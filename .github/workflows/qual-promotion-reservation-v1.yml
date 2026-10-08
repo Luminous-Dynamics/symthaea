@@ -75,6 +75,14 @@ jobs:
               "PromotionStackEffectEvidenceV1",
               "PromotionStackEffectEvidenceSetV1",
               "PromotionPrEffectStateV1",
+              "PromotionTemporalAttemptIdentityV1",
+              "ClockRelationV1",
+              "ProviderTimestampPolicyV1",
+              "ProviderWebhookStackMetadataV1",
+              "ProviderWebhookEffectTimingV1",
+              "ProviderDeliveryIdentityV1",
+              "PromotionStackEffectTimingV1",
+              "PromotionStackEffectTimingSetV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
           }
@@ -99,6 +107,36 @@ jobs:
               "provider-result-unavailable",
               "invalid-retention-state",
           }
+
+          temporal_states = {
+              "temporally-admissible",
+              "cross-domain-time-unbounded",
+              "cross-domain-time-uncertain",
+              "provider-event-before-dispatch",
+              "provider-event-after-observation",
+              "provider-event-time-missing",
+              "provider-event-time-upper-missing",
+              "invalid-provider-event-interval",
+              "provider-timestamp-policy-unusable",
+              "provider-timestamp-policy-integrity-invalid",
+              "local-reservation-time-missing",
+              "local-dispatch-time-missing",
+              "local-observation-time-missing",
+              "local-reservation-monotonic-time-missing",
+              "local-dispatch-monotonic-time-missing",
+              "local-observation-monotonic-time-missing",
+              "local-monotonic-clock-identity-missing",
+              "promotion-temporal-attempt-identity-missing",
+              "promotion-temporal-attempt-binding-invalid",
+              "clock-relation-does-not-cover-event",
+              "invalid-local-time-order",
+              "invalid-local-monotonic-order",
+              "invalid-provider-time-order",
+              "clock-relation-invalid-at-observation",
+              "invalid-negative-time",
+          }
+          for state in temporal_states:
+              assert f'"{state}"' in source, f"Missing temporal state: {state}"
           for state in retention_states:
               assert f'"{state}"' in source, f"Missing retention state: {state}"
 
@@ -126,9 +164,40 @@ jobs:
               "merge_commit_sha",
               "head",
               "action",
+              "merged_at",
+              "stack",
+          }
+          webhook_temporal_identity_fields = {
+              "local_monotonic_clock_id",
+              "temporal_attempt_identity",
+              "temporal_attempt_identity_digest",
+              "operation_identity_digest",
+              "reservation_id",
+              "promotion_operation_id",
+              "reservation_head",
+              "dispatch_attempt_id",
+              "dispatch_attempt_sequence",
+              "operation_identity_digest",
+              "fencing_token",
+              "local_received_monotonic_ns",
+              "local_reservation_monotonic_ns",
+              "local_dispatch_monotonic_ns",
+              "local_observation_monotonic_ns",
+              "local_minus_provider_lower_bound_ms",
+              "local_minus_provider_upper_bound_ms",
+              "provider_clock_id",
+              "provider_timestamp_policy",
+              "provider_timestamp_policy_digest",
+              "clock_relation_identity_digest",
+              "source_effect_evidence_identity_digest",
+              "timing_identity_digest",
+              "verification_evidence_digest",
+              "verification_method",
           }
           for field in semantic_webhook_fields:
               assert field in source, f"Missing webhook semantic field: {field}"
+          for field in webhook_temporal_identity_fields:
+              assert field in source, f"Missing webhook temporal identity field: {field}"
 
           stack_effect_derivation_markers = {
               "from_webhook_observations",
@@ -143,6 +212,21 @@ jobs:
               "compatible-repeat",
               "duplicate-delivery",
               "no-eligible-effect",
+              "parse_provider_timestamp_ms",
+              "ClockRelationV1",
+              "PromotionTemporalAttemptIdentityV1",
+              "from_prepared_reservation",
+              "dispatch_attempt_sequence",
+              "validates_operation",
+              "matches_timing",
+              "temporal_attempt_identity_digest",
+              "effective_offset_bounds_ms",
+              "local_minus_provider_lower_bound_ms",
+              "local_minus_provider_upper_bound_ms",
+              "ProviderWebhookStackMetadataV1",
+              "ProviderWebhookEffectTimingV1",
+              "PromotionStackEffectTimingSetV1",
+              "ProviderWebhookStackMetadataV1",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"
@@ -178,6 +262,21 @@ jobs:
                   continue
               assert len(node.args) == expected and not node.keywords, (
                   f"{node.func.attr} call-shape drift: args={len(node.args)} "
+                  f"keywords={len(node.keywords)}"
+              )
+
+          expected_constructor_args = {
+              "PromotionStackEffectTimingV1": 4,
+              "PromotionStackEffectTimingSetV1": 5,
+          }
+          for node in ast.walk(tree):
+              if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                  continue
+              expected = expected_constructor_args.get(node.func.id)
+              if expected is None:
+                  continue
+              assert len(node.args) == expected and not node.keywords, (
+                  f"{node.func.id} constructor arity drift: args={len(node.args)} "
                   f"keywords={len(node.keywords)}"
               )
 

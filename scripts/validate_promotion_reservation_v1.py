@@ -5,6 +5,8 @@ claim_ceiling=deterministic local transaction/reconciliation model only
 promotion_authority=false
 """
 
+from datetime import datetime
+
 import hashlib
 import hmac
 import json
@@ -361,6 +363,9 @@ class ProviderWebhookRequestContextV1:
     hook_id: str
     event_type: str
     repository: str
+    received_at_ms: int | None = None
+    received_monotonic_ns: int | None = None
+    monotonic_clock_id: str | None = None
 
     def matches_receipt(self, receipt: ProviderWebhookReceiptV1) -> bool:
         return (
@@ -368,6 +373,47 @@ class ProviderWebhookRequestContextV1:
             and self.hook_id == receipt.hook_id
             and self.event_type == receipt.event_type
             and self.repository == receipt.repository
+        )
+
+
+@dataclass(frozen=True)
+class ProviderWebhookStackMetadataV1:
+    stack_number: int
+    stack_size: int
+    stack_position: int
+    base_ref: str
+    base_sha: str
+
+    def internally_consistent(self) -> bool:
+        return (
+            self.stack_number > 0
+            and self.stack_size > 0
+            and 1 <= self.stack_position <= self.stack_size
+            and bool(self.base_ref)
+            and bool(self.base_sha)
+        )
+
+    def matches_operation(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        if not self.internally_consistent():
+            return False
+        expected_position = next(
+            (
+                index + 1
+                for index, entry in enumerate(identity.ordered_stack)
+                if entry.pr_number == identity.requested_pr_number
+            ),
+            None,
+        )
+        return (
+            expected_position is not None
+            and self.stack_number == identity.provider_stack_number
+            and self.stack_size >= len(identity.ordered_stack)
+            and self.stack_position == expected_position
+            and self.base_ref == identity.base_ref
+            and self.base_sha == identity.base_tip_sha
         )
 
 
@@ -382,6 +428,11 @@ class ProviderPullRequestMergeObservationV1:
     head_sha: str
     merge_commit_sha: str
     payload_bytes_digest: str
+    merged_at: str = ""
+    provider_stack: ProviderWebhookStackMetadataV1 | None = None
+    local_received_at_ms: int | None = None
+    local_received_monotonic_ns: int | None = None
+    local_monotonic_clock_id: str | None = None
     hook_id: str = ""
     source_authentication: str = ""
 
@@ -412,6 +463,19 @@ class ProviderPullRequestMergeObservationV1:
             repository = document["repository"]
             head = pull_request["head"]
             merge_commit_sha = pull_request["merge_commit_sha"]
+            merged_at = pull_request.get("merged_at") or ""
+            stack = pull_request.get("stack")
+            provider_stack = (
+                ProviderWebhookStackMetadataV1(
+                    stack_number=int(stack["number"]),
+                    stack_size=int(stack["size"]),
+                    stack_position=int(stack["position"]),
+                    base_ref=str(stack["base"]["ref"]),
+                    base_sha=str(stack["base"]["sha"]),
+                )
+                if stack is not None
+                else None
+            )
             pr_number = int(document["number"])
             nested_pr_number = int(pull_request["number"])
             event_type = receipt.event_type
@@ -444,6 +508,11 @@ class ProviderPullRequestMergeObservationV1:
             head_sha=head_sha,
             merge_commit_sha=str(merge_commit_sha),
             payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
+            merged_at=str(merged_at),
+            provider_stack=provider_stack,
+            local_received_at_ms=received_context.received_at_ms,
+            local_received_monotonic_ns=received_context.received_monotonic_ns,
+            local_monotonic_clock_id=received_context.monotonic_clock_id,
             hook_id=receipt.hook_id,
             source_authentication="webhook-hmac-verified",
         )
@@ -492,6 +561,15 @@ class ProviderPullRequestMergeObservationV1:
             source_event_type=self.event_type,
             source_repository=self.repository,
             source_authentication=self.source_authentication,
+        )
+
+    def validates_provider_stack_metadata(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        return (
+            self.provider_stack is not None
+            and self.provider_stack.matches_operation(identity)
         )
 
     def validates_requested_effect(self, identity: PromotionOperationIdentityV1) -> bool:
@@ -671,6 +749,554 @@ class PromotionPrEffectStateV1:
             and self.validates_source_delivery_bindings()
         )
 
+def parse_provider_timestamp_ms(value: str) -> int | None:
+    interval = parse_provider_timestamp_interval_ms(
+        value,
+        occurrence_semantics="truncated",
+    )
+    return interval[0] if interval is not None else None
+
+
+def _timestamp_reported_resolution_ms(value: str) -> int | None:
+    if not value:
+        return None
+    raw = value
+    if raw.endswith("Z"):
+        raw = raw[:-1]
+    try:
+        date_part, time_part = raw.split("T", 1)
+        if "+" in time_part[1:] or time_part.count("-") > 0:
+            for separator in ("+", "-"):
+                idx = time_part.find(separator, 1)
+                if idx >= 0:
+                    time_part = time_part[:idx]
+                    break
+        fraction = time_part.split(".", 1)[1] if "." in time_part else ""
+    except ValueError:
+        return None
+    if not fraction:
+        return 1000
+    if not fraction.isdigit() or len(fraction) > 3:
+        return None
+    return 10 ** (3 - len(fraction))
+
+
+def parse_provider_timestamp_interval_ms(
+    value: str,
+    *,
+    occurrence_semantics: str,
+) -> tuple[int, int] | None:
+    if occurrence_semantics not in {"truncated", "exact"}:
+        return None
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return None
+    resolution_ms = _timestamp_reported_resolution_ms(value)
+    if resolution_ms is None:
+        return None
+    lower = int(parsed.timestamp() * 1000)
+    if occurrence_semantics == "exact":
+        if resolution_ms != 1:
+            return None
+        return lower, lower
+    return lower, lower + resolution_ms - 1
+
+
+@dataclass(frozen=True)
+class ProviderTimestampPolicyV1:
+    provider_identity: str
+    source_field: str
+    occurrence_semantics: str
+    max_reported_resolution_ms: int
+    policy_generation: int
+
+    def usable(self) -> bool:
+        return (
+            bool(self.provider_identity)
+            and self.source_field == "pull_request.merged_at"
+            and self.occurrence_semantics in {"truncated", "exact"}
+            and self.max_reported_resolution_ms > 0
+            and self.policy_generation > 0
+        )
+
+    def identity_digest(self) -> str:
+        payload = {
+            "max_reported_resolution_ms": self.max_reported_resolution_ms,
+            "occurrence_semantics": self.occurrence_semantics,
+            "policy_generation": self.policy_generation,
+            "provider_identity": self.provider_identity,
+            "source_field": self.source_field,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+
+@dataclass(frozen=True)
+class ClockRelationV1:
+    provider_clock_id: str
+    local_clock_id: str
+    local_minus_provider_lower_bound_ms: int
+    local_minus_provider_upper_bound_ms: int
+    verified: bool = False
+    measured_at_local_time_ms: int | None = None
+    valid_until_local_time_ms: int | None = None
+    max_drift_ppm: int = 0
+    verification_method: str = ""
+    verification_evidence_digest: str = ""
+
+    def usable(self) -> bool:
+        return (
+            bool(self.provider_clock_id)
+            and bool(self.local_clock_id)
+            and self.provider_clock_id != self.local_clock_id
+            and self.local_minus_provider_lower_bound_ms
+            <= self.local_minus_provider_upper_bound_ms
+            and self.max_drift_ppm >= 0
+            and self.verified
+            and self.measured_at_local_time_ms is not None
+            and self.valid_until_local_time_ms is not None
+            and self.measured_at_local_time_ms >= 0
+            and self.valid_until_local_time_ms >= self.measured_at_local_time_ms
+            and bool(self.verification_method)
+            and bool(self.verification_evidence_digest)
+        )
+
+    def identity_digest(self) -> str:
+        payload = {
+            "local_clock_id": self.local_clock_id,
+            "local_minus_provider_lower_bound_ms": self.local_minus_provider_lower_bound_ms,
+            "local_minus_provider_upper_bound_ms": self.local_minus_provider_upper_bound_ms,
+            "max_drift_ppm": self.max_drift_ppm,
+            "measured_at_local_time_ms": self.measured_at_local_time_ms,
+            "provider_clock_id": self.provider_clock_id,
+            "valid_until_local_time_ms": self.valid_until_local_time_ms,
+            "verification_evidence_digest": self.verification_evidence_digest,
+            "verification_method": self.verification_method,
+            "verified": self.verified,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def effective_offset_bounds_ms(
+        self,
+        at_local_time_ms: int,
+    ) -> tuple[int, int] | None:
+        if not self.usable():
+            return None
+        if at_local_time_ms < self.measured_at_local_time_ms:
+            return None
+        if at_local_time_ms > self.valid_until_local_time_ms:
+            return None
+        elapsed_ms = at_local_time_ms - self.measured_at_local_time_ms
+        drift_ms = (
+            self.max_drift_ppm * elapsed_ms + 999_999
+        ) // 1_000_000
+        return (
+            self.local_minus_provider_lower_bound_ms - drift_ms,
+            self.local_minus_provider_upper_bound_ms + drift_ms,
+        )
+
+
+@dataclass(frozen=True)
+class PromotionTemporalAttemptIdentityV1:
+    operation_identity_digest: str
+    reservation_id: str
+    promotion_operation_id: str
+    reservation_head: str
+    dispatch_attempt_id: str
+    dispatch_attempt_sequence: int
+    fencing_token: int
+    trust_root_generation: int
+    governance_generation: int
+    local_monotonic_clock_id: str
+    reservation_time_ms: int | None
+    dispatch_time_ms: int | None
+    reservation_monotonic_ns: int | None
+    dispatch_monotonic_ns: int | None
+
+    def structurally_valid(self) -> bool:
+        return (
+            bool(self.operation_identity_digest)
+            and bool(self.reservation_id)
+            and bool(self.promotion_operation_id)
+            and bool(self.reservation_head)
+            and bool(self.dispatch_attempt_id)
+            and self.dispatch_attempt_sequence > 0
+            and self.fencing_token > 0
+            and self.trust_root_generation >= 0
+            and self.governance_generation >= 0
+            and bool(self.local_monotonic_clock_id)
+        )
+
+    def identity_digest(self) -> str:
+        payload = {
+            "dispatch_attempt_id": self.dispatch_attempt_id,
+            "dispatch_attempt_sequence": self.dispatch_attempt_sequence,
+            "dispatch_monotonic_ns": self.dispatch_monotonic_ns,
+            "dispatch_time_ms": self.dispatch_time_ms,
+            "fencing_token": self.fencing_token,
+            "governance_generation": self.governance_generation,
+            "local_monotonic_clock_id": self.local_monotonic_clock_id,
+            "operation_identity_digest": self.operation_identity_digest,
+            "promotion_operation_id": self.promotion_operation_id,
+            "reservation_head": self.reservation_head,
+            "reservation_id": self.reservation_id,
+            "reservation_monotonic_ns": self.reservation_monotonic_ns,
+            "reservation_time_ms": self.reservation_time_ms,
+            "trust_root_generation": self.trust_root_generation,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    @classmethod
+    def from_prepared_reservation(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        reservation: "Reservation",
+        *,
+        local_monotonic_clock_id: str,
+        reservation_time_ms: int,
+        dispatch_time_ms: int,
+        reservation_monotonic_ns: int,
+        dispatch_monotonic_ns: int,
+    ) -> "PromotionTemporalAttemptIdentityV1 | None":
+        sequence = reservation.dispatch_attempt_sequence
+        if not (
+            reservation.dispatch_intent
+            and reservation.state == "PromotionDispatchPrepared"
+            and sequence is not None
+            and sequence > 0
+            and reservation.operation_identity_digest == identity.digest()
+            and reservation.trust_root_generation == identity.trust_root_generation
+            and reservation.expected_pr_head_sha == identity.requested_pr_head_sha
+            and reservation.fencing_token > 0
+            and bool(local_monotonic_clock_id)
+            and reservation_time_ms >= 0
+            and dispatch_time_ms >= reservation_time_ms
+            and reservation_monotonic_ns >= 0
+            and dispatch_monotonic_ns >= reservation_monotonic_ns
+        ):
+            return None
+        candidate = cls(
+            operation_identity_digest=identity.digest(),
+            reservation_id=reservation.reservation_id,
+            promotion_operation_id=reservation.operation_id,
+            reservation_head=reservation.reservation_head,
+            dispatch_attempt_id=f"{reservation.operation_id}:dispatch:{sequence}",
+            dispatch_attempt_sequence=sequence,
+            fencing_token=reservation.fencing_token,
+            trust_root_generation=reservation.trust_root_generation,
+            governance_generation=identity.governance_generation,
+            local_monotonic_clock_id=local_monotonic_clock_id,
+            reservation_time_ms=reservation_time_ms,
+            dispatch_time_ms=dispatch_time_ms,
+            reservation_monotonic_ns=reservation_monotonic_ns,
+            dispatch_monotonic_ns=dispatch_monotonic_ns,
+        )
+        return candidate if candidate.structurally_valid() else None
+
+    def validates_operation(self, identity: PromotionOperationIdentityV1) -> bool:
+        return (
+            self.structurally_valid()
+            and self.operation_identity_digest == identity.digest()
+            and self.trust_root_generation == identity.trust_root_generation
+            and self.governance_generation == identity.governance_generation
+        )
+
+    def matches_timing(self, timing: "ProviderWebhookEffectTimingV1") -> bool:
+        return (
+            self.structurally_valid()
+            and self.local_monotonic_clock_id == timing.local_monotonic_clock_id
+            and self.reservation_time_ms == timing.local_reservation_time_ms
+            and self.dispatch_time_ms == timing.local_dispatch_time_ms
+            and self.reservation_monotonic_ns == timing.local_reservation_monotonic_ns
+            and self.dispatch_monotonic_ns == timing.local_dispatch_monotonic_ns
+        )
+
+
+@dataclass(frozen=True)
+class ProviderWebhookEffectTimingV1:
+    provider_event_time_ms: int | None
+    provider_event_time_upper_ms: int | None
+    provider_timestamp_policy: ProviderTimestampPolicyV1 | None
+    provider_timestamp_policy_digest: str | None
+    provider_delivery_time_ms: int | None
+    local_reservation_time_ms: int | None
+    local_dispatch_time_ms: int | None
+    local_observation_time_ms: int | None
+    local_reservation_monotonic_ns: int | None
+    local_dispatch_monotonic_ns: int | None
+    local_observation_monotonic_ns: int | None
+    local_monotonic_clock_id: str | None
+    temporal_attempt_identity: PromotionTemporalAttemptIdentityV1 | None
+    clock_relation: ClockRelationV1 | None
+
+    @classmethod
+    def from_observation(
+        cls,
+        observation: ProviderPullRequestMergeObservationV1,
+        local_reservation_time_ms: int | None,
+        local_dispatch_time_ms: int | None,
+        clock_relation: ClockRelationV1 | None,
+        provider_delivery_time_ms: int | None = None,
+        timestamp_policy: ProviderTimestampPolicyV1 | None = None,
+        local_reservation_monotonic_ns: int | None = None,
+        local_dispatch_monotonic_ns: int | None = None,
+        local_monotonic_clock_id: str | None = None,
+        temporal_attempt_identity: PromotionTemporalAttemptIdentityV1 | None = None,
+    ) -> "ProviderWebhookEffectTimingV1":
+        interval = (
+            parse_provider_timestamp_interval_ms(
+                observation.merged_at,
+                occurrence_semantics=timestamp_policy.occurrence_semantics,
+            )
+            if timestamp_policy is not None and timestamp_policy.usable()
+            else None
+        )
+        if (
+            interval is not None
+            and timestamp_policy is not None
+            and interval[1] - interval[0] + 1
+            > timestamp_policy.max_reported_resolution_ms
+        ):
+            interval = None
+        return cls(
+            provider_event_time_ms=interval[0] if interval is not None else None,
+            provider_event_time_upper_ms=interval[1] if interval is not None else None,
+            provider_timestamp_policy=timestamp_policy,
+            provider_timestamp_policy_digest=(
+                timestamp_policy.identity_digest()
+                if timestamp_policy is not None
+                else None
+            ),
+            provider_delivery_time_ms=provider_delivery_time_ms,
+            local_reservation_time_ms=local_reservation_time_ms,
+            local_dispatch_time_ms=local_dispatch_time_ms,
+            local_observation_time_ms=observation.local_received_at_ms,
+            local_reservation_monotonic_ns=local_reservation_monotonic_ns,
+            local_dispatch_monotonic_ns=local_dispatch_monotonic_ns,
+            local_observation_monotonic_ns=observation.local_received_monotonic_ns,
+            local_monotonic_clock_id=(
+                local_monotonic_clock_id
+                if local_monotonic_clock_id is not None
+                else observation.local_monotonic_clock_id
+            ),
+            temporal_attempt_identity=temporal_attempt_identity,
+            clock_relation=clock_relation,
+        )
+
+    def classify(self) -> str:
+        values = (
+            self.provider_event_time_ms,
+            self.provider_event_time_upper_ms,
+            self.provider_delivery_time_ms,
+            self.local_reservation_time_ms,
+            self.local_dispatch_time_ms,
+            self.local_observation_time_ms,
+            self.local_reservation_monotonic_ns,
+            self.local_dispatch_monotonic_ns,
+            self.local_observation_monotonic_ns,
+        )
+        if any(value is not None and value < 0 for value in values):
+            return "invalid-negative-time"
+        if self.provider_event_time_ms is None:
+            return "provider-event-time-missing"
+        if self.provider_event_time_upper_ms is None:
+            return "provider-event-time-upper-missing"
+        if self.provider_event_time_upper_ms < self.provider_event_time_ms:
+            return "invalid-provider-event-interval"
+        if (
+            self.provider_timestamp_policy is None
+            or not self.provider_timestamp_policy.usable()
+        ):
+            return "provider-timestamp-policy-unusable"
+        if (
+            self.provider_timestamp_policy_digest
+            != self.provider_timestamp_policy.identity_digest()
+        ):
+            return "provider-timestamp-policy-integrity-invalid"
+        if self.local_reservation_time_ms is None:
+            return "local-reservation-time-missing"
+        if self.local_dispatch_time_ms is None:
+            return "local-dispatch-time-missing"
+        if self.local_observation_time_ms is None:
+            return "local-observation-time-missing"
+        if not self.local_monotonic_clock_id:
+            return "local-monotonic-clock-identity-missing"
+        if self.temporal_attempt_identity is None:
+            return "promotion-temporal-attempt-identity-missing"
+        if not self.temporal_attempt_identity.matches_timing(self):
+            return "promotion-temporal-attempt-binding-invalid"
+        if self.local_reservation_monotonic_ns is None:
+            return "local-reservation-monotonic-time-missing"
+        if self.local_dispatch_monotonic_ns is None:
+            return "local-dispatch-monotonic-time-missing"
+        if self.local_observation_monotonic_ns is None:
+            return "local-observation-monotonic-time-missing"
+        if self.local_dispatch_time_ms < self.local_reservation_time_ms:
+            return "invalid-local-time-order"
+        if self.local_observation_time_ms < self.local_dispatch_time_ms:
+            return "invalid-local-time-order"
+        if self.local_dispatch_monotonic_ns < self.local_reservation_monotonic_ns:
+            return "invalid-local-monotonic-order"
+        if self.local_observation_monotonic_ns < self.local_dispatch_monotonic_ns:
+            return "invalid-local-monotonic-order"
+        if self.provider_delivery_time_ms is not None:
+            if self.provider_delivery_time_ms < self.provider_event_time_ms:
+                return "invalid-provider-time-order"
+        if self.clock_relation is None or not self.clock_relation.usable():
+            return "cross-domain-time-unbounded"
+
+        offset_bounds = self.clock_relation.effective_offset_bounds_ms(
+            self.local_observation_time_ms
+        )
+        if offset_bounds is None:
+            return "clock-relation-invalid-at-observation"
+
+        offset_lower, offset_upper = offset_bounds
+        event_lower = self.provider_event_time_ms
+        event_upper = self.provider_event_time_upper_ms
+        dispatch = self.local_dispatch_time_ms
+        observed = self.local_observation_time_ms
+        local_event_lower = event_lower + offset_lower
+        local_event_upper = event_upper + offset_upper
+        if (
+            local_event_lower < self.clock_relation.measured_at_local_time_ms
+            or local_event_upper > self.clock_relation.valid_until_local_time_ms
+        ):
+            return "clock-relation-does-not-cover-event"
+
+        if local_event_upper < dispatch:
+            return "provider-event-before-dispatch"
+        if local_event_lower > observed:
+            return "provider-event-after-observation"
+        if local_event_lower < dispatch or local_event_upper > observed:
+            return "cross-domain-time-uncertain"
+        return "temporally-admissible"
+
+    def identity_digest(self) -> str:
+        relation_digest = (
+            self.clock_relation.identity_digest()
+            if self.clock_relation is not None
+            else None
+        )
+        payload = {
+            "clock_relation_identity_digest": relation_digest,
+            "local_dispatch_monotonic_ns": self.local_dispatch_monotonic_ns,
+            "local_dispatch_time_ms": self.local_dispatch_time_ms,
+            "local_observation_monotonic_ns": self.local_observation_monotonic_ns,
+            "local_observation_time_ms": self.local_observation_time_ms,
+            "local_monotonic_clock_id": self.local_monotonic_clock_id,
+            "promotion_temporal_attempt_identity_digest": (
+                self.temporal_attempt_identity.identity_digest()
+                if self.temporal_attempt_identity is not None
+                else None
+            ),
+            "local_reservation_monotonic_ns": self.local_reservation_monotonic_ns,
+            "local_reservation_time_ms": self.local_reservation_time_ms,
+            "provider_delivery_time_ms": self.provider_delivery_time_ms,
+            "provider_event_time_ms": self.provider_event_time_ms,
+            "provider_event_time_upper_ms": self.provider_event_time_upper_ms,
+            "provider_timestamp_policy_digest": self.provider_timestamp_policy_digest,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def temporally_admissible(self) -> bool:
+        return self.classify() == "temporally-admissible"
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectTimingV1:
+    pr_number: int
+    source_effect_evidence_identity_digest: str
+    timing_identity_digest: str
+    timing: ProviderWebhookEffectTimingV1
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectTimingSetV1:
+    operation_identity_digest: str
+    timestamp_policy_identity_digest: str
+    clock_relation_identity_digest: str
+    temporal_attempt_identity_digest: str
+    timings: tuple[PromotionStackEffectTimingV1, ...]
+
+    def validates_complete(
+        self,
+        identity: PromotionOperationIdentityV1,
+        effect_evidence: "PromotionStackEffectEvidenceSetV1 | None",
+    ) -> bool:
+        if self.operation_identity_digest != identity.digest():
+            return False
+        if not self.timestamp_policy_identity_digest:
+            return False
+        if not self.clock_relation_identity_digest:
+            return False
+        if not self.temporal_attempt_identity_digest:
+            return False
+        if effect_evidence is None or not effect_evidence.validates_complete(identity):
+            return False
+        expected = identity.ordered_stack
+        if len(self.timings) != len(expected):
+            return False
+        if len(effect_evidence.effects) != len(expected):
+            return False
+        observed_prs = [item.pr_number for item in self.timings]
+        if len(observed_prs) != len(set(observed_prs)):
+            return False
+        return all(
+            item.pr_number == entry.pr_number
+            and item.source_effect_evidence_identity_digest == evidence.identity_digest()
+            and item.timing_identity_digest == item.timing.identity_digest()
+            and item.timing.provider_timestamp_policy_digest
+            == self.timestamp_policy_identity_digest
+            and item.timing.clock_relation is not None
+            and item.timing.clock_relation.identity_digest()
+            == self.clock_relation_identity_digest
+            and item.timing.temporal_attempt_identity is not None
+            and item.timing.temporal_attempt_identity.identity_digest()
+            == self.temporal_attempt_identity_digest
+            and item.timing.temporal_attempt_identity.validates_operation(identity)
+            and item.timing.temporal_attempt_identity.matches_timing(item.timing)
+            and item.timing.temporally_admissible()
+            for entry, item, evidence in zip(
+                expected,
+                self.timings,
+                effect_evidence.effects,
+            )
+        )
+
+
 @dataclass(frozen=True)
 class PromotionStackEffectEvidenceV1:
     effect: PromotionStackEffectV1
@@ -680,6 +1306,29 @@ class PromotionStackEffectEvidenceV1:
     source_event_type: str
     source_repository: str
     source_authentication: str
+
+    def identity_digest(self) -> str:
+        payload = {
+            "effect": {
+                "observed_merge_commit": self.effect.observed_merge_commit,
+                "pr_number": self.effect.pr_number,
+                "expected_head_sha": self.effect.expected_head_sha,
+            },
+            "source_authentication": self.source_authentication,
+            "source_delivery_id": self.source_delivery_id,
+            "source_event_type": self.source_event_type,
+            "source_hook_id": self.source_hook_id,
+            "source_payload_digest": self.source_payload_digest,
+            "source_repository": self.source_repository,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
 
     def validates(self, identity: PromotionOperationIdentityV1) -> bool:
         expected_prs = {entry.pr_number for entry in identity.ordered_stack}
@@ -1118,12 +1767,18 @@ def test_webhook_hmac_verification_rejects_wrong_secret():
 
 def webhook_received_context(
     receipt: ProviderWebhookReceiptV1,
+    received_at_ms: int | None = None,
+    received_monotonic_ns: int | None = None,
+    monotonic_clock_id: str | None = "runtime-monotonic-1",
 ) -> ProviderWebhookRequestContextV1:
     return ProviderWebhookRequestContextV1(
         delivery_id=receipt.delivery_id,
         hook_id=receipt.hook_id,
         event_type=receipt.event_type,
         repository=receipt.repository,
+        received_at_ms=received_at_ms,
+        received_monotonic_ns=received_monotonic_ns,
+        monotonic_clock_id=monotonic_clock_id,
     )
 
 
@@ -1137,10 +1792,11 @@ def webhook_merge_payload(
     merge_commit: str | None = None,
     extra_field: str | None = None,
 ) -> bytes:
-    document = {
-        "action": action,
-        "number": pr_number,
-        "pull_request": {
+    return json.dumps(
+        {
+            "action": action,
+            "number": pr_number,
+            "pull_request": {
                 "number": pr_number,
                 "merged": merged,
                 "head": {"sha": head_sha},
@@ -1149,13 +1805,28 @@ def webhook_merge_payload(
                     if merge_commit is not None
                     else ("M2" if merged else None)
                 ),
+                "merged_at": (
+                    "2026-10-08T16:00:00Z"
+                    if merged
+                    else None
+                ),
+                "stack": {
+                    "number": 41,
+                    "size": 3,
+                    "position": 2,
+                    "base": {
+                        "ref": "main",
+                        "sha": "T1",
+                    },
+                },
             },
-        "repository": {"full_name": repository},
-    }
-    if extra_field is not None:
-        document["qualification_extra"] = extra_field
-    return json.dumps(
-        document,
+            "repository": {"full_name": repository},
+            **(
+                {"qualification_extra": extra_field}
+                if extra_field is not None
+                else {}
+            ),
+        },
         separators=(",", ":"),
     ).encode("utf-8")
 
@@ -1186,6 +1857,9 @@ def stack_webhook_observation(
     delivery_id: str = "delivery-merge",
     repository: str = "Luminous-Dynamics/symthaea",
     payload_extra: str | None = None,
+    received_at_ms: int = 1791475205000,
+    received_monotonic_ns: int = 9000000000000,
+    monotonic_clock_id: str | None = "runtime-monotonic-1",
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
     payload = webhook_merge_payload(
@@ -1206,13 +1880,141 @@ def stack_webhook_observation(
         receipt,
         payload,
         b"secret",
-        webhook_received_context(receipt),
+        webhook_received_context(
+            receipt,
+            received_at_ms,
+            received_monotonic_ns,
+            monotonic_clock_id,
+        ),
         "hook-1",
         "pull_request",
         "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     return observation
+
+
+def timestamp_policy_fixture(
+    *,
+    provider_identity: str = "github",
+    source_field: str = "pull_request.merged_at",
+    occurrence_semantics: str = "truncated",
+    max_reported_resolution_ms: int = 1000,
+    policy_generation: int = 1,
+) -> ProviderTimestampPolicyV1:
+    return ProviderTimestampPolicyV1(
+        provider_identity=provider_identity,
+        source_field=source_field,
+        occurrence_semantics=occurrence_semantics,
+        max_reported_resolution_ms=max_reported_resolution_ms,
+        policy_generation=policy_generation,
+    )
+
+
+def clock_relation_fixture(
+    *,
+    offset_lower_ms: int = -1000,
+    offset_upper_ms: int = 1000,
+    verified: bool = True,
+    measured_at_local_time_ms: int | None = 1791475190000,
+    valid_until_local_time_ms: int | None = 1791478800000,
+    max_drift_ppm: int = 0,
+    verification_method: str = "authenticated-time-sample",
+    verification_evidence_digest: str = "clock-evidence-1",
+) -> ClockRelationV1:
+    return ClockRelationV1(
+        provider_clock_id="github",
+        local_clock_id="local",
+        local_minus_provider_lower_bound_ms=offset_lower_ms,
+        local_minus_provider_upper_bound_ms=offset_upper_ms,
+        verified=verified,
+        measured_at_local_time_ms=measured_at_local_time_ms,
+        valid_until_local_time_ms=valid_until_local_time_ms,
+        max_drift_ppm=max_drift_ppm,
+        verification_method=verification_method,
+        verification_evidence_digest=verification_evidence_digest,
+    )
+
+
+def effect_timing_fixture(
+    *,
+    event_time_ms: int | None = 1791475200000,
+    event_upper_time_ms: int | None = 1791475200999,
+    timestamp_policy: ProviderTimestampPolicyV1 | None = None,
+    delivery_time_ms: int | None = None,
+    reservation_time_ms: int | None = 1791475190000,
+    dispatch_time_ms: int | None = 1791475195000,
+    observation_time_ms: int | None = 1791475205000,
+    reservation_monotonic_ns: int | None = 8999999000000,
+    dispatch_monotonic_ns: int | None = 8999999500000,
+    observation_monotonic_ns: int | None = 9000000000000,
+    monotonic_clock_id: str | None = "runtime-monotonic-1",
+    clock_relation: ClockRelationV1 | None = None,
+    operation_identity: PromotionOperationIdentityV1 | None = None,
+    temporal_attempt_identity: PromotionTemporalAttemptIdentityV1 | None = None,
+    reservation_id: str = "RES-TEMPORAL-1",
+    promotion_operation_id: str = "OP-TEMPORAL-1",
+    reservation_head: str = "PROMOTION-RESERVATION-HEAD-1",
+    dispatch_attempt_id: str = "DISPATCH-ATTEMPT-1",
+    dispatch_attempt_sequence: int = 1,
+    fencing_token: int = 1,
+) -> ProviderWebhookEffectTimingV1:
+    identity = operation_identity or stack_identity_fixture()
+    policy = timestamp_policy if timestamp_policy is not None else timestamp_policy_fixture()
+    relation = clock_relation if clock_relation is not None else clock_relation_fixture()
+    attempt = temporal_attempt_identity or PromotionTemporalAttemptIdentityV1(
+        operation_identity_digest=identity.digest(),
+        reservation_id=reservation_id,
+        promotion_operation_id=promotion_operation_id,
+        reservation_head=reservation_head,
+        dispatch_attempt_id=dispatch_attempt_id,
+        dispatch_attempt_sequence=dispatch_attempt_sequence,
+        fencing_token=fencing_token,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+        local_monotonic_clock_id=monotonic_clock_id or "",
+        reservation_time_ms=reservation_time_ms,
+        dispatch_time_ms=dispatch_time_ms,
+        reservation_monotonic_ns=reservation_monotonic_ns,
+        dispatch_monotonic_ns=dispatch_monotonic_ns,
+    )
+    return ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=event_time_ms,
+        provider_event_time_upper_ms=event_upper_time_ms,
+        provider_timestamp_policy=policy,
+        provider_timestamp_policy_digest=policy.identity_digest(),
+        provider_delivery_time_ms=delivery_time_ms,
+        local_reservation_time_ms=reservation_time_ms,
+        local_dispatch_time_ms=dispatch_time_ms,
+        local_observation_time_ms=observation_time_ms,
+        local_reservation_monotonic_ns=reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=dispatch_monotonic_ns,
+        local_observation_monotonic_ns=observation_monotonic_ns,
+        local_monotonic_clock_id=monotonic_clock_id,
+        temporal_attempt_identity=attempt,
+        clock_relation=relation,
+    )
+
+
+def webhook_effect_timing_from_observation(
+    identity: PromotionOperationIdentityV1 | None = None,
+) -> ProviderWebhookEffectTimingV1:
+    identity = identity or stack_identity_fixture()
+    observation = stack_webhook_observation(
+        identity,
+        received_at_ms=1791475205000,
+    )
+    return ProviderWebhookEffectTimingV1.from_observation(
+        observation,
+        local_reservation_time_ms=1791475190000,
+        local_dispatch_time_ms=1791475195000,
+        local_reservation_monotonic_ns=8999999000000,
+        local_dispatch_monotonic_ns=8999999500000,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        temporal_attempt_identity=temporal_attempt_fixture(identity),
+        clock_relation=clock_relation_fixture(),
+        timestamp_policy=timestamp_policy_fixture(),
+    )
 
 
 def effect_state_fixture(
@@ -1225,6 +2027,952 @@ def effect_state_fixture(
         expected_entry=entry,
         operation_identity_digest=identity.digest(),
     )
+
+
+def test_webhook_stack_metadata_matches_exact_operation():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    assert observation.provider_stack is not None
+    assert observation.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_stack_number_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=99,
+                stack_size=3,
+                stack_position=2,
+                base_ref="main",
+                base_sha="T1",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_base_sha_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=41,
+                stack_size=3,
+                stack_position=2,
+                base_ref="main",
+                base_sha="T-DRIFT",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_position_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=41,
+                stack_size=3,
+                stack_position=1,
+                base_ref="main",
+                base_sha="T1",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_base_ref_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=41,
+                stack_size=3,
+                stack_position=2,
+                base_ref="release",
+                base_sha="T1",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_missing_is_not_topology_proof():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": None,
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_malformed_payload_is_rejected():
+    identity = stack_identity_fixture()
+    payload = json.dumps(
+        {
+            "action": "closed",
+            "number": 7087,
+            "pull_request": {
+                "number": 7087,
+                "merged": True,
+                "head": {"sha": "H3"},
+                "merge_commit_sha": "M2",
+                "merged_at": "2026-10-08T16:00:00Z",
+                "stack": {
+                    "number": 41,
+                    "size": 3,
+                    "position": 2,
+                    "base": {"ref": "main"},
+                },
+            },
+            "repository": {"full_name": identity.repository},
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+        webhook_received_context(receipt, 1791475205000, 9000000000000),
+        "hook-1",
+        "pull_request",
+        identity.repository,
+    )
+    assert observation is None
+
+
+def test_provider_timestamp_parser_accepts_utc_and_offset():
+    assert parse_provider_timestamp_ms("2026-10-08T16:00:00Z") == parse_provider_timestamp_ms(
+        "2026-10-08T18:00:00+02:00"
+    )
+
+
+def test_provider_timestamp_interval_respects_reported_precision():
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00Z",
+        occurrence_semantics="truncated",
+    ) == (
+        parse_provider_timestamp_ms("2026-10-08T16:00:00Z"),
+        parse_provider_timestamp_ms("2026-10-08T16:00:00Z") + 999,
+    )
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00.12Z",
+        occurrence_semantics="truncated",
+    )[1] == parse_provider_timestamp_ms("2026-10-08T16:00:00.12Z") + 9
+
+
+def test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics():
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00.1234Z",
+        occurrence_semantics="truncated",
+    ) is None
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00Z",
+        occurrence_semantics="unknown",
+    ) is None
+
+
+def test_timestamp_policy_binds_provider_source_and_interpretation():
+    policy = timestamp_policy_fixture()
+    assert policy.usable()
+    assert policy.identity_digest()
+    assert not timestamp_policy_fixture(source_field="pull_request.closed_at").usable()
+    assert not timestamp_policy_fixture(occurrence_semantics="unknown").usable()
+
+
+def test_timestamp_policy_resolution_limit_is_enforced():
+    timing = effect_timing_fixture(
+        timestamp_policy=timestamp_policy_fixture(max_reported_resolution_ms=500),
+    )
+    assert timing.provider_event_time_ms is not None
+    assert timing.classify() == "provider-event-time-missing"
+
+
+def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
+    policy = timestamp_policy_fixture()
+    timing = effect_timing_fixture(timestamp_policy=policy)
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=timestamp_policy_fixture(policy_generation=2),
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
+        clock_relation=timing.clock_relation,
+    )
+    assert tampered.classify() == "provider-timestamp-policy-integrity-invalid"
+
+
+def test_stack_timing_rejects_mixed_clock_relation_identities():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-clock-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-clock-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture()
+    second_timing = effect_timing_fixture(
+        clock_relation=clock_relation_fixture(offset_lower_ms=-500, offset_upper_ms=2000),
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                first_timing.identity_digest(),
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
+                second_timing,
+            ),
+        ),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_timing_identity_detects_interval_tampering():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms + 1,
+        provider_timestamp_policy=timing.provider_timestamp_policy,
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
+        clock_relation=timing.clock_relation,
+    )
+    assert tampered.identity_digest() != timing.identity_digest()
+
+
+def test_timing_identity_detects_clock_relation_tampering():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=timing.provider_timestamp_policy,
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1001),
+    )
+    assert tampered.identity_digest() != timing.identity_digest()
+
+
+def test_stack_timing_rejects_tampered_timing_identity_digest():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-integrity-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-integrity-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture()
+    second_timing = effect_timing_fixture()
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                "tampered",
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
+                second_timing,
+            ),
+        ),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_stack_timing_rejects_mixed_timestamp_policy_identities():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-policy-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-policy-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture(
+        timestamp_policy=timestamp_policy_fixture(policy_generation=1),
+    )
+    second_timing = effect_timing_fixture(
+        timestamp_policy=timestamp_policy_fixture(policy_generation=2),
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                first_timing.identity_digest(),
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
+                second_timing,
+            ),
+        ),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_temporal_effect_without_timestamp_policy_is_not_admissible():
+    timing = effect_timing_fixture(timestamp_policy=None)
+    timing = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=None,
+        provider_timestamp_policy_digest=None,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
+        clock_relation=timing.clock_relation,
+    )
+    assert timing.classify() == "provider-timestamp-policy-unusable"
+
+
+def test_provider_timestamp_parser_rejects_malformed_timestamp():
+    assert parse_provider_timestamp_ms("not-a-timestamp") is None
+    assert parse_provider_timestamp_ms("2026-10-08T16:00:00") is None
+
+
+def test_clock_relation_unverified_is_unusable():
+    assert not clock_relation_fixture(verified=False).usable()
+
+
+def test_clock_relation_negative_or_inverted_offset_bounds_are_unusable():
+    assert not clock_relation_fixture(offset_lower_ms=0, offset_upper_ms=-1, verified=True).usable()
+
+
+def test_clock_relation_accepts_asymmetric_offset_bounds():
+    relation = clock_relation_fixture(
+        offset_lower_ms=-400,
+        offset_upper_ms=200,
+    )
+    assert relation.usable()
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-400, 200)
+
+
+def test_clock_relation_requires_verification_method_and_evidence():
+    assert not clock_relation_fixture(
+        verification_method="",
+        verification_evidence_digest="clock-evidence-1",
+    ).usable()
+    assert not clock_relation_fixture(
+        verification_method="authenticated-time-sample",
+        verification_evidence_digest="",
+    ).usable()
+
+
+
+def test_clock_relation_requires_explicit_validity_window():
+    relation = clock_relation_fixture(
+        measured_at_local_time_ms=None,
+        valid_until_local_time_ms=None,
+    )
+    assert not relation.usable()
+
+
+def test_clock_relation_rejects_expiry_before_verification():
+    relation = clock_relation_fixture(
+        measured_at_local_time_ms=10,
+        valid_until_local_time_ms=9,
+    )
+    assert not relation.usable()
+
+
+def test_clock_relation_expiry_blocks_late_observation():
+    relation = clock_relation_fixture(
+        measured_at_local_time_ms=1791475190000,
+        valid_until_local_time_ms=1791475200000,
+    )
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-1000, 1000)
+    assert relation.effective_offset_bounds_ms(1791475200001) is None
+
+
+def test_clock_relation_drift_expands_asymmetric_bounds_monotonically():
+    relation = clock_relation_fixture(
+        offset_lower_ms=-100,
+        offset_upper_ms=50,
+        max_drift_ppm=1000,
+        valid_until_local_time_ms=1791475290000,
+    )
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-110, 60)
+    assert relation.effective_offset_bounds_ms(1791475210000) == (-120, 70)
+
+
+def test_temporal_effect_rejects_event_before_clock_relation_measurement():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475180000,
+        event_upper_time_ms=1791475180999,
+        dispatch_time_ms=1791475195000,
+        observation_time_ms=1791475205000,
+    )
+    assert timing.classify() == "clock-relation-does-not-cover-event"
+
+
+def test_temporal_effect_rejects_event_interval_after_clock_relation_expiry():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        event_upper_time_ms=1791475200999,
+        dispatch_time_ms=1791475199000,
+        observation_time_ms=1791475200500,
+        clock_relation=clock_relation_fixture(
+            valid_until_local_time_ms=1791475200500,
+        ),
+    )
+    assert timing.classify() == "clock-relation-does-not-cover-event"
+
+
+def test_temporal_effect_with_asymmetric_offset_bounds_is_admissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200400,
+        event_upper_time_ms=1791475200499,
+        dispatch_time_ms=1791475199900,
+        observation_time_ms=1791475200800,
+        clock_relation=clock_relation_fixture(
+            offset_lower_ms=-400,
+            offset_upper_ms=200,
+        ),
+    )
+    assert timing.classify() == "temporally-admissible"
+
+
+def test_temporal_effect_with_valid_skew_is_admissible():
+    timing = effect_timing_fixture()
+    assert timing.classify() == "temporally-admissible"
+    assert timing.temporally_admissible()
+
+
+
+
+def test_temporal_effect_interval_overlap_is_not_admissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        event_upper_time_ms=1791475200999,
+        dispatch_time_ms=1791475200500,
+        observation_time_ms=1791475202000,
+        clock_relation=clock_relation_fixture(offset_lower_ms=-600, offset_upper_ms=600),
+    )
+    assert timing.classify() == "cross-domain-time-uncertain"
+    assert not timing.temporally_admissible()
+
+
+def test_temporal_effect_expired_clock_relation_is_not_admissible():
+    timing = effect_timing_fixture(
+        observation_time_ms=1791476000000,
+        clock_relation=clock_relation_fixture(
+            valid_until_local_time_ms=1791475999999,
+        ),
+    )
+    assert timing.classify() == "clock-relation-invalid-at-observation"
+
+
+def test_temporal_effect_drift_can_turn_boundary_into_uncertainty():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        event_upper_time_ms=1791475200999,
+        dispatch_time_ms=1791475199000,
+        observation_time_ms=1791475203000,
+        clock_relation=clock_relation_fixture(
+            offset_lower_ms=-1, offset_upper_ms=1,
+            max_drift_ppm=1000,
+            valid_until_local_time_ms=1791475203000,
+        ),
+    )
+    assert timing.classify() == "cross-domain-time-uncertain"
+
+
+def test_temporal_timing_rejects_monotonic_clock_identity_missing():
+    timing = effect_timing_fixture(monotonic_clock_id=None)
+    assert timing.classify() == "local-monotonic-clock-identity-missing"
+
+
+def test_temporal_timing_rejects_cross_runtime_monotonic_clock_identity():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=timing.provider_timestamp_policy,
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id="runtime-monotonic-2",
+        temporal_attempt_identity=timing.temporal_attempt_identity,
+        clock_relation=timing.clock_relation,
+    )
+    assert tampered.identity_digest() != timing.identity_digest()
+    assert tampered.classify() == "promotion-temporal-attempt-binding-invalid"
+
+
+def test_temporal_timing_rejects_missing_local_monotonic_time():
+    timing = effect_timing_fixture(
+        observation_monotonic_ns=None,
+    )
+    assert timing.classify() == "local-observation-monotonic-time-missing"
+
+
+def test_temporal_timing_rejects_local_monotonic_rollback():
+    timing = effect_timing_fixture(
+        observation_monotonic_ns=8999999400000,
+        dispatch_monotonic_ns=8999999500000,
+    )
+    assert timing.classify() == "invalid-local-monotonic-order"
+
+
+def test_temporal_timing_rejects_wall_clock_valid_but_monotonic_invalid_order():
+    timing = effect_timing_fixture(
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        observation_time_ms=1791475205000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=9000000500000,
+        observation_monotonic_ns=9000000000000,
+    )
+    assert timing.classify() == "invalid-local-monotonic-order"
+
+
+def test_temporal_effect_without_clock_relation_is_unbounded():
+    timing = effect_timing_fixture(clock_relation=None)
+    assert timing.classify() == "cross-domain-time-unbounded"
+
+
+def test_temporal_effect_with_event_before_dispatch_is_rejected():
+    timing = effect_timing_fixture(
+        event_time_ms=1728400000000,
+        reservation_time_ms=1728402000000,
+        dispatch_time_ms=1728402500000,
+    )
+    assert timing.classify() == "provider-event-before-dispatch"
+
+
+def test_temporal_effect_with_event_after_observation_is_rejected():
+    timing = effect_timing_fixture(
+        event_time_ms=1728405000000,
+        observation_time_ms=1728403200000,
+    )
+    assert timing.classify() == "provider-event-after-observation"
+
+
+def test_temporal_effect_with_uncertain_clock_overlap_is_not_admissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1728402949500,
+        dispatch_time_ms=1728402950000,
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1000),
+    )
+    assert timing.classify() == "cross-domain-time-uncertain"
+    assert not timing.temporally_admissible()
+
+
+def test_temporal_effect_accepts_exact_skew_boundaries():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        dispatch_time_ms=1791475199000,
+        observation_time_ms=1791475201000,
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1000),
+    )
+    assert timing.classify() == "temporally-admissible"
+
+
+def test_provider_delivery_time_before_event_is_invalid():
+    timing = effect_timing_fixture(
+        delivery_time_ms=1728402959000,
+        event_time_ms=1728402960000,
+    )
+    assert timing.classify() == "invalid-provider-time-order"
+
+
+def test_temporal_timing_can_be_derived_from_authenticated_observation():
+    timing = webhook_effect_timing_from_observation()
+    assert timing.provider_event_time_ms == parse_provider_timestamp_ms(
+        "2026-10-08T16:00:00Z"
+    )
+    assert timing.local_observation_time_ms == 1791475205000
+    assert timing.temporally_admissible()
+
+
+def test_historical_merge_delivered_after_new_reservation_is_inadmissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475000000,
+        reservation_time_ms=1791475300000,
+        dispatch_time_ms=1791475350000,
+        observation_time_ms=1791475500000,
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1000),
+    )
+    assert timing.classify() == "provider-event-before-dispatch"
+
+
+def test_temporal_timing_rejects_missing_event_time():
+    timing = effect_timing_fixture(event_time_ms=None)
+    assert timing.classify() == "provider-event-time-missing"
+
+
+def test_temporal_timing_rejects_invalid_local_order():
+    timing = effect_timing_fixture(
+        reservation_time_ms=1728403100000,
+        dispatch_time_ms=1728403000000,
+    )
+    assert timing.classify() == "invalid-local-time-order"
+
+
+def test_temporal_timing_rejects_local_observation_rollback():
+    timing = effect_timing_fixture(
+        observation_time_ms=1728403000000,
+        dispatch_time_ms=1728403100000,
+    )
+    assert timing.classify() == "invalid-local-time-order"
+
+
+def test_complete_stack_timing_requires_every_member_admissible():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-complete-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-complete-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    good_timing = effect_timing_fixture()
+    bad_timing = effect_timing_fixture(event_time_ms=1791475000000)
+    good = PromotionStackEffectTimingV1(
+        7085,
+        evidence.effects[0].identity_digest(),
+        good_timing.identity_digest(),
+        good_timing,
+    )
+    bad = PromotionStackEffectTimingV1(
+        7087,
+        evidence.effects[1].identity_digest(),
+        bad_timing.identity_digest(),
+        bad_timing,
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        timestamp_policy_fixture().identity_digest(),
+        clock_relation_fixture().identity_digest(),
+        good.timing.temporal_attempt_identity.identity_digest(),
+        (good, bad),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_dispatch_attempt_sequence_is_persisted_before_prepared_state():
+    ledger = Ledger()
+    ledger.trust_root_generation = 7
+    identity = stack_identity_fixture()
+    assert ledger.reserve(
+        observed_head="L0",
+        lease_id="LEASE-1",
+        candidate="L1",
+        trust_root_generation=7,
+        expected_pr_head_sha=identity.requested_pr_head_sha,
+        operation_identity_digest=identity.digest(),
+    )
+    reservation = ledger.reservation
+    assert reservation is not None
+    assert reservation.dispatch_attempt_sequence is None
+    assert not ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 0)
+    assert reservation.dispatch_attempt_sequence is None
+    assert ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 9)
+    assert reservation.dispatch_attempt_sequence == 9
+    assert not ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 10)
+    assert reservation.dispatch_attempt_sequence == 9
+
+
+def test_temporal_attempt_identity_derives_from_exact_prepared_reservation():
+    ledger = Ledger()
+    ledger.trust_root_generation = 7
+    identity = stack_identity_fixture()
+    assert ledger.reserve(
+        observed_head="L0",
+        lease_id="LEASE-1",
+        candidate="L1",
+        trust_root_generation=7,
+        expected_pr_head_sha=identity.requested_pr_head_sha,
+        operation_identity_digest=identity.digest(),
+    )
+    reservation = ledger.reservation
+    assert reservation is not None
+    assert PromotionTemporalAttemptIdentityV1.from_prepared_reservation(
+        identity,
+        reservation,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=8999999500000,
+    ) is None
+    assert ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 9)
+    attempt = PromotionTemporalAttemptIdentityV1.from_prepared_reservation(
+        identity,
+        reservation,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=8999999500000,
+    )
+    assert attempt is not None
+    assert attempt.validates_operation(identity)
+    assert attempt.reservation_id == reservation.reservation_id
+    assert attempt.promotion_operation_id == reservation.operation_id
+    assert attempt.reservation_head == reservation.reservation_head
+    assert attempt.fencing_token == reservation.fencing_token
+    assert attempt.dispatch_attempt_sequence == 9
+    assert attempt.dispatch_attempt_id == f"{reservation.operation_id}:dispatch:9"
+    drifted_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "base_tip_sha": "BASE-DRIFT"}
+    )
+    assert PromotionTemporalAttemptIdentityV1.from_prepared_reservation(
+        drifted_identity,
+        reservation,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=8999999500000,
+    ) is None
+
+
+def test_temporal_attempt_identity_binds_operation_and_authority_generations():
+    identity = stack_identity_fixture()
+    attempt = temporal_attempt_fixture(
+        identity,
+        reservation_id="RES-A",
+        dispatch_attempt_id="DISPATCH-A",
+        fencing_token=7,
+    )
+    assert attempt.validates_operation(identity)
+    changed_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "base_tip_sha": "BASE-DRIFT"}
+    )
+    assert not attempt.validates_operation(changed_identity)
+    changed_fence = temporal_attempt_fixture(
+        identity,
+        reservation_id="RES-A",
+        dispatch_attempt_id="DISPATCH-A",
+        fencing_token=8,
+    )
+    assert attempt.identity_digest() != changed_fence.identity_digest()
+
+
+def test_temporal_timing_rejects_missing_attempt_identity():
+    timing = effect_timing_fixture()
+    missing = ProviderWebhookEffectTimingV1(
+        **{**timing.__dict__, "temporal_attempt_identity": None}
+    )
+    assert missing.classify() == "promotion-temporal-attempt-identity-missing"
+
+
+def test_temporal_timing_rejects_local_times_not_bound_to_attempt():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        **{
+            **timing.__dict__,
+            "local_dispatch_time_ms": timing.local_dispatch_time_ms + 1,
+        }
+    )
+    assert tampered.classify() == "promotion-temporal-attempt-binding-invalid"
+
+
+def test_complete_stack_timing_rejects_mixed_temporal_attempts():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-attempt-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-attempt-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture(
+        operation_identity=identity,
+        reservation_id="RES-1",
+        dispatch_attempt_id="DISPATCH-1",
+        fencing_token=1,
+    )
+    second_timing = effect_timing_fixture(
+        operation_identity=identity,
+        reservation_id="RES-2",
+        dispatch_attempt_id="DISPATCH-2",
+        fencing_token=2,
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                first_timing.identity_digest(),
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
+                second_timing,
+            ),
+        ),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_stack_timing_rejects_crosswired_effect_evidence_identity():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-crosswire-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-crosswire-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    crosswired = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        timestamp_policy_fixture().identity_digest(),
+        clock_relation_fixture().identity_digest(),
+        effect_timing_fixture().temporal_attempt_identity.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[1].identity_digest(),
+                effect_timing_fixture().identity_digest(),
+                effect_timing_fixture(),
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[0].identity_digest(),
+                effect_timing_fixture().identity_digest(),
+                effect_timing_fixture(),
+            ),
+        ),
+    )
+    assert not crosswired.validates_complete(identity, evidence)
 
 
 def test_effect_state_binds_to_exact_operation_identity():
@@ -1247,6 +2995,105 @@ def test_effect_state_binds_to_exact_operation_identity():
     )
     assert not state.validates_operation_identity(changed_identity)
 
+def test_effect_state_same_delivery_id_with_changed_payload_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="first-payload",
+    )
+    conflicting_payload = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="second-payload",
+    )
+    assert first.payload_bytes_digest != conflicting_payload.payload_bytes_digest
+    assert first.to_stack_effect(identity) == conflicting_payload.to_stack_effect(identity)
+
+    state, decision = state.ingest(first)
+    assert decision == "admitted"
+    state_after, decision = state.ingest(conflicting_payload)
+    assert decision == "delivery-identity-conflict"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+def test_effect_state_rejects_inconsistent_source_delivery_bindings():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    state = PromotionPrEffectStateV1(
+        repository=identity.repository,
+        expected_entry=identity.ordered_stack[-1],
+        operation_identity_digest=identity.digest(),
+        state="EffectObserved",
+        effect=observation.to_stack_effect(identity),
+        source_delivery_ids=(observation.delivery_id,),
+    )
+    assert not state.validates_source_delivery_bindings()
+    assert not state.is_terminally_observed()
+
+def test_effect_state_conflict_is_absorbing():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-first",
+        merge_commit="M2",
+    )
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-conflict",
+        merge_commit="M9",
+    )
+    compatible = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-late",
+        merge_commit="M2",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state.state == "Conflict"
+    state_after, decision = state.ingest(compatible)
+    assert decision == "rejected-invalid-state"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+def test_effect_state_conflict_never_reclassifies_as_terminal_observed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-reclass-first")
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-reclass-conflict",
+        head_sha="H0",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert not state.is_terminally_observed()
+    assert state.effect is None
+
+def test_webhook_delivery_registry_rejects_same_id_with_changed_context():
+    payload = b"{}"
+    first = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    second = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-2",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    registry = ProviderDeliveryRegistryV1().record(first)
+    assert registry.observe(second) == "delivery-id-conflict"
 
 def test_effect_state_admits_first_authenticated_merge():
     identity = stack_identity_fixture()
@@ -1300,48 +3147,6 @@ def test_effect_state_repeated_same_delivery_is_idempotent():
     state_after, decision = state.ingest(observation)
     assert decision == "duplicate-delivery"
     assert state_after == state
-    assert state_after.source_delivery_identities == (
-        ProviderDeliveryIdentityV1.from_observation(observation),
-    )
-
-
-def test_effect_state_same_delivery_id_with_changed_payload_fails_closed():
-    identity = stack_identity_fixture()
-    state = effect_state_fixture(identity)
-    first = stack_webhook_observation(
-        identity,
-        delivery_id="delivery-same-id",
-        payload_extra="first-payload",
-    )
-    conflicting_payload = stack_webhook_observation(
-        identity,
-        delivery_id="delivery-same-id",
-        payload_extra="second-payload",
-    )
-    assert first.payload_bytes_digest != conflicting_payload.payload_bytes_digest
-    assert first.to_stack_effect(identity) == conflicting_payload.to_stack_effect(identity)
-
-    state, decision = state.ingest(first)
-    assert decision == "admitted"
-    state_after, decision = state.ingest(conflicting_payload)
-    assert decision == "delivery-identity-conflict"
-    assert state_after.state == "Conflict"
-    assert state_after.effect is None
-
-
-def test_effect_state_rejects_inconsistent_source_delivery_bindings():
-    identity = stack_identity_fixture()
-    observation = stack_webhook_observation(identity)
-    state = PromotionPrEffectStateV1(
-        repository=identity.repository,
-        expected_entry=identity.ordered_stack[-1],
-        operation_identity_digest=identity.digest(),
-        state="EffectObserved",
-        effect=observation.to_stack_effect(identity),
-        source_delivery_ids=(observation.delivery_id,),
-    )
-    assert not state.validates_source_delivery_bindings()
-    assert not state.is_terminally_observed()
 
 
 def test_effect_state_conflicting_merge_commit_fails_closed():
@@ -1378,50 +3183,6 @@ def test_effect_state_conflicting_head_fails_closed():
     assert decision == "conflict"
     assert state_after.state == "Conflict"
     assert not state_after.is_terminally_observed()
-
-
-def test_effect_state_conflict_is_absorbing():
-    identity = stack_identity_fixture()
-    state = effect_state_fixture(identity)
-    first = stack_webhook_observation(
-        identity,
-        delivery_id="delivery-absorbing-first",
-        merge_commit="M2",
-    )
-    conflicting = stack_webhook_observation(
-        identity,
-        delivery_id="delivery-absorbing-conflict",
-        merge_commit="M9",
-    )
-    compatible = stack_webhook_observation(
-        identity,
-        delivery_id="delivery-absorbing-late",
-        merge_commit="M2",
-    )
-    state, _ = state.ingest(first)
-    state, decision = state.ingest(conflicting)
-    assert decision == "conflict"
-    assert state.state == "Conflict"
-    state_after, decision = state.ingest(compatible)
-    assert decision == "rejected-invalid-state"
-    assert state_after.state == "Conflict"
-    assert state_after.effect is None
-
-
-def test_effect_state_conflict_never_reclassifies_as_terminal_observed():
-    identity = stack_identity_fixture()
-    state = effect_state_fixture(identity)
-    first = stack_webhook_observation(identity, delivery_id="delivery-reclass-first")
-    conflicting = stack_webhook_observation(
-        identity,
-        delivery_id="delivery-reclass-conflict",
-        head_sha="H0",
-    )
-    state, _ = state.ingest(first)
-    state, decision = state.ingest(conflicting)
-    assert decision == "conflict"
-    assert not state.is_terminally_observed()
-    assert state.effect is None
 
 
 def test_effect_state_untrusted_after_merge_does_not_downgrade():
@@ -2203,28 +3964,6 @@ def test_webhook_delivery_registry_rejects_same_id_with_different_payload():
     assert registry.observe(second) == "delivery-id-conflict"
 
 
-def test_webhook_delivery_registry_rejects_same_id_with_changed_context():
-    payload = b"{}"
-    first = ProviderWebhookReceiptV1.from_delivery(
-        "delivery-context-reuse",
-        "hook-1",
-        "pull_request",
-        "Luminous-Dynamics/symthaea",
-        payload,
-        b"secret",
-    )
-    second = ProviderWebhookReceiptV1.from_delivery(
-        "delivery-context-reuse",
-        "hook-2",
-        "pull_request",
-        "Luminous-Dynamics/symthaea",
-        payload,
-        b"secret",
-    )
-    registry = ProviderDeliveryRegistryV1().record(first)
-    assert registry.observe(second) == "delivery-id-conflict"
-
-
 def test_webhook_authentication_does_not_prove_merge_result_causality():
     identity = stack_identity_fixture()
     payload = b'{"action":"closed"}'
@@ -2611,6 +4350,8 @@ class Reservation:
     expected_pr_head_sha: str = "H1"
     trust_root_generation: int = 1
     effect_receipt: PromotionEffectReceipt | None = None
+    operation_identity_digest: str = ""
+    dispatch_attempt_sequence: int | None = None
 
 
 class Ledger:
@@ -2630,6 +4371,7 @@ class Ledger:
         candidate: str,
         trust_root_generation: int = 1,
         expected_pr_head_sha: str = "H1",
+        operation_identity_digest: str = "",
     ) -> bool:
         if observed_head != self.head or lease_id != self.active_lease:
             return False
@@ -2649,6 +4391,7 @@ class Ledger:
         self.reservation.fencing_token = self.fencing_token
         self.reservation.expected_pr_head_sha = expected_pr_head_sha
         self.reservation.trust_root_generation = trust_root_generation
+        self.reservation.operation_identity_digest = operation_identity_digest
         self.active_lease = None
         self.head = candidate
         self.transitions.append(("reservation", observed_head, candidate))
@@ -2672,9 +4415,14 @@ class Ledger:
         observed_fencing_token: int,
         attempt_sequence: int,
     ) -> bool:
-        del attempt_sequence  # Reserved for durable dispatch-intent sequencing.
         r = self.reservation
-        if r is None or r.dispatch_intent or r.state != "PromotionReserved":
+        if (
+            attempt_sequence <= 0
+            or r is None
+            or r.dispatch_intent
+            or r.dispatch_attempt_sequence is not None
+            or r.state != "PromotionReserved"
+        ):
             return False
         if observed_head != self.head:
             return False
@@ -2686,6 +4434,7 @@ class Ledger:
             return False
         if r.trust_root_generation != self.trust_root_generation:
             return False
+        r.dispatch_attempt_sequence = attempt_sequence
         r.dispatch_intent = True
         r.state = "PromotionDispatchPrepared"
         return True
@@ -2947,6 +4696,40 @@ def stack_identity_fixture() -> PromotionOperationIdentityV1:
         trust_root_generation=7,
         governance_generation=11,
     )
+
+def temporal_attempt_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+    *,
+    reservation_id: str = "RES-TEMPORAL-1",
+    promotion_operation_id: str = "OP-TEMPORAL-1",
+    reservation_head: str = "PROMOTION-RESERVATION-HEAD-1",
+    dispatch_attempt_id: str = "DISPATCH-ATTEMPT-1",
+    dispatch_attempt_sequence: int = 1,
+    fencing_token: int = 1,
+    reservation_time_ms: int | None = 1791475190000,
+    dispatch_time_ms: int | None = 1791475195000,
+    reservation_monotonic_ns: int | None = 8999999000000,
+    dispatch_monotonic_ns: int | None = 8999999500000,
+    local_monotonic_clock_id: str = "runtime-monotonic-1",
+) -> PromotionTemporalAttemptIdentityV1:
+    identity = identity or stack_identity_fixture()
+    return PromotionTemporalAttemptIdentityV1(
+        operation_identity_digest=identity.digest(),
+        reservation_id=reservation_id,
+        promotion_operation_id=promotion_operation_id,
+        reservation_head=reservation_head,
+        dispatch_attempt_id=dispatch_attempt_id,
+        dispatch_attempt_sequence=dispatch_attempt_sequence,
+        fencing_token=fencing_token,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+        local_monotonic_clock_id=local_monotonic_clock_id,
+        reservation_time_ms=reservation_time_ms,
+        dispatch_time_ms=dispatch_time_ms,
+        reservation_monotonic_ns=reservation_monotonic_ns,
+        dispatch_monotonic_ns=dispatch_monotonic_ns,
+    )
+
 
 
 def stack_effect_fixture(
@@ -3648,6 +5431,65 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_webhook_stack_metadata_matches_exact_operation,
+    test_webhook_stack_metadata_rejects_stack_number_drift,
+    test_webhook_stack_metadata_rejects_base_sha_drift,
+    test_webhook_stack_metadata_rejects_position_drift,
+    test_webhook_stack_metadata_rejects_base_ref_drift,
+    test_webhook_stack_metadata_missing_is_not_topology_proof,
+    test_webhook_stack_metadata_malformed_payload_is_rejected,
+    test_provider_timestamp_parser_accepts_utc_and_offset,
+    test_provider_timestamp_interval_respects_reported_precision,
+    test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics,
+    test_timestamp_policy_binds_provider_source_and_interpretation,
+    test_timestamp_policy_resolution_limit_is_enforced,
+    test_temporal_effect_rejects_tampered_timestamp_policy_identity,
+    test_temporal_effect_without_timestamp_policy_is_not_admissible,
+    test_provider_timestamp_parser_rejects_malformed_timestamp,
+    test_clock_relation_unverified_is_unusable,
+    test_clock_relation_negative_or_inverted_offset_bounds_are_unusable,
+    test_clock_relation_accepts_asymmetric_offset_bounds,
+    test_clock_relation_requires_verification_method_and_evidence,
+    test_clock_relation_requires_explicit_validity_window,
+    test_clock_relation_rejects_expiry_before_verification,
+    test_clock_relation_expiry_blocks_late_observation,
+    test_clock_relation_drift_expands_asymmetric_bounds_monotonically,
+    test_temporal_effect_rejects_event_before_clock_relation_measurement,
+    test_temporal_effect_rejects_event_interval_after_clock_relation_expiry,
+    test_temporal_effect_with_asymmetric_offset_bounds_is_admissible,
+    test_temporal_effect_with_valid_skew_is_admissible,
+    test_timing_identity_detects_interval_tampering,
+    test_timing_identity_detects_clock_relation_tampering,
+    test_stack_timing_rejects_tampered_timing_identity_digest,
+    test_stack_timing_rejects_mixed_timestamp_policy_identities,
+    test_stack_timing_rejects_mixed_clock_relation_identities,
+    test_temporal_effect_interval_overlap_is_not_admissible,
+    test_temporal_effect_expired_clock_relation_is_not_admissible,
+    test_temporal_effect_drift_can_turn_boundary_into_uncertainty,
+    test_temporal_timing_rejects_monotonic_clock_identity_missing,
+    test_temporal_timing_rejects_cross_runtime_monotonic_clock_identity,
+    test_temporal_timing_rejects_missing_local_monotonic_time,
+    test_temporal_timing_rejects_local_monotonic_rollback,
+    test_temporal_timing_rejects_wall_clock_valid_but_monotonic_invalid_order,
+    test_temporal_effect_without_clock_relation_is_unbounded,
+    test_temporal_effect_with_event_before_dispatch_is_rejected,
+    test_temporal_effect_with_event_after_observation_is_rejected,
+    test_temporal_effect_with_uncertain_clock_overlap_is_not_admissible,
+    test_temporal_effect_accepts_exact_skew_boundaries,
+    test_provider_delivery_time_before_event_is_invalid,
+    test_temporal_timing_can_be_derived_from_authenticated_observation,
+    test_historical_merge_delivered_after_new_reservation_is_inadmissible,
+    test_temporal_timing_rejects_missing_event_time,
+    test_temporal_timing_rejects_invalid_local_order,
+    test_temporal_timing_rejects_local_observation_rollback,
+    test_complete_stack_timing_requires_every_member_admissible,
+    test_dispatch_attempt_sequence_is_persisted_before_prepared_state,
+    test_temporal_attempt_identity_derives_from_exact_prepared_reservation,
+    test_temporal_attempt_identity_binds_operation_and_authority_generations,
+    test_temporal_timing_rejects_missing_attempt_identity,
+    test_temporal_timing_rejects_local_times_not_bound_to_attempt,
+    test_complete_stack_timing_rejects_mixed_temporal_attempts,
+    test_stack_timing_rejects_crosswired_effect_evidence_identity,
     test_effect_state_binds_to_exact_operation_identity,
     test_effect_state_same_delivery_id_with_changed_payload_fails_closed,
     test_effect_state_rejects_inconsistent_source_delivery_bindings,
