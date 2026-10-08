@@ -451,6 +451,7 @@ mod tests {
         let verifying_key_sha256 = [8; 32];
         let policy_digest_sha256 = [7; 32];
         Rfc9942HybridTranscript {
+            policy_digest_sha256,
             key_id,
             verifying_key_sha256,
             receipt_sha256,
@@ -485,6 +486,22 @@ mod tests {
         hasher.update([2u8; 32]);
 
         assert_ne!(t.transcript_sha256(), hasher.finalize().into());
+    }
+
+    #[test]
+    fn signing_bytes_bind_policy_digest() {
+        let mut a = transcript(1, 2);
+        let mut b = a;
+        b.policy_digest_sha256 = [6; 32];
+        b.transcript_sha256 = digest_transcript(
+            b.policy_digest_sha256,
+            b.key_id,
+            b.verifying_key_sha256,
+            b.receipt_sha256,
+            b.classical_capability_sha256,
+        );
+        assert_ne!(a.signing_bytes(), b.signing_bytes());
+        assert_ne!(a.transcript_sha256(), b.transcript_sha256());
     }
 
     #[test]
