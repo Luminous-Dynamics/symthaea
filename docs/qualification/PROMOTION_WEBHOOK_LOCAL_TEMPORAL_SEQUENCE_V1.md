@@ -142,3 +142,31 @@ A correctly ordered sequence with missing provenance is rejected as local-sequen
 The reference model deliberately does not claim a kernel or hardware attestation of the sequence source. It establishes provenance and binding semantics so a bare caller-authored sequence cannot satisfy the full cross-domain timing predicate.
 
 Rust's current Instant documentation describes Instant as monotonically nondecreasing but not necessarily steady, and notes that platform or virtualization bugs can still violate practical monotonicity guarantees. That supports keeping monotonic ordering separate from wall-clock accuracy and source trust. citeturn670450search1turn670450search0
+
+
+## Cryptographic verification receipt
+
+The source attestation no longer uses a caller-authored signature_verified boolean.
+
+It now records a typed verification receipt containing:
+
+    signed payload digest
+    signature digest
+    public-key digest
+    signature algorithm
+    signature context
+    key role
+    trust-anchor identifier
+    verifier identity
+    verifier implementation digest
+    verifier policy digest
+    verification time and validity
+    verification result
+
+The exact receipt digest becomes part of the surrounding clock evidence identity.
+
+This still does not implement Ed25519 or another signature primitive inside the provider-free oracle. The receipt represents the output of an external cryptographic verifier, but the input/output transcript is now explicit enough to be independently reconstructed and checked against captured artifacts.
+
+Roughtime's response validation requires the client to verify the certificate's long-term signature, the request-derived Merkle path, and the response signature over the SREP value, while explicitly stating that a valid response does not prove the timestamp itself is correct. This distinction is preserved here. citeturn946860search1
+
+The schema remains algorithm-agile rather than declaring post-quantum readiness. NIST's ML-DSA standard is available as a separate signature family, but introducing a string such as ML-DSA-65 into this receipt must not be interpreted as implementation support; the verifier policy must establish the allowed algorithm set. citeturn946860search2
