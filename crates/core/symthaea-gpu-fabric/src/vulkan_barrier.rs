@@ -2822,6 +2822,34 @@ mod tests {
             Err(VulkanBarrierReceiptError::DriverIdBinding)
         ));
 
+        let mut tampered_features = test_synchronization_feature_profile();
+        tampered_features.synchronization2_supported = false;
+        tampered_features.identity_digest = synchronization_feature_identity_digest(
+            tampered_features.timeline_semaphore_supported,
+            tampered_features.synchronization2_supported,
+            tampered_features.timeline_semaphore_enabled,
+            tampered_features.synchronization2_enabled,
+        );
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &tampered_features,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+            ),
+            Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentityBinding)
+        ));
+
         assert!(matches!(
             receipt.verify_runtime_binding(
                 VULKAN_API_VERSION,
