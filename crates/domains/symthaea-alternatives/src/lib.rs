@@ -9289,7 +9289,7 @@ mod tests {
             .edges
             .push(CalibrationTraceabilityEdge {
                 from_node_id: "reference-si".into(),
-                to_node_id: "calibration".into(),
+                to_node_id: "calibration-a".into(),
             });
         assert!(matches!(
             cycle.evidence[0]
@@ -9423,10 +9423,10 @@ mod tests {
                 CalibrationTraceabilityNodeRef {
                     node_id: "calibration".into(),
                     kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
-                    record_id: "calibration".into(),
-                    record_revision: "v1".into(),
-                    record_digest: "calibration-digest".into(),
-                    used_at_epoch_seconds: 1_700_000_000,
+                    record_id: observation.calibration_chain_refs[0].calibration_id.clone(),
+                    record_revision: observation.calibration_chain_refs[0].calibration_revision.clone(),
+                    record_digest: observation.calibration_chain_refs[0].calibration_record_digest.clone(),
+                    used_at_epoch_seconds: observation.calibration_chain_refs[0].used_at_epoch_seconds,
                 },
                 CalibrationTraceabilityNodeRef {
                     node_id: "reference".into(),
@@ -12088,12 +12088,10 @@ mod tests {
             .flat_map(|candidate| candidate.evidence.iter_mut())
             .find(|evidence| evidence.observation.is_some())
             .unwrap();
-        evidence
-            .uncertainty
-            .as_mut()
-            .unwrap()
-            .evaluation
-            .calibration_chain_count += 1;
+        let uncertainty = evidence.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.calibration_chain_count += 1;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
         let error = AlternativesEngine
             .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
@@ -12175,6 +12173,8 @@ mod tests {
         let uncertainty = observed.uncertainty.as_mut().unwrap();
         uncertainty.evaluation.calibration_chain_digest = calibration_chain_digest;
         uncertainty.evaluation.calibration_chain_count = calibration_chain_count;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
         let changed = AlternativesEngine
             .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
             .unwrap();
@@ -12221,6 +12221,8 @@ mod tests {
         let uncertainty = evidence.uncertainty.as_mut().unwrap();
         uncertainty.evaluation.calibration_chain_digest = calibration_chain_digest;
         uncertainty.evaluation.calibration_chain_count = calibration_chain_count;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
         let changed = AlternativesEngine
             .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
