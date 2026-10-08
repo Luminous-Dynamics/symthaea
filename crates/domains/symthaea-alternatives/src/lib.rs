@@ -5602,7 +5602,7 @@ impl AlternativesEngine {
             b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
         });
 
-        ranked.first().map(|(dimension, unresolved_count)| {
+        ranked.first().and_then(|(dimension, unresolved_count)| {
             let mut candidate_ids = frontier_assessments
                 .iter()
                 .filter(|candidate| {
@@ -5651,7 +5651,7 @@ impl AlternativesEngine {
             {
                 return None;
             }
-            MeasurementPriority {
+            Some(MeasurementPriority {
                 dimension: *dimension,
                 unresolved_candidate_count: *unresolved_count,
                 frontier_candidate_count: frontier_assessments.len(),
@@ -5659,7 +5659,7 @@ impl AlternativesEngine {
                 candidate_ids,
                 expected_discrimination,
                 rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets are interval-overlap candidates; no cross-dimension unit scalarization".to_string(),
-            }
+            })
         })
     }
 }
@@ -5812,6 +5812,7 @@ fn canonical_payload_hash(result: &AssessmentResult) -> Result<String, Assessmen
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::corpus::admitted;
 
     fn fixture_basis() -> ComparisonBasisRef {
         ComparisonBasisRef {
@@ -10699,10 +10700,10 @@ mod tests {
         let a = Interval::new(1.0, 3.0).unwrap();
         let b = Interval::new(2.0, 4.0).unwrap();
 
-        assert!(!a.clearly_no_worse_than(&b));
-        assert!(!b.clearly_no_worse_than(&a));
-        assert!(!a.clearly_better_than(&b));
-        assert!(!b.clearly_better_than(&a));
+        assert!(!a.clearly_no_worse_than(b));
+        assert!(!b.clearly_no_worse_than(a));
+        assert!(!a.clearly_better_than(b));
+        assert!(!b.clearly_better_than(a));
     }
 
     #[test]
