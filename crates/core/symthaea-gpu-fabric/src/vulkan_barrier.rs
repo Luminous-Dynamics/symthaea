@@ -279,6 +279,8 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
     queue_family_index: u32,
+    // Must be dropped after Instance/Device because ash requires Entry to outlive them.
+    entry: Entry,
 }
 
 impl VulkanBarrierWorkloadRuntime {
@@ -486,6 +488,7 @@ impl VulkanBarrierWorkloadRuntime {
         };
 
         qualification_stage("descriptor_pool_created");
+        qualification_stage("runtime_owning_entry");
         Ok(Self {
             instance, device, queue, command_pool, descriptor_layout, descriptor_pool,
             pipeline_layout, pipeline, shader, memory_properties,
@@ -493,6 +496,7 @@ impl VulkanBarrierWorkloadRuntime {
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
             queue_family_index: family,
+            entry,
         })
     }
 
