@@ -68,12 +68,12 @@ jobs:
           LIVE_RUN_EVENT="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.event')"
           LIVE_RUN_PR_COUNT="$(printf '%s' "$LIVE_RUN_JSON" | jq -r '.pull_requests | length')"
           LIVE_RUN_PR_NUMBER="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].number else 0 end')"
-          LIVE_RUN_PR_HEAD_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.sha else "" end')"
-          LIVE_RUN_PR_HEAD_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.id else 0 end')"
-          LIVE_RUN_PR_HEAD_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.full_name else "" end')"
-          LIVE_RUN_PR_BASE_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.sha else "" end')"
-          LIVE_RUN_PR_BASE_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.id else 0 end')"
-          LIVE_RUN_PR_BASE_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.full_name else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_HEAD_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.sha else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.id else 0 end')"
+          LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].head.repo.full_name else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_BASE_SHA="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.sha else "" end')"
+          LIVE_RUN_PR_ASSOCIATION_BASE_REPO_ID="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.id else 0 end')"
+          LIVE_RUN_PR_ASSOCIATION_BASE_REPO_NAME="$(printf '%s' "$LIVE_RUN_JSON" | jq -r 'if (.pull_requests | length) == 1 then .pull_requests[0].base.repo.full_name else "" end')"
           test "$LIVE_RUN_REPO_ID" = "$CURRENT_REPO_ID"
           test "$LIVE_RUN_HEAD_REF" = "$EVENT_HEAD_REF"
           test "$LIVE_RUN_WORKFLOW_ID" = "375128913"
@@ -94,12 +94,11 @@ jobs:
           if test "$GITHUB_EVENT_NAME" = "pull_request"; then
             test "$LIVE_RUN_PR_COUNT" -eq 1
             test "$LIVE_RUN_PR_NUMBER" = "$GITHUB_EVENT_NUMBER"
-            test "$LIVE_RUN_PR_HEAD_SHA" = "$EVENT_HEAD_SHA"
-            test "$LIVE_RUN_PR_HEAD_REPO_ID" = "$EVENT_HEAD_REPO_ID"
-            test "$LIVE_RUN_PR_HEAD_REPO_NAME" = "$EVENT_HEAD_REPO"
-            test "$LIVE_RUN_PR_BASE_SHA" = "$EVENT_BASE_SHA"
-            test "$LIVE_RUN_PR_BASE_REPO_ID" = "$CURRENT_REPO_ID"
-            test "$LIVE_RUN_PR_BASE_REPO_NAME" = "$GITHUB_REPOSITORY"
+            # workflow_run.pull_requests is a mutable association view, not an immutable
+            # run snapshot. GitHub may update its head/base metadata after this run when
+            # the PR is force-pushed or the base branch moves. Historical run identity
+            # comes from workflow_run.head_sha/head_branch plus the immutable triggering
+            # event fields above. The association head/base values are observation-only.
           fi
           test "$ACTUAL_SHA" = "$EVENT_HEAD_SHA"
           git cat-file -e "${PARENT_SHA}^{commit}"
@@ -133,8 +132,8 @@ jobs:
           echo "live_run_workflow_path=$LIVE_RUN_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_name=$LIVE_RUN_WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
           echo "live_run_event=$LIVE_RUN_EVENT" >> "$GITHUB_OUTPUT"
-          echo "live_run_pr_head_repo_name=$LIVE_RUN_PR_HEAD_REPO_NAME" >> "$GITHUB_OUTPUT"
-          echo "live_run_pr_base_repo_name=$LIVE_RUN_PR_BASE_REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_repo_name=$LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_NAME" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_repo_name=$LIVE_RUN_PR_ASSOCIATION_BASE_REPO_NAME" >> "$GITHUB_OUTPUT"
           echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
           echo "workflow_ref=$GITHUB_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
           echo "workflow_file_sha256=$CHECKED_OUT_WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
@@ -142,10 +141,10 @@ jobs:
           echo "workflow_definition_match=true" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_count=$LIVE_RUN_PR_COUNT" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_number=$LIVE_RUN_PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "live_run_pr_head_sha=$LIVE_RUN_PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "live_run_pr_head_repo_id=$LIVE_RUN_PR_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
-          echo "live_run_pr_base_sha=$LIVE_RUN_PR_BASE_SHA" >> "$GITHUB_OUTPUT"
-          echo "live_run_pr_base_repo_id=$LIVE_RUN_PR_BASE_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_sha=$LIVE_RUN_PR_ASSOCIATION_HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_head_repo_id=$LIVE_RUN_PR_ASSOCIATION_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_sha=$LIVE_RUN_PR_ASSOCIATION_BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_run_pr_association_base_repo_id=$LIVE_RUN_PR_ASSOCIATION_BASE_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "ancestry_status=$COMPARE_STATUS" >> "$GITHUB_OUTPUT"
           echo "stack_distance=$COMPARE_AHEAD_BY" >> "$GITHUB_OUTPUT"
           echo "stack_behind=$COMPARE_BEHIND_BY" >> "$GITHUB_OUTPUT"
@@ -554,8 +553,8 @@ jobs:
           source_repo_id=${{ steps.head.outputs.source_repo_id }}
           canonical_repo=Luminous-Dynamics/symthaea
           checkout_persist_credentials=false
-          live_run_pr_head_repo_name=${{ steps.head.outputs.live_run_pr_head_repo_name }}
-          live_run_pr_base_repo_name=${{ steps.head.outputs.live_run_pr_base_repo_name }}
+          live_run_pr_association_head_repo_name=${{ steps.head.outputs.live_run_pr_association_head_repo_name }}
+          live_run_pr_association_base_repo_name=${{ steps.head.outputs.live_run_pr_association_base_repo_name }}
           event_repo_id=${{ steps.head.outputs.event_repo_id }}
           current_repo_id=${{ steps.head.outputs.current_repo_id }}
           live_run_repo_id=${{ steps.head.outputs.live_run_repo_id }}
@@ -572,10 +571,10 @@ jobs:
           workflow_definition_match=${{ steps.head.outputs.workflow_definition_match }}
           live_run_pr_count=${{ steps.head.outputs.live_run_pr_count }}
           live_run_pr_number=${{ steps.head.outputs.live_run_pr_number }}
-          live_run_pr_head_sha=${{ steps.head.outputs.live_run_pr_head_sha }}
-          live_run_pr_head_repo_id=${{ steps.head.outputs.live_run_pr_head_repo_id }}
-          live_run_pr_base_sha=${{ steps.head.outputs.live_run_pr_base_sha }}
-          live_run_pr_base_repo_id=${{ steps.head.outputs.live_run_pr_base_repo_id }}
+          live_run_pr_association_head_sha=${{ steps.head.outputs.live_run_pr_association_head_sha }}
+          live_run_pr_association_head_repo_id=${{ steps.head.outputs.live_run_pr_association_head_repo_id }}
+          live_run_pr_association_base_sha=${{ steps.head.outputs.live_run_pr_association_base_sha }}
+          live_run_pr_association_base_repo_id=${{ steps.head.outputs.live_run_pr_association_base_repo_id }}
           event_base_sha=${{ steps.head.outputs.event_base_sha }}
           ancestry_status=${{ steps.head.outputs.ancestry_status }}
           stack_distance=${{ steps.head.outputs.stack_distance }}
