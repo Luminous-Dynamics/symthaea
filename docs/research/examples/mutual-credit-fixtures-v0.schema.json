@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/mutual-credit-fixtures-v0.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "member_limit", "initial_members", "valid", "rejected"],
+  "properties": {
+    "schema_version": { "const": "mutual-credit-fixtures-v0" },
+    "member_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["debit_limit", "credit_limit"],
+      "properties": {
+        "debit_limit": { "type": "integer", "minimum": 0 },
+        "credit_limit": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "initial_members": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "valid": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fixture" }
+    },
+    "rejected": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejected" }
+    }
+  },
+  "$defs": {
+    "trade_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "buyer", "seller", "amount"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "op": { "const": "trade" },
+        "buyer": { "type": "string", "minLength": 1 },
+        "seller": { "type": "string", "minLength": 1 },
+        "amount": { "type": "integer", "exclusiveMinimum": 0 }
+      }
+    },
+    "settle_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "member", "amount"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "op": { "const": "settle_external" },
+        "member": { "type": "string", "minLength": 1 },
+        "amount": { "type": "integer", "exclusiveMinimum": 0 }
+      }
+    },
+    "default_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "op", "member"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "op": { "const": "mark_defaulted" },
+        "member": { "type": "string", "minLength": 1 }
+      }
+    },
+    "event": {
+      "oneOf": [
+        { "$ref": "#/$defs/trade_event" },
+        { "$ref": "#/$defs/settle_event" },
+        { "$ref": "#/$defs/default_event" }
+      ]
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "events", "expect"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" }
+        },
+        "expect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["balances", "total", "external_settled_total"],
+          "properties": {
+            "balances": {
+              "type": "object",
+              "additionalProperties": { "type": "integer" }
+            },
+            "total": { "type": "integer" },
+            "external_settled_total": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "rejected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "events", "error"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/event" }
+        },
+        "error": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
