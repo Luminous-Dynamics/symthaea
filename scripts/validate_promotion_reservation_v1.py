@@ -2084,6 +2084,7 @@ def test_stack_timing_rejects_crosswired_effect_evidence_identity():
     assert evidence is not None
     crosswired = PromotionStackEffectTimingSetV1(
         identity.digest(),
+        timestamp_policy_fixture().identity_digest(),
         (
             PromotionStackEffectTimingV1(
                 7085,
