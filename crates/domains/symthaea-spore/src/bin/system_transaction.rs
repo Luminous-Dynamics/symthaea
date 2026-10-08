@@ -585,6 +585,18 @@ impl TransactionLedger {
         let Some(file) = self.open_ledger_file(libc::O_RDONLY, 0)? else {
             return Ok(HashMap::new());
         };
+
+        // Readers share the journal lock with writers so normal operation never
+        // parses an append that is still between write() and fsync().
+        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_SH) };
+        if lock_result != 0 {
+            return Err(format!(
+                "unable to lock transaction ledger {} for read: {}",
+                self.path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+
         let metadata = file.metadata().map_err(|error| {
             format!(
                 "unable to inspect transaction ledger {}: {error}",
@@ -934,8 +946,9 @@ impl TransactionLedger {
             }
         }
 
-        file.write_all(serialized.as_bytes())
-            .and_then(|_| file.write_all(b"\n"))
+        let mut framed = serialized.into_bytes();
+        framed.push(b'\n');
+        file.write_all(&framed)
             .and_then(|_| file.sync_all())
             .map_err(|error| {
                 format!(
