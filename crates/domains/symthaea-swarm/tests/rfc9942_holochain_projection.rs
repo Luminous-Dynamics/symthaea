@@ -398,7 +398,7 @@ fn unprotected_outer_metadata_is_not_authenticated_but_is_provenance_bound() {
     modified_wire[collection_start] = 0xa2;
     modified_wire.splice(
         collection_start..collection_start,
-        [0x19, 0x23, 0x28, 0x01, 0x02, 0x61, 0x78],
+        [0x19, 0x23, 0x28, 0x01],
     );
 
     let modified = Rfc9942SignatureWithReceipts::from_cbor(&modified_wire).unwrap();
