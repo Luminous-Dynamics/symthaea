@@ -1,0 +1,41 @@
+{
+  "schema_version":"monetary-strategic-response-v1",
+  "experiment_id":"monetary-interop-strategic-response-v1",
+  "factorial_size":1080,
+  "batch_size":3,
+  "factors":{
+    "monetary_pair":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],
+    "adapter":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],
+    "shock":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"],
+    "seed":[11,23,47,89,131],
+    "participant_policy":["fixed_submission","liquidity_aware_stagger","critical_payment_acceleration"]
+  },
+  "participant_policies":{
+    "fixed_submission":{"policy_id":"fixed-submission-v1","digest":"7a7a6ffeaba670eeb8fc8d715e1307ae79df4912a13daedeeb672644eb57d9b8","rule":"all three obligations submit at tick 0"},
+    "liquidity_aware_stagger":{"policy_id":"liquidity-aware-stagger-v1","digest":"25a8dc13ba209e1d2c7b4b8f449e875308774d20ccbd4d22c849863d43278a2e","rule":"obligations with declared liquidity demand >= 10 submit one tick later"},
+    "critical_payment_acceleration":{"policy_id":"critical-payment-acceleration-v1","digest":"868cea5e436881256d0b239a8fdaf985815c85ead564d09de8898f3ee2c4de12","rule":"criticality >= 3 submits at tick 0; other obligations submit at tick 1"}
+  },
+  "fixed_dimensions":{
+    "topology_digest":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
+    "resource_regime":"bounded_shared_settlement_liquidity",
+    "resource_digest":"8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7",
+    "allocation_policy_digest":"7bfe21a9815c819972baf46f8dc77199a6f602d31fcabc8e0708b14436777fb8",
+    "obligations":[{"obligation_index":0,"amount":15,"criticality":2},{"obligation_index":1,"amount":5,"criticality":1},{"obligation_index":2,"amount":10,"criticality":3}],
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous draws across participant policies",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+    "behavioral_boundary":"participant policy may change submission time only; monetary, adapter, topology, resource and allocation contracts remain fixed"
+  },
+  "profile_digests":{
+    "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+    "sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+    "mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+    "tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+    "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+  },
+  "edge_digests":{
+    "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
+    "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
+    "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
+  },
+  "claim_ceiling":"Synthetic behavioral-response experiment only; deterministic participant heuristics are not empirical behavior or equilibrium."
+}

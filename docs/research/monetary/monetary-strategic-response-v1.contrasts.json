@@ -1,0 +1,9 @@
+{
+  "schema_version":"monetary-strategic-response-v1-contrasts",
+  "system_completion_vs_fixed":{"liquidity_aware_stagger":2.218181818181819,"critical_payment_acceleration":2.072727272727273},
+  "critical_obligation_latency_vs_fixed":{"liquidity_aware_stagger":0.18181818181818166,"critical_payment_acceleration":-5.327272727272727},
+  "liquidity_shock":{"system_completion_vs_fixed":{"liquidity_aware_stagger":0.6666666666666661,"critical_payment_acceleration":0.0},"critical_obligation_latency_vs_fixed":{"liquidity_aware_stagger":-0.33333333333333215,"critical_payment_acceleration":-5.399999999999999}},
+  "normal":{"system_completion_vs_fixed":{"liquidity_aware_stagger":3.0,"critical_payment_acceleration":3.133333333333333},"critical_obligation_latency_vs_fixed":{"liquidity_aware_stagger":1.0,"critical_payment_acceleration":-5.133333333333333}},
+  "crn_validation":{"manual_draw_mismatches":0,"namespace":"world:{shock}:{seed}:obligation:{index}","treatment_factors_in_random_key":false},
+  "claim_ceiling":"Synthetic strategy contrasts only; deterministic heuristics are not equilibrium estimates."
+}

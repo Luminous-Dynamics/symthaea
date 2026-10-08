@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-strategic-response-negative-v1",
+  "cases":[
+    {"id":"STRAT-X01","kind":"participant_policy_changes_resource_capacity","expected":"reject_factor_leakage"},
+    {"id":"STRAT-X02","kind":"participant_policy_changes_money_mechanism","expected":"reject_semantic_leak"},
+    {"id":"STRAT-X03","kind":"participant_policy_changes_obligation_amount","expected":"reject_workload_mutation"},
+    {"id":"STRAT-X04","kind":"participant_policy_uses_treatment_dependent_rng_namespace","expected":"reject_common_random_number_breach"},
+    {"id":"STRAT-X05","kind":"behavioral_adaptation_hidden_inside_allocation_policy","expected":"reject_factor_alias"},
+    {"id":"STRAT-X06","kind":"criticality_inferred_from_observed_delay","expected":"reject_endogeneity"},
+    {"id":"STRAT-X07","kind":"one_heuristic_reported_as_equilibrium","expected":"reject_equilibrium_overclaim"},
+    {"id":"STRAT-X08","kind":"submission_delay_added_to_technical_settlement_time","expected":"reject_latency_collapse"},
+    {"id":"STRAT-X09","kind":"strategic_submission_mutates_exogenous_shock","expected":"reject_common_world_breach"},
+    {"id":"STRAT-X10","kind":"strategy_effect_averaged_across_shocks","expected":"reject_interaction_collapse"},
+    {"id":"STRAT-X11","kind":"uncompleted_obligation_assigned_finite_completion_time","expected":"reject_censoring"},
+    {"id":"STRAT-X12","kind":"behavioral_policy_digest_reused_after_rule_mutation","expected":"reject_generation_mismatch"}
+  ]
+}
