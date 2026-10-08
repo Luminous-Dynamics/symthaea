@@ -719,6 +719,17 @@ def test_provider_topology_binding_rejects_unbound_cas_evidence():
     assert binding.classify(identity) == "observed-not-cas"
 
 
+def test_provider_topology_binding_rejects_cas_evidence_sequence_drift():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity, pre_submit_sequence=3)
+    binding = topology_binding_fixture(
+        identity,
+        pre_submit_sequence=2,
+        provider_topology_cas_evidence=evidence,
+    )
+    assert binding.classify(identity) == "observed-not-cas"
+
+
 def test_matching_revalidation_does_not_claim_post_submit_freshness():
     identity = stack_identity_fixture()
     binding = topology_binding_fixture(identity)
@@ -1315,6 +1326,7 @@ TESTS = [
     test_provider_topology_binding_requires_positive_initial_sequence,
     test_provider_topology_binding_requires_cas_evidence_for_strong_class,
     test_provider_topology_binding_rejects_unbound_cas_evidence,
+    test_provider_topology_binding_rejects_cas_evidence_sequence_drift,
     test_matching_revalidation_does_not_claim_post_submit_freshness,
     test_provider_stack_observation_exact_selected_prefix_matches,
     test_provider_stack_observation_missing_value_fails_closed,
