@@ -2748,8 +2748,14 @@ impl CandidatePathway {
         as_of: Option<i64>,
         freshness_policy: Option<&EvidenceFreshnessPolicy>,
     ) -> QualificationState {
-        if !self.performance_is_supported(requirement, as_of, freshness_policy)
-            || !self.operating_envelope_is_supported(requirement, as_of, freshness_policy)
+        let burden_conflict = self.has_conflict_at(as_of, freshness_policy);
+        let functional_or_operating_conflict =
+            requirement_conflicts(requirement, self, as_of, freshness_policy);
+
+        if (!self.performance_is_supported(requirement, as_of, freshness_policy)
+            && !functional_or_operating_conflict)
+            || (!self.operating_envelope_is_supported(requirement, as_of, freshness_policy)
+                && !functional_or_operating_conflict)
             || !self.burden_scales_match_requirement(requirement)
             || self.burdens.is_empty()
             || !self.all_burden_dimensions_have_usable_evidence(as_of, freshness_policy)
@@ -2757,9 +2763,7 @@ impl CandidatePathway {
             return QualificationState::Hypothesis;
         }
 
-        if self.has_conflict_at(as_of, freshness_policy)
-            || requirement_conflicts(requirement, self, as_of, freshness_policy)
-        {
+        if burden_conflict || functional_or_operating_conflict {
             return QualificationState::ComputationallyPlausible;
         }
 
