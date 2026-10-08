@@ -26,6 +26,9 @@ jobs:
           RACE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-race"
           race_ref_path="${RACE_REF#refs/}"
 
+          FORCE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-force"
+          force_ref_path="${FORCE_REF#refs/}"
+
           delete_ref() {
             local target_ref_path="$1"
             local status
@@ -46,6 +49,7 @@ jobs:
           cleanup_best_effort() {
             delete_ref "${ref_path}" || true
             delete_ref "${race_ref_path}" || true
+            delete_ref "${force_ref_path}" || true
           }
           trap cleanup_best_effort EXIT
 
@@ -64,10 +68,16 @@ jobs:
             -f ref="${RACE_REF}" \
             -f sha="${BASE_SHA}" >/dev/null
 
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="${FORCE_REF}" \
+            -f sha="${BASE_SHA}" >/dev/null
+
           LAB_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
           RACE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${race_ref_path}" --jq '.object.sha')"
+          FORCE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
           test "${LAB_HEAD}" = "${BASE_SHA}"
           test "${RACE_HEAD}" = "${BASE_SHA}"
+          test "${FORCE_HEAD}" = "${BASE_SHA}"
 
           create_commit() {
             local message="$1"
