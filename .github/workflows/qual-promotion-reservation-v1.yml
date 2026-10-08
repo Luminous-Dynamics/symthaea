@@ -152,12 +152,15 @@ jobs:
               assert field in source, f"Missing effect provenance field: {field}"
           for field in webhook_context_fields:
               assert field in source, f"Missing webhook context field: {field}"
+          assert "received_context" in source, "Missing independent received-context input"
+          assert "matches_receipt" in source, "Missing receipt/context binding check"
 
           expected_call_args = {
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
               "record_unknown": 1,       # self omitted; operation identity
               "reconcile_complete": 2,   # self omitted; operation + receipt
               "verify": 6,               # payload + secret + context + three expectations
+              "from_delivery": 6,        # delivery + hook + event + repository + payload + secret
               "from_authenticated_delivery": 7,  # receipt + payload + secret + context + three expectations
           }
           for node in ast.walk(tree):
