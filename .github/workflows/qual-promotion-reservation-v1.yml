@@ -23,6 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          openssl version
           grep -Fq "claim_ceiling=deterministic local transaction/reconciliation model only" scripts/validate_promotion_reservation_v1.py
           grep -Fq "promotion_authority=false" scripts/validate_promotion_reservation_v1.py
 
@@ -39,6 +40,8 @@ jobs:
 
           required_classes = {
               "ProviderTopologyCasPredicateV1",
+              "ProviderTopologyCasDsseEnvelopeV1",
+              "ProviderTopologyCasTrustRootV1",
               "ProviderTopologyCasRequestV1",
               "ProviderTopologyCasSubmissionV1",
               "ProviderTopologyCasExecutionV1",
@@ -67,6 +70,12 @@ jobs:
               "ProviderTopologyCasVerificationV1",
               "independent-verifier",
               "canonical-binding-v1",
+              "DSSEv1 ",
+              "application/vnd.in-toto+json",
+              "openssl-ed25519-dsse-verifier",
+              "test_provider_topology_cas_signature_tampering_rejects",
+              "test_provider_topology_cas_trust_root_key_id_mismatch_rejects",
+              "test_provider_topology_cas_missing_trust_root_fails_closed",
               "test_provider_topology_cas_provider_result_requires_attestation_verification",
               "test_provider_topology_cas_evidence_rejects_unenforced_execution",
               "test_stack_identity_rejects_bypass_for_multi_pr_stack",
@@ -159,6 +168,8 @@ jobs:
             echo "python_oracle=scripts/validate_promotion_reservation_v1.py"
             echo "promotion_authority=false"
             echo "provider_dispatch=not invoked"
+            echo "attestation_verifier=DSSEv1 PAE + OpenSSL Ed25519"
+            echo "attestation_signer=ephemeral test-only key; no production trust asserted"
             echo
             echo "### Rust reference"
             cat /tmp/promotion-reservation-v1-rust.out
