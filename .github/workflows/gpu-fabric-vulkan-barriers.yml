@@ -105,8 +105,12 @@ jobs:
         if: always()
         working-directory: .ci/gpu-fabric-workspace
         run: |
-          test -f qualification-runtime.txt
-          sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
+          if test -f qualification-runtime.txt; then
+            sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
+          else
+            printf 'qualification_execution=not_reached\n' > qualification-runtime.txt
+            sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
+          fi
 
       - name: Upload immutable qualification evidence
         if: always()
