@@ -8833,6 +8833,40 @@ mod tests {
             } if frontier_id == "fixture-input-frontier-v1"
         ));
 
+        let mut wrong_input_role = topology.clone();
+        wrong_input_role.input_bindings[0].role = MeasurementModelInputRole::Influence;
+        assert!(matches!(
+            wrong_input_role
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_input_specification = topology.clone();
+        wrong_input_specification.input_bindings[0]
+            .input_specification
+            .specification_digest = "different-input-spec-digest".into();
+        assert!(matches!(
+            wrong_input_specification
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
         let mut wrong_frontier_model = topology.clone();
         wrong_frontier_model.input_frontier.measurement_model_digest =
             "other-model-digest".into();
