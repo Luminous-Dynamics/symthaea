@@ -1492,8 +1492,16 @@ if [ -f /mnt/etc/nixos/configuration.nix ]; then
     echo "ERROR: unable to apply TPM2 crypttab configuration."
     exit 1
   fi
+  if ! grep -Fq 'cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix; then
+    echo "ERROR: TPM2 crypttab configuration postcondition was not observed."
+    exit 1
+  fi
   if ! sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix 2>/dev/null; then
     echo "ERROR: unable to enable systemd initrd for TPM2."
+    exit 1
+  fi
+  if ! grep -Fq 'boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix; then
+    echo "ERROR: TPM2 systemd initrd configuration postcondition was not observed."
     exit 1
   fi
   echo "  TPM2 enrollment complete for $CRYPT_PART."
@@ -1703,7 +1711,14 @@ fn system_config_patch(msg: &ClientMessage, transaction_dir: &str) -> String {
     format!(
         r#"
 # Install supplementary system configuration from the transaction-private staging file.
-cp "{staged}" /mnt/etc/nixos/system-config.nix
+if ! cp "{staged}" /mnt/etc/nixos/system-config.nix 2>/dev/null; then
+  echo "ERROR: unable to install staged system-config.nix."
+  exit 1
+fi
+if ! cmp -s "{staged}" /mnt/etc/nixos/system-config.nix; then
+  echo "ERROR: installed system-config.nix does not match the staged transaction artifact."
+  exit 1
+fi
 # Add import to configuration.nix. The source path is fixed; all browser-derived
 # configuration content remains in the staged file, not in this shell source.
 if ! sed -i 's|imports = [|imports = [ ./system-config.nix|' /mnt/etc/nixos/configuration.nix 2>/dev/null; then
