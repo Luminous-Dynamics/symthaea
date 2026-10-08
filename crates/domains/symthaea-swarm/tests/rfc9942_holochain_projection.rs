@@ -349,6 +349,89 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
 
 #[cfg(feature = "semantic-receipts")]
 #[test]
+fn unprotected_outer_metadata_is_not_authenticated_but_is_provenance_bound() {
+    let rng = SystemRandom::new();
+    let receipt_signer = signing_key(&rng);
+    let outer_signer = signing_key(&rng);
+    let receipt_key = receipt_signer.public_key().as_ref().to_vec();
+    let outer_key = outer_signer.public_key().as_ref().to_vec();
+
+    let collection = Rfc9942ReceiptCollection::new(vec![
+        signed_inclusion_receipt(
+            &[b"candidate".to_vec(), b"other".to_vec()],
+            &receipt_signer,
+            &rng,
+        ),
+    ])
+    .unwrap();
+
+    let outer = signed_outer_with_receipts(
+        &collection,
+        b"candidate",
+        &outer_signer,
+        &rng,
+    );
+    let baseline_wire = outer.to_cbor();
+    let (baseline_verified, _) = outer
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        )
+        .unwrap();
+
+    // Add an unrelated unprotected header without resigning. RFC 9052's
+    // Sig_structure excludes the unprotected bucket, so the outer signature
+    // must continue to verify. The provenance capability must nevertheless
+    // distinguish the modified transport artifact.
+    let collection_start = baseline_wire
+        .windows(4)
+        .position(|window| window == [0xa1, 0x19, 0x01, 0x8a])
+        .expect("receipt header marker");
+    let payload_marker = baseline_wire
+        .windows(1)
+        .enumerate()
+        .skip(collection_start + 4)
+        .find(|(_, byte)| **byte == 0x49)
+        .map(|(index, _)| index)
+        .expect("payload bstr marker");
+
+    // The existing unprotected map is {394: collection}; replace its map
+    // header with a two-member map and insert an opaque extension before 394.
+    let mut modified_wire = baseline_wire.clone();
+    assert_eq!(modified_wire.get(collection_start), Some(&0xa1));
+    modified_wire[collection_start] = 0xa2;
+    modified_wire.splice(
+        collection_start..collection_start,
+        [0x19, 0x23, 0x28, 0x01, 0x02, 0x61, 0x78],
+    );
+
+    let modified = Rfc9942SignatureWithReceipts::from_cbor(&modified_wire).unwrap();
+    let (modified_verified, _) = modified
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        )
+        .unwrap();
+
+    assert_ne!(
+        baseline_verified.capability_sha256(),
+        modified_verified.capability_sha256()
+    );
+    assert_ne!(
+        baseline_verified.outer_signature_with_receipt_sha256(),
+        modified_verified.outer_signature_with_receipt_sha256()
+    );
+    assert_ne!(modified_wire, baseline_wire);
+    let _ = payload_marker;
+}
+#[cfg(feature = "semantic-receipts")]
+#[test]
 fn atomic_priority_selection_api_returns_bound_witness() {
     let rng = SystemRandom::new();
     let receipt_signer = signing_key(&rng);
