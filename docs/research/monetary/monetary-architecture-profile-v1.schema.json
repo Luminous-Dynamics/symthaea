@@ -16,6 +16,7 @@
     "provenance",
     "inheritance_policy",
     "monetary_primitives",
+    "moneyness_properties",
     "institutional_composition",
     "transplant_contract"
   ],
@@ -98,6 +99,16 @@
         "interoperability": { "$ref": "#/$defs/mechanism" },
         "default_loss_allocation": { "$ref": "#/$defs/mechanism" },
         "governance_legal_finality": { "$ref": "#/$defs/mechanism" }
+      }
+    },
+    "moneyness_properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["par_singleness", "liquidity_elasticity", "integrity_constraints"],
+      "properties": {
+        "par_singleness": { "$ref": "#/$defs/mechanism" },
+        "liquidity_elasticity": { "$ref": "#/$defs/mechanism" },
+        "integrity_constraints": { "$ref": "#/$defs/mechanism" }
       }
     },
     "institutional_composition": {
