@@ -322,6 +322,19 @@ def main() -> None:
     if "rm -rf" in production_text:
         fail("production relay source contains recursive rm -rf")
 
+    # Config reads are read-only, but the pathname still crosses a filesystem
+    # authority boundary. Require the same descriptor-relative O_NOFOLLOW reader
+    # used by restore/postcondition verification.
+    read_cfg_start = text.find('            "read_config" => {')
+    read_cfg_end = text.find('\n            "', read_cfg_start + 20)
+    if read_cfg_start < 0 or read_cfg_end < 0:
+        fail("read_config arm disappeared")
+    read_cfg_body = text[read_cfg_start:read_cfg_end]
+    if 'tokio::fs::read_to_string("/etc/nixos/configuration.nix")' in read_cfg_body:
+        fail("read_config regressed to pathname-following read_to_string")
+    if 'read_regular_file_bytes_at(' not in read_cfg_body:
+        fail("read_config lost descriptor-relative regular-file reader")
+
     # Generated system_config.nix content must remain an out-of-band staged file.
     patch_start = text.find("fn system_config_patch(")
     patch_end = text.find("\n/// Generate the automated install script", patch_start)
