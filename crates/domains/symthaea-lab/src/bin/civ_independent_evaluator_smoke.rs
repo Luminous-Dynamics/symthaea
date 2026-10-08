@@ -34,13 +34,14 @@ impl CandidateRevision {
     fn digest(self) -> Digest {
         // The smoke fixture uses content-address-like stable identities.
         // A production implementation must bind the canonical artifact bytes.
-        let tag = match self.change_set {
-            Digest("candidate-expected") => "candidate-v1",
-            Digest("candidate-tampered") => "candidate-tampered",
-            Digest("candidate-degraded") => "candidate-degraded",
-            _ => "candidate-other",
-        };
-        Digest(tag)
+        match (self.candidate, self.change_set) {
+            (Digest("candidate-v1"), Digest("candidate-expected")) => Digest("candidate-v1"),
+            (Digest("candidate-v1"), Digest("candidate-tampered")) => Digest("candidate-tampered"),
+            (Digest("candidate-degraded"), Digest("candidate-degraded")) => {
+                Digest("candidate-degraded")
+            }
+            _ => Digest("candidate-other"),
+        }
     }
 }
 
@@ -62,8 +63,12 @@ impl EvaluationProfile {
     }
 
     fn digest(self) -> Digest {
-        // Stable fixture identity for this smoke.
-        Digest("evaluator-profile-v1")
+        // Stable fixture identity for this smoke. The profile field is part of
+        // the bound evaluation subject rather than free-form metadata.
+        match self.profile {
+            Digest("evaluation-profile-v1") => Digest("evaluator-profile-v1"),
+            _ => Digest("evaluator-profile-other"),
+        }
     }
 }
 
@@ -170,7 +175,6 @@ impl Evaluator {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum IndependenceFinding {
-    Independent,
     SharedCodeLineage,
     SharedDataLineage,
     SharedAuthorityLineage,
@@ -322,6 +326,7 @@ fn main() {
         epoch: 151,
         measured_value: 42,
     };
+    assert_eq!(degraded.parent, Some(candidate.digest()));
     let fail = evaluator
         .evaluate(degraded, degraded_observation)
         .expect("degraded candidate should evaluate");
@@ -374,8 +379,11 @@ fn main() {
     };
     let deployment = issue_deployment_receipt(pass, admitted, 160)
         .expect("external authority should be able to authorize");
+    assert_eq!(deployment.candidate, pass.candidate);
     assert_eq!(deployment.evaluation, pass.digest());
     assert_eq!(deployment.authority, Digest("external-authority"));
+    assert_eq!(deployment.scope, Digest("bounded-test-scope"));
+    assert!(deployment.expires_at_epoch >= pass.issued_epoch);
 
     // Duplicate replay cannot become fresh independent evidence.
     let duplicate = evaluator.admit_observation(observation);
