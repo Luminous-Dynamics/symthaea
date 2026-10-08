@@ -129,13 +129,15 @@ An admission reference can now contribute to higher-tier authority diversity onl
 
 ## Experimental-design provenance
 
-The assessment schema remains **53** and the assessment algorithm is now **v76**. v76 adds the fail-closed requirement that a design-bound observation must actually be linked into the candidate estimate named by its experimental target surface. The v76 heuristic target carries the exact requirement-declared comparison scale (unit, scope, and basis digest) alongside candidate-pair and dimension identity, so a serialized measurement priority cannot silently lose the comparability context that justified the overlap.
+The assessment schema remains **53** and the assessment algorithm is now **v77**. v76 adds the fail-closed requirement that a design-bound observation must actually be linked into the candidate estimate named by its experimental target surface. The v76 heuristic target carries the exact requirement-declared comparison scale (unit, scope, and basis digest) alongside candidate-pair and dimension identity, so a serialized measurement priority cannot silently lose the comparability context that justified the overlap.
 
 The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, exact uncertainty identities when the linked evidence actually carries them, and interval-overlap discrimination targets without inventing a laboratory protocol. It never synthesizes an uncertainty identifier when the evidence layer has not supplied one.
 
 When an actual measurement campaign is proposed, ExperimentalDesignProvenance can be attached to the assessment. It requires an exact hypothesis, exact requirement identity, targeted uncertainty identities, candidate identities, explicit discrimination targets, an exact documented protocol identity/digest and comparison basis, and explicit stopping criteria. The assessment receipt commits to that design.
 
 An observation may then carry the resulting experimental_design_id, closing the lineage from proposal to observed result. This is provenance, not scientific authorization: Symthaea does not certify protocol adequacy, sample size, statistical power, causal validity, metrological traceability, or experimental safety.
+
+Every `unresolved_uncertainty_refs` entry in a proposed design must now resolve to the exact uncertainty identity on pre-existing evidence linked to one endpoint candidate's declared target surface. An observation already marked as produced by an experimental design/target cannot retroactively serve as the unresolved uncertainty that justified that same design. This is an identity-and-linkage guard only: it does not recompute uncertainty, establish that uncertainty is adequate, or prove that a campaign's decision rule is scientifically sufficient.
 
 
 ### Typed experimental discrimination
