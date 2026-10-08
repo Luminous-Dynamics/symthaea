@@ -28,7 +28,7 @@ An exact repeated delivery ID is classified as duplicate-delivery and is idempot
 
 If a later authenticated merged observation disagrees on the expected head or merge commit, the reducer enters Conflict rather than choosing one observation.
 
-This is fail-closed evidence handling: contradictory provider evidence does not become a guessed truth.
+This is fail-closed evidence handling: contradictory provider evidence does not become a guessed truth. Once `Conflict` is entered, it is absorbing: later compatible, duplicate, non-effect, or untrusted arrivals cannot reclassify the state as `EffectObserved`.
 
 ## Out-of-order non-effects
 
