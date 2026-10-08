@@ -52,7 +52,7 @@ fn next_demand(agent: Agent, observed_stock: i64) -> i64 {
             if observed_stock < 700 {
                 agent.demand.max(2)
             } else {
-                agent.demand.min(5)
+                agent.demand.min(4)
             }
         }
     }
@@ -68,13 +68,13 @@ fn simulate(behavior: Behavior, institution: Institution) -> Trajectory {
     // The institution is deliberately held constant for the B1 comparison.
     assert!(agents.iter().all(|agent| agent.institution == institution));
 
-    let mut stock = 1_000_i64;
+    let mut stock = 10_000_i64;
     let mut total_consumed = 0_i64;
 
     for tick in 0..20 {
         // Same physical shock schedule for every behavioral profile.
         if tick == 10 {
-            stock -= 300;
+            stock -= 1_500;
             assert!(stock >= 0);
         }
 
