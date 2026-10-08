@@ -2616,6 +2616,14 @@ mod tests {
                 [1; 16],
                 TEST_IMPLEMENTATION_IDENTITY_DIGEST,
                 "3333333333333333333333333333333333333333333333333333333333333333",
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding)
         ));
@@ -2651,6 +2659,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [9; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::DriverUuidBinding)
         ));
@@ -2665,8 +2678,51 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 9,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::DriverIdBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                "4444444444444444444444444444444444444444444444444444444444444444",
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+            ),
+            Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                2,
+                0,
+                [1, 1, 1],
+            ),
+            Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
         ));
     }
 
