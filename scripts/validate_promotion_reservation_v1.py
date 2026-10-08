@@ -627,6 +627,23 @@ class ClockRelationV1:
 
 
 @dataclass(frozen=True)
+class LocalTemporalSequenceV1:
+    reservation_sequence: int
+    dispatch_sequence: int
+    observation_sequence: int
+
+    def valid(self) -> bool:
+        return (
+            self.reservation_sequence > 0
+            and self.dispatch_sequence > 0
+            and self.observation_sequence > 0
+            and self.reservation_sequence
+            <= self.dispatch_sequence
+            <= self.observation_sequence
+        )
+
+
+@dataclass(frozen=True)
 class ProviderWebhookEffectTimingV1:
     provider_event_time_ms: int | None
     provider_delivery_time_ms: int | None
@@ -634,6 +651,7 @@ class ProviderWebhookEffectTimingV1:
     local_dispatch_time_ms: int | None
     local_observation_time_ms: int | None
     clock_relation: ClockRelationV1 | None
+    local_sequence: LocalTemporalSequenceV1 | None = None
 
     @classmethod
     def from_observation(
@@ -643,6 +661,7 @@ class ProviderWebhookEffectTimingV1:
         local_dispatch_time_ms: int | None,
         clock_relation: ClockRelationV1 | None,
         provider_delivery_time_ms: int | None = None,
+        local_sequence: LocalTemporalSequenceV1 | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
         return cls(
             provider_event_time_ms=parse_provider_timestamp_ms(observation.merged_at),
@@ -651,6 +670,7 @@ class ProviderWebhookEffectTimingV1:
             local_dispatch_time_ms=local_dispatch_time_ms,
             local_observation_time_ms=observation.local_received_at_ms,
             clock_relation=clock_relation,
+            local_sequence=local_sequence,
         )
 
     def classify(self) -> str:
@@ -673,6 +693,10 @@ class ProviderWebhookEffectTimingV1:
             return "local-observation-time-missing"
         if self.local_dispatch_time_ms < self.local_reservation_time_ms:
             return "invalid-local-time-order"
+        if self.local_sequence is None:
+            return "local-monotonic-sequence-missing"
+        if not self.local_sequence.valid():
+            return "invalid-local-monotonic-sequence"
         if self.provider_delivery_time_ms is not None:
             if self.provider_delivery_time_ms < self.provider_event_time_ms:
                 return "invalid-provider-time-order"
@@ -1280,6 +1304,7 @@ def effect_timing_fixture(
     dispatch_time_ms: int | None = 1791475195000,
     observation_time_ms: int | None = 1791475205000,
     clock_relation: ClockRelationV1 | None = None,
+    local_sequence: LocalTemporalSequenceV1 | None = None,
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
         provider_event_time_ms=event_time_ms,
@@ -1289,6 +1314,11 @@ def effect_timing_fixture(
         local_observation_time_ms=observation_time_ms,
         clock_relation=(
             clock_relation if clock_relation is not None else clock_relation_fixture()
+        ),
+        local_sequence=(
+            local_sequence
+            if local_sequence is not None
+            else LocalTemporalSequenceV1(1, 2, 3)
         ),
     )
 
@@ -1306,6 +1336,7 @@ def webhook_effect_timing_from_observation(
         local_reservation_time_ms=1791475190000,
         local_dispatch_time_ms=1791475195000,
         clock_relation=clock_relation_fixture(),
+        local_sequence=LocalTemporalSequenceV1(10, 11, 12),
     )
 
 
@@ -1337,6 +1368,38 @@ def test_clock_relation_unverified_is_unusable():
 
 def test_clock_relation_negative_skew_is_unusable():
     assert not clock_relation_fixture(max_skew_ms=-1, verified=True).usable()
+
+
+def test_local_temporal_sequence_validates_monotonic_order():
+    assert LocalTemporalSequenceV1(1, 2, 3).valid()
+    assert LocalTemporalSequenceV1(1, 1, 1).valid()
+
+
+def test_local_temporal_sequence_rejects_nonpositive_values():
+    assert not LocalTemporalSequenceV1(0, 1, 2).valid()
+    assert not LocalTemporalSequenceV1(1, 0, 2).valid()
+
+
+def test_local_temporal_sequence_rejects_backward_dispatch():
+    assert not LocalTemporalSequenceV1(2, 1, 3).valid()
+
+
+def test_local_temporal_sequence_rejects_observation_before_dispatch():
+    assert not LocalTemporalSequenceV1(1, 3, 2).valid()
+
+
+def test_temporal_effect_without_local_sequence_is_not_admissible():
+    timing = effect_timing_fixture(local_sequence=None)
+    assert timing.classify() == "local-monotonic-sequence-missing"
+    assert not timing.temporally_admissible()
+
+
+def test_temporal_effect_with_invalid_local_sequence_is_not_admissible():
+    timing = effect_timing_fixture(
+        local_sequence=LocalTemporalSequenceV1(3, 2, 1),
+    )
+    assert timing.classify() == "invalid-local-monotonic-sequence"
+    assert not timing.temporally_admissible()
 
 
 def test_temporal_effect_with_valid_skew_is_admissible():
@@ -3734,6 +3797,12 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_local_temporal_sequence_validates_monotonic_order,
+    test_local_temporal_sequence_rejects_nonpositive_values,
+    test_local_temporal_sequence_rejects_backward_dispatch,
+    test_local_temporal_sequence_rejects_observation_before_dispatch,
+    test_temporal_effect_without_local_sequence_is_not_admissible,
+    test_temporal_effect_with_invalid_local_sequence_is_not_admissible,
     test_provider_timestamp_parser_accepts_utc_and_offset,
     test_provider_timestamp_parser_rejects_malformed_timestamp,
     test_clock_relation_unverified_is_unusable,
