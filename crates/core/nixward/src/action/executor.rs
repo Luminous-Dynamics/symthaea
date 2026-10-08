@@ -11,13 +11,11 @@
 
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::execution_witness::NixLiveExecutionWitnessV1;
-#[cfg(feature = "systemd-observer")]
-use crate::action::{
-    NixSystemdLifecycleMutationTransportV1, NixSystemdReadOnlyObserverV1,
-};
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
 use crate::action::service_state::NixServiceObservedStateV1;
+#[cfg(feature = "systemd-observer")]
+use crate::action::{NixSystemdLifecycleMutationTransportV1, NixSystemdReadOnlyObserverV1};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -46,14 +44,12 @@ fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
         .map_err(|_| format!("invalid generation pre-state identity: {identity}"))
 }
 
-fn parse_service_pre_state_identity(
-    identity: &str,
-) -> Result<(u64, String, String), String> {
+fn parse_service_pre_state_identity(identity: &str) -> Result<(u64, String, String), String> {
     let mut parts = identity.split('|');
-    if parts.next() != Some(SERVICE_PRE_STATE_IDENTITY_PREFIX_V1)
-        || parts.clone().count() != 3
-    {
-        return Err(format!("unsupported service pre-state identity format: {identity}"));
+    if parts.next() != Some(SERVICE_PRE_STATE_IDENTITY_PREFIX_V1) || parts.clone().count() != 3 {
+        return Err(format!(
+            "unsupported service pre-state identity format: {identity}"
+        ));
     }
 
     let generation = parts
@@ -61,9 +57,7 @@ fn parse_service_pre_state_identity(
         .and_then(|part| part.strip_prefix("generation="))
         .ok_or_else(|| format!("service pre-state identity missing generation: {identity}"))?;
     if generation == "none" {
-        return Err(
-            "service execution authority requires a bound NixOS generation".to_string(),
-        );
+        return Err("service execution authority requires a bound NixOS generation".to_string());
     }
     let generation = generation
         .parse::<u64>()
@@ -94,7 +88,6 @@ fn parse_service_pre_state_identity(
 
     Ok((generation, unit, digest.to_string()))
 }
-
 
 fn validate_service_pre_state_observation(
     identity: &str,
@@ -391,9 +384,7 @@ impl NixOSCommand {
                     extra_args: vec!["--rollback".to_string()],
                 })
             }
-            Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
-                Some(NixOSCommand::EnvRollback)
-            }
+            Self::EnvInstall { .. } | Self::EnvRemove { .. } => Some(NixOSCommand::EnvRollback),
             // The previous implementation used a shell pipeline to locate and
             // activate an older Home Manager generation. That was an arbitrary
             // shell effect and cannot cross a typed execution boundary safely.
@@ -1027,8 +1018,9 @@ impl NixOSExecutor {
             #[cfg(not(feature = "systemd-observer"))]
             {
                 let result = ExecutionResult::Blocked {
-                    reason: "typed Service execution requires the systemd read-only observer capability"
-                        .to_string(),
+                    reason:
+                        "typed Service execution requires the systemd read-only observer capability"
+                            .to_string(),
                     safety_level: safety,
                 };
                 self.record_authorized_execution(
@@ -1147,7 +1139,9 @@ impl NixOSExecutor {
             Err(error) => {
                 return (
                     ExecutionResult::Blocked {
-                        reason: format!("could not connect read-only systemd observer before dispatch: {error}"),
+                        reason: format!(
+                            "could not connect read-only systemd observer before dispatch: {error}"
+                        ),
                         safety_level: command.safety_level(),
                     },
                     None,
@@ -1160,7 +1154,9 @@ impl NixOSExecutor {
             Err(error) => {
                 return (
                     ExecutionResult::Blocked {
-                        reason: format!("could not arm JobRemoved watcher before Service dispatch: {error}"),
+                        reason: format!(
+                            "could not arm JobRemoved watcher before Service dispatch: {error}"
+                        ),
                         safety_level: command.safety_level(),
                     },
                     None,
@@ -1171,8 +1167,9 @@ impl NixOSExecutor {
         if watcher.manager_owner() != expected_manager_owner {
             return (
                 ExecutionResult::Blocked {
-                    reason: "armed JobRemoved watcher manager owner does not match Service authority"
-                        .to_string(),
+                    reason:
+                        "armed JobRemoved watcher manager owner does not match Service authority"
+                            .to_string(),
                     safety_level: command.safety_level(),
                 },
                 None,
@@ -1181,8 +1178,9 @@ impl NixOSExecutor {
         if watcher.bus_id() != expected_bus_id {
             return (
                 ExecutionResult::Blocked {
-                    reason: "armed JobRemoved watcher bus incarnation does not match Service authority"
-                        .to_string(),
+                    reason:
+                        "armed JobRemoved watcher bus incarnation does not match Service authority"
+                            .to_string(),
                     safety_level: command.safety_level(),
                 },
                 None,
@@ -1194,7 +1192,9 @@ impl NixOSExecutor {
             Err(error) => {
                 return (
                     ExecutionResult::Blocked {
-                        reason: format!("could not connect typed systemd mutation transport: {error}"),
+                        reason: format!(
+                            "could not connect typed systemd mutation transport: {error}"
+                        ),
                         safety_level: command.safety_level(),
                     },
                     None,
@@ -1285,17 +1285,13 @@ impl NixOSExecutor {
             NixServiceOperationKindV1::Stop => "stop",
             NixServiceOperationKindV1::Restart => "restart",
             NixServiceOperationKindV1::Reload => "reload",
-            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => {
-                "unsupported"
-            }
+            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => "unsupported",
         };
         let result = if job_evidence.result == "done" {
             ExecutionResult::Success {
                 stdout: format!(
                     "systemd {} job {} completed for {}",
-                    operation_label,
-                    job_evidence.id,
-                    unit
+                    operation_label, job_evidence.id, unit
                 ),
                 stderr: String::new(),
                 execution_time_ms: elapsed,
@@ -1304,10 +1300,7 @@ impl NixOSExecutor {
             ExecutionResult::FailedNoRollback {
                 error: format!(
                     "systemd {} job {} for {} finished with result {}",
-                    operation_label,
-                    job_evidence.id,
-                    unit,
-                    job_evidence.result
+                    operation_label, job_evidence.id, unit, job_evidence.result
                 ),
                 rollback_error: None,
             }
@@ -1338,12 +1331,9 @@ impl NixOSExecutor {
                 return Ok(());
             }
 
-            let actual_generation = self
-                .capture_generation()
-                .await
-                .map_err(|error| {
-                    format!("could not revalidate current NixOS generation: {error}")
-                })?;
+            let actual_generation = self.capture_generation().await.map_err(|error| {
+                format!("could not revalidate current NixOS generation: {error}")
+            })?;
             let observed = ServiceManager::observed_state(unit)
                 .map_err(|error| format!("could not revalidate service pre-state: {error}"))?;
             validate_service_pre_state_observation(
@@ -1399,8 +1389,7 @@ impl NixOSExecutor {
         let expected_digest = authority
             .service_definition_content_digest()
             .ok_or_else(|| {
-                "Service execution authority has no bound definition-content commitment"
-                    .to_string()
+                "Service execution authority has no bound definition-content commitment".to_string()
             })?;
 
         let observer = NixSystemdReadOnlyObserverV1::connect_system()
@@ -1412,19 +1401,17 @@ impl NixOSExecutor {
             })?;
 
         let content = match operation {
-            NixServiceOperationKindV1::Restart => observer
-                .capture_service_definition_content_for_restart(unit)
-                .await,
+            NixServiceOperationKindV1::Restart => {
+                observer
+                    .capture_service_definition_content_for_restart(unit)
+                    .await
+            }
             _ => observer.capture_service_definition_content(unit).await,
         }
-        .map_err(|error| {
-            format!("could not revalidate service definition content: {error}")
+        .map_err(|error| format!("could not revalidate service definition content: {error}"))?;
+        let actual_digest = content.digest().map_err(|error| {
+            format!("could not digest revalidated service definition content: {error}")
         })?;
-        let actual_digest = content
-            .digest()
-            .map_err(|error| {
-                format!("could not digest revalidated service definition content: {error}")
-            })?;
 
         if actual_digest != expected_digest {
             return Err(format!(
@@ -1433,18 +1420,12 @@ impl NixOSExecutor {
             ));
         }
 
-        let expected_manager_owner = authority
-            .service_manager_owner()
-            .ok_or_else(|| {
-                "Service execution authority has no bound systemd manager owner"
-                    .to_string()
-            })?;
-        let expected_bus_id = authority
-            .service_bus_id()
-            .ok_or_else(|| {
-                "Service execution authority has no bound D-Bus bus incarnation"
-                    .to_string()
-            })?;
+        let expected_manager_owner = authority.service_manager_owner().ok_or_else(|| {
+            "Service execution authority has no bound systemd manager owner".to_string()
+        })?;
+        let expected_bus_id = authority.service_bus_id().ok_or_else(|| {
+            "Service execution authority has no bound D-Bus bus incarnation".to_string()
+        })?;
         if content.manager_owner() != expected_manager_owner {
             return Err(format!(
                 "systemd manager owner changed since approval: approved={} current={}",
@@ -1461,18 +1442,13 @@ impl NixOSExecutor {
         }
 
         if operation == NixServiceOperationKindV1::Restart {
-            let expected_invocation_id = authority
-                .pre_invocation_id()
-                .ok_or_else(|| {
-                    "Restart execution authority has no bound pre-invocation identity"
-                        .to_string()
-                })?;
-            let actual_invocation_id = content
-                .pre_invocation_id()
-                .ok_or_else(|| {
-                    "Restart definition revalidation has no observer-derived pre-invocation identity"
-                        .to_string()
-                })?;
+            let expected_invocation_id = authority.pre_invocation_id().ok_or_else(|| {
+                "Restart execution authority has no bound pre-invocation identity".to_string()
+            })?;
+            let actual_invocation_id = content.pre_invocation_id().ok_or_else(|| {
+                "Restart definition revalidation has no observer-derived pre-invocation identity"
+                    .to_string()
+            })?;
             if actual_invocation_id != expected_invocation_id {
                 return Err(format!(
                     "service invocation identity changed since approval: approved={} current={}",
@@ -1536,8 +1512,9 @@ impl NixOSExecutor {
 
         if !self.dry_run && matches!(&command, NixOSCommand::Service { .. }) {
             return ExecutionResult::Blocked {
-                reason: "typed Service effects must use the governed manager-bound D-Bus dispatch path"
-                    .to_string(),
+                reason:
+                    "typed Service effects must use the governed manager-bound D-Bus dispatch path"
+                        .to_string(),
                 safety_level: safety,
             };
         }
@@ -1696,14 +1673,18 @@ mod tests {
         )
         .is_err());
 
-        assert!(parse_service_pre_state_identity(
-            "nixward-service-pre-state-v1|generation=42|unit=nginx|state=0123"
-        )
-        .is_err());
-        assert!(parse_service_pre_state_identity(
-            "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=not-a-digest"
-        )
-        .is_err());
+        assert!(
+            parse_service_pre_state_identity(
+                "nixward-service-pre-state-v1|generation=42|unit=nginx|state=0123"
+            )
+            .is_err()
+        );
+        assert!(
+            parse_service_pre_state_identity(
+                "nixward-service-pre-state-v1|generation=42|unit=nginx.service|state=not-a-digest"
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1722,9 +1703,8 @@ mod tests {
         .unwrap();
         let identity = state.execution_pre_state_identity(42).unwrap();
 
-        let error =
-            validate_service_pre_state_observation(&identity, "nginx.service", 43, &state)
-                .unwrap_err();
+        let error = validate_service_pre_state_observation(&identity, "nginx.service", 43, &state)
+            .unwrap_err();
         assert!(error.contains("approved generation=42"));
     }
 
@@ -1756,9 +1736,8 @@ mod tests {
         .unwrap();
         let identity = active.execution_pre_state_identity(42).unwrap();
 
-        let error =
-            validate_service_pre_state_observation(&identity, "nginx.service", 42, &failed)
-                .unwrap_err();
+        let error = validate_service_pre_state_observation(&identity, "nginx.service", 42, &failed)
+            .unwrap_err();
         assert!(error.contains("approved pre-state digest"));
     }
 
@@ -1778,9 +1757,8 @@ mod tests {
         .unwrap();
         let identity = nginx.execution_pre_state_identity(42).unwrap();
 
-        let error =
-            validate_service_pre_state_observation(&identity, "sshd.service", 42, &nginx)
-                .unwrap_err();
+        let error = validate_service_pre_state_observation(&identity, "sshd.service", 42, &nginx)
+            .unwrap_err();
         assert!(error.contains("unit mismatch"));
     }
 
@@ -2084,8 +2062,21 @@ mod tests {
     async fn arbitrary_custom_wrapper_cannot_reach_service_effects() {
         let mut executor = NixOSExecutor::new();
         for (command, args) in [
-            ("sh", vec!["-c".to_string(), "systemctl restart nginx.service".to_string()]),
-            ("env", vec!["systemctl".to_string(), "restart".to_string(), "nginx.service".to_string()]),
+            (
+                "sh",
+                vec![
+                    "-c".to_string(),
+                    "systemctl restart nginx.service".to_string(),
+                ],
+            ),
+            (
+                "env",
+                vec![
+                    "systemctl".to_string(),
+                    "restart".to_string(),
+                    "nginx.service".to_string(),
+                ],
+            ),
         ] {
             let result = executor
                 .execute(
@@ -2114,7 +2105,10 @@ mod tests {
             .execute(
                 NixOSCommand::Custom {
                     command: "sh".to_string(),
-                    args: vec!["-c".to_string(), "systemctl restart nginx.service".to_string()],
+                    args: vec![
+                        "-c".to_string(),
+                        "systemctl restart nginx.service".to_string(),
+                    ],
                     safety_level: SafetyLevel::SystemModify,
                 },
                 1.0,
