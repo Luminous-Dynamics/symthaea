@@ -515,18 +515,16 @@ mod tests {
     #[test]
     fn constitutional_mutation_is_blocked_until_separate_treatment() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        let mut candidate = candidate(RuleLevel::Constitutional, "profile-v1", "constitution-v1", "m-constitutional");
+        let mut candidate = candidate(
+            RuleLevel::Constitutional,
+            "profile-v1",
+            "constitution-v1",
+            "m-constitutional",
+        );
         candidate.semantic_delta.path = "amendment.threshold".into();
-        evolution.propose("p1", candidate, "a", "capture").unwrap();
         assert_eq!(
-            evolution.decide(AdoptionDecision {
-                proposal_id: "p1".into(),
-                adopted: true,
-                authority: Some("authority".into()),
-                authorizing_rule_hash: Some("meta-v0".into()),
-                authorizing_rule_level: Some(RuleLevel::MetaConstitutional),
-            }),
-            Err(FailureDisposition::MetaConstitutionalMutationDisabled)
+            evolution.propose("p1", candidate, "a", "capture"),
+            Err(FailureDisposition::ConstitutionalMutationDisabled)
         );
     }
 
