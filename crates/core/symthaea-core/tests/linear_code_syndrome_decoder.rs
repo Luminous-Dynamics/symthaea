@@ -1339,6 +1339,24 @@ fn independent_parity_check_rows(code: &RandomLinearCode) -> Vec<u64> {
     checks
 }
 
+fn brute_force_dual_space(code: &RandomLinearCode, dimension: usize) -> Vec<u64> {
+    assert_eq!(code.dimension(), dimension);
+    assert!(dimension <= 20, "brute-force dual oracle is intentionally bounded to small regimes");
+
+    let mut dual = Vec::new();
+    for mask in 0..(1usize << dimension) {
+        let candidate = mask as u64;
+        if code
+            .basis()
+            .iter()
+            .all(|generator| (candidate & generator.words()[0]).count_ones() % 2 == 0)
+        {
+            dual.push(candidate);
+        }
+    }
+    dual
+}
+
 fn independent_coset_leader_profile(checks: &[u64], dimension: usize) -> Vec<(usize, usize)> {
     let syndrome_count = 1usize << checks.len();
     let mut profile = vec![(usize::MAX, 0usize); syndrome_count];
@@ -1723,6 +1741,73 @@ fn composed_basis_and_coordinate_metamorphisms_preserve_decoder_semantics() {
         "COMPOSED_METAMORPHIC_EQUIVARIANCE=dimension=73;rank=8;probes=64;basis_then_coordinate=true;codeword_set_equal=true;parity_check_equal=true;decoder_list_equal=true;work_ledger_equal=true"
     );
 }
+#[test]
+fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
+    let cases = [
+        (12usize, 4usize, 0xE100_0000u64),
+        (20usize, 3usize, 0xE200_0000u64),
+    ];
+
+    let mut total_dual_vectors = 0usize;
+    let mut total_row_membership_checks = 0usize;
+    let mut total_kernel_observations = 0usize;
+
+    for &(dimension, rank, seed) in &cases {
+        let code = RandomLinearCode::generate(dimension, rank, seed);
+        let parity_check = ParityCheckMatrix::from_code(&code).expect("parity-check matrix");
+
+        let dual_vectors = brute_force_dual_space(&code, dimension);
+        total_dual_vectors += dual_vectors.len();
+
+        assert_eq!(
+            dual_vectors.len(),
+            1usize << (dimension - rank),
+            "brute-force dual-space cardinality mismatch: regime={dimension}x{rank} seed=0x{seed:X}"
+        );
+
+        for row in parity_check.rows() {
+            let mask = row.words()[0];
+            assert!(
+                dual_vectors.binary_search(&mask).is_ok(),
+                "production parity-check row was not in the brute-force dual space: regime={dimension}x{rank} seed=0x{seed:X} row={mask:#x}"
+            );
+            total_row_membership_checks += 1;
+        }
+
+        let production_rows = parity_check
+            .rows()
+            .iter()
+            .map(|row| row.words()[0])
+            .collect::<Vec<_>>();
+        assert_eq!(
+            independent_binary_rank(&production_rows, dimension),
+            dimension - rank,
+            "production parity-check rows did not have the full dual rank: regime={dimension}x{rank} seed=0x{seed:X}"
+        );
+
+        let expected_kernel_size = 1usize << rank;
+        let mut kernel_size = 0usize;
+        for mask in 0..(1usize << dimension) {
+            let observation = error_from_mask(mask, dimension);
+            let syndrome = parity_check.syndrome(&observation).expect("same dimension");
+            if syndrome.weight() == 0 {
+                kernel_size += 1;
+                assert!(
+                    code.contains(&observation),
+                    "production zero-syndrome kernel admitted an observation outside the code: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                );
+            }
+            total_kernel_observations += 1;
+        }
+        assert_eq!(kernel_size, expected_kernel_size);
+    }
+
+    println!(
+        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_rank_full=true;kernel_equals_code=true;algebraically_distinct=true",
+        cases.len(),
+    );
+}
+
 #[test]
 fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
     let regimes = [
