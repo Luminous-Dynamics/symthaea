@@ -1466,7 +1466,7 @@ impl MeasurementUncertaintyRef {
             .collect::<Vec<_>>();
         unique_component_ids.dedup();
         if unique_component_ids.len() != canonical_component_refs.len() {
-            return Err(AssessmentError::DuplicateMeasurementUncertaintyComponentReference);
+            return Err(AssessmentError::InvalidMeasurementUncertaintyComponentReference);
         }
 
         if self.uncertainty_budget_component_count != canonical_component_refs.len() {
@@ -2829,7 +2829,7 @@ pub enum ConstraintStatus {
 }
 
 /// Result for one named functional constraint.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConstraintEvaluation {
     /// Metric name.
     pub metric: String,
@@ -4151,6 +4151,28 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "evidence {evidence_id} observation record digest {expected_observation_record_digest} does not match uncertainty record digest {actual_observation_record_digest}"
             ),
+            Self::MeasurementUncertaintyEvaluationScopeMismatch {
+                uncertainty_id,
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} evaluation scope field {field} expected {expected} actual {actual}"
+            ),
+            Self::InvalidMeasurementUncertaintyEvaluation => {
+                write!(f, "measurement uncertainty evaluation provenance is invalid")
+            }
+            Self::MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+                uncertainty_id,
+                expected_calibration_chain_digest,
+                actual_calibration_chain_digest,
+                expected_calibration_chain_count,
+                actual_calibration_chain_count,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} evaluation calibration chain mismatch: digest {actual_calibration_chain_digest} expected {expected_calibration_chain_digest}, count {actual_calibration_chain_count} expected {expected_calibration_chain_count}"
+            ),
             Self::MeasurementUncertaintyComponentRefsDigestMismatch {
                 uncertainty_id,
                 expected_component_refs_digest,
@@ -5001,7 +5023,12 @@ impl AlternativesEngine {
         let expected_scales = requirement
             .comparison_scales
             .iter()
-            .map(|(dimension, scale)| (dimension, (scale.unit.clone(), scale.scope.clone())))
+            .map(|(dimension, scale)| {
+                (
+                    dimension,
+                    (scale.unit.clone(), scale.scope.clone(), scale.basis.clone()),
+                )
+            })
             .collect::<BTreeMap<_, _>>();
 
         for candidate in &normalized_candidates {
@@ -5114,7 +5141,7 @@ impl AlternativesEngine {
             for dimension in Dimension::ALL {
                 match (candidate.burdens.get(&dimension), expected_scales.get(&dimension)) {
                     (None, _) => candidate_blockers.push(FrontierBlocker::MissingDimension(dimension)),
-                    (Some(estimate), Some((expected_unit, expected_scope)))
+                    (Some(estimate), Some((expected_unit, expected_scope, _expected_basis)))
                         if estimate.unit != *expected_unit || estimate.scope != *expected_scope =>
                     {
                         candidate_blockers.push(FrontierBlocker::IncompatibleScale {
@@ -5125,12 +5152,12 @@ impl AlternativesEngine {
                             actual_scope: estimate.scope.clone(),
                         });
                     }
-                    (Some(estimate), Some(scale))
-                        if estimate.basis != scale.basis =>
+                    (Some(estimate), Some((_, _, expected_basis)))
+                        if estimate.basis != *expected_basis =>
                     {
                         candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
                             context: format!("burden:{dimension:?}"),
-                            expected: scale.basis.clone(),
+                            expected: expected_basis.clone(),
                             actual: estimate.basis.clone(),
                         });
                     }
@@ -5404,8 +5431,11 @@ impl AlternativesEngine {
                 .map(|candidate_id| format!("uncertainty:{candidate_id}:{dimension:?}"))
                 .collect();
 
-            for target in &expected_discrimination {
-                target.validate()?;
+            if expected_discrimination
+                .iter()
+                .any(|target| target.validate().is_err())
+            {
+                return None;
             }
             MeasurementPriority {
                 dimension: *dimension,
@@ -6347,7 +6377,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             error,
-            AssessmentError::DuplicateMeasurementUncertaintyComponentReference
+            AssessmentError::InvalidMeasurementUncertaintyComponentReference
         );
     }
 
@@ -7708,7 +7738,7 @@ mod tests {
             ],
         );
 
-        let result = AlternativesEngine::assess(&fixture_requirement(), &[candidate], None).unwrap();
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[candidate], None).unwrap();
         let assessment = &result.candidates[0];
         assert!(assessment.evidence_conflict);
         assert_eq!(
@@ -8803,6 +8833,8 @@ mod tests {
         let mut duplicate_input = topology.clone();
         duplicate_input.input_bindings.push(CalibrationTraceabilityInputBinding {
             input_quantity_id: "fixture-input".into(),
+            input_specification: duplicate_input.input_bindings[0].input_specification.clone(),
+            role: duplicate_input.input_bindings[0].role,
             node_id: "calibration".into(),
         });
         assert!(matches!(
@@ -9656,7 +9688,7 @@ mod tests {
 
     #[test]
     fn lifecycle_tier_requires_two_admitted_lifecycle_authorities() {
-        let lifecycle_a = evidence(
+        let mut lifecycle_a = evidence(
             "lca-a",
             "lca-authority-a",
             EvidenceKind::LifecycleAssessed,
@@ -9771,7 +9803,7 @@ mod tests {
 
     #[test]
     fn manufacturing_tier_requires_two_admitted_manufacturing_authorities() {
-        let manufacturing_a = evidence(
+        let mut manufacturing_a = evidence(
             "manufacturing-a",
             "manufacturing-authority-a",
             EvidenceKind::ManufacturingObserved,
@@ -9888,7 +9920,7 @@ mod tests {
         water.unit = "candidate-defined-unit".into();
         water.evidence_ids.clear();
 
-        let result = AlternativesEngine::assess(&fixture_requirement(), &[c], None).unwrap();
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
 
         assert!(matches!(
             result.frontier_blockers["cohort-authority"][0],
@@ -9963,7 +9995,7 @@ mod tests {
         };
 
         let expected_basis = fixture_basis();
-        for target in [burden, performance, operating] {
+        for target in [&burden, &performance, &operating] {
             let (unit, scope, basis) = target
                 .requirement_scale(&requirement)
                 .expect("fixture declares every target scale");
@@ -10791,16 +10823,24 @@ mod tests {
             .iter()
             .position(|candidate| candidate.id == "product-redesign")
             .unwrap();
-        let observed = candidates[candidate_index]
+        let evidence_id = candidates[candidate_index]
             .evidence
-            .iter_mut()
+            .iter()
             .find(|evidence| evidence.kind == EvidenceKind::Observed)
-            .unwrap();
-        let evidence_id = observed.id.clone();
-        observed.observation.as_mut().unwrap().experimental_design_id =
-            Some("design:procedure".into());
-        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
-        observed.observation.as_mut().unwrap().procedure_id = "procedure:wrong".into();
+            .unwrap()
+            .id
+            .clone();
+        {
+            let observed = candidates[candidate_index]
+                .evidence
+                .iter_mut()
+                .find(|evidence| evidence.kind == EvidenceKind::Observed)
+                .unwrap();
+            observed.observation.as_mut().unwrap().experimental_design_id =
+                Some("design:procedure".into());
+            observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+            observed.observation.as_mut().unwrap().procedure_id = "procedure:wrong".into();
+        }
 
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
@@ -10848,22 +10888,29 @@ mod tests {
                 Some(case.incumbent_id),
                 None,
                 None,
-                design,
+                design.clone(),
             )
             .unwrap_err();
 
         assert_eq!(
             error,
             AssessmentError::ExperimentalDesignProcedureMismatch {
-                evidence_id,
+                evidence_id: evidence_id.clone(),
                 expected_procedure_id: "fixture-measurement-procedure-v1".into(),
                 actual_procedure_id: "procedure:wrong".into(),
             }
         );
-        observed.observation.as_mut().unwrap().procedure_id =
-            "fixture-measurement-procedure-v1".into();
-        observed.observation.as_mut().unwrap().procedure_digest =
-            "procedure-digest:wrong".into();
+        {
+            let observed = candidates[candidate_index]
+                .evidence
+                .iter_mut()
+                .find(|evidence| evidence.kind == EvidenceKind::Observed)
+                .unwrap();
+            observed.observation.as_mut().unwrap().procedure_id =
+                "fixture-measurement-procedure-v1".into();
+            observed.observation.as_mut().unwrap().procedure_digest =
+                "procedure-digest:wrong".into();
+        }
 
         let error = AlternativesEngine
             .assess_with_experimental_design(
@@ -11143,7 +11190,7 @@ mod tests {
                 candidate
                     .evidence
                     .iter_mut()
-                    .find(|evidence| e.observation.is_some())
+                    .find(|evidence| evidence.observation.is_some())
             })
             .unwrap();
         let (calibration_chain_digest, calibration_chain_count) = {
