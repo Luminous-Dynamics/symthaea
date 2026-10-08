@@ -125,8 +125,8 @@ use symthaea_swarm::rfc9942_selection::{
 #[cfg(feature = "semantic-receipts")]
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942ProofKind, Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope,
-    Rfc9942ReceiptPayload, Rfc9942Vdp, Rfc9162InclusionProof, Rfc9162Sha256Vds,
-    COSE_ES256_ALGORITHM_ID,
+    Rfc9942ReceiptPayload, Rfc9942SignatureWithReceipts, Rfc9942Vdp,
+    Rfc9162InclusionProof, Rfc9162Sha256Vds, COSE_ES256_ALGORITHM_ID,
 };
 
 #[cfg(feature = "semantic-receipts")]
@@ -264,6 +264,85 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
     );
 
     assert!(MAX_RECEIPT_SELECTION_CANDIDATES >= collection.len() as u32);
+}
+
+#[cfg(feature = "semantic-receipts")]
+#[test]
+fn atomic_priority_selection_api_returns_bound_witness() {
+    let rng = SystemRandom::new();
+    let receipt_signer = signing_key(&rng);
+    let outer_signer = signing_key(&rng);
+    let receipt_key = receipt_signer.public_key().as_ref().to_vec();
+    let outer_key = outer_signer.public_key().as_ref().to_vec();
+
+    let first_receipt = signed_inclusion_receipt(
+        &[b"candidate".to_vec(), b"other-a".to_vec()],
+        &receipt_signer,
+        &rng,
+    );
+    let second_receipt = signed_inclusion_receipt(
+        &[b"candidate".to_vec(), b"other-b".to_vec()],
+        &receipt_signer,
+        &rng,
+    );
+    let collection =
+        Rfc9942ReceiptCollection::new(vec![first_receipt, second_receipt]).unwrap();
+
+    // Build a real Signature_With_Receipt with protected alg=-7 and the
+    // priority-ordered receipt collection in unprotected header 394.
+    // The outer payload is the exact candidate bytes consumed by the selected
+    // inner inclusion Receipt.
+    let collection_bytes = collection.to_cbor();
+    let protected = [0xa1, 0x01, 0x26];
+    let mut unsigned_wire = vec![0xd2, 0x84, 0x43];
+    unsigned_wire.extend_from_slice(&protected);
+    unsigned_wire.extend_from_slice(&[
+        0xa1, 0x19, 0x01, 0x8a,
+    ]);
+    unsigned_wire.extend_from_slice(&collection_bytes);
+    unsigned_wire.extend_from_slice(&cbor_bstr(b"candidate"));
+    unsigned_wire.extend_from_slice(&cbor_bstr(&[0; 64]));
+
+    let unsigned = Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
+    let signature = outer_signer
+        .sign(&rng, &unsigned.signature1_tbs(&[], None).unwrap())
+        .unwrap()
+        .as_ref()
+        .to_vec();
+
+    let mut signed_wire = vec![0xd2, 0x84, 0x43];
+    signed_wire.extend_from_slice(&protected);
+    signed_wire.extend_from_slice(&[
+        0xa1, 0x19, 0x01, 0x8a,
+    ]);
+    signed_wire.extend_from_slice(&collection_bytes);
+    signed_wire.extend_from_slice(&cbor_bstr(b"candidate"));
+    signed_wire.extend_from_slice(&cbor_bstr(&signature));
+
+    let outer = Rfc9942SignatureWithReceipts::from_cbor(&signed_wire).unwrap();
+    let (verified_outer, witness) = outer
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(witness.decision().selected_index, Some(0));
+    assert_eq!(
+        witness.decision().selected_receipt_sha256,
+        Some(witness.decision().candidates[0].receipt_sha256)
+    );
+    assert_eq!(
+        witness.verified_capability_sha256(),
+        verified_outer.receipt().capability_sha256()
+    );
+    assert_eq!(
+        witness.selection_decision_sha256().unwrap(),
+        witness.decision().validated_digest().unwrap()
+    );
 }
 
 #[cfg(feature = "semantic-receipts")]
