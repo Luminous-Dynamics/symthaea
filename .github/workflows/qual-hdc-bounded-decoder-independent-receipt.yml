@@ -1163,16 +1163,43 @@ jobs:
               repo: context.repo.repo,
               per_page: 100,
             });
-            const publicationGovernanceIdentitySha256 = sha256Canonical({
+            const publicationRulesets = Array.isArray(publicationGovernanceResponse.data)
+              ? publicationGovernanceResponse.data
+              : [];
+            let publicationBranchProtection;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/branches/{branch}/protection',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              publicationBranchProtection = {
+                accessible: true,
+                http_status: response.status,
+                required_status_checks: response.data?.required_status_checks ?? null,
+              };
+            } catch (error) {
+              publicationBranchProtection = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                required_status_checks: null,
+              };
+            }
+            const publicationGovernanceObserved = {
+              schema_version: 'governance-authority-observation-v1',
               default_branch: repositoryMetadata.default_branch,
-              rulesets: (Array.isArray(publicationGovernanceResponse.data) ? publicationGovernanceResponse.data : [])
-                .map((rule) => ({
-                  id: rule.id ?? null,
-                  name: rule.name ?? null,
-                  target: rule.target ?? null,
-                  enforcement: rule.enforcement ?? null,
-                })),
-            });
+              rulesets: publicationRulesets.map((rule) => ({
+                id: rule.id ?? null,
+                name: rule.name ?? null,
+                target: rule.target ?? null,
+                enforcement: rule.enforcement ?? null,
+              })),
+              branch_protection: publicationBranchProtection,
+            };
+            const publicationGovernanceIdentitySha256 = sha256Canonical(publicationGovernanceObserved);
             const publicationFencePassed =
               publicationMainSha === liveEvidence.finalMainSha &&
               publicationPr.head?.sha === liveEvidence.finalPr.head?.sha &&
@@ -1180,6 +1207,32 @@ jobs:
               publicationPr.merge_commit_sha === liveEvidence.finalPr.merge_commit_sha &&
               publicationBaseSha === liveEvidence.finalBaseBranchTipSha &&
               publicationGovernanceIdentitySha256 === governanceIdentitySha256;
+
+            const finalLeaseObservedAt = new Date().toISOString();
+            promotionLease.observed_at = finalLeaseObservedAt;
+            promotionLease.reconciliation.observed_at = finalLeaseObservedAt;
+            promotionLease.reconciliation.publication_fence = {
+              passed: publicationFencePassed,
+              main_tip_sha: publicationMainSha,
+              base_tip_sha: publicationBaseSha,
+              governance_identity_sha256: publicationGovernanceIdentitySha256,
+            };
+            if (!publicationFencePassed) {
+              if (!promotionLease.invalidation_reasons.includes('publication_fence_failed')) {
+                promotionLease.invalidation_reasons.push('publication_fence_failed');
+              }
+              promotionLease.lease_state = 'NOT_ELIGIBLE';
+            }
+            promotionLease.lease_id_sha256 = sha256Canonical({
+              ...promotionLease,
+              lease_id_sha256: undefined,
+            });
+            delete promotionLease.lease_id_sha256;
+
+            const leaseBodyForHash = JSON.parse(JSON.stringify(promotionLease));
+            promotionLease.lease_id_sha256 = sha256Canonical(leaseBodyForHash);
+
+            receipt.promotion_eligibility_lease = promotionLease;
 
             const promotable =
               receipt.qualification_result === 'PASS' &&
@@ -1210,6 +1263,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V7.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V8.json
           if-no-files-found: error
           retention-days: 90
