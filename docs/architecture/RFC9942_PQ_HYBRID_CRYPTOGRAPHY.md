@@ -173,10 +173,38 @@ Before a hybrid durable path is promoted:
 8. CI records exact-head evidence for the complete vector/fuzz/interop suite.
 9. The PQ backend's audit status is recorded explicitly; no “secure” or “FIPS validated” claim is inferred from algorithm standardization alone.
 
+## Choice of classical component
+
+The best classical component depends on the protocol boundary rather than on a desire to make every subsystem look identical.
+
+For **RFC 9942 receipts**, the first hybrid target should be:
+
+**ES256 + ML-DSA-65**
+
+The current durable RFC 9942 path already uses ES256. More importantly, RFC 9942 explicitly recommends selecting signature algorithms that share cryptographic components with the VDS; the RFC9162 SHA-256 VDS and ES256 both rely on SHA-256. This makes ES256 the least disruptive classical half for the receipt migration.
+
+For **identity/attestation protocols that already use Ed25519**, the corresponding target should be:
+
+**Ed25519 + ML-DSA-65**
+
+That preserves the existing identity ecosystem while adding the PQ component.
+
+These are separate profile decisions. Symthaea should not force one classical algorithm across unrelated cryptographic domains merely for consistency.
+
+## Key-independence requirement
+
+The two hybrid components should use independent key material and independent key identifiers.
+
+A hybrid witness MUST NOT mean “the same key represented through two encodings.” The security benefit comes from retaining distinct cryptographic assumptions and distinct compromise paths.
+
+Where practical, key rotation, authorization, custody, and recovery policy should also be independent. Otherwise a single operational compromise can defeat the intended multi-algorithm failure isolation even when the mathematics of the combiner is sound.
+
 ## Current recommendation
 
 **Yes: adopt PQ/T hybrid for the durable evidence boundary.**
 
 Do not remove Ed25519 now. Do not make Ed25519 the durable root of new quantum-resistant evidence. Add ML-DSA-65 as the standards-aligned PQ component, and make the future durable witness require **both** classical and PQ verification over one exact, domain-separated transcript.
+
+For RFC 9942, make ES256 the first classical half of that migration. For existing Ed25519 identity/attestation paths, use Ed25519 as the classical half.
 
 The existing RFC 9942 parser/fuzz qualification remains a separate change stream. This PQC migration is intentionally isolated so the current qualification run can finish without being invalidated by an unrelated cryptographic dependency migration.
