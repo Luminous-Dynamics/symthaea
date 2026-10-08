@@ -870,6 +870,13 @@ impl NixPostStateReceiptV1 {
         {
             return Err(NixPostStateErrorV1::BusIncarnationMismatch);
         }
+        let expected_manager_owner = intent
+            .service_effect_context()
+            .map(|context| context.authorized_manager_owner.as_str())
+            .ok_or(NixPostStateErrorV1::MissingServiceEffectContext)?;
+        if self.systemd_manager_owner != expected_manager_owner {
+            return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
+        }
         authorization
             .validate_against_intent(intent)
             .map_err(|error| match error {
@@ -2356,6 +2363,35 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err(),
+            NixPostStateErrorV1::ManagerOwnerMismatch
+        );
+    }
+
+    #[test]
+    fn serialized_receipt_manager_owner_tamper_is_rejected() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.systemd_manager_owner = ":1.124".to_string();
+
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            ":1.123",
+            "0123456789abcdef0123456789abcdef",
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+
+        assert_eq!(
+            receipt.verify_against(&intent, &authorization).unwrap_err(),
             NixPostStateErrorV1::ManagerOwnerMismatch
         );
     }
