@@ -55,6 +55,31 @@ jobs:
               f"Ledger method signature drift: {methods}"
           )
 
+          top_level_classes = {
+              node.name
+              for node in tree.body
+              if isinstance(node, ast.ClassDef)
+          }
+          required_classes = {
+              "ProviderMergeResultV1",
+              "PromotionCausalResolutionV1",
+              "ProviderTopologyBindingV1",
+              "PromotionStackEffectSetV1",
+          }
+          assert required_classes <= top_level_classes, (
+              f"Required causal classes missing: {sorted(required_classes - top_level_classes)}"
+          )
+
+          causal_outcomes = {
+              "requested-effect-causal",
+              "stack-effect-causal",
+              "effect-observed-only",
+              "causality-unestablished",
+          }
+          source = path.read_text()
+          for outcome in causal_outcomes:
+              assert f'"{outcome}"' in source, f"Missing causal outcome: {outcome}"
+
           expected_call_args = {
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
               "record_unknown": 1,       # self omitted; operation identity
