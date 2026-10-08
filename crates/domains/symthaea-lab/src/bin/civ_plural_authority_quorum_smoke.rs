@@ -356,6 +356,9 @@ fn emergency_suspend(
     if policy.roster_version != roster.version {
         return Err(QuorumFailure::StaleRoster);
     }
+    if effective_epoch < policy.valid_from_epoch || effective_epoch > policy.valid_until_epoch {
+        return Err(QuorumFailure::PolicyNotCurrent);
+    }
     if member.role != AuthorityRole::EmergencyGuardian {
         return Err(QuorumFailure::MemberNotInCurrentRoster);
     }
@@ -665,6 +668,23 @@ fn main() {
     .expect("scope expansion requires a new matching policy and quorum");
     assert_ne!(decision.id, expanded.id);
 
+    // A different eligible approver set for the same scope/time creates a
+    // different identity even when the policy and candidate are unchanged.
+    let alternate_quorum = approve(
+        evaluation,
+        ConsequenceTier::Critical,
+        Digest("critical-scope-v1"),
+        candidate,
+        evaluator,
+        &[safety, technical, affected],
+        &roster,
+        policy,
+        Digest("independent-critical-quorum"),
+        100,
+    )
+    .expect("alternate independent quorum should be representable");
+    assert_ne!(decision.id, alternate_quorum.id);
+
     // Higher consequence cannot be retroactively inferred from a lower-tier
     // evaluation; the evaluator must explicitly evaluate at the requested tier.
     let low_evaluation = EvaluationReceipt {
@@ -766,7 +786,7 @@ fn main() {
     // Historical decisions retain their immutable roster/policy snapshot.
     assert_eq!(decision.id.roster_version, Digest("roster-v1"));
     assert_eq!(decision.id.policy.version, Digest("governance-policy-v1"));
-    assert_eq!(decision.id.approvers, vec![safety, technical, public]);
+    assert_eq!(decision.id.approvers, vec![public, safety, technical]);
 
     println!("SYM-CIV-006 PASS: plural-authority, policy-freshness and quorum controls hold.");
     println!("Claim ceiling: structured local identity/type-flow fixture only; not cryptographic proof or democratic legitimacy.");
