@@ -1385,6 +1385,18 @@ jobs:
             core.setOutput('lease_id', promotionLease.lease_id_sha256);
             core.setOutput('publication_fence_passed', String(publicationFencePassed));
             core.setOutput('promotable', String(promotable));
+            core.setOutput('final_main_sha', publicationMainSha);
+            core.setOutput('final_base_sha', publicationBaseSha);
+            core.setOutput('final_pr_head_sha', publicationPr.head?.sha ?? '');
+            core.setOutput('final_pr_base_sha', publicationPr.base?.sha ?? '');
+            core.setOutput('final_pr_merge_sha', publicationPr.merge_commit_sha ?? '');
+            core.setOutput('run_id', String(publicationRun.id));
+            core.setOutput('run_attempt', String(publicationRun.run_attempt));
+            core.setOutput('artifact_id', String(publicationArtifact?.id ?? ''));
+            core.setOutput('artifact_digest', publicationArtifact?.digest ?? '');
+            core.setOutput('artifact_created_at', publicationArtifact?.created_at ?? '');
+            core.setOutput('artifact_expires_at', publicationArtifact?.expires_at ?? '');
+            core.setOutput('governance_identity_sha256', publicationGovernanceIdentitySha256);
 
             if (receipt.qualification_result !== 'PASS') {
               core.setFailed('Independent verifier refused to qualify the triggering run');
@@ -1409,9 +1421,41 @@ jobs:
           UPLOAD_OUTCOME: ${{ steps.upload_receipt.outcome }}
           PROMOTABLE: ${{ steps.verify.outputs.promotable }}
           LEASE_ID: ${{ steps.verify.outputs.lease_id }}
+          EXPECTED_MAIN_SHA: ${{ steps.verify.outputs.final_main_sha }}
+          EXPECTED_BASE_SHA: ${{ steps.verify.outputs.final_base_sha }}
+          EXPECTED_PR_HEAD_SHA: ${{ steps.verify.outputs.final_pr_head_sha }}
+          EXPECTED_PR_BASE_SHA: ${{ steps.verify.outputs.final_pr_base_sha }}
+          EXPECTED_PR_MERGE_SHA: ${{ steps.verify.outputs.final_pr_merge_sha }}
+          EXPECTED_RUN_ID: ${{ steps.verify.outputs.run_id }}
+          EXPECTED_RUN_ATTEMPT: ${{ steps.verify.outputs.run_attempt }}
+          EXPECTED_ARTIFACT_ID: ${{ steps.verify.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ steps.verify.outputs.artifact_digest }}
+          EXPECTED_ARTIFACT_CREATED_AT: ${{ steps.verify.outputs.artifact_created_at }}
+          EXPECTED_ARTIFACT_EXPIRES_AT: ${{ steps.verify.outputs.artifact_expires_at }}
+          EXPECTED_GOVERNANCE_IDENTITY_SHA256: ${{ steps.verify.outputs.governance_identity_sha256 }}
         with:
           script: |
+            const crypto = require('crypto');
             const uploadSucceeded = process.env.UPLOAD_OUTCOME === 'success';
+            const verifierSucceeded = process.env.VERIFIER_OUTCOME === 'success';
+
+            function canonicalize(value) {
+              if (Array.isArray(value)) return value.map(canonicalize);
+              if (value && typeof value === 'object') {
+                return Object.fromEntries(
+                  Object.keys(value).sort().map((key) => [key, canonicalize(value[key])])
+                );
+              }
+              return value;
+            }
+
+            function governanceIdentity(value) {
+              return crypto
+                .createHash('sha256')
+                .update('promotion-eligibility-lease-v1\\u0000' + JSON.stringify(canonicalize(value)))
+                .digest('hex');
+            }
+
             const verifierSucceeded = process.env.VERIFIER_OUTCOME === 'success';
             let receiptArtifactAvailable = false;
             let receiptArtifact = null;
@@ -1441,11 +1485,122 @@ jobs:
                 receiptArtifact.size_in_bytes > 0;
             }
 
+            const mainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            })).data;
+            const currentMainSha = String(mainRef.object?.sha ?? '');
+
+            const currentPr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: 6803,
+            })).data;
+
+            const currentBaseRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/research/hdc-linear-code-recovery-design-v1',
+            })).data;
+            const currentBaseSha = String(currentBaseRef.object?.sha ?? '');
+
+            const currentRun = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(process.env.EXPECTED_RUN_ID),
+            })).data;
+
+            const currentArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: Number(process.env.EXPECTED_RUN_ID),
+                per_page: 100,
+              }
+            );
+            const currentProducerArtifactMatches = currentArtifacts.filter(
+              (artifact) => Number(artifact.id) === Number(process.env.EXPECTED_ARTIFACT_ID)
+            );
+            const currentProducerArtifact = currentProducerArtifactMatches[0] ?? null;
+
+            const currentRulesetsResponse = await github.request('GET /repos/{owner}/{repo}/rulesets', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const currentBranchSummaryResponse = await github.request(
+              'GET /repos/{owner}/{repo}/branches/{branch}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: 'main',
+              }
+            );
+            let currentBranchProtection;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/branches/{branch}/protection',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: 'main',
+                }
+              );
+              currentBranchProtection = {
+                accessible: true,
+                http_status: response.status,
+                required_status_checks: response.data?.required_status_checks ?? null,
+              };
+            } catch (error) {
+              currentBranchProtection = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                required_status_checks: null,
+              };
+            }
+            const currentGovernanceObserved = {
+              schema_version: 'governance-authority-observation-v1',
+              default_branch: 'main',
+              branch_summary: {
+                protected: currentBranchSummaryResponse.data?.protected === true,
+                protection: currentBranchSummaryResponse.data?.protection ?? null,
+              },
+              rulesets: (Array.isArray(currentRulesetsResponse.data) ? currentRulesetsResponse.data : [])
+                .map((rule) => ({
+                  id: rule.id ?? null,
+                  name: rule.name ?? null,
+                  target: rule.target ?? null,
+                  enforcement: rule.enforcement ?? null,
+                })),
+              branch_protection: currentBranchProtection,
+            };
+            const currentGovernanceIdentitySha256 = governanceIdentity(currentGovernanceObserved);
+
+            const finalLeaseFenceStable =
+              currentMainSha === process.env.EXPECTED_MAIN_SHA &&
+              currentBaseSha === process.env.EXPECTED_BASE_SHA &&
+              currentPr.head?.sha === process.env.EXPECTED_PR_HEAD_SHA &&
+              currentPr.base?.sha === process.env.EXPECTED_PR_BASE_SHA &&
+              currentPr.merge_commit_sha === process.env.EXPECTED_PR_MERGE_SHA &&
+              currentRun.id === Number(process.env.EXPECTED_RUN_ID) &&
+              currentRun.run_attempt === Number(process.env.EXPECTED_RUN_ATTEMPT) &&
+              currentRun.head_sha === process.env.EXPECTED_PR_HEAD_SHA &&
+              currentProducerArtifact?.id === Number(process.env.EXPECTED_ARTIFACT_ID) &&
+              currentProducerArtifact?.digest === process.env.EXPECTED_ARTIFACT_DIGEST &&
+              currentProducerArtifact?.created_at === process.env.EXPECTED_ARTIFACT_CREATED_AT &&
+              currentProducerArtifact?.expires_at === process.env.EXPECTED_ARTIFACT_EXPIRES_AT &&
+              artifactLifecycleVerified(currentProducerArtifact) &&
+              currentProducerArtifact.expired === false &&
+              currentGovernanceIdentitySha256 === process.env.EXPECTED_GOVERNANCE_IDENTITY_SHA256;
+
             const success =
               verifierSucceeded &&
               uploadSucceeded &&
               receiptArtifactAvailable &&
-              process.env.PROMOTABLE === 'true';
+              process.env.PROMOTABLE === 'true' &&
+              finalLeaseFenceStable;
             const state = success ? 'success' : 'pending';
             const description = success
               ? 'Qualification and decision-time promotion lease verified.'
