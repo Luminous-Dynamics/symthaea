@@ -1525,6 +1525,72 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_ledger_writers_remain_framed_and_replayable() {
+        use std::sync::{Arc, Barrier, Mutex};
+        use std::thread;
+
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-concurrent-{name}.jsonl"));
+        let workers = 8usize;
+        let barrier = Arc::new(Barrier::new(workers));
+        let errors = Arc::new(Mutex::new(Vec::<String>::new()));
+
+        thread::scope(|scope| {
+            for worker in 0..workers {
+                let barrier = Arc::clone(&barrier);
+                let errors = Arc::clone(&errors);
+                let path = path.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    let ledger = match TransactionLedger::open_at(&path) {
+                        Ok(ledger) => ledger,
+                        Err(error) => {
+                            errors.lock().unwrap().push(error);
+                            return;
+                        }
+                    };
+
+                    let request_id = format!("concurrent-request-{worker:04}");
+                    let transaction = match SystemTransaction::begin(
+                        MutationKind::GcCollect,
+                        &request_id,
+                        None,
+                        format!("gc-{worker}").as_bytes(),
+                    ) {
+                        Ok(transaction) => transaction,
+                        Err(error) => {
+                            errors.lock().unwrap().push(error);
+                            return;
+                        }
+                    };
+
+                    if let Err(error) = ledger.admit(transaction) {
+                        errors.lock().unwrap().push(error);
+                    }
+                });
+            }
+        });
+
+        assert!(errors.lock().unwrap().is_empty(), "concurrent admission errors: {:?}", errors.lock().unwrap());
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let records = ledger.load().unwrap();
+        assert_eq!(records.len(), workers);
+        for worker in 0..workers {
+            let request_id = format!("concurrent-request-{worker:04}");
+            let receipt = ledger.lookup(&request_id).unwrap().expect("request must replay");
+            assert_eq!(receipt.mutation, MutationKind::GcCollect);
+        }
+
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.lines().count() >= workers);
+        assert!(!contents.as_bytes().windows(2).any(|pair| pair == b"}\n{"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn transaction_ids_are_random_and_unique() {
         let a = SystemTransaction::begin(MutationKind::Rollback, "request-a-00000001", None, b"rollback").unwrap();
         let b = SystemTransaction::begin(MutationKind::Rollback, "request-b-00000001", None, b"rollback").unwrap();
@@ -1685,7 +1751,7 @@ mod tests {
         let ledger = TransactionLedger::open_at(&path).unwrap();
         let event = JournalEvent {
             schema_version: SCHEMA_VERSION,
-            event: "started".into(),
+            event: JournalEventKind::Started,
             request_id: "append-permissions-0001".into(),
             transaction_id: "0123456789abcdef0123456789abcdef".into(),
             mutation: MutationKind::Install,
