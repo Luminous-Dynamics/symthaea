@@ -42,7 +42,7 @@ The resulting control-plane chain is:
 
 `default-branch verifier -> API-only PR inspection -> exact PR head -> independent workflow/job checks -> trusted commit status`
 
-The verifier also self-audits the base-owned trust workflow definition at its trusted checkout SHA, including its exact Action pins, permissions, early-invalidation triggers, default-branch replay restriction, and manual-run input plumbing. This is an accidental-drift guard; repository branch/ruleset governance remains the ultimate external trust root.
+The verifier also self-audits the base-owned trust workflow definition at its trusted checkout SHA, including its exact Action pins, permissions, trigger topology, early-invalidation triggers, default-branch replay restriction, and manual-run input plumbing. The admissible trigger topology is exactly the three required `workflow_run` sources plus the single `workflow_dispatch.workflow_run_id` input; additional workflow-run sources or dispatch inputs are rejected rather than ignored. This is an accidental-drift guard; repository branch/ruleset governance remains the ultimate external trust root.
 
 The trust anchor complements, rather than replaces, the Broca Feature Matrix's local compiler replay and artifact provenance checks.
 
