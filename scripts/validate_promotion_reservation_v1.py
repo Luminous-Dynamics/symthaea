@@ -330,9 +330,10 @@ class ProviderWebhookReceiptV1:
         self,
         payload: bytes,
         secret: bytes,
-        expected_hook_id: str | None = None,
-        expected_event_type: str | None = None,
-        expected_repository: str | None = None,
+        received_context: "ProviderWebhookRequestContextV1",
+        expected_hook_id: str,
+        expected_event_type: str,
+        expected_repository: str,
     ) -> bool:
         expected = "sha256=" + hmac.new(
             secret,
@@ -345,11 +346,28 @@ class ProviderWebhookReceiptV1:
             and bool(self.hook_id)
             and bool(self.event_type)
             and bool(self.repository)
+            and received_context.matches_receipt(self)
+            and received_context.hook_id == expected_hook_id
+            and received_context.event_type == expected_event_type
+            and received_context.repository == expected_repository
             and hmac.compare_digest(self.signature, expected)
             and self.payload_bytes_digest == hashlib.sha256(payload).hexdigest()
-            and (expected_hook_id is None or self.hook_id == expected_hook_id)
-            and (expected_event_type is None or self.event_type == expected_event_type)
-            and (expected_repository is None or self.repository == expected_repository)
+        )
+
+
+@dataclass(frozen=True)
+class ProviderWebhookRequestContextV1:
+    delivery_id: str
+    hook_id: str
+    event_type: str
+    repository: str
+
+    def matches_receipt(self, receipt: ProviderWebhookReceiptV1) -> bool:
+        return (
+            self.delivery_id == receipt.delivery_id
+            and self.hook_id == receipt.hook_id
+            and self.event_type == receipt.event_type
+            and self.repository == receipt.repository
         )
 
 
@@ -373,13 +391,18 @@ class ProviderPullRequestMergeObservationV1:
         receipt: ProviderWebhookReceiptV1,
         payload: bytes,
         secret: bytes,
+        received_context: ProviderWebhookRequestContextV1,
+        expected_hook_id: str,
+        expected_event_type: str,
+        expected_repository: str,
     ) -> "ProviderPullRequestMergeObservationV1 | None":
         if not receipt.verify(
             payload,
             secret,
-            expected_hook_id=receipt.hook_id,
-            expected_event_type="pull_request",
-            expected_repository=receipt.repository,
+            received_context,
+            expected_hook_id,
+            expected_event_type,
+            expected_repository,
         ):
             return None
 
@@ -862,12 +885,19 @@ def test_webhook_hmac_verification_accepts_exact_payload():
         payload,
         b"secret",
     )
+    context = ProviderWebhookRequestContextV1(
+        delivery_id="delivery-1",
+        hook_id="hook-1",
+        event_type="pull_request",
+        repository="Luminous-Dynamics/symthaea",
+    )
     assert receipt.verify(
         payload,
         b"secret",
-        expected_hook_id="hook-1",
-        expected_event_type="pull_request",
-        expected_repository="Luminous-Dynamics/symthaea",
+        context,
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
 
 
@@ -881,7 +911,20 @@ def test_webhook_hmac_verification_rejects_tampered_payload():
         payload,
         b"secret",
     )
-    assert not receipt.verify(b'{"action":"opened"}', b"secret")
+    context = ProviderWebhookRequestContextV1(
+        "delivery-2",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        b'{"action":"opened"}',
+        b"secret",
+        context,
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
 
 
 def test_webhook_hmac_verification_rejects_wrong_secret():
@@ -894,7 +937,31 @@ def test_webhook_hmac_verification_rejects_wrong_secret():
         payload,
         b"secret",
     )
-    assert not receipt.verify(payload, b"wrong")
+    context = ProviderWebhookRequestContextV1(
+        "delivery-3",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"wrong",
+        context,
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
+
+
+def webhook_received_context(
+    receipt: ProviderWebhookReceiptV1,
+) -> ProviderWebhookRequestContextV1:
+    return ProviderWebhookRequestContextV1(
+        delivery_id=receipt.delivery_id,
+        hook_id=receipt.hook_id,
+        event_type=receipt.event_type,
+        repository=receipt.repository,
+    )
 
 
 def webhook_merge_payload(
@@ -970,6 +1037,10 @@ def stack_webhook_observation(
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     return observation
@@ -1327,6 +1398,26 @@ def test_webhook_derived_effect_set_preserves_observation_only_semantics():
     assert resolution.outcome == "effect-observed-only"
 
 
+def test_webhook_parser_rejects_substituted_received_context():
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    context = ProviderWebhookRequestContextV1(
+        receipt.delivery_id,
+        "wrong-hook",
+        receipt.event_type,
+        receipt.repository,
+    )
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+        context,
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    ) is None
+
+
 def test_webhook_merge_effect_parses_authenticated_merged_pr():
     identity = stack_identity_fixture()
     payload = webhook_merge_payload()
@@ -1335,6 +1426,10 @@ def test_webhook_merge_effect_parses_authenticated_merged_pr():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     assert observation.validates_requested_effect(identity)
@@ -1370,6 +1465,10 @@ def test_webhook_merge_effect_rejects_non_pull_request_event():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     ) is None
 
 
@@ -1380,6 +1479,10 @@ def test_webhook_merge_effect_rejects_non_closed_action():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     ) is None
 
 
@@ -1390,6 +1493,10 @@ def test_webhook_merge_effect_rejects_closed_not_merged():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     ) is None
 
 
@@ -1407,6 +1514,10 @@ def test_webhook_merge_effect_rejects_wrong_repository():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     ) is None
 
 
@@ -1418,6 +1529,10 @@ def test_webhook_merge_effect_rejects_wrong_pr_number():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     assert not observation.validates_requested_effect(identity)
@@ -1431,6 +1546,10 @@ def test_webhook_merge_effect_rejects_wrong_head():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     assert not observation.validates_requested_effect(identity)
@@ -1456,6 +1575,10 @@ def test_webhook_merge_effect_rejects_missing_merge_commit():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     ) is None
 
 
@@ -1478,6 +1601,10 @@ def test_webhook_merge_effect_requires_exact_payload_digest():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     assert observation.payload_bytes_digest == receipt.payload_bytes_digest
@@ -1492,6 +1619,10 @@ def test_webhook_merge_effect_does_not_establish_async_operation_causality():
         receipt,
         payload,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     effect_set = PromotionStackEffectSetV1(
@@ -1536,26 +1667,49 @@ def test_webhook_context_mismatch_rejects_even_with_valid_hmac():
         payload,
         b"secret",
     )
-    assert not receipt.verify(
-        payload,
-        b"secret",
-        expected_hook_id="hook-2",
-        expected_event_type="pull_request",
-        expected_repository="Luminous-Dynamics/symthaea",
+    context = ProviderWebhookRequestContextV1(
+        "delivery-context",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert not receipt.verify(
         payload,
         b"secret",
-        expected_hook_id="hook-1",
-        expected_event_type="issues",
-        expected_repository="Luminous-Dynamics/symthaea",
+        context,
+        "hook-2",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
     assert not receipt.verify(
         payload,
         b"secret",
-        expected_hook_id="hook-1",
-        expected_event_type="pull_request",
-        expected_repository="other/repo",
+        context,
+        "hook-1",
+        "issues",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        context,
+        "hook-1",
+        "pull_request",
+        "other/repo",
+    )
+    substituted = ProviderWebhookRequestContextV1(
+        "delivery-context",
+        "hook-2",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        substituted,
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     )
 
 
@@ -3003,6 +3157,7 @@ TESTS = [
     test_webhook_derived_stack_effect_set_rejects_head_mismatch,
     test_webhook_derived_stack_effect_set_rejects_semantically_invalid_observation,
     test_webhook_derived_effect_set_preserves_observation_only_semantics,
+    test_webhook_parser_rejects_substituted_received_context,
     test_webhook_merge_effect_parses_authenticated_merged_pr,
     test_webhook_merge_effect_rejects_invalid_hmac,
     test_webhook_merge_effect_rejects_non_pull_request_event,
