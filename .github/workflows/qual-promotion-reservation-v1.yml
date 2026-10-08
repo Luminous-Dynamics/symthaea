@@ -244,6 +244,21 @@ jobs:
           assert "received_context" in source, "Missing independent received-context input"
           assert "matches_receipt" in source, "Missing receipt/context binding check"
 
+          crypto_replay = Path("scripts/verify_clock_relation_crypto_v1.py")
+          assert crypto_replay.is_file(), "Missing independent crypto replay harness"
+          crypto_source = crypto_replay.read_text()
+          for marker in (
+              "verify_ed25519",
+              "independent_crypto_replay=PASS",
+              "CLOCK_RELATION_CRYPTO_RFC8032_V1.json",
+              "not production cryptography",
+          ):
+              assert marker in crypto_source, f"Missing crypto replay marker: {marker}"
+          crypto_fixture = Path(
+              "docs/qualification/fixtures/CLOCK_RELATION_CRYPTO_RFC8032_V1.json"
+          )
+          assert crypto_fixture.is_file(), "Missing captured crypto replay vector"
+
           expected_call_args = {
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
               "record_unknown": 1,       # self omitted; operation identity
@@ -302,6 +317,12 @@ jobs:
           set -euo pipefail
           python3 scripts/validate_promotion_reservation_v1.py | tee /tmp/promotion-reservation-v1-python.out
 
+      - name: Replay cryptographic receipt independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_clock_relation_crypto_v1.py | tee /tmp/clock-relation-crypto-replay.out
+
       - name: Record model evidence
         shell: bash
         run: |
@@ -312,6 +333,7 @@ jobs:
             echo "trusted_head=$GITHUB_SHA"
             echo "rust_reference=validation/promotion_reservation_v1.rs"
             echo "python_oracle=scripts/validate_promotion_reservation_v1.py"
+            echo "crypto_replay=scripts/verify_clock_relation_crypto_v1.py"
             echo "promotion_authority=false"
             echo "provider_dispatch=not invoked"
             echo
