@@ -1607,38 +1607,64 @@ def test_provider_topology_cas_submission_digest_binds_operation_id():
 
 def test_provider_topology_cas_attestation_factory_is_deterministic():
     identity = stack_identity_fixture()
-    evidence = provider_topology_cas_evidence_fixture(identity)
-    assert evidence.provider_result.execution is not None
-    assert evidence.provider_result.attestation is not None
-    rebuilt = ProviderTopologyCasAttestationV1.from_execution(
-        evidence.provider_result.execution,
-        attestation_id=evidence.provider_result.attestation.attestation_id,
-    )
-    assert rebuilt == evidence.provider_result.attestation
+    first = provider_topology_cas_evidence_fixture(identity)
+    second = provider_topology_cas_evidence_fixture(identity)
+    assert first.provider_result.attestation == second.provider_result.attestation
 
 
 def test_provider_topology_cas_verification_factory_is_deterministic():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.execution is not None
     assert evidence.provider_result.attestation is not None
     assert evidence.provider_result.verification is not None
-    rebuilt = ProviderTopologyCasVerificationV1.from_attestation(
+    verified = verify_provider_topology_cas_attestation(
         evidence.provider_result.attestation,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
     )
-    assert rebuilt == evidence.provider_result.verification
+    assert verified == evidence.provider_result.verification
 
 
 def test_provider_topology_cas_attestation_digest_binds_execution():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
     assert evidence.provider_result.attestation is not None
-    changed = ProviderTopologyCasAttestationV1(
+    envelope = evidence.provider_result.attestation.envelope
+    original_payload = envelope.decoded_payload()
+    statement = json.loads(original_payload.decode("utf-8"))
+    statement["predicate"]["execution_digest"] = "wrong-execution-digest"
+    changed_payload = _canonical_json_bytes(statement)
+    changed_envelope = ProviderTopologyCasDsseEnvelopeV1(
         **{
-            **evidence.provider_result.attestation.__dict__,
-            "execution_digest": "wrong-execution-digest",
+            **envelope.__dict__,
+            "payload_base64": base64.b64encode(changed_payload).decode("ascii"),
         }
     )
-    assert evidence.provider_result.attestation.digest() != changed.digest()
+    changed = ProviderTopologyCasAttestationV1(envelope=changed_envelope)
+    assert changed.digest() != evidence.provider_result.attestation.digest()
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.execution is not None
+    assert verify_provider_topology_cas_attestation(
+        changed,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
 
 
 def test_provider_topology_cas_verification_binds_attestation():
@@ -1727,13 +1753,26 @@ def test_provider_topology_cas_attestation_rejects_wrong_source():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
     assert evidence.provider_result.attestation is not None
+    envelope = evidence.provider_result.attestation.envelope
     changed = ProviderTopologyCasAttestationV1(
-        **{
-            **evidence.provider_result.attestation.__dict__,
-            "attestation_source": "local-receipt",
-        }
+        envelope=ProviderTopologyCasDsseEnvelopeV1(
+            **{**envelope.__dict__, "payload_type": "application/json"}
+        )
     )
-    assert not changed.validates(evidence.provider_result.execution)
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.execution is not None
+    assert verify_provider_topology_cas_attestation(
+        changed,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
 
 
 def test_provider_topology_cas_verification_rejects_wrong_source():
@@ -1747,8 +1786,92 @@ def test_provider_topology_cas_verification_rejects_wrong_source():
             "verifier_source": "local-assertion",
         }
     )
-    assert not changed.validates(evidence.provider_result.attestation)
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.execution is not None
+    assert not changed.validates(
+        evidence.provider_result.attestation,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    )
 
+
+def test_provider_topology_cas_signature_tampering_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.attestation is not None
+    envelope = evidence.provider_result.attestation.envelope
+    signature = bytearray(base64.b64decode(envelope.signature_base64, validate=True))
+    signature[0] ^= 0x01
+    changed = ProviderTopologyCasAttestationV1(
+        envelope=ProviderTopologyCasDsseEnvelopeV1(
+            **{
+                **envelope.__dict__,
+                "signature_base64": base64.b64encode(bytes(signature)).decode("ascii"),
+            }
+        )
+    )
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.execution is not None
+    assert verify_provider_topology_cas_attestation(
+        changed,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
+
+
+def test_provider_topology_cas_trust_root_key_id_mismatch_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.attestation is not None
+    assert evidence.provider_result.execution is not None
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    root = ProviderTopologyCasTrustRootV1(
+        **{**_test_trust_root(identity).__dict__, "key_id": "sha256:" + ("0" * 64)}
+    )
+    assert verify_provider_topology_cas_attestation(
+        evidence.provider_result.attestation,
+        root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
+
+
+def test_provider_topology_cas_missing_trust_root_fails_closed():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    binding = topology_binding_fixture(
+        identity,
+        provider_topology_cas_evidence=evidence,
+    )
+    binding = ProviderTopologyBindingV1(
+        initial_observation=binding.initial_observation,
+        pre_submit_observation=binding.pre_submit_observation,
+        initial_sequence=binding.initial_sequence,
+        pre_submit_sequence=binding.pre_submit_sequence,
+        provider_topology_cas_evidence=evidence,
+        attestation_trust_root=None,
+    )
+    assert binding.classify(identity) == "observed-not-cas"
 
 
 def test_provider_topology_cas_execution_digest_binds_predicate():
