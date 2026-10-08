@@ -5424,6 +5424,9 @@ impl AlternativesEngine {
             }
 
             let frontier_blocked = !candidate_blockers.is_empty();
+            if frontier_blocked {
+                blockers.insert(candidate.id.clone(), candidate_blockers);
+            }
             let observed_evidence_count = Dimension::ALL
                 .into_iter()
                 .map(|dimension| {
@@ -9973,7 +9976,7 @@ mod tests {
 
         let mut admitted_a = a.clone();
         admitted_a.admission = Some(SourceAdmissionRef {
-            authority_id: "a".into(),
+            authority_id: "authority-a".into(),
             policy_id: "policy".into(),
             policy_revision: "v1".into(),
             policy_digest: "digest".into(),
@@ -11678,8 +11681,8 @@ mod tests {
                 protocol_id: "protocol".into(),
                 protocol_revision: "v1".into(),
                 protocol_digest: "digest".into(),
-                procedure_id: "fixture-measurement-procedure-v1".into(),
-                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                procedure_id: observed.observation.as_ref().unwrap().procedure_id.clone(),
+                procedure_digest: observed.observation.as_ref().unwrap().procedure_digest.clone(),
                 basis: basis.clone(),
             },
             stopping_criteria: ExperimentalStoppingCriteria {
