@@ -1,0 +1,484 @@
+{
+  "schema_version": "monetary-interoperability-matrix-v1",
+  "description": "Directed composition matrix for the five seed monetary state machines. Edge existence does not imply convertibility, parity, legal recognition, or a qualified adapter.",
+  "profile_count": 5,
+  "directed_edge_count": 25,
+  "cross_architecture_edge_count": 20,
+  "edges": [
+    {
+      "edge_id": "io-conventional-bank-money-to-conventional-bank-money",
+      "source_profile_id": "conventional-bank-money-v1",
+      "source_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "target_profile_id": "conventional-bank-money-v1",
+      "target_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "directionality": "bidirectional_explicitly_symmetric",
+      "test_status": "control",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-sovereign-money",
+      "source_profile_id": "conventional-bank-money-v1",
+      "source_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "target_profile_id": "sovereign-money-v1",
+      "target_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-mutual-credit",
+      "source_profile_id": "conventional-bank-money-v1",
+      "source_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "target_profile_id": "mutual-credit-v1",
+      "target_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-tokenized-deposit",
+      "source_profile_id": "conventional-bank-money-v1",
+      "source_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "target_profile_id": "tokenized-deposit-v1",
+      "target_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-reserve-backed-stablecoin",
+      "source_profile_id": "conventional-bank-money-v1",
+      "source_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "target_profile_id": "reserve-backed-stablecoin-v1",
+      "target_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-conventional-bank-money",
+      "source_profile_id": "sovereign-money-v1",
+      "source_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "target_profile_id": "conventional-bank-money-v1",
+      "target_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-sovereign-money",
+      "source_profile_id": "sovereign-money-v1",
+      "source_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "target_profile_id": "sovereign-money-v1",
+      "target_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "directionality": "bidirectional_explicitly_symmetric",
+      "test_status": "control",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-mutual-credit",
+      "source_profile_id": "sovereign-money-v1",
+      "source_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "target_profile_id": "mutual-credit-v1",
+      "target_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-tokenized-deposit",
+      "source_profile_id": "sovereign-money-v1",
+      "source_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "target_profile_id": "tokenized-deposit-v1",
+      "target_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-reserve-backed-stablecoin",
+      "source_profile_id": "sovereign-money-v1",
+      "source_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "target_profile_id": "reserve-backed-stablecoin-v1",
+      "target_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-conventional-bank-money",
+      "source_profile_id": "mutual-credit-v1",
+      "source_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "target_profile_id": "conventional-bank-money-v1",
+      "target_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-sovereign-money",
+      "source_profile_id": "mutual-credit-v1",
+      "source_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "target_profile_id": "sovereign-money-v1",
+      "target_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-mutual-credit",
+      "source_profile_id": "mutual-credit-v1",
+      "source_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "target_profile_id": "mutual-credit-v1",
+      "target_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "directionality": "bidirectional_explicitly_symmetric",
+      "test_status": "control",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-tokenized-deposit",
+      "source_profile_id": "mutual-credit-v1",
+      "source_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "target_profile_id": "tokenized-deposit-v1",
+      "target_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-reserve-backed-stablecoin",
+      "source_profile_id": "mutual-credit-v1",
+      "source_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "target_profile_id": "reserve-backed-stablecoin-v1",
+      "target_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-conventional-bank-money",
+      "source_profile_id": "tokenized-deposit-v1",
+      "source_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "target_profile_id": "conventional-bank-money-v1",
+      "target_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-sovereign-money",
+      "source_profile_id": "tokenized-deposit-v1",
+      "source_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "target_profile_id": "sovereign-money-v1",
+      "target_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-mutual-credit",
+      "source_profile_id": "tokenized-deposit-v1",
+      "source_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "target_profile_id": "mutual-credit-v1",
+      "target_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-tokenized-deposit",
+      "source_profile_id": "tokenized-deposit-v1",
+      "source_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "target_profile_id": "tokenized-deposit-v1",
+      "target_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "directionality": "bidirectional_explicitly_symmetric",
+      "test_status": "control",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-reserve-backed-stablecoin",
+      "source_profile_id": "tokenized-deposit-v1",
+      "source_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "target_profile_id": "reserve-backed-stablecoin-v1",
+      "target_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-conventional-bank-money",
+      "source_profile_id": "reserve-backed-stablecoin-v1",
+      "source_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "target_profile_id": "conventional-bank-money-v1",
+      "target_profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-sovereign-money",
+      "source_profile_id": "reserve-backed-stablecoin-v1",
+      "source_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "target_profile_id": "sovereign-money-v1",
+      "target_profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-mutual-credit",
+      "source_profile_id": "reserve-backed-stablecoin-v1",
+      "source_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "target_profile_id": "mutual-credit-v1",
+      "target_profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-tokenized-deposit",
+      "source_profile_id": "reserve-backed-stablecoin-v1",
+      "source_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "target_profile_id": "tokenized-deposit-v1",
+      "target_profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "directionality": "directed",
+      "test_status": "planned",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-reserve-backed-stablecoin",
+      "source_profile_id": "reserve-backed-stablecoin-v1",
+      "source_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "target_profile_id": "reserve-backed-stablecoin-v1",
+      "target_profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7",
+      "directionality": "bidirectional_explicitly_symmetric",
+      "test_status": "control",
+      "adapter_modes_to_test": [
+        "native_common_settlement_asset",
+        "redeem_reissue",
+        "escrowed_atomic_swap",
+        "correspondent_bridge",
+        "multilateral_net_settlement",
+        "message_only",
+        "absent"
+      ],
+      "paired_scenario_policy": "same scenario generation and common random-number seed across treatments"
+    }
+  ]
+}

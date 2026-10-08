@@ -1,0 +1,14 @@
+{
+  "schema_version": "monetary-interoperability-reference-v1",
+  "claim_ceiling": "Synthetic reference semantics only; no live settlement, solvency, legal, policy, or production claim.",
+  "cases": [
+    {"id":"REF-X01","mode":"escrowed_atomic_swap","expected_status":"settled","failure_control":"none"},
+    {"id":"REF-X02","mode":"escrowed_atomic_swap","target_available":false,"expected_status":"rejected","expected_reason":"atomic_target_unavailable"},
+    {"id":"REF-X03","mode":"redeem_reissue","target_available":false,"expected_status":"stranded","expected_reason":"destination_unavailable_after_source_commit"},
+    {"id":"REF-X04","mode":"escrowed_atomic_swap","event_id_reused":true,"expected_status":"rejected","expected_reason":"replay"},
+    {"id":"REF-X05","mode":"multilateral_net_settlement","expected_initial_status":"queued","expected_final_status":"settled"},
+    {"id":"REF-X06","invariant":"typed_asset_quantity_vector","expected":"conservation_is_per_asset_identity"},
+    {"id":"REF-X07","invariant":"atomicity","expected":"failed_atomic_transfer_leaves_source_and_target_unchanged"},
+    {"id":"REF-X08","invariant":"sequential_failure","expected":"source_commit_without_target_credit_is_explicit_stranded_state"}
+  ]
+}
