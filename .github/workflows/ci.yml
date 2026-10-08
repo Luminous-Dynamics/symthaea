@@ -1738,3 +1738,33 @@ jobs:
           sudo mv gitleaks /usr/local/bin/
       - name: Run gitleaks
         run: gitleaks detect --source . --config .gitleaks.toml --verbose --exit-code 1
+
+
+  civ-governance-smokes:
+    name: CIV Governance Smoke Controls
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      # symthaea-lab is explicitly excluded from the workspace, so root-level
+      # cargo fmt/test commands do not qualify these executables. Run the
+      # standalone manifest directly and require each smoke to execute.
+      - name: Format standalone CIV smoke controls
+        run: cargo fmt --manifest-path crates/domains/symthaea-lab/Cargo.toml -- --check
+
+      - name: Execute CIV-CORE-003 through CIV-CORE-007 smoke controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="crates/domains/symthaea-lab/Cargo.toml"
+          cargo run --manifest-path "$manifest" --bin civ_independent_evaluator_smoke
+          cargo run --manifest-path "$manifest" --bin civ_contestable_revocable_lifecycle_smoke
+          cargo run --manifest-path "$manifest" --bin civ_consequence_tiered_credibility_smoke
+          cargo run --manifest-path "$manifest" --bin civ_plural_authority_quorum_smoke
+          cargo run --manifest-path "$manifest" --bin civ_governance_audit_chain_smoke
