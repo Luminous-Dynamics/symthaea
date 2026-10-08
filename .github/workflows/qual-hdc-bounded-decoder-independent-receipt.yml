@@ -478,6 +478,20 @@ jobs:
               }],
             ];
 
+            const requiredStepSurfaceValid =
+              requiredSteps.length === 36 &&
+              new Set(requiredSteps).size === requiredSteps.length &&
+              requiredSteps.every((name) => typeof name === 'string' && name.length > 0);
+            const adversarialCorpusShapeValid =
+              attackCases.length >= 55 &&
+              new Set(attackCases.map(([name]) => name)).size === attackCases.length &&
+              attackCases.every(
+                ([name, mutate]) =>
+                  typeof name === 'string' &&
+                  name.length > 0 &&
+                  typeof mutate === 'function'
+              );
+
             const syntheticBaseline = evaluate(syntheticEvidence());
             const syntheticBaselinePassed =
               syntheticBaseline.qualificationResult === 'PASS';
@@ -496,6 +510,8 @@ jobs:
             }
 
             const adversarialCorpusPassed =
+              requiredStepSurfaceValid &&
+              adversarialCorpusShapeValid &&
               syntheticBaselinePassed &&
               adversarialResults.length === attackCases.length &&
               adversarialResults.every((result) => result.passed);
