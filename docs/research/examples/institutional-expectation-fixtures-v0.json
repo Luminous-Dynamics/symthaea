@@ -74,6 +74,42 @@
         "belief": "persist",
         "actual_institution": "profile-v1"
       }
+    },
+    {
+      "id": "EX-004",
+      "events": [
+        {
+          "type": "Expectation",
+          "expectation_id": "e1",
+          "subject_id": "agent-1",
+          "observation_time": 10,
+          "referenced_institution_hash": "profile-v0",
+          "expectation_rule_hash": "expect-rule-v0",
+          "information_set_as_of": 10,
+          "belief": "persist"
+        },
+        {
+          "type": "Update",
+          "expectation_id": "e2",
+          "update_id": "same-id",
+          "update_time": 20,
+          "superseded_expectation_id": "e1",
+          "information_set_as_of": 20,
+          "belief": "fail"
+        },
+        {
+          "type": "ActualObservation",
+          "observation_id": "same-id",
+          "observation_time": 30,
+          "institution_hash": "profile-v1"
+        }
+      ],
+      "expected": {
+        "current_expectation": "e2",
+        "belief": "fail",
+        "prior_belief": "persist",
+        "actual_institution": "profile-v1"
+      }
     }
   ],
   "rejected": [
@@ -175,6 +211,34 @@
         }
       ],
       "expected_disposition": "DuplicateUpdate"
+    },
+    {
+      "id": "EX-X05",
+      "events": [
+        {
+          "type": "Expectation",
+          "expectation_id": "e1",
+          "subject_id": "agent-1",
+          "observation_time": 10,
+          "referenced_institution_hash": "profile-v0",
+          "expectation_rule_hash": "expect-rule-v0",
+          "information_set_as_of": 10,
+          "belief": "persist"
+        },
+        {
+          "type": "ActualObservation",
+          "observation_id": "o1",
+          "observation_time": 30,
+          "institution_hash": "profile-v1"
+        },
+        {
+          "type": "ActualObservation",
+          "observation_id": "o1",
+          "observation_time": 31,
+          "institution_hash": "profile-v2"
+        }
+      ],
+      "expected_disposition": "DuplicateActualObservation"
     }
   ]
 }
