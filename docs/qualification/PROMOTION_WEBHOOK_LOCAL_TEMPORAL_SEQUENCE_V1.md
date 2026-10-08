@@ -48,6 +48,14 @@ Verification that occurs after dispatch fails closed as:
 
     clock-relation-established-after-dispatch
 
+The trust snapshot must also predate the verifier decision. Otherwise the verifier could appear to have made an accepted decision using a trust state that did not yet exist.
+
+That fails closed as:
+
+    clock-relation-trust-snapshot-after-verification
+
+Evidence measurement must not occur after verification. Such a record would amount to future evidence being used to justify an earlier decision and is structurally invalid.
+
 ## Policy drift and revocation
 
 The operation compares the verification's policy digest and revocation epoch against an explicit local trust snapshot.
