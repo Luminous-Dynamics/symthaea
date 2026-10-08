@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/monetary-operational-workflow-v1.schema.json",
+  "title":"Monetary Interoperability Operational Workflow v1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","states","terminal_states","experiment_factors","metrics","adversarial_boundaries","claim_ceiling","observation_binding"],
+  "properties":{
+    "schema_version":{"const":"monetary-operational-workflow-v1"},
+    "states":{"type":"array","minItems":1,"items":{"type":"string","enum":["requested","compliance_pending","authorized","source_reserved","settlement_ready","atomically_settled","redemption_pending","externally_finalized","rejected","timed_out","manual_intervention","reconciling","unresolved"]}},
+    "terminal_states":{"type":"array","items":{"type":"string"}},
+    "experiment_factors":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","unit","description"],"properties":{"id":{"type":"string","minLength":1},"unit":{"type":"string","minLength":1},"description":{"type":"string","minLength":1}}}},
+    "metrics":{"type":"array","items":{"type":"string"}},
+    "adversarial_boundaries":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},
+    "claim_ceiling":{"type":"string","minLength":1},
+    "observation_binding":{"type":"object","additionalProperties":false,"required":["required_fields"],"properties":{"required_fields":{"type":"array","minItems":5,"items":{"type":"string","enum":["scenario_id","policy_digest","settlement_receipt_digest","seed","trace_digest"]}}}}
+  }
+}
