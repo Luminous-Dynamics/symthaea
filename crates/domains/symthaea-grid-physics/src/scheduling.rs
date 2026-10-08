@@ -62,28 +62,6 @@ pub struct ScenarioResult {
     pub battery_cycles: f64,
 }
 
-/// Run a scenario from `start_hour` for `total_hours` in steps of
-/// `dt_hours`, calling `policy` each step to decide charge/discharge
-/// setpoints (kW, clamped to the battery's power rating before being
-/// applied). `start_hour` is applied consistently to `load_profile`,
-/// `generation_profile`, `tariff`'s time-of-use lookup, AND `policy` --
-/// they all see the same absolute clock. (An earlier version of this
-/// scenario harness let callers shift `load_profile`/`generation_profile`
-/// via wrapper closures while `tariff.import_price` kept reading the
-/// unshifted internal loop counter; that silently priced every import at
-/// whatever tariff bracket `[0, total_hours)` happened to fall into,
-/// which is why a "start at 11:00, run to 21:00" scenario was still being
-/// priced as if hour 17-21 never occurred. `start_hour` fixes this at the
-/// root instead of requiring every caller to reimplement the shift
-/// correctly by hand.)
-///
-/// `grid_available`: if true, any shortfall not covered by generation +
-/// battery is imported at `tariff`'s price (adds to `total_cost`, not
-/// `unserved_energy_kwh`); any surplus not stored is exported at the
-/// tariff's export price. If false (islanded), shortfall becomes
-/// `unserved_energy_kwh` instead and surplus is simply curtailed (no cost
-/// either way -- there's no grid to sell it to).
-#[allow(clippy::too_many_arguments)]
 /// Failures returned by the validated energy-scheduling scenario runner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScenarioError {
@@ -98,10 +76,10 @@ pub enum ScenarioError {
     NonFiniteResult,
 }
 
-/// Compatibility wrapper for callers that already supply trusted, valid
-/// scenarios. Untrusted or generated scenario inputs should use
-/// try_run_scenario so invalid data is reported instead of panicking or
-/// hanging the simulator.
+/// Run a scenario using the fail-fast compatibility interface.
+///
+/// For scenario inputs that may be generated or externally supplied, prefer
+/// try_run_scenario to receive a typed error instead of a panic.
 #[allow(clippy::too_many_arguments)]
 pub fn run_scenario(
     battery: &mut Battery,
