@@ -1844,7 +1844,7 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
                     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                    ":1.42",
+                    ":1.123",
                     "0123456789abcdef0123456789abcdef",
                     pre_invocation_id,
                     required_stability_us,
@@ -1905,7 +1905,7 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
                     exp.authorized_definition_content_digest.clone(),
-                    ":1.42",
+                    ":1.123",
                     "0123456789abcdef0123456789abcdef",
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
@@ -1976,7 +1976,7 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
                     exp.authorized_definition_content_digest.clone(),
-                    ":1.42",
+                    ":1.123",
                     "0123456789abcdef0123456789abcdef",
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
@@ -2301,6 +2301,62 @@ mod tests {
             )
             .unwrap_err(),
             NixPostStateErrorV1::LiveExecutionWitnessMismatch
+        );
+    }
+
+    #[test]
+    fn wrong_manager_owner_with_same_bus_is_rejected() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_manager_owner = Some(":1.124".to_string());
+        obs.systemd_job.as_mut().unwrap().manager_owner = ":1.124".to_string();
+
+        let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone()).unwrap();
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            ":1.123",
+            "0123456789abcdef0123456789abcdef",
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+        let witness = NixLiveExecutionWitnessV1::for_test(
+            intent.digest().unwrap(),
+            authorization.digest().unwrap(),
+            "approval:test",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            intent.pre_state_identity.clone(),
+            intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.authorized_definition_content_digest.clone()),
+            intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.authorized_manager_owner.clone()),
+            exp.pre_invocation_id.clone(),
+        );
+
+        let result = NixPostStateReceiptV1::build_proven_from_live_execution_witness(
+            &intent,
+            &authorization,
+            &exp,
+            &verified,
+            None,
+            witness,
+            "systemd-observer-v1",
+            "1",
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            NixPostStateErrorV1::ManagerOwnerMismatch
         );
     }
 
