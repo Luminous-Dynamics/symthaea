@@ -1191,7 +1191,7 @@ mod tests {
             vec![crate::DependencyEdge::new(
                 1,
                 2,
-                mid,
+                mid.clone(),
                 DependencyKind::ReadAfterWrite,
             )],
         )
@@ -1265,7 +1265,7 @@ mod tests {
                 crate::DependencyEdge::new(
                     1,
                     2,
-                    mid,
+                    mid.clone(),
                     DependencyKind::ReadAfterWrite,
                 ),
                 crate::DependencyEdge::new(
