@@ -890,8 +890,10 @@ def test_completion_requires_effect_receipt():
     assert ledger.prepare_dispatch("L1", 1, 1, 1)
     assert ledger.record_unknown(ledger.reservation.operation_id)
     op = ledger.reservation.operation_id
-    assert not ledger.reconcile_complete(PromotionEffectReceipt("wrong", "H1", "M1"))
-    assert ledger.reconcile_complete(PromotionEffectReceipt(op, "H1", "M1"))
+    assert not ledger.reconcile_complete(
+        "wrong", PromotionEffectReceipt("wrong", "H1", "M1")
+    )
+    assert ledger.reconcile_complete(op, PromotionEffectReceipt(op, "H1", "M1"))
     assert ledger.reservation.state == "PromotionCompleted"
 
 
