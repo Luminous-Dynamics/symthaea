@@ -209,9 +209,14 @@ impl GovernanceLedger {
 
 fn issue_deployment(
     authorization: PromotionAuthorization,
+    requested_scope: Digest,
     now_epoch: u64,
     ledger: &GovernanceLedger,
 ) -> Result<DeploymentReceipt, &'static str> {
+    if requested_scope != authorization.scope {
+        return Err("requested deployment scope exceeds authorization scope");
+    }
+
     match ledger.current_state(authorization, now_epoch) {
         AuthorizationState::Active => Ok(DeploymentReceipt {
             id: Digest("deployment-v1"),
@@ -228,11 +233,15 @@ fn issue_deployment(
 fn continue_execution(
     deployment: DeploymentReceipt,
     authorization: PromotionAuthorization,
+    requested_scope: Digest,
     now_epoch: u64,
     ledger: &GovernanceLedger,
 ) -> Result<(), &'static str> {
     if deployment.authorization != authorization.id {
         return Err("deployment authorization mismatch");
+    }
+    if requested_scope != authorization.scope {
+        return Err("requested execution scope exceeds authorization scope");
     }
 
     match ledger.current_state(authorization, now_epoch) {
@@ -253,6 +262,9 @@ fn record_outcome(
         || outcome.candidate != deployment.candidate
     {
         return Err("outcome is not bound to the exact deployed subject");
+    }
+    if outcome.observed_epoch < deployment.started_epoch {
+        return Err("outcome predates deployment execution");
     }
 
     // Outcome evidence is linked but does not rewrite evaluation history.
@@ -320,8 +332,29 @@ fn main() {
 
     let mut ledger = GovernanceLedger::new();
 
-    let deployment = issue_deployment(authorization, 150, &ledger)
-        .expect("fresh authorization should permit deployment");
+    assert_eq!(
+        issue_deployment(authorization, Digest("unbounded-scope"), 150, &ledger),
+        Err("requested deployment scope exceeds authorization scope")
+    );
+
+    assert_eq!(
+        ledger.append_authority_action(
+            authorization,
+            Digest("untrusted-evaluator"),
+            AuthorityAction::Suspend,
+            155,
+            Digest("evaluator-cannot-self-suspend")
+        ),
+        Err("only the named external authority can change authorization state")
+    );
+
+    let deployment = issue_deployment(
+        authorization,
+        Digest("bounded-deployment-scope"),
+        150,
+        &ledger,
+    )
+    .expect("fresh authorization should permit deployment");
 
     // Historical receipts remain values. Governance events append state changes
     // instead of mutating the original authorization/evaluation.
@@ -344,7 +377,13 @@ fn main() {
         AuthorizationState::Suspended
     );
     assert_eq!(
-        continue_execution(deployment, authorization, 165, &ledger),
+        continue_execution(
+            deployment,
+            authorization,
+            Digest("bounded-deployment-scope"),
+            165,
+            &ledger,
+        ),
         Err("execution halted by current suspension state")
     );
 
@@ -387,6 +426,20 @@ fn main() {
 
     // An adverse post-deployment outcome is distinct evidence and may support
     // governance action, but it does not become a retrospective evaluation edit.
+    let premature_outcome = OutcomeObservation {
+        id: Digest("outcome-premature-v1"),
+        deployment: deployment.id,
+        authorization: authorization.id,
+        candidate: deployment.candidate,
+        observed_epoch: 149,
+        score: 1,
+        rights_invariant_holds: true,
+    };
+    assert_eq!(
+        record_outcome(deployment, authorization, premature_outcome),
+        Err("outcome predates deployment execution")
+    );
+
     let adverse_outcome = OutcomeObservation {
         id: Digest("outcome-adverse-v1"),
         deployment: deployment.id,
@@ -452,10 +505,16 @@ fn main() {
     };
     requalify(authorization, fresh_evaluation, fresh_authorization)
         .expect("requalification must be a fresh chain");
+    assert_ne!(fresh_authorization.scope, authorization.scope);
 
     // Reusing the stale pre-revocation authorization is explicitly rejected.
     assert_eq!(
-        issue_deployment(authorization, 300, &ledger),
+        issue_deployment(
+            authorization,
+            Digest("bounded-deployment-scope"),
+            300,
+            &ledger,
+        ),
         Err("authorization is expired")
     );
 
