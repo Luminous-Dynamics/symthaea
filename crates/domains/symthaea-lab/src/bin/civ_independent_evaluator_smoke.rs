@@ -145,6 +145,7 @@ struct Observation {
     id: Digest,
     epoch: u64,
     measured_value: u64,
+    rights_invariant_holds: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -220,6 +221,10 @@ impl Evaluator {
         // the reference value and decide the local experimental verdict.
         let verdict = if candidate.change_set == Digest("candidate-degraded") {
             Verdict::Fail
+        } else if !observation.rights_invariant_holds {
+            // Performance cannot launder a failed safety/rights invariant into
+            // a PASS. This ordering is part of the qualification boundary.
+            Verdict::Fail
         } else if observation.measured_value == self.oracle_expected_value {
             Verdict::Pass
         } else {
@@ -247,6 +252,12 @@ impl Evaluator {
                 Digest("observation-3"),
                 Verdict::Indeterminate,
             ) => Digest("evaluation-receipt-candidate-v1-observation-3"),
+            (
+                Digest("candidate-v1"),
+                Digest("evaluator-profile-v1"),
+                Digest("observation-4"),
+                Verdict::Pass,
+            ) => Digest("evaluation-receipt-candidate-v1-observation-4"),
             _ => Digest("evaluation-receipt-other"),
         };
 
@@ -409,6 +420,7 @@ fn main() {
         id: Digest("observation-1"),
         epoch: 150,
         measured_value: 42,
+        rights_invariant_holds: true,
     };
 
     let pass = evaluator
@@ -461,6 +473,7 @@ fn main() {
         id: Digest("observation-2"),
         epoch: 151,
         measured_value: 42,
+        rights_invariant_holds: true,
     };
     assert_eq!(degraded.parent, Some(candidate.digest()));
     let fail = evaluator
@@ -473,6 +486,7 @@ fn main() {
         id: Digest("observation-3"),
         epoch: 152,
         measured_value: 7,
+        rights_invariant_holds: true,
     };
     let uncertain = evaluator
         .evaluate(candidate, uncertain_observation)
@@ -494,6 +508,45 @@ fn main() {
         evaluator_operator_lineage: evaluator_profile.operator_lineage,
     };
     assert!(independent.is_independent());
+
+    // Distinct PASS observations must receive distinct receipt identities. A
+    // promotion authorization bound to one PASS cannot be replayed for another.
+    let second_pass_observation = Observation {
+        id: Digest("observation-4"),
+        epoch: 153,
+        measured_value: 42,
+        rights_invariant_holds: true,
+    };
+    let second_pass = evaluator
+        .evaluate(candidate, second_pass_observation)
+        .expect("second benign observation should evaluate");
+    assert_eq!(second_pass.verdict, Verdict::Pass);
+    assert_ne!(pass.digest(), second_pass.digest());
+
+    let replayed_authorization = PromotionAuthorization {
+        authority: Digest("external-authority"),
+        evaluation: pass.digest(),
+        independence,
+        scope: Digest("bounded-test-scope"),
+        expires_at_epoch: 180,
+        allowed: true,
+    };
+    assert_eq!(
+        issue_deployment_receipt(second_pass, replayed_authorization, 160),
+        Err("promotion does not bind the exact evaluation receipt")
+    );
+
+    // A materially better score cannot override a failed safety/rights invariant.
+    let high_score_rights_violation = Observation {
+        id: Digest("observation-rights-fail"),
+        epoch: 154,
+        measured_value: 999,
+        rights_invariant_holds: false,
+    };
+    let rights_failed = evaluator
+        .evaluate(candidate, high_score_rights_violation)
+        .expect("rights-violating result should still be evaluable");
+    assert_eq!(rights_failed.verdict, Verdict::Fail);
 
     let forced_pass = PromotionAuthorization {
         authority: Digest("external-authority"),
@@ -575,6 +628,7 @@ fn main() {
         id: Digest("observation-stale"),
         epoch: 201,
         measured_value: 42,
+        rights_invariant_holds: true,
     };
     assert_eq!(
         evaluator.evaluate(candidate, stale_observation),
