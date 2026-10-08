@@ -97,9 +97,11 @@ pub struct ReceiptSelectionContext {
     pub selection_policy: String,
     pub selection_policy_version: u16,
     /// Whether policy required the stronger PQ-bound assurance at admission.
-    pub hybrid_required: bool,
+    /// Read-only externally: it is set by the assurance admission constructor.
+    hybrid_required: bool,
     /// PQ attestation identity, retained in canonical durable projection.
-    pub hybrid_assurance: Option<HybridReceiptAssuranceContext>,
+    /// Read-only externally: it is derived from a privately constructed verified capability.
+    hybrid_assurance: Option<HybridReceiptAssuranceContext>,
 }
 
 /// Canonical durable identity for an application-level PQ-bound receipt
@@ -107,21 +109,38 @@ pub struct ReceiptSelectionContext {
 /// not a replacement for retaining or verifying the source cryptographic bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HybridReceiptAssuranceContext {
-    pub profile_id: String,
-    pub profile_version: u16,
-    pub pq_algorithm_id: i64,
-    pub hybrid_capability_sha256: [u8; 32],
-    pub key_policy_digest_sha256: [u8; 32],
-    pub evaluation_time_unix_seconds: u64,
-    pub pq_key_id: [u8; 16],
-    pub verifying_key_sha256: [u8; 32],
-    pub pq_signature_sha256: [u8; 32],
-    pub receipt_sha256: [u8; 32],
-    pub classical_capability_sha256: [u8; 32],
-    pub transcript_sha256: [u8; 32],
+    profile_id: String,
+    profile_version: u16,
+    pq_algorithm_id: i64,
+    hybrid_capability_sha256: [u8; 32],
+    key_policy_digest_sha256: [u8; 32],
+    evaluation_time_unix_seconds: u64,
+    pq_key_id: [u8; 16],
+    verifying_key_sha256: [u8; 32],
+    pq_signature_sha256: [u8; 32],
+    receipt_sha256: [u8; 32],
+    classical_capability_sha256: [u8; 32],
+    transcript_sha256: [u8; 32],
 }
 
 impl HybridReceiptAssuranceContext {
+    pub fn profile_id(&self) -> &str { &self.profile_id }
+    pub const fn profile_version(&self) -> u16 { self.profile_version }
+    pub const fn pq_algorithm_id(&self) -> i64 { self.pq_algorithm_id }
+    pub const fn hybrid_capability_sha256(&self) -> [u8; 32] { self.hybrid_capability_sha256 }
+    pub const fn key_policy_digest_sha256(&self) -> [u8; 32] { self.key_policy_digest_sha256 }
+    pub const fn evaluation_time_unix_seconds(&self) -> u64 { self.evaluation_time_unix_seconds }
+    pub const fn pq_key_id(&self) -> [u8; 16] { self.pq_key_id }
+    pub const fn verifying_key_sha256(&self) -> [u8; 32] { self.verifying_key_sha256 }
+    pub const fn pq_signature_sha256(&self) -> [u8; 32] { self.pq_signature_sha256 }
+    pub const fn receipt_sha256(&self) -> [u8; 32] { self.receipt_sha256 }
+    pub const fn classical_capability_sha256(&self) -> [u8; 32] { self.classical_capability_sha256 }
+    pub const fn transcript_sha256(&self) -> [u8; 32] { self.transcript_sha256 }
+
+    pub const fn hybrid_required(&self) -> bool { self.hybrid_required }
+    pub fn hybrid_assurance(&self) -> Option<&HybridReceiptAssuranceContext> {
+        self.hybrid_assurance.as_ref()
+    }
     #[cfg(feature = "semantic-receipts")]
     fn from_verified(
         hybrid: &crate::rfc9942_hybrid::Rfc9942HybridVerifiedReceipt,
@@ -512,6 +531,23 @@ mod tests {
             .unwrap()
             .collection_sha256[0] ^= 1;
         assert_ne!(before, changed.canonical_bytes().unwrap());
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn projection_profile_constants_match_hybrid_verifier_profile() {
+        assert_eq!(
+            HYBRID_ASSURANCE_PROFILE_ID,
+            crate::rfc9942_hybrid::HYBRID_POLICY_ID
+        );
+        assert_eq!(
+            HYBRID_ASSURANCE_PROFILE_VERSION,
+            crate::rfc9942_hybrid::HYBRID_POLICY_VERSION
+        );
+        assert_eq!(
+            HYBRID_ASSURANCE_ML_DSA_65_ALGORITHM_ID,
+            crate::rfc9942_hybrid::ML_DSA_65_COSE_ALGORITHM_ID
+        );
     }
 
     #[test]
