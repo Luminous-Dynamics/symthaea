@@ -326,8 +326,100 @@ fn write_private_file(path: &str, contents: &[u8], mode: u32) -> Result<(), std:
     file.sync_all()
 }
 
+fn unlink_verified_sensitive_file(
+    path: &str,
+    file: &std::fs::File,
+    metadata: &std::fs::Metadata,
+) -> Result<(), String> {
+    use std::ffi::CString;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+
+    let path = std::path::Path::new(path);
+    let parent_path = path
+        .parent()
+        .ok_or_else(|| format!("sensitive cleanup path {path:?} has no parent directory"))?;
+    let basename = path
+        .file_name()
+        .ok_or_else(|| format!("sensitive cleanup path {path:?} has no basename"))?;
+    let basename = CString::new(basename.as_bytes())
+        .map_err(|_| format!("sensitive cleanup basename {basename:?} contains NUL"))?;
+
+    let parent = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(parent_path)
+        .map_err(|error| {
+            format!(
+                "unable to open sensitive cleanup parent {}: {error}",
+                parent_path.display()
+            )
+        })?;
+    let parent_meta = parent
+        .metadata()
+        .map_err(|error| format!("unable to inspect sensitive cleanup parent: {error}"))?;
+    if !parent_meta.is_dir()
+        || parent_meta.uid() != unsafe { libc::geteuid() }
+        || parent_meta.permissions().mode() & 0o077 != 0
+    {
+        return Err(format!(
+            "sensitive cleanup parent {} failed ownership, type, or privacy checks",
+            parent_path.display()
+        ));
+    }
+
+    let mut observed = unsafe { std::mem::zeroed::<libc::stat>() };
+    let result = unsafe {
+        libc::fstatat(
+            parent.as_raw_fd(),
+            basename.as_ptr(),
+            &mut observed,
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if result != 0 {
+        return Err(format!(
+            "unable to verify sensitive cleanup target {}: {}",
+            path.display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    if observed.st_dev as u64 != metadata.dev()
+        || observed.st_ino as u64 != metadata.ino()
+    {
+        return Err(format!(
+            "sensitive cleanup target {} changed inode identity after wipe",
+            path.display()
+        ));
+    }
+
+    let unlink_result = unsafe { libc::unlinkat(parent.as_raw_fd(), basename.as_ptr(), 0) };
+    if unlink_result != 0 {
+        let error = std::io::Error::last_os_error();
+        if error.kind() == std::io::ErrorKind::NotFound {
+            return Ok(());
+        }
+        return Err(format!(
+            "unable to unlink verified sensitive cleanup file {}: {error}",
+            path.display()
+        ));
+    }
+
+    parent
+        .sync_all()
+        .map_err(|error| {
+            format!(
+                "unable to synchronize sensitive cleanup parent {}: {error}",
+                parent_path.display()
+            )
+        })
+}
+
 fn cleanup_sensitive_file(path: &str) -> Result<(), String> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    use std::io::Write;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
     let mut file = match std::fs::OpenOptions::new()
         .read(true)
@@ -365,12 +457,10 @@ fn cleanup_sensitive_file(path: &str) -> Result<(), String> {
     file.sync_all()
         .map_err(|error| format!("unable to synchronize sensitive cleanup file {path}: {error}"))?;
 
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(format!("unable to unlink sensitive cleanup file {path}: {error}")),
-    }
+    unlink_verified_sensitive_file(path, &file, &metadata)
+        .map_err(|error| format!("sensitive cleanup unlink was not observed safely: {error}"))
 }
+
 
 fn cleanup_sensitive_files(paths: &[String]) -> Result<(), String> {
     let mut first_error = None;
@@ -768,9 +858,9 @@ fn parse_stage(output: &str) -> Option<NixosAnywhereStage> {
 }
 
 // Security validators imported from symthaea_spore::security (see use statement above).
-// Local definitions removed — single source of truth for fuzzing and testing.
+// Local definitions removed â single source of truth for fuzzing and testing.
 
-// ── sanitize_heredoc also imported from security module ──
+// ââ sanitize_heredoc also imported from security module ââ
 
 /// Rate limiter: 1 active session per IP, with auth failure tracking.
 struct SessionTracker {
@@ -822,7 +912,7 @@ impl SessionTracker {
     }
 }
 
-/// Client → Relay message.
+/// Client â Relay message.
 #[derive(serde::Deserialize)]
 #[allow(dead_code)]
 struct ClientMessage {
@@ -1414,11 +1504,11 @@ fn remove_directory_contents_fd(dir_fd: libc::c_int) -> Result<(), std::io::Erro
 /// Git-initialize the NixOS config (always appended to install scripts).
 fn git_init_config() -> &'static str {
     r#"
-# ── Git-Initialize NixOS Config ──
+# ââ Git-Initialize NixOS Config ââ
 echo "STAGE: Initializing config version control..."
 if chroot /mnt git --version >/dev/null 2>&1; then
   if [ ! -d /mnt/etc/nixos/.git ]; then
-    if chroot /mnt git -C /etc/nixos init 2>/dev/null       && chroot /mnt git -C /etc/nixos add -A 2>/dev/null       && chroot /mnt git -C /etc/nixos commit -m "Initial NixOS configuration — Sovereign Inoculation" 2>/dev/null; then
+    if chroot /mnt git -C /etc/nixos init 2>/dev/null       && chroot /mnt git -C /etc/nixos add -A 2>/dev/null       && chroot /mnt git -C /etc/nixos commit -m "Initial NixOS configuration â Sovereign Inoculation" 2>/dev/null; then
       echo "  Config versioned at /etc/nixos/.git"
     else
       echo "  Git init skipped (initial commit failed)"
@@ -1430,12 +1520,12 @@ fi
 "#
 }
 
-/// Pre-install disk snapshot (partition table + UUIDs — always, instant).
+/// Pre-install disk snapshot (partition table + UUIDs â always, instant).
 fn disk_snapshot(transaction_dir: &str) -> String {
     let snapshot_dir = format!("{transaction_dir}/disk-snapshot");
     format!(
         r#"
-# ── Pre-Install Disk Snapshot (Tier 1: instant) ──
+# ââ Pre-Install Disk Snapshot (Tier 1: instant) ââ
 DISK="$1"
 if [ -z "$DISK" ]; then
   echo "ERROR: install disk argument missing from snapshot authority."
@@ -1459,13 +1549,13 @@ echo "  Partition table can be restored with: sfdisk $DISK < partition-table.dum
 
 fn secure_boot_postinstall() -> &'static str {
     r#"
-# ── Secure Boot Setup (lanzaboote + sbctl) ──
+# ââ Secure Boot Setup (lanzaboote + sbctl) ââ
 echo "STAGE: Setting up Secure Boot..."
 
 # If Secure Boot is already active, the requested capability is already realized.
 BOOTCTL_STATUS=$(bootctl status 2>/dev/null || true)
 SBCTL_STATUS=$(chroot /mnt sbctl status 2>/dev/null || true)
-if echo "$BOOTCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(✓[[:space:]]*)?Enabled'     || echo "$SBCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(✓[[:space:]]*)?Enabled'; then
+if echo "$BOOTCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(â[[:space:]]*)?Enabled'     || echo "$SBCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(â[[:space:]]*)?Enabled'; then
   echo "SECURITY: secure-boot-observed-active"
 else
   SETUP_MODE=$(printf '%s\n' "$BOOTCTL_STATUS" | grep "Setup Mode:" | grep -ci "setup" || echo "0")
@@ -1509,7 +1599,7 @@ fi
 /// Generate TPM2 auto-unlock enrollment (appended after LUKS install + Secure Boot).
 fn tpm2_postinstall() -> &'static str {
     r#"
-# ── TPM2 Auto-Unlock Enrollment ──
+# ââ TPM2 Auto-Unlock Enrollment ââ
 echo "STAGE: Enrolling TPM2 auto-unlock..."
 
 # CRYPT_PART is established by the single-luks transaction before this hook runs.
@@ -1558,7 +1648,7 @@ fi
 /// Generate FIDO2/YubiKey enrollment commands (appended after LUKS install).
 fn fido2_postinstall() -> &'static str {
     r#"
-# ── FIDO2/YubiKey Enrollment ──
+# ââ FIDO2/YubiKey Enrollment ââ
 echo "STAGE: Enrolling FIDO2 security key..."
 
 if [ -z "${CRYPT_PART:-}" ] || [ ! -b "$CRYPT_PART" ]; then
@@ -1631,7 +1721,7 @@ fn generate_system_config(msg: &ClientMessage) -> String {
             config.push_str("  services.xserver.displayManager.lightdm.enable = true;\n");
             config.push_str("  services.xserver.desktopManager.xfce.enable = true;\n");
         }
-        _ => {} // "none" or empty — no DE (server/CLI)
+        _ => {} // "none" or empty â no DE (server/CLI)
     }
 
     // GPU driver
@@ -1702,7 +1792,7 @@ fn generate_system_config_module(msg: &ClientMessage) -> String {
     }
 
     format!(
-        "{{ config, pkgs, ... }}:\n         {{\n           # ── System Configuration (NixForHumanity) ──\n{sys_config}           # Audio (PipeWire)\n           services.pulseaudio.enable = false;\n           security.rtkit.enable = true;\n           services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};\n         \n           # Nix settings\n           nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n           nix.gc = {{ automatic = true; dates = \"weekly\"; options = \"--delete-older-than 30d\"; }};\n         }}\n",
+        "{{ config, pkgs, ... }}:\n         {{\n           # ââ System Configuration (NixForHumanity) ââ\n{sys_config}           # Audio (PipeWire)\n           services.pulseaudio.enable = false;\n           security.rtkit.enable = true;\n           services.pipewire = {{ enable = true; alsa.enable = true; pulse.enable = true; }};\n         \n           # Nix settings\n           nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n           nix.gc = {{ automatic = true; dates = \"weekly\"; options = \"--delete-older-than 30d\"; }};\n         }}\n",
         sys_config = sys_config,
     )
 }
@@ -1713,7 +1803,7 @@ fn generate_system_config_module(msg: &ClientMessage) -> String {
 /// Returns a shell snippet that sets BOOT_MODE=efi|bios and creates boot partition accordingly.
 fn boot_mode_detection() -> &'static str {
     r#"
-# ── Boot Mode Detection ──
+# ââ Boot Mode Detection ââ
 if [ -d /sys/firmware/efi ]; then
   BOOT_MODE="efi"
   echo "  Boot mode: EFI/UEFI"
@@ -1769,7 +1859,7 @@ if [ "$BOOT_MODE" = "efi" ]; then
   mkfs.vfat -F 32 "{boot}"
 else
   # BIOS boot: format the /boot partition (not the 1MB BIOS boot partition)
-  # The BIOS boot partition (EF02) is left unformatted — GRUB writes to it directly
+  # The BIOS boot partition (EF02) is left unformatted â GRUB writes to it directly
   mkfs.ext4 -F -L boot "{boot}"
 fi
 mkdir -p /mnt/boot
@@ -1842,13 +1932,13 @@ fn config_write_commands(
     out.push_str("mkdir -p /mnt/etc/nixos\n");
 
     if !browser_config.is_empty() {
-        // Browser config pre-staged via tokio::fs::write — no heredoc, no injection
+        // Browser config pre-staged via tokio::fs::write â no heredoc, no injection
         out.push_str(&format!(
             "cp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n",
             staging
         ));
     } else {
-        // Server-generated fallback — safe to use heredoc (not user input)
+        // Server-generated fallback â safe to use heredoc (not user input)
         out.push_str("cat > /mnt/etc/nixos/configuration.nix << 'NIXCONF'\n");
         out.push_str(fallback_config);
         if !fallback_config.ends_with('\n') {
@@ -1936,7 +2026,7 @@ for PART in $(blkid -o device "$DISK"* 2>/dev/null); do
     echo ""
     echo "  Before proceeding, you MUST:"
     echo ""
-    echo "  1. FIND YOUR RECOVERY KEY — you will need it if BitLocker"
+    echo "  1. FIND YOUR RECOVERY KEY â you will need it if BitLocker"
     echo "     activates during partition changes."
     echo ""
     echo "     Where to find it:"
@@ -2025,7 +2115,7 @@ if [ "$FREE_GB" -lt 20 ]; then
         FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
         echo "  Free space after shrink: ~${{FREE_GB}}GB"
       else
-        echo "  Dry-run FAILED — partition cannot be safely shrunk."
+        echo "  Dry-run FAILED â partition cannot be safely shrunk."
         echo "  Please shrink from within Windows instead."
       fi
     else
@@ -2099,7 +2189,7 @@ nixos-generate-config --root /mnt
                 disk = msg.disk
             );
 
-            // Append configuration.nix (and optionally flake.nix) via heredoc —
+            // Append configuration.nix (and optionally flake.nix) via heredoc â
             // avoids passing Nix braces through format!().
             let fallback_alongside = format!(
                 "{{ config, pkgs, ... }}:\n\
@@ -2178,14 +2268,14 @@ echo "STAGE: FirstBreath"
 echo "=== Sovereign Birth Complete (Alongside) ==="
 echo "Reboot and select NixOS from the boot menu."
 echo "Login as: {hostname} (use the password supplied during install)"
-echo "Your existing OS is preserved — select it from the boot menu."
+echo "Your existing OS is preserved â select it from the boot menu."
 echo "COMPLETE"
 "#, hostname = hostname));
             script
         }
 
         "single" | "" => {
-            // Full disk wipe → direct partition → nixos-install
+            // Full disk wipe â direct partition â nixos-install
             // Uses sgdisk + mkfs directly (no disko download needed on live ISO)
             let mut script = format!(
                 r#"set -eo pipefail
@@ -2265,7 +2355,7 @@ nixos-generate-config --root /mnt || echo "WARNING: nixos-generate-config failed
                 boot_detect = boot_mode_detection()
             );
 
-            // Append configuration.nix (and optionally flake.nix) via heredoc —
+            // Append configuration.nix (and optionally flake.nix) via heredoc â
             // avoids passing Nix braces through format!().
             let fallback_single = format!(
                 "{{ config, pkgs, ... }}:\n\
@@ -2354,7 +2444,7 @@ echo "COMPLETE"
         }
 
         "single-zfs" => {
-            // Full disk wipe → ZFS pool with datasets → nixos-install
+            // Full disk wipe â ZFS pool with datasets â nixos-install
             let mut script = format!(
                 r#"set -eo pipefail
 echo "=== NixForHumanity: Single Disk (ZFS) ==="
@@ -2450,7 +2540,7 @@ echo '  networking.hostId = "deadbeef";' >> /mnt/etc/nixos/hardware-configuratio
             ));
             script.push_str(&bootloader_patch_commands(&msg.disk));
 
-            // ZFS doesn't need separate swap file setup — zvol already created
+            // ZFS doesn't need separate swap file setup â zvol already created
             script.push_str(&format!(
                 r#"
 # Step 6: Install
@@ -2475,7 +2565,7 @@ echo "COMPLETE"
         }
 
         "single-luks" => {
-            // Full disk wipe → LUKS2 encryption → btrfs → nixos-install
+            // Full disk wipe â LUKS2 encryption â btrfs â nixos-install
             // The LUKS secret is staged separately by the authenticated
             // install handler and is never interpolated into this script.
             let luks_key_file = format!("{transaction_dir}/luks-passphrase");
@@ -2647,7 +2737,7 @@ echo "COMPLETE"
 
         "dual" => {
             // Dual-disk: fast drive for data (btrfs), standard for OS (ext4)
-            // Direct partitioning — no disko download needed
+            // Direct partitioning â no disko download needed
             let mut script = format!(
                 r#"set -eo pipefail
 echo "=== Symthaea Sovereign Birth: Dual NVMe ==="
@@ -3043,7 +3133,7 @@ echo "COMPLETE"
             script
         }
 
-        // ── Multi-disk RAID layouts ──
+        // ââ Multi-disk RAID layouts ââ
         "raid5-mdadm" | "raid6-mdadm" | "raid10-mdadm" => {
             let raid_level = match msg.layout.as_str() {
                 "raid5-mdadm" => "5",
@@ -3167,7 +3257,7 @@ echo "COMPLETE"
             script
         }
 
-        // ── ZFS multi-disk layouts ──
+        // ââ ZFS multi-disk layouts ââ
         "zfs-mirror" | "zfs-raidz" | "zfs-raidz2" => {
             let zfs_type = match msg.layout.as_str() {
                 "zfs-mirror" => "mirror",
@@ -3297,7 +3387,7 @@ echo "COMPLETE"
     }
 }
 
-/// Relay → Client message.
+/// Relay â Client message.
 #[derive(serde::Serialize)]
 struct RelayMessage {
     #[serde(rename = "type")]
@@ -3509,7 +3599,7 @@ async fn handle_connection(
                 return Err(resp);
             }
         }
-        // No Origin header = non-browser client (curl, relay tools) — allow
+        // No Origin header = non-browser client (curl, relay tools) â allow
         Ok(resp)
     };
 
@@ -5852,7 +5942,7 @@ async fn preserve_data_native(
         "type": "home_dirs",
         "name": format!("/home ({home_size})"),
         "size": home_size,
-        "path": "not backed up — requires explicit user-directed preservation"
+        "path": "not backed up â requires explicit user-directed preservation"
     }));
 
     let total_size = match run_privileged_args("du", &["-sh", &backup_dir]).await {
@@ -6172,7 +6262,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
-                // No SSH needed — relay runs directly on the target machine
+                // No SSH needed â relay runs directly on the target machine
                 eprintln!("[{}] Connection acknowledged (local mode)", peer_addr);
                 let _ = ws_tx
                     .send(Message::Text(
@@ -6300,7 +6390,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
             }
 
             "install" => {
-                // ── Validate ALL user inputs before they reach shell commands ──
+                // ââ Validate ALL user inputs before they reach shell commands ââ
                 let disk = if client_msg.disk.is_empty() {
                     "/dev/sda".to_string()
                 } else {
@@ -6747,8 +6837,8 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
 
-                // Fully automated install — generates and executes the entire
-                // partition → format → install → configure sequence.
+                // Fully automated install â generates and executes the entire
+                // partition â format â install â configure sequence.
                 // The user only clicked "Deploy" in the browser.
                 // All inputs are validated above before reaching generate_install_script.
 
@@ -6770,7 +6860,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                                 .to_json(),
                             ))
                             .await;
-                        // Continue anyway — pure-eval may reject valid NixOS modules
+                        // Continue anyway â pure-eval may reject valid NixOS modules
                         // that use impure features like <nixpkgs>. This is advisory, not blocking.
                     }
                 }
@@ -6816,7 +6906,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 let snapshot = disk_snapshot(&transaction_dir);
                 script = format!("{}\n{}", snapshot, script);
 
-                // Patch configuration.nix with DE/GPU/locale — but only if the browser
+                // Patch configuration.nix with DE/GPU/locale â but only if the browser
                 // didn't supply a full configuration.nix (which already has everything).
                 if client_msg.configuration_nix.is_empty() {
                     let patch = system_config_patch(&client_msg, transaction_dir);
@@ -6895,7 +6985,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     let username = username.as_str();
                     let pw_script = format!(
                         r#"
-# ── Set User Password ──
+# ââ Set User Password ââ
 echo "STAGE: Setting user password..."
 if [ ! -f {pw_file} ]; then
     echo "ERROR: staged user password is missing."
@@ -7230,8 +7320,8 @@ echo "  User password set."
                     peer_addr, transaction.transaction_id
                 );
 
-            // ── Comprehensive hardware probe ──
-            // ── Pre-install validation checklist ──
+            // ââ Comprehensive hardware probe ââ
+            // ââ Pre-install validation checklist ââ
             "pre_install_check" => {
                 eprintln!("[{}] Running pre-install checks...", peer_addr);
                 let disk = client_msg.disk.clone();
@@ -7242,19 +7332,19 @@ echo '{{"checks": ['
 
 # 1. EFI vs BIOS
 if [ -d /sys/firmware/efi ]; then
-  echo '{{"name":"boot_mode","status":"pass","detail":"EFI/UEFI detected — systemd-boot will be used"}},'
+  echo '{{"name":"boot_mode","status":"pass","detail":"EFI/UEFI detected â systemd-boot will be used"}},'
 else
-  echo '{{"name":"boot_mode","status":"warn","detail":"Legacy BIOS detected — GRUB will be used (limited features)"}},'
+  echo '{{"name":"boot_mode","status":"warn","detail":"Legacy BIOS detected â GRUB will be used (limited features)"}},'
 fi
 
 # 2. RAM check
 RAM_MB=$(free -m | awk '/Mem:/{{print $2}}')
 if [ "$RAM_MB" -ge 4096 ]; then
-  echo "{{"name":"ram","status":"pass","detail":"${{RAM_MB}}MB RAM — sufficient for any desktop"}},"
+  echo "{{"name":"ram","status":"pass","detail":"${{RAM_MB}}MB RAM â sufficient for any desktop"}},"
 elif [ "$RAM_MB" -ge 2048 ]; then
-  echo "{{"name":"ram","status":"warn","detail":"${{RAM_MB}}MB RAM — use XFCE or Sway for best performance"}},"
+  echo "{{"name":"ram","status":"warn","detail":"${{RAM_MB}}MB RAM â use XFCE or Sway for best performance"}},"
 else
-  echo "{{"name":"ram","status":"fail","detail":"${{RAM_MB}}MB RAM — insufficient for graphical desktop. CLI-only recommended"}},"
+  echo "{{"name":"ram","status":"fail","detail":"${{RAM_MB}}MB RAM â insufficient for graphical desktop. CLI-only recommended"}},"
 fi
 
 # 3. Disk health (SMART)
@@ -7276,7 +7366,7 @@ BL_FOUND=false
 for PART in $(blkid -o device "{disk_arg}"* 2>/dev/null); do
   if blkid "$PART" 2>/dev/null | grep -qi bitlocker; then
     BL_FOUND=true
-    echo "{{"name":"bitlocker","status":"warn","detail":"BitLocker detected on $PART — have your recovery key ready"}},"
+    echo "{{"name":"bitlocker","status":"warn","detail":"BitLocker detected on $PART â have your recovery key ready"}},"
   fi
 done
 if [ "$BL_FOUND" = false ]; then
@@ -7287,11 +7377,11 @@ fi
 FREE_SECTORS=$(sgdisk -p "{disk_arg}" 2>/dev/null | awk '/Total free space/{{print $5}}' || echo "0")
 FREE_GB=$((FREE_SECTORS * 512 / 1073741824))
 if [ "$FREE_GB" -ge 40 ]; then
-  echo "{{"name":"free_space","status":"pass","detail":"${{FREE_GB}}GB free — sufficient for NixOS"}},"
+  echo "{{"name":"free_space","status":"pass","detail":"${{FREE_GB}}GB free â sufficient for NixOS"}},"
 elif [ "$FREE_GB" -ge 20 ]; then
-  echo "{{"name":"free_space","status":"warn","detail":"${{FREE_GB}}GB free — tight. Consider freeing more space"}},"
+  echo "{{"name":"free_space","status":"warn","detail":"${{FREE_GB}}GB free â tight. Consider freeing more space"}},"
 else
-  echo "{{"name":"free_space","status":"fail","detail":"${{FREE_GB}}GB free — insufficient for dual-boot. Shrink existing partitions first"}},"
+  echo "{{"name":"free_space","status":"fail","detail":"${{FREE_GB}}GB free â insufficient for dual-boot. Shrink existing partitions first"}},"
 fi
 
 # 6. Existing OS detection
@@ -7317,9 +7407,9 @@ fi
 
 # 7. Network connectivity
 if ping -c1 -W3 cache.nixos.org >/dev/null 2>&1; then
-  echo '{{"name":"network","status":"pass","detail":"Network OK — can reach NixOS cache"}}'
+  echo '{{"name":"network","status":"pass","detail":"Network OK â can reach NixOS cache"}}'
 else
-  echo '{{"name":"network","status":"fail","detail":"Cannot reach cache.nixos.org — install will fail without internet"}}'
+  echo '{{"name":"network","status":"fail","detail":"Cannot reach cache.nixos.org â install will fail without internet"}}'
 fi
 
 echo ']}}'
@@ -7529,7 +7619,7 @@ for disk in $(lsblk -dnro NAME,TYPE 2>/dev/null | awk '$2=="disk" {print $1}'); 
 done
 echo ']'
 
-# ── GPU Detection ──
+# ââ GPU Detection ââ
 echo ',"gpu": {'
 GPU_VENDOR="unknown"
 GPU_MODEL="unknown"
@@ -7556,7 +7646,7 @@ printf '"vendor":"%s","model":"%s","driver":"%s","hybrid":%s,"count":%d' \
   "$GPU_VENDOR" "$(echo "$GPU_MODEL" | sed 's/"/\\"/g')" "$GPU_DRIVER" "$HYBRID" "$GPU_COUNT"
 echo '}'
 
-# ── WiFi Detection ──
+# ââ WiFi Detection ââ
 echo ',"wifi": {'
 WIFI_AVAILABLE=false
 WIFI_IFACE=""
@@ -7577,7 +7667,7 @@ fi
 printf '"available":%s,"interface":"%s","networks":%s' "$WIFI_AVAILABLE" "$WIFI_IFACE" "$WIFI_NETWORKS"
 echo '}'
 
-# ── Timezone / Locale Detection ──
+# ââ Timezone / Locale Detection ââ
 echo ',"locale": {'
 # Try to detect timezone from system or IP geolocation
 TZ_DETECTED=$(cat /etc/timezone 2>/dev/null || timedatectl show --property=Timezone --value 2>/dev/null || echo "")
@@ -7593,7 +7683,7 @@ KB_LAYOUT=$(cat /etc/vconsole.conf 2>/dev/null | grep KEYMAP | cut -d= -f2 || ec
 printf '"timezone":"%s","language":"%s","keyboard":"%s"' "$TZ_DETECTED" "$LANG_DETECTED" "$KB_LAYOUT"
 echo '}'
 
-# ── Safety: Active server detection ──
+# ââ Safety: Active server detection ââ
 # Scores risk factors. High score = likely production server, block install.
 echo ',"safety": {'
 
@@ -7800,7 +7890,7 @@ echo '}'
                 }
             }
 
-            // ── Scan existing OS for installed applications ──
+            // ââ Scan existing OS for installed applications ââ
             "scan_apps" => {
                 eprintln!("[{}] Scanning apps on existing OS...", peer_addr);
 
@@ -7912,7 +8002,7 @@ echo ']'
                             .await;
                     }
                     Ok(result) => {
-                        // Partial results are OK — some partitions may fail to mount
+                        // Partial results are OK â some partitions may fail to mount
                         eprintln!(
                             "[{}] App scan partial (exit {})",
                             peer_addr, result.exit_status
@@ -7938,14 +8028,14 @@ echo ']'
                 }
             }
 
-            // ── Deep scan: dotfiles, config, personal data for migration + welcome ──
+            // ââ Deep scan: dotfiles, config, personal data for migration + welcome ââ
             "deep_scan" => {
                 eprintln!("[{}] Deep scanning for migration data...", peer_addr);
 
                 let deep_scan_script = r#"
 echo '{'
 
-# ── Git Configuration ──
+# ââ Git Configuration ââ
 echo '"git": {'
 FIRST_GIT=true
 for home in /home/* /root; do
@@ -7963,7 +8053,7 @@ for home in /home/* /root; do
 done
 echo '}'
 
-# ── Shell Configuration ──
+# ââ Shell Configuration ââ
 echo ',"shell": {'
 SHELL_TYPE="bash"
 ALIAS_COUNT=0
@@ -7985,7 +8075,7 @@ printf '"type":"%s","alias_count":%d,"custom_functions":%d' \
   "$SHELL_TYPE" "$ALIAS_COUNT" "$CUSTOM_FUNCTIONS"
 echo '}'
 
-# ── SSH Keys & Config ──
+# ââ SSH Keys & Config ââ
 echo ',"ssh": {'
 KEY_COUNT=0
 HOST_COUNT=0
@@ -8000,7 +8090,7 @@ printf '"key_count":%d,"host_count":%d,"has_agent_config":%s' \
   "$(grep -rq "AddKeysToAgent" /home/*/.ssh/config /root/.ssh/config 2>/dev/null && echo true || echo false)"
 echo '}'
 
-# ── Editor Configurations ──
+# ââ Editor Configurations ââ
 echo ',"editors": {'
 EDITORS="["
 FIRST_ED=true
@@ -8030,7 +8120,7 @@ for home in /home/* /root; do
 done
 echo "\"detected\":$EDITORS]}"
 
-# ── Desktop / Window Manager ──
+# ââ Desktop / Window Manager ââ
 echo ',"current_desktop": {'
 DE="unknown"
 WM="unknown"
@@ -8047,7 +8137,7 @@ done
 printf '"de":"%s","wm":"%s"' "$DE" "$WM"
 echo '}'
 
-# ── Browser Data ──
+# ââ Browser Data ââ
 echo ',"browsers": {'
 BROWSERS="["
 FIRST_BR=true
@@ -8072,7 +8162,7 @@ for home in /home/*; do
 done
 echo "\"detected\":$BROWSERS]}"
 
-# ── Docker / Development Environment ──
+# ââ Docker / Development Environment ââ
 echo ',"development": {'
 DOCKER_IMAGES=0
 DOCKER_COMPOSE_FILES=0
@@ -8088,7 +8178,7 @@ printf '"docker_images":%d,"compose_files":%d,"python_venvs":%d,"node_projects":
   "$DOCKER_IMAGES" "$DOCKER_COMPOSE_FILES" "$VENVS" "$NODE_PROJECTS" "$RUST_PROJECTS"
 echo '}'
 
-# ── Music / Creative Tools ──
+# ââ Music / Creative Tools ââ
 echo ',"creative": {'
 HAS_AUDIO_PROJECTS=false
 HAS_DAW_CONFIG=false
@@ -8101,7 +8191,7 @@ done
 printf '"has_daw_config":%s,"has_audio_projects":%s' "$HAS_DAW_CONFIG" "$HAS_AUDIO_PROJECTS"
 echo '}'
 
-# ── User Identity ──
+# ââ User Identity ââ
 echo ',"identity": {'
 USERNAME=""
 FULLNAME=""
@@ -8144,7 +8234,7 @@ echo '}'
                 }
             }
 
-            // ── Data preservation before wipe ──
+            // ââ Data preservation before wipe ââ
             "preserve_data" => {
                 let _mutation_guard = match mutation_lock.try_lock() {
                     Ok(guard) => guard,
@@ -8323,9 +8413,9 @@ echo '}'
                 remove_transaction_artifact_dir(&transaction_dir);
             }
 
-            // ═══════════════════════════════════════════════════════
+            // âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
             // Post-install NixOS management actions
-            // ═══════════════════════════════════════════════════════
+            // âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
             "list_generations" => {
                 eprintln!("[{}] Listing generations...", peer_addr);
                 match run_privileged_args(
@@ -9482,7 +9572,7 @@ echo '}'
                     .await;
             }
 
-            // ── PXE / Network Boot ──
+            // ââ PXE / Network Boot ââ
             "netboot_info" => {
                 eprintln!("[{}] Querying netboot info...", peer_addr);
                 let script = r#"
@@ -9527,9 +9617,9 @@ echo '}'
                 }
             }
 
-            // ═══════════════════════════════════════════════════════
+            // âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
             // Tier 3: Disk cloning & Machine inventory
-            // ═══════════════════════════════════════════════════════
+            // âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
             "create_image" => {
                 let _mutation_guard = match mutation_lock.try_lock() {
                     Ok(guard) => guard,
@@ -10313,7 +10403,7 @@ echo '}'
                 }
             }
 
-            // ── WiFi scanning and connection ──
+            // ââ WiFi scanning and connection ââ
             "scan_wifi" => {
                 eprintln!("[{}] Scanning WiFi...", peer_addr);
                 match run_privileged_args("nmcli", &["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list"]).await
@@ -10951,7 +11041,7 @@ echo '}'
                 let _ = ws_tx.send(Message::Text(result.to_string())).await;
             }
 
-            // ── nixpkgs Version Query ──
+            // ââ nixpkgs Version Query ââ
             // Returns the nixpkgs channel version running on the target system.
             // Used to detect stale package names in the app database.
             "nixpkgs_version" => {
@@ -11194,7 +11284,7 @@ async fn main() {
         "{}",
         auth_token_banner(&auth_token, std::io::stderr().is_terminal())
     );
-    eprintln!("  Protocol: auth → connect → (discover_disks/install/...) → disconnect");
+    eprintln!("  Protocol: auth â connect â (discover_disks/install/...) â disconnect");
     eprintln!("  Session timeout: 30 minutes");
     eprintln!("  Rate limit: 1 active session per IP");
 
@@ -11388,7 +11478,7 @@ async fn main() {
     }
 }
 
-// ── Security regression tests ──
+// ââ Security regression tests ââ
 
 #[cfg(test)]
 mod tests {
@@ -12203,6 +12293,56 @@ mod tests {
     }
 
     #[test]
+    fn sensitive_cleanup_refuses_target_inode_interposition() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-secret-interposition-{id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let target = dir.join("secret");
+        let replacement = dir.join("replacement");
+        std::fs::write(&target, b"original-secret").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        std::fs::write(&replacement, b"replacement-secret").unwrap();
+        std::fs::set_permissions(
+            &replacement,
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&target)
+            .unwrap();
+        let metadata = file.metadata().unwrap();
+        file.set_len(0).unwrap();
+        file.sync_all().unwrap();
+
+        std::fs::rename(&target, dir.join("wiped-secret")).unwrap();
+        std::fs::rename(&replacement, &target).unwrap();
+
+        let error = unlink_verified_sensitive_file(
+            target.to_str().unwrap(),
+            &file,
+            &metadata,
+        )
+        .expect_err("inode interposition must fail closed");
+        assert!(error.contains("changed inode identity"));
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"replacement-secret"
+        );
+
+        drop(file);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn trusted_script_open_rejects_symlinks_and_unsafe_modes() {
         use std::os::unix::fs::PermissionsExt;
 
@@ -12298,7 +12438,7 @@ mod tests {
         assert!(script.contains("bootctl status"));
         assert!(script.contains("sbctl list-enrolled-keys"));
         assert!(script.contains("secure-boot-enrollment-observed"));
-        assert!(!script.contains("Key enrollment failed — enroll manually"));
+        assert!(!script.contains("Key enrollment failed â enroll manually"));
         assert!(!script.contains("Secure Boot keys will be created but NOT enrolled."));
     }
 
@@ -12916,7 +13056,7 @@ mod tests {
         assert!(lock.try_lock().is_ok());
     }
 
-    // ── sanitize_heredoc ──
+    // ââ sanitize_heredoc ââ
 
     #[test]
     fn heredoc_strips_exact_delimiter() {
@@ -12962,7 +13102,7 @@ mod tests {
         assert_eq!(sanitize_heredoc("", "NIXCONF"), "");
     }
 
-    // ── validate_disk_path ──
+    // ââ validate_disk_path ââ
 
     #[test]
     fn disk_valid_sda() {
@@ -13114,7 +13254,7 @@ mod tests {
         assert_eq!(validate_disk_path("  /dev/sda  ").unwrap(), "/dev/sda");
     }
 
-    // ── token_eq (constant-time comparison) ──
+    // ââ token_eq (constant-time comparison) ââ
 
     #[test]
     fn token_eq_same() {
@@ -13131,7 +13271,7 @@ mod tests {
         assert!(!token_eq("short", "longer_token"));
     }
 
-    // ── sanitize_input ──
+    // ââ sanitize_input ââ
 
     #[test]
     fn sanitize_allows_valid() {
@@ -13158,7 +13298,7 @@ mod tests {
         assert!(sanitize_input("America/Chicago", "tz", false).is_err());
     }
 
-    // ── validate_hostname_relay ──
+    // ââ validate_hostname_relay ââ
 
     #[test]
     fn hostname_valid() {
@@ -13181,7 +13321,7 @@ mod tests {
         assert!(validate_hostname_relay(&long).is_err());
     }
 
-    // ── Generated config secret hygiene ──
+    // ââ Generated config secret hygiene ââ
 
     #[test]
     fn machine_binding_digest_matches_stable_domain_and_normalization() {
@@ -13350,7 +13490,7 @@ mod tests {
         }
     }
 
-    // ── Target architecture contract ──
+    // ââ Target architecture contract ââ
 
     #[test]
     fn extracts_explicit_nix_system() {
@@ -13363,7 +13503,7 @@ mod tests {
         assert_eq!(extract_explicit_nix_system("outputs = { };"), None);
     }
 
-    // ── Secret-boundary regressions ──
+    // ââ Secret-boundary regressions ââ
 
     #[test]
     fn relay_rejects_unsafe_usernames_before_shell_construction() {
@@ -13371,7 +13511,7 @@ mod tests {
         assert!(validate_username("operator;rm").is_err());
     }
 
-    // ── config_write_commands (heredoc safety) ──
+    // ââ config_write_commands (heredoc safety) ââ
 
     #[test]
     fn config_write_strips_nixconf_delimiter() {
