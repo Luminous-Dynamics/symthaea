@@ -38,6 +38,12 @@ COMPOSITION = (
     "ecological_constraints",
 )
 
+MONEYNESS = (
+    "par_singleness",
+    "liquidity_elasticity",
+    "integrity_constraints",
+)
+
 CLASSIFICATIONS = {
     "whole_system",
     "architecture",
@@ -60,8 +66,8 @@ def check_profile(p: dict) -> None:
     required = {
         "schema_version","profile_id","semantic_version","title","classification",
         "evidence_maturity","evidence_refs","claim_ceiling","provenance",
-        "inheritance_policy","monetary_primitives","institutional_composition",
-        "transplant_contract",
+        "inheritance_policy","monetary_primitives","moneyness_properties",
+        "institutional_composition","transplant_contract",
     }
     if set(p) != required:
         fail(f"{p.get('profile_id','<unknown>')}: top-level key mismatch")
@@ -86,6 +92,16 @@ def check_profile(p: dict) -> None:
             fail(f"{p['profile_id']}.{name}: specified without definition")
         if value["status"] != "specified" and "definition" in value:
             fail(f"{p['profile_id']}.{name}: non-specified mechanism carries definition")
+    moneyness = p["moneyness_properties"]
+    if set(moneyness) != set(MONEYNESS):
+        fail(f"{p['profile_id']}: moneyness property key set")
+    for name, value in moneyness.items():
+        if value.get("status") not in {"specified","underdetermined","not_applicable"}:
+            fail(f"{p['profile_id']}.{name}: status")
+        if value["status"] == "specified" and not value.get("definition"):
+            fail(f"{p['profile_id']}.{name}: specified without definition")
+        if value["status"] != "specified" and "definition" in value:
+            fail(f"{p['profile_id']}.{name}: non-specified property carries definition")
     comp = p["institutional_composition"]
     if set(comp) != set(COMPOSITION):
         fail(f"{p['profile_id']}: composition key set")
