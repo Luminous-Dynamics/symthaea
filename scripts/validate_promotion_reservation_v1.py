@@ -647,8 +647,29 @@ class PromotionPrEffectStateV1:
             "compatible-repeat",
         )
 
+    def validates_source_delivery_bindings(self) -> bool:
+        identities = self.source_delivery_identities
+        delivery_ids = self.source_delivery_ids
+        return (
+            len(delivery_ids) == len(identities)
+            and delivery_ids == tuple(identity.delivery_id for identity in identities)
+            and len(delivery_ids) == len(set(delivery_ids))
+            and all(
+                bool(identity.delivery_id)
+                and bool(identity.payload_bytes_digest)
+                and bool(identity.hook_id)
+                and bool(identity.event_type)
+                and bool(identity.repository)
+                for identity in identities
+            )
+        )
+
     def is_terminally_observed(self) -> bool:
-        return self.state == "EffectObserved" and self.effect is not None
+        return (
+            self.state == "EffectObserved"
+            and self.effect is not None
+            and self.validates_source_delivery_bindings()
+        )
 
 @dataclass(frozen=True)
 class PromotionStackEffectEvidenceV1:
@@ -1306,6 +1327,21 @@ def test_effect_state_same_delivery_id_with_changed_payload_fails_closed():
     assert decision == "delivery-identity-conflict"
     assert state_after.state == "Conflict"
     assert state_after.effect is None
+
+
+def test_effect_state_rejects_inconsistent_source_delivery_bindings():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    state = PromotionPrEffectStateV1(
+        repository=identity.repository,
+        expected_entry=identity.ordered_stack[-1],
+        operation_identity_digest=identity.digest(),
+        state="EffectObserved",
+        effect=observation.to_stack_effect(identity),
+        source_delivery_ids=(observation.delivery_id,),
+    )
+    assert not state.validates_source_delivery_bindings()
+    assert not state.is_terminally_observed()
 
 
 def test_effect_state_conflicting_merge_commit_fails_closed():
@@ -3614,6 +3650,7 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 TESTS = [
     test_effect_state_binds_to_exact_operation_identity,
     test_effect_state_same_delivery_id_with_changed_payload_fails_closed,
+    test_effect_state_rejects_inconsistent_source_delivery_bindings,
     test_effect_state_conflict_is_absorbing,
     test_effect_state_conflict_never_reclassifies_as_terminal_observed,
     test_effect_state_admits_first_authenticated_merge,
