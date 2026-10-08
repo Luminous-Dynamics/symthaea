@@ -233,7 +233,7 @@ def run(args):
                 expected_sig = (
                     (1, 1, 1) if case == "all-directions-one-positive-root"
                     else (-1, -1, 1) if case == "cone-support"
-                    else (1, 0, 0) if case == "c-zero-boundary"
+                    else (0, 0, 1) if case == "c-zero-boundary"
                     else (-1, -1, -1) if case == "no-discriminant-direction"
                     else None
                 )
