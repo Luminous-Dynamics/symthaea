@@ -1585,7 +1585,7 @@ mod tests {
 
         let contents = std::fs::read_to_string(&path).unwrap();
         assert!(contents.lines().count() >= workers);
-        assert!(!contents.as_bytes().windows(2).any(|pair| pair == b"}\n{"));
+        assert!(contents.lines().all(|line| serde_json::from_str::<serde_json::Value>(line).is_ok()));
 
         let _ = std::fs::remove_file(path);
     }
