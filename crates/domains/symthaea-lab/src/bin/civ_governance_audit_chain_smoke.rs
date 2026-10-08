@@ -112,9 +112,15 @@ fn update_field(hasher: &mut Sha256, field: &[u8]) {
     hasher.update(field);
 }
 
-fn hash_event(sequence: u64, previous_hash: Option<Hash>, body: &EventBody) -> Hash {
+fn hash_event(
+    log_id: &str,
+    sequence: u64,
+    previous_hash: Option<Hash>,
+    body: &EventBody,
+) -> Hash {
     let mut hasher = Sha256::new();
     hasher.update(EVENT_DOMAIN);
+    update_field(&mut hasher, log_id.as_bytes());
     hasher.update(sequence.to_be_bytes());
 
     match previous_hash {
@@ -152,7 +158,7 @@ impl AuditLog {
 
         let sequence = self.events.len() as u64 + 1;
         let previous_hash = self.events.last().map(|event| event.hash);
-        let hash = hash_event(sequence, previous_hash, &body);
+        let hash = hash_event(&self.log_id, sequence, previous_hash, &body);
         let event = AuditEvent {
             sequence,
             previous_hash,
@@ -178,7 +184,12 @@ impl AuditLog {
                 return Err(AuditFailure::DuplicateEventKey);
             }
 
-            let expected = hash_event(event.sequence, event.previous_hash, &event.body);
+            let expected = hash_event(
+                &self.log_id,
+                event.sequence,
+                event.previous_hash,
+                &event.body,
+            );
             if expected != event.hash {
                 return Err(AuditFailure::EventHashMismatch);
             }
@@ -238,7 +249,12 @@ impl AuditLog {
         let mut previous_hash = None;
         for event in &mut self.events {
             event.previous_hash = previous_hash;
-            event.hash = hash_event(event.sequence, event.previous_hash, &event.body);
+            event.hash = hash_event(
+                &self.log_id,
+                event.sequence,
+                event.previous_hash,
+                &event.body,
+            );
             previous_hash = Some(event.hash);
         }
     }
@@ -331,6 +347,16 @@ fn main() {
     let checkpoint_three = log.checkpoint();
 
     assert_eq!(log.verify(), Ok(()));
+
+    // Log identity is inside the domain-separated event hash: copying the
+    // same event bytes to another log identity is rejected as cross-log replay.
+    let mut cross_log_replay = AuditLog::new("civ-governance-log-v2");
+    cross_log_replay.events = log.events.clone();
+    assert_eq!(
+        cross_log_replay.verify(),
+        Err(AuditFailure::EventHashMismatch)
+    );
+
     assert_eq!(log.verify_checkpoint_prefix(&checkpoint_two), Ok(()));
     assert_eq!(
         log.verify_current_checkpoint(&checkpoint_two),
