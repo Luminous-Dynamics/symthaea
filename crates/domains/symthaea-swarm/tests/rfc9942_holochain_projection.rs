@@ -512,7 +512,7 @@ fn noncanonical_protected_algorithm_encoding_requires_exact_tbs() {
         unsigned_wire.extend_from_slice(&cbor_bstr(&[0; 64]));
         let unsigned = Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
         let signature = outer_signer
-            .sign(rng.as_ref(), &unsigned.signature1_tbs(&[], None).unwrap())
+            .sign(&rng, &unsigned.signature1_tbs(&[], None).unwrap())
             .unwrap()
             .as_ref()
             .to_vec();
