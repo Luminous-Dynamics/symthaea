@@ -1,0 +1,16 @@
+{
+  "schema_version": "monetary-attestation-reference-v1-contrasts",
+  "trace_set_digest": "5e6ca9d3ac8381121058ed6e625306462220a2380913f3c0822bc8bdc3e02437",
+  "key_findings": [
+    "Exact binding depends on a trustworthy reference anchor; tuple equality alone is not an authority proof.",
+    "Verifier-current reference accepts only exact-current attestation and rejects all substituted variants.",
+    "A verifier reference one generation stale accepts the matching stale-generation attestation under naive tuple equality, demonstrating false-positive authority when currentness is not separately enforced.",
+    "A sibling-context reference accepts the corresponding context-substituted attestation under naive tuple equality, demonstrating context rollback/substitution when currentness is not separately enforced.",
+    "Participant-supplied reference accepts every variant by construction; this is circular validation rather than independent verification.",
+    "Cross-authority reference accepts exact-current tuple equality even though the source is outside the local authority domain, showing that subject × attribute × generation × context is insufficient when authority provenance is external to those coordinates.",
+    "Accepted invalid/reference-compromised evidence does not always improve allocation; acceptance and exploitability remain separate measurements.",
+    "The safe boundary therefore requires reference provenance/currentness before tuple equality can confer authority."
+  ],
+  "design_implication": "Treat the expected binding tuple as a separate verifier-owned witness: source identity, authority namespace, lifecycle generation and current decision context must be validated before attestation equality can produce an authoritative input.",
+  "claim_ceiling": "Deterministic synthetic reference-provenance/currentness experiment only; no real cryptographic key custody, trusted hardware, empirical attacker behavior, calibrated uncertainty, equilibrium, legal finality, interoperability conformance, or production-readiness claim."
+}

@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/monetary-attestation-reference-v1.schema.json",
+  "title": "Monetary Attestation Reference Provenance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "factorial_size",
+    "batch_size",
+    "factors",
+    "reference_sources",
+    "reference_source_digests",
+    "attestation_variants",
+    "variant_digests",
+    "fixed_dimensions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "monetary-attestation-reference-v1"
+    },
+    "experiment_id": {
+      "const": "monetary-interop-attestation-reference-v1"
+    },
+    "factorial_size": {
+      "const": 324000
+    },
+    "batch_size": {
+      "const": 3
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_pair",
+        "adapter",
+        "shock",
+        "seed",
+        "allocation_policy",
+        "focal_obligation",
+        "reporting_policy",
+        "reference_source",
+        "attestation_variant"
+      ],
+      "properties": {
+        "monetary_pair": {
+          "const": [
+            "bank_mutual",
+            "bank_stablecoin",
+            "tokenized_deposit_stablecoin"
+          ]
+        },
+        "adapter": {
+          "const": [
+            "redeem_reissue",
+            "escrowed_atomic_swap",
+            "multilateral_net_settlement",
+            "absent"
+          ]
+        },
+        "shock": {
+          "const": [
+            "normal",
+            "liquidity_shock",
+            "network_partition",
+            "issuer_default",
+            "bridge_failure",
+            "stale_quote"
+          ]
+        },
+        "seed": {
+          "const": [
+            11,
+            23,
+            47,
+            89,
+            131
+          ]
+        },
+        "allocation_policy": {
+          "const": [
+            "fifo",
+            "criticality_priority",
+            "minimum_liquidity_demand"
+          ]
+        },
+        "focal_obligation": {
+          "const": [
+            0,
+            1,
+            2
+          ]
+        },
+        "reporting_policy": {
+          "const": [
+            "truthful",
+            "criticality_inflation",
+            "liquidity_demand_underreport",
+            "dual_misreport"
+          ]
+        },
+        "reference_source": {
+          "const": [
+            "verifier_current",
+            "verifier_stale_generation",
+            "verifier_stale_context",
+            "participant_supplied",
+            "cross_authority"
+          ]
+        },
+        "attestation_variant": {
+          "const": [
+            "exact_current",
+            "subject_substitution",
+            "attribute_substitution",
+            "generation_substitution",
+            "context_substitution"
+          ]
+        }
+      }
+    },
+    "reference_sources": {
+      "type": "object"
+    },
+    "reference_source_digests": {
+      "type": "object"
+    },
+    "attestation_variants": {
+      "type": "object"
+    },
+    "variant_digests": {
+      "type": "object"
+    },
+    "fixed_dimensions": {
+      "type": "object",
+      "required": [
+        "topology",
+        "topology_digest",
+        "resource_regime",
+        "resource_digest",
+        "resource_capacity",
+        "obligations",
+        "liquidity_demand_multiplier_by_adapter",
+        "liquidity_shock_increment",
+        "current_generation_by_seed",
+        "stale_generation_delta",
+        "binding_policy",
+        "binding_fields",
+        "attestation_envelope_fields",
+        "signature_semantics",
+        "reference_provenance_rule",
+        "invalid_reference_fallback",
+        "crn_namespace"
+      ],
+      "properties": {
+        "topology": {
+          "const": "full_mesh"
+        },
+        "topology_digest": {
+          "type": "string"
+        },
+        "resource_regime": {
+          "const": "bounded_shared_settlement_liquidity"
+        },
+        "resource_digest": {
+          "type": "string"
+        },
+        "resource_capacity": {
+          "const": 15
+        },
+        "obligations": {
+          "type": "array"
+        },
+        "liquidity_demand_multiplier_by_adapter": {
+          "type": "object"
+        },
+        "liquidity_shock_increment": {
+          "const": 5
+        },
+        "current_generation_by_seed": {
+          "type": "object"
+        },
+        "stale_generation_delta": {
+          "const": 1
+        },
+        "binding_policy": {
+          "const": "exact_all"
+        },
+        "binding_fields": {
+          "const": [
+            "subject_id",
+            "attribute_id",
+            "generation",
+            "context_id"
+          ]
+        },
+        "attestation_envelope_fields": {
+          "const": [
+            "subject_id",
+            "attribute_id",
+            "generation",
+            "context_id",
+            "attested_value",
+            "signer_profile",
+            "signature_valid"
+          ]
+        },
+        "signature_semantics": {
+          "type": "string"
+        },
+        "reference_provenance_rule": {
+          "type": "string"
+        },
+        "invalid_reference_fallback": {
+          "const": "neutral_ordering"
+        },
+        "crn_namespace": {
+          "const": "world:{shock}:{seed}:obligation:{index}"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string"
+    }
+  }
+}
