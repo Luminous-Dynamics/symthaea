@@ -1421,11 +1421,12 @@ fn secure_boot_postinstall() -> &'static str {
 echo "STAGE: Setting up Secure Boot..."
 
 # If Secure Boot is already active, the requested capability is already realized.
+BOOTCTL_STATUS=$(bootctl status 2>/dev/null || true)
 SBCTL_STATUS=$(chroot /mnt sbctl status 2>/dev/null || true)
-if echo "$SBCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(✓[[:space:]]*)?Enabled'; then
+if echo "$BOOTCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(✓[[:space:]]*)?Enabled'     || echo "$SBCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(✓[[:space:]]*)?Enabled'; then
   echo "SECURITY: secure-boot-observed-active"
 else
-  SETUP_MODE=$(bootctl status 2>/dev/null | grep "Setup Mode:" | grep -ci "setup" || echo "0")
+  SETUP_MODE=$(printf '%s\n' "$BOOTCTL_STATUS" | grep "Setup Mode:" | grep -ci "setup" || echo "0")
   if [ "$SETUP_MODE" = "0" ]; then
     echo "ERROR: Secure Boot was requested but firmware is neither already active nor in Setup Mode."
     echo "ERROR: Refusing to report installation success without Secure Boot enrollment."
@@ -12218,6 +12219,7 @@ mod tests {
     fn secure_boot_hook_fails_closed_without_enrollment_evidence() {
         let script = secure_boot_postinstall();
         assert!(script.contains("Refusing to report installation success"));
+        assert!(script.contains("bootctl status"));
         assert!(script.contains("sbctl list-enrolled-keys"));
         assert!(script.contains("secure-boot-enrollment-observed"));
         assert!(!script.contains("Key enrollment failed — enroll manually"));
