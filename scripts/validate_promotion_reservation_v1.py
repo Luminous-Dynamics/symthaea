@@ -41,6 +41,7 @@ class PromotionOperationIdentityV1:
     merge_action: str
     trust_root_generation: int
     governance_generation: int
+    bypass_rules: bool = False
 
     def canonical_bytes(self) -> bytes:
         payload = {
@@ -48,6 +49,7 @@ class PromotionOperationIdentityV1:
             "provider_stack_number": self.provider_stack_number,
             "base_tip_sha": self.base_tip_sha,
             "governance_generation": self.governance_generation,
+            "bypass_rules": self.bypass_rules,
             "merge_action": self.merge_action,
             "merge_method": self.merge_method,
             "ordered_stack": [
@@ -408,12 +410,14 @@ class ProviderOutcome:
         uuid: str | None = None,
         merge_method: str | None = None,
         merge_action: str | None = None,
+        bypass_rules: bool = False,
     ):
         self.http = http
         self.kind = kind
         self.uuid = uuid
         self.merge_method = merge_method
         self.merge_action = merge_action
+        self.bypass_rules = bypass_rules
 
 
 @dataclass(frozen=True)
@@ -430,6 +434,7 @@ class GitHubAsyncModel:
         self.pending_uuid: str | None = None
         self.pending_merge_method: str | None = None
         self.pending_merge_action: str | None = None
+        self.pending_bypass_rules: bool = False
         self.async_status: str | None = None
         self.merge_sha: str | None = None
         self.expired: set[str] = set()
@@ -440,6 +445,7 @@ class GitHubAsyncModel:
         expected_head: str,
         merge_method: str = "squash",
         merge_action: str = "direct_merge",
+        bypass_rules: bool = False,
         timeout_after_accept: bool = False,
     ) -> ProviderOutcome:
         self.calls += 1
@@ -451,6 +457,7 @@ class GitHubAsyncModel:
             if (
                 merge_method == self.pending_merge_method
                 and merge_action == self.pending_merge_action
+                and bypass_rules == self.pending_bypass_rules
             ):
                 return ProviderOutcome(
                     409,
@@ -458,6 +465,7 @@ class GitHubAsyncModel:
                     self.pending_uuid,
                     self.pending_merge_method,
                     self.pending_merge_action,
+                    self.pending_bypass_rules,
                 )
             return ProviderOutcome(
                 409,
@@ -465,10 +473,12 @@ class GitHubAsyncModel:
                 self.pending_uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         self.pending_uuid = f"uuid-{self.calls}"
         self.pending_merge_method = merge_method
         self.pending_merge_action = merge_action
+        self.pending_bypass_rules = bypass_rules
         self.async_status = "pending"
         if timeout_after_accept:
             return ProviderOutcome(
@@ -477,6 +487,7 @@ class GitHubAsyncModel:
                 self.pending_uuid,
                 merge_method,
                 merge_action,
+                bypass_rules,
             )
         return ProviderOutcome(
             202,
@@ -533,6 +544,7 @@ class GitHubAsyncModel:
         expected_head: str,
         merge_method: str = "squash",
         merge_action: str = "direct_merge",
+        bypass_rules: bool = False,
     ) -> EffectReconciliation:
         result = self.get_async_result(uuid)
 
@@ -541,6 +553,7 @@ class GitHubAsyncModel:
                 result.uuid == uuid
                 and result.merge_method == merge_method
                 and result.merge_action == merge_action
+                and result.bypass_rules == bypass_rules
                 and expected_head == self.pr_head
             ):
                 return EffectReconciliation(
@@ -802,6 +815,17 @@ def test_provider_topology_cas_predicate_digest_binds_sequence():
     first = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
     second = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 3)
     assert first.digest() != second.digest()
+
+
+def test_provider_topology_cas_predicate_digest_binds_bypass_rules():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    normal = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    bypass_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "bypass_rules": True},
+    )
+    bypass = ProviderTopologyCasPredicateV1.from_binding(bypass_identity, observation, 2)
+    assert normal.digest() != bypass.digest()
 
 
 def test_provider_topology_binding_rejects_non_provider_cas_evidence_source():
@@ -1151,6 +1175,14 @@ def test_stack_identity_binds_provider_stack_number():
     assert original.digest() != changed.digest()
 
 
+def test_stack_identity_binds_bypass_rules():
+    original = stack_identity_fixture()
+    changed = PromotionOperationIdentityV1(
+        **{**original.__dict__, "bypass_rules": True},
+    )
+    assert original.digest() != changed.digest()
+
+
 def test_stack_identity_binds_requested_subject_identity():
     original = stack_identity_fixture()
     changed_pr = PromotionOperationIdentityV1(
@@ -1235,6 +1267,17 @@ def test_duplicate_async_request_option_mismatch_is_not_idempotent():
     assert second.uuid == first.uuid
     assert second.merge_method == "squash"
     assert second.merge_action == "direct_merge"
+
+
+def test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent():
+    provider = GitHubAsyncModel()
+    first = provider.submit("H1", "squash", "direct_merge", False)
+    second = provider.submit("H1", "squash", "direct_merge", True)
+    assert first.uuid is not None
+    assert second.http == 409
+    assert second.kind == "duplicate-parameter-mismatch"
+    assert second.uuid == first.uuid
+    assert second.bypass_rules is False
 
 
 def test_direct_provider_merge_establishes_causal_attribution():
@@ -1442,6 +1485,7 @@ TESTS = [
     test_provider_topology_binding_rejects_cas_evidence_sequence_drift,
     test_provider_topology_cas_predicate_digest_binds_observation,
     test_provider_topology_cas_predicate_digest_binds_sequence,
+    test_provider_topology_cas_predicate_digest_binds_bypass_rules,
     test_provider_topology_binding_rejects_non_provider_cas_evidence_source,
     test_provider_topology_binding_rejects_empty_provider_operation_id,
     test_provider_topology_binding_rejects_unaccepted_cas_predicate_result,
@@ -1476,6 +1520,7 @@ TESTS = [
     test_stack_identity_binds_merge_parameters,
     test_stack_identity_binds_authority_generations,
     test_stack_identity_binds_provider_stack_number,
+    test_stack_identity_binds_bypass_rules,
     test_stack_identity_binds_requested_subject_identity,
     test_exact_20_schedules_are_executed,
     test_single_use_reservation,
@@ -1483,6 +1528,7 @@ TESTS = [
     test_timeout_after_acceptance_is_unknown,
     test_duplicate_async_request_reuses_provider_handle,
     test_duplicate_async_request_option_mismatch_is_not_idempotent,
+    test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent,
     test_direct_provider_merge_establishes_causal_attribution,
     test_enqueued_then_durable_merge_observes_effect_without_causality,
     test_expired_uuid_then_durable_merge_observes_effect_without_causality,
