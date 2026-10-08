@@ -15,6 +15,7 @@
       "mutation_id": "M-COORD-QUEUE-001",
       "rule_level": "operational",
       "authorizing_rule_hash": null,
+      "authorizing_rule_level": null,
       "transition": "proposed",
       "semantic_delta": {
         "path": "allocation.reservation",
@@ -37,6 +38,7 @@
       "mutation_id": "M-COORD-QUEUE-001",
       "rule_level": "operational",
       "authorizing_rule_hash": "blake3:collective-choice-rule-v0",
+      "authorizing_rule_level": "collective_choice",
       "transition": "adopted",
       "semantic_delta": {
         "path": "allocation.reservation",
