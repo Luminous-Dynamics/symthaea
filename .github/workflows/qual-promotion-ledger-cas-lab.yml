@@ -108,7 +108,7 @@ jobs:
           stale_response="$(mktemp)"
           stale_status="$(update_ref_status "${STALE_SHA}" "${stale_response}" "${ref_path}")"
           case "${stale_status}" in
-            409|422) ;;
+            409) ;;
             *)
               echo "unexpected stale update HTTP status: ${stale_status}" >&2
               cat "${stale_response}" >&2
@@ -139,7 +139,7 @@ jobs:
           right_wins=0
           case "${race_left_status}" in
             200) left_wins=1 ;;
-            409|422) ;;
+            409) ;;
             *)
               echo "unexpected concurrent-left HTTP status: ${race_left_status}" >&2
               cat "${race_left_response}" >&2
@@ -148,7 +148,7 @@ jobs:
           esac
           case "${race_right_status}" in
             200) right_wins=1 ;;
-            409|422) ;;
+            409) ;;
             *)
               echo "unexpected concurrent-right HTTP status: ${race_right_status}" >&2
               cat "${race_right_response}" >&2
@@ -178,7 +178,7 @@ jobs:
           stale_after_invalidation_response="$(mktemp)"
           stale_after_invalidation_status="$(update_ref_status "${STALE_SHA}" "${stale_after_invalidation_response}" "${ref_path}")"
           case "${stale_after_invalidation_status}" in
-            409|422) ;;
+            409) ;;
             *)
               echo "unexpected late-stale HTTP status: ${stale_after_invalidation_status}" >&2
               cat "${stale_after_invalidation_response}" >&2
@@ -193,7 +193,7 @@ jobs:
           rollback_response="$(mktemp)"
           rollback_status="$(update_ref_status "${BASE_SHA}" "${rollback_response}" "${ref_path}")"
           case "${rollback_status}" in
-            409|422) ;;
+            409) ;;
             *)
               echo "unexpected rollback HTTP status: ${rollback_status}" >&2
               cat "${rollback_response}" >&2
