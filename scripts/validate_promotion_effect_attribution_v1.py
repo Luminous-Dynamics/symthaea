@@ -135,8 +135,8 @@ def test_direct_result_without_uuid_is_invalid() -> None:
     result = EffectObservation(
         Source.DIRECT_PROVIDER_RESULT,
         Attribution.ESTABLISHED,
+        "OP-1",
         None,
-        "uuid-1",
         "H1",
         "M1",
     )
