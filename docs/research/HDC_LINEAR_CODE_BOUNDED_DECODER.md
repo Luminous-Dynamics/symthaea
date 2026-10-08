@@ -124,8 +124,9 @@ The randomized qualification surface uses a test-side parity-check construction 
 nullspace elimination, which is intentionally separate from the production constructor. The
 resulting syndrome is compared directly with the production parity-check syndrome for every probe.
 
-A stronger algebraic-independence witness now covers one deterministic code in each small random
-regime: for `[12,4]` and `[20,3]`, the complete dual space is enumerated directly by checking
+A stronger algebraic-independence witness now covers one deterministic code in each selected
+small random regime: `[12,4]`, `[16,8]`, and `[20,3]`. For each code, the complete dual space is
+enumerated directly by checking
 orthogonality against the generator basis. Every production parity-check row must occur in that brute-force dual space, and the
 complete XOR-span of the production check rows must equal the independently enumerated dual space
 element-for-element. The production zero-syndrome kernel is also exhaustively checked against the
