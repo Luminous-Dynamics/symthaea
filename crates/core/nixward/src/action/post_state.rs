@@ -2248,6 +2248,66 @@ mod tests {
     }
 
     #[test]
+    fn receipt_rejects_bus_incarnation_rollover() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut rolled = obs.clone();
+        rolled.systemd_bus_id = Some(
+            "fedcba9876543210fedcba9876543210".to_string(),
+        );
+
+        assert_eq!(
+            build_receipt(&exp, &rolled, None).unwrap_err(),
+            NixPostStateErrorV1::BusIncarnationMismatch
+        );
+    }
+
+    #[test]
+    fn stability_rejects_bus_incarnation_rollover() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(
+            &obs,
+            1_000,
+            1_000,
+            2_000,
+            &[1_000, 2_000],
+        );
+        evidence.samples[1].bus_id =
+            Some("fedcba9876543210fedcba9876543210".to_string());
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+
+        assert_eq!(
+            build_receipt(&exp, &obs, Some(evidence)).unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn legacy_non_proven_receipt_can_omit_bus_incarnation() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let mut legacy = receipt;
+        legacy.systemd_bus_id = None;
+        assert_ne!(legacy.claim, NixPostStateClaimV1::Proven);
+        assert!(legacy.validate_shape().is_ok());
+        assert!(legacy.digest().is_ok());
+    }
+
+    #[test]
     fn stable_claim_requires_window_and_unchanged_state_change_timestamp() {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
