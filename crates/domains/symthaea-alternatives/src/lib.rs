@@ -2686,6 +2686,61 @@ impl CandidatePathway {
         })
     }
 
+    /// Return true only when every required performance surface is either
+    /// positively supported or explicitly unresolved by a contradiction on
+    /// that exact metric. A conflict on one metric must never mask a missing
+    /// or unsupported different required metric.
+    fn performance_surface_is_supported_or_conflicted(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.constraints.keys().all(|metric| {
+            let Some(estimate) = self.performance.get(metric) else {
+                return false;
+            };
+            let Some(scale) = requirement.performance_scales.get(metric) else {
+                return false;
+            };
+            if estimate.unit != scale.unit
+                || estimate.scope != scale.scope
+                || estimate.basis != scale.basis
+            {
+                return false;
+            }
+            self.performance_evidence_is_supported_at(metric, as_of, freshness_policy)
+                || self.performance_evidence_conflicts_at(metric, as_of, freshness_policy)
+        })
+    }
+
+    /// Return true only when every required operating surface is either
+    /// positively supported or explicitly unresolved by a contradiction on
+    /// that exact condition. A conflict on one condition must never mask a
+    /// missing or unsupported different required condition.
+    fn operating_surface_is_supported_or_conflicted(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.operating_envelope.iter().all(|(condition, required)| {
+            let Some(capability) = self.operating_capabilities.get(condition) else {
+                return false;
+            };
+            if capability.unit != required.unit
+                || capability.scope != required.scope
+                || capability.basis != required.basis
+                || capability.interval.lower > required.interval.lower
+                || capability.interval.upper < required.interval.upper
+            {
+                return false;
+            }
+            self.operating_evidence_is_supported_at(condition, as_of, freshness_policy)
+                || self.operating_evidence_conflicts_at(condition, as_of, freshness_policy)
+        })
+    }
+
     fn performance_has_supported_kind_at(
         &self,
         requirement: &FunctionalRequirement,
@@ -2752,11 +2807,15 @@ impl CandidatePathway {
         let functional_or_operating_conflict =
             requirement_conflicts(requirement, self, as_of, freshness_policy);
 
-        if (!self.performance_is_supported(requirement, as_of, freshness_policy)
-            && !functional_or_operating_conflict)
-            || (!self.operating_envelope_is_supported(requirement, as_of, freshness_policy)
-                && !functional_or_operating_conflict)
-            || !self.burden_scales_match_requirement(requirement)
+        if !self.performance_surface_is_supported_or_conflicted(
+            requirement,
+            as_of,
+            freshness_policy,
+        ) || !self.operating_surface_is_supported_or_conflicted(
+            requirement,
+            as_of,
+            freshness_policy,
+        ) || !self.burden_scales_match_requirement(requirement)
             || self.burdens.is_empty()
             || !self.all_burden_dimensions_have_usable_evidence(as_of, freshness_policy)
         {
@@ -8096,6 +8155,48 @@ mod tests {
                 blocker,
                 FrontierBlocker::ConstraintUnresolved(metric)
                     if metric == "throughput_per_hour"
+            )));
+    }
+
+    #[test]
+    fn functional_conflict_does_not_mask_missing_second_metric() {
+        let mut c = candidate(
+            "mixed-functional-boundary",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![
+                evidence(
+                    "support",
+                    "source-a",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "contradict",
+                    "source-b",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Contradicts,
+                    0.95,
+                ),
+            ],
+        );
+        c.performance.remove("service_life_years");
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(result.frontier_blockers["mixed-functional-boundary"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::ConstraintUnresolved(metric)
+                    if metric == "service_life_years"
             )));
     }
 
