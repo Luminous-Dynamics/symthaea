@@ -32,11 +32,15 @@ write lease_ref = success
 
 because the trust-root ref can move to B between the reads and the write.
 
-The authoritative state therefore lives in one domain-scoped Git ref:
+The authoritative state therefore lives in one domain-scoped Git ref.
+
+For the GitHub-backed v1 construction, that ref is intentionally a branch ref:
 
 ~~~text
-refs/qualification/promotions/<domain>/current
+refs/heads/qualification/promotions/<domain>/current
 ~~~
+
+This is a governance boundary, not a naming preference. GitHub documents branch/tag rulesets as the control surface for selected branches and tags, with explicit creation, update, deletion, and bypass rules. The qualification construction therefore does not assume that a custom namespace such as `refs/qualification/...` receives equivalent repository-governance coverage. A custom ref namespace remains possible only with an independently verified provider control plane that establishes the same mutation, deletion, recreation, force-writer, and bypass constraints.
 
 The referenced commit contains both:
 
