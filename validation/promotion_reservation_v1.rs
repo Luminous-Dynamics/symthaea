@@ -56,6 +56,7 @@ pub struct PromotionDispatchIntentV1 {
 pub enum ReservationError {
     StaleLedgerHead,
     StaleTrustRoot,
+    TrustRootGenerationRegression,
     StaleDispatchFence,
     LeaseUnavailable,
     LeaseAlreadyConsumed,
@@ -160,6 +161,9 @@ impl PromotionReservationLedgerV1 {
     ) -> Result<(), ReservationError> {
         if observed_head != self.current_head {
             return Err(ReservationError::StaleLedgerHead);
+        }
+        if trust_root_generation < self.current_trust_root_generation {
+            return Err(ReservationError::TrustRootGenerationRegression);
         }
         self.current_fencing_token += 1;
         self.current_trust_root_generation = trust_root_generation;
@@ -343,6 +347,16 @@ mod tests {
             ledger.reserve("L0", "LEASE-1", "L1", "repo", 1, "H1", 2, "gov", "github"),
             Err(ReservationError::StaleTrustRoot)
         );
+    }
+
+    #[test]
+    fn invalidation_rejects_trust_root_generation_regression() {
+        let mut ledger = reserve_one();
+        assert_eq!(
+            ledger.invalidate("L1", "I1", 0),
+            Err(ReservationError::TrustRootGenerationRegression)
+        );
+        assert_eq!(ledger.current_head(), "L1");
     }
 
     #[test]
