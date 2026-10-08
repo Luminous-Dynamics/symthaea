@@ -1805,25 +1805,36 @@ fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
             "production parity-check row span diverged from the complete brute-force dual space: regime={dimension}x{rank} seed=0x{seed:X}"
         );
 
+        let independent_codeword_masks = independently_enumerated_codewords(&code)
+            .into_iter()
+            .map(|word| word.words()[0])
+            .collect::<Vec<_>>();
+
+        let mut observed_kernel_masks = Vec::new();
         let expected_kernel_size = 1usize << rank;
-        let mut kernel_size = 0usize;
         for mask in 0..(1usize << dimension) {
             let observation = error_from_mask(mask, dimension);
             let syndrome = parity_check.syndrome(&observation).expect("same dimension");
             if syndrome.weight() == 0 {
-                kernel_size += 1;
-                assert!(
-                    code.contains(&observation),
-                    "production zero-syndrome kernel admitted an observation outside the code: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
-                );
+                observed_kernel_masks.push(mask as u64);
             }
             total_kernel_observations += 1;
         }
-        assert_eq!(kernel_size, expected_kernel_size);
+        observed_kernel_masks.sort_unstable();
+
+        assert_eq!(
+            observed_kernel_masks.len(),
+            expected_kernel_size,
+            "zero-syndrome kernel cardinality mismatch: regime={dimension}x{rank} seed=0x{seed:X}"
+        );
+        assert_eq!(
+            observed_kernel_masks, independent_codeword_masks,
+            "production zero-syndrome kernel diverged from the independently reconstructed codeword set: regime={dimension}x{rank} seed=0x{seed:X}"
+        );
     }
 
     println!(
-        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};total_production_span_vectors={total_production_span_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_span_exact=true;kernel_equals_code=true;algebraically_distinct=true",
+        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};total_production_span_vectors={total_production_span_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_span_exact=true;kernel_equals_independent_codeword_set=true;algebraically_distinct=true",
         cases.len(),
     );
 }
