@@ -291,3 +291,12 @@ but not:
     production promotion success
 
 The chain digest is order-sensitive because measurement order is semantically meaningful, unlike the source-set digest which is intentionally order-invariant.
+
+
+The measurement chain also requires source/operator/trust-anchor independence within each round, and the same operator/trust-anchor lineage across the repeated rounds. A changed trust lineage is rejected as:
+
+    clock-source-measurement-trust-lineage-mismatch
+
+Causal ordering is checked pairwise across every earlier/later response, not merely adjacent responses. This avoids allowing a middle response with a wide uncertainty interval to mask a contradiction between two non-adjacent responses.
+
+The source-set admission itself is fail-closed even without a supplied local dispatch/observation window: every member must first be a structurally admissible `ClockRelationV1`. A missing time window therefore cannot turn malformed cryptographic/source evidence into a valid quorum.
