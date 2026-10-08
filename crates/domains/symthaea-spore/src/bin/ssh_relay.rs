@@ -1617,7 +1617,42 @@ fn generate_system_config(msg: &ClientMessage) -> String {
     config.push_str("  networking.networkmanager.enable = true;\n");
 
     config
-}fn generate_system_config_module(msg: &ClientMessage) -> String {
+}fn single_luks_fallback_configuration(hostname: &str) -> String {
+    format!(
+        "{{ config, pkgs, ... }}:
+{{
+  imports = [ ./hardware-configuration.nix ];
+  networking.hostName = "{hostname}";
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # LUKS2 encryption; runtime UUID substitution occurs after luksFormat.
+  boot.initrd.luks.devices."cryptroot" = {{
+    device = "/dev/disk/by-uuid/__CRYPT_UUID__";
+    allowDiscards = true;
+  }};
+
+  services.openssh.enable = true;
+  services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};
+  services.fstrim.enable = true;
+  services.smartd = {{ enable = true; autodetect = true; }};
+  services.btrfs.autoScrub = {{ enable = true; interval = "monthly"; fileSystems = [ "/" ]; }};
+  zramSwap = {{ enable = true; algorithm = "zstd"; }};
+  boot.kernel.sysctl."vm.swappiness" = 60;
+
+  users.users.{hostname} = {{
+    isNormalUser = true;
+    extraGroups = [ "wheel" "video" "networkmanager" ];
+  }};
+
+  environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs cryptsetup ];
+  system.stateVersion = "26.05";
+}}",
+        hostname = hostname,
+    )
+}
+
+fn generate_system_config_module(msg: &ClientMessage) -> String {
     let sys_config = generate_system_config(msg);
     if sys_config.trim().is_empty() {
         return String::new();
@@ -2475,73 +2510,43 @@ nixos-generate-config --root /mnt
                 luks_key_file = luks_key_file
             );
 
-            // Append configuration.nix (and optionally flake.nix) via heredoc.
-            // NOTE: The fallback LUKS config uses an *unquoted* heredoc (NIXCONF without
-            // single quotes) so that $CRYPT_UUID is expanded by the shell at install time.
-            // When the browser supplies a config, it is written with a quoted heredoc
-            // ('NIXCONF') since it should already contain the correct UUID or be self-contained.
-            if !msg.configuration_nix.is_empty() {
-                // Browser config pre-staged — copy from temp dir (no heredoc)
-                let staging = format!("{transaction_dir}/config");
-                script.push_str(&format!("mkdir -p /mnt/etc/nixos\ncp {}/configuration.nix /mnt/etc/nixos/configuration.nix\n", staging));
-                if !msg.flake_nix.is_empty() {
-                    script.push_str(&format!(
-                        "cp {}/flake.nix /mnt/etc/nixos/flake.nix\n",
-                        staging
-                    ));
-                }
-                // Transaction staging cleanup is owned by Rust after installation;
-                // never embed recursive deletion of the transaction namespace in the
-                // privileged install script.
-            } else {
-                // Fallback: unquoted heredoc for $CRYPT_UUID expansion
+            // Install transaction-staged configuration without a heredoc.
+            // Browser input is copied verbatim. Fallback configuration is staged by Rust
+            // with only the runtime __CRYPT_UUID__ placeholder.
+            let config_staging_dir = format!("{transaction_dir}/config");
+            script.push_str(&format!(
+                r#"mkdir -p /mnt/etc/nixos
+if ! cp "{config_staging_dir}/configuration.nix" /mnt/etc/nixos/configuration.nix; then
+  echo "ERROR: unable to install staged configuration.nix."
+  exit 1
+fi
+"#,
+                config_staging_dir = config_staging_dir,
+            ));
+
+            if msg.configuration_nix.is_empty() {
+                script.push_str(
+                    r#"if ! sed -i "s|__CRYPT_UUID__|$CRYPT_UUID|g" /mnt/etc/nixos/configuration.nix 2>/dev/null; then
+  echo "ERROR: unable to bind generated configuration to the formatted LUKS volume."
+  exit 1
+fi
+if grep -Fq "__CRYPT_UUID__" /mnt/etc/nixos/configuration.nix; then
+  echo "ERROR: generated configuration still contains the unresolved LUKS placeholder."
+  exit 1
+fi
+"#,
+                );
+            }
+
+            if !msg.flake_nix.is_empty() {
                 script.push_str(&format!(
-                    "cat > /mnt/etc/nixos/configuration.nix << NIXCONF\n\
-                     {{ config, pkgs, ... }}:\n\
-                     {{\n\
-                     \x20 imports = [ ./hardware-configuration.nix ];\n\
-                     \x20 networking.hostName = \"{hostname}\";\n\
-                     \x20 boot.loader.systemd-boot.enable = true;\n\
-                     \x20 boot.loader.efi.canTouchEfiVariables = true;\n\
-                     \n\
-                     \x20 # LUKS encryption\n\
-                     \x20 boot.initrd.luks.devices.\"cryptroot\" = {{\n\
-                     \x20   device = \"/dev/disk/by-uuid/$CRYPT_UUID\";\n\
-                     \x20   allowDiscards = true;\n\
-                     \x20 }};\n\
-                     \n\
-                     \x20 # Hardening (Symthaea defaults)\n\
-                     \x20 services.openssh.enable = true;\n\
-                     \x20 services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};\n\
-                     \x20 services.fstrim.enable = true;\n\
-                     \x20 services.smartd = {{ enable = true; autodetect = true; }};\n\
-                     \x20 services.btrfs.autoScrub = {{ enable = true; interval = \"monthly\"; fileSystems = [ \"/\" ]; }};\n\
-                     \x20 zramSwap = {{ enable = true; algorithm = \"zstd\"; }};\n\
-                     \x20 boot.kernel.sysctl.\"vm.swappiness\" = 60;\n\
-                     \n\
-                     \x20 # User\n\
-                     \x20 users.users.{hostname} = {{\n\
-                     \x20   isNormalUser = true;\n\
-                     \x20   extraGroups = [ \"wheel\" \"video\" \"networkmanager\" ];\n\
-                     \x20   \n\
-                     \x20 }};\n\
-                     \n\
-                     \x20 environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs cryptsetup ];\n\
-                     \x20 system.stateVersion = \"26.05\";\n\
-                     }}\n\
-                     NIXCONF\n",
-                    hostname = hostname,
-                    luks_key_file = luks_key_file,
+                    r#"if ! cp "{config_staging_dir}/flake.nix" /mnt/etc/nixos/flake.nix; then
+  echo "ERROR: unable to install staged flake.nix."
+  exit 1
+fi
+"#,
+                    config_staging_dir = config_staging_dir,
                 ));
-                // Write flake.nix if provided by browser even with fallback config
-                if !msg.flake_nix.is_empty() {
-                    script.push_str("\ncat > /mnt/etc/nixos/flake.nix << 'FLAKEEOF'\n");
-                    script.push_str(&msg.flake_nix);
-                    if !msg.flake_nix.ends_with('\n') {
-                        script.push('\n');
-                    }
-                    script.push_str("FLAKEEOF\n");
-                }
             }
 
             // Patch bootloader for BIOS mode (LUKS layout)
@@ -6671,6 +6676,25 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
                                     "Unable to stage generated system configuration safely: {error}"
+                                ))
+                                .to_json(),
+                            ))
+                            .await;
+                        remove_transaction_artifact_dir(&transaction_dir);
+                        continue;
+                    }
+                }
+
+                if client_msg.layout == "single-luks" && client_msg.configuration_nix.is_empty() {
+                    let fallback_path = format!("{config_staging_dir}/configuration.nix");
+                    let fallback_config = single_luks_fallback_configuration(&hostname);
+                    if let Err(error) =
+                        write_private_file(&fallback_path, fallback_config.as_bytes(), 0o600)
+                    {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to stage fallback encrypted configuration safely: {error}"
                                 ))
                                 .to_json(),
                             ))
