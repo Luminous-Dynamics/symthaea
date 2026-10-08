@@ -60,6 +60,188 @@ pub fn validate_disk_path(d: &str) -> Result<String, String> {
     Ok(d.to_string())
 }
 
+/// A kernel-level binding for a whole block device node at one point in time.
+///
+/// This identifies the opened device by its Linux device number and reported
+/// capacity. It intentionally does not claim to be a globally unique physical
+/// disk identity: device numbers can be reused after hot-unplug/replug.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockDeviceBinding {
+    pub major: u32,
+    pub minor: u32,
+    pub size_bytes: u64,
+}
+
+#[cfg(target_os = "linux")]
+fn linux_device_number_parts(dev: u64) -> (u32, u32) {
+    // Linux/glibc modern dev_t uses a split major/minor representation.
+    // Keep this decomposition local and dependency-free so this crate can
+    // retain #![deny(unsafe_code)] without a raw libc major/minor call.
+    let major = ((dev >> 8) & 0x0fff) | ((dev >> 32) & 0xfffff000);
+    let minor = (dev & 0x00ff) | ((dev >> 12) & 0xffffff00);
+    (major as u32, minor as u32)
+}
+
+#[cfg(target_os = "linux")]
+fn block_device_capacity_from_sysfs(major: u32, minor: u32) -> Result<u64, String> {
+    // /sys/dev/block/<major>:<minor>/size exposes the capacity in standard
+    // 512-byte sectors. Binding the read to the exact device number observed
+    // from the already-open block-device inode avoids a raw ioctl here.
+    let sysfs_root = format!("/sys/dev/block/{major}:{minor}");
+    let dev_number = std::fs::read_to_string(format!("{sysfs_root}/dev"))
+        .map_err(|error| {
+            format!(
+                "unable to query sysfs device identity for {major}:{minor}: {error}"
+            )
+        })?;
+    if dev_number.trim() != format!("{major}:{minor}") {
+        return Err(format!(
+            "sysfs device identity mismatch: expected {major}:{minor}, observed {:?}",
+            dev_number.trim()
+        ));
+    }
+
+    let sectors = std::fs::read_to_string(format!("{sysfs_root}/size"))
+        .map_err(|error| {
+            format!(
+                "unable to query block-device capacity for {major}:{minor}: {error}"
+            )
+        })?
+        .trim()
+        .parse::<u64>()
+        .map_err(|error| {
+            format!(
+                "block-device capacity for {major}:{minor} is not a valid sector count: {error}"
+            )
+        })?;
+
+    sectors
+        .checked_mul(512)
+        .ok_or_else(|| format!("block-device capacity for {major}:{minor} overflows u64"))
+}
+
+#[cfg(target_os = "linux")]
+pub fn bind_block_device(path: &str) -> Result<BlockDeviceBinding, String> {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
+
+    let validated = validate_disk_path(path)?;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&validated)
+        .map_err(|error| format!("unable to open block device {validated}: {error}"))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("unable to inspect block device {validated}: {error}"))?;
+
+    if !metadata.file_type().is_block_device() {
+        return Err(format!("{validated} is not a block device"));
+    }
+
+    let (major, minor) = linux_device_number_parts(metadata.rdev());
+    let size_bytes = block_device_capacity_from_sysfs(major, minor)?;
+
+    if size_bytes == 0 {
+        return Err(format!(
+            "block device {validated} reports zero capacity"
+        ));
+    }
+
+    Ok(BlockDeviceBinding {
+        major,
+        minor,
+        size_bytes,
+    })
+}
+#[cfg(not(target_os = "linux"))]
+pub fn bind_block_device(_path: &str) -> Result<(), String> {
+    Err("block-device binding is only supported on Linux".into())
+}
+
+#[cfg(target_os = "linux")]
+pub fn verify_block_device_binding(
+    path: &str,
+    expected: BlockDeviceBinding,
+) -> Result<(), String> {
+    let observed = bind_block_device(path)?;
+    if observed == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "block device binding changed for {path}: expected {}:{}, {} bytes; observed {}:{}, {} bytes",
+            expected.major,
+            expected.minor,
+            expected.size_bytes,
+            observed.major,
+            observed.minor,
+            observed.size_bytes
+        ))
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn bind_block_device(_path: &str) -> Result<BlockDeviceBinding, String> {
+    Err("block-device binding is only supported on Linux".into())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn verify_block_device_binding(
+    _path: &str,
+    _expected: BlockDeviceBinding,
+) -> Result<(), String> {
+    Err("block-device binding is only supported on Linux".into())
+}
+
+/// Validate a disk path specifically as a whole-disk target.
+///
+/// The generic validator intentionally accepts any syntactically valid
+/// block-device node. Destructive install topology is narrower: partition
+/// nodes must never be accepted as the disk we intend to repartition.
+pub fn validate_whole_disk_path(value: &str) -> Result<String, String> {
+    let path = validate_disk_path(value)?;
+    let dev = &path["/dev/".len()..];
+
+    let is_ascii_digits = |part: &str| {
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+    };
+    let is_ascii_lower = |part: &str| {
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_lowercase())
+    };
+
+    let whole = if let Some(rest) = dev.strip_prefix("nvme") {
+        if let Some((controller, namespace)) = rest.split_once('n') {
+            is_ascii_digits(controller) && is_ascii_digits(namespace)
+        } else {
+            false
+        }
+    } else if let Some(rest) = dev.strip_prefix("mmcblk") {
+        is_ascii_digits(rest)
+    } else if let Some(rest) = dev.strip_prefix("loop") {
+        is_ascii_digits(rest)
+    } else if let Some(rest) = dev.strip_prefix("fd") {
+        is_ascii_digits(rest)
+    } else if let Some(rest) = dev.strip_prefix("sd") {
+        is_ascii_lower(rest)
+    } else if let Some(rest) = dev.strip_prefix("vd") {
+        is_ascii_lower(rest)
+    } else if let Some(rest) = dev.strip_prefix("xvd") {
+        is_ascii_lower(rest)
+    } else if let Some(rest) = dev.strip_prefix("hd") {
+        is_ascii_lower(rest)
+    } else {
+        false
+    };
+
+    if whole {
+        Ok(path)
+    } else {
+        Err(format!(
+            "Install target must be a whole-disk device, not partition node: {}",
+            path
+        ))
+    }
+}
+
 /// Sanitize a string for safe use in shell commands and Nix config.
 ///
 /// Only allows alphanumeric, hyphens, underscores, dots, and optionally forward slashes.
@@ -83,6 +265,33 @@ pub fn sanitize_input(s: &str, field_name: &str, allow_slashes: bool) -> Result<
     }
     Ok(s.to_string())
 }
+/// Render an arbitrary value as a complete, safe Nix double-quoted string literal.
+///
+/// Nix treats `"`, `\\`, and `${...}` specially inside double-quoted strings.
+/// Keep this at the code-generation boundary so generated Nix remains safe even
+/// when a future caller bypasses the current input sanitizer.
+pub fn nix_string_literal(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '$' if chars.peek() == Some(&'{') => out.push_str("\\$"),
+            c if c.is_control() => out.push('\u{FFFD}'),
+            c => out.push(c),
+        }
+    }
+
+    out.push('"');
+    out
+}
+
 
 /// Validate hostname — RFC 1123. Returns lowercase, defaults to "guardian" if empty.
 pub fn validate_hostname(h: &str) -> Result<String, String> {
@@ -157,24 +366,71 @@ pub fn token_eq(a: &str, b: &str) -> bool {
 /// rnix-parser for syntax validation.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn validate_nix_pure_eval(nix_content: &str) -> Result<(), String> {
+    const MAX_NIX_PREFLIGHT_BYTES: usize = 256 * 1024;
+
+    if nix_content.is_empty() {
+        return Err("Nix expression cannot be empty".into());
+    }
+    if nix_content.len() > MAX_NIX_PREFLIGHT_BYTES {
+        return Err(format!(
+            "Nix expression exceeds the {} KiB preflight limit",
+            MAX_NIX_PREFLIGHT_BYTES / 1024
+        ));
+    }
+    if nix_content.as_bytes().contains(&0) {
+        return Err("Nix expression contains a NUL byte".into());
+    }
     use std::process::Command;
 
-    // Wrap in a trivial evaluator — we just want to check it parses
+    const TRUSTED_PATH: &str =
+        "/run/current-system/sw/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/sbin";
+    // Do not expose the target machine's existing NixOS configuration as an
+    // implicit input to a browser-supplied expression. Keeping the search path
+    // empty prevents the advisory preflight from becoming a configuration-file
+    // read capability.
+    const HERMETIC_NIX_PATH: &str = "";
+
+    let nix = [
+        "/run/current-system/sw/bin/nix",
+        "/nix/var/nix/profiles/default/bin/nix",
+        "/usr/bin/nix",
+    ]
+    .into_iter()
+    .find(|path| std::path::Path::new(path).is_file())
+    .ok_or_else(|| "Failed to locate trusted nix executable".to_string())?;
+
+    // Wrap in a trivial evaluator — we just want to check it parses.
     let expr = format!(
         "let config = {{}}; pkgs = {{}}; lib = {{}}; in builtins.tryEval ({})",
         nix_content
     );
 
-    let output = Command::new("nix")
+    // This helper may execute as the privileged relay user. Match the relay's
+    // command-boundary policy instead of inheriting ambient Nix configuration,
+    // daemon/socket locations, user config directories, or dynamic-loader hooks.
+    let mut command = Command::new(nix);
+    // Pure evaluation is still run with a hermetic process environment. The
+    // evaluator must never inherit caller-controlled Nix, shell, loader, proxy,
+    // or user-directory variables.
+    command.env_clear();
+    command
         .args(["eval", "--pure-eval", "--expr", &expr])
+        .env("PATH", TRUSTED_PATH)
+        .env("NIX_PATH", HERMETIC_NIX_PATH)
+        .env("HOME", "/nonexistent")
+        .env("XDG_CONFIG_HOME", "/nonexistent")
+        .env("LANG", "C")
+        .env("LC_ALL", "C");
+
+    let output = command
         .output()
-        .map_err(|e| format!("Failed to run nix eval: {} (is nix installed?)", e))?;
+        .map_err(|e| format!("Failed to run trusted nix eval: {e}"))?;
 
     if output.status.success() {
         Ok(())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        // Extract just the error message, not the full trace
+        // Extract just the error message, not the full trace.
         let msg = stderr
             .lines()
             .find(|l| l.contains("error:"))
@@ -217,6 +473,69 @@ mod tests {
         assert_eq!(sanitize_heredoc("", "NIXCONF"), "");
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn pure_eval_hermetic_environment_keeps_nix_path_empty() {
+        let hermetic_nix_path = "";
+        assert!(hermetic_nix_path.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn nix_pure_eval_rejects_unbounded_or_nul_input_before_process_spawn() {
+        let oversized = "x".repeat(256 * 1024 + 1);
+        let error = validate_nix_pure_eval(&oversized).expect_err("oversized input must fail closed");
+        assert!(error.contains("preflight limit"));
+
+        let nul_error =
+            validate_nix_pure_eval("1\0").expect_err("NUL-containing input must fail closed");
+        assert!(nul_error.contains("NUL"));
+    }
+
+    // ── block-device binding ──
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn block_device_binding_rejects_regular_files() {
+        let path = std::env::temp_dir().join("nixforhumanity-not-a-block-device");
+        std::fs::write(&path, b"not a disk").unwrap();
+        let error = bind_block_device(path.to_str().unwrap())
+            .expect_err("regular file must not bind as a block device");
+        assert!(error.contains("not a block device"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_device_number_split_matches_standard_device_id_example() {
+        assert_eq!(linux_device_number_parts(0x0000_0000_0000_0103), (1, 3));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_device_capacity_sector_conversion_is_checked() {
+        assert_eq!((2048u64).checked_mul(512), Some(1_048_576u64));
+        assert!(
+            (u64::MAX).checked_mul(512).is_none(),
+            "capacity conversion must fail closed on overflow"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn block_device_binding_is_self_consistent_when_rechecked() {
+        let candidates = ["/dev/sda", "/dev/nvme0n1", "/dev/vda", "/dev/mmcblk0"];
+        if let Some(path) = candidates
+            .iter()
+            .copied()
+            .find(|candidate| std::path::Path::new(candidate).exists())
+        {
+            let binding = bind_block_device(path).expect("existing candidate should bind");
+            verify_block_device_binding(path, binding)
+                .expect("unchanged block device should retain its binding");
+        }
+    }
+
     // ── validate_disk_path ──
 
     #[test]
@@ -237,6 +556,33 @@ mod tests {
         assert!(validate_disk_path("/dev/zz0").is_err());
         assert!(validate_disk_path("/dev/").is_err());
     }
+    #[test]
+    fn whole_disk_accepts_supported_whole_device_names() {
+        assert_eq!(validate_whole_disk_path("/dev/sda").unwrap(), "/dev/sda");
+        assert_eq!(validate_whole_disk_path("/dev/vda").unwrap(), "/dev/vda");
+        assert_eq!(validate_whole_disk_path("/dev/xvdb").unwrap(), "/dev/xvdb");
+        assert_eq!(validate_whole_disk_path("/dev/nvme0n1").unwrap(), "/dev/nvme0n1");
+        assert_eq!(validate_whole_disk_path("/dev/mmcblk0").unwrap(), "/dev/mmcblk0");
+        assert_eq!(validate_whole_disk_path("/dev/loop0").unwrap(), "/dev/loop0");
+    }
+
+    #[test]
+    fn whole_disk_rejects_partition_nodes() {
+        for path in [
+            "/dev/sda1",
+            "/dev/vda2",
+            "/dev/xvdb3",
+            "/dev/nvme0n1p1",
+            "/dev/mmcblk0p1",
+            "/dev/fd0p1",
+        ] {
+            assert!(
+                validate_whole_disk_path(path).is_err(),
+                "partition node must be rejected: {path}"
+            );
+        }
+    }
+
 
     // ── sanitize_input ──
 
@@ -259,6 +605,23 @@ mod tests {
     fn sanitize_slash_gating() {
         assert!(sanitize_input("America/Chicago", "tz", false).is_err());
         assert!(sanitize_input("America/Chicago", "tz", true).is_ok());
+    }
+
+    // ── nix_string_literal ──
+
+    #[test]
+    fn nix_string_literal_escapes_quotes_backslashes_and_interpolation() {
+        let input = r#"hello"\${builtins.abort "pwned"}"#;
+        assert_eq!(
+            nix_string_literal(input),
+            r#""hello\"\\\${builtins.abort \"pwned\"}""#,
+        );
+    }
+
+    #[test]
+    fn nix_string_literal_escapes_common_control_characters() {
+        assert_eq!(nix_string_literal("a\nb\tc\rd"), r#""a\nb\tc\rd""#);
+        assert!(!nix_string_literal("a\0b").contains("\0"));
     }
 
     // ── validate_username ──

@@ -164,6 +164,7 @@ log "Step 7: Driving install via WebSocket..."
 # Use python3 to send WebSocket messages (available on NixOS)
 python3 << 'PYEOF' 2>&1 | tee -a "$LOG_FILE"
 import asyncio
+import uuid
 import json
 import os
 import sys
@@ -223,6 +224,7 @@ async def run_demo():
         print(">> Sending install (single layout on /dev/nvme0n1)...")
         await ws.send(json.dumps({
             "action": "install",
+            "request_id": uuid.uuid4().hex,
             "host": "localhost",
             "port": 2222,
             "username": "root",
