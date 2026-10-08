@@ -381,13 +381,32 @@ fn trusted_script_process_from_stdin(
         .args(args))
 }
 
+fn sync_parent_directory(path: &std::path::Path) -> Result<(), std::io::Error> {
+    let parent = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => std::path::Path::new("."),
+    };
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(parent)?;
+    directory.sync_all()
+}
+
 fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
-    std::fs::OpenOptions::new()
+    let file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(mode)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(path)
+        .open(path)?;
+
+    // fsync(file) makes the file contents durable; fsync(parent) makes the
+    // directory entry durable. Both are required before this file becomes an
+    // authority-bearing transaction artifact.
+    sync_parent_directory(std::path::Path::new(path))?;
+    Ok(file)
 }
 
 fn write_private_file(path: &str, contents: &[u8], mode: u32) -> Result<(), std::io::Error> {
@@ -12945,6 +12964,32 @@ mod tests {
             RestoreArchiveFormat::TarGzip
         );
         assert!(restore_archive_format_for_commitment("unknown").is_err());
+    }
+
+    #[test]
+    fn sync_parent_directory_rejects_symlink_parent() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "nixforhumanity-sync-parent-{transaction_id}"
+        ));
+        let real = root.join("real");
+        let alias = root.join("alias");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::os::unix::fs::symlink(&real, &alias).unwrap();
+
+        assert!(sync_parent_directory(&real.join("artifact")).is_ok());
+        let error = sync_parent_directory(&alias.join("artifact"))
+            .expect_err("symlink parent must be rejected by O_NOFOLLOW");
+        assert!(
+            matches!(error.raw_os_error(), Some(libc::ELOOP | libc::ENOTDIR)),
+            "unexpected symlink-parent error: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

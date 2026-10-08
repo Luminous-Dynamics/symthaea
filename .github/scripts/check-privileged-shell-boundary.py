@@ -224,6 +224,8 @@ def main() -> None:
     if descriptor_start < 0 or descriptor_end < 0:
         fail("staged script descriptor capability disappeared")
     descriptor_body = text[descriptor_start:descriptor_end]
+    if "sync_parent_directory" not in descriptor_body:
+        fail("staged script capability no longer synchronizes its parent directory entry")
     for required in (
         "blake3::hash(contents)",
         "file.sync_all()",
