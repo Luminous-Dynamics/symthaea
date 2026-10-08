@@ -156,6 +156,14 @@ class ProviderOutcome:
         self.merge_action = merge_action
 
 
+@dataclass(frozen=True)
+class EffectReconciliation:
+    effect_observed: bool
+    observation_source: str
+    causal_attribution: str
+    observed_merge_commit: str | None = None
+
+
 class GitHubAsyncModel:
     def __init__(self):
         self.pr_head = "H1"
@@ -253,6 +261,56 @@ class GitHubAsyncModel:
         # An enqueued merge-queue result is final and remains enqueued;
         # durable PR merged state is the separate reconciliation surface.
         self.async_status = "enqueued"
+
+    def merge_directly(self) -> None:
+        assert self.pending_uuid is not None
+        self.merge_sha = "M1"
+        self.async_status = "merged"
+
+    def reconcile(
+        self,
+        uuid: str,
+        expected_head: str,
+        merge_method: str = "squash",
+        merge_action: str = "direct_merge",
+    ) -> EffectReconciliation:
+        result = self.get_async_result(uuid)
+
+        if result.kind == "merged":
+            if (
+                result.uuid == uuid
+                and result.merge_method == merge_method
+                and result.merge_action == merge_action
+                and expected_head == self.pr_head
+            ):
+                return EffectReconciliation(
+                    effect_observed=True,
+                    observation_source="provider-operation-result",
+                    causal_attribution="established",
+                    observed_merge_commit=self.merge_sha,
+                )
+
+        if result.kind == "enqueued" and self.merge_sha is not None:
+            return EffectReconciliation(
+                effect_observed=True,
+                observation_source="durable-pr-state",
+                causal_attribution="unestablished",
+                observed_merge_commit=self.merge_sha,
+            )
+
+        if result.kind == "not-found" and self.merge_sha is not None:
+            return EffectReconciliation(
+                effect_observed=True,
+                observation_source="durable-pr-state-after-uuid-expiry",
+                causal_attribution="unestablished",
+                observed_merge_commit=self.merge_sha,
+            )
+
+        return EffectReconciliation(
+            effect_observed=False,
+            observation_source="no-durable-effect",
+            causal_attribution="unestablished",
+        )
 
 
 def legal_interleavings():
@@ -364,6 +422,83 @@ def test_duplicate_async_request_option_mismatch_is_not_idempotent():
     assert second.uuid == first.uuid
     assert second.merge_method == "squash"
     assert second.merge_action == "direct_merge"
+
+
+def test_direct_provider_merge_establishes_causal_attribution():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1", "squash", "direct_merge")
+    assert accepted.uuid is not None
+    provider.merge_directly()
+    reconciliation = provider.reconcile(
+        accepted.uuid,
+        "H1",
+        "squash",
+        "direct_merge",
+    )
+    assert reconciliation.effect_observed
+    assert reconciliation.observation_source == "provider-operation-result"
+    assert reconciliation.causal_attribution == "established"
+    assert reconciliation.observed_merge_commit == "M1"
+
+
+def test_enqueued_then_durable_merge_observes_effect_without_causality():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1", "squash", "direct_merge")
+    assert accepted.uuid is not None
+    queued = provider.get_async_result(accepted.uuid)
+    assert queued.kind == "pending"
+    provider.async_status = "enqueued"
+    provider.complete()
+
+    reconciliation = provider.reconcile(
+        accepted.uuid,
+        "H1",
+        "squash",
+        "direct_merge",
+    )
+    assert reconciliation.effect_observed
+    assert reconciliation.observation_source == "durable-pr-state"
+    assert reconciliation.causal_attribution == "unestablished"
+    assert reconciliation.observed_merge_commit == "M1"
+
+
+def test_expired_uuid_then_durable_merge_observes_effect_without_causality():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1")
+    assert accepted.uuid is not None
+    provider.complete()
+    provider.expired.add(accepted.uuid)
+
+    reconciliation = provider.reconcile(accepted.uuid, "H1")
+    assert reconciliation.effect_observed
+    assert reconciliation.observation_source == "durable-pr-state-after-uuid-expiry"
+    assert reconciliation.causal_attribution == "unestablished"
+
+
+def test_already_merged_retry_observes_effect_without_causality():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1")
+    assert accepted.uuid is not None
+    provider.merge_directly()
+
+    retry = provider.submit("H1")
+    assert retry.kind == "merged"
+    assert retry.uuid is None
+
+    reconciliation = EffectReconciliation(
+        effect_observed=True,
+        observation_source="already-merged-pr-state",
+        causal_attribution="unestablished",
+        observed_merge_commit=provider.merge_sha,
+    )
+    assert reconciliation.effect_observed
+    assert reconciliation.causal_attribution == "unestablished"
+
+
+def test_local_operation_id_does_not_mint_causal_attribution():
+    receipt = PromotionEffectReceipt("OP-1", "H1", "M1")
+    assert receipt.promotion_operation_id == "OP-1"
+    assert not hasattr(receipt, "causal_attribution")
 
 
 def test_enqueued_is_not_completion():
@@ -486,6 +621,11 @@ TESTS = [
     test_timeout_after_acceptance_is_unknown,
     test_duplicate_async_request_reuses_provider_handle,
     test_duplicate_async_request_option_mismatch_is_not_idempotent,
+    test_direct_provider_merge_establishes_causal_attribution,
+    test_enqueued_then_durable_merge_observes_effect_without_causality,
+    test_expired_uuid_then_durable_merge_observes_effect_without_causality,
+    test_already_merged_retry_observes_effect_without_causality,
+    test_local_operation_id_does_not_mint_causal_attribution,
     test_enqueued_is_not_completion,
     test_already_merged_is_durable_completion,
     test_expired_uuid_with_merged_pr_uses_pr_state,
