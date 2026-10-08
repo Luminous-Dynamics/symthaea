@@ -495,6 +495,7 @@ class GitHubAsyncModel:
             self.pending_uuid,
             merge_method,
             merge_action,
+            bypass_rules,
         )
 
     def get_async_result(self, uuid: str) -> ProviderOutcome:
@@ -507,6 +508,7 @@ class GitHubAsyncModel:
                 uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         if self.async_status == "merged" and self.pending_uuid == uuid:
             return ProviderOutcome(
@@ -515,6 +517,7 @@ class GitHubAsyncModel:
                 uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         if self.pending_uuid == uuid:
             return ProviderOutcome(
@@ -523,6 +526,7 @@ class GitHubAsyncModel:
                 uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         return ProviderOutcome(404, "not-found")
 
@@ -1280,6 +1284,27 @@ def test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent():
     assert second.bypass_rules is False
 
 
+def test_async_provider_result_preserves_bypass_rules_for_reconciliation():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1", "squash", "direct_merge", True)
+    assert accepted.uuid is not None
+    assert accepted.bypass_rules is True
+    pending = provider.get_async_result(accepted.uuid)
+    assert pending.bypass_rules is True
+    provider.merge_directly()
+    merged = provider.get_async_result(accepted.uuid)
+    assert merged.bypass_rules is True
+    reconciliation = provider.reconcile(
+        accepted.uuid,
+        "H1",
+        "squash",
+        "direct_merge",
+        True,
+    )
+    assert reconciliation.effect_observed
+    assert reconciliation.causal_attribution == "established"
+
+
 def test_direct_provider_merge_establishes_causal_attribution():
     provider = GitHubAsyncModel()
     accepted = provider.submit("H1", "squash", "direct_merge")
@@ -1529,6 +1554,7 @@ TESTS = [
     test_duplicate_async_request_reuses_provider_handle,
     test_duplicate_async_request_option_mismatch_is_not_idempotent,
     test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent,
+    test_async_provider_result_preserves_bypass_rules_for_reconciliation,
     test_direct_provider_merge_establishes_causal_attribution,
     test_enqueued_then_durable_merge_observes_effect_without_causality,
     test_expired_uuid_then_durable_merge_observes_effect_without_causality,
