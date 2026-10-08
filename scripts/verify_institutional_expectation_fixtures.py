@@ -10,6 +10,7 @@ class OracleError(Exception):
 def run(case):
     records = {}
     current = {}
+    updates = {}
     observations = {}
     for event in case.get('events', [case.get('event')]):
         if event is None:
@@ -23,7 +24,7 @@ def run(case):
             records[event['expectation_id']] = event.copy()
             current[event['subject_id']] = event['expectation_id']
         elif kind == 'Update':
-            if event['update_id'] in observations:
+            if event['update_id'] in updates:
                 return 'DuplicateUpdate', {}
             prior = records.get(event['superseded_expectation_id'])
             if prior is None:
@@ -43,11 +44,11 @@ def run(case):
             records[event['superseded_expectation_id']]['superseded_by'] = event['expectation_id']
             updated['current'] = True
             records[event['expectation_id']] = updated
-            observations[event['update_id']] = event
+            updates[event['update_id']] = event
             current[updated['subject_id']] = event['expectation_id']
         elif kind == 'ActualObservation':
             if event['observation_id'] in observations:
-                return 'DuplicateUpdate', {}
+                return 'DuplicateActualObservation', {}
             observations[event['observation_id']] = event
         else:
             return f'UnknownEvent:{kind}', {}
