@@ -32,6 +32,7 @@ pub struct ExpectationRecord {
     pub subject_id: String,
     pub observation_time: u64,
     pub referenced_institution_hash: String,
+    pub referenced_institution_status: ReferencedInstitutionStatus,
     pub expectation_rule_hash: String,
     pub information_set: InformationSetIdentity,
     pub representation: ExpectationRepresentation,
@@ -159,6 +160,7 @@ impl ExpectationBook {
             subject_id: existing.subject_id.clone(),
             observation_time: update.update_time,
             referenced_institution_hash: existing.referenced_institution_hash.clone(),
+            referenced_institution_status: existing.referenced_institution_status,
             expectation_rule_hash: existing.expectation_rule_hash.clone(),
             information_set: update.information_set.clone(),
             representation: existing.representation,
@@ -212,6 +214,7 @@ mod tests {
             subject_id: "agent-1".into(),
             observation_time: time,
             referenced_institution_hash: "profile-v0".into(),
+            referenced_institution_status: ReferencedInstitutionStatus::Current,
             expectation_rule_hash: "expect-rule-v0".into(),
             information_set: InformationSetIdentity { hash: "info-v0".into(), as_of: time },
             representation: ExpectationRepresentation::Categorical,
@@ -230,6 +233,10 @@ mod tests {
         book.record(record("e1", 10, "persist")).unwrap();
         assert_eq!(before, "profile-v0");
         assert_eq!(book.records()["e1"].referenced_institution_hash, before);
+        assert_eq!(
+            book.records()["e1"].referenced_institution_status,
+            ReferencedInstitutionStatus::Current
+        );
     }
 
     #[test]
@@ -260,6 +267,10 @@ mod tests {
         }).unwrap();
         assert!(!book.records()["e1"].belief_current);
         assert_eq!(book.records()["e1"].belief_value, "persist");
+        assert_eq!(
+            book.records()["e1"].referenced_institution_status,
+            ReferencedInstitutionStatus::Current
+        );
         assert_eq!(book.records()["e1"].superseded_by.as_deref(), Some("e2"));
         assert!(book.records()["e2"].belief_current);
     }
