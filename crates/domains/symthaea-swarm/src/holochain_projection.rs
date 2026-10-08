@@ -91,6 +91,79 @@ pub struct ReceiptSelectionContext {
     pub selection_decision_sha256: [u8; 32],
     pub selection_policy: String,
     pub selection_policy_version: u16,
+    /// Whether policy required the stronger PQ-bound assurance at admission.
+    pub hybrid_required: bool,
+    /// PQ attestation identity, retained in canonical durable projection.
+    pub hybrid_assurance: Option<HybridReceiptAssuranceContext>,
+}
+
+/// Canonical durable identity for an application-level PQ-bound receipt
+/// attestation. This is metadata to be independently checked by validators,
+/// not a replacement for retaining or verifying the source cryptographic bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HybridReceiptAssuranceContext {
+    pub profile_id: String,
+    pub profile_version: u16,
+    pub pq_algorithm_id: i64,
+    pub hybrid_capability_sha256: [u8; 32],
+    pub key_policy_digest_sha256: [u8; 32],
+    pub evaluation_time_unix_seconds: u64,
+    pub pq_key_id: [u8; 16],
+    pub verifying_key_sha256: [u8; 32],
+    pub pq_signature_sha256: [u8; 32],
+    pub receipt_sha256: [u8; 32],
+    pub classical_capability_sha256: [u8; 32],
+    pub transcript_sha256: [u8; 32],
+}
+
+impl HybridReceiptAssuranceContext {
+    #[cfg(feature = "semantic-receipts")]
+    fn from_verified(
+        hybrid: &crate::rfc9942_hybrid::Rfc9942HybridVerifiedReceipt,
+    ) -> Self {
+        let attestation = hybrid.pq_attestation();
+        let transcript = attestation.transcript();
+        Self {
+            profile_id: crate::rfc9942_hybrid::HYBRID_POLICY_ID.to_owned(),
+            profile_version: crate::rfc9942_hybrid::HYBRID_POLICY_VERSION,
+            pq_algorithm_id: crate::rfc9942_hybrid::ML_DSA_65_COSE_ALGORITHM_ID,
+            hybrid_capability_sha256: hybrid.hybrid_capability_sha256(),
+            key_policy_digest_sha256: hybrid.key_policy_digest_sha256(),
+            evaluation_time_unix_seconds:
+                hybrid.key_authorization_evaluation_time_unix_seconds(),
+            pq_key_id: attestation.key_id().bytes(),
+            verifying_key_sha256: attestation.verifying_key_sha256(),
+            pq_signature_sha256: attestation.signature_sha256(),
+            receipt_sha256: transcript.receipt_sha256(),
+            classical_capability_sha256: transcript.classical_capability_sha256(),
+            transcript_sha256: transcript.transcript_sha256(),
+        }
+    }
+
+    fn validate(
+        &self,
+        selected_receipt_sha256: [u8; 32],
+        verified_capability_sha256: [u8; 32],
+    ) -> Result<(), HolochainProjectionError> {
+        if self.profile_id != crate::rfc9942_hybrid::HYBRID_POLICY_ID
+            || self.profile_id.len() > MAX_SELECTION_POLICY_BYTES
+            || self.profile_version != crate::rfc9942_hybrid::HYBRID_POLICY_VERSION
+            || self.pq_algorithm_id != crate::rfc9942_hybrid::ML_DSA_65_COSE_ALGORITHM_ID
+            || self.hybrid_capability_sha256 == [0; 32]
+            || self.key_policy_digest_sha256 == [0; 32]
+            || self.pq_key_id == [0; 16]
+            || self.verifying_key_sha256 == [0; 32]
+            || self.pq_signature_sha256 == [0; 32]
+            || self.receipt_sha256 == [0; 32]
+            || self.classical_capability_sha256 == [0; 32]
+            || self.transcript_sha256 == [0; 32]
+            || self.receipt_sha256 != selected_receipt_sha256
+            || self.classical_capability_sha256 != verified_capability_sha256
+        {
+            return Err(HolochainProjectionError::InvalidHybridAssurance);
+        }
+        Ok(())
+    }
 }
 
 impl ReceiptSelectionContext {
@@ -123,6 +196,8 @@ impl ReceiptSelectionContext {
             selection_decision_sha256,
             selection_policy: decision.policy_id.to_owned(),
             selection_policy_version: decision.policy_version,
+            hybrid_required: false,
+            hybrid_assurance: None,
         })
     }
 
@@ -142,6 +217,28 @@ impl ReceiptSelectionContext {
         )
     }
 
+    /// Build a durable context from the explicit assurance admission gate.
+    /// This preserves whether hybrid assurance was required, and refuses to
+    /// serialize a hybrid-required context without the bound PQ capability.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn from_assurance_admission(
+        admission: &crate::rfc9942_hybrid::Rfc9942SelectionAssuranceAdmission,
+    ) -> Result<Self, HolochainProjectionError> {
+        let selection = admission.selection();
+        let mut context = Self::from_decision(
+            selection.decision(),
+            selection.verified_capability_sha256(),
+            selection.verified_composition_capability_sha256(),
+        )?;
+        context.hybrid_required = admission.requirement()
+            == crate::rfc9942_hybrid::Rfc9942HybridRequirement::HybridRequired;
+        context.hybrid_assurance = admission
+            .hybrid()
+            .map(HybridReceiptAssuranceContext::from_verified);
+        context.validate()?;
+        Ok(context)
+    }
+
     fn validate(&self) -> Result<(), HolochainProjectionError> {
         if self.collection_len == 0
             || self.collection_len > MAX_RECEIPT_SELECTION_CANDIDATES
@@ -155,6 +252,15 @@ impl ReceiptSelectionContext {
             return Err(HolochainProjectionError::FieldTooLarge(
                 "selection_policy",
             ));
+        }
+        if self.hybrid_required && self.hybrid_assurance.is_none() {
+            return Err(HolochainProjectionError::HybridAssuranceRequired);
+        }
+        if let Some(hybrid) = &self.hybrid_assurance {
+            hybrid.validate(
+                self.selected_receipt_sha256,
+                self.verified_capability_sha256,
+            )?;
         }
         if self.collection_sha256 == [0; 32]
             || self.selected_receipt_sha256 == [0; 32]
@@ -194,6 +300,8 @@ pub enum HolochainProjectionError {
     InvalidReceiptSelection,
     UnaddressableDependency(&'static str),
     InvalidActionHashType,
+    HybridAssuranceRequired,
+    InvalidHybridAssurance,
     FieldTooLarge(&'static str),
 }
 
@@ -279,6 +387,27 @@ impl HolochainEvidenceAnchor {
                 out.extend_from_slice(&selection.selection_decision_sha256);
                 put_string(&mut out, &selection.selection_policy);
                 put_u16(&mut out, selection.selection_policy_version);
+                out.push(u8::from(selection.hybrid_required));
+                match &selection.hybrid_assurance {
+                    Some(hybrid) => {
+                        out.push(1);
+                        put_string(&mut out, &hybrid.profile_id);
+                        put_u16(&mut out, hybrid.profile_version);
+                        out.extend_from_slice(&hybrid.pq_algorithm_id.to_be_bytes());
+                        out.extend_from_slice(&hybrid.hybrid_capability_sha256);
+                        out.extend_from_slice(&hybrid.key_policy_digest_sha256);
+                        out.extend_from_slice(
+                            &hybrid.evaluation_time_unix_seconds.to_be_bytes(),
+                        );
+                        out.extend_from_slice(&hybrid.pq_key_id);
+                        out.extend_from_slice(&hybrid.verifying_key_sha256);
+                        out.extend_from_slice(&hybrid.pq_signature_sha256);
+                        out.extend_from_slice(&hybrid.receipt_sha256);
+                        out.extend_from_slice(&hybrid.classical_capability_sha256);
+                        out.extend_from_slice(&hybrid.transcript_sha256);
+                    }
+                    None => out.push(0),
+                }
             }
             None => out.push(0),
         }
@@ -346,6 +475,8 @@ mod tests {
                 selection_decision_sha256: [7; 32],
                 selection_policy: "rfc9942/priority-first-valid-v1".into(),
                 selection_policy_version: 1,
+                hybrid_required: false,
+                hybrid_assurance: None,
             }),
             selection_decision_action_hash: Some(valid_action_hash(8)),
             context: b"qualification".to_vec(),
@@ -376,6 +507,50 @@ mod tests {
             .unwrap()
             .collection_sha256[0] ^= 1;
         assert_ne!(before, changed.canonical_bytes().unwrap());
+    }
+
+    #[test]
+    fn hybrid_required_projection_fails_closed_without_hybrid_capability() {
+        let mut projected = anchor();
+        projected.receipt_selection.as_mut().unwrap().hybrid_required = true;
+        assert_eq!(
+            projected.validate(),
+            Err(HolochainProjectionError::HybridAssuranceRequired)
+        );
+        assert!(projected.canonical_bytes().is_err());
+    }
+
+    #[test]
+    fn hybrid_attestation_identity_is_canonical_and_bound_to_selection() {
+        let mut projected = anchor();
+        let selection = projected.receipt_selection.as_mut().unwrap();
+        selection.hybrid_assurance = Some(HybridReceiptAssuranceContext {
+            profile_id: crate::rfc9942_hybrid::HYBRID_POLICY_ID.to_owned(),
+            profile_version: crate::rfc9942_hybrid::HYBRID_POLICY_VERSION,
+            pq_algorithm_id: crate::rfc9942_hybrid::ML_DSA_65_COSE_ALGORITHM_ID,
+            hybrid_capability_sha256: [10; 32],
+            key_policy_digest_sha256: [11; 32],
+            evaluation_time_unix_seconds: 1234,
+            pq_key_id: [12; 16],
+            verifying_key_sha256: [13; 32],
+            pq_signature_sha256: [14; 32],
+            receipt_sha256: [5; 32],
+            classical_capability_sha256: [6; 32],
+            transcript_sha256: [15; 32],
+        });
+        let before = projected.canonical_bytes().unwrap();
+        projected.receipt_selection.as_mut().unwrap()
+            .hybrid_assurance.as_mut().unwrap()
+            .hybrid_capability_sha256[0] ^= 1;
+        assert_ne!(before, projected.canonical_bytes().unwrap());
+
+        let mut wrong_receipt = anchor();
+        wrong_receipt.receipt_selection.as_mut().unwrap().hybrid_assurance =
+            projected.receipt_selection.as_ref().unwrap().hybrid_assurance.clone();
+        assert_eq!(
+            wrong_receipt.validate(),
+            Err(HolochainProjectionError::InvalidHybridAssurance)
+        );
     }
 
     #[test]
