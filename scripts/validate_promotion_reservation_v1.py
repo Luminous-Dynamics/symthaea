@@ -1375,31 +1375,11 @@ def _test_trust_root(identity: PromotionOperationIdentityV1) -> ProviderTopology
     )
 
 
-def _test_sign_topology_statement(
-    identity: PromotionOperationIdentityV1,
-    observation: ProviderStackObservationV1,
-    pre_submit_sequence: int,
-    request: ProviderTopologyCasRequestV1,
-    submission: ProviderTopologyCasSubmissionV1,
-    execution: ProviderTopologyCasExecutionV1,
-) -> ProviderTopologyCasAttestationV1:
+def _test_sign_dsse_payload(payload: bytes, payload_type: str = "application/vnd.in-toto+json") -> ProviderTopologyCasAttestationV1:
     private_pem, _, key_id = _test_signer_material()
-    trust_root = _test_trust_root(identity)
-    payload = _canonical_json_bytes(
-        _provider_topology_statement(
-            identity,
-            observation,
-            pre_submit_sequence,
-            request,
-            submission,
-            execution,
-            trust_root,
-        )
-    )
-    payload_base64 = base64.b64encode(payload).decode("ascii")
     unsigned = ProviderTopologyCasDsseEnvelopeV1(
-        payload_type="application/vnd.in-toto+json",
-        payload_base64=payload_base64,
+        payload_type=payload_type,
+        payload_base64=base64.b64encode(payload).decode("ascii"),
         key_id=key_id,
         signature_base64="",
     )
@@ -1432,11 +1412,34 @@ def _test_sign_topology_statement(
     return ProviderTopologyCasAttestationV1(
         envelope=ProviderTopologyCasDsseEnvelopeV1(
             payload_type=unsigned.payload_type,
-            payload_base64=payload_base64,
+            payload_base64=unsigned.payload_base64,
             key_id=key_id,
             signature_base64=signature_base64,
         )
     )
+
+
+def _test_sign_topology_statement(
+    identity: PromotionOperationIdentityV1,
+    observation: ProviderStackObservationV1,
+    pre_submit_sequence: int,
+    request: ProviderTopologyCasRequestV1,
+    submission: ProviderTopologyCasSubmissionV1,
+    execution: ProviderTopologyCasExecutionV1,
+) -> ProviderTopologyCasAttestationV1:
+    trust_root = _test_trust_root(identity)
+    payload = _canonical_json_bytes(
+        _provider_topology_statement(
+            identity,
+            observation,
+            pre_submit_sequence,
+            request,
+            submission,
+            execution,
+            trust_root,
+        )
+    )
+    return _test_sign_dsse_payload(payload)
 
 
 def test_provider_topology_binding_requires_an_initial_observation():
@@ -1872,6 +1875,85 @@ def test_provider_topology_cas_missing_trust_root_fails_closed():
         attestation_trust_root=None,
     )
     assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_trust_root_generation_mismatch_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.attestation is not None
+    assert evidence.provider_result.execution is not None
+    wrong_root = ProviderTopologyCasTrustRootV1(
+        **{
+            **_test_trust_root(identity).__dict__,
+            "generation": identity.trust_root_generation + 1,
+        }
+    )
+    assert verify_provider_topology_cas_attestation(
+        evidence.provider_result.attestation,
+        wrong_root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
+
+
+def test_provider_topology_cas_trust_root_repository_scope_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.attestation is not None
+    assert evidence.provider_result.execution is not None
+    wrong_root = ProviderTopologyCasTrustRootV1(
+        **{**_test_trust_root(identity).__dict__, "repository": "other/repository"}
+    )
+    assert verify_provider_topology_cas_attestation(
+        evidence.provider_result.attestation,
+        wrong_root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
+
+
+def test_provider_topology_cas_signed_duplicate_json_keys_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.attestation is not None
+    payload = evidence.provider_result.attestation.envelope.decoded_payload()
+    needle = b'"statement":"predicate-enforced"'
+    assert needle in payload
+    duplicated = payload.replace(
+        needle,
+        b'"statement":"ignored","statement":"predicate-enforced"',
+        1,
+    )
+    assert duplicated != payload
+    changed = _test_sign_dsse_payload(duplicated)
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert evidence.provider_result.execution is not None
+    assert verify_provider_topology_cas_attestation(
+        changed,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
 
 
 def test_provider_topology_cas_execution_digest_binds_predicate():
@@ -2801,6 +2883,9 @@ TESTS = [
     test_provider_topology_cas_signature_tampering_rejects,
     test_provider_topology_cas_trust_root_key_id_mismatch_rejects,
     test_provider_topology_cas_missing_trust_root_fails_closed,
+    test_provider_topology_cas_trust_root_generation_mismatch_rejects,
+    test_provider_topology_cas_trust_root_repository_scope_rejects,
+    test_provider_topology_cas_signed_duplicate_json_keys_rejects,
     test_provider_topology_cas_execution_digest_binds_predicate,
     test_provider_topology_cas_provider_result_requires_enforcement_witness,
     test_provider_topology_cas_provider_result_rejects_execution_digest_splice,
