@@ -107,6 +107,7 @@ class GitHubAsyncModel:
     def __init__(self):
         self.pr_head = "H1"
         self.pending_uuid: str | None = None
+        self.async_status: str | None = None
         self.merge_sha: str | None = None
         self.expired: set[str] = set()
         self.calls = 0
@@ -120,6 +121,7 @@ class GitHubAsyncModel:
         if self.pending_uuid is not None:
             return ProviderOutcome(409, "duplicate", self.pending_uuid)
         self.pending_uuid = f"uuid-{self.calls}"
+        self.async_status = "pending"
         if timeout_after_accept:
             return ProviderOutcome(599, "timeout-after-accept")
         return ProviderOutcome(202, "accepted", self.pending_uuid)
@@ -127,15 +129,20 @@ class GitHubAsyncModel:
     def get_async_result(self, uuid: str) -> ProviderOutcome:
         if uuid in self.expired:
             return ProviderOutcome(404, "not-found")
-        if self.merge_sha is not None:
+        if self.async_status == "enqueued" and self.pending_uuid == uuid:
+            return ProviderOutcome(200, "enqueued")
+        if self.async_status == "merged" and self.pending_uuid == uuid:
             return ProviderOutcome(200, "merged")
         if self.pending_uuid == uuid:
-            return ProviderOutcome(200, "enqueued")
+            return ProviderOutcome(200, "pending")
         return ProviderOutcome(404, "not-found")
 
     def complete(self) -> None:
         assert self.pending_uuid is not None
         self.merge_sha = "M1"
+        # An enqueued merge-queue result is final and remains enqueued;
+        # durable PR merged state is the separate reconciliation surface.
+        self.async_status = "enqueued"
 
 
 def legal_interleavings():
@@ -239,9 +246,15 @@ def test_enqueued_is_not_completion():
     provider = GitHubAsyncModel()
     accepted = provider.submit("H1")
     assert accepted.uuid is not None
-    queued = provider.get_async_result(accepted.uuid)
-    assert queued.http == 200 and queued.kind == "enqueued"
+    provider.async_status = "enqueued"
+    queued_before = provider.get_async_result(accepted.uuid)
+    assert queued_before.http == 200 and queued_before.kind == "enqueued"
     assert provider.merge_sha is None
+
+    provider.complete()
+    queued_after = provider.get_async_result(accepted.uuid)
+    assert queued_after.http == 200 and queued_after.kind == "enqueued"
+    assert provider.merge_sha == "M1"
 
 
 def test_already_merged_is_durable_completion():
