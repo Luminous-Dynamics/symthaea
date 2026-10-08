@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from itertools import permutations
 
 
+_UNSET = object()
+
+
 @dataclass
 class PromotionEffectReceipt:
     # Local reconciliation record only. Provider provenance/causal attribution
@@ -223,10 +226,14 @@ class ProviderSourceAuthenticationV1:
     provider_identity: str | None = None
 
     def is_accepted_transport_auth(self) -> bool:
-        return self.verified and self.method in {
-            "authenticated-api-channel",
-            "webhook-hmac-verified",
-        }
+        return (
+            self.verified
+            and bool(self.provider_identity)
+            and self.method in {
+                "authenticated-api-channel",
+                "webhook-hmac-verified",
+            }
+        )
 
 
 @dataclass(frozen=True)
@@ -953,18 +960,47 @@ def provider_merge_result_fixture(
 def causal_resolution_fixture(
     identity: PromotionOperationIdentityV1 | None = None,
     *,
-    provider_result: ProviderMergeResultV1 | None = None,
-    effect_set: PromotionStackEffectSetV1 | None = None,
-    topology_binding: ProviderTopologyBindingV1 | None = None,
+    provider_result: ProviderMergeResultV1 | None | object = _UNSET,
+    effect_set: PromotionStackEffectSetV1 | None | object = _UNSET,
+    topology_binding: ProviderTopologyBindingV1 | None | object = _UNSET,
+    provider_evidence: ProviderEvidenceEnvelopeV1 | None | object = _UNSET,
 ) -> PromotionCausalResolutionV1:
     identity = identity or stack_identity_fixture()
+    if provider_result is _UNSET:
+        provider_result = provider_merge_result_fixture(identity)
+    if effect_set is _UNSET:
+        effect_set = stack_effect_fixture(identity)
+    if topology_binding is _UNSET:
+        topology_binding = topology_binding_fixture(identity)
+    if provider_evidence is _UNSET:
+        provider_evidence = provider_evidence_fixture()
     return PromotionCausalResolutionV1.resolve(
         identity,
-        provider_result if provider_result is not None else provider_merge_result_fixture(identity),
-        effect_set if effect_set is not None else stack_effect_fixture(identity),
-        topology_binding if topology_binding is not None else topology_binding_fixture(identity),
-        provider_evidence if provider_evidence is not None else provider_evidence_fixture(),
+        provider_result,
+        effect_set,
+        topology_binding,
+        provider_evidence,
     )
+
+
+def test_capture_integrity_hashes_exact_raw_bytes():
+    capture = ProviderCaptureIntegrityV1.capture(
+        b"provider-result",
+        "store-1",
+        1,
+    )
+    assert capture.raw_bytes_digest == hashlib.sha256(b"provider-result").hexdigest()
+    assert capture.is_valid()
+
+
+def test_capture_integrity_rejects_empty_storage_identity():
+    capture = ProviderCaptureIntegrityV1(
+        "digest",
+        "",
+        1,
+        durable=True,
+    )
+    assert not capture.is_valid()
 
 
 def test_capture_integrity_requires_durable_storage():
@@ -989,6 +1025,18 @@ def test_source_authentication_api_channel_is_distinct_from_attestation():
     )
     assert evidence.is_preserved_provider_evidence()
     assert not evidence.has_provider_attestation()
+
+
+def test_source_authentication_rejects_missing_provider_identity():
+    evidence = ProviderEvidenceEnvelopeV1(
+        ProviderCaptureIntegrityV1("D", "store-1", 1),
+        ProviderSourceAuthenticationV1(
+            "authenticated-api-channel",
+            True,
+            None,
+        ),
+    )
+    assert not evidence.is_preserved_provider_evidence()
 
 
 def test_source_authentication_rejects_unverified_api_channel():
@@ -2421,9 +2469,12 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_capture_integrity_hashes_exact_raw_bytes,
+    test_capture_integrity_rejects_empty_storage_identity,
     test_capture_integrity_requires_durable_storage,
     test_capture_integrity_rejects_nonpositive_sequence,
     test_source_authentication_api_channel_is_distinct_from_attestation,
+    test_source_authentication_rejects_missing_provider_identity,
     test_source_authentication_rejects_unverified_api_channel,
     test_webhook_hmac_verification_accepts_exact_payload,
     test_webhook_hmac_verification_rejects_tampered_payload,
@@ -2434,6 +2485,7 @@ TESTS = [
     test_fabricated_local_capture_cannot_establish_requested_causality,
     test_authenticated_api_capture_can_support_requested_causality,
     test_invalid_capture_cannot_support_requested_causality,
+    test_expiry_does_not_change_later_effect_observation_class,
     test_provider_result_retention_captured_locally_survives_expiry,
     test_provider_result_retention_is_recoverable_before_expiry,
     test_provider_result_retention_expires_at_window_boundary,
