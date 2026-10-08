@@ -6775,40 +6775,25 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                     let pw_file = format!("{transaction_dir}/user-password");
-                    // Write the secret through the filesystem API instead of
-                    // embedding it in a shell command. This keeps the password
-                    // out of the relay child-process argument list.
-                    // Create with mode 0600 from the beginning so the secret is
-                    // never briefly exposed under a permissive umask.
-                    let mut pw_file_handle = match std::fs::OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .mode(0o600)
-                        .open(&pw_file)
+                    // One authority primitive: O_EXCL + O_NOFOLLOW + O_CLOEXEC,
+                    // restrictive mode from creation, and fsync before the path is
+                    // exposed to the install worker.
+                    if let Err(error) =
+                        write_private_file(&pw_file, client_msg.user_password.as_bytes(), 0o600)
                     {
-                        Ok(file) => file,
-                        Err(error) => {
-                            let _ = ws_tx
-                                .send(Message::Text(
-                                    RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
-                                ))
-                                .await;
-                            remove_transaction_artifact_dir(&transaction_dir);
-                            continue;
-                        }
-                    };
-                    if let Err(error) = pw_file_handle.write_all(client_msg.user_password.as_bytes()) {
-                        drop(pw_file_handle);
-                        let _ = tokio::fs::remove_file(&pw_file).await;
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to stage password: {}", error)).to_json(),
+                                RelayMessage::error(&format!(
+                                    "Failed to stage password: {}",
+                                    error
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
-                    drop(pw_file_handle);
+
                     let username = username.as_str();
                     let pw_script = format!(
                         r#"
@@ -6845,49 +6830,24 @@ echo "  User password set."
 
                 if requires_luks {
                     let luks_key_path = format!("{transaction_dir}/luks-passphrase");
-                    let mut luks_file = match std::fs::OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .mode(0o600)
-                        .open(&luks_key_path)
+                    if let Err(error) =
+                        write_private_file(&luks_key_path, client_msg.luks_passphrase.as_bytes(), 0o600)
                     {
-                        Ok(file) => file,
-                        Err(error) => {
-                            let _ = ws_tx
-                                .send(Message::Text(
-                                    RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
-                                ))
-                                .await;
-                            remove_transaction_artifact_dir(&transaction_dir);
-                            continue;
-                        }
-                    };
-                    if let Err(error) = luks_file.write_all(client_msg.luks_passphrase.as_bytes()) {
-                        drop(luks_file);
-                        let _ = cleanup_sensitive_file(&luks_key_path);
                         let _ = cleanup_sensitive_file(&format!("{transaction_dir}/user-password"));
                         let _ = ws_tx
                             .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to stage LUKS2 passphrase: {}", error)).to_json(),
+                                RelayMessage::error(&format!(
+                                    "Failed to stage LUKS2 passphrase: {}",
+                                    error
+                                ))
+                                .to_json(),
                             ))
                             .await;
                         remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
-                    if let Err(error) = luks_file.sync_all() {
-                        drop(luks_file);
-                        let _ = tokio::fs::remove_file(&luks_key_path).await;
-                        let _ = tokio::fs::remove_file(format!("{transaction_dir}/user-password")).await;
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!("Failed to flush LUKS2 passphrase: {}", error)).to_json(),
-                            ))
-                            .await;
-                        remove_transaction_artifact_dir(&transaction_dir);
-                        continue;
-                    }
-                    drop(luks_file);
                     staged_secret_paths.push(luks_key_path);
+
                 }
 
                 eprintln!(
