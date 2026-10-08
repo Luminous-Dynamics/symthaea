@@ -1415,6 +1415,7 @@ impl IdentificationDecisionStatus {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IdentificationReceipt {
+    pub observed_schema_id: String,
     pub target_id: String,
     pub classification: IdentificationClass,
     pub identification_model_id: String,
@@ -1428,6 +1429,7 @@ pub struct IdentificationReceipt {
 
 impl IdentificationReceipt {
     pub fn new(
+        observed_schema_id: impl Into<String>,
         target_id: impl Into<String>,
         classification: IdentificationClass,
         identification_model_id: impl Into<String>,
@@ -1438,6 +1440,7 @@ impl IdentificationReceipt {
         decision_status: IdentificationDecisionStatus,
     ) -> Result<Self, RelationalPredictionError> {
         let mut receipt = Self {
+            observed_schema_id: observed_schema_id.into(),
             target_id: target_id.into(),
             classification,
             identification_model_id: identification_model_id.into(),
@@ -1454,7 +1457,8 @@ impl IdentificationReceipt {
     }
 
     pub fn validate(&self) -> Result<(), RelationalPredictionError> {
-        if self.target_id.trim().is_empty()
+        if self.observed_schema_id.trim().is_empty()
+            || self.target_id.trim().is_empty()
             || self.identification_model_id.trim().is_empty()
             || !is_hex_digest(&self.identification_assumption_digest, 64)
             || !is_hex_digest(&self.observational_equivalence_suite_digest, 64)
@@ -1486,6 +1490,7 @@ impl IdentificationReceipt {
         self.validate()?;
         Ok(serde_json::json!({
             "schema": IDENTIFICATION_RECEIPT_SCHEMA,
+            "observed_schema_id": &self.observed_schema_id,
             "target_id": &self.target_id,
             "classification": self.classification.as_str(),
             "identification_model_id": &self.identification_model_id,
@@ -1505,6 +1510,7 @@ impl IdentificationReceipt {
 fn identification_receipt_digest(receipt: &IdentificationReceipt) -> String {
     let canonical = serde_json::json!({
         "schema": IDENTIFICATION_RECEIPT_SCHEMA,
+        "observed_schema_id": &receipt.observed_schema_id,
         "target_id": &receipt.target_id,
         "classification": receipt.classification.as_str(),
         "identification_model_id": &receipt.identification_model_id,
@@ -5118,6 +5124,7 @@ mod tests {
     #[test]
     fn identification_receipt_fail_closed_for_ni_and_unstable_surface() {
         let receipt = IdentificationReceipt::new(
+            "relational-prediction/v1",
             "C",
             IdentificationClass::NotIdentified,
             "minimal-gaussian-rh006-v1",
@@ -5141,6 +5148,7 @@ mod tests {
     #[test]
     fn identification_receipt_allows_stable_pi_decision_without_point_estimation() {
         let receipt = IdentificationReceipt::new(
+            "relational-prediction/v1",
             "C",
             IdentificationClass::PartiallyIdentified,
             "explicit-measurement-model-v1",
