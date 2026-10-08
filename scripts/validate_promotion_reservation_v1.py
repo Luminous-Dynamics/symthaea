@@ -1013,6 +1013,34 @@ class ProviderWebhookEffectTimingV1:
             return "cross-domain-time-uncertain"
         return "temporally-admissible"
 
+    def identity_digest(self) -> str:
+        relation_digest = (
+            self.clock_relation.identity_digest()
+            if self.clock_relation is not None
+            else None
+        )
+        payload = {
+            "clock_relation_identity_digest": relation_digest,
+            "local_dispatch_monotonic_ns": self.local_dispatch_monotonic_ns,
+            "local_dispatch_time_ms": self.local_dispatch_time_ms,
+            "local_observation_monotonic_ns": self.local_observation_monotonic_ns,
+            "local_observation_time_ms": self.local_observation_time_ms,
+            "local_reservation_monotonic_ns": self.local_reservation_monotonic_ns,
+            "local_reservation_time_ms": self.local_reservation_time_ms,
+            "provider_delivery_time_ms": self.provider_delivery_time_ms,
+            "provider_event_time_ms": self.provider_event_time_ms,
+            "provider_event_time_upper_ms": self.provider_event_time_upper_ms,
+            "provider_timestamp_policy_digest": self.provider_timestamp_policy_digest,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
     def temporally_admissible(self) -> bool:
         return self.classify() == "temporally-admissible"
 
@@ -1021,6 +1049,7 @@ class ProviderWebhookEffectTimingV1:
 class PromotionStackEffectTimingV1:
     pr_number: int
     source_effect_evidence_identity_digest: str
+    timing_identity_digest: str
     timing: ProviderWebhookEffectTimingV1
 
 
@@ -1055,6 +1084,7 @@ class PromotionStackEffectTimingSetV1:
         return all(
             item.pr_number == entry.pr_number
             and item.source_effect_evidence_identity_digest == evidence.identity_digest()
+            and item.timing_identity_digest == item.timing.identity_digest()
             and item.timing.provider_timestamp_policy_digest
             == self.timestamp_policy_identity_digest
             and item.timing.clock_relation is not None
@@ -1991,11 +2021,74 @@ def test_stack_timing_rejects_mixed_clock_relation_identities():
             PromotionStackEffectTimingV1(
                 7085,
                 evidence.effects[0].identity_digest(),
+                first_timing.identity_digest(),
                 first_timing,
             ),
             PromotionStackEffectTimingV1(
                 7087,
                 evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
+                second_timing,
+            ),
+        ),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_timing_identity_detects_interval_tampering():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms + 1,
+        provider_timestamp_policy=timing.provider_timestamp_policy,
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        clock_relation=timing.clock_relation,
+    )
+    assert tampered.identity_digest() != timing.identity_digest()
+
+
+def test_stack_timing_rejects_tampered_timing_identity_digest():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-integrity-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-integrity-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture()
+    second_timing = effect_timing_fixture()
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        first_timing.clock_relation.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                "tampered",
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
                 second_timing,
             ),
         ),
@@ -2035,11 +2128,13 @@ def test_stack_timing_rejects_mixed_timestamp_policy_identities():
             PromotionStackEffectTimingV1(
                 7085,
                 evidence.effects[0].identity_digest(),
+                first_timing.identity_digest(),
                 first_timing,
             ),
             PromotionStackEffectTimingV1(
                 7087,
                 evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
                 second_timing,
             ),
         ),
@@ -2340,11 +2435,13 @@ def test_stack_timing_rejects_crosswired_effect_evidence_identity():
             PromotionStackEffectTimingV1(
                 7085,
                 evidence.effects[1].identity_digest(),
+                effect_timing_fixture().identity_digest(),
                 effect_timing_fixture(),
             ),
             PromotionStackEffectTimingV1(
                 7087,
                 evidence.effects[0].identity_digest(),
+                effect_timing_fixture().identity_digest(),
                 effect_timing_fixture(),
             ),
         ),
@@ -4786,6 +4883,8 @@ TESTS = [
     test_clock_relation_expiry_blocks_late_observation,
     test_clock_relation_drift_expands_uncertainty_monotonically,
     test_temporal_effect_with_valid_skew_is_admissible,
+    test_timing_identity_detects_interval_tampering,
+    test_stack_timing_rejects_tampered_timing_identity_digest,
     test_stack_timing_rejects_mixed_timestamp_policy_identities,
     test_stack_timing_rejects_mixed_clock_relation_identities,
     test_temporal_effect_interval_overlap_is_not_admissible,
