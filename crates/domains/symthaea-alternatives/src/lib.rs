@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 51;
+pub const SCHEMA_VERSION: u16 = 52;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-typed-validation-v71";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-v72";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -440,6 +440,8 @@ impl CalibrationTraceabilityRef {
 pub enum CalibrationTraceabilityNodeKind {
     /// The measurement result whose traceability is being declared.
     MeasurementResult,
+    /// An external result record supplying a value for a measurement-model input.
+    ModelInputResult,
     /// An intermediate calibration/comparison record.
     CalibrationRecord,
     /// A terminal specified reference standard or realization.
@@ -832,6 +834,49 @@ impl CalibrationTraceabilityTopology {
                 ));
             }
         }
+        let mut input_result_node_binding_counts = BTreeMap::<&str, usize>::new();
+        for binding in &self.input_bindings {
+            if let Some(input_result_ref) = &binding.input_result_ref {
+                let node = nodes_by_id
+                    .get(&binding.node_id)
+                    .ok_or_else(|| {
+                        AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                            input_quantity_id: binding.input_quantity_id.clone(),
+                            node_id: binding.node_id.clone(),
+                        }
+                    })?;
+                if node.kind != CalibrationTraceabilityNodeKind::ModelInputResult
+                    || node.record_id != input_result_ref.result_id
+                    || node.record_revision != input_result_ref.result_revision
+                    || node.record_digest != input_result_ref.result_record_digest
+                {
+                    return Err(
+                        AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                            input_quantity_id: binding.input_quantity_id.clone(),
+                            node_id: binding.node_id.clone(),
+                        },
+                    );
+                }
+                *input_result_node_binding_counts
+                    .entry(binding.node_id.as_str())
+                    .or_default() += 1;
+            }
+        }
+        for node in nodes_by_id.values() {
+            if node.kind == CalibrationTraceabilityNodeKind::ModelInputResult
+                && input_result_node_binding_counts
+                    .get(node.node_id.as_str())
+                    .copied()
+                    != Some(1)
+            {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityOrphanedInputResultNode {
+                        node_id: node.node_id.clone(),
+                    },
+                );
+            }
+        }
+
         let result = nodes_by_id
             .get(&self.result_node_id)
             .ok_or(AssessmentError::CalibrationTraceabilityResultNodeMissing)?;
@@ -4118,6 +4163,18 @@ pub enum AssessmentError {
         /// Actual topology binding count.
         actual_input_count: usize,
     },
+    /// An input-result reference is not bound to a matching model-input-result topology node.
+    CalibrationTraceabilityInputResultBindingMismatch {
+        /// Model input identity.
+        input_quantity_id: String,
+        /// Topology node identity.
+        node_id: String,
+    },
+    /// A model-input-result node is not bound to exactly one input-result reference.
+    CalibrationTraceabilityOrphanedInputResultNode {
+        /// Topology node identity.
+        node_id: String,
+    },
     /// The topology input set does not match the authoritative input frontier's attested set digest.
     MeasurementModelInputFrontierInputSetDigestMismatch {
         /// Frontier identity.
@@ -4686,6 +4743,17 @@ impl std::fmt::Display for AssessmentError {
             Self::InvalidMeasurementModelInputResultReference => {
                 write!(f, "measurement-model input result reference is incomplete")
             }
+            Self::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } => write!(
+                f,
+                "measurement-model input {input_quantity_id} input-result reference does not match topology node {node_id}"
+            ),
+            Self::CalibrationTraceabilityOrphanedInputResultNode { node_id } => write!(
+                f,
+                "model-input-result topology node {node_id} is not bound to exactly one input-result reference"
+            ),
             Self::MeasurementModelInputFrontierCountMismatch {
                 frontier_id,
                 expected_input_count,
