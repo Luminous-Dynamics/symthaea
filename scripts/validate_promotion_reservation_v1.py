@@ -2253,6 +2253,8 @@ def test_timing_identity_detects_clock_relation_tampering():
         local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
+        temporal_attempt_identity=timing.temporal_attempt_identity,
         clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1001),
     )
     assert tampered.identity_digest() != timing.identity_digest()
@@ -2541,9 +2543,11 @@ def test_temporal_timing_rejects_cross_runtime_monotonic_clock_identity():
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
         local_monotonic_clock_id="runtime-monotonic-2",
+        temporal_attempt_identity=timing.temporal_attempt_identity,
         clock_relation=timing.clock_relation,
     )
     assert tampered.identity_digest() != timing.identity_digest()
+    assert tampered.classify() == "promotion-temporal-attempt-binding-invalid"
 
 
 def test_temporal_timing_rejects_missing_local_monotonic_time():
