@@ -1,0 +1,40 @@
+{
+  "schema": "rh006-null-surface-identifiable-subspace-policy-executed/v1",
+  "status": "research-diagnostic-only",
+  "faithfulness_scope": "independent deterministic mirror of the committed estimator mechanics; the local execution was not a direct execution of the committed repository file",
+  "execution": {
+    "committed_script_blob_sha": "afd0c985843c725b29a350dddf406535ad5a4ae8",
+    "local_mirror_sha256": "12367b3942a0b2b04e5f939254019da5323447c4529ee9bf5efc31f37446fd60",
+    "command": "python scripts/research/rh006_null_surface_identifiable_subspace_policy_splitmix64.py --paths 8 --directions 256 --seed 20261014",
+    "execution_note": "The local mirror used the same SplitMix64 generator, feature DGP, stressed relational channels, pooled SVD, Fibonacci surface directions, epsilons, and singular-ratio thresholds as the committed script."
+  },
+  "geometry": {
+    "train": 48,
+    "test": 16,
+    "gap": 4,
+    "origins": 24,
+    "step": 16,
+    "feature_paths": 8,
+    "surface_directions": 256,
+    "epsilons": [0.01, 0.001, 0.0001, 0.0],
+    "singular_ratio_thresholds": [0.01, 0.001, 0.0001, 0.00001]
+  },
+  "scenarios": [
+    {"epsilon":0.01,"tau":0.01,"rank_median":1.0,"min_singular_ratio_median":0.0037648300606022526,"retained_median":0.5102135032614407,"retained_p10":0.10970142753482752,"retained_p90":0.9037045717173073,"directions_ge90_median":0.1015625},
+    {"epsilon":0.01,"tau":0.001,"rank_median":3.0,"min_singular_ratio_median":0.0037648300606022526,"retained_median":1.0,"retained_p10":0.9999999999999996,"retained_p90":1.0000000000000002,"directions_ge90_median":1.0},
+    {"epsilon":0.001,"tau":0.01,"rank_median":1.0,"min_singular_ratio_median":0.00036892604666670175,"retained_median":0.5102053728533578,"retained_p10":0.10968974766557982,"retained_p90":0.9036958329839193,"directions_ge90_median":0.1015625},
+    {"epsilon":0.001,"tau":0.001,"rank_median":1.0,"min_singular_ratio_median":0.00036892604666670175,"retained_median":0.5102053728533578,"retained_p10":0.10968974766557982,"retained_p90":0.9036958329839193,"directions_ge90_median":0.1015625},
+    {"epsilon":0.0001,"tau":0.0001,"rank_median":1.0,"min_singular_ratio_median":0.00003819575872659247,"retained_median":0.5102052824523459,"retained_p10":0.10968961855575547,"retained_p90":0.903695832983919,"directions_ge90_median":0.1015625},
+    {"epsilon":0.0001,"tau":0.00001,"rank_median":3.0,"min_singular_ratio_median":0.00003819575872659247,"retained_median":1.0,"retained_p10":0.9999999999999996,"retained_p90":1.0,"directions_ge90_median":1.0},
+    {"epsilon":0.0,"tau":0.00001,"rank_median":1.0,"min_singular_ratio_median":1.3506798946849728e-16,"retained_median":0.5102052816518403,"retained_p10":0.10968961740444194,"retained_p90":0.9036957396196519,"directions_ge90_median":0.1015625}
+  ],
+  "interpretation": {
+    "finding": "When the admissible SVD threshold discards weak relational directions, the projected alternative retains only about 51% median coefficient-direction norm and only about 10.2% of surface directions retain at least 90% of their norm in the stressed rank-one cases.",
+    "scientific_boundary": "Identifiable-subspace projection is therefore a different estimand unless discarded coefficient directions are declared scientifically irrelevant before data inspection.",
+    "policy_status": "no threshold approved",
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  },
+  "payload_sha256": "9d8438bc6b042e7c7216f116ae512ff8a27820b027331e568fdbd9648b53a0e4"
+}
