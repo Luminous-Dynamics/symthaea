@@ -1362,6 +1362,167 @@ impl Default for RollingOriginRelationalPredictionConfig {
     }
 }
 
+const IDENTIFICATION_RECEIPT_SCHEMA: &str = "rh006-identification-receipt/v1";
+
+/// Scientific identification status for a proposed nuisance quantity.
+/// This is distinct from EvidenceStatus: measured evidence can still be
+/// scientifically nonidentified.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdentificationClass {
+    Observable,
+    ModelIdentified,
+    PartiallyIdentified,
+    NotIdentified,
+}
+
+impl IdentificationClass {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Observable => "O",
+            Self::ModelIdentified => "MI",
+            Self::PartiallyIdentified => "PI",
+            Self::NotIdentified => "NI",
+        }
+    }
+
+    pub fn permits_point_estimation(self) -> bool {
+        matches!(self, Self::Observable | Self::ModelIdentified)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdentificationDecisionStatus {
+    Stable,
+    Unstable,
+    Boundary,
+    Unknown,
+}
+
+impl IdentificationDecisionStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stable => "decision-stable",
+            Self::Unstable => "decision-unstable-under-identification-set",
+            Self::Boundary => "nonregular-boundary",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    pub fn permits_downstream_decision(self) -> bool {
+        matches!(self, Self::Stable)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IdentificationReceipt {
+    pub observed_schema_id: String,
+    pub target_id: String,
+    pub classification: IdentificationClass,
+    pub identification_model_id: String,
+    pub identification_assumption_digest: String,
+    pub observational_equivalence_suite_digest: String,
+    pub identified_set_digest: String,
+    pub downstream_surface_digest: String,
+    pub decision_status: IdentificationDecisionStatus,
+    pub receipt_blake3: String,
+}
+
+impl IdentificationReceipt {
+    pub fn new(
+        observed_schema_id: impl Into<String>,
+        target_id: impl Into<String>,
+        classification: IdentificationClass,
+        identification_model_id: impl Into<String>,
+        identification_assumption_digest: impl Into<String>,
+        observational_equivalence_suite_digest: impl Into<String>,
+        identified_set_digest: impl Into<String>,
+        downstream_surface_digest: impl Into<String>,
+        decision_status: IdentificationDecisionStatus,
+    ) -> Result<Self, RelationalPredictionError> {
+        let mut receipt = Self {
+            observed_schema_id: observed_schema_id.into(),
+            target_id: target_id.into(),
+            classification,
+            identification_model_id: identification_model_id.into(),
+            identification_assumption_digest: identification_assumption_digest.into(),
+            observational_equivalence_suite_digest: observational_equivalence_suite_digest.into(),
+            identified_set_digest: identified_set_digest.into(),
+            downstream_surface_digest: downstream_surface_digest.into(),
+            decision_status,
+            receipt_blake3: String::new(),
+        };
+        receipt.receipt_blake3 = identification_receipt_digest(&receipt);
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.observed_schema_id.trim().is_empty()
+            || self.target_id.trim().is_empty()
+            || self.identification_model_id.trim().is_empty()
+            || !is_hex_digest(&self.identification_assumption_digest, 64)
+            || !is_hex_digest(&self.observational_equivalence_suite_digest, 64)
+            || !is_hex_digest(&self.identified_set_digest, 64)
+            || !is_hex_digest(&self.downstream_surface_digest, 64)
+            || !is_hex_digest(&self.receipt_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        if identification_receipt_digest(self) != self.receipt_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn permits_point_estimation(&self) -> bool {
+        self.classification.permits_point_estimation()
+    }
+
+    pub fn permits_downstream_decision(&self) -> bool {
+        self.decision_status.permits_downstream_decision()
+    }
+
+    pub fn permits_point_valued_claim(&self) -> bool {
+        self.permits_point_estimation() && self.permits_downstream_decision()
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": IDENTIFICATION_RECEIPT_SCHEMA,
+            "observed_schema_id": &self.observed_schema_id,
+            "target_id": &self.target_id,
+            "classification": self.classification.as_str(),
+            "identification_model_id": &self.identification_model_id,
+            "identification_assumption_digest": &self.identification_assumption_digest,
+            "observational_equivalence_suite_digest": &self.observational_equivalence_suite_digest,
+            "identified_set_digest": &self.identified_set_digest,
+            "downstream_surface_digest": &self.downstream_surface_digest,
+            "decision_status": self.decision_status.as_str(),
+            "point_estimation_permitted": self.permits_point_estimation(),
+            "downstream_decision_permitted": self.permits_downstream_decision(),
+            "point_valued_claim_permitted": self.permits_point_valued_claim(),
+            "receipt_blake3": &self.receipt_blake3
+        }).to_string())
+    }
+}
+
+fn identification_receipt_digest(receipt: &IdentificationReceipt) -> String {
+    let canonical = serde_json::json!({
+        "schema": IDENTIFICATION_RECEIPT_SCHEMA,
+        "observed_schema_id": &receipt.observed_schema_id,
+        "target_id": &receipt.target_id,
+        "classification": receipt.classification.as_str(),
+        "identification_model_id": &receipt.identification_model_id,
+        "identification_assumption_digest": &receipt.identification_assumption_digest,
+        "observational_equivalence_suite_digest": &receipt.observational_equivalence_suite_digest,
+        "identified_set_digest": &receipt.identified_set_digest,
+        "downstream_surface_digest": &receipt.downstream_surface_digest,
+        "decision_status": receipt.decision_status.as_str()
+    });
+    blake3::hash(canonical.to_string().as_bytes()).to_hex().to_string()
+}
+
 const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v2";
 const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/v1";
 const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
@@ -4960,6 +5121,49 @@ fn make_surrogate(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn identification_receipt_fail_closed_for_ni_and_unstable_surface() {
+        let receipt = IdentificationReceipt::new(
+            "relational-prediction/v1",
+            "C",
+            IdentificationClass::NotIdentified,
+            "minimal-gaussian-rh006-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            IdentificationDecisionStatus::Unstable,
+        ).unwrap();
+
+        assert!(!receipt.permits_point_estimation());
+        assert!(!receipt.permits_downstream_decision());
+        assert!(!receipt.permits_point_valued_claim());
+        assert_eq!(receipt.decision_status.as_str(), "decision-unstable-under-identification-set");
+
+        let mut tampered = receipt.clone();
+        tampered.classification = IdentificationClass::ModelIdentified;
+        assert_eq!(tampered.validate(), Err(RelationalPredictionError::InvalidEvidenceInputDigest));
+    }
+
+    #[test]
+    fn identification_receipt_allows_stable_pi_decision_without_point_estimation() {
+        let receipt = IdentificationReceipt::new(
+            "relational-prediction/v1",
+            "C",
+            IdentificationClass::PartiallyIdentified,
+            "explicit-measurement-model-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            IdentificationDecisionStatus::Stable,
+        ).unwrap();
+
+        assert!(!receipt.permits_point_estimation());
+        assert!(receipt.permits_downstream_decision());
+        assert!(!receipt.permits_point_valued_claim());
+    }
+
     const CANONICAL_SELECTION_RULE_ID: &str = super::CANONICAL_INFERENCE_SELECTION_RULE_ID;
     const CANONICAL_SELECTION_RULE_SPEC_SHA256: &str =
         super::CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256;
