@@ -2214,18 +2214,36 @@ mod tests {
     #[test]
     fn receipt_rejects_runtime_device_and_queue_binding_mismatch() {
         let mut receipt = minimal_receipt_for_binding_tests();
-        assert!(receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]).is_ok());
+        assert!(receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]),
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
 
         receipt.physical_device_api_version = VULKAN_API_VERSION;
         receipt.queue_family_index = 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]),
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
     }
@@ -2267,6 +2285,8 @@ mod tests {
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 7,
             device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2293,6 +2313,8 @@ mod tests {
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
             device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         }
     }
 
@@ -2328,6 +2350,49 @@ mod tests {
         for (resource, value) in observed {
             println!("resource_observed_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
+    }
+
+    #[test]
+    fn implementation_identity_digest_is_deterministic_and_spirv_bound() {
+        let baseline = vulkan_implementation_identity_digest(&[0x07230203, 0x00010000]);
+        assert_eq!(
+            baseline,
+            vulkan_implementation_identity_digest(&[0x07230203, 0x00010000])
+        );
+        assert_ne!(
+            baseline,
+            vulkan_implementation_identity_digest(&[0x07230203, 0x00010001])
+        );
+    }
+
+    #[test]
+    fn physical_device_identity_digest_binds_device_and_driver_fields() {
+        let mut props = vk::PhysicalDeviceProperties::default();
+        props.vendor_id = 1;
+        props.device_id = 2;
+        props.device_type = vk::PhysicalDeviceType::CPU;
+        props.api_version = VULKAN_API_VERSION;
+        props.driver_version = 3;
+        let baseline = physical_device_identity_digest(&props);
+
+        props.driver_version += 1;
+        assert_ne!(baseline, physical_device_identity_digest(&props));
+
+        props.driver_version = 3;
+        props.vendor_id += 1;
+        assert_ne!(baseline, physical_device_identity_digest(&props));
+    }
+
+    #[test]
+    fn receipt_rejects_malformed_provenance_identity() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let mut receipt = minimal_receipt_for_binding_tests();
+        receipt.implementation_identity_digest = "tampered".to_owned();
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ImplementationIdentity)
+        ));
     }
 
     #[test]
