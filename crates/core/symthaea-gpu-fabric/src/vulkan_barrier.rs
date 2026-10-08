@@ -1052,7 +1052,7 @@ fn completion_lowering_digest(
     queue_family_index: u32,
 ) -> String {
     let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v3\0");
+    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v4\0");
     h.update(b"semaphore-type:timeline\0");
     h.update(b"initial-value:0\0");
     h.update(b"recording-policy:single-primary-command-buffer\0");
