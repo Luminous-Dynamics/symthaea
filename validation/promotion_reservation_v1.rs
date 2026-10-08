@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(ledger.current_head(), "I1");
         assert_eq!(ledger.reservation().unwrap().state, PromotionState::Superseded);
         assert_eq!(
-            ledger.prepare_dispatch(&op, 1),
+            ledger.prepare_dispatch(&op, "L1", 1, 1, 1),
             Err(ReservationError::ReservationNotDispatchable)
         );
     }
