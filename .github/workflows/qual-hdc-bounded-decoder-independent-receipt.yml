@@ -961,6 +961,19 @@ jobs:
             });
             const rulesets = Array.isArray(rulesetsResponse.data) ? rulesetsResponse.data : [];
 
+            const branchSummaryResponse = await github.request(
+              'GET /repos/{owner}/{repo}/branches/{branch}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: repositoryMetadata.default_branch,
+              }
+            );
+            const branchSummary = {
+              protected: branchSummaryResponse.data?.protected === true,
+              protection: branchSummaryResponse.data?.protection ?? null,
+            };
+
             let branchProtection;
             try {
               const response = await github.request(
@@ -987,6 +1000,7 @@ jobs:
             const governanceObserved = {
               schema_version: 'governance-authority-observation-v1',
               default_branch: repositoryMetadata.default_branch,
+              branch_summary: branchSummary,
               rulesets: rulesets.map((rule) => ({
                 id: rule.id ?? null,
                 name: rule.name ?? null,
@@ -997,17 +1011,19 @@ jobs:
             };
             const governanceIdentitySha256 = sha256Canonical(governanceObserved);
             const requiredStatusCheckObserved =
-              branchProtection.accessible &&
-              Array.isArray(branchProtection.required_status_checks?.contexts) &&
-              branchProtection.required_status_checks.contexts.includes(STATUS_CONTEXT);
+              Array.isArray(branchSummary.protection?.required_status_checks?.contexts) &&
+              branchSummary.protection.required_status_checks.contexts.includes(STATUS_CONTEXT);
             const governanceObservation = {
               observation_identity_sha256: governanceIdentitySha256,
               default_branch: repositoryMetadata.default_branch,
-              verified: requiredStatusCheckObserved,
+              verified: branchSummary.protected && requiredStatusCheckObserved,
               verification_basis:
-                requiredStatusCheckObserved
-                  ? 'branch_protection_required_status_context'
-                  : 'governance_configuration_not_independently_verified',
+                branchSummary.protected && requiredStatusCheckObserved
+                  ? 'protected_branch_required_status_context'
+                  : branchSummary.protected
+                    ? 'required_status_context_not_observed'
+                    : 'default_branch_unprotected',
+              protected: branchSummary.protected,
               ruleset_count: rulesets.length,
               branch_protection_accessible: branchProtection.accessible,
               required_status_context: STATUS_CONTEXT,
@@ -1057,7 +1073,7 @@ jobs:
             });
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v8',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v9',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -1187,7 +1203,7 @@ jobs:
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V8.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V9.json'
             );
 
             const publicationMainRef = (await github.rest.git.getRef({
@@ -1215,6 +1231,18 @@ jobs:
             const publicationRulesets = Array.isArray(publicationGovernanceResponse.data)
               ? publicationGovernanceResponse.data
               : [];
+            const publicationBranchSummaryResponse = await github.request(
+              'GET /repos/{owner}/{repo}/branches/{branch}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: repositoryMetadata.default_branch,
+              }
+            );
+            const publicationBranchSummary = {
+              protected: publicationBranchSummaryResponse.data?.protected === true,
+              protection: publicationBranchSummaryResponse.data?.protection ?? null,
+            };
             let publicationBranchProtection;
             try {
               const response = await github.request(
@@ -1240,6 +1268,7 @@ jobs:
             const publicationGovernanceObserved = {
               schema_version: 'governance-authority-observation-v1',
               default_branch: repositoryMetadata.default_branch,
+              branch_summary: publicationBranchSummary,
               rulesets: publicationRulesets.map((rule) => ({
                 id: rule.id ?? null,
                 name: rule.name ?? null,
@@ -1374,6 +1403,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V8.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V9.json
           if-no-files-found: error
           retention-days: 90
