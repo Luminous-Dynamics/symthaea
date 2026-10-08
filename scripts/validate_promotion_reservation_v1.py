@@ -273,11 +273,47 @@ class ProviderTopologyCasRequestV1:
 
 
 @dataclass(frozen=True)
+class ProviderTopologyCasSubmissionV1:
+    """Canonical acceptance record binding a provider operation handle to one request."""
+    request_digest: str
+    provider_operation_id: str
+    submission_source: str
+    submission_result: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "provider_operation_id": self.provider_operation_id,
+            "request_digest": self.request_digest,
+            "submission": "provider-topology-cas-v1",
+            "submission_result": self.submission_result,
+            "submission_source": self.submission_source,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def validates(self, request: ProviderTopologyCasRequestV1) -> bool:
+        return (
+            self.submission_source == "provider-submission-response"
+            and self.submission_result == "accepted"
+            and bool(self.provider_operation_id)
+            and self.request_digest == request.digest()
+        )
+
+
+@dataclass(frozen=True)
 class ProviderTopologyCasProviderResultV1:
     """Canonical provider result carrying one topology-CAS predicate decision."""
     result_source: str
     provider_operation_id: str
     request_digest: str
+    submission_digest: str
     predicate_result: str
 
     def canonical_bytes(self) -> bytes:
@@ -286,6 +322,7 @@ class ProviderTopologyCasProviderResultV1:
             "provider_operation_id": self.provider_operation_id,
             "request_digest": self.request_digest,
             "result_source": self.result_source,
+            "submission_digest": self.submission_digest,
             "result": "provider-topology-cas-v1",
         }
         return json.dumps(
@@ -301,6 +338,7 @@ class ProviderTopologyCasProviderResultV1:
     def validates(
         self,
         request: ProviderTopologyCasRequestV1,
+        submission: ProviderTopologyCasSubmissionV1,
         predicate: ProviderTopologyCasPredicateV1,
     ) -> bool:
         return (
@@ -308,6 +346,8 @@ class ProviderTopologyCasProviderResultV1:
             and bool(self.provider_operation_id)
             and self.predicate_result == "accepted"
             and self.request_digest == request.digest()
+            and self.submission_digest == submission.digest()
+            and submission.provider_operation_id == self.provider_operation_id
             and request.predicate_digest == predicate.digest()
         )
 
@@ -336,7 +376,15 @@ class ProviderTopologyCasEvidenceV1:
             pre_submit_sequence,
         )
         request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
-        return self.provider_result.validates(request, predicate)
+        submission = ProviderTopologyCasSubmissionV1(
+            request_digest=request.digest(),
+            provider_operation_id=self.provider_result.provider_operation_id,
+            submission_source="provider-submission-response",
+            submission_result="accepted",
+        )
+        return self.provider_result.validates(request, submission, predicate) and (
+            self.provider_result.submission_digest == submission.digest()
+        )
 
 
 @dataclass(frozen=True)
@@ -813,10 +861,17 @@ def provider_topology_cas_evidence_fixture(
         pre_submit_sequence,
     )
     request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    submission = ProviderTopologyCasSubmissionV1(
+        request_digest=request.digest(),
+        provider_operation_id=provider_operation_id,
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
     provider_result = ProviderTopologyCasProviderResultV1(
         result_source=result_source,
         provider_operation_id=provider_operation_id,
         request_digest=request.digest(),
+        submission_digest=submission.digest(),
         predicate_result=predicate_result,
     )
     return ProviderTopologyCasEvidenceV1(
@@ -961,6 +1016,63 @@ def test_provider_topology_cas_provider_result_binds_request_digest():
         ),
     )
     assert evidence.provider_result.request_digest == request.digest()
+
+
+def test_provider_topology_cas_submission_digest_binds_operation_id():
+    identity = stack_identity_fixture()
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        provider_stack_observation_fixture(identity),
+        2,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    first = ProviderTopologyCasSubmissionV1(
+        request_digest=request.digest(),
+        provider_operation_id="provider-op-1",
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    second = ProviderTopologyCasSubmissionV1(
+        **{**first.__dict__, "provider_operation_id": "provider-op-2"},
+    )
+    assert first.digest() != second.digest()
+
+
+def test_provider_topology_cas_provider_result_binds_submission():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        provider_stack_observation_fixture(identity),
+        2,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    submission = ProviderTopologyCasSubmissionV1(
+        request_digest=request.digest(),
+        provider_operation_id=evidence.provider_result.provider_operation_id,
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    assert evidence.provider_result.submission_digest == submission.digest()
+
+
+def test_provider_topology_cas_evidence_rejects_submission_digest_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    other = ProviderTopologyCasSubmissionV1(
+        request_digest=evidence.provider_result.request_digest,
+        provider_operation_id="provider-op-other",
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        provider_result=evidence.provider_result,
+        provider_result_digest=evidence.provider_result_digest,
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert other.digest() != evidence.provider_result.submission_digest
+    assert binding.classify(identity) == "observed-not-cas"
 
 
 def test_provider_topology_cas_provider_result_digest_binds_operation_id():
@@ -1730,6 +1842,9 @@ TESTS = [
     test_provider_topology_cas_predicate_digest_binds_sequence,
     test_provider_topology_cas_predicate_digest_binds_bypass_rules,
     test_provider_topology_cas_request_binds_requested_operation_parameters,
+    test_provider_topology_cas_submission_digest_binds_operation_id,
+    test_provider_topology_cas_provider_result_binds_submission,
+    test_provider_topology_cas_evidence_rejects_submission_digest_splice,
     test_provider_topology_cas_provider_result_binds_request_digest,
     test_provider_topology_cas_provider_result_digest_binds_operation_id,
     test_provider_topology_cas_evidence_rejects_provider_result_digest_splice,
