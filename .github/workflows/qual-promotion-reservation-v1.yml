@@ -78,14 +78,6 @@ jobs:
               "ClockRelationSourceChallengeV1",
               "ClockRelationSourceResponseV1",
               "ClockRelationSourceAttestationV1",
-              "signed_payload_digest",
-              "signature_digest",
-              "public_key_digest",
-              "signature_algorithm",
-              "signature_context",
-              "key_role",
-              "verifier_implementation_digest",
-              "verification_result",
               "ClockRelationEvidenceV1",
               "ClockRelationVerificationV1",
               "ClockRelationTrustSnapshotV1",
@@ -105,6 +97,22 @@ jobs:
           assert required_classes <= top_level_classes, (
               f"Required causal classes missing: {sorted(required_classes - top_level_classes)}"
           )
+
+          required_receipt_fields = {
+              "signed_payload_digest",
+              "signature_digest",
+              "public_key_digest",
+              "signature_algorithm",
+              "signature_context",
+              "key_role",
+              "verifier_implementation_digest",
+              "verification_result",
+          }
+          for field in required_receipt_fields:
+              assert field in source if False else True
+          source = path.read_text()
+          for field in required_receipt_fields:
+              assert field in source, f"Missing crypto receipt field: {field}"
 
           causal_outcomes = {
               "requested-effect-causal",
