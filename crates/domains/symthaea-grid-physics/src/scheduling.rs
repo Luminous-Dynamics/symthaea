@@ -71,6 +71,7 @@ pub enum ScenarioError {
     InvalidStartHour,
     InvalidTariff,
     InvalidBatteryConfiguration,
+    InvalidBatteryState,
     InvalidProfile,
     InvalidSetpoint,
     SimultaneousChargeAndDischarge,
@@ -105,6 +106,33 @@ pub fn run_scenario(
         policy,
     )
     .unwrap_or_else(|error| panic!("invalid energy scheduling scenario: {error:?}"))
+}
+
+/// Check mutable battery state after a numerical update. Constructor-time
+/// validation alone is insufficient because extreme but finite inputs can
+/// overflow arithmetic inside the battery model.
+fn battery_state_is_valid(battery: &Battery) -> bool {
+    let values = [
+        battery.capacity_kwh,
+        battery.power_rating_kw,
+        battery.round_trip_efficiency,
+        battery.soc(),
+        battery.state_of_health(),
+        battery.effective_capacity_kwh(),
+        battery.stored_energy_kwh(),
+        battery.equivalent_full_cycles(),
+        battery.degradation_per_cycle,
+    ];
+    values.iter().all(|value| value.is_finite())
+        && battery.capacity_kwh >= 0.0
+        && battery.power_rating_kw >= 0.0
+        && (0.0..=1.0).contains(&battery.round_trip_efficiency)
+        && (0.0..=1.0).contains(&battery.soc())
+        && (0.0..=1.0).contains(&battery.state_of_health())
+        && battery.effective_capacity_kwh() >= 0.0
+        && battery.stored_energy_kwh() >= 0.0
+        && battery.equivalent_full_cycles() >= 0.0
+        && battery.degradation_per_cycle >= 0.0
 }
 
 /// Maximum number of discrete steps accepted for one scenario. This prevents
@@ -238,6 +266,9 @@ pub fn try_run_scenario(
         let charge_accepted_dc_kwh = working_battery
             .charge(charge_kw, step_hours)
             .map_err(|_| ScenarioError::InvalidBatteryConfiguration)?;
+        if !battery_state_is_valid(&working_battery) {
+            return Err(ScenarioError::InvalidBatteryState);
+        }
         let one_way_efficiency = working_battery.round_trip_efficiency.sqrt();
         let actual_charge_kw = if step_hours <= 0.0 {
             0.0
@@ -257,6 +288,9 @@ pub fn try_run_scenario(
         let discharge_delivered_ac_kwh = working_battery
             .discharge(discharge_kw, step_hours)
             .map_err(|_| ScenarioError::InvalidBatteryConfiguration)?;
+        if !battery_state_is_valid(&working_battery) {
+            return Err(ScenarioError::InvalidBatteryState);
+        }
         let served_kw_from_battery = discharge_delivered_ac_kwh / step_hours;
 
         // Use accepted charge energy, not the requested setpoint, in the
@@ -291,6 +325,15 @@ pub fn try_run_scenario(
         unserved_energy_kwh,
         battery_cycles: working_battery.equivalent_full_cycles() - initial_cycles,
     };
+    if !result.total_cost.is_finite()
+        || !result.unserved_energy_kwh.is_finite()
+        || !result.battery_cycles.is_finite()
+        || result.unserved_energy_kwh < 0.0
+        || result.battery_cycles < 0.0
+        || !battery_state_is_valid(&working_battery)
+    {
+        return Err(ScenarioError::NonFiniteResult);
+    }
     *battery = working_battery;
     Ok(result)
 }
@@ -723,6 +766,32 @@ mod tests {
             "surplus from a full battery should be exportable, got {}",
             result.total_cost
         );
+    }
+
+    #[test]
+    fn test_overflowing_cost_rolls_back_battery_state() {
+        let tariff = TariffSchedule {
+            off_peak_price_per_kwh: 2.0,
+            peak_price_per_kwh: 2.0,
+            ..default_tariff()
+        };
+        let mut battery = Battery::new(100.0, 10.0, 0.9).with_soc(0.5);
+        let before_soc = battery.soc();
+        let before_cycles = battery.equivalent_full_cycles();
+        let result = try_run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| f64::MAX,
+            |_t| 0.0,
+            1.0,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (1.0, 0.0),
+        );
+        assert_eq!(result, Err(ScenarioError::NonFiniteResult));
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
     }
 
     #[test]
