@@ -1,0 +1,67 @@
+{
+  "schema_version":"monetary-partial-attestation-v1",
+  "experiment_id":"monetary-interop-partial-attestation-v1",
+  "factorial_size":155520,
+  "batch_size":3,
+  "factors":{
+    "monetary_pair":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],
+    "adapter":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],
+    "shock":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"],
+    "seed":[11,23,47,89,131],
+    "allocation_policy":["fifo","criticality_priority","minimum_liquidity_demand"],
+    "focal_obligation":[0,1,2],
+    "reporting_policy":["truthful","criticality_inflation","liquidity_demand_underreport","dual_misreport"],
+    "coverage_profile":["none","focal_only","nonfocal_only","full"],
+    "fallback_policy":["claim_fallback","neutral_fallback","reject_unattested"]
+  },
+  "coverage_profiles":{
+    "none":{"profile_id":"attestation-none-v1","digest":"53e818c198526ef4b2e02b1dc77742892e472898d17d0356fea6af2a9b25d172","rule":"no obligation has an attested true criticality or true liquidity demand"},
+    "focal_only":{"profile_id":"attestation-focal-only-v1","digest":"b0bc36f6d0f89c754ee8568c63dd36b6ba0623d8d6260ee37041f744d18ea7ec","rule":"only the focal obligation has attested true criticality and true liquidity demand"},
+    "nonfocal_only":{"profile_id":"attestation-nonfocal-only-v1","digest":"a3f49fb6bf2c201132ffe8ef0a608dac2dca95a668d9bbdc77259603c7befbb8","rule":"only non-focal obligations have attested true criticality and true liquidity demand"},
+    "full":{"profile_id":"attestation-full-v1","digest":"4706b9e35a5ade465ce4889e33a83de84d6aed0566dccaedb2b9ad19c8cf3ec5","rule":"all obligations have attested true criticality and true liquidity demand"}
+  },
+  "fallback_policies":{
+    "claim_fallback":{"policy_id":"partial-attestation-claim-fallback-v1","digest":"f13f6e997eae84285eee9e21c14141c103269ee02e38d87a1e104d581348b7e9","rule":"unattested obligations use participant-declared ordering inputs"},
+    "neutral_fallback":{"policy_id":"partial-attestation-neutral-fallback-v1","digest":"9a9b69caf22c749f91b2ba5baeb5f8603f57c2b10b40127c8d4187f783706efc","rule":"unattested obligations use deterministic neutral ordering keys: criticality 0 and liquidity demand CAP+1; declarations remain non-authoritative"},
+    "reject_unattested":{"policy_id":"partial-attestation-reject-v1","digest":"d3ff59528f88a233303ad1378f074bfdefb06a51fcd7439806542b52e7f605cc","rule":"unattested obligations cannot enter allocation"}
+  },
+  "reporting_policies":{
+    "truthful":{"policy_id":"truthful-report-v1","digest":"429a35ed7ab43e231454b9bb1700c67fdc14da1f4d25116709eb074bbd5651c3","rule":"declared criticality and declared liquidity demand equal immutable true values"},
+    "criticality_inflation":{"policy_id":"criticality-inflation-v1","digest":"c266caba2ea2f1e0f64541e828ba2319073499d04faa4446e5ebcb25a4d0073f","rule":"focal obligation declares criticality 5 while immutable true criticality is unchanged; liquidity demand is truthful"},
+    "liquidity_demand_underreport":{"policy_id":"liquidity-demand-underreport-v1","digest":"ef2711b330dfdcc0b17577b95041641f5b2d14adcdb99e727ee8b9034e454170","rule":"focal obligation declares liquidity demand min(true demand, 5) while immutable true demand is unchanged; criticality is truthful"},
+    "dual_misreport":{"policy_id":"dual-misreport-v1","digest":"c2df69e738326df89cf6cb1133f939779f36c8dd3d11f9b6fc2b7c1d71f8954c","rule":"focal obligation declares criticality 5 and liquidity demand min(true demand, 5) while immutable true values are unchanged"}
+  },
+  "fixed_dimensions":{
+    "topology":"full_mesh",
+    "topology_digest":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
+    "resource_regime":"bounded_shared_settlement_liquidity",
+    "resource_digest":"8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7",
+    "resource_capacity":15,
+    "allocation_policy_digests":{
+      "fifo":"7bfe21a9815c819972baf46f8dc77199a6f602d31fcabc8e0708b14436777fb8",
+      "criticality_priority":"89fb3406736d4d36c7a29c8094e3be198b3135090e7c8f78a13bfec0d2f2d234",
+      "minimum_liquidity_demand":"fe1ae1b40106ac7c5343f5aa254ce3e0bd454df49fbdca99b4ae40519e47c900"
+    },
+    "obligations":[{"obligation_index":0,"amount":15,"criticality":2},{"obligation_index":1,"amount":5,"criticality":1},{"obligation_index":2,"amount":10,"criticality":3}],
+    "liquidity_demand_multiplier_by_adapter":{"redeem_reissue":1,"escrowed_atomic_swap":1,"multilateral_net_settlement":0.7,"absent":0},
+    "liquidity_shock_increment":5,
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous draw namespace across all reporting, coverage and fallback treatments",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+    "authority_boundary":"attestation may determine whether immutable true values are authoritative, whether a neutral fallback applies, or whether an unattested obligation is rejected; monetary, adapter, topology, resource and exogenous dimensions remain fixed",
+    "reservation_boundary":"resource reservation always consumes immutable true liquidity demand; declared demand is never a resource quantity",
+    "comparison_boundary":"each non-truthful cell is paired with the exact truthful counterpart sharing pair, adapter, shock, seed, allocation policy, focal obligation, coverage profile and fallback policy"
+  },
+  "profile_digests":{
+    "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+    "sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+    "mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+    "tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+    "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+  },
+  "edge_digests":{
+    "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
+    "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
+    "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
+  },
+  "claim_ceiling":"Deterministic partial-attestation experiment only; no empirical behavioural, calibrated-uncertainty, equilibrium, incentive-compatibility, welfare, systemic-safety, legal-finality, or policy-superiority claim."
+}
