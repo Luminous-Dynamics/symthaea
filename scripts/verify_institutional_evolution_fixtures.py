@@ -36,6 +36,7 @@ def disposition_for(events: list[dict], initial_rules: dict[str, str]) -> tuple[
     proposals: dict[str, dict] = {}
     decisions: dict[str, dict] = {}
     last = "Initial"
+    last_authorizing_rule_hash = None
 
     for event in events:
         kind = event.get("type")
@@ -78,6 +79,7 @@ def disposition_for(events: list[dict], initial_rules: dict[str, str]) -> tuple[
                 if event["authorizing_rule_hash"] == proposal["candidate_rule_hash"]:
                     return "SelfModificationUnauthorized", {"current_profile": current_profile}
             decisions[proposal_id] = event
+            last_authorizing_rule_hash = event.get("authorizing_rule_hash")
             last = "Adopted"
             continue
 
@@ -100,7 +102,12 @@ def disposition_for(events: list[dict], initial_rules: dict[str, str]) -> tuple[
 
         raise OracleError(f"unknown event type: {kind!r}")
 
-    observables = {"current_profile": current_profile, "proposal_count": len(proposals), "disposition": last}
+    observables = {
+        "current_profile": current_profile,
+        "proposal_count": len(proposals),
+        "disposition": last,
+        "authorizing_rule_hash": last_authorizing_rule_hash,
+    }
     for level, key in zip(RULE_KEYS, ("operational_rule", "collective_choice_rule", "constitutional_rule", "meta_constitutional_rule")):
         observables[key] = rules[level]
     return last, observables
