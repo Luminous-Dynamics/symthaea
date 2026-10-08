@@ -5,10 +5,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import struct
 import sys
 from pathlib import Path
 
 VULKAN_API_1_3 = 4206592
+IMPLEMENTATION_IDENTITY_VERSION = "1"
+PHYSICAL_DEVICE_IDENTITY_VERSION = "1"
+WGSL_ABI_MARKER = "symthaea.hdc.bind_xor.storage-u32.v1"
+KERNEL_ID = "symthaea.hdc.bind_xor.v1"
 
 FIXTURES = {
     "fixture": {
@@ -138,6 +143,12 @@ def verify_runtime(path: Path) -> None:
         if int(values.get("queue_family_index", "-1")) != 0:
             fail(f"{name}: queue family mismatch")
 
+        implementation_digest, physical_digest = verify_provenance(values, root)
+        if values.get("implementation_identity_sha256") != implementation_digest:
+            fail(f"{name}: implementation identity receipt binding mismatch")
+        if values.get("physical_device_identity_sha256") != physical_digest:
+            fail(f"{name}: physical-device identity receipt binding mismatch")
+
         initial, observed = parse_vectors(lines)
         expected_initial = spec["initial"]
         if set(initial) != set(expected_initial) or set(observed) != set(expected_initial):
@@ -152,6 +163,103 @@ def verify_runtime(path: Path) -> None:
             dimensions, payload = observed[resource]
             if dimensions != 32 or payload != expected_payload:
                 fail(f"{name}: observed vector mismatch for {resource}")
+
+def sha256_len_prefixed(parts: list[bytes], domain: bytes) -> str:
+    digest = hashlib.sha256()
+    digest.update(domain)
+    digest.update(b"\\x00")
+    for part in parts:
+        digest.update(struct.pack("<Q", len(part)))
+        digest.update(part)
+    return digest.hexdigest()
+
+
+def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str]:
+    if values.get("implementation_identity_version") != IMPLEMENTATION_IDENTITY_VERSION:
+        fail("implementation identity version mismatch")
+    if values.get("physical_device_identity_version") != PHYSICAL_DEVICE_IDENTITY_VERSION:
+        fail("physical-device identity version mismatch")
+    if values.get("implementation_abi_marker") != WGSL_ABI_MARKER:
+        fail("implementation ABI marker mismatch")
+    if values.get("implementation_kernel_id") != KERNEL_ID:
+        fail("implementation kernel id mismatch")
+
+    try:
+        wgsl = bytes.fromhex(values["implementation_wgsl_hex"])
+        spirv = bytes.fromhex(values["shader_spirv_hex"])
+        name = bytes.fromhex(values["physical_device_name_hex"])
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed provenance hex field: {exc}")
+    if not wgsl or not spirv:
+        fail("provenance source or SPIR-V is empty")
+    if len(spirv) % 4 != 0:
+        fail("SPIR-V byte length is not a multiple of four")
+
+    wgsl_path = root / "src" / "hdc_bind_xor.wgsl"
+    if not wgsl_path.is_file():
+        fail("sealed WGSL source file is missing")
+    source_wgsl = wgsl_path.read_bytes()
+    if wgsl != source_wgsl:
+        fail("runtime WGSL bytes do not match sealed WGSL source")
+    if values.get("implementation_wgsl_sha256") != sha256_file(wgsl_path):
+        fail("WGSL source SHA-256 mismatch")
+    if values.get("shader_spirv_sha256") != hashlib.sha256(spirv).hexdigest():
+        fail("SPIR-V SHA-256 mismatch")
+
+    implementation_digest = sha256_len_prefixed(
+        [
+            WGSL_ABI_MARKER.encode("utf-8"),
+            KERNEL_ID.encode("utf-8"),
+            wgsl,
+            spirv,
+        ],
+        b"symthaea.gpu-fabric.vulkan-implementation.v1",
+    )
+    if values.get("implementation_identity_sha256") != implementation_digest:
+        fail("implementation identity digest mismatch")
+    if len(values.get("implementation_identity_sha256", "")) != 64:
+        fail("malformed implementation identity digest")
+
+    try:
+        vendor_id = int(values["physical_device_vendor_id"])
+        device_id = int(values["physical_device_device_id"])
+        device_type = int(values["physical_device_type"])
+        api_version = int(values["physical_device_api_version"])
+        driver_version = int(values["physical_device_driver_version"])
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed physical-device numeric identity: {exc}")
+    if any(value < 0 or value > 0xFFFFFFFF for value in
+           (vendor_id, device_id, device_type, api_version, driver_version)):
+        fail("physical-device identity numeric field outside u32 range")
+    physical_digest = sha256_len_prefixed(
+        [],
+        b"symthaea.gpu-fabric.vulkan-device.v1",
+    )
+    physical_hash = hashlib.sha256()
+    physical_hash.update(b"symthaea.gpu-fabric.vulkan-device.v1")
+    physical_hash.update(b"\\x00")
+    physical_hash.update(struct.pack("<I", vendor_id))
+    physical_hash.update(struct.pack("<I", device_id))
+    physical_hash.update(struct.pack("<I", device_type))
+    physical_hash.update(struct.pack("<I", api_version))
+    physical_hash.update(struct.pack("<I", driver_version))
+    physical_hash.update(struct.pack("<Q", len(name)))
+    physical_hash.update(name)
+    physical_digest = physical_hash.hexdigest()
+    if values.get("physical_device_identity_sha256") != physical_digest:
+        fail("physical-device identity digest mismatch")
+    if len(values.get("physical_device_identity_sha256", "")) != 64:
+        fail("malformed physical-device identity digest")
+
+    if values.get("physical_device_api_version") != values.get("physical_device_api_version"):
+        fail("physical-device API version self-binding failed")
+    if int(values.get("vulkan_api_version", "-1")) != VULKAN_API_1_3:
+        fail("Vulkan API version changed")
+    if api_version < VULKAN_API_1_3:
+        fail("physical-device API version below Vulkan 1.3")
+
+    return implementation_digest, physical_digest
+
 
 def verify_source_hashes(path: Path, root: Path) -> None:
     for line in path.read_text(encoding="utf-8").splitlines():
