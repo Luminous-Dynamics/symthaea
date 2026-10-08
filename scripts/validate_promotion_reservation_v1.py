@@ -1956,6 +1956,7 @@ def effect_timing_fixture(
     promotion_operation_id: str = "OP-TEMPORAL-1",
     reservation_head: str = "PROMOTION-RESERVATION-HEAD-1",
     dispatch_attempt_id: str = "DISPATCH-ATTEMPT-1",
+    dispatch_attempt_sequence: int = 1,
     fencing_token: int = 1,
 ) -> ProviderWebhookEffectTimingV1:
     identity = operation_identity or stack_identity_fixture()
@@ -1967,6 +1968,7 @@ def effect_timing_fixture(
         promotion_operation_id=promotion_operation_id,
         reservation_head=reservation_head,
         dispatch_attempt_id=dispatch_attempt_id,
+        dispatch_attempt_sequence=dispatch_attempt_sequence,
         fencing_token=fencing_token,
         trust_root_generation=identity.trust_root_generation,
         governance_generation=identity.governance_generation,
@@ -2758,6 +2760,84 @@ def test_complete_stack_timing_requires_every_member_admissible():
         (good, bad),
     )
     assert not timings.validates_complete(identity, evidence)
+
+
+def test_dispatch_attempt_sequence_is_persisted_before_prepared_state():
+    ledger = Ledger()
+    ledger.trust_root_generation = 7
+    identity = stack_identity_fixture()
+    assert ledger.reserve(
+        observed_head="L0",
+        lease_id="LEASE-1",
+        candidate="L1",
+        trust_root_generation=7,
+        expected_pr_head_sha=identity.requested_pr_head_sha,
+        operation_identity_digest=identity.digest(),
+    )
+    reservation = ledger.reservation
+    assert reservation is not None
+    assert reservation.dispatch_attempt_sequence is None
+    assert not ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 0)
+    assert reservation.dispatch_attempt_sequence is None
+    assert ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 9)
+    assert reservation.dispatch_attempt_sequence == 9
+    assert not ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 10)
+    assert reservation.dispatch_attempt_sequence == 9
+
+
+def test_temporal_attempt_identity_derives_from_exact_prepared_reservation():
+    ledger = Ledger()
+    ledger.trust_root_generation = 7
+    identity = stack_identity_fixture()
+    assert ledger.reserve(
+        observed_head="L0",
+        lease_id="LEASE-1",
+        candidate="L1",
+        trust_root_generation=7,
+        expected_pr_head_sha=identity.requested_pr_head_sha,
+        operation_identity_digest=identity.digest(),
+    )
+    reservation = ledger.reservation
+    assert reservation is not None
+    assert PromotionTemporalAttemptIdentityV1.from_prepared_reservation(
+        identity,
+        reservation,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=8999999500000,
+    ) is None
+    assert ledger.prepare_dispatch("L1", 7, ledger.fencing_token, 9)
+    attempt = PromotionTemporalAttemptIdentityV1.from_prepared_reservation(
+        identity,
+        reservation,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=8999999500000,
+    )
+    assert attempt is not None
+    assert attempt.validates_operation(identity)
+    assert attempt.reservation_id == reservation.reservation_id
+    assert attempt.promotion_operation_id == reservation.operation_id
+    assert attempt.reservation_head == reservation.reservation_head
+    assert attempt.fencing_token == reservation.fencing_token
+    assert attempt.dispatch_attempt_sequence == 9
+    assert attempt.dispatch_attempt_id == f"{reservation.operation_id}:dispatch:9"
+    drifted_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "base_tip_sha": "BASE-DRIFT"}
+    )
+    assert PromotionTemporalAttemptIdentityV1.from_prepared_reservation(
+        drifted_identity,
+        reservation,
+        local_monotonic_clock_id="runtime-monotonic-1",
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=8999999500000,
+    ) is None
 
 
 def test_temporal_attempt_identity_binds_operation_and_authority_generations():
@@ -4624,6 +4704,7 @@ def temporal_attempt_fixture(
     promotion_operation_id: str = "OP-TEMPORAL-1",
     reservation_head: str = "PROMOTION-RESERVATION-HEAD-1",
     dispatch_attempt_id: str = "DISPATCH-ATTEMPT-1",
+    dispatch_attempt_sequence: int = 1,
     fencing_token: int = 1,
     reservation_time_ms: int | None = 1791475190000,
     dispatch_time_ms: int | None = 1791475195000,
@@ -4638,6 +4719,7 @@ def temporal_attempt_fixture(
         promotion_operation_id=promotion_operation_id,
         reservation_head=reservation_head,
         dispatch_attempt_id=dispatch_attempt_id,
+        dispatch_attempt_sequence=dispatch_attempt_sequence,
         fencing_token=fencing_token,
         trust_root_generation=identity.trust_root_generation,
         governance_generation=identity.governance_generation,
@@ -5401,6 +5483,8 @@ TESTS = [
     test_temporal_timing_rejects_invalid_local_order,
     test_temporal_timing_rejects_local_observation_rollback,
     test_complete_stack_timing_requires_every_member_admissible,
+    test_dispatch_attempt_sequence_is_persisted_before_prepared_state,
+    test_temporal_attempt_identity_derives_from_exact_prepared_reservation,
     test_temporal_attempt_identity_binds_operation_and_authority_generations,
     test_temporal_timing_rejects_missing_attempt_identity,
     test_temporal_timing_rejects_local_times_not_bound_to_attempt,
