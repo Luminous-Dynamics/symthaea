@@ -2214,6 +2214,8 @@ def clock_relation_fixture(
         issued_local_time_ms=1791475189000,
         expires_local_time_ms=1791475210000,
         trust_anchor_id="time-anchor-1",
+        source_id="time-source-1",
+        operator_id="time-operator-1",
     )
     response = ClockRelationSourceResponseV1(
         challenge_digest=challenge.digest(),
