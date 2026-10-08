@@ -15,8 +15,8 @@
 
 use crate::rhythm::Duration;
 use crate::score::{PartId, Score, ScoreNote};
-use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Number of dimensions in a frame's canonical structural vector.
 ///
@@ -155,7 +155,10 @@ impl MusicalStateTrajectory {
             });
         }
 
-        let estimated_frames = (total / hop_beats).ceil();
+        // Number of starts before the trailing window reaches the score end.
+        // A window covering the whole score is one frame even with a tiny hop.
+        let uncovered = (total - window_beats).max(0.0);
+        let estimated_frames = (uncovered / hop_beats).ceil() + 1.0;
         if !estimated_frames.is_finite() || estimated_frames > MAX_TRAJECTORY_FRAMES as f64 {
             return Err(format!(
                 "hop_beats would produce more than {MAX_TRAJECTORY_FRAMES} trajectory frames"
@@ -555,7 +558,9 @@ mod tests {
     #[test]
     fn tiny_hops_fail_closed_before_quadratic_analysis() {
         let s = score(&[note(0, 4, 0), note(2, 4, 1), note(4, 4, 2)], 0);
-        assert!(MusicalStateTrajectory::from_score(&s, 3.0, 1e-9).is_err());
+        assert!(MusicalStateTrajectory::from_score(&s, 1.0, 1e-9).is_err());
+        let full_window = MusicalStateTrajectory::from_score(&s, 3.0, 1e-9).unwrap();
+        assert_eq!(full_window.frames.len(), 1);
     }
 
     #[test]
