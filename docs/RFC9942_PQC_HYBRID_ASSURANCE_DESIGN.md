@@ -10,7 +10,7 @@ Near-term profile:
 
 - Classical component: existing ES256 (COSE alg -7) for the RFC 9942 receipt path.
 - PQ component: ML-DSA-65 (COSE alg -49, standardized by RFC 9964).
-- Combination: an application-level **dual signature / hybrid attestation** in which both signatures are required for the stronger "PQ-hybrid qualified" state.
+- Combination: an application-level **PQ-bound attestation** over the exact Receipt identity and the already-verified classical capability. Both verifications are required for the stronger "PQ-hybrid qualified" state; the two signatures are not currently a standardized composite and do not sign an identical transcript.
 - Existing RFC 9942 ES256 receipt remains independently valid and independently qualified.
 - The hybrid layer is a second assurance result; it does not change the meaning of the RFC 9942 VDS proof or make a selection decision into cryptographic proof.
 
@@ -57,42 +57,38 @@ Therefore Symthaea must not place -55 on the wire and call it an interoperable s
 
 ### Hybrid policy identifier
 
-Use a private application policy identifier such as:
+The implementation currently uses this private assurance profile identifier:
 
-symthaea-swarm/rfc9942-dual-signature-mldsa65-es256-v1
+symthaea-swarm/rfc9942-pq-bound-mldsa65-v1
 
 This is a **policy/profile identifier**, not a COSE alg value.
 
-### Authenticated message
+### Authenticated message — current implementation seam
 
-Define one canonical **hybrid transcript** and have both components sign that exact byte string independently.
+The current branch deliberately implements an **out-of-band PQ attestation**, not a COSE composite and not a second ES256 signature over a new transcript. RFC 9942's existing ES256 signature is verified according to RFC 9942/COSE; the ML-DSA-65 provider verifies a separate fixed-width transcript that binds the exact Receipt bytes and the already-verified classical capability identity.
 
-Recommended transcript:
+This distinction matters: the ES256 signature does **not** sign the 186-byte hybrid transcript. The transcript links the PQ attestation to a particular classical verification result, rather than pretending that the two component signatures use a standardized composite construction.
 
-hybrid_message = Domain || version || len(receipt_wire) || receipt_wire
+The current authenticated byte layout is exactly 186 bytes:
 
-where:
+| Offset | Width | Value |
+|---|---:|---|
+| 0 | 2 | Hybrid profile version, unsigned big-endian |
+| 2 | 8 | ML-DSA-65 COSE algorithm identifier -49, signed big-endian |
+| 10 | 32 | Key-policy/snapshot SHA-256 |
+| 42 | 16 | Application key-policy ID |
+| 58 | 32 | SHA-256 of exact ML-DSA public-key bytes |
+| 90 | 32 | SHA-256 of exact serialized RFC 9942 Receipt bytes |
+| 122 | 32 | SHA-256 of the verified classical capability |
+| 154 | 32 | Domain-separated transcript digest |
 
-- Domain is a fixed, protocol-owned domain separator;
-- version is the profile version;
-- receipt_wire is the exact byte sequence being bound by the hybrid attestation.
+The transcript digest uses the private domain `symthaea-swarm/rfc9942-pq-bound-mldsa65-transcript-v1`, the profile version, algorithm ID, key-policy digest, key ID, public-key digest, and length-framed Receipt/capability digests. The full receipt bytes are bounded and hashed before this metadata is formed; parsed Rust structs are not re-serialized to define the signed meaning.
 
-The classical ES256 hybrid signature and the ML-DSA-65 signature must both authenticate hybrid_message. This avoids making the PQ signature depend on the internal representation of the ES256 COSE Sig_structure and keeps the two component signatures semantically parallel.
+The verifier must retain the exact Receipt digest, classical capability digest, key-policy snapshot digest, key ID, public-key digest, PQ signature digest, transcript digest, evaluation time, and private hybrid capability identity.
 
-The existing RFC 9942 ES256 signature remains independently verified; the hybrid attestation is a second assurance layer over the exact receipt wire.
+**Not yet implemented:** a serialized PQ-attestation envelope, the RFC 9964 AKP COSE_Key/thumbprint adapter, an actual ML-DSA provider, hybrid-required selection admission, and a Holochain projection field that durably carries the hybrid assurance. The 16-byte key ID is an application registry identifier, not a claim to be an RFC 9964 key thumbprint. Those are explicit follow-on seams, not implied capabilities.
 
-The hybrid verifier should retain:
-
-- SHA-256 of the exact hybrid transcript bytes;
-- SHA-256 of the exact receipt wire bytes;
-- SHA-256 of the exact PQ COSE protected header bytes;
-- SHA-256 of the exact PQ signature bytes;
-- SHA-256 of the exact PQ public-key bytes;
-- SHA-256 of the hybrid ES256 signature bytes;
-- both algorithm identifiers;
-- hybrid policy/version.
-
-The canonical transcript must be length-delimited and domain-separated. Do not reconstruct it from parsed semantic fields after verification.
+Do not claim that the existing ES256 signature authenticates PQ-specific metadata or that this interim profile is interoperable as one composite COSE object.
 
 ## Key separation
 
@@ -172,7 +168,7 @@ A hybrid capability must never expose an API that implies "true" merely because 
 
 Receipt selection remains downstream:
 
-wire → verify-classical → verify-pq → form-hybrid-capability → selection witness → durable projection
+wire → verify-classical → verify-PQ attestation over exact Receipt + classical capability → form-hybrid-capability → (not yet implemented: hybrid-required selection admission) → durable projection
 
 The existing ReceiptSelectionDecision remains audit/evaluator evidence only.
 
@@ -226,7 +222,7 @@ The same rule already enforced for RFC 9052 must continue:
 - protected headers used by a COSE signature are authenticated;
 - unprotected headers are not authenticated by that signature.
 
-Therefore a PQ hybrid attestation placed in an unprotected container must carry its own cryptographic binding and must not be treated as authenticated merely because the surrounding object parses.
+No PQ COSE envelope is implemented yet. If a later wire format places an attestation in an unprotected container, it must carry its own authenticated binding and must not be treated as authenticated merely because the surrounding object parses.
 
 The durable capability must record whether a field was:
 
