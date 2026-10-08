@@ -508,7 +508,8 @@ jobs:
         raise AssertionError("event exclusion hidden in a string literal was accepted")
 
 
-def main() -> int:    self_test()
+def main() -> int:
+    self_test()
 
     if not WORKFLOW_DIR.is_dir():
         fail(f"workflow directory not found: {WORKFLOW_DIR}")
