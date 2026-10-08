@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 52;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-v72";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-v73";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -943,17 +943,26 @@ impl CalibrationTraceabilityTopology {
             .cloned()
             .unwrap_or_default();
         for binding in &self.input_bindings {
-            if !nodes_by_id.contains_key(&binding.node_id) {
-                return Err(AssessmentError::CalibrationTraceabilityInputBindingNodeMissing {
+            let binding_node = nodes_by_id.get(&binding.node_id).ok_or_else(|| {
+                AssessmentError::CalibrationTraceabilityInputBindingNodeMissing {
                     input_quantity_id: binding.input_quantity_id.clone(),
                     node_id: binding.node_id.clone(),
-                });
-            }
+                }
+            })?;
             if !result_children.contains(&binding.node_id) {
                 return Err(
                     AssessmentError::CalibrationTraceabilityInputBindingNotDirectChild {
                         input_quantity_id: binding.input_quantity_id.clone(),
                         node_id: binding.node_id.clone(),
+                    },
+                );
+            }
+            if binding_node.kind == CalibrationTraceabilityNodeKind::ReferenceStandard {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityInputBindingInvalidNodeKind {
+                        input_quantity_id: binding.input_quantity_id.clone(),
+                        node_id: binding.node_id.clone(),
+                        kind: binding_node.kind,
                     },
                 );
             }
@@ -4101,6 +4110,15 @@ pub enum AssessmentError {
         /// Referenced topology node identity.
         node_id: String,
     },
+    /// An input binding anchors a terminal reference-standard node rather than an input lineage node.
+    CalibrationTraceabilityInputBindingInvalidNodeKind {
+        /// Exact model input identity.
+        input_quantity_id: String,
+        /// Referenced topology node identity.
+        node_id: String,
+        /// Actual topology node kind.
+        kind: CalibrationTraceabilityNodeKind,
+    },
     /// The topology's measurement-model scope disagrees with the uncertainty evaluation.
     CalibrationTraceabilityMeasurementModelMismatch {
         /// Expected model identity.
@@ -4693,6 +4711,14 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "calibration traceability input {input_quantity_id} is not anchored at direct result child {node_id}"
+            ),
+            Self::CalibrationTraceabilityInputBindingInvalidNodeKind {
+                input_quantity_id,
+                node_id,
+                kind,
+            } => write!(
+                f,
+                "calibration traceability input {input_quantity_id} anchors invalid node kind {kind:?} at {node_id}"
             ),
             Self::CalibrationTraceabilityMeasurementModelMismatch {
                 expected_model_id,
@@ -10693,6 +10719,143 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn input_binding_rejects_terminal_reference_standard_root() {
+        let mut candidate = candidate(
+            "input-reference-root",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "input-reference-root",
+                "authority",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let observation = candidate.evidence[0]
+            .observation
+            .as_ref()
+            .expect("fixture observation exists")
+            .clone();
+
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input".into(),
+                    input_specification: MeasurementModelInputSpecificationRef {
+                        specification_id: "fixture-input-spec".into(),
+                        specification_revision: "v1".into(),
+                        specification_digest: "fixture-input-spec-digest".into(),
+                        quantity_definition: None,
+                        unit_definition: None,
+                    },
+                    input_result_ref: None,
+                    role: MeasurementModelInputRole::Correction,
+                    node_id: "reference".into(),
+                },
+            ])
+            .unwrap();
+        let mut topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "fixture-measurement-model".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-measurement-model-digest".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-input-frontier".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: "fixture-input-frontier-record-digest".into(),
+                input_set_digest: input_frontier_digest,
+                measurement_model_id: "fixture-measurement-model".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-measurement-model-digest".into(),
+                input_count: 1,
+            },
+            input_bindings: vec![CalibrationTraceabilityInputBinding {
+                input_quantity_id: "fixture-input".into(),
+                input_specification: MeasurementModelInputSpecificationRef {
+                    specification_id: "fixture-input-spec".into(),
+                    specification_revision: "v1".into(),
+                    specification_digest: "fixture-input-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                },
+                input_result_ref: None,
+                role: MeasurementModelInputRole::Correction,
+                node_id: "reference".into(),
+            }],
+            reference_node_ids: vec!["reference".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: "calibration".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "reference".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference".into(),
+                },
+            ],
+        };
+
+        let error = topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::CalibrationTraceabilityInputBindingInvalidNodeKind {
+                input_quantity_id,
+                node_id,
+                kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+            } if input_quantity_id == "fixture-input" && node_id == "reference"
+        ));
+
+        topology.input_bindings[0].node_id = "calibration".into();
+        topology.edges.retain(|edge| {
+            !(edge.from_node_id == "result" && edge.to_node_id == "reference")
+        });
+        topology.validate_against_observation(
+            &observation.observation_id,
+            &observation.record_digest,
+            &observation.calibration_chain_refs,
+        )
+        .unwrap();
     }
 
     #[test]
