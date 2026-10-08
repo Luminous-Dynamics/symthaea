@@ -13041,6 +13041,32 @@ mod tests {
     }
 
     #[test]
+    fn create_private_directory_enforces_private_mode_and_reuse_fence() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "nixforhumanity-private-dir-{transaction_id}"
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let child = root.join("child");
+        create_private_directory(child.to_str().unwrap()).unwrap();
+
+        let metadata = std::fs::metadata(&child).unwrap();
+        assert!(metadata.is_dir());
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o700);
+        assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+
+        let error = create_private_directory(child.to_str().unwrap())
+            .expect_err("private directory creation must refuse namespace reuse");
+        assert!(error.contains("unable to create private directory"));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn sync_parent_directory_rejects_symlink_parent() {
         use std::os::unix::fs::PermissionsExt;
 
