@@ -77,6 +77,8 @@ class Ledger:
     def invalidate(self, observed_head: str, candidate: str, trust_root_generation: int) -> bool:
         if observed_head != self.head:
             return False
+        if trust_root_generation < self.trust_root_generation:
+            return False
         self.fencing_token += 1
         self.trust_root_generation = trust_root_generation
         self.head = candidate
@@ -595,6 +597,13 @@ def test_stale_trust_root_rejects_reservation():
     assert ledger.head == "L0"
 
 
+def test_trust_root_generation_regression_rejects_invalidation():
+    ledger = Ledger()
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
+    assert not ledger.invalidate("L1", "I1", 0)
+    assert ledger.head == "L1"
+
+
 def test_completion_requires_effect_receipt():
     ledger = Ledger()
     assert ledger.reserve("L0", "LEASE-1", "L1", 1)
@@ -635,6 +644,7 @@ TESTS = [
     test_root_change_after_dispatch_is_not_retroactive,
     test_stale_coordinator_cannot_reserve_after_new_head,
     test_stale_trust_root_rejects_reservation,
+    test_trust_root_generation_regression_rejects_invalidation,
     test_completion_requires_effect_receipt,
     test_unrelated_ledger_transition_rejects_stale_dispatch_fence,
 ]
