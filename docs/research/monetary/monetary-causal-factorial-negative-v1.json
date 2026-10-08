@@ -12,6 +12,7 @@
     {"id":"FAC-X09","kind":"pair_identity_inferred_from_unit_labels","expected":"reject_identity_inference"},
     {"id":"FAC-X10","kind":"three_way_interaction_averaged_out","expected":"reject_uncontrolled_composition_effect"},
     {"id":"FAC-X11","kind":"seed_reused_as_treatment_specific_rng","expected":"reject_common_random_number_breach"},
-    {"id":"FAC-X12","kind":"missing_trace_digest","expected":"reject_unbound_observation"}
+    {"id":"FAC-X12","kind":"missing_trace_digest","expected":"reject_unbound_observation"},
+    {"id":"FAC-X13","kind":"treatment_dependent_exogenous_rng_namespace","expected":"reject_common_random_number_breach"}
   ]
 }
