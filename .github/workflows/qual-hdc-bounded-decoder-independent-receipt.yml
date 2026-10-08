@@ -194,6 +194,9 @@ jobs:
 
               const mergeIdentityVerified =
                 typeof evidence.pr.merge_commit_sha === 'string' &&
+                evidence.pr.merge_commit_sha !== expected.subject &&
+                evidence.pr.merge_commit_sha !== expected.parent &&
+                /^[0-9a-f]{40}$/.test(evidence.pr.merge_commit_sha) &&
                 evidence.mergeCommit?.sha === evidence.pr.merge_commit_sha &&
                 evidence.mergeCommit?.parents?.length === 2 &&
                 JSON.stringify(mergeParentSet) === JSON.stringify(expectedMergeParentSet);
@@ -423,6 +426,7 @@ jobs:
                 e.sourceBlobShas['crates/core/symthaea-core/src/hdc/syndrome_decoder.rs'] = '0'.repeat(40);
               }],
               ['merge_commit_sha', (e) => { e.pr.merge_commit_sha = '0'.repeat(40); }],
+              ['merge_commit_equals_subject', (e) => { e.pr.merge_commit_sha = e.pr.head.sha; e.mergeCommit.sha = e.pr.head.sha; }],
               ['merge_parent_sha', (e) => { e.mergeCommit.parents[0].sha = '0'.repeat(40); }],
               ['merge_observed_commit_sha', (e) => { e.mergeCommit.sha = '0'.repeat(40); }],
               ['merge_source_blob_sha', (e) => {
