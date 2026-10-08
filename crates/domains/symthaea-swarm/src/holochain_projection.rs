@@ -124,18 +124,53 @@ pub struct HybridReceiptAssuranceContext {
 }
 
 impl HybridReceiptAssuranceContext {
-    pub fn profile_id(&self) -> &str { &self.profile_id }
-    pub const fn profile_version(&self) -> u16 { self.profile_version }
-    pub const fn pq_algorithm_id(&self) -> i64 { self.pq_algorithm_id }
-    pub const fn hybrid_capability_sha256(&self) -> [u8; 32] { self.hybrid_capability_sha256 }
-    pub const fn key_policy_digest_sha256(&self) -> [u8; 32] { self.key_policy_digest_sha256 }
-    pub const fn evaluation_time_unix_seconds(&self) -> u64 { self.evaluation_time_unix_seconds }
-    pub const fn pq_key_id(&self) -> [u8; 16] { self.pq_key_id }
-    pub const fn verifying_key_sha256(&self) -> [u8; 32] { self.verifying_key_sha256 }
-    pub const fn pq_signature_sha256(&self) -> [u8; 32] { self.pq_signature_sha256 }
-    pub const fn receipt_sha256(&self) -> [u8; 32] { self.receipt_sha256 }
-    pub const fn classical_capability_sha256(&self) -> [u8; 32] { self.classical_capability_sha256 }
-    pub const fn transcript_sha256(&self) -> [u8; 32] { self.transcript_sha256 }
+    pub fn profile_id(&self) -> &str {
+        &self.profile_id
+    }
+
+    pub const fn profile_version(&self) -> u16 {
+        self.profile_version
+    }
+
+    pub const fn pq_algorithm_id(&self) -> i64 {
+        self.pq_algorithm_id
+    }
+
+    pub const fn hybrid_capability_sha256(&self) -> [u8; 32] {
+        self.hybrid_capability_sha256
+    }
+
+    pub const fn key_policy_digest_sha256(&self) -> [u8; 32] {
+        self.key_policy_digest_sha256
+    }
+
+    pub const fn evaluation_time_unix_seconds(&self) -> u64 {
+        self.evaluation_time_unix_seconds
+    }
+
+    pub const fn pq_key_id(&self) -> [u8; 16] {
+        self.pq_key_id
+    }
+
+    pub const fn verifying_key_sha256(&self) -> [u8; 32] {
+        self.verifying_key_sha256
+    }
+
+    pub const fn pq_signature_sha256(&self) -> [u8; 32] {
+        self.pq_signature_sha256
+    }
+
+    pub const fn receipt_sha256(&self) -> [u8; 32] {
+        self.receipt_sha256
+    }
+
+    pub const fn classical_capability_sha256(&self) -> [u8; 32] {
+        self.classical_capability_sha256
+    }
+
+    pub const fn transcript_sha256(&self) -> [u8; 32] {
+        self.transcript_sha256
+    }
 
     #[cfg(feature = "semantic-receipts")]
     fn from_verified(
