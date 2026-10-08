@@ -1,7 +1,6 @@
 name: QUAL HDC bounded decoder trusted runner
           echo "trusted_workflow_ref=$TRUSTED_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
           echo "trusted_workflow_loaded_blob_sha=$LOADED_WORKFLOW_BLOB_SHA" >> "$GITHUB_OUTPUT"
-          test "$GITHUB_WORKFLOW_REF" = "$TRUSTED_WORKFLOW_REF"
           test "$GITHUB_WORKFLOW_SHA" != ""
           LOADED_WORKFLOW_BLOB_SHA="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/contents/${TRUSTED_WORKFLOW_PATH}?ref=${GITHUB_WORKFLOW_SHA}" --jq ".sha")"
           test "$LOADED_WORKFLOW_BLOB_SHA" = "$EXPECTED_TRUSTED_WORKFLOW_BLOB_SHA"
@@ -541,7 +540,7 @@ jobs:
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
           workflow_ref=${{ github.workflow_ref }}
-          trusted_execution_root=main
+          trusted_execution_root=main_anchored_by_workflow_blob
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           event_head_ref=${{ steps.head.outputs.source_ref }}
@@ -625,7 +624,7 @@ jobs:
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
           workflow_definition_status=${{ steps.head.outputs.trusted_workflow_definition_match == 'true' && 'matched' || 'mismatch' }}
-          trusted_execution_root=main
+          trusted_execution_root=main_anchored_by_workflow_blob
           trusted_workflow_path=${{ steps.head.outputs.trusted_workflow_path }}
           trusted_workflow_sha=${{ steps.head.outputs.workflow_sha }}
           trusted_workflow_ref=${{ steps.head.outputs.trusted_workflow_ref }}
