@@ -176,6 +176,24 @@ It:
 - requires successful cleanup of every temporary ref and verifies the refs are gone;
 - deletes temporary refs on failure as a best-effort containment path.
 
+- deletes temporary refs on failure as a best-effort containment path.
+
+### Privileged force-writer negative control
+
+The provider lab also exercises the exact assumption left outside non-force CAS:
+
+1. create temporary ref at A;
+2. publish B as a normal fast-forward;
+3. force-reset B -> A using force=true;
+4. publish stale successor S, whose parent is A, with force=false;
+5. observe that A -> S succeeds after the rollback.
+
+This is **not** a safety-pass condition. It is a negative control establishing:
+
+`non-force ref update != exclusion of privileged rollback writers`
+
+Therefore the promotion-ledger monotonicity theorem is conditional on governance that excludes force-reset, delete/recreate, or equivalent privileged alternate publication paths for the authoritative ledger ref. GitHub explicitly documents that force updates can rewrite a reference, while rulesets/branch protections can block force pushes and restrict bypass actors.
+
 The workflow establishes provider-level behavior only. It does not make the temporary test ref itself an application authority.
 
 ## Adversarial corpus
@@ -215,6 +233,16 @@ GitHub Git-ref publication can serve as a serialization point for a
 domain-scoped promotion ledger when all authoritative transitions
 contend on the same ref and non-fast-forward updates are rejected.
 ~~~
+
+The stronger monotonic-currentness claim additionally requires:
+
+~~~text
+authoritative ledger ref is protected from privileged force rollback,
+deletion/recreation, and equivalent alternate publication paths.
+~~~
+
+The privileged force-writer negative control demonstrates why that assumption
+cannot be inferred from a writer choosing force=false.
 
 It does not establish:
 

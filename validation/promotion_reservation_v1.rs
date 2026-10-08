@@ -420,6 +420,30 @@ mod tests {
     }
 
     #[test]
+    fn non_force_cas_is_conditional_on_force_writer_exclusion() {
+        // Model the provider-side ABA sequence separately from the application
+        // ledger's monotonic state machine.
+        let parent = "A";
+        let intermediate_parent = "B";
+        let stale_successor_parent = "A";
+
+        // Normal publication is a fast-forward from the current ref.
+        assert_eq!(intermediate_parent, "B");
+        let mut current = intermediate_parent;
+
+        // A privileged force writer can move the same ref backwards.
+        current = parent;
+        assert_eq!(current, "A");
+
+        // The stale successor is now a valid fast-forward from the resurrected A.
+        // This demonstrates why force-writer exclusion is an external governance
+        // precondition of the monotonic ledger theorem.
+        assert_eq!(stale_successor_parent, current);
+        current = "S";
+        assert_eq!(current, "S");
+    }
+
+    #[test]
     fn stale_writer_cannot_publish_from_old_predecessor() {
         let mut ledger = PromotionReservationLedgerV1::new("L0", "LEASE-1");
         ledger

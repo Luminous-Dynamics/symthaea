@@ -255,6 +255,42 @@ class GitHubAsyncModel:
         self.async_status = "enqueued"
 
 
+class GitRefModel:
+    """Minimal provider semantics for non-force versus privileged force updates."""
+
+    def __init__(self, head: str):
+        self.head = head
+        self.parents: dict[str, str] = {}
+
+    def create_commit(self, sha: str, parent: str) -> None:
+        self.parents[sha] = parent
+
+    def update(self, target: str, force: bool = False) -> bool:
+        if not force and self.parents.get(target) != self.head:
+            return False
+        self.head = target
+        return True
+
+
+def test_privileged_force_writer_can_reproduce_aba():
+    ref = GitRefModel("A")
+    ref.create_commit("B", "A")
+    ref.create_commit("S", "A")
+
+    assert ref.update("B", force=False)
+    assert ref.head == "B"
+
+    # The force-writer capability is intentionally modeled as a prerequisite
+    # outside the normal CAS writer. It can roll B back to A.
+    ref.head = "A"
+    assert ref.head == "A"
+
+    # Once the privileged rollback occurred, stale successor S can pass the
+    # ordinary fast-forward predicate because its parent is again A.
+    assert ref.update("S", force=False)
+    assert ref.head == "S"
+
+
 def legal_interleavings():
     out = []
     events = ("E-read", "E-construct", "E-commit", "I-read", "I-construct", "I-commit")
@@ -497,6 +533,7 @@ TESTS = [
     test_stale_trust_root_rejects_reservation,
     test_completion_requires_effect_receipt,
     test_unrelated_ledger_transition_rejects_stale_dispatch_fence,
+    test_privileged_force_writer_can_reproduce_aba,
 ]
 
 if __name__ == "__main__":
@@ -505,4 +542,5 @@ if __name__ == "__main__":
         print("PASS", test.__name__)
     print("PromotionReservationV1 model: PASS")
     print("claim_ceiling=deterministic local transaction/reconciliation model only")
+    print("force_writer_assumption=authoritative ledger refs must block privileged rollback")
     print("promotion_authority=false")
