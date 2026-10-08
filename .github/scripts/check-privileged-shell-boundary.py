@@ -251,6 +251,19 @@ def main() -> None:
     if 'strip_prefix("/nix/var/nix/profiles/system/bin/")' not in trusted_body:
         fail("typed executable resolver lost the validated system-profile exception")
 
+    for required in (
+        "std::fs::canonicalize(&requested)",
+        'resolved.starts_with("/nix/store/")',
+        "let metadata = std::fs::metadata(&resolved)?;",
+        "metadata.is_file()",
+        "metadata.permissions().mode() & 0o111",
+    ):
+        if required not in trusted_body:
+            fail(
+                "trusted executable resolver lost immutable-store binding: "
+                f"{required!r}"
+            )
+
     # There should be no privileged command-construction sites outside the
     # intentionally narrow capability adapters. This keeps helper functions from
     # bypassing the trusted executable resolver while preserving shell compatibility
