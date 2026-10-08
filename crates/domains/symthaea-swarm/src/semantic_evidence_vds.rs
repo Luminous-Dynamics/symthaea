@@ -252,6 +252,9 @@ pub enum Rfc9942ReceiptPlacement {
 /// - the inner Receipt was bound to VDS 1 and its signed Merkle root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942VerifiedSignatureWithReceipt {
+    /// SHA-256 fingerprint of the exact outer Signature_With_Receipt wire that
+    /// produced this verified capability.
+    outer_signature_with_receipt_sha256: [u8; 32],
     outer_algorithm_id: i64,
     outer_payload_sha256: [u8; 32],
     outer_payload_mode: Rfc9942PayloadMode,
@@ -276,6 +279,9 @@ pub struct Rfc9942VerifiedSignatureWithReceipt {
 }
 
 impl Rfc9942VerifiedSignatureWithReceipt {
+    pub const fn outer_signature_with_receipt_sha256(&self) -> [u8; 32] {
+        self.outer_signature_with_receipt_sha256
+    }
     pub const fn outer_algorithm_id(&self) -> i64 { self.outer_algorithm_id }
     pub const fn outer_payload_sha256(&self) -> [u8; 32] { self.outer_payload_sha256 }
     pub const fn outer_payload_mode(&self) -> Rfc9942PayloadMode { self.outer_payload_mode }
@@ -300,7 +306,8 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     /// This is a capability identity, not a truth or authorization claim.
     pub fn capability_sha256(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(b"symthaea-swarm/rfc9942-verified-signature-with-receipt-capability-v1");
+        hasher.update(b"symthaea-swarm/rfc9942-verified-signature-with-receipt-capability-v2");
+        hasher.update(&self.outer_signature_with_receipt_sha256);
         hasher.update(&self.outer_algorithm_id.to_be_bytes());
         hasher.update(&self.outer_payload_sha256);
         hasher.update(&[match self.outer_payload_mode {
@@ -1196,6 +1203,9 @@ impl Rfc9942ReceiptEnvelope {
 /// is intentionally external.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rfc9942SignatureWithReceipts {
+    /// Exact serialized outer COSE_Sign1 wire when parsed; `None` means the
+    /// object was newly constructed and is encoded from its typed fields.
+    serialized_bytes: Option<Vec<u8>>,
     /// Exact serialized protected-header map when parsed; `None` means the
     /// object was newly constructed and is encoded from its typed fields.
     protected_bytes: Option<Vec<u8>>,
@@ -1219,6 +1229,7 @@ impl Rfc9942SignatureWithReceipts {
         receipts: Option<Rfc9942ReceiptCollection>,
     ) -> Self {
         Self {
+            serialized_bytes: None,
             protected_bytes: None,
             unprotected_bytes: None,
             protected_extensions: Vec::new(),
@@ -1246,6 +1257,12 @@ impl Rfc9942SignatureWithReceipts {
 
     pub fn payload(&self) -> &Rfc9942SignaturePayload {
         &self.payload
+    }
+
+    /// Exact serialized outer COSE_Sign1 wire; parsed objects retain source
+    /// bytes while newly constructed objects use deterministic encoding.
+    pub fn serialized_bytes(&self) -> Vec<u8> {
+        self.to_cbor()
     }
 
     pub fn protected_header_bytes(&self) -> Vec<u8> {
@@ -1506,6 +1523,7 @@ impl Rfc9942SignatureWithReceipts {
         )?;
 
         Ok(Rfc9942VerifiedSignatureWithReceipt {
+            outer_signature_with_receipt_sha256: sha256(&self.to_cbor()),
             outer_algorithm_id: self.protected_algorithm_id()?,
             outer_payload_sha256: sha256(payload),
             outer_payload_mode: match &self.payload {
@@ -1531,7 +1549,12 @@ impl Rfc9942SignatureWithReceipts {
 
     /// Encode the tagged COSE_Sign1 object, preserving receipt placement and
     /// unrelated header entries already represented by this structural type.
+    /// Parsed objects return their exact source wire; newly constructed objects
+    /// use the deterministic typed encoding below.
     pub fn to_cbor(&self) -> Vec<u8> {
+        if let Some(bytes) = &self.serialized_bytes {
+            return bytes.clone();
+        }
         let protected = self.protected_bytes.as_deref().map_or_else(
             || {
                 let mut bytes = Vec::new();
@@ -1758,6 +1781,7 @@ impl Rfc9942SignatureWithReceipts {
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
         Ok(Self {
+            serialized_bytes: Some(bytes.to_vec()),
             protected_bytes: Some(protected_bytes),
             unprotected_bytes: Some(unprotected_bytes),
             protected_extensions,
