@@ -14,6 +14,8 @@ The rule should apply to the branch that receives the Broca compiler changes.
 
 GitHub supports required checks as either checks or commit statuses. Where repository policy supports selecting the expected source, select the GitHub App that owns the status rather than allowing any source to satisfy the requirement.
 
+Use the **strict** required-check mode: enable “Require branches to be up to date before merging.” This makes the merge decision depend on the pull request being synchronized with the protected base, so a base-branch advance cannot leave an older qualification verdict sufficient for merge. GitHub documents this strict/loose distinction for required status checks.
+
 ## Required semantics
 
 The independent status must be required on the protected target branch.
