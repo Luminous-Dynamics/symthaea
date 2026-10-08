@@ -354,6 +354,8 @@ class ProviderTopologyCasProviderResultV1:
 
 @dataclass(frozen=True)
 class ProviderTopologyCasEvidenceV1:
+    submission: ProviderTopologyCasSubmissionV1
+    submission_digest: str
     provider_result: ProviderTopologyCasProviderResultV1
     provider_result_digest: str
     evidence_source: str
@@ -366,6 +368,8 @@ class ProviderTopologyCasEvidenceV1:
     ) -> bool:
         if self.evidence_source != "provider-result-capture":
             return False
+        if self.submission_digest != self.submission.digest():
+            return False
         if self.provider_result_digest != self.provider_result.digest():
             return False
         if pre_submit_sequence <= 0:
@@ -376,14 +380,9 @@ class ProviderTopologyCasEvidenceV1:
             pre_submit_sequence,
         )
         request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
-        submission = ProviderTopologyCasSubmissionV1(
-            request_digest=request.digest(),
-            provider_operation_id=self.provider_result.provider_operation_id,
-            submission_source="provider-submission-response",
-            submission_result="accepted",
-        )
-        return self.provider_result.validates(request, submission, predicate) and (
-            self.provider_result.submission_digest == submission.digest()
+        return (
+            self.submission.validates(request)
+            and self.provider_result.validates(request, self.submission, predicate)
         )
 
 
@@ -875,6 +874,8 @@ def provider_topology_cas_evidence_fixture(
         predicate_result=predicate_result,
     )
     return ProviderTopologyCasEvidenceV1(
+        submission=submission,
+        submission_digest=submission.digest(),
         provider_result=provider_result,
         provider_result_digest=provider_result.digest(),
         evidence_source=evidence_source,
@@ -1060,18 +1061,42 @@ def test_provider_topology_cas_evidence_rejects_submission_digest_splice():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
     other = ProviderTopologyCasSubmissionV1(
-        request_digest=evidence.provider_result.request_digest,
+        request_digest=evidence.submission.request_digest,
         provider_operation_id="provider-op-other",
         submission_source="provider-submission-response",
         submission_result="accepted",
     )
+    spliced_result = ProviderTopologyCasProviderResultV1(
+        **{
+            **evidence.provider_result.__dict__,
+            "submission_digest": other.digest(),
+        }
+    )
     spliced = ProviderTopologyCasEvidenceV1(
+        submission=evidence.submission,
+        submission_digest=evidence.submission_digest,
+        provider_result=spliced_result,
+        provider_result_digest=spliced_result.digest(),
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_evidence_rejects_submission_field_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    changed_submission = ProviderTopologyCasSubmissionV1(
+        **{**evidence.submission.__dict__, "submission_result": "accepted-with-warning"},
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        submission=changed_submission,
+        submission_digest=evidence.submission_digest,
         provider_result=evidence.provider_result,
         provider_result_digest=evidence.provider_result_digest,
         evidence_source="provider-result-capture",
     )
     binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
-    assert other.digest() != evidence.provider_result.submission_digest
     assert binding.classify(identity) == "observed-not-cas"
 
 
@@ -1845,6 +1870,7 @@ TESTS = [
     test_provider_topology_cas_submission_digest_binds_operation_id,
     test_provider_topology_cas_provider_result_binds_submission,
     test_provider_topology_cas_evidence_rejects_submission_digest_splice,
+    test_provider_topology_cas_evidence_rejects_submission_field_splice,
     test_provider_topology_cas_provider_result_binds_request_digest,
     test_provider_topology_cas_provider_result_digest_binds_operation_id,
     test_provider_topology_cas_evidence_rejects_provider_result_digest_splice,
