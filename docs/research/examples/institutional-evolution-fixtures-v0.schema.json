@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Institutional Evolution Fixtures v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "purpose",
+    "nonclaims",
+    "initial_rule_set",
+    "valid",
+    "rejected",
+    "invariants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "institutional-evolution-fixtures-v0"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonclaims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "initial_rule_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operational",
+        "collective_choice",
+        "constitutional",
+        "meta_constitutional"
+      ],
+      "properties": {
+        "operational": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collective_choice": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constitutional": {
+          "type": "string",
+          "minLength": 1
+        },
+        "meta_constitutional": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "valid": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/rejected_case"
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "proposal_id",
+        "parent_institution_hash",
+        "candidate_institution_hash",
+        "candidate_rule_hash",
+        "rule_level"
+      ],
+      "properties": {
+        "type": {
+          "const": "Proposal"
+        },
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_institution_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_institution_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_rule_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rule_level": {
+          "enum": [
+            "operational",
+            "collective_choice",
+            "constitutional",
+            "meta_constitutional"
+          ]
+        }
+      }
+    },
+    "adoption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "proposal_id",
+        "adopted"
+      ],
+      "properties": {
+        "type": {
+          "const": "Adoption"
+        },
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adopted": {
+          "type": "boolean"
+        },
+        "authority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorizing_rule_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorizing_rule_level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "operational",
+            "collective_choice",
+            "constitutional",
+            "meta_constitutional",
+            null
+          ]
+        }
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "proposal_id"
+      ],
+      "properties": {
+        "type": {
+          "const": "Implementation"
+        },
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "event": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/proposal"
+        },
+        {
+          "$ref": "#/$defs/adoption"
+        },
+        {
+          "$ref": "#/$defs/implementation"
+        }
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "events",
+        "expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "rejected_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "events",
+        "expected_disposition"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "expected_disposition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

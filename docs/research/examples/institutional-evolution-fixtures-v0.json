@@ -1,0 +1,246 @@
+{
+  "schema_version": "institutional-evolution-fixtures-v0",
+  "purpose": "Synthetic conformance corpus for deterministic institutional evolution state transitions.",
+  "nonclaims": [
+    "does not establish empirical institutional emergence",
+    "does not establish political legitimacy",
+    "does not establish economic superiority"
+  ],
+  "initial_rule_set": {
+    "operational": "op-rule-v0",
+    "collective_choice": "cc-rule-v0",
+    "constitutional": "constitution-v0",
+    "meta_constitutional": "meta-v0"
+  },
+  "valid": [
+    {
+      "id": "IE-001",
+      "name": "proposal does not change current institution",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "op-rule-v1",
+          "rule_level": "operational"
+        }
+      ],
+      "expected": {
+        "current_profile": "profile-v0",
+        "proposal_count": 1,
+        "disposition": "Proposed"
+      }
+    },
+    {
+      "id": "IE-002",
+      "name": "operational adoption requires current collective-choice rule",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "op-rule-v1",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Adoption",
+          "proposal_id": "p1",
+          "adopted": true,
+          "authority": "authority-a",
+          "authorizing_rule_hash": "cc-rule-v0",
+          "authorizing_rule_level": "collective_choice"
+        }
+      ],
+      "expected": {
+        "current_profile": "profile-v0",
+        "disposition": "Adopted",
+        "authorizing_rule_hash": "cc-rule-v0"
+      }
+    },
+    {
+      "id": "IE-003",
+      "name": "adoption followed by implementation changes only declared rule",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "op-rule-v1",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Adoption",
+          "proposal_id": "p1",
+          "adopted": true,
+          "authority": "authority-a",
+          "authorizing_rule_hash": "cc-rule-v0",
+          "authorizing_rule_level": "collective_choice"
+        },
+        {
+          "type": "Implementation",
+          "proposal_id": "p1"
+        }
+      ],
+      "expected": {
+        "current_profile": "profile-v1",
+        "operational_rule": "op-rule-v1",
+        "collective_choice_rule": "cc-rule-v0",
+        "constitutional_rule": "constitution-v0",
+        "meta_constitutional_rule": "meta-v0",
+        "disposition": "Implemented"
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "id": "IE-X01",
+      "name": "duplicate proposal identifier",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "op-rule-v1",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v2",
+          "candidate_rule_hash": "op-rule-v2",
+          "rule_level": "operational"
+        }
+      ],
+      "expected_disposition": "DuplicateProposal"
+    },
+    {
+      "id": "IE-X02",
+      "name": "wrong authorizing rule level",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "op-rule-v1",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Adoption",
+          "proposal_id": "p1",
+          "adopted": true,
+          "authority": "authority-a",
+          "authorizing_rule_hash": "constitution-v0",
+          "authorizing_rule_level": "constitutional"
+        }
+      ],
+      "expected_disposition": "WrongAuthorityLevel"
+    },
+    {
+      "id": "IE-X03",
+      "name": "stale proposal after competing implementation",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "op-rule-v1",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Proposal",
+          "proposal_id": "p2",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v2",
+          "candidate_rule_hash": "op-rule-v2",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Adoption",
+          "proposal_id": "p1",
+          "adopted": true,
+          "authority": "authority-a",
+          "authorizing_rule_hash": "cc-rule-v0",
+          "authorizing_rule_level": "collective_choice"
+        },
+        {
+          "type": "Implementation",
+          "proposal_id": "p1"
+        },
+        {
+          "type": "Adoption",
+          "proposal_id": "p2",
+          "adopted": true,
+          "authority": "authority-a",
+          "authorizing_rule_hash": "cc-rule-v0",
+          "authorizing_rule_level": "collective_choice"
+        }
+      ],
+      "expected_disposition": "ParentMismatch"
+    },
+    {
+      "id": "IE-X04",
+      "name": "constitutional mutation disabled in deterministic baseline",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "constitution-v1",
+          "rule_level": "constitutional"
+        }
+      ],
+      "expected_disposition": "ConstitutionalMutationDisabled"
+    },
+    {
+      "id": "IE-X05",
+      "name": "self-authorizing rule cannot authorize itself",
+      "initial_profile": "profile-v0",
+      "events": [
+        {
+          "type": "Proposal",
+          "proposal_id": "p1",
+          "parent_institution_hash": "profile-v0",
+          "candidate_institution_hash": "profile-v1",
+          "candidate_rule_hash": "cc-rule-v0",
+          "rule_level": "operational"
+        },
+        {
+          "type": "Adoption",
+          "proposal_id": "p1",
+          "adopted": true,
+          "authority": "authority-a",
+          "authorizing_rule_hash": "cc-rule-v0",
+          "authorizing_rule_level": "collective_choice"
+        }
+      ],
+      "expected_disposition": "SelfModificationUnauthorized"
+    }
+  ],
+  "invariants": [
+    "proposal_does_not_change_current_profile",
+    "adoption_does_not_change_current_profile",
+    "implemented_profile_preserves_stable_institution_identity",
+    "implementation_changes_only_declared_rule_hash",
+    "required_authorizer_is_current",
+    "required_authorizer_level_matches_rule_level",
+    "duplicate_identifiers_fail_closed",
+    "stale_parent_fails_closed",
+    "disabled_higher_order_mutation_fails_closed",
+    "self_authorization_fails_closed"
+  ]
+}

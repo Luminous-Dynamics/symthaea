@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Institutional Ecology Record v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "mechanism_profile_hash",
+    "problem_schedule_hash",
+    "institution_population",
+    "membership_events",
+    "migration_profile_hash",
+    "oracle_version",
+    "claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "institutional-ecology-record-v0"
+    },
+    "mechanism_profile_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "problem_schedule_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "institution_population": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/institution"
+      }
+    },
+    "membership_events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/membership_event"
+      }
+    },
+    "migration_profile_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "oracle_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "historical_qualification",
+        "currentness",
+        "dominance_implies_superiority",
+        "political_legitimacy"
+      ],
+      "properties": {
+        "historical_qualification": {
+          "type": "boolean"
+        },
+        "currentness": {
+          "type": "boolean"
+        },
+        "dominance_implies_superiority": {
+          "const": false
+        },
+        "political_legitimacy": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "institution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "institution_hash",
+        "semantic_version",
+        "lineage_root_hash",
+        "status"
+      ],
+      "properties": {
+        "institution_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantic_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lineage_root_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "available",
+            "active",
+            "suspended",
+            "failed",
+            "superseded"
+          ]
+        },
+        "capacity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "network_effect_profile_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "switching_cost_profile_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interoperability_profile_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "membership_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "subject",
+        "transition"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_institution_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_institution_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transition": {
+          "type": "string",
+          "enum": [
+            "entered",
+            "exited",
+            "switched",
+            "overlapped",
+            "removed"
+          ]
+        },
+        "migration_authority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "implementation_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation_window": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

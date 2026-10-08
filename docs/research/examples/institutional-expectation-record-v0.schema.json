@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Institutional Expectation Record v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "expectation_id",
+    "subject_id",
+    "observation_time",
+    "referenced_institution_hash",
+    "expectation_rule_hash",
+    "information_set_hash",
+    "representation",
+    "belief_value",
+    "currentness"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "institutional-expectation-record-v0"
+    },
+    "expectation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_time": {
+      "type": "string",
+      "minLength": 1
+    },
+    "referenced_institution_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expectation_rule_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "information_set_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "representation": {
+      "type": "string",
+      "enum": [
+        "probability",
+        "interval",
+        "ordinal",
+        "categorical",
+        "deterministic_forecast",
+        "bounded_heuristic",
+        "unknown"
+      ]
+    },
+    "belief_value": {},
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "signal_identity": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "actual_subsequent_state_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "update_event_identity": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "currentness": {
+      "type": "boolean"
+    },
+    "superseded_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "schema_version": "alternative-economic-model-profile-v0",
+  "registry_version": "v0",
+  "entries": [
+    {
+      "model_id": "creditism-v0",
+      "name": "Creditism",
+      "classification": "whole_system",
+      "primary_divergence": "Non-transferable or purpose-typed credit with separate contribution recognition and settlement deletion circuits.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "sovereign-money-100m-v0",
+      "name": "Sovereign Money / 100%-Money",
+      "classification": "architecture",
+      "primary_divergence": "Transaction-money issuance is institutionally separated from bank lending.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "market-socialism-cooperative-v0",
+      "name": "Market Socialism / Cooperative Ownership",
+      "classification": "whole_system",
+      "primary_divergence": "Market price coordination is retained while productive ownership and control are socialized or democratized.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "democratic-negotiated-planning-v0",
+      "name": "Democratic Negotiated Planning",
+      "classification": "whole_system",
+      "primary_divergence": "Production and allocation are coordinated through negotiated multi-level plans with substantial local autonomy.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "parecon-v0",
+      "name": "Participatory Economics",
+      "classification": "whole_system",
+      "primary_divergence": "Nested participatory councils negotiate consumption and production plans under explicit participation rules.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "distributed-commonist-planning-v0",
+      "name": "Distributed Commonist Planning",
+      "classification": "whole_system",
+      "primary_divergence": "In-kind mediation and distributed production protocols replace monetary/value mediation.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "islamic-risk-sharing-finance-v0",
+      "name": "Islamic Risk-Sharing Finance",
+      "classification": "architecture",
+      "primary_divergence": "Asset-backed and profit/loss-sharing contracts replace interest-centered risk-transfer structures.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "community-wealth-building-v0",
+      "name": "Community Wealth Building",
+      "classification": "architecture",
+      "primary_divergence": "Local/community ownership, anchor procurement, and wealth retention redirect accumulation toward place-based control.",
+      "parent_model_id": null,
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "post-growth-degrowth-v0",
+      "name": "Post-Growth / Degrowth",
+      "classification": "macro_regime",
+      "primary_divergence": "Ecological throughput and social sufficiency are binding macro constraints rather than perpetual GDP growth.",
+      "parent_model_id": null,
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "polycentric-commons-v0",
+      "name": "Polycentric Commons",
+      "classification": "overlay",
+      "primary_divergence": "Nested and partially autonomous governance units manage shared resources through locally adapted rules.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "piketty-participatory-socialism-v0",
+      "name": "Participatory Socialism / Predistribution",
+      "classification": "whole_system",
+      "primary_divergence": "Co-determination, broad capital circulation, public provision, and progressive wealth/inheritance taxation reshape ownership power while retaining market allocation.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "social-dividend-socialism-v0",
+      "name": "Social Dividend Socialism",
+      "classification": "variant",
+      "primary_divergence": "A universal social dividend replaces wage labour as the primary distribution mechanism inside participatory planning.",
+      "parent_model_id": "democratic-negotiated-planning-v0",
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "mmt-job-guarantee-v0",
+      "name": "MMT-style Fiscal-Monetary Regime + Job Guarantee",
+      "classification": "macro_regime",
+      "primary_divergence": "Sovereign fiscal-monetary coordination is coupled to a standing employment stabilizer.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "georgist-land-value-socialization-v0",
+      "name": "Georgist / Land-Value Socialization",
+      "classification": "architecture",
+      "primary_divergence": "Capture socially created land rent through land-value taxation or analogous land-rent socialization while reducing taxes on productive improvements.",
+      "parent_model_id": null,
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "community-land-trust-housing-commons-v0",
+      "name": "Community Land Trusts / Housing Commons",
+      "classification": "architecture",
+      "primary_divergence": "Separate community land stewardship from use/occupancy rights to preserve long-term affordability and collective land control.",
+      "parent_model_id": null,
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "mutual-credit-v0",
+      "name": "Mutual Credit / Credit-Clearing Networks",
+      "classification": "architecture",
+      "primary_divergence": "Credit is created and extinguished through reciprocal multilateral obligations within a bounded network rather than primarily through bank-issued national money.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "demurrage-money-v0",
+      "name": "Demurrage / Gesellian Money",
+      "classification": "architecture",
+      "primary_divergence": "The monetary instrument carries an explicit holding cost intended to reduce hoarding and alter liquidity, spending, and rent dynamics.",
+      "parent_model_id": null,
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "private-currency-competition-v0",
+      "name": "Competitive Private Money / Denationalized Currency",
+      "classification": "architecture",
+      "primary_divergence": "Multiple privately issued monies compete for adoption and settlement rather than relying on a single sovereign currency.",
+      "parent_model_id": null,
+      "evidence_tier": "A",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "retail-cbdc-v0",
+      "name": "Retail CBDC / Direct Central-Bank Money",
+      "classification": "architecture",
+      "primary_divergence": "The public can hold digital central-bank money directly, changing the relationship among payments, deposits, bank funding, and monetary policy.",
+      "parent_model_id": null,
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "sovereign-grassroots-currencies-v0",
+      "name": "Sovereign Grassroots Currencies",
+      "classification": "architecture",
+      "primary_divergence": "A CBDC architecture composes sovereign money, non-sovereign grassroots credit instruments, and interest-bearing bonds in a shared monetary framework.",
+      "parent_model_id": null,
+      "evidence_tier": "C",
+      "status": "specified_for_research"
+    },
+    {
+      "model_id": "neutral-multilateral-settlement-v0",
+      "name": "Neutral Multilateral Settlement / Interoperable Local Money",
+      "classification": "architecture",
+      "primary_divergence": "Multilateral net-settlement and explicit future commitments provide a neutral interoperability layer among local or non-convertible monetary expressions.",
+      "parent_model_id": "mutual-credit-v0",
+      "evidence_tier": "B",
+      "status": "specified_for_research"
+    }
+  ],
+  "notes": [
+    "Classification is semantic, not evaluative.",
+    "A registry entry does not imply validation.",
+    "Overlays and macro regimes should be composable with whole-system profiles.",
+    "Unknown or underdetermined mechanisms must remain explicit rather than inherited from Creditism."
+  ]
+}
