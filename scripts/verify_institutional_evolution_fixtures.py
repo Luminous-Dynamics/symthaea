@@ -30,8 +30,12 @@ class OracleError(Exception):
     pass
 
 
-def disposition_for(events: list[dict], initial_rules: dict[str, str]) -> tuple[str, dict[str, object]]:
-    current_profile = "profile-v0"
+def disposition_for(
+    events: list[dict],
+    initial_rules: dict[str, str],
+    initial_profile: str = "profile-v0",
+) -> tuple[str, dict[str, object]]:
+    current_profile = initial_profile
     rules = dict(initial_rules)
     proposals: dict[str, dict] = {}
     decisions: dict[str, dict] = {}
@@ -114,7 +118,9 @@ def disposition_for(events: list[dict], initial_rules: dict[str, str]) -> tuple[
 
 
 def check_case(case: dict, initial_rules: dict[str, str], rejected: bool) -> None:
-    disposition, observed = disposition_for(case["events"], initial_rules)
+    disposition, observed = disposition_for(
+        case["events"], initial_rules, case.get("initial_profile", "profile-v0")
+    )
     if rejected:
         expected = case["expected_disposition"]
         if disposition != expected:
