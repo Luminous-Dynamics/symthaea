@@ -27,137 +27,137 @@
   "edges": [
     {
       "edge_id": "io-conventional-bank-money-to-sovereign-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "a4b2a049274fab0c5b3f451fe7e045656989e9ed3776d359a9ab7d30445c2a99",
       "source": "conventional-bank-money-v1",
       "target": "sovereign-money-v1"
     },
     {
       "edge_id": "io-conventional-bank-money-to-mutual-credit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
       "source": "conventional-bank-money-v1",
       "target": "mutual-credit-v1"
     },
     {
       "edge_id": "io-conventional-bank-money-to-tokenized-deposit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "77648a93af8eccc9b9ad5a4bec9ae97440ae5d81f43c4784d28be4f7a1e3ae87",
       "source": "conventional-bank-money-v1",
       "target": "tokenized-deposit-v1"
     },
     {
       "edge_id": "io-conventional-bank-money-to-reserve-backed-stablecoin",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
       "source": "conventional-bank-money-v1",
       "target": "reserve-backed-stablecoin-v1"
     },
     {
       "edge_id": "io-sovereign-money-to-conventional-bank-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "54c24f711f7b394b7fd8a03bce0367c01a84ec943ad0b49e918bb5ed191e1dfe",
       "source": "sovereign-money-v1",
       "target": "conventional-bank-money-v1"
     },
     {
       "edge_id": "io-sovereign-money-to-mutual-credit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "940940c848f64278e7288e91f31efa710813e4943a497259c88171417399c45e",
       "source": "sovereign-money-v1",
       "target": "mutual-credit-v1"
     },
     {
       "edge_id": "io-sovereign-money-to-tokenized-deposit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "f609a0679d7ea3bfd27525f570103012dd7a043d12e89fbe453501045374026f",
       "source": "sovereign-money-v1",
       "target": "tokenized-deposit-v1"
     },
     {
       "edge_id": "io-sovereign-money-to-reserve-backed-stablecoin",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "be13721211b4c1d21a27615c15e9c7fc9f1c036318bafe8ca0a985b629939c75",
       "source": "sovereign-money-v1",
       "target": "reserve-backed-stablecoin-v1"
     },
     {
       "edge_id": "io-mutual-credit-to-conventional-bank-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "1e7706d031a45cf598d160c2c1ae14ccc6c8bd4368c2bc7905d0a3c8abe7145c",
       "source": "mutual-credit-v1",
       "target": "conventional-bank-money-v1"
     },
     {
       "edge_id": "io-mutual-credit-to-sovereign-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "354ace126a51ae0c41396fcbb2ddfdce4ca8677c65e9b9a2210493530fdcec19",
       "source": "mutual-credit-v1",
       "target": "sovereign-money-v1"
     },
     {
       "edge_id": "io-mutual-credit-to-tokenized-deposit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "0128e21718d87613f30de4e5764657400c3d6881317fbd1ac348fa20dae97006",
       "source": "mutual-credit-v1",
       "target": "tokenized-deposit-v1"
     },
     {
       "edge_id": "io-mutual-credit-to-reserve-backed-stablecoin",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "4ca15dd084c97ae036067dbe28f03ae14b7f1277e0f8790b8e8c533dd58e6482",
       "source": "mutual-credit-v1",
       "target": "reserve-backed-stablecoin-v1"
     },
     {
       "edge_id": "io-tokenized-deposit-to-conventional-bank-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "f9ee4b8d2dd654c6ac5c0c843f963887b05799a13952bdad8b04f0fdf9647255",
       "source": "tokenized-deposit-v1",
       "target": "conventional-bank-money-v1"
     },
     {
       "edge_id": "io-tokenized-deposit-to-sovereign-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "f749ed6512568167b8eb663a53353085330632dae12febe254656e71de257670",
       "source": "tokenized-deposit-v1",
       "target": "sovereign-money-v1"
     },
     {
       "edge_id": "io-tokenized-deposit-to-mutual-credit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "7cd7ce74229e82b285756cf15e0b1a4b310d44c3421108a014d401eec1f9dec1",
       "source": "tokenized-deposit-v1",
       "target": "mutual-credit-v1"
     },
     {
       "edge_id": "io-tokenized-deposit-to-reserve-backed-stablecoin",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc",
       "source": "tokenized-deposit-v1",
       "target": "reserve-backed-stablecoin-v1"
     },
     {
       "edge_id": "io-reserve-backed-stablecoin-to-conventional-bank-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "87301e31a38be59ed94165fbd9248714473c0ba2a3a4af979f57c86b25984cd8",
       "source": "reserve-backed-stablecoin-v1",
       "target": "conventional-bank-money-v1"
     },
     {
       "edge_id": "io-reserve-backed-stablecoin-to-sovereign-money",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "ce386ef1564f80c3c7af2b2855ce529a0dc33ee953e0a8ee99c48159ccb38fb6",
       "source": "reserve-backed-stablecoin-v1",
       "target": "sovereign-money-v1"
     },
     {
       "edge_id": "io-reserve-backed-stablecoin-to-mutual-credit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "b9f6eb5f916054fea4406f88ad0190073d6874324f8b3441fc335f0efd71df23",
       "source": "reserve-backed-stablecoin-v1",
       "target": "mutual-credit-v1"
     },
     {
       "edge_id": "io-reserve-backed-stablecoin-to-tokenized-deposit",
-      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "edge_digest": "338bbf11d6806b0edb718b1d16c7c19b7e6d942614855470341f5f32e5f25c8b",
       "source": "reserve-backed-stablecoin-v1",
       "target": "tokenized-deposit-v1"
     }
   ],
   "topology": {
     "topology_id": "fully-connected-planned-v1",
-    "topology_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    "topology_digest": "6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983"
   },
   "routing": {
     "policy_id": "explicit-shortest-feasible-route-v1",
-    "policy_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+    "policy_digest": "a5435036c4791a6dc0275771d73f78c2c54f02d64fbe2de88adbdb2b7c5901c3"
   },
   "shared_dependencies": [],
   "generation": {
     "generation_id": "g1",
-    "composition_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    "composition_digest": "45db3287f169ca4335026da8a7ab30af4b97efe550341508b1c12e9f86a35cc8"
   },
-  "claim_ceiling": "Composition graph definition only; edge existence does not imply qualified convertibility or systemic safety."
+  "claim_ceiling": "Composition graph definition only; edge digests are declared edge identities, not qualified adapter behavior."
 }
