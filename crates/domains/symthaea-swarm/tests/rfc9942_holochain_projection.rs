@@ -131,9 +131,7 @@ use ring::{
 };
 
 #[cfg(feature = "semantic-receipts")]
-use symthaea_swarm::rfc9942_selection::{
-    evaluate_priority_first_valid, Rfc9942VerifiedReceiptSelection,
-  };
+use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
 
 #[cfg(feature = "semantic-receipts")]
 use symthaea_swarm::semantic_evidence_vds::{
@@ -340,7 +338,7 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
     )
     .unwrap();
     assert_eq!(
-        Rfc9942VerifiedReceiptSelection::bind(&decision, &reversed, &verified_outer),
+        witness.decision().validate_against_collection(&reversed),
         Err(symthaea_swarm::rfc9942_selection::ReceiptSelectionDecisionError::CollectionDigestMismatch)
     );
 
@@ -602,9 +600,18 @@ fn noncanonical_receipt_wire_identity_survives_verified_projection() {
         verified.proof()
     );
 
-    let decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
-    let witness =
-        Rfc9942VerifiedReceiptSelection::bind(&decision, &collection, &verified).unwrap();
+    let outer_signer = signing_key(&rng);
+    let outer_key = outer_signer.public_key().as_ref().to_vec();
+    let outer = signed_outer_with_receipts(&collection, b"candidate", &outer_signer, &rng);
+    let (_verified_outer, witness) = outer
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        )
+        .unwrap();
     let context = ReceiptSelectionContext::from_verified_selection(&witness).unwrap();
     assert_eq!(
         context.selected_receipt_sha256,
