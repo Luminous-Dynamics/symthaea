@@ -222,46 +222,51 @@ async fn run_privileged_args(program: &str, args: &[&str]) -> Result<CmdResult, 
     })
 }
 
-fn open_trusted_script(path: &str) -> Result<std::fs::File, std::io::Error> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
-
-    let file = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(path)?;
-
-    let metadata = file.metadata()?;
-    if !metadata.file_type().is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("privileged script {path} is not a regular file"),
-        ));
-    }
-    if metadata.uid() != unsafe { libc::geteuid() } {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            format!("privileged script {path} is not owned by the relay user"),
-        ));
-    }
-    if metadata.permissions().mode() & 0o777 != 0o700 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            format!(
-                "privileged script {path} has unsafe permissions {:04o}; require 0700",
-                metadata.permissions().mode() & 0o777
-            ),
-        ));
-    }
-    if metadata.len() == 0 || metadata.len() > 256 * 1024 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("privileged script {path} has unsupported size {}", metadata.len()),
-        ));
-    }
-
-    Ok(file)
+struct StagedScript {
+    file: std::fs::File,
+    digest_hex: String,
 }
 
+fn stage_trusted_script(path: &str, contents: &[u8]) -> Result<StagedScript, std::io::Error> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    if contents.is_empty() || contents.len() > 256 * 1024 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("privileged script has unsupported size {}", contents.len()),
+        ));
+    }
+    if contents.contains(&0) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "privileged script contains a NUL byte",
+        ));
+    }
+
+    let expected = blake3::hash(contents);
+    let mut file = create_private_runtime_file(path, 0o700)?;
+    file.write_all(contents)?;
+    file.sync_all()?;
+    file.seek(SeekFrom::Start(0))?;
+
+    let mut observed = Vec::with_capacity(contents.len());
+    file.read_to_end(&mut observed)?;
+    let observed_hash = blake3::hash(&observed);
+    if observed_hash.as_bytes() != expected.as_bytes() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "staged privileged script bytes changed during verification",
+        ));
+    }
+
+    file.seek(SeekFrom::Start(0))?;
+    Ok(StagedScript {
+        file,
+        digest_hex: expected.to_hex().to_string(),
+    })
+}
+
+fn open_trusted_script(path: &str) -> Result<std::fs::File, std::io::Error> {
 fn trusted_script_shell() -> &'static str {
     if std::path::Path::new("/bin/bash").exists() {
         "/bin/bash"
@@ -352,11 +357,10 @@ async fn run_privileged_script_source(
     })
 }
 
-async fn run_privileged_script_with_args(
-    path: &str,
+async fn run_privileged_script_file(
+    script: std::fs::File,
     args: &[&str],
 ) -> Result<CmdResult, std::io::Error> {
-    let script = open_trusted_script(path)?;
     let mut command = trusted_script_process(script, args);
     let output = command.output().await?;
     Ok(CmdResult {
@@ -364,6 +368,14 @@ async fn run_privileged_script_with_args(
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
         exit_status: output.status.code().unwrap_or(1) as u32,
     })
+}
+
+async fn run_privileged_script_with_args(
+    path: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    let script = open_trusted_script(path)?;
+    run_privileged_script_file(script, args).await
 }
 
 
@@ -678,6 +690,22 @@ async fn spawn_privileged_background_process(
     Ok(pid)
 }
 
+async fn spawn_privileged_background_script_file(
+    script: std::fs::File,
+    log_path: &str,
+    status_path: &str,
+    pid_path: &str,
+    args: &[&str],
+) -> Result<u32, std::io::Error> {
+    spawn_privileged_background_process(
+        trusted_nix_script_process(script, args),
+        log_path,
+        status_path,
+        pid_path,
+    )
+    .await
+}
+
 async fn spawn_privileged_background_script_with_args(
     script_path: &str,
     log_path: &str,
@@ -686,11 +714,12 @@ async fn spawn_privileged_background_script_with_args(
     args: &[&str],
 ) -> Result<u32, std::io::Error> {
     let script = open_trusted_script(script_path)?;
-    spawn_privileged_background_process(
-        trusted_nix_script_process(script, args),
+    spawn_privileged_background_script_file(
+        script,
         log_path,
         status_path,
         pid_path,
+        args,
     )
     .await
 }
@@ -7226,63 +7255,22 @@ echo "  User password set."
                     ))
                     .await;
 
-                // Write the install script directly to disk (no heredoc).
-                // SECURITY: Direct file write eliminates SCRIPTEOF heredoc injection.
-                if let Err(error) = write_private_file(&script_path, script.as_bytes(), 0o700) {
-                    for secret_path in &staged_secret_paths {
-                        let _ = cleanup_sensitive_file(secret_path);
-                    }
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            RelayMessage::error(&format!("Failed to write script: {}", error))
-                                .to_json(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-
-                // Upload verification is now a filesystem observation, not a shell
-                // expression whose pathname has to cross another parser.
-                match std::fs::metadata(&script_path) {
-                    Ok(metadata)
-                        if metadata.is_file()
-                            && (metadata.permissions().mode() & 0o111) != 0 =>
-                    {
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::output("Install script uploaded.", "stdout")
-                                    .to_json(),
-                            ))
-                            .await;
-                    }
-                    Ok(metadata) => {
-                        for secret_path in &staged_secret_paths {
-                            let _ = tokio::fs::remove_file(secret_path).await;
-                        }
-                        let _ = ws_tx
-                            .send(Message::Text(
-                                RelayMessage::error(&format!(
-                                    "Failed to upload script: {} (mode {:04o}, regular_file={})",
-                                    script_path,
-                                    metadata.permissions().mode() & 0o777,
-                                    metadata.is_file()
-                                ))
-                                .to_json(),
-                            ))
-                            .await;
-                        remove_transaction_artifact_dir(&transaction_dir);
-                        continue;
-                    }
+                // Stage, hash, rewind, and retain the exact script descriptor.
+                // The privileged child consumes this same verified descriptor; it never
+                // reopens the transaction pathname after verification.
+                let staged_script = match stage_trusted_script(
+                    &script_path,
+                    script.as_bytes(),
+                ) {
+                    Ok(staged) => staged,
                     Err(error) => {
                         for secret_path in &staged_secret_paths {
-                            let _ = tokio::fs::remove_file(secret_path).await;
+                            let _ = cleanup_sensitive_file(secret_path);
                         }
                         let _ = ws_tx
                             .send(Message::Text(
                                 RelayMessage::error(&format!(
-                                    "Upload verification failed: {}",
-                                    error
+                                    "Failed to stage install script: {error}"
                                 ))
                                 .to_json(),
                             ))
@@ -7290,10 +7278,15 @@ echo "  User password set."
                         remove_transaction_artifact_dir(&transaction_dir);
                         continue;
                     }
-                }
+                };
+                eprintln!(
+                    "[{}] install script commitment {}",
+                    peer_addr,
+                    staged_script.digest_hex
+                );
 
-                if let Err(error) = spawn_privileged_background_script_with_args(
-                    &script_path,
+                if let Err(error) = spawn_privileged_background_script_file(
+                    staged_script.file,
                     &log_path,
                     &status_path,
                     &pid_path,
@@ -12588,6 +12581,38 @@ mod tests {
         );
 
         drop(file);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn staged_script_descriptor_survives_path_replacement_with_exact_bytes() {
+        use std::io::{Read, Seek, SeekFrom};
+        use std::os::unix::fs::PermissionsExt;
+
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-staged-script-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let path = dir.join("install.sh");
+        let original = b"#!/bin/sh\nprintf '%s\\n' original\n";
+        let staged = stage_trusted_script(path.to_str().unwrap(), original).unwrap();
+
+        assert_eq!(
+            staged.digest_hex,
+            blake3::hash(original).to_hex().to_string()
+        );
+
+        std::fs::write(&path, b"#!/bin/sh\nprintf '%s\\n' attacker\n").unwrap();
+
+        let mut bytes = Vec::new();
+        let mut file = staged.file;
+        file.seek(SeekFrom::Start(0)).unwrap();
+        file.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, original);
+
         let _ = std::fs::remove_dir_all(dir);
     }
 
