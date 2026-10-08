@@ -10,6 +10,7 @@ on:
 permissions:
   actions: read
   contents: read
+  statuses: write
 
 jobs:
   receipt:
@@ -33,6 +34,7 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
+            const crypto = require('crypto');
 
             const expected = {
               pr: Number(process.env.EXPECTED_PR),
@@ -47,6 +49,106 @@ jobs:
               workflowBlobSha: process.env.EXPECTED_WORKFLOW_BLOB_SHA,
             };
 
+            const TRUSTED_VERIFIER_WORKFLOW_PATH = '.github/workflows/qual-hdc-bounded-decoder-independent-receipt.yml';
+            const STATUS_CONTEXT = 'HDC / Independent Qualification';
+
+            function canonicalize(value) {
+              if (Array.isArray(value)) return value.map(canonicalize);
+              if (value && typeof value === 'object') {
+                return Object.fromEntries(
+                  Object.keys(value).sort().map((key) => [key, canonicalize(value[key])])
+                );
+              }
+              return value;
+            }
+
+            function sha256Canonical(value) {
+              return crypto
+                .createHash('sha256')
+                .update('promotion-eligibility-lease-v1\\0' + JSON.stringify(canonicalize(value)))
+                .digest('hex');
+            }
+
+            function admissionPolicyIdentity(expectedValue, files, steps) {
+              return sha256Canonical({
+                schema_version: 'hdc-bounded-decoder-admission-policy-v1',
+                expected: expectedValue,
+                expected_files: files,
+                required_steps: steps,
+              });
+            }
+
+            function buildPromotionEligibilityLease({
+              evaluation,
+              evidence,
+              governanceObservation,
+              verifierWorkflowBlobSha,
+              policyIdentity,
+              observedAt,
+            }) {
+              const reasons = [];
+              if (evaluation.qualificationResult !== 'PASS') reasons.push('qualification_not_pass');
+              if (evidence.contextSha !== evidence.currentMainSha ||
+                  evidence.contextSha !== evidence.finalMainSha) reasons.push('verifier_root_drift');
+              if (!evaluation.checks.run_attempt_matches_trigger) reasons.push('run_attempt_drift');
+              if (!evaluation.checks.pr_snapshot_stable) reasons.push('pr_snapshot_drift');
+              if (!evaluation.checks.base_branch_tip_stable) reasons.push('base_branch_tip_drift');
+              if (!evaluation.checks.artifact_snapshot_stable) reasons.push('artifact_snapshot_drift');
+              if (!governanceObservation.verified) reasons.push('governance_authority_unverified');
+
+              const lease = {
+                schema_version: 'PromotionEligibilityLeaseV1',
+                lease_state: reasons.length === 0 ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
+                invalidation_reasons: reasons,
+                observed_at: observedAt,
+                repository: {
+                  id: expected.repositoryId,
+                  full_name: expected.repository,
+                },
+                subject: {
+                  pr_number: expected.pr,
+                  head_sha: evidence.pr.head.sha,
+                  base_branch: evidence.pr.base.ref,
+                  base_sha: evidence.pr.base.sha,
+                  merge_commit_sha: evidence.pr.merge_commit_sha ?? null,
+                },
+                currentness: {
+                  verifier_main_tip_initial: evidence.currentMainSha,
+                  verifier_main_tip_final: evidence.finalMainSha,
+                  stacked_base_tip_initial: evidence.initialBaseBranchTipSha,
+                  stacked_base_tip_final: evidence.finalBaseBranchTipSha,
+                },
+                qualification: {
+                  run_id: evidence.run.id,
+                  run_attempt: evidence.run.run_attempt,
+                  triggering_run_attempt: evidence.triggerRunAttempt,
+                  head_sha: evidence.run.head_sha,
+                  workflow_path: evidence.run.path,
+                },
+                evidence_lifecycle: {
+                  artifact_id: evidence.finalArtifacts?.[0]?.id ?? null,
+                  digest: evidence.finalArtifacts?.[0]?.digest ?? null,
+                  created_at: evidence.finalArtifacts?.[0]?.created_at ?? null,
+                  expires_at: evidence.finalArtifacts?.[0]?.expires_at ?? null,
+                },
+                trusted_verifier_root: {
+                  workflow_path: TRUSTED_VERIFIER_WORKFLOW_PATH,
+                  workflow_blob_sha: verifierWorkflowBlobSha,
+                  commit_sha: evidence.contextSha,
+                },
+                independent_admission_policy: {
+                  identity_sha256: policyIdentity,
+                  schema_version: 'hdc-bounded-decoder-admission-policy-v1',
+                },
+                governance_authority: governanceObservation,
+                reconciliation: {
+                  observed_at: observedAt,
+                  status_context: STATUS_CONTEXT,
+                },
+              };
+              lease.lease_id_sha256 = sha256Canonical(lease);
+              return lease;
+            }
             const expectedFiles = [
               '.github/workflows/hdc-linear-code-syndrome-qualify.yml',
               'crates/core/symthaea-core/src/hdc/mod.rs',
@@ -635,6 +737,20 @@ jobs:
               run_id: runId,
             })).data;
 
+            const verifierWorkflowFile = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: TRUSTED_VERIFIER_WORKFLOW_PATH,
+              ref: context.sha,
+            });
+            if (Array.isArray(verifierWorkflowFile.data)) {
+              throw new Error('trusted verifier workflow path resolved to a directory');
+            }
+            const verifierWorkflowBlobSha = String(verifierWorkflowFile.data.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(verifierWorkflowBlobSha)) {
+              throw new Error('trusted verifier workflow blob SHA is not canonical');
+            }
+
             const jobs = await github.paginate(
               github.rest.actions.listJobsForWorkflowRun,
               {
@@ -714,6 +830,8 @@ jobs:
                 mergeSourceBlobShas[file] = content.data.sha;
               }
             }
+
+            const policyIdentity = admissionPolicyIdentity(expected, expectedFiles, requiredSteps);
 
             const repositoryMetadata = (await github.rest.repos.get({
               owner: context.repo.owner,
@@ -795,6 +913,65 @@ jobs:
               }
             );
 
+            const rulesetsResponse = await github.request('GET /repos/{owner}/{repo}/rulesets', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const rulesets = Array.isArray(rulesetsResponse.data) ? rulesetsResponse.data : [];
+
+            let branchProtection;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/branches/{branch}/protection',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              branchProtection = {
+                accessible: true,
+                http_status: response.status,
+                required_status_checks: response.data?.required_status_checks ?? null,
+              };
+            } catch (error) {
+              branchProtection = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                required_status_checks: null,
+              };
+            }
+
+            const governanceObserved = {
+              schema_version: 'governance-authority-observation-v1',
+              default_branch: repositoryMetadata.default_branch,
+              rulesets: rulesets.map((rule) => ({
+                id: rule.id ?? null,
+                name: rule.name ?? null,
+                target: rule.target ?? null,
+                enforcement: rule.enforcement ?? null,
+              })),
+              branch_protection: branchProtection,
+            };
+            const governanceIdentitySha256 = sha256Canonical(governanceObserved);
+            const requiredStatusCheckObserved =
+              branchProtection.accessible &&
+              Array.isArray(branchProtection.required_status_checks?.contexts) &&
+              branchProtection.required_status_checks.contexts.includes(STATUS_CONTEXT);
+            const governanceObservation = {
+              observation_identity_sha256: governanceIdentitySha256,
+              default_branch: repositoryMetadata.default_branch,
+              verified: requiredStatusCheckObserved,
+              verification_basis:
+                requiredStatusCheckObserved
+                  ? 'branch_protection_required_status_context'
+                  : 'governance_configuration_not_independently_verified',
+              ruleset_count: rulesets.length,
+              branch_protection_accessible: branchProtection.accessible,
+              required_status_context: STATUS_CONTEXT,
+            };
+
             const liveEvidence = {
               contextRef: context.ref,
               contextSha: context.sha,
@@ -822,12 +999,24 @@ jobs:
               sourceBlobShas,
               artifacts,
               finalArtifacts,
+              verifierWorkflowBlobSha,
+              policyIdentity,
+              governanceObservation,
             };
 
             const liveEvaluation = evaluate(liveEvidence);
+            const leaseObservedAt = new Date().toISOString();
+            const promotionLease = buildPromotionEligibilityLease({
+              evaluation: liveEvaluation,
+              evidence: liveEvidence,
+              governanceObservation,
+              verifierWorkflowBlobSha,
+              policyIdentity,
+              observedAt: leaseObservedAt,
+            });
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v7',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v8',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -940,15 +1129,78 @@ jobs:
                   liveEvaluation.artifact?.expired ?? null,
               },
               live_checks: liveEvaluation.checks,
+              promotion_eligibility_lease: promotionLease,
             };
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V7.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V8.json'
             );
             fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
+            core.info('Promotion lease: ' + promotionLease.lease_state + ' [' + promotionLease.lease_id_sha256 + ']');
             core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
             core.info('Independent qualification result: ' + receipt.qualification_result);
+
+            const publicationMainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + repositoryMetadata.default_branch,
+            })).data;
+            const publicationMainSha = String(publicationMainRef.object?.sha ?? '');
+            const publicationPr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: expected.pr,
+            })).data;
+            const publicationBaseRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + expected.baseBranch,
+            })).data;
+            const publicationBaseSha = String(publicationBaseRef.object?.sha ?? '');
+            const publicationGovernanceResponse = await github.request('GET /repos/{owner}/{repo}/rulesets', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const publicationGovernanceIdentitySha256 = sha256Canonical({
+              default_branch: repositoryMetadata.default_branch,
+              rulesets: (Array.isArray(publicationGovernanceResponse.data) ? publicationGovernanceResponse.data : [])
+                .map((rule) => ({
+                  id: rule.id ?? null,
+                  name: rule.name ?? null,
+                  target: rule.target ?? null,
+                  enforcement: rule.enforcement ?? null,
+                })),
+            });
+            const publicationFencePassed =
+              publicationMainSha === liveEvidence.finalMainSha &&
+              publicationPr.head?.sha === liveEvidence.finalPr.head?.sha &&
+              publicationPr.base?.sha === liveEvidence.finalPr.base?.sha &&
+              publicationPr.merge_commit_sha === liveEvidence.finalPr.merge_commit_sha &&
+              publicationBaseSha === liveEvidence.finalBaseBranchTipSha &&
+              publicationGovernanceIdentitySha256 === governanceIdentitySha256;
+
+            const promotable =
+              receipt.qualification_result === 'PASS' &&
+              promotionLease.lease_state === 'ELIGIBLE' &&
+              publicationFencePassed;
+
+            const statusState = promotable ? 'success' : 'pending';
+            const statusDescription = promotable
+              ? 'Qualification and decision-time promotion lease verified.'
+              : 'Qualification evidence is not currently promotion-eligible; currentness or governance fence not satisfied.';
+            const statusReceiptUrl = context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId;
+            await github.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: expected.subject,
+              state: statusState,
+              target_url: statusReceiptUrl,
+              description: statusDescription,
+              context: STATUS_CONTEXT,
+            });
+            core.info('Published decision-time status: ' + statusState);
 
             if (receipt.qualification_result !== 'PASS') {
               core.setFailed('Independent verifier refused to qualify the triggering run');
