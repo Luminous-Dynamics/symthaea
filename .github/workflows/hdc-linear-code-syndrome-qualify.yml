@@ -82,7 +82,7 @@ jobs:
           test "$LIVE_RUN_EVENT" = "$GITHUB_EVENT_NAME"
           test "$GITHUB_EVENT_NAME" = "pull_request"
           test -n "$SYNTHETIC_MERGE_SHA"
-          test "$LIVE_RUN_HEAD_SHA" = "$SYNTHETIC_MERGE_SHA"
+          test "$LIVE_RUN_HEAD_SHA" = "$EVENT_HEAD_SHA"
           test -n "$GITHUB_WORKFLOW_SHA"
           WORKFLOW_PATH=".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           CHECKED_OUT_WORKFLOW_SHA256="$(sha256sum "$WORKFLOW_PATH" | cut -d" " -f1)"
@@ -128,7 +128,7 @@ jobs:
           echo "live_run_repo_id=$LIVE_RUN_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "live_run_head_sha=$LIVE_RUN_HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "live_run_head_ref=$LIVE_RUN_HEAD_REF" >> "$GITHUB_OUTPUT"
-          echo "live_run_head_is_synthetic_merge=true" >> "$GITHUB_OUTPUT"
+          echo "live_run_head_is_pr_head=true" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_id=$LIVE_RUN_WORKFLOW_ID" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_path=$LIVE_RUN_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
           echo "live_run_workflow_name=$LIVE_RUN_WORKFLOW_NAME" >> "$GITHUB_OUTPUT"
@@ -661,7 +661,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXACT_HEAD: ${{ steps.head.outputs.sha }}
-          EXPECTED_MERGE_SHA: ${{ steps.head.outputs.synthetic_merge_sha }}
+          SYNTHETIC_MERGE_SHA: ${{ steps.head.outputs.synthetic_merge_sha }}
           RUN_ID: ${{ github.run_id }}
           ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
           EXPECTED_NAME: hdc-linear-code-bounded-decoder-${{ github.event.pull_request.head.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -680,7 +680,7 @@ jobs:
           test "$REFETCH_NAME" = "$EXPECTED_NAME"
           test "$REFETCH_REPO_ID" = "$EXPECTED_REPO_ID"
           test "$REFETCH_RUN_ID" = "$RUN_ID"
-          test "$REFETCH_HEAD_SHA" = "$EXPECTED_MERGE_SHA"
+          test "$REFETCH_HEAD_SHA" = "$EXACT_HEAD"
           test "$REFETCH_HEAD_REPO_ID" = "$EXPECTED_REPO_ID"
           test "$EXACT_HEAD" != "$EXPECTED_MERGE_SHA"
           test -n "$REFETCH_DIGEST"
@@ -689,7 +689,7 @@ jobs:
           echo "artifact_refetch_repo_id=$REFETCH_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_run_id=$REFETCH_RUN_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_head_sha=$REFETCH_HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "artifact_refetch_expected_merge_sha=$EXPECTED_MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_refetch_synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_pr_head_sha=$EXACT_HEAD" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_head_repo_id=$REFETCH_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_digest=$REFETCH_DIGEST" >> "$GITHUB_OUTPUT"
