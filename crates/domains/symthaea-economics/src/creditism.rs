@@ -32,9 +32,6 @@ pub enum CreditismError {
     NotInterestBearing,
     NotInvestable,
     NotInheritable,
-    InvalidAcquisitionCost {
-        cost: f64,
-    },
     NonFiniteAmount,
     NonFiniteResult,
     DuplicateAccount(String),
@@ -289,8 +286,13 @@ impl PersonalCreditLedger {
             });
         }
 
+        let new_deleted = self.deleted + amount;
+        if !new_deleted.is_finite() {
+            return Err(CreditismError::NonFiniteResult);
+        }
+
         *balance -= amount;
-        self.deleted += amount;
+        self.deleted = new_deleted;
         Ok(())
     }
 }
@@ -409,7 +411,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn failed_exchange_is_atomic() {
         let mut ledger = PersonalCreditLedger::from_opening_balances([
             ("buyer".to_owned(), 100.0),
@@ -474,6 +475,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn malformed_amounts_fail_closed() {
         let mut ledger = PersonalCreditLedger::new();
         assert_eq!(
