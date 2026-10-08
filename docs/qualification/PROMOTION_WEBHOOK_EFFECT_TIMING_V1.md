@@ -163,3 +163,15 @@ This still does not prove the correctness of the local clock source; it only pre
 `PromotionStackEffectTimingSetV1` also carries one `clock_relation_identity_digest` and requires every timing record to resolve to that same relation identity.
 
 This prevents one stack result from silently mixing different skew baselines, validity windows, or drift bounds. A clock-relation change is therefore a new temporal evidence generation rather than a local reinterpretation of only one stack member.
+
+## Timing-record integrity
+
+`ProviderWebhookEffectTimingV1.identity_digest()` commits the temporal inputs that can affect classification: provider event interval, provider delivery time, local wall-clock points, local monotonic points, timestamp-policy identity, and clock-relation identity.
+
+`PromotionStackEffectTimingV1` carries that digest and the complete stack validator recomputes it. Therefore a changed interval, clock relation, local timestamp, or policy cannot be silently represented as the same timing evidence record.
+
+## Stacked webhook topology evidence
+
+GitHub's stacked-PR webhooks can carry stack metadata including stack number, size, position, and the stack base ref/SHA. The model preserves this as `ProviderWebhookStackMetadataV1` and can validate it against the exact operation identity.
+
+This is deliberately an observation boundary, not provider-side CAS. Matching webhook stack metadata says the authenticated payload describes the expected topology at that delivery; it does not prove that GitHub atomically reserved or merged that topology.
