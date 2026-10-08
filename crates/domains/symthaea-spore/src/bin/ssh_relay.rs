@@ -220,7 +220,11 @@ fn trusted_nix_script_process(
     args: &[&str],
 ) -> tokio::process::Command {
     let shell = trusted_script_shell();
-    let mut command = privileged_nix_process(shell).expect("trusted script shell is on the executable allowlist");
+    let mut command = privileged_process(shell);
+    command.env(
+        "NIX_PATH",
+        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
+    );
     if shell.ends_with("/bash") {
         command.arg("-p");
     }
