@@ -5137,6 +5137,20 @@ fn replace_configuration_atomically_blocking(
         .open(target_dir_path)
         .map_err(|error| format!("unable to open configuration directory: {error}"))?;
     let dir_fd = target_dir.as_raw_fd();
+    let effective_uid = unsafe { libc::geteuid() };
+
+    let directory_metadata = target_dir
+        .metadata()
+        .map_err(|error| format!("unable to inspect configuration directory security: {error}"))?;
+    if !directory_metadata.is_dir()
+        || directory_metadata.uid() != effective_uid
+        || directory_metadata.permissions().mode() & 0o022 != 0
+    {
+        return Err(
+            "configuration directory must be owned by the relay user and not be group/world-writable"
+                .into(),
+        );
+    }
 
     let final_name = "configuration.nix";
     let final_c = CString::new(final_name).unwrap();
@@ -5159,6 +5173,12 @@ fn replace_configuration_atomically_blocking(
         .map_err(|error| format!("unable to inspect current configuration: {error}"))?;
     if !metadata.is_file() {
         return Err("current configuration is not a regular file".into());
+    }
+    if metadata.uid() != effective_uid || metadata.permissions().mode() & 0o022 != 0 {
+        return Err(
+            "current configuration must be owned by the relay user and not be group/world-writable"
+                .into(),
+        );
     }
     let original_identity = FileIdentity {
         device: metadata.dev(),
