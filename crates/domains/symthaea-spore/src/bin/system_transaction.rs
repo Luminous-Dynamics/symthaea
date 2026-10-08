@@ -168,7 +168,6 @@ impl MutationLease {
             }
         }
     }
-    }
 }
 
 impl Drop for MutationLease {
