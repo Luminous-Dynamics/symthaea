@@ -44,16 +44,16 @@ pub trait MlDsa65Verifier {
 /// policy must validate the exact key bytes, key identifier, and evaluation
 /// time against an independently trusted registry/snapshot.
 pub trait MlDsa65KeyPolicy {
-    /// Stable digest of the exact key-authorization policy/snapshot used.
-    /// A zero digest is invalid and must fail closed.
-    fn policy_digest_sha256(&self) -> [u8; 32];
-
+    /// Authorize a key and return the exact snapshot-bound authorization
+    /// receipt used for this decision. Returning the digest and authorization
+    /// as separate calls would permit a mutable registry to change between
+    /// them, creating a policy time-of-check/time-of-use gap.
     fn authorize(
         &self,
         key_id: &Rfc9942PqKeyId,
         verifying_key_sha256: [u8; 32],
         evaluation_time_unix_seconds: u64,
-    ) -> Result<(), MlDsa65KeyAuthorizationError>;
+    ) -> Result<MlDsa65KeyAuthorization, MlDsa65KeyAuthorizationError>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -79,7 +79,56 @@ pub enum MlDsa65KeyAuthorizationError {
     Expired,
     Revoked,
     UsageNotPermitted,
+    InvalidPolicyDigest,
     PolicyUnavailable,
+}
+
+/// Snapshot-bound result of key authorization.
+///
+/// The digest and the key/time tuple travel together so downstream verification
+/// cannot accidentally combine an authorization result with a different trust
+/// snapshot, key, or evaluation time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MlDsa65KeyAuthorization {
+    policy_digest_sha256: [u8; 32],
+    key_id: Rfc9942PqKeyId,
+    verifying_key_sha256: [u8; 32],
+    evaluation_time_unix_seconds: u64,
+}
+
+impl MlDsa65KeyAuthorization {
+    pub fn new(
+        policy_digest_sha256: [u8; 32],
+        key_id: Rfc9942PqKeyId,
+        verifying_key_sha256: [u8; 32],
+        evaluation_time_unix_seconds: u64,
+    ) -> Result<Self, MlDsa65KeyAuthorizationError> {
+        if policy_digest_sha256 == [0; 32] {
+            return Err(MlDsa65KeyAuthorizationError::InvalidPolicyDigest);
+        }
+        Ok(Self {
+            policy_digest_sha256,
+            key_id,
+            verifying_key_sha256,
+            evaluation_time_unix_seconds,
+        })
+    }
+
+    pub const fn policy_digest_sha256(&self) -> [u8; 32] {
+        self.policy_digest_sha256
+    }
+
+    pub const fn key_id(&self) -> Rfc9942PqKeyId {
+        self.key_id
+    }
+
+    pub const fn verifying_key_sha256(&self) -> [u8; 32] {
+        self.verifying_key_sha256
+    }
+
+    pub const fn evaluation_time_unix_seconds(&self) -> u64 {
+        self.evaluation_time_unix_seconds
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -261,19 +310,23 @@ impl Rfc9942HybridVerifiedReceipt {
             return Err(Rfc9942HybridError::PqSignatureAllZero);
         }
 
-        let policy_digest_sha256 = key_policy.policy_digest_sha256();
-        if policy_digest_sha256 == [0; 32] {
-            return Err(Rfc9942HybridError::PqKeyPolicyInvalid);
-        }
-
         let verifying_key_sha256 = sha256(verifying_key);
-        key_policy
+        let authorization = key_policy
             .authorize(
                 &key_id,
                 verifying_key_sha256,
                 evaluation_time_unix_seconds,
             )
             .map_err(Rfc9942HybridError::from_key_policy)?;
+
+        if authorization.key_id() != key_id
+            || authorization.verifying_key_sha256() != verifying_key_sha256
+            || authorization.evaluation_time_unix_seconds()
+                != evaluation_time_unix_seconds
+        {
+            return Err(Rfc9942HybridError::PqKeyAuthorizationBindingMismatch);
+        }
+        let policy_digest_sha256 = authorization.policy_digest_sha256();
 
         let transcript = Rfc9942HybridTranscript::new(
             verified_classical,
@@ -341,6 +394,7 @@ pub enum Rfc9942HybridError {
     ReceiptWireIdentityMismatch,
     PqKeyIdInvalid,
     PqKeyPolicyInvalid,
+    PqKeyAuthorizationBindingMismatch,
     PqKeyUnknown,
     PqKeyNotYetValid,
     PqKeyExpired,
@@ -367,6 +421,9 @@ impl Rfc9942HybridError {
             MlDsa65KeyAuthorizationError::Revoked => Self::PqKeyRevoked,
             MlDsa65KeyAuthorizationError::UsageNotPermitted => {
                 Self::PqKeyUsageNotPermitted
+            }
+            MlDsa65KeyAuthorizationError::InvalidPolicyDigest => {
+                Self::PqKeyPolicyInvalid
             }
             MlDsa65KeyAuthorizationError::PolicyUnavailable => {
                 Self::PqKeyPolicyUnavailable
@@ -535,6 +592,21 @@ mod tests {
         assert_ne!(a.signing_bytes(), b.signing_bytes());
         assert_ne!(a.transcript_sha256(), b.transcript_sha256());
         assert_ne!(a.key_id(), b.key_id());
+    }
+
+    #[test]
+    fn authorization_receipt_binds_policy_key_and_evaluation_time() {
+        let key_id = Rfc9942PqKeyId::new([4; 16]).unwrap();
+        let auth = MlDsa65KeyAuthorization::new([3; 32], key_id, [2; 32], 1234)
+            .unwrap();
+        assert_eq!(auth.policy_digest_sha256(), [3; 32]);
+        assert_eq!(auth.key_id(), key_id);
+        assert_eq!(auth.verifying_key_sha256(), [2; 32]);
+        assert_eq!(auth.evaluation_time_unix_seconds(), 1234);
+        assert_eq!(
+            MlDsa65KeyAuthorization::new([0; 32], key_id, [2; 32], 1234),
+            Err(MlDsa65KeyAuthorizationError::InvalidPolicyDigest)
+        );
     }
 
     #[test]
