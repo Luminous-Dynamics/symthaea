@@ -75,6 +75,10 @@ jobs:
               "PromotionStackEffectEvidenceV1",
               "PromotionStackEffectEvidenceSetV1",
               "PromotionPrEffectStateV1",
+              "ClockRelationV1",
+              "ProviderWebhookEffectTimingV1",
+              "PromotionStackEffectTimingV1",
+              "PromotionStackEffectTimingSetV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
           }
@@ -99,6 +103,23 @@ jobs:
               "provider-result-unavailable",
               "invalid-retention-state",
           }
+
+          temporal_states = {
+              "temporally-admissible",
+              "cross-domain-time-unbounded",
+              "cross-domain-time-uncertain",
+              "provider-event-before-dispatch",
+              "provider-event-after-observation",
+              "provider-event-time-missing",
+              "local-reservation-time-missing",
+              "local-dispatch-time-missing",
+              "local-observation-time-missing",
+              "invalid-local-time-order",
+              "invalid-provider-time-order",
+              "invalid-negative-time",
+          }
+          for state in temporal_states:
+              assert f'"{state}"' in source, f"Missing temporal state: {state}"
           for state in retention_states:
               assert f'"{state}"' in source, f"Missing retention state: {state}"
 
@@ -143,6 +164,10 @@ jobs:
               "compatible-repeat",
               "duplicate-delivery",
               "no-eligible-effect",
+              "parse_provider_timestamp_ms",
+              "ClockRelationV1",
+              "ProviderWebhookEffectTimingV1",
+              "PromotionStackEffectTimingSetV1",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"
