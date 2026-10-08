@@ -154,7 +154,7 @@ pub fn try_run_scenario(
     ];
     if !tariff_values.iter().all(|value| value.is_finite())
         || !(0.0..24.0).contains(&tariff.peak_start_hour)
-        || !(0.0..24.0).contains(&tariff.peak_end_hour)
+        || !(0.0..=24.0).contains(&tariff.peak_end_hour)
     {
         return Err(ScenarioError::InvalidTariff);
     }
@@ -239,8 +239,18 @@ pub fn try_run_scenario(
             .charge(charge_kw, step_hours)
             .map_err(|_| ScenarioError::InvalidBatteryConfiguration)?;
         let one_way_efficiency = working_battery.round_trip_efficiency.sqrt();
-        let actual_charge_kw = if step_hours > 0.0 && one_way_efficiency > 0.0 {
+        let actual_charge_kw = if step_hours <= 0.0 {
+            0.0
+        } else if one_way_efficiency > 0.0 {
             charge_accepted_dc_kwh / one_way_efficiency / step_hours
+        } else if working_battery.effective_capacity_kwh() > 0.0
+            && working_battery.soc() < 1.0
+        {
+            // A zero-efficiency battery can store no energy, but charging it
+            // still consumes input power while usable headroom exists. Do not
+            // erase that demand from the power balance just because the model
+            // records zero accepted DC energy.
+            charge_kw
         } else {
             0.0
         };
@@ -549,6 +559,41 @@ mod tests {
         assert_eq!(tariff.import_price(23.0), tariff.peak_price_per_kwh);
         assert_eq!(tariff.import_price(2.0), tariff.peak_price_per_kwh);
         assert_eq!(tariff.import_price(12.0), tariff.off_peak_price_per_kwh);
+    }
+
+    #[test]
+    fn test_tariff_accepts_hour_24_as_end_of_day() {
+        let tariff = TariffSchedule {
+            peak_start_hour: 17.0,
+            peak_end_hour: 24.0,
+            ..default_tariff()
+        };
+        assert_eq!(tariff.import_price(23.0), tariff.peak_price_per_kwh);
+        assert_eq!(tariff.import_price(16.0), tariff.off_peak_price_per_kwh);
+    }
+
+    #[test]
+    fn test_zero_efficiency_battery_charge_still_counts_input_power() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 0.0).with_soc(0.5);
+        let result = try_run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 0.0,
+            |_t| 0.0,
+            1.0,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (5.0, 0.0),
+        )
+        .unwrap();
+        assert!(
+            (result.total_cost - 0.5).abs() < 1e-9,
+            "5 kW of charge input with zero stored energy should still cost 0.50, got {}",
+            result.total_cost
+        );
+        assert_eq!(battery.soc(), 0.5);
     }
 
     #[test]
