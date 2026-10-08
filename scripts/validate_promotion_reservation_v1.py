@@ -673,6 +673,8 @@ class ProviderWebhookEffectTimingV1:
             return "local-observation-time-missing"
         if self.local_dispatch_time_ms < self.local_reservation_time_ms:
             return "invalid-local-time-order"
+        if self.local_observation_time_ms < self.local_dispatch_time_ms:
+            return "invalid-local-time-order"
         if self.provider_delivery_time_ms is not None:
             if self.provider_delivery_time_ms < self.provider_event_time_ms:
                 return "invalid-provider-time-order"
@@ -699,6 +701,7 @@ class ProviderWebhookEffectTimingV1:
 @dataclass(frozen=True)
 class PromotionStackEffectTimingV1:
     pr_number: int
+    source_effect_evidence_identity_digest: str
     timing: ProviderWebhookEffectTimingV1
 
 
@@ -707,19 +710,32 @@ class PromotionStackEffectTimingSetV1:
     operation_identity_digest: str
     timings: tuple[PromotionStackEffectTimingV1, ...]
 
-    def validates_complete(self, identity: PromotionOperationIdentityV1) -> bool:
+    def validates_complete(
+        self,
+        identity: PromotionOperationIdentityV1,
+        effect_evidence: "PromotionStackEffectEvidenceSetV1 | None",
+    ) -> bool:
         if self.operation_identity_digest != identity.digest():
+            return False
+        if effect_evidence is None or not effect_evidence.validates_complete(identity):
             return False
         expected = identity.ordered_stack
         if len(self.timings) != len(expected):
+            return False
+        if len(effect_evidence.effects) != len(expected):
             return False
         observed_prs = [item.pr_number for item in self.timings]
         if len(observed_prs) != len(set(observed_prs)):
             return False
         return all(
             item.pr_number == entry.pr_number
+            and item.source_effect_evidence_identity_digest == evidence.identity_digest()
             and item.timing.temporally_admissible()
-            for entry, item in zip(expected, self.timings)
+            for entry, item, evidence in zip(
+                expected,
+                self.timings,
+                effect_evidence.effects,
+            )
         )
 
 
@@ -732,6 +748,29 @@ class PromotionStackEffectEvidenceV1:
     source_event_type: str
     source_repository: str
     source_authentication: str
+
+    def identity_digest(self) -> str:
+        payload = {
+            "effect": {
+                "observed_merge_commit": self.effect.observed_merge_commit,
+                "pr_number": self.effect.pr_number,
+                "expected_head_sha": self.effect.expected_head_sha,
+            },
+            "source_authentication": self.source_authentication,
+            "source_delivery_id": self.source_delivery_id,
+            "source_event_type": self.source_event_type,
+            "source_hook_id": self.source_hook_id,
+            "source_payload_digest": self.source_payload_digest,
+            "source_repository": self.source_repository,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
 
     def validates(self, identity: PromotionOperationIdentityV1) -> bool:
         expected_prs = {entry.pr_number for entry in identity.ordered_stack}
@@ -1428,18 +1467,83 @@ def test_temporal_timing_rejects_invalid_local_order():
     assert timing.classify() == "invalid-local-time-order"
 
 
+def test_temporal_timing_rejects_local_observation_rollback():
+    timing = effect_timing_fixture(
+        observation_time_ms=1728403000000,
+        dispatch_time_ms=1728403100000,
+    )
+    assert timing.classify() == "invalid-local-time-order"
+
+
 def test_complete_stack_timing_requires_every_member_admissible():
     identity = stack_identity_fixture()
-    good = PromotionStackEffectTimingV1(7085, effect_timing_fixture())
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-complete-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-complete-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    good = PromotionStackEffectTimingV1(
+        7085,
+        evidence.effects[0].identity_digest(),
+        effect_timing_fixture(),
+    )
     bad = PromotionStackEffectTimingV1(
         7087,
+        evidence.effects[1].identity_digest(),
         effect_timing_fixture(event_time_ms=1791475000000),
     )
     timings = PromotionStackEffectTimingSetV1(
         identity.digest(),
         (good, bad),
     )
-    assert not timings.validates_complete(identity)
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_stack_timing_rejects_crosswired_effect_evidence_identity():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-crosswire-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-crosswire-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    crosswired = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[1].identity_digest(),
+                effect_timing_fixture(),
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[0].identity_digest(),
+                effect_timing_fixture(),
+            ),
+        ),
+    )
+    assert not crosswired.validates_complete(identity, evidence)
 
 
 def test_effect_state_admits_first_authenticated_merge():
@@ -3749,7 +3853,9 @@ TESTS = [
     test_historical_merge_delivered_after_new_reservation_is_inadmissible,
     test_temporal_timing_rejects_missing_event_time,
     test_temporal_timing_rejects_invalid_local_order,
+    test_temporal_timing_rejects_local_observation_rollback,
     test_complete_stack_timing_requires_every_member_admissible,
+    test_stack_timing_rejects_crosswired_effect_evidence_identity,
     test_effect_state_admits_first_authenticated_merge,
     test_effect_state_merged_then_non_effect_does_not_downgrade,
     test_effect_state_equivalent_second_delivery_is_idempotent,
