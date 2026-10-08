@@ -108,8 +108,6 @@ jobs:
               "verifier_implementation_digest",
               "verification_result",
           }
-          for field in required_receipt_fields:
-              assert field in source if False else True
           source = path.read_text()
           for field in required_receipt_fields:
               assert field in source, f"Missing crypto receipt field: {field}"
