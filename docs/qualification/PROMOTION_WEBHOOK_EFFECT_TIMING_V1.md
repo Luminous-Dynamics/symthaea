@@ -84,3 +84,19 @@ This establishes deterministic temporal-admissibility semantics with explicit cl
 It does not establish synchronized clocks, provider truthfulness, causal attribution, provider-side topology CAS, governance legitimacy, production atomicity, or promotion success.
 
 Related: #7169, #7171, #7152, #7154, #7156, #7166, #7168.
+
+## Exact effect-source binding
+
+Temporal admissibility is not sufficient by itself to identify which merged effect the timing belongs to.
+
+Each stack timing record is therefore bound to the exact `PromotionStackEffectEvidenceV1` identity digest containing the effect head, merge commit, delivery ID, payload digest, hook, event type, repository, and source-authentication class. `PromotionStackEffectTimingSetV1.validates_complete()` requires the timing identities to match the effect-evidence set positionally under the exact operation identity.
+
+A temporally admissible timestamp attached to another PR's evidence, another delivery, another payload, or another merge result is rejected rather than being composable by PR number alone.
+
+## Local timeline monotonicity
+
+The local evidence path also requires:
+
+    reservation <= dispatch <= observation
+
+A local wall-clock rollback between dispatch and observation is invalid temporal evidence and cannot be rescued by a provider timestamp or skew bound.
