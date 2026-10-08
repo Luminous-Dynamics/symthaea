@@ -21,6 +21,7 @@ pub enum PromotionEffectSourceV1 {
 pub struct PromotionEffectObservationV1 {
     pub source: PromotionEffectSourceV1,
     pub causal_attribution: PromotionCausalAttributionV1,
+    pub local_promotion_operation_id: Option<String>,
     pub provider_operation_uuid: Option<String>,
     pub expected_pr_head_sha: String,
     pub observed_merge_commit: String,
@@ -28,6 +29,7 @@ pub struct PromotionEffectObservationV1 {
 
 impl PromotionEffectObservationV1 {
     fn provider_direct(
+        local_promotion_operation_id: impl Into<String>,
         provider_operation_uuid: impl Into<String>,
         expected_pr_head_sha: impl Into<String>,
         observed_merge_commit: impl Into<String>,
@@ -35,6 +37,7 @@ impl PromotionEffectObservationV1 {
         Self {
             source: PromotionEffectSourceV1::DirectProviderResult,
             causal_attribution: PromotionCausalAttributionV1::Established,
+            local_promotion_operation_id: Some(local_promotion_operation_id.into()),
             provider_operation_uuid: Some(provider_operation_uuid.into()),
             expected_pr_head_sha: expected_pr_head_sha.into(),
             observed_merge_commit: observed_merge_commit.into(),
@@ -65,9 +68,13 @@ impl PromotionEffectObservationV1 {
         match self.source {
             PromotionEffectSourceV1::DirectProviderResult => {
                 if self.causal_attribution != PromotionCausalAttributionV1::Established
+                    || self.local_promotion_operation_id
+                        .as_deref()
+                        .unwrap_or_default()
+                        .is_empty()
                     || self.provider_operation_uuid.as_deref().unwrap_or_default().is_empty()
                 {
-                    return Err("direct provider result is missing causal operation identity");
+                    return Err("direct provider result is missing local/provider operation binding");
                 }
             }
             PromotionEffectSourceV1::DurableSubjectObservation => {
@@ -87,11 +94,13 @@ impl PromotionEffectObservationV1 {
 /// and the resulting merge commit, so the narrow operation-to-effect edge
 /// is directly represented.
 pub fn from_async_merged(
+    local_promotion_operation_id: &str,
     provider_operation_uuid: &str,
     expected_pr_head_sha: &str,
     merge_commit: &str,
 ) -> Result<PromotionEffectObservationV1, &'static str> {
     let observation = PromotionEffectObservationV1::provider_direct(
+        local_promotion_operation_id,
         provider_operation_uuid,
         expected_pr_head_sha,
         merge_commit,
@@ -137,11 +146,15 @@ mod tests {
 
     #[test]
     fn direct_provider_merge_establishes_narrow_causal_attribution() {
-        let observation = from_async_merged("uuid-1", "H1", "M1").unwrap();
+        let observation = from_async_merged("OP-1", "uuid-1", "H1", "M1").unwrap();
         assert_eq!(observation.source, PromotionEffectSourceV1::DirectProviderResult);
         assert_eq!(
             observation.causal_attribution,
             PromotionCausalAttributionV1::Established
+        );
+        assert_eq!(
+            observation.local_promotion_operation_id.as_deref(),
+            Some("OP-1")
         );
         assert_eq!(observation.provider_operation_uuid.as_deref(), Some("uuid-1"));
     }
@@ -187,11 +200,28 @@ mod tests {
     }
 
     #[test]
+    fn provider_uuid_without_local_operation_binding_cannot_claim_causality() {
+        let observation = PromotionEffectObservationV1 {
+            source: PromotionEffectSourceV1::DirectProviderResult,
+            causal_attribution: PromotionCausalAttributionV1::Established,
+            local_promotion_operation_id: None,
+            provider_operation_uuid: Some("uuid-1".into()),
+            expected_pr_head_sha: "H1".into(),
+            observed_merge_commit: "M1".into(),
+        };
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            "direct provider result is missing local/provider operation binding"
+        );
+    }
+
+    #[test]
     fn malformed_direct_result_cannot_claim_causality() {
         let observation = PromotionEffectObservationV1 {
             source: PromotionEffectSourceV1::DirectProviderResult,
             causal_attribution: PromotionCausalAttributionV1::Established,
-            provider_operation_uuid: None,
+            local_promotion_operation_id: None,
+            provider_operation_uuid: Some("uuid-1".into()),
             expected_pr_head_sha: "H1".into(),
             observed_merge_commit: "M1".into(),
         };
