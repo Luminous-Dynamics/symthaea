@@ -645,6 +645,68 @@ class ProviderDeliveryRegistryV1:
 
 
 @dataclass(frozen=True)
+class ProviderAsyncMergeRequestEvidenceV1:
+    capture: ProviderEvidenceEnvelopeV1
+    repository: str
+    requested_pr_number: int
+    expected_head_sha: str
+    merge_method: str
+    merge_action: str
+
+    def validates(self, identity: PromotionOperationIdentityV1) -> bool:
+        return (
+            self.capture.is_preserved_provider_evidence()
+            and self.capture.source_authentication.method == "authenticated-api-channel"
+            and self.repository == identity.repository
+            and self.requested_pr_number == identity.requested_pr_number
+            and self.expected_head_sha == identity.requested_pr_head_sha
+            and self.merge_method == identity.merge_method
+            and self.merge_action == identity.merge_action
+            and bool(self.capture.capture.raw_bytes_digest)
+        )
+
+
+@dataclass(frozen=True)
+class ProviderAsyncMergeResponseEvidenceV1:
+    capture: ProviderEvidenceEnvelopeV1
+    status: str
+    provider_uuid: str | None
+    observed_merge_commit: str | None
+
+    def validates(self, result: "ProviderMergeResultV1") -> bool:
+        return (
+            self.capture.is_preserved_provider_evidence()
+            and self.capture.source_authentication.method == "authenticated-api-channel"
+            and self.status == result.status
+            and self.provider_uuid == result.provider_uuid
+            and self.observed_merge_commit == result.observed_merge_commit
+            and bool(self.capture.capture.raw_bytes_digest)
+        )
+
+
+@dataclass(frozen=True)
+class ProviderAsyncMergeEvidencePairV1:
+    request: ProviderAsyncMergeRequestEvidenceV1 | None
+    response: ProviderAsyncMergeResponseEvidenceV1 | None
+
+    def validates(
+        self,
+        identity: PromotionOperationIdentityV1,
+        result: "ProviderMergeResultV1",
+    ) -> bool:
+        return (
+            self.request is not None
+            and self.response is not None
+            and self.request.validates(identity)
+            and self.response.validates(result)
+            and result.request_payload_digest
+            == self.request.capture.capture.raw_bytes_digest
+            and result.response_payload_digest
+            == self.response.capture.capture.raw_bytes_digest
+        )
+
+
+@dataclass(frozen=True)
 class ProviderMergeResultV1:
     result_source: str
     status: str
@@ -654,17 +716,17 @@ class ProviderMergeResultV1:
     merge_method: str
     merge_action: str
     observed_merge_commit: str | None = None
-    result_payload_digest: str = ""
+    request_payload_digest: str = ""
+    response_payload_digest: str = ""
 
     def directly_binds_requested_effect(
         self,
         identity: PromotionOperationIdentityV1,
-        evidence: ProviderEvidenceEnvelopeV1 | None = None,
+        evidence: ProviderAsyncMergeEvidencePairV1 | None = None,
     ) -> bool:
         return (
             evidence is not None
-            and evidence.is_preserved_provider_evidence()
-            and evidence.source_authentication.method == "authenticated-api-channel"
+            and evidence.validates(identity, self)
             and self.result_source == "provider-async-result"
             and self.status == "merged"
             and bool(self.provider_uuid)
@@ -673,8 +735,6 @@ class ProviderMergeResultV1:
             and self.merge_method == identity.merge_method
             and self.merge_action == identity.merge_action
             and bool(self.observed_merge_commit)
-            and bool(self.result_payload_digest)
-            and self.result_payload_digest == evidence.capture.raw_bytes_digest
         )
 
 
@@ -730,7 +790,7 @@ class PromotionCausalResolutionV1:
         provider_result: ProviderMergeResultV1 | None,
         effect_set: PromotionStackEffectSetV1 | None,
         topology_binding: ProviderTopologyBindingV1 | None,
-        provider_evidence: ProviderEvidenceEnvelopeV1 | None = None,
+        provider_evidence: ProviderAsyncMergeEvidencePairV1 | None = None,
     ) -> "PromotionCausalResolutionV1":
         effect_observed = (
             effect_set is not None and effect_set.validates_complete(identity)
