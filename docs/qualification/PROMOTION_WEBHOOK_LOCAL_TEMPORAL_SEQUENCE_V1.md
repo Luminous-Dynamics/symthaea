@@ -201,3 +201,40 @@ The vector follows the Ed25519 verification structure specified by RFC 8032, inc
 Roughtime remains a separate protocol-level source of truth about how a real time response should be validated: RFC 10049 requires validation of the long-term certificate signature, request-derived Merkle proof, and response signature, and explicitly says a valid response does not by itself prove the timestamp is correct. citeturn348751search0turn348751search2
 
 Hosted qualification remains fail-closed: the PR-triggered workflows for this draft branch are still not a qualification claim. The new replay step only becomes executable as part of the existing trusted-default-branch manual lab.
+
+
+## Independent-source quorum
+
+A single authenticated clock source is no longer treated as sufficient for the stronger temporal disposition.
+
+`ClockRelationSourceSetV1` requires a policy minimum of three sources and requires each source to carry distinct:
+
+    source_id
+    operator_id
+    trust_anchor_id
+
+The set also requires a common provider clock domain and a non-empty intersection of the sources' uncertainty intervals.
+
+The resulting predicate is:
+
+    independent-source quorum
+        +
+    common time interval
+        +
+    per-source cryptographic validity
+        ->
+    clock-source-quorum-admissible
+
+The model deliberately returns failure states rather than selecting a preferred source:
+
+    clock-source-policy-too-weak
+    clock-source-quorum-insufficient
+    clock-source-independence-invalid
+    clock-source-domain-mismatch
+    clock-source-time-disagreement
+
+Distinct source identifiers alone are not enough: the operator and trust-anchor identities are also required to be distinct. This is a conservative model of source independence, not proof that two supposedly separate operators are actually independent.
+
+RFC 10049 specifies that Roughtime clients use a list with at least three operational servers not run by the same parties, and its multi-server mode checks reported times for causal consistency. The present model borrows the anti-single-source principle and interval reasoning while remaining a local qualification model rather than a Roughtime implementation. citeturn348751search0turn348751search2
+
+The source-set agreement predicate still does not establish global clock correctness, network-path symmetry, provider honesty, or causal attribution. It only makes single-source temporal evidence insufficient for the stronger disposition.
