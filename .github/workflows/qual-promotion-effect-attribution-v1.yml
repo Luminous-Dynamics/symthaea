@@ -59,6 +59,7 @@ jobs:
             cat /tmp/promotion-effect-attribution-v1-python.out
             echo
             echo "### Semantic boundary"
-            echo "DirectProviderResult => narrow causal attribution may be established"
+            echo "DirectProviderResult + exact local/provider operation binding => narrow causal attribution may be established"
             echo "DurableSubjectObservation => effect observed; causal attribution remains unestablished"
+            echo "provider UUID alone => insufficient for local causal attribution"
           } >> "$GITHUB_STEP_SUMMARY"
