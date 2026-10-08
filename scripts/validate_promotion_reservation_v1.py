@@ -1219,6 +1219,50 @@ def test_effect_state_conflicting_head_fails_closed():
     assert not state_after.is_terminally_observed()
 
 
+def test_effect_state_conflict_is_absorbing():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-first",
+        merge_commit="M2",
+    )
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-conflict",
+        merge_commit="M9",
+    )
+    compatible = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-late",
+        merge_commit="M2",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state.state == "Conflict"
+    state_after, decision = state.ingest(compatible)
+    assert decision == "rejected-invalid-state"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+
+def test_effect_state_conflict_never_reclassifies_as_terminal_observed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-reclass-first")
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-reclass-conflict",
+        head_sha="H0",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert not state.is_terminally_observed()
+    assert state.effect is None
+
+
 def test_effect_state_untrusted_after_merge_does_not_downgrade():
     identity = stack_identity_fixture()
     state = effect_state_fixture(identity)
@@ -3421,6 +3465,8 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_effect_state_conflict_is_absorbing,
+    test_effect_state_conflict_never_reclassifies_as_terminal_observed,
     test_effect_state_admits_first_authenticated_merge,
     test_effect_state_merged_then_non_effect_does_not_downgrade,
     test_effect_state_equivalent_second_delivery_is_idempotent,
