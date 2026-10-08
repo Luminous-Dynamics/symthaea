@@ -224,6 +224,9 @@ jobs:
       - name: No shell-backed executor in mutation handlers
         run: python3 .github/scripts/check-privileged-shell-boundary.py
 
+      - name: Verify transaction ledger durability invariants
+        run: python3 .github/scripts/check-transaction-ledger-boundary.py
+
   muse:
     name: Muse (tests, studio, wasm UI)
     runs-on: ubuntu-latest
