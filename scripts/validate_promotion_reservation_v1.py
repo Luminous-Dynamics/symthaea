@@ -150,6 +150,29 @@ class ProviderStackObservationV1:
             and requested.head_sha == identity.requested_pr_head_sha
         )
 
+    def digest(self) -> str:
+        payload = {
+            "base_ref": self.base_ref,
+            "base_tip_sha": self.base_tip_sha,
+            "observation_id": self.observation_id,
+            "observation_source": self.observation_source,
+            "ordered_stack": [
+                {
+                    "base_head_sha": entry.base_head_sha,
+                    "base_ref": entry.base_ref,
+                    "head_sha": entry.head_sha,
+                    "pr_number": entry.pr_number,
+                }
+                for entry in self.ordered_stack
+            ],
+            "stack_number": self.stack_number,
+            "stack_position": self.stack_position,
+            "stack_size": self.stack_size,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest()
+
 
 def provider_stack_observation_matches_reserved(
     observation: ProviderStackObservationV1 | None,
@@ -159,12 +182,32 @@ def provider_stack_observation_matches_reserved(
 
 
 @dataclass(frozen=True)
+class ProviderTopologyCasEvidenceV1:
+    operation_identity_digest: str
+    observation_digest: str
+    pre_submit_sequence: int
+
+    def validates(
+        self,
+        identity: PromotionOperationIdentityV1,
+        observation: ProviderStackObservationV1,
+        pre_submit_sequence: int,
+    ) -> bool:
+        return (
+            self.operation_identity_digest == identity.digest()
+            and self.observation_digest == observation.digest()
+            and self.pre_submit_sequence == pre_submit_sequence
+            and self.pre_submit_sequence > 0
+        )
+
+
+@dataclass(frozen=True)
 class ProviderTopologyBindingV1:
     initial_observation: ProviderStackObservationV1 | None
     pre_submit_observation: ProviderStackObservationV1 | None
     initial_sequence: int
     pre_submit_sequence: int | None
-    provider_topology_cas: bool = False
+    provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
         if self.initial_sequence <= 0:
@@ -179,9 +222,13 @@ class ProviderTopologyBindingV1:
             return "invalid-observation-order"
         if not self.pre_submit_observation.matches_reserved(identity):
             return "stale-before-submit"
-        if self.provider_topology_cas:
-            return "provider-topology-cas"
-        return "observed-not-cas"
+        if self.provider_topology_cas_evidence is None:
+            return "observed-not-cas"
+        if not self.provider_topology_cas_evidence.validates(
+            identity, self.pre_submit_observation, self.pre_submit_sequence
+        ):
+            return "observed-not-cas"
+        return "provider-topology-cas"
 
 
 @dataclass
@@ -574,18 +621,31 @@ def topology_binding_fixture(
     identity: PromotionOperationIdentityV1 | None = None,
     pre_submit_observation: ProviderStackObservationV1 | None = None,
     pre_submit_sequence: int | None = 2,
-    provider_topology_cas: bool = False,
+    provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None,
 ) -> ProviderTopologyBindingV1:
     identity = identity or stack_identity_fixture()
     initial = provider_stack_observation_fixture(identity)
+    pre_submit = pre_submit_observation if pre_submit_observation is not None else initial
     return ProviderTopologyBindingV1(
         initial_observation=initial,
-        pre_submit_observation=(
-            pre_submit_observation if pre_submit_observation is not None else initial
-        ),
+        pre_submit_observation=pre_submit,
         initial_sequence=1,
         pre_submit_sequence=pre_submit_sequence,
-        provider_topology_cas=provider_topology_cas,
+        provider_topology_cas_evidence=provider_topology_cas_evidence,
+    )
+
+
+def provider_topology_cas_evidence_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+    observation: ProviderStackObservationV1 | None = None,
+    pre_submit_sequence: int = 2,
+) -> ProviderTopologyCasEvidenceV1:
+    identity = identity or stack_identity_fixture()
+    observation = observation or provider_stack_observation_fixture(identity)
+    return ProviderTopologyCasEvidenceV1(
+        operation_identity_digest=identity.digest(),
+        observation_digest=observation.digest(),
+        pre_submit_sequence=pre_submit_sequence,
     )
 
 
@@ -641,10 +701,22 @@ def test_provider_topology_binding_requires_positive_initial_sequence():
     assert binding.classify(identity) == "invalid-observation-sequence"
 
 
-def test_provider_topology_binding_synthetic_cas_is_explicit():
+def test_provider_topology_binding_requires_cas_evidence_for_strong_class():
     identity = stack_identity_fixture()
-    binding = topology_binding_fixture(identity, provider_topology_cas=True)
-    assert binding.classify(identity) == "provider-topology-cas"
+    binding = topology_binding_fixture(identity)
+    assert binding.classify(identity) == "observed-not-cas"
+
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    bound = topology_binding_fixture(identity, provider_topology_cas_evidence=evidence)
+    assert bound.classify(identity) == "provider-topology-cas"
+
+
+def test_provider_topology_binding_rejects_unbound_cas_evidence():
+    identity = stack_identity_fixture()
+    other = PromotionOperationIdentityV1(**{**identity.__dict__, "base_tip_sha": "T2"})
+    evidence = provider_topology_cas_evidence_fixture(other)
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=evidence)
+    assert binding.classify(identity) == "observed-not-cas"
 
 
 def test_matching_revalidation_does_not_claim_post_submit_freshness():
@@ -1241,7 +1313,8 @@ TESTS = [
     test_provider_topology_binding_detects_stale_pre_submit_topology,
     test_provider_topology_binding_detects_invalid_observation_order,
     test_provider_topology_binding_requires_positive_initial_sequence,
-    test_provider_topology_binding_synthetic_cas_is_explicit,
+    test_provider_topology_binding_requires_cas_evidence_for_strong_class,
+    test_provider_topology_binding_rejects_unbound_cas_evidence,
     test_matching_revalidation_does_not_claim_post_submit_freshness,
     test_provider_stack_observation_exact_selected_prefix_matches,
     test_provider_stack_observation_missing_value_fails_closed,
