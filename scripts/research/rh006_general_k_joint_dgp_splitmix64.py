@@ -204,7 +204,7 @@ def run(args):
             for strength in STRENGTHS:
                 Q,b,c,g,V,L,Sigma,ops,alpha,lmax,min_v,K=risk_surface(F,q,G,strength)
                 case,ew,margin=theorem(Q,b,c); sig,rev=spectrum_sig(Q,b,c)
-                expected=("+++" if case=="all-directions-one-positive-root" else "--+" if case=="cone-support" else "+00" if case=="c-zero-boundary" else "---" if case=="no-discriminant-direction" else None)
+                expected=("+++" if case=="all-directions-one-positive-root" else "--+" if case=="cone-support" else "00+" if case=="c-zero-boundary" else "---" if case=="no-discriminant-direction" else None)
                 topo_rows.append({"path":pi,"family":kind,"strength":strength,"case":case,"actual_signature":sig,"expected_signature":expected,"match":expected is None or expected==sig,"min_Q_eigen":float(ew[0]),"c":c,"qinv_minus_4c":margin,"K_scale":alpha,"K_explained_operator_norm":math.sqrt(lmax),"min_conditional_cov_eigen":min_v})
                 dir_support.append({"path":pi,"family":kind,"strength":strength,**{d:bool(roots(Q,b,c,u)) for d,u in DIRECTIONS.items()}})
                 coeff=(Q,b,c)
