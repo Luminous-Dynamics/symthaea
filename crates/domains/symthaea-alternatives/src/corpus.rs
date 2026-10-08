@@ -69,6 +69,7 @@ fn evidence(
             procedure_digest: "benchmark-measurement-procedure-v1-digest".into(),
             record_digest: format!("benchmark-record-digest:{id}"),
             measurement_system_id: Some("benchmark-measurement-system-v1".into()),
+            calibration_topology: None,
             calibration_chain_refs: vec![CalibrationTraceabilityRef {
                 calibration_id: "benchmark-calibration-chain-v1".into(),
                 calibration_revision: "v1".into(),
