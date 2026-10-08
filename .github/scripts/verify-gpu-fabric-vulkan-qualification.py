@@ -20,6 +20,8 @@ DRIVER_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-driver.v1"
 DRIVER_IDENTITY_VERSION_NUMBER = "1"
 QUEUE_FAMILY_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-queue-family.v1"
 QUEUE_FAMILY_IDENTITY_VERSION_NUMBER = "1"
+SYNCHRONIZATION_FEATURE_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-sync-features.v1"
+SYNCHRONIZATION_FEATURE_IDENTITY_VERSION_NUMBER = "1"
 
 FIXTURES = {
     "fixture": {
@@ -259,6 +261,34 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
     )
 
 
+def verify_synchronization_feature_provenance(
+    values: dict[str, str],
+) -> tuple[str, tuple[int, int, int, int]]:
+    if values.get("synchronization_feature_identity_version") != SYNCHRONIZATION_FEATURE_IDENTITY_VERSION_NUMBER:
+        fail("synchronization feature identity version mismatch")
+    try:
+        fields = (
+            int(values["timeline_semaphore_supported"]),
+            int(values["synchronization2_supported"]),
+            int(values["timeline_semaphore_enabled"]),
+            int(values["synchronization2_enabled"]),
+        )
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed synchronization feature profile: {exc}")
+    if any(value not in (0, 1) for value in fields):
+        fail("synchronization feature profile must use 0/1 values")
+    if fields != (1, 1, 1, 1):
+        fail("required synchronization features are not fully supported and enabled")
+    digest = hashlib.sha256()
+    digest.update(SYNCHRONIZATION_FEATURE_IDENTITY_VERSION.encode("utf-8"))
+    digest.update(b"\x00")
+    digest.update(bytes(fields))
+    expected = digest.hexdigest()
+    if values.get("synchronization_feature_identity_sha256") != expected:
+        fail("synchronization feature identity digest mismatch")
+    return expected, fields
+
+
 def verify_driver_provenance(values: dict[str, str]) -> tuple[str, bytes, int]:
     if values.get("driver_identity_version") != DRIVER_IDENTITY_VERSION_NUMBER:
         fail("driver identity version mismatch")
@@ -302,7 +332,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "6":
+        if values.get("receipt_version") != "7":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -333,6 +363,7 @@ def verify_runtime(path: Path) -> None:
             timestamp_valid_bits,
             granularity,
         ) = verify_provenance(values, path.parent)
+        sync_feature_digest, sync_feature_fields = verify_synchronization_feature_provenance(values)
         driver_digest, driver_uuid, driver_id = verify_driver_provenance(values)
         if values.get("implementation_identity_sha256") != implementation_digest:
             fail(f"{name}: implementation identity receipt binding mismatch")
@@ -351,6 +382,8 @@ def verify_runtime(path: Path) -> None:
             queue_count,
             timestamp_valid_bits,
             granularity,
+            sync_feature_digest,
+            sync_feature_fields,
         )
         if provenance is None:
             provenance = current_provenance
