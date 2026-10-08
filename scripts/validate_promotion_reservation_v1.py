@@ -319,6 +319,98 @@ class ProviderWebhookReceiptV1:
 
 
 @dataclass(frozen=True)
+class ProviderPullRequestMergeObservationV1:
+    delivery_id: str
+    repository: str
+    pr_number: int
+    event_type: str
+    action: str
+    merged: bool
+    head_sha: str
+    merge_commit_sha: str
+    payload_bytes_digest: str
+
+    @classmethod
+    def from_authenticated_delivery(
+        cls,
+        receipt: ProviderWebhookReceiptV1,
+        payload: bytes,
+        secret: bytes,
+    ) -> "ProviderPullRequestMergeObservationV1 | None":
+        if not receipt.verify(
+            payload,
+            secret,
+            expected_hook_id=receipt.hook_id,
+            expected_event_type="pull_request",
+            expected_repository=receipt.repository,
+        ):
+            return None
+
+        try:
+            document = json.loads(payload.decode("utf-8"))
+            pull_request = document["pull_request"]
+            repository = document["repository"]
+            head = pull_request["head"]
+            merge_commit_sha = pull_request["merge_commit_sha"]
+            pr_number = int(document["number"])
+            nested_pr_number = int(pull_request["number"])
+            event_type = receipt.event_type
+            action = document["action"]
+            merged = bool(pull_request["merged"])
+            head_sha = str(head["sha"])
+            repository_name = str(repository["full_name"])
+        except (KeyError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
+
+        if (
+            event_type != "pull_request"
+            or action != "closed"
+            or not merged
+            or not repository_name
+            or repository_name != receipt.repository
+            or pr_number != nested_pr_number
+            or not head_sha
+            or not merge_commit_sha
+        ):
+            return None
+
+        return cls(
+            delivery_id=receipt.delivery_id,
+            repository=repository_name,
+            pr_number=pr_number,
+            event_type=event_type,
+            action=action,
+            merged=merged,
+            head_sha=head_sha,
+            merge_commit_sha=str(merge_commit_sha),
+            payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
+        )
+
+    def validates_requested_effect(self, identity: PromotionOperationIdentityV1) -> bool:
+        return (
+            self.event_type == "pull_request"
+            and self.action == "closed"
+            and self.merged
+            and self.repository == identity.repository
+            and self.pr_number == identity.requested_pr_number
+            and self.head_sha == identity.requested_pr_head_sha
+            and bool(self.merge_commit_sha)
+        )
+
+    def to_stack_effect(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> PromotionStackEffectV1 | None:
+        if not self.validates_requested_effect(identity):
+            return None
+        return PromotionStackEffectV1(
+            pr_number=self.pr_number,
+            expected_head_sha=self.head_sha,
+            observed_merge_commit=self.merge_commit_sha,
+        )
+
+
+@dataclass(frozen=True)
 class ProviderDeliveryRegistryV1:
     deliveries: tuple[tuple[str, str], ...] = ()
 
@@ -614,6 +706,224 @@ def test_webhook_hmac_verification_rejects_wrong_secret():
         b"secret",
     )
     assert not receipt.verify(payload, b"wrong")
+
+
+def webhook_merge_payload(
+    *,
+    repository: str = "Luminous-Dynamics/symthaea",
+    pr_number: int = 7087,
+    head_sha: str = "H3",
+    merged: bool = True,
+    action: str = "closed",
+) -> bytes:
+    return json.dumps(
+        {
+            "action": action,
+            "number": pr_number,
+            "pull_request": {
+                "number": pr_number,
+                "merged": merged,
+                "head": {"sha": head_sha},
+                "merge_commit_sha": "M2" if merged else None,
+            },
+            "repository": {"full_name": repository},
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def webhook_merge_receipt(payload: bytes) -> ProviderWebhookReceiptV1:
+    return ProviderWebhookReceiptV1.from_delivery(
+        "delivery-merge",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+
+
+def test_webhook_merge_effect_parses_authenticated_merged_pr():
+    identity = stack_identity_fixture()
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    )
+    assert observation is not None
+    assert observation.validates_requested_effect(identity)
+    effect = observation.to_stack_effect(identity)
+    assert effect is not None
+    assert effect.observed_merge_commit == "M2"
+
+
+def test_webhook_merge_effect_rejects_invalid_hmac():
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    assert (
+        ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+            receipt,
+            payload,
+            b"wrong",
+        )
+        is None
+    )
+
+
+def test_webhook_merge_effect_rejects_non_pull_request_event():
+    payload = webhook_merge_payload()
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-merge-event",
+        "hook-1",
+        "issues",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    ) is None
+
+
+def test_webhook_merge_effect_rejects_non_closed_action():
+    payload = webhook_merge_payload(action="opened")
+    receipt = webhook_merge_receipt(payload)
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    ) is None
+
+
+def test_webhook_merge_effect_rejects_closed_not_merged():
+    payload = webhook_merge_payload(merged=False)
+    receipt = webhook_merge_receipt(payload)
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    ) is None
+
+
+def test_webhook_merge_effect_rejects_wrong_repository():
+    payload = webhook_merge_payload(repository="other/repo")
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-wrong-repo",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    ) is None
+
+
+def test_webhook_merge_effect_rejects_wrong_pr_number():
+    identity = stack_identity_fixture()
+    payload = webhook_merge_payload(pr_number=7090)
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    )
+    assert observation is not None
+    assert not observation.validates_requested_effect(identity)
+
+
+def test_webhook_merge_effect_rejects_wrong_head():
+    identity = stack_identity_fixture()
+    payload = webhook_merge_payload(head_sha="H0")
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    )
+    assert observation is not None
+    assert not observation.validates_requested_effect(identity)
+
+
+def test_webhook_merge_effect_rejects_missing_merge_commit():
+    payload = json.dumps(
+        {
+            "action": "closed",
+            "number": 7087,
+            "pull_request": {
+                "number": 7087,
+                "merged": True,
+                "head": {"sha": "H3"},
+                "merge_commit_sha": "",
+            },
+            "repository": {"full_name": "Luminous-Dynamics/symthaea"},
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    receipt = webhook_merge_receipt(payload)
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    ) is None
+
+
+def test_webhook_merge_effect_rejects_tampered_payload_after_receipt():
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    tampered = payload.replace(b'"H3"', b'"H0"')
+    assert ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        tampered,
+        b"secret",
+    ) is None
+
+
+def test_webhook_merge_effect_requires_exact_payload_digest():
+    identity = stack_identity_fixture()
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    )
+    assert observation is not None
+    assert observation.payload_bytes_digest == receipt.payload_bytes_digest
+    assert observation.validates_requested_effect(identity)
+
+
+def test_webhook_merge_effect_does_not_establish_async_operation_causality():
+    identity = stack_identity_fixture()
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    )
+    assert observation is not None
+    effect_set = PromotionStackEffectSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(
+            PromotionStackEffectV1(7085, "H1", "M1"),
+            PromotionStackEffectV1(7087, "H3", "M2"),
+        ),
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=None,
+        effect_set=effect_set,
+        provider_evidence=None,
+    )
+    assert resolution.outcome == "effect-observed-only"
 
 
 def test_webhook_delivery_registry_accepts_new_delivery():
@@ -2093,6 +2403,18 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_webhook_merge_effect_parses_authenticated_merged_pr,
+    test_webhook_merge_effect_rejects_invalid_hmac,
+    test_webhook_merge_effect_rejects_non_pull_request_event,
+    test_webhook_merge_effect_rejects_non_closed_action,
+    test_webhook_merge_effect_rejects_closed_not_merged,
+    test_webhook_merge_effect_rejects_wrong_repository,
+    test_webhook_merge_effect_rejects_wrong_pr_number,
+    test_webhook_merge_effect_rejects_wrong_head,
+    test_webhook_merge_effect_rejects_missing_merge_commit,
+    test_webhook_merge_effect_rejects_tampered_payload_after_receipt,
+    test_webhook_merge_effect_requires_exact_payload_digest,
+    test_webhook_merge_effect_does_not_establish_async_operation_causality,
     test_capture_integrity_hashes_exact_raw_bytes,
     test_capture_integrity_rejects_empty_storage_identity,
     test_capture_integrity_rejects_nonpositive_sequence,
