@@ -8591,6 +8591,7 @@ mod tests {
                     definition_revision: "3.5.2".into(),
                     definition_digest: digest.into(),
                 }),
+                unit_definition: None,
             },
             role: MeasurementModelInputRole::Influence,
             node_id: "temperature-calibration".into(),
