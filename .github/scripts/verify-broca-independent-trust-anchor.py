@@ -692,6 +692,7 @@ def main() -> int:
     trust_workflow_blob = verify_trust_anchor_workflow()
     policy_blob = trusted_file_blob(POLICY_PATH.as_posix())
     target_url = ""
+    result_code = 0
 
     receipt: dict[str, Any] = {
         "schema_version": "broca-independent-trust-anchor-receipt-v1",
@@ -1257,7 +1258,15 @@ def main() -> int:
     except StaleError as error:
         receipt["qualification_result"] = "STALE"
         receipt["verification"]["error"] = str(error)
+        if TRIGGER_RUN_HEAD_SHA:
+            post_status(
+                TRIGGER_RUN_HEAD_SHA,
+                "failure",
+                "Independent Broca trust anchor became stale; requalification required",
+                target_url,
+            )
         print(f"STALE: {error}", file=sys.stderr)
+        result_code = 1
     except WaitingError as error:
         receipt["qualification_result"] = "WAITING"
         receipt["verification"]["error"] = str(error)
@@ -1268,6 +1277,7 @@ def main() -> int:
             target_url,
         )
         print(f"WAITING: {error}", file=sys.stderr)
+        result_code = 0
     except Exception as error:
         receipt["qualification_result"] = "NOT_PASS"
         receipt["verification"]["error"] = str(error)
@@ -1278,6 +1288,7 @@ def main() -> int:
             target_url,
         )
         print(f"NOT_PASS: {error}", file=sys.stderr)
+        result_code = 1
     finally:
         RECEIPT_PATH.write_text(
             json.dumps(
@@ -1292,7 +1303,7 @@ def main() -> int:
             encoding="utf-8",
         )
 
-    return 0
+    return result_code
 
 
 if __name__ == "__main__":
