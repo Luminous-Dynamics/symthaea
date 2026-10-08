@@ -1420,33 +1420,48 @@ fn secure_boot_postinstall() -> &'static str {
 # ── Secure Boot Setup (lanzaboote + sbctl) ──
 echo "STAGE: Setting up Secure Boot..."
 
-# Check if firmware is in Setup Mode
-SETUP_MODE=$(bootctl status 2>/dev/null | grep "Setup Mode:" | grep -c "setup" || echo "0")
-if [ "$SETUP_MODE" = "0" ]; then
-  echo "WARNING: Firmware is NOT in Setup Mode."
-  echo "WARNING: Secure Boot keys will be created but NOT enrolled."
-  echo "WARNING: Enter BIOS, clear Secure Boot keys, then re-run key enrollment."
-fi
-
-# Create Secure Boot keys on the installed system without spawning a nested shell.
-if chroot /mnt sbctl --version >/dev/null 2>&1; then
-  chroot /mnt sbctl create-keys 2>/dev/null || echo "Keys may already exist"
-  if [ "$SETUP_MODE" = "1" ]; then
-    if chroot /mnt sbctl enroll-keys --microsoft 2>/dev/null; then
-      echo "Secure Boot keys enrolled (with Microsoft CA)"
-    else
-      echo "Key enrollment failed — enroll manually after first boot"
-    fi
-  else
-    echo "Skipping key enrollment — firmware not in Setup Mode"
-    echo "After first boot: sudo sbctl enroll-keys --microsoft"
-  fi
+# If Secure Boot is already active, the requested capability is already realized.
+SBCTL_STATUS=$(chroot /mnt sbctl status 2>/dev/null || true)
+if echo "$SBCTL_STATUS" | grep -qiE 'Secure Boot:[[:space:]]*(✓[[:space:]]*)?Enabled'; then
+  echo "SECURITY: secure-boot-observed-active"
 else
-  echo "sbctl not found — install it and run: sbctl create-keys && sbctl enroll-keys --microsoft"
+  SETUP_MODE=$(bootctl status 2>/dev/null | grep "Setup Mode:" | grep -ci "setup" || echo "0")
+  if [ "$SETUP_MODE" = "0" ]; then
+    echo "ERROR: Secure Boot was requested but firmware is neither already active nor in Setup Mode."
+    echo "ERROR: Refusing to report installation success without Secure Boot enrollment."
+    exit 1
+  fi
+
+  if ! chroot /mnt sbctl --version >/dev/null 2>&1; then
+    echo "ERROR: Secure Boot was requested but sbctl is unavailable in the installed root."
+    exit 1
+  fi
+
+  if ! chroot /mnt sbctl create-keys 2>/dev/null; then
+    SBCTL_STATUS=$(chroot /mnt sbctl status 2>/dev/null || true)
+    if ! echo "$SBCTL_STATUS" | grep -q "Owner GUID:"; then
+      echo "ERROR: Secure Boot key creation failed and no existing sbctl owner identity was observed."
+      exit 1
+    fi
+  fi
+
+  if ! chroot /mnt sbctl enroll-keys --microsoft 2>/dev/null; then
+    echo "ERROR: Secure Boot key enrollment failed."
+    exit 1
+  fi
+
+  ENROLLED_KEYS=$(chroot /mnt sbctl list-enrolled-keys 2>/dev/null || true)
+  if [ -z "$ENROLLED_KEYS" ]; then
+    echo "ERROR: Secure Boot enrollment returned success but no enrolled-key evidence was observed."
+    exit 1
+  fi
+
+  echo "SECURITY: secure-boot-enrollment-observed"
+  echo "  Secure Boot keys are enrolled. Firmware activation will be verified after reboot."
 fi
-echo "  Secure Boot keys created at /etc/secureboot/"
 "#
 }
+
 
 /// Generate TPM2 auto-unlock enrollment (appended after LUKS install + Secure Boot).
 fn tpm2_postinstall() -> &'static str {
@@ -12182,6 +12197,16 @@ mod tests {
         assert!(!fido.contains('blkid -t TYPE=crypto_LUKS'));
         assert!(tpm.contains("ERROR: TPM 2.0 requested"));
         assert!(fido.contains("ERROR: FIDO2 requested"));
+    }
+
+    #[test]
+    fn secure_boot_hook_fails_closed_without_enrollment_evidence() {
+        let script = secure_boot_postinstall();
+        assert!(script.contains("Refusing to report installation success"));
+        assert!(script.contains("sbctl list-enrolled-keys"));
+        assert!(script.contains("secure-boot-enrollment-observed"));
+        assert!(!script.contains("Key enrollment failed — enroll manually"));
+        assert!(!script.contains("Secure Boot keys will be created but NOT enrolled."));
     }
 
     #[test]
