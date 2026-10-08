@@ -1081,7 +1081,7 @@ class ClockRelationSourceSetV1:
     def canonical_bytes(self) -> bytes:
         payload = {
             "operation_identity_digest": self.operation_identity_digest,
-            "relations": [relation.digest() for relation in self.relations],
+            "relations": sorted(relation.digest() for relation in self.relations),
             "required_independent_sources": self.required_independent_sources,
         }
         return json.dumps(
@@ -2204,6 +2204,85 @@ def test_clock_source_set_requires_at_least_three_sources():
 def test_clock_source_set_rejects_weak_policy():
     source_set = clock_relation_source_set_fixture(required_independent_sources=2)
     assert source_set.classify() == "clock-source-policy-too-weak"
+
+
+def test_clock_source_set_rejects_duplicate_source_or_anchor():
+    source_set = clock_relation_source_set_fixture()
+    first = source_set.relations[0]
+    second = source_set.relations[1]
+    assert first.evidence is not None and second.evidence is not None
+    for challenge_change in (
+        {"source_id": first.evidence.source_challenge.source_id},
+        {"trust_anchor_id": first.evidence.source_challenge.trust_anchor_id},
+    ):
+        challenge = replace(second.evidence.source_challenge, **challenge_change)
+        response = replace(
+            second.evidence.source_response,
+            challenge_digest=challenge.digest(),
+            trust_anchor_id=challenge.trust_anchor_id,
+        )
+        attestation = replace(
+            second.evidence.source_attestation,
+            challenge_digest=challenge.digest(),
+            response_digest=response.digest(),
+            trust_anchor_id=challenge.trust_anchor_id,
+        )
+        evidence = replace(
+            second.evidence,
+            source_challenge=challenge,
+            source_response=response,
+            source_attestation=attestation,
+        )
+        verification = replace(
+            second.verification,
+            evidence_digest=evidence.digest(),
+        )
+        altered = replace(
+            second,
+            evidence=evidence,
+            verification=verification,
+        )
+        altered_set = replace(
+            source_set,
+            relations=(first, altered, source_set.relations[2]),
+        )
+        assert altered_set.classify() == "clock-source-independence-invalid"
+
+
+def test_clock_source_set_rejects_mixed_provider_clock_domain():
+    source_set = clock_relation_source_set_fixture()
+    altered = source_set.relations[1]
+    assert altered.evidence is not None
+    evidence = replace(
+        altered.evidence,
+        source_response=replace(
+            altered.evidence.source_response,
+            provider_clock_domain="other-clock-domain",
+        ),
+    )
+    verification = replace(
+        altered.verification,
+        evidence_digest=evidence.digest(),
+    )
+    altered_relation = replace(
+        altered,
+        evidence=evidence,
+        verification=verification,
+    )
+    altered_set = replace(
+        source_set,
+        relations=(source_set.relations[0], altered_relation, source_set.relations[2]),
+    )
+    assert altered_set.classify() == "clock-source-domain-mismatch"
+
+
+def test_clock_source_set_digest_is_order_invariant():
+    source_set = clock_relation_source_set_fixture()
+    reversed_set = replace(
+        source_set,
+        relations=tuple(reversed(source_set.relations)),
+    )
+    assert reversed_set.digest() == source_set.digest()
 
 
 def test_clock_source_set_rejects_duplicate_operator():
@@ -5029,6 +5108,9 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 TESTS = [
     test_clock_source_set_accepts_three_independent_sources,
+    test_clock_source_set_rejects_duplicate_source_or_anchor,
+    test_clock_source_set_rejects_mixed_provider_clock_domain,
+    test_clock_source_set_digest_is_order_invariant,
     test_clock_source_set_requires_at_least_three_sources,
     test_clock_source_set_rejects_weak_policy,
     test_clock_source_set_rejects_duplicate_operator,
