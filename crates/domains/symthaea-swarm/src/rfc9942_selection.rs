@@ -271,6 +271,11 @@ impl ReceiptSelectionDecision {
         out
     }
 
+    /// Content-address the decision record itself.
+    ///
+    /// This digest is an identity for the decision structure, not evidence that
+    /// its candidate outcomes or source collection were cryptographically
+    /// verified.
     pub fn digest(&self) -> [u8; 32] {
         let canonical = self.canonical_bytes();
         let mut hasher = Hasher::new();
@@ -283,8 +288,10 @@ impl ReceiptSelectionDecision {
 
     /// Digest an internally consistent selection decision.
     ///
-    /// This is the boundary for durable publication: malformed
-    /// candidate/selection relationships are rejected first.
+    /// This validates only the decision's internal referential invariants.
+    /// It does not bind the decision to the exact source collection or to a
+    /// cryptographically verified Receipt capability; durable projection must
+    /// cross the stronger `Rfc9942VerifiedReceiptSelection` witness boundary.
     pub fn validated_digest(&self) -> Result<[u8; 32], ReceiptSelectionDecisionError> {
         self.validate()?;
         Ok(self.digest())
