@@ -14,6 +14,8 @@ IMPLEMENTATION_IDENTITY_VERSION = "1"
 PHYSICAL_DEVICE_IDENTITY_VERSION = "1"
 WGSL_ABI_MARKER = "symthaea.hdc.bind_xor.storage-u32.v1"
 KERNEL_ID = "symthaea.hdc.bind_xor.v1"
+VULKAN_ENTRY_POINT = "main"
+VULKAN_SHADER_STAGE = "compute"
 
 FIXTURES = {
     "fixture": {
@@ -133,6 +135,10 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
         fail("implementation ABI marker mismatch")
     if values.get("implementation_kernel_id") != KERNEL_ID:
         fail("implementation kernel id mismatch")
+    if values.get("implementation_entry_point") != VULKAN_ENTRY_POINT:
+        fail("implementation entry point mismatch")
+    if values.get("implementation_shader_stage") != VULKAN_SHADER_STAGE:
+        fail("implementation shader stage mismatch")
 
     try:
         wgsl = bytes.fromhex(values["implementation_wgsl_hex"])
@@ -163,6 +169,8 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
         [
             WGSL_ABI_MARKER.encode("utf-8"),
             KERNEL_ID.encode("utf-8"),
+            VULKAN_ENTRY_POINT.encode("utf-8"),
+            VULKAN_SHADER_STAGE.encode("utf-8"),
             wgsl,
             spirv,
         ],
