@@ -249,3 +249,11 @@ The complete stack timing set pins one `temporal_attempt_identity_digest`. Every
 This is an identity/composition guard, not proof that the named reservation or dispatch actually occurred. The model remains provider-free and callers could fabricate an internally consistent object; production authority would need to source this identity from the durable reservation/dispatch journal and verify that journal's own integrity and writer fencing.
 
 The workflow also parses Python AST calls to enforce exact constructor arity for `PromotionStackEffectTimingV1` and `PromotionStackEffectTimingSetV1`. This guards against a real regression found during this tranche: the test registry could be complete while a test still called a four-field dataclass with three positional arguments.
+
+## Reservation model integration
+
+The reference `Ledger` no longer discards `attempt_sequence` in `prepare_dispatch()`. It rejects non-positive values, records the selected dispatch attempt sequence on the reservation before entering `PromotionDispatchPrepared`, and refuses a second sequence for the same single-use reservation.
+
+`PromotionTemporalAttemptIdentityV1.from_prepared_reservation()` derives its reservation ID, operation ID, reservation head, fencing token, operation digest, authority generations, and dispatch-attempt ID/sequence from the matching prepared `Reservation`. It returns no identity before dispatch preparation, when the attempt sequence is absent, or when the reservation's operation digest, requested head, or trust-root generation does not match.
+
+The wall-clock and monotonic reservation/dispatch readings are still explicit inputs to this reference constructor. Matching the reservation object binds those readings to its identity, but does not prove the readings were durably captured. The current `Ledger` is an in-memory reference model; production use still requires equivalent persisted state, a durable journal, and storage-enforced writer fencing.
