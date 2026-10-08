@@ -23,6 +23,7 @@ class Source(Enum):
 class EffectObservation:
     source: Source
     attribution: Attribution
+    local_promotion_operation_id: str | None
     provider_operation_uuid: str | None
     expected_pr_head_sha: str
     observed_merge_commit: str
@@ -33,6 +34,7 @@ class EffectObservation:
 
         if self.source is Source.DIRECT_PROVIDER_RESULT:
             assert self.attribution is Attribution.ESTABLISHED
+            assert self.local_promotion_operation_id
             assert self.provider_operation_uuid
         else:
             assert self.attribution is Attribution.UNESTABLISHED
@@ -43,6 +45,7 @@ def direct_provider_merge() -> EffectObservation:
     result = EffectObservation(
         Source.DIRECT_PROVIDER_RESULT,
         Attribution.ESTABLISHED,
+        "OP-1",
         "uuid-1",
         "H1",
         "M1",
@@ -55,6 +58,7 @@ def enqueued_then_durable_merge() -> EffectObservation:
     result = EffectObservation(
         Source.DURABLE_SUBJECT_OBSERVATION,
         Attribution.UNESTABLISHED,
+        None,
         None,
         "H1",
         "M1",
@@ -75,6 +79,7 @@ def another_actor_merge() -> EffectObservation:
     result = EffectObservation(
         Source.DURABLE_SUBJECT_OBSERVATION,
         Attribution.UNESTABLISHED,
+        None,
         None,
         "H1",
         "M2",
@@ -110,11 +115,28 @@ def test_other_actor_merge_is_not_causal() -> None:
     assert result.attribution is Attribution.UNESTABLISHED
 
 
+def test_direct_result_without_local_binding_is_invalid() -> None:
+    result = EffectObservation(
+        Source.DIRECT_PROVIDER_RESULT,
+        Attribution.ESTABLISHED,
+        None,
+        "uuid-1",
+        "H1",
+        "M1",
+    )
+    try:
+        result.validate()
+    except AssertionError:
+        return
+    raise AssertionError("direct provider result without local operation binding was accepted")
+
+
 def test_direct_result_without_uuid_is_invalid() -> None:
     result = EffectObservation(
         Source.DIRECT_PROVIDER_RESULT,
         Attribution.ESTABLISHED,
         None,
+        "uuid-1",
         "H1",
         "M1",
     )
@@ -131,6 +153,7 @@ TESTS = [
     test_expired_uuid_does_not_backfill_causality,
     test_already_merged_retry_is_not_causal,
     test_other_actor_merge_is_not_causal,
+    test_direct_result_without_local_binding_is_invalid,
     test_direct_result_without_uuid_is_invalid,
 ]
 
