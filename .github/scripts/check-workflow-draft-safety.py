@@ -456,9 +456,29 @@ jobs:
     assert pr is not None
     assert validate_generic(Path("spaced-on-safe.yml"), spaced_on, pr) == (1, 1)
 
+    branch_named_ready = """on:
+  pull_request:
+    branches: [ready_for_review]
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    try:
+        validate_generic(
+            Path("branch-named-ready.yml"),
+            branch_named_ready,
+            pull_request_block(branch_named_ready) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("branch name was incorrectly treated as ready_for_review activity")
 
-def main() -> int:
-    self_test()
+
+def main() -> int:    self_test()
 
     if not WORKFLOW_DIR.is_dir():
         fail(f"workflow directory not found: {WORKFLOW_DIR}")
