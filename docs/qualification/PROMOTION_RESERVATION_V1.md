@@ -109,6 +109,41 @@ The dedicated qualification workflow remains deliberately provider-dispatch-free
 reference transaction nor the oracle may be described as hosted-executed until an actual trusted
 run records their execution.
 
+## Effect observation versus causal attribution
+
+A terminal effect observation is not automatically a causal attribution to the local promotion operation.
+
+The reference provider model distinguishes:
+
+    provider-operation result reports merged
+      -> effect observed
+      -> causal attribution established
+
+from:
+
+    enqueued final queue result
+      -> later durable PR state reports merged
+      -> effect observed
+      -> causal attribution unestablished
+
+and:
+
+    async result expired
+      -> durable PR state reports merged
+      -> effect observed
+      -> causal attribution unestablished
+
+A local receipt carrying `promotion_operation_id`, expected PR-head SHA, and merge commit cannot
+mint the stronger causal proposition by itself. This is why #7101 is a separate semantic boundary.
+
+The distinction is especially important for stacked merges: GitHub documents that a stack merge can
+merge or queue every open PR in the stack up to the requested PR, so a later observed group effect must
+not be compressed into one single-PR operation identity. citeturn965026search2turn965026search6
+
+The provider API currently documents `enqueued` as final for the merge-queue request, with eventual
+merge state exposed separately through pull-request state; asynchronous result records expire after
+24 hours. citeturn965026search0
+
 ## Claim ceiling
 
 A passing lab establishes only internal consistency of the synthetic local reservation/reconciliation model under the enumerated failure cases.
