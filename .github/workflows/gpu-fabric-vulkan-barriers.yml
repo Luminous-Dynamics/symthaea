@@ -119,7 +119,12 @@ jobs:
             gdb -q -batch \
               -ex 'set pagination off' \
               -ex 'set confirm off' \
+              -ex 'handle SIGSEGV stop print nopass' \
               -ex run \
+              -ex 'info registers' \
+              -ex 'x/16i $pc' \
+              -ex 'info sharedlibrary' \
+              -ex 'info proc mappings' \
               -ex 'thread apply all bt full' \
               --args "$TEST_BINARY" --ignored --nocapture
           } > qualification-gdb.txt 2>&1
