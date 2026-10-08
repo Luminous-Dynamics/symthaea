@@ -2199,6 +2199,7 @@ def test_stack_timing_rejects_mixed_clock_relation_identities():
         identity.digest(),
         first_timing.provider_timestamp_policy_digest,
         first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
         (
             PromotionStackEffectTimingV1(
                 7085,
@@ -2281,6 +2282,7 @@ def test_stack_timing_rejects_tampered_timing_identity_digest():
         identity.digest(),
         first_timing.provider_timestamp_policy_digest,
         first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
         (
             PromotionStackEffectTimingV1(
                 7085,
@@ -2327,6 +2329,7 @@ def test_stack_timing_rejects_mixed_timestamp_policy_identities():
         identity.digest(),
         first_timing.provider_timestamp_policy_digest,
         first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
         (
             PromotionStackEffectTimingV1(
                 7085,
@@ -2697,7 +2700,102 @@ def test_complete_stack_timing_requires_every_member_admissible():
         identity.digest(),
         timestamp_policy_fixture().identity_digest(),
         clock_relation_fixture().identity_digest(),
+        good.timing.temporal_attempt_identity.identity_digest(),
         (good, bad),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
+def test_temporal_attempt_identity_binds_operation_and_authority_generations():
+    identity = stack_identity_fixture()
+    attempt = temporal_attempt_fixture(
+        identity,
+        reservation_id="RES-A",
+        dispatch_attempt_id="DISPATCH-A",
+        fencing_token=7,
+    )
+    assert attempt.validates_operation(identity)
+    changed_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "base_tip_sha": "BASE-DRIFT"}
+    )
+    assert not attempt.validates_operation(changed_identity)
+    changed_fence = temporal_attempt_fixture(
+        identity,
+        reservation_id="RES-A",
+        dispatch_attempt_id="DISPATCH-A",
+        fencing_token=8,
+    )
+    assert attempt.identity_digest() != changed_fence.identity_digest()
+
+
+def test_temporal_timing_rejects_missing_attempt_identity():
+    timing = effect_timing_fixture()
+    missing = ProviderWebhookEffectTimingV1(
+        **{**timing.__dict__, "temporal_attempt_identity": None}
+    )
+    assert missing.classify() == "promotion-temporal-attempt-identity-missing"
+
+
+def test_temporal_timing_rejects_local_times_not_bound_to_attempt():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        **{
+            **timing.__dict__,
+            "local_dispatch_time_ms": timing.local_dispatch_time_ms + 1,
+        }
+    )
+    assert tampered.classify() == "promotion-temporal-attempt-binding-invalid"
+
+
+def test_complete_stack_timing_rejects_mixed_temporal_attempts():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-attempt-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-attempt-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture(
+        operation_identity=identity,
+        reservation_id="RES-1",
+        dispatch_attempt_id="DISPATCH-1",
+        fencing_token=1,
+    )
+    second_timing = effect_timing_fixture(
+        operation_identity=identity,
+        reservation_id="RES-2",
+        dispatch_attempt_id="DISPATCH-2",
+        fencing_token=2,
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        first_timing.clock_relation.identity_digest(),
+        first_timing.temporal_attempt_identity.identity_digest(),
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                first_timing.identity_digest(),
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing.identity_digest(),
+                second_timing,
+            ),
+        ),
     )
     assert not timings.validates_complete(identity, evidence)
 
@@ -2724,6 +2822,7 @@ def test_stack_timing_rejects_crosswired_effect_evidence_identity():
         identity.digest(),
         timestamp_policy_fixture().identity_digest(),
         clock_relation_fixture().identity_digest(),
+        effect_timing_fixture().temporal_attempt_identity.identity_digest(),
         (
             PromotionStackEffectTimingV1(
                 7085,
@@ -5238,6 +5337,10 @@ TESTS = [
     test_temporal_timing_rejects_invalid_local_order,
     test_temporal_timing_rejects_local_observation_rollback,
     test_complete_stack_timing_requires_every_member_admissible,
+    test_temporal_attempt_identity_binds_operation_and_authority_generations,
+    test_temporal_timing_rejects_missing_attempt_identity,
+    test_temporal_timing_rejects_local_times_not_bound_to_attempt,
+    test_complete_stack_timing_rejects_mixed_temporal_attempts,
     test_stack_timing_rejects_crosswired_effect_evidence_identity,
     test_effect_state_binds_to_exact_operation_identity,
     test_effect_state_same_delivery_id_with_changed_payload_fails_closed,
