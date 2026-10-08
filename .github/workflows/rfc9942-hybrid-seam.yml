@@ -9,6 +9,7 @@ on:
       - 'Cargo.lock'
       - 'crates/domains/symthaea-swarm/**'
       - 'crates/domains/symthaea-fabrication-kernel/**'
+      - 'docs/RFC9942_PQC_HYBRID_ASSURANCE_DESIGN.md'
       - 'patches/**'
 permissions:
   contents: read
