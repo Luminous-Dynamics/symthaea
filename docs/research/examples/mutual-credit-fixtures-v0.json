@@ -379,16 +379,6 @@
         }
       ],
       "error": "DefaultedMember"
-    },
-    {
-      "id": "MC-X11",
-      "events": [
-        {
-          "id": "mc-x11-unknown-op",
-          "op": "unknown"
-        }
-      ],
-      "error": "UnknownOperation"
     }
   ]
 }
