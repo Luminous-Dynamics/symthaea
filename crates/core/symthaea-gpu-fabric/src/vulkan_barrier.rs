@@ -138,6 +138,10 @@ pub enum VulkanBarrierReceiptError {
     DriverIdentity,
     #[error("receipt driver identity does not match the execution runtime")]
     DriverIdentityBinding,
+    #[error("receipt driver UUID does not match the execution runtime")]
+    DriverUuidBinding,
+    #[error("receipt driver ID does not match the execution runtime")]
+    DriverIdBinding,
     #[error("receipt physical-device UUID does not match the execution runtime")]
     DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -305,8 +309,11 @@ impl VulkanBarrierExecutionReceipt {
         if self.driver_identity_digest != driver_identity_digest {
             return Err(VulkanBarrierReceiptError::DriverIdentityBinding);
         }
-        if self.driver_uuid != driver_uuid || self.driver_id != driver_id {
-            return Err(VulkanBarrierReceiptError::DriverIdentityBinding);
+        if self.driver_uuid != driver_uuid {
+            return Err(VulkanBarrierReceiptError::DriverUuidBinding);
+        }
+        if self.driver_id != driver_id {
+            return Err(VulkanBarrierReceiptError::DriverIdBinding);
         }
         Ok(())
     }
@@ -2443,7 +2450,7 @@ mod tests {
     }
 
     #[test]
-        fn receipt_rejects_tampered_queue_family_binding() {
+    fn receipt_rejects_tampered_queue_family_binding() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
         let digests = final_state
