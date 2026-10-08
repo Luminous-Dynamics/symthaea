@@ -9821,7 +9821,7 @@ echo '}'
                     }
                 }
 
-                let expected_current = match tokio::fs::read("/etc/nixos/configuration.nix").await {
+                let expected_current = match read_regular_file_bytes_at(\n                    std::path::Path::new("/etc/nixos"),\n                    "configuration.nix",\n                )\n                .await {
                     Ok(bytes) => bytes,
                     Err(error) => {
                         remove_transaction_artifact_dir(&transaction_dir);
@@ -12468,6 +12468,34 @@ mod tests {
         assert!(!wifi_profile_cleanup_succeeded(&Err(
             "spawn failure".into()
         )));
+    }
+
+    #[tokio::test]
+    async fn configuration_preimage_reader_rejects_symlinks() {
+        let transaction_id = random_operation_id().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "nixforhumanity-config-preimage-{transaction_id}"
+        ));
+        std::fs::create_dir(&dir).unwrap();
+
+        let configuration = dir.join("configuration.nix");
+        std::fs::write(&configuration, b"trusted-config").unwrap();
+        let observed = read_regular_file_bytes_at(&dir, "configuration.nix")
+            .await
+            .unwrap();
+        assert_eq!(observed, b"trusted-config");
+
+        let link = dir.join("configuration-link.nix");
+        std::os::unix::fs::symlink(&configuration, &link).unwrap();
+        let error = read_regular_file_bytes_at(&dir, "configuration-link.nix")
+            .await
+            .expect_err("preimage reader must reject symlink targets");
+        assert!(
+            error.contains("unable to open postcondition file"),
+            "unexpected symlink rejection error: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

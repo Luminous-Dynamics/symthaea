@@ -160,6 +160,14 @@ def main() -> None:
         len(lines),
     )
     write_body = "\n".join(lines[write_start:next_write])
+    if 'tokio::fs::read("/etc/nixos/configuration.nix")' in write_body:
+        fail(
+            "write_config regressed to a pathname-following preimage read; "
+            "use the descriptor-relative O_NOFOLLOW reader"
+        )
+    if "read_regular_file_bytes_at(" not in write_body:
+        fail("write_config lost descriptor-relative preimage binding")
+
     activation_marker = 'run_privileged_nixos_rebuild_args(&["switch"]).await'
     activation_index = write_body.find(activation_marker)
     if activation_index < 0:
