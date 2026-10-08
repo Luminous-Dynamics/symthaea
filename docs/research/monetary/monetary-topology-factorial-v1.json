@@ -1,0 +1,31 @@
+{
+  "schema_version":"monetary-topology-factorial-v1",
+  "experiment_id":"monetary-interop-topology-factorial-v1",
+  "factorial_size":1080,
+  "factors":{"topology":["full_mesh","routing_only_hub","redundant_two_hub"],"monetary_pair":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],"adapter":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],"shock":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"],"seed":[11,23,47,89,131]},
+  "topologies":{
+    "full_mesh":{"digest":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983","generation":"t1","route_overhead":0,"centrality":0.20,"partition_recovery":0,"financial_powers":[]},
+    "routing_only_hub":{"digest":"90d10f6025f7200a3c4ff2863e755e29b7d40bbc437729410ef4ff06ba80d0e3","generation":"t2","route_overhead":1,"centrality":1.0,"partition_recovery":0,"financial_powers":[]},
+    "redundant_two_hub":{"digest":"400c93eabda6ceb9d224fa4944f458ab410233c1c13404297c64ab53ad077a47","generation":"t3","route_overhead":1,"centrality":0.50,"partition_recovery":1,"financial_powers":[]}
+  },
+  "fixed_dimensions":{
+    "routing_policy_digest":"a5435036c4791a6dc0275771d73f78c2c54f02d64fbe2de88adbdb2b7c5901c3",
+    "profile_digests":{
+      "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+    },
+    "edge_digests":{
+      "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
+      "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
+      "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
+    },
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous jitter across topologies",
+    "no_financial_hub_inference":true,
+    "technical_settlement_semantics":"topology must not mutate adapter-declared technical settlement semantics except explicit routing-overhead effects are operational, not settlement finality",
+    "composition_identity_rule":"topology change requires new topology and composition generation identities"
+  },
+  "claim_ceiling":"Synthetic topology factorial only; identifies topology-conditioned behavior inside the declared model. It does not establish empirical causal effects, monetary superiority, systemic safety or live interoperability."
+}
