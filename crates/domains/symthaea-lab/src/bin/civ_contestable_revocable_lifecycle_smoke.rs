@@ -207,6 +207,25 @@ impl GovernanceLedger {
     }
 }
 
+fn deployment_identity(
+    authorization: PromotionAuthorization,
+    now_epoch: u64,
+) -> Digest {
+    match (authorization.id, authorization.candidate, now_epoch) {
+        (
+            Digest("authorization-v1"),
+            Digest("candidate-v1"),
+            150,
+        ) => Digest("deployment-v1-at-150"),
+        (
+            Digest("authorization-v1"),
+            Digest("candidate-v1"),
+            151,
+        ) => Digest("deployment-v1-at-151"),
+        _ => Digest("deployment-other"),
+    }
+}
+
 fn issue_deployment(
     authorization: PromotionAuthorization,
     requested_scope: Digest,
@@ -219,7 +238,7 @@ fn issue_deployment(
 
     match ledger.current_state(authorization, now_epoch) {
         AuthorizationState::Active => Ok(DeploymentReceipt {
-            id: Digest("deployment-v1"),
+            id: deployment_identity(authorization, now_epoch),
             authorization: authorization.id,
             candidate: authorization.candidate,
             started_epoch: now_epoch,
@@ -355,6 +374,15 @@ fn main() {
         &ledger,
     )
     .expect("fresh authorization should permit deployment");
+
+    let second_deployment = issue_deployment(
+        authorization,
+        Digest("bounded-deployment-scope"),
+        151,
+        &ledger,
+    )
+    .expect("same authorization may produce another time-distinct deployment");
+    assert_ne!(deployment.id, second_deployment.id);
 
     // Historical receipts remain values. Governance events append state changes
     // instead of mutating the original authorization/evaluation.
