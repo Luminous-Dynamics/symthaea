@@ -468,7 +468,7 @@ fn equivalent_receipt_outer_framings_are_semantically_equal() {
     // bytes remain separately observable and provenance-sensitive.
     assert_eq!(canonical, indefinite);
     assert_ne!(canonical.to_cbor(), indefinite.to_cbor());
-    assert_ne!(
+    assert_eq!(
         canonical.to_cbor(),
         constructed.to_cbor(),
         "parsed canonical wire should preserve its exact source too"
