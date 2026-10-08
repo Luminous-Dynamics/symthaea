@@ -1926,7 +1926,15 @@ def test_webhook_authentication_does_not_prove_merge_result_causality():
         identity,
         provider_result=result,
         effect_set=None,
-        provider_evidence=webhook_evidence,
+        provider_evidence=ProviderAsyncMergeEvidencePairV1(
+            request=None,
+            response=ProviderAsyncMergeResponseEvidenceV1(
+                capture=webhook_evidence,
+                status="merged",
+                provider_uuid="uuid-1",
+                observed_merge_commit="M2",
+            ),
+        ),
     )
     assert resolution.outcome == "causality-unestablished"
 
@@ -1959,16 +1967,112 @@ def test_fabricated_local_capture_cannot_establish_requested_causality():
         identity,
         provider_result=result,
         effect_set=None,
-        provider_evidence=local,
+        provider_evidence=ProviderAsyncMergeEvidencePairV1(
+            request=ProviderAsyncMergeRequestEvidenceV1(
+                capture=local,
+                repository=identity.repository,
+                requested_pr_number=identity.requested_pr_number,
+                expected_head_sha=identity.requested_pr_head_sha,
+                merge_method=identity.merge_method,
+                merge_action=identity.merge_action,
+            ),
+            response=None,
+        ),
     )
     assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_rejects_unrelated_request_digest():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(
+        identity,
+        request_payload_digest="unrelated-request",
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=provider_evidence_fixture(),
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_rejects_unrelated_response_digest():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(
+        identity,
+        response_payload_digest="unrelated-response",
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=provider_evidence_fixture(),
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_requires_both_request_and_response_evidence():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    pair = provider_evidence_fixture()
+    request_only = ProviderAsyncMergeEvidencePairV1(pair.request, None)
+    response_only = ProviderAsyncMergeEvidencePairV1(None, pair.response)
+    assert not pair.validates(identity, result)
+    assert not request_only.validates(identity, result)
+    assert not response_only.validates(identity, result)
+
+
+def test_request_and_response_evidence_must_match_normalized_result():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    mismatched_response = ProviderAsyncMergeResponseEvidenceV1(
+        capture=provider_evidence_fixture().response.capture,
+        status="enqueued",
+        provider_uuid="uuid-1",
+        observed_merge_commit=None,
+    )
+    pair = ProviderAsyncMergeEvidencePairV1(
+        request=provider_evidence_fixture().request,
+        response=mismatched_response,
+    )
+    assert not pair.validates(identity, result)
+
+
+def test_request_evidence_binds_exact_merge_parameters():
+    identity = stack_identity_fixture()
+    pair = provider_evidence_fixture()
+    wrong_request = ProviderAsyncMergeRequestEvidenceV1(
+        capture=pair.request.capture,
+        repository=identity.repository,
+        requested_pr_number=identity.requested_pr_number,
+        expected_head_sha=identity.requested_pr_head_sha,
+        merge_method="merge",
+        merge_action=identity.merge_action,
+    )
+    altered = ProviderAsyncMergeEvidencePairV1(wrong_request, pair.response)
+    assert not altered.request.validates(identity)
+
+
+def test_response_evidence_binds_exact_provider_result_fields():
+    identity = stack_identity_fixture()
+    pair = provider_evidence_fixture()
+    result = provider_merge_result_fixture(identity)
+    wrong_uuid = ProviderAsyncMergeResponseEvidenceV1(
+        capture=pair.response.capture,
+        status=result.status,
+        provider_uuid="uuid-other",
+        observed_merge_commit=result.observed_merge_commit,
+    )
+    altered = ProviderAsyncMergeEvidencePairV1(pair.request, wrong_uuid)
+    assert not altered.validates(identity, result)
 
 
 def test_provider_result_missing_content_digest_cannot_be_causal():
     identity = stack_identity_fixture()
     result = provider_merge_result_fixture(
         identity,
-        result_payload_digest="",
+        response_payload_digest="",
     )
     resolution = causal_resolution_fixture(
         identity,
@@ -1983,7 +2087,7 @@ def test_provider_result_content_digest_mismatch_cannot_be_causal():
     identity = stack_identity_fixture()
     result = provider_merge_result_fixture(
         identity,
-        result_payload_digest="different-digest",
+        response_payload_digest="different-digest",
     )
     resolution = causal_resolution_fixture(
         identity,
@@ -1999,7 +2103,7 @@ def test_provider_result_matching_content_digest_can_be_causal():
     digest = hashlib.sha256(provider_result_response_bytes()).hexdigest()
     result = provider_merge_result_fixture(
         identity,
-        result_payload_digest=digest,
+        response_payload_digest=digest,
     )
     resolution = causal_resolution_fixture(
         identity,
@@ -2015,7 +2119,7 @@ def test_webhook_evidence_cannot_be_async_operation_causality_even_with_matching
     digest = hashlib.sha256(provider_result_response_bytes()).hexdigest()
     result = provider_merge_result_fixture(
         identity,
-        result_payload_digest=digest,
+        response_payload_digest=digest,
     )
     webhook_evidence = ProviderEvidenceEnvelopeV1(
         ProviderCaptureIntegrityV1(
@@ -3381,6 +3485,12 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_result_rejects_unrelated_request_digest,
+    test_provider_result_rejects_unrelated_response_digest,
+    test_provider_result_requires_both_request_and_response_evidence,
+    test_request_and_response_evidence_must_match_normalized_result,
+    test_request_evidence_binds_exact_merge_parameters,
+    test_response_evidence_binds_exact_provider_result_fields,
     test_provider_result_missing_content_digest_cannot_be_causal,
     test_provider_result_content_digest_mismatch_cannot_be_causal,
     test_provider_result_matching_content_digest_can_be_causal,
