@@ -108,6 +108,16 @@ jobs:
           for marker in authenticity_markers:
               assert f'"{marker}"' in source, f"Missing authenticity marker: {marker}"
 
+          webhook_context_fields = {
+              "hook_id",
+              "event_type",
+              "repository",
+              "delivery_id",
+              "payload_bytes_digest",
+          }
+          for field in webhook_context_fields:
+              assert field in source, f"Missing webhook context field: {field}"
+
           expected_call_args = {
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
               "record_unknown": 1,       # self omitted; operation identity
