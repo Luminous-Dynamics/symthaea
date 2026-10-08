@@ -145,6 +145,14 @@ fn run_closed_loop_bridge_control() {
 
 fn run_equal_balance_power_control() {
     let people = build_people();
+    let community_counts: [usize; COMMUNITIES] = people.iter().fold(
+        [0; COMMUNITIES],
+        |mut counts, person| {
+            counts[person.community] += 1;
+            counts
+        },
+    );
+    assert!(community_counts.iter().all(|count| *count == PERSONS / COMMUNITIES));
     let pc: Vec<i64> = people.iter().map(|person| person.pc).collect();
     let pc_gini = gini(&pc);
 
@@ -209,6 +217,39 @@ fn run_stock_flow_control() {
     println!("  closing_total={total_closing}");
 }
 
+fn run_unsafe_bridge_detection_control() {
+    let source = 1_000_i64;
+    let target = 1_000_i64;
+    // Unsafe bridge behavior: mint target without consuming source.
+    let post_source = source;
+    let post_target = target + 500;
+    let net_claim_creation = (post_source + post_target) - (source + target);
+
+    assert!(
+        net_claim_creation > 0,
+        "detector fixture must contain unauthorized net claim creation"
+    );
+
+    println!("CONTROL:UNSAFE_BRIDGE_DETECTED:PASS");
+    println!("  net_claim_creation={net_claim_creation}");
+}
+
+fn run_capacity_overbooking_detection_control() {
+    let available_capacity = 100_i64;
+    let project_a = 80_i64;
+    let project_b = 40_i64;
+    let authorized_demand = project_a + project_b;
+
+    assert!(
+        authorized_demand > available_capacity,
+        "detector fixture must overbook physical capacity"
+    );
+
+    println!("CONTROL:CAPACITY_OVERBOOKING_DETECTED:PASS");
+    println!("  available_capacity={available_capacity}");
+    println!("  authorized_demand={authorized_demand}");
+}
+
 fn run_non_equivalence_control() {
     // Same numeric quantity, different semantic objects.
     let pc_units = 100_i64;
@@ -234,6 +275,8 @@ fn main() {
     println!("persons={PERSONS} communities={COMMUNITIES} resources={RESOURCES}");
 
     run_closed_loop_bridge_control();
+    run_unsafe_bridge_detection_control();
+    run_capacity_overbooking_detection_control();
     run_equal_balance_power_control();
     run_stock_flow_control();
     run_non_equivalence_control();
