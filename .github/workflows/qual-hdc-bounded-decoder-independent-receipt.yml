@@ -346,7 +346,7 @@ jobs:
                       full_name: expected.repository,
                     },
                   },
-                   merge_commit_sha: 'synthetic-merge',
+                   merge_commit_sha: 'c'.repeat(40),
                 },
                 parentCommit: {
                   sha: expected.subject,
@@ -360,7 +360,7 @@ jobs:
                   files: expectedFiles.map((filename) => ({ filename })),
                 },
                 mergeCommit: {
-                   sha: 'synthetic-merge',
+                   sha: 'c'.repeat(40),
                   parents: [
                     { sha: expected.parent },
                     { sha: expected.subject },
