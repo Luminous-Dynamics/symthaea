@@ -37,7 +37,7 @@ jobs:
       - name: Install Vulkan runtime and validation
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers
+          sudo apt-get install -y libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers gdb
 
       - name: Verify validation layer
         run: |
@@ -104,6 +104,27 @@ jobs:
           set -o pipefail
           cargo test --locked --features vulkan --lib -- --ignored --nocapture 2>&1 | tee qualification-runtime.txt
 
+      - name: Capture native crash backtrace
+        if: failure()
+        working-directory: .ci/gpu-fabric-workspace
+        continue-on-error: true
+        run: |
+          set +e
+          TEST_BINARY="$(find target/debug/deps -maxdepth 1 -type f -name 'symthaea_gpu_fabric-*' -executable | sort | head -n 1)"
+          test -n "$TEST_BINARY"
+          {
+            echo "test_binary=$TEST_BINARY"
+            gdb -q -batch \
+              -ex 'set pagination off' \
+              -ex 'set confirm off' \
+              -ex run \
+              -ex 'thread apply all bt full' \
+              --args "$TEST_BINARY" --ignored --nocapture
+          } > qualification-gdb.txt 2>&1
+          GDB_STATUS=$?
+          echo "gdb_exit=$GDB_STATUS" >> qualification-gdb.txt
+          exit 0
+
       - name: Seal runtime evidence digest
         if: always()
         working-directory: .ci/gpu-fabric-workspace
@@ -132,3 +153,4 @@ jobs:
             .ci/gpu-fabric-workspace/vulkan-package-versions.txt
             .ci/gpu-fabric-workspace/qualification-runtime.txt
             .ci/gpu-fabric-workspace/qualification-runtime.sha256
+            .ci/gpu-fabric-workspace/qualification-gdb.txt
