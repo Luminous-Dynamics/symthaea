@@ -100,13 +100,14 @@ jobs:
         run: cargo test --locked --features vulkan --lib
 
       - name: Execute real workload barrier qualification
+        id: execute_runtime
         working-directory: .ci/gpu-fabric-workspace
         run: |
           set -o pipefail
           cargo test --locked --features vulkan --lib -- --ignored --nocapture 2>&1 | tee qualification-runtime.txt
 
       - name: Capture native crash backtrace
-        if: failure()
+        if: steps.execute_runtime.outcome == 'failure'
         working-directory: .ci/gpu-fabric-workspace
         continue-on-error: true
         run: |
