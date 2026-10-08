@@ -40,6 +40,11 @@ def fail(message: str) -> None:
 
 
 def main() -> None:
+    if "run_cmd(" in text:
+        fail("legacy run_cmd shell executor regressed into relay source")
+    if "privileged_shell_command(" in text:
+        fail("legacy privileged_shell_command shell executor regressed into relay source")
+
     if not SOURCE.is_file():
         fail(f"source file missing: {SOURCE}")
 
