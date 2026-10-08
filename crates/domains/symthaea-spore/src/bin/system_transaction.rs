@@ -1193,7 +1193,7 @@ impl TransactionLedger {
         }
 
         let Some(mut file) = self.open_ledger_file(
-            libc::O_RDWR | libc::O_CREAT | libc::O_APPEND,
+            libc::O_RDWR | libc::O_APPEND,
             0o600,
         )? else {
             return Err(format!(
