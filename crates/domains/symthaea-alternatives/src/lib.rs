@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 48;
+pub const SCHEMA_VERSION: u16 = 49;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-v67";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-v68";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -517,6 +517,36 @@ pub enum MeasurementModelInputRole {
     Other,
 }
 
+/// Exact machine-readable external definition bound to a measurement-model input specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputQuantityDefinitionRef {
+    /// Stable identity of the external quantity-definition vocabulary/graph.
+    pub vocabulary_id: String,
+    /// Revision of the external quantity-definition vocabulary/graph.
+    pub vocabulary_revision: String,
+    /// Stable identity of the exact external quantity definition.
+    pub definition_id: String,
+    /// Revision of the exact external quantity definition.
+    pub definition_revision: String,
+    /// Digest of the exact external quantity definition record.
+    pub definition_digest: String,
+}
+
+impl MeasurementModelInputQuantityDefinitionRef {
+    /// Validate the opaque external quantity-definition identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.vocabulary_id.is_empty()
+            || self.vocabulary_revision.is_empty()
+            || self.definition_id.is_empty()
+            || self.definition_revision.is_empty()
+            || self.definition_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputQuantityDefinition);
+        }
+        Ok(())
+    }
+}
+
 /// Exact external identity of the specification governing one measurement-model input.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MeasurementModelInputSpecificationRef {
@@ -526,6 +556,13 @@ pub struct MeasurementModelInputSpecificationRef {
     pub specification_revision: String,
     /// Digest of the exact authoritative input specification record.
     pub specification_digest: String,
+                    quantity_definition: None,
+    /// Optional exact machine-readable quantity definition bound by the authoritative specification.
+    ///
+    /// Symthaea treats this as an opaque external reference. It does not parse,
+    /// infer, or independently validate quantity kind, dimensions, units, or context
+    /// from the referenced external vocabulary.
+    pub quantity_definition: Option<MeasurementModelInputQuantityDefinitionRef>,
 }
 
 impl MeasurementModelInputSpecificationRef {
@@ -536,6 +573,9 @@ impl MeasurementModelInputSpecificationRef {
             || self.specification_digest.is_empty()
         {
             return Err(AssessmentError::InvalidMeasurementModelInputSpecification);
+        }
+        if let Some(quantity_definition) = &self.quantity_definition {
+            quantity_definition.validate()?;
         }
         Ok(())
     }
@@ -927,6 +967,15 @@ fn canonical_measurement_model_input_frontier_digest(
                 &binding.input_specification.specification_id,
                 &binding.input_specification.specification_revision,
                 &binding.input_specification.specification_digest,
+                binding.input_specification.quantity_definition.as_ref().map(|definition| {
+                    (
+                        &definition.vocabulary_id,
+                        &definition.vocabulary_revision,
+                        &definition.definition_id,
+                        &definition.definition_revision,
+                        &definition.definition_digest,
+                    )
+                }),
                 binding.role,
             )
         })
@@ -3972,6 +4021,8 @@ pub enum AssessmentError {
     InvalidMeasurementModelInputFrontier,
     /// An authoritative input specification reference is structurally incomplete.
     InvalidMeasurementModelInputSpecification,
+    /// An external machine-readable quantity-definition reference is structurally incomplete.
+    InvalidMeasurementModelInputQuantityDefinition,
     /// The topology binding count differs from the authoritative input frontier.
     MeasurementModelInputFrontierCountMismatch {
         /// Frontier identity.
@@ -4539,6 +4590,9 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::InvalidMeasurementModelInputSpecification => {
                 write!(f, "measurement-model input specification reference is incomplete")
+            }
+            Self::InvalidMeasurementModelInputQuantityDefinition => {
+                write!(f, "measurement-model input quantity definition reference is incomplete")
             }
             Self::MeasurementModelInputFrontierCountMismatch {
                 frontier_id,
@@ -8309,6 +8363,7 @@ mod tests {
                     specification_id: "model-input-spec-primary".into(),
                     specification_revision: "v1".into(),
                     specification_digest: "model-input-spec-primary-digest".into(),
+                    quantity_definition: None,
                 },
                 role: MeasurementModelInputRole::Measured,
                 node_id: "calibration".into(),
@@ -8335,6 +8390,7 @@ mod tests {
                     specification_id: "model-input-spec-primary".into(),
                     specification_revision: "v1".into(),
                     specification_digest: "model-input-spec-primary-digest".into(),
+                    quantity_definition: None,
                 },
                 role: MeasurementModelInputRole::Measured,
                 node_id: "calibration".into(),
@@ -8467,6 +8523,42 @@ mod tests {
     }
 
     #[test]
+    fn quantity_definition_reference_is_frontier_significant_but_opaque() {
+        let make_binding = |digest: &str| CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: Some(MeasurementModelInputQuantityDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/quantitykind".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/quantitykind/Temperature".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: digest.into(),
+                }),
+            },
+            role: MeasurementModelInputRole::Influence,
+            node_id: "temperature-calibration".into(),
+        };
+
+        let first = canonical_measurement_model_input_frontier_digest(&[make_binding("definition-v1")])
+            .unwrap();
+        let second = canonical_measurement_model_input_frontier_digest(&[make_binding("definition-v2")])
+            .unwrap();
+        assert_ne!(first, second);
+
+        let mut malformed = make_binding("");
+        assert_eq!(
+            malformed.input_specification.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementModelInputQuantityDefinition
+        );
+
+        malformed.input_specification.quantity_definition = None;
+        malformed.input_specification.validate().unwrap();
+    }
+
+    #[test]
     fn branched_traceability_topology_is_typed_and_uncertainty_bound() {
         let mut candidate = candidate(
             "branched-traceability-topology",
@@ -8500,6 +8592,7 @@ mod tests {
                         specification_id: "fixture-input-a-spec".into(),
                         specification_revision: "v1".into(),
                         specification_digest: "fixture-input-a-spec-digest".into(),
+                    quantity_definition: None,
                     },
                     role: MeasurementModelInputRole::Measured,
                     node_id: "calibration-a".into(),
@@ -8510,6 +8603,7 @@ mod tests {
                         specification_id: "fixture-input-b-spec".into(),
                         specification_revision: "v1".into(),
                         specification_digest: "fixture-input-b-spec-digest".into(),
+                    quantity_definition: None,
                     },
                     role: MeasurementModelInputRole::Influence,
                     node_id: "calibration-b".into(),
@@ -8538,6 +8632,7 @@ mod tests {
                         specification_id: "fixture-input-a-spec".into(),
                         specification_revision: "v1".into(),
                         specification_digest: "fixture-input-a-spec-digest".into(),
+                    quantity_definition: None,
                     },
                     role: MeasurementModelInputRole::Measured,
                     node_id: "calibration-a".into(),
@@ -8548,6 +8643,7 @@ mod tests {
                         specification_id: "fixture-input-b-spec".into(),
                         specification_revision: "v1".into(),
                         specification_digest: "fixture-input-b-spec-digest".into(),
+                    quantity_definition: None,
                     },
                     role: MeasurementModelInputRole::Influence,
                     node_id: "calibration-b".into(),
@@ -8749,6 +8845,7 @@ mod tests {
                     specification_id: "fixture-input-spec".into(),
                     specification_revision: "v1".into(),
                     specification_digest: "fixture-input-spec-digest".into(),
+                    quantity_definition: None,
                 },
                 role: MeasurementModelInputRole::Correction,
                 node_id: "calibration".into(),
@@ -8775,6 +8872,7 @@ mod tests {
                     specification_id: "fixture-input-spec".into(),
                     specification_revision: "v1".into(),
                     specification_digest: "fixture-input-spec-digest".into(),
+                    quantity_definition: None,
                 },
                 role: MeasurementModelInputRole::Correction,
                 node_id: "calibration".into(),
