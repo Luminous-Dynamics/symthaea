@@ -93,6 +93,15 @@ REQUIRED_WORKFLOWS = {
     "PR Governance": ".github/workflows/pr-governance.yml",
 }
 
+# GitHub workflow IDs are stable identifiers distinct from display names and paths.
+# Requiring them prevents a deleted/recreated workflow from silently inheriting
+# trust merely because the replacement has the same name and filename.
+EXPECTED_WORKFLOW_IDS = {
+    "Broca Feature Matrix": 305440448,
+    "Workflow Syntax": 357672680,
+    "PR Governance": 357738222,
+}
+
 
 class VerificationError(Exception):
     pass
@@ -371,6 +380,7 @@ def latest_required_runs(head_sha: str) -> dict[str, dict[str, Any] | None]:
             for run in runs
             if run.get("name") == name
             and run.get("path") == expected_path
+            and run.get("workflow_id") == EXPECTED_WORKFLOW_IDS[name]
             and run.get("head_sha") == head_sha
         ]
         candidates.sort(
@@ -391,6 +401,11 @@ def verify_trigger_is_current(
     if trigger_run.get("name") not in REQUIRED_WORKFLOWS:
         raise VerificationError(
             f"unexpected triggering workflow: {trigger_run.get('name')!r}"
+        )
+    expected_workflow_id = EXPECTED_WORKFLOW_IDS[trigger_run["name"]]
+    if trigger_run.get("workflow_id") != expected_workflow_id:
+        raise VerificationError(
+            f"triggering workflow ID mismatch: expected {expected_workflow_id}, got {trigger_run.get('workflow_id')!r}"
         )
     latest = latest_runs.get(trigger_run["name"])
     if latest is None:
@@ -771,7 +786,7 @@ def main() -> int:
                     TRIGGER_ACTIVITY_TYPE == "completed"
                     and trigger_run.get("conclusion") != TRIGGER_RUN_CONCLUSION
                 )
-                or not trigger_run.get("workflow_id")
+                or trigger_run.get("workflow_id") != EXPECTED_WORKFLOW_IDS.get(trigger_run.get("name"))
             ):
                 raise StaleError(
                     "workflow_run event payload does not match authoritative GitHub run state"
