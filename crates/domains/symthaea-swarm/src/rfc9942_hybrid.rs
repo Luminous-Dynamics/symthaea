@@ -44,6 +44,10 @@ pub trait MlDsa65Verifier {
 /// policy must validate the exact key bytes, key identifier, and evaluation
 /// time against an independently trusted registry/snapshot.
 pub trait MlDsa65KeyPolicy {
+    /// Stable digest of the exact key-authorization policy/snapshot used.
+    /// A zero digest is invalid and must fail closed.
+    fn policy_digest_sha256(&self) -> [u8; 32];
+
     fn authorize(
         &self,
         key_id: &Rfc9942PqKeyId,
@@ -53,7 +57,7 @@ pub trait MlDsa65KeyPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Rfc9942PqKeyId(pub [u8; 16]);
+pub struct Rfc9942PqKeyId([u8; 16]);
 
 impl Rfc9942PqKeyId {
     pub fn new(bytes: [u8; 16]) -> Result<Self, Rfc9942HybridError> {
@@ -100,6 +104,9 @@ pub struct Rfc9942HybridTranscript {
     key_id: Rfc9942PqKeyId,
     verifying_key_sha256: [u8; 32],
     receipt_sha256: [u8; 32],
+    policy_digest_sha256: [u8; 32],
+    key_id: Rfc9942PqKeyId,
+    verifying_key_sha256: [u8; 32],
     classical_capability_sha256: [u8; 32],
     transcript_sha256: [u8; 32],
 }
@@ -110,11 +117,15 @@ impl Rfc9942HybridTranscript {
         exact_receipt_wire: &[u8],
         key_id: Rfc9942PqKeyId,
         verifying_key_sha256: [u8; 32],
+        policy_digest_sha256: [u8; 32],
     ) -> Result<Self, Rfc9942HybridError> {
         if exact_receipt_wire.is_empty()
             || exact_receipt_wire.len() > MAX_HYBRID_RECEIPT_WIRE_BYTES
         {
             return Err(Rfc9942HybridError::ReceiptWireTooLarge);
+        }
+        if policy_digest_sha256 == [0; 32] {
+            return Err(Rfc9942HybridError::PqKeyPolicyInvalid);
         }
 
         let receipt_sha256 = sha256(exact_receipt_wire);
@@ -124,6 +135,7 @@ impl Rfc9942HybridTranscript {
 
         let classical_capability_sha256 = verified_classical.capability_sha256();
         let transcript_sha256 = digest_transcript(
+            policy_digest_sha256,
             key_id,
             verifying_key_sha256,
             receipt_sha256,
@@ -131,12 +143,17 @@ impl Rfc9942HybridTranscript {
         );
 
         Ok(Self {
+            policy_digest_sha256,
             key_id,
             verifying_key_sha256,
             receipt_sha256,
             classical_capability_sha256,
             transcript_sha256,
         })
+    }
+
+    pub const fn policy_digest_sha256(&self) -> [u8; 32] {
+        self.policy_digest_sha256
     }
 
     pub const fn key_id(&self) -> Rfc9942PqKeyId {
@@ -164,15 +181,16 @@ impl Rfc9942HybridTranscript {
     /// Domain separation is included in transcript_sha256. These bytes carry
     /// the explicit policy/version and the three fixed identities needed by
     /// the verifier.
-    pub fn signing_bytes(&self) -> [u8; 154] {
-        let mut out = [0u8; 154];
+    pub fn signing_bytes(&self) -> [u8; 186] {
+        let mut out = [0u8; 186];
         out[0..2].copy_from_slice(&HYBRID_POLICY_VERSION.to_be_bytes());
         out[2..10].copy_from_slice(&ML_DSA_65_COSE_ALGORITHM_ID.to_be_bytes());
-        out[10..26].copy_from_slice(&self.key_id.0);
-        out[26..58].copy_from_slice(&self.verifying_key_sha256);
-        out[58..90].copy_from_slice(&self.receipt_sha256);
-        out[90..122].copy_from_slice(&self.classical_capability_sha256);
-        out[122..154].copy_from_slice(&self.transcript_sha256);
+        out[10..42].copy_from_slice(&self.policy_digest_sha256);
+        out[42..58].copy_from_slice(&self.key_id.0);
+        out[58..90].copy_from_slice(&self.verifying_key_sha256);
+        out[90..122].copy_from_slice(&self.receipt_sha256);
+        out[122..154].copy_from_slice(&self.classical_capability_sha256);
+        out[154..186].copy_from_slice(&self.transcript_sha256);
         out
     }
 }
@@ -215,6 +233,8 @@ impl Rfc9942PqAttestation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942HybridVerifiedReceipt {
     classical_capability_sha256: [u8; 32],
+    key_policy_digest_sha256: [u8; 32],
+    key_authorization_evaluation_time_unix_seconds: u64,
     pq_attestation: Rfc9942PqAttestation,
     hybrid_capability_sha256: [u8; 32],
 }
@@ -243,6 +263,11 @@ impl Rfc9942HybridVerifiedReceipt {
             return Err(Rfc9942HybridError::PqSignatureAllZero);
         }
 
+        let policy_digest_sha256 = key_policy.policy_digest_sha256();
+        if policy_digest_sha256 == [0; 32] {
+            return Err(Rfc9942HybridError::PqKeyPolicyInvalid);
+        }
+
         let verifying_key_sha256 = sha256(verifying_key);
         key_policy
             .authorize(
@@ -257,6 +282,7 @@ impl Rfc9942HybridVerifiedReceipt {
             exact_receipt_wire,
             key_id,
             verifying_key_sha256,
+            policy_digest_sha256,
         )?;
 
         verifier
@@ -274,11 +300,16 @@ impl Rfc9942HybridVerifiedReceipt {
             verified_classical.capability_sha256();
         let hybrid_capability_sha256 = digest_hybrid_capability(
             classical_capability_sha256,
+            policy_digest_sha256,
+            evaluation_time_unix_seconds,
             &pq_attestation,
         );
 
         Ok(Self {
             classical_capability_sha256,
+            key_policy_digest_sha256: policy_digest_sha256,
+            key_authorization_evaluation_time_unix_seconds:
+                evaluation_time_unix_seconds,
             pq_attestation,
             hybrid_capability_sha256,
         })
@@ -286,6 +317,14 @@ impl Rfc9942HybridVerifiedReceipt {
 
     pub const fn classical_capability_sha256(&self) -> [u8; 32] {
         self.classical_capability_sha256
+    }
+
+    pub const fn key_policy_digest_sha256(&self) -> [u8; 32] {
+        self.key_policy_digest_sha256
+    }
+
+    pub const fn key_authorization_evaluation_time_unix_seconds(&self) -> u64 {
+        self.key_authorization_evaluation_time_unix_seconds
     }
 
     pub const fn pq_attestation(&self) -> Rfc9942PqAttestation {
@@ -303,6 +342,7 @@ pub enum Rfc9942HybridError {
     ReceiptWireTooLarge,
     ReceiptWireIdentityMismatch,
     PqKeyIdInvalid,
+    PqKeyPolicyInvalid,
     PqKeyUnknown,
     PqKeyNotYetValid,
     PqKeyExpired,
@@ -356,6 +396,7 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
 }
 
 fn digest_transcript(
+    policy_digest_sha256: [u8; 32],
     key_id: Rfc9942PqKeyId,
     verifying_key_sha256: [u8; 32],
     receipt_sha256: [u8; 32],
@@ -365,6 +406,7 @@ fn digest_transcript(
     hasher.update(HYBRID_TRANSCRIPT_DOMAIN);
     hasher.update(HYBRID_POLICY_VERSION.to_be_bytes());
     hasher.update(ML_DSA_65_COSE_ALGORITHM_ID.to_be_bytes());
+    hasher.update(policy_digest_sha256);
     hasher.update(key_id.0);
     hasher.update(verifying_key_sha256);
     hasher.update((receipt_sha256.len() as u32).to_be_bytes());
@@ -376,6 +418,8 @@ fn digest_transcript(
 
 fn digest_hybrid_capability(
     classical_capability_sha256: [u8; 32],
+    policy_digest_sha256: [u8; 32],
+    evaluation_time_unix_seconds: u64,
     pq_attestation: &Rfc9942PqAttestation,
 ) -> [u8; 32] {
     let mut hasher = Sha256::new();
@@ -384,6 +428,8 @@ fn digest_hybrid_capability(
     );
     hasher.update(HYBRID_POLICY_VERSION.to_be_bytes());
     hasher.update(classical_capability_sha256);
+    hasher.update(policy_digest_sha256);
+    hasher.update(evaluation_time_unix_seconds.to_be_bytes());
     hasher.update(pq_attestation.verifying_key_sha256);
     hasher.update(pq_attestation.signature_sha256);
     hasher.update(pq_attestation.transcript.receipt_sha256);
@@ -405,12 +451,14 @@ mod tests {
         let classical_capability_sha256 = [classical; 32];
         let key_id = Rfc9942PqKeyId([9; 16]);
         let verifying_key_sha256 = [8; 32];
+        let policy_digest_sha256 = [7; 32];
         Rfc9942HybridTranscript {
             key_id,
             verifying_key_sha256,
             receipt_sha256,
             classical_capability_sha256,
             transcript_sha256: digest_transcript(
+                policy_digest_sha256,
                 key_id,
                 verifying_key_sha256,
                 receipt_sha256,
@@ -422,7 +470,7 @@ mod tests {
     #[test]
     fn transcript_is_fixed_width_and_domain_separated() {
         let t = transcript(1, 2);
-        assert_eq!(t.signing_bytes().len(), 154);
+        assert_eq!(t.signing_bytes().len(), 186);
 
         let mut second_domain = HYBRID_TRANSCRIPT_DOMAIN.to_vec();
         second_domain.push(0);
@@ -430,6 +478,7 @@ mod tests {
         hasher.update(&second_domain);
         hasher.update(HYBRID_POLICY_VERSION.to_be_bytes());
         hasher.update(ML_DSA_65_COSE_ALGORITHM_ID.to_be_bytes());
+        hasher.update([7u8; 32]);
         hasher.update([9u8; 16]);
         hasher.update([8u8; 32]);
         hasher.update((32u32).to_be_bytes());
@@ -458,10 +507,11 @@ mod tests {
 
     #[test]
     fn transcript_changes_when_key_identity_changes() {
-        let mut a = transcript(1, 2);
+        let a = transcript(1, 2);
         let mut b = transcript(1, 2);
         b.key_id = Rfc9942PqKeyId([10; 16]);
         b.transcript_sha256 = digest_transcript(
+            b.policy_digest_sha256,
             b.key_id,
             b.verifying_key_sha256,
             b.receipt_sha256,
@@ -469,7 +519,7 @@ mod tests {
         );
         assert_ne!(a.signing_bytes(), b.signing_bytes());
         assert_ne!(a.transcript_sha256(), b.transcript_sha256());
-        a.key_id = Rfc9942PqKeyId([11; 16]);
+        assert_ne!(a.key_id(), b.key_id());
     }
 
     #[test]
