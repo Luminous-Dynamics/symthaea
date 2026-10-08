@@ -818,6 +818,6 @@ mod tests {
             .unwrap();
 
         assert!(!direct.evidence_conflict);
-        assert_eq!(direct.qualification, QualificationState::LifecycleQualified);
+        assert_eq!(direct.qualification, QualificationState::EvidenceSupported);
     }
 }
