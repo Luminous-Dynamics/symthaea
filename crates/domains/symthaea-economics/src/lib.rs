@@ -15,6 +15,7 @@ pub mod finance;
 pub mod game;
 pub mod inequality;
 pub mod market;
+pub mod institutional_expectations;
 
 pub use creditism::{CreditismError, ExchangeSettlement, PersonalCreditLedger};
 pub use error::{EconomicsError, Result};
