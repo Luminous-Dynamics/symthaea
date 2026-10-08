@@ -2135,6 +2135,7 @@ mod tests {
             target_machine_digest: None,
             request_digest: "a".repeat(64),
             outcome: None,
+            execution_commitment: None,
             artifact_commitment: None,
             configuration_commitment: None,
         };
@@ -2146,6 +2147,73 @@ mod tests {
             std::fs::read(&path).unwrap().is_empty(),
             "unsafe journal must remain untouched"
         );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn execution_commitment_is_durable_and_immutable() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-execution-commitment-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+
+        let request_id = format!("execution-commitment-{name}");
+        let mut transaction = SystemTransaction::begin(
+            MutationKind::Install,
+            &request_id,
+            Some(&"b".repeat(64)),
+            b"install-payload",
+        )
+        .unwrap();
+
+        let commitment = ExecutionCommitment {
+            role: "install-script".into(),
+            size: 1234,
+            digest: "c".repeat(64),
+        };
+        transaction
+            .bind_execution_commitment(commitment.clone())
+            .unwrap();
+
+        ledger.admit(transaction.clone()).unwrap();
+        ledger
+            .bind_execution_commitment(&transaction, commitment.clone())
+            .unwrap();
+        // A retry with the exact same commitment is idempotent.
+        ledger
+            .bind_execution_commitment(&transaction, commitment.clone())
+            .unwrap();
+
+        let conflicting = ExecutionCommitment {
+            role: "install-script".into(),
+            size: 1234,
+            digest: "d".repeat(64),
+        };
+        transaction
+            .bind_execution_commitment(conflicting.clone())
+            .expect_err("local transaction must reject a second binding");
+
+        let receipt = ledger
+            .lookup(&request_id)
+            .unwrap()
+            .expect("bound transaction must be observable");
+        assert_eq!(receipt.execution_commitment, Some(commitment.clone()));
+        assert_eq!(receipt.outcome, TransactionOutcome::Indeterminate);
+
+        ledger
+            .mark_completed(&transaction, TransactionOutcome::ObservedSuccess)
+            .unwrap();
+
+        let completed = ledger
+            .lookup(&request_id)
+            .unwrap()
+            .expect("completed transaction must remain observable");
+        assert_eq!(completed.execution_commitment, Some(commitment));
+        assert_eq!(
+            completed.outcome,
+            TransactionOutcome::ObservedSuccess
+        );
+
         let _ = std::fs::remove_file(path);
     }
 
