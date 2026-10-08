@@ -1754,7 +1754,7 @@ fn generate_system_config(msg: &ClientMessage) -> String {
 }"#,
     );
     config = config.replace("__HOSTNAME_LITERAL__", &hostname_literal);
-    config = config.replace("__HOSTNAME_ATTR__", &hostname_literal[1..hostname_literal.len() - 1]);
+    config = config.replace("__HOSTNAME_ATTR__", &hostname_literal);
     config
 }
 
@@ -13696,6 +13696,30 @@ mod tests {
         ));
         assert!(!script.contains("/dev/vda"));
         assert!(!script.contains("/tmp/symthaea-pre-install-snapshot"));
+    }
+
+    #[test]
+    fn generated_system_config_uses_safe_nix_literals() {
+        let mut message = sample_install_message();
+        message.timezone = r#"Europe/Chicago"\${builtins.abort "pwned"}"#.into();
+        message.keyboard = r#"us\${builtins.abort "pwned"}"#.into();
+        message.desktop = "gnome".into();
+
+        let config = generate_system_config(&message);
+        let expected_tz = nix_string_literal(&message.timezone);
+        let expected_kb = nix_string_literal(&message.keyboard);
+
+        assert!(config.contains(&format!("time.timeZone = {expected_tz};")));
+        assert!(config.contains(&format!("console.keyMap = {expected_kb};")));
+        assert!(config.contains(&format!("services.xserver.xkb.layout = {expected_kb};")));
+    }
+
+    #[test]
+    fn single_luks_fallback_configuration_quotes_hostname_attribute_key() {
+        let config = single_luks_fallback_configuration("123-workstation");
+        assert!(config.contains("networking.hostName = \"123-workstation\";"));
+        assert!(config.contains("users.users.\"123-workstation\" = {"));
+        assert!(!config.contains("users.users.123-workstation = {"));
     }
 
     #[test]
