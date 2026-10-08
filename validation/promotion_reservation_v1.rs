@@ -290,7 +290,7 @@ mod tests {
                 "Luminous-Dynamics/symthaea",
                 7085,
                 "H1",
-                7,
+                1,
                 "gov-1",
                 "github-async-merge",
             )
