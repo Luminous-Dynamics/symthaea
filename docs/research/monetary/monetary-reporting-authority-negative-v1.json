@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-reporting-authority-negative-v1",
+  "cases":[
+    {"id":"AUTH-X01","description":"claim-driven mode silently mutates immutable true values"},
+    {"id":"AUTH-X02","description":"verified-truth mode consumes participant declarations for allocation ordering"},
+    {"id":"AUTH-X03","description":"mismatch-rejected mode allocates before mismatch rejection"},
+    {"id":"AUTH-X04","description":"declared liquidity demand is used for resource reservation"},
+    {"id":"AUTH-X05","description":"authority mode enters the exogenous random namespace"},
+    {"id":"AUTH-X06","description":"reporting policy changes topology, adapter, or resource identity"},
+    {"id":"AUTH-X07","description":"authority mode changes resource capacity"},
+    {"id":"AUTH-X08","description":"non-focal obligations are allowed to misreport"},
+    {"id":"AUTH-X09","description":"truthful counterpart is not paired on exact authority mode"},
+    {"id":"AUTH-X10","description":"CRN namespace depends on reporting or authority treatment"},
+    {"id":"AUTH-X11","description":"authority mode identity digest is omitted or mismatched"},
+    {"id":"AUTH-X12","description":"verified-truth leaves a positive focal reporting gain in the reference execution"}
+  ]
+}
