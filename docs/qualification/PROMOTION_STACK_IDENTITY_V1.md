@@ -10,6 +10,7 @@ A single PR head is not sufficient to identify a stacked merge operation.
 The reference identity binds:
 
     repository
+    provider stack number
     requested PR number
     requested PR head SHA
     base ref
@@ -24,7 +25,7 @@ The reference identity binds:
     trust-root generation
     governance generation
 
-The resulting canonical JSON bytes are SHA-256 addressed. Ordering is semantic: reversing stack
+The resulting canonical JSON bytes are SHA-256 addressed. The provider stack number is included as provider-scoped stack identity. Ordering is semantic: reversing stack
 membership changes the identity rather than being normalized away.
 
 ## Why this is distinct from provider CAS
@@ -39,6 +40,7 @@ A deterministic local operation digest lets the authority core detect:
     changed lower-stack head
     changed stack membership/order
     changed base tip
+    changed provider stack number
     changed requested PR/head
     changed merge parameters
     changed trust/governance generation
@@ -55,6 +57,7 @@ The reference tests require:
 - stack order changes the digest;
 - a lower-stack PR head change changes the digest;
 - base-tip movement changes the digest;
+- provider stack-number changes the digest;
 - merge-method or merge-action changes the digest;
 - trust-root or governance generation changes the digest;
 - requested PR number or requested head SHA changes the digest.
