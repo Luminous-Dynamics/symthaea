@@ -1,0 +1,14 @@
+{
+  "schema_version":"monetary-resource-allocation-v1-execution",
+  "run_count":12960,
+  "obligation_count":38880,
+  "common_random_number_cells":90,
+  "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest":"80140bb2b6c7772195b9fe5f2365f1c83507a80ca4f1b1b2fadd9aff64e05b15",
+  "completion_rate_by_policy":{"fifo":0.3958333333333333,"criticality_priority":0.3958333333333333,"minimum_liquidity_demand":0.3958333333333333},
+  "mean_completion_time_by_policy":{"fifo":14.269444444444446,"criticality_priority":15.118333333333334,"minimum_liquidity_demand":13.795},
+  "weighted_critical_completion_time_by_policy":{"fifo":14.846388888888889,"criticality_priority":14.248611111111112,"minimum_liquidity_demand":14.0875},
+  "critical_obligation_failures_by_policy":{"fifo":2520,"criticality_priority":2520,"minimum_liquidity_demand":2520},
+  "resource_blocked_obligations_by_regime":{"unrestricted":0,"bounded_shared_settlement_liquidity":405,"bounded_operator_capacity":0,"both_bounded":405},
+  "claim_ceiling":"Local deterministic allocation-policy reference execution only; treatment-independent CRN namespace; no empirical causal or live-system claim."
+}
