@@ -1053,6 +1053,11 @@ class ProviderWebhookEffectTimingV1:
         observed = self.local_observation_time_ms
         local_event_lower = event_lower + offset_lower
         local_event_upper = event_upper + offset_upper
+        if (
+            local_event_lower < self.clock_relation.measured_at_local_time_ms
+            or local_event_upper > self.clock_relation.valid_until_local_time_ms
+        ):
+            return "clock-relation-does-not-cover-event"
 
         if local_event_upper < dispatch:
             return "provider-event-before-dispatch"
@@ -2319,6 +2324,29 @@ def test_clock_relation_drift_expands_asymmetric_bounds_monotonically():
     assert relation.effective_offset_bounds_ms(1791475210000) == (-120, 70)
 
 
+def test_temporal_effect_rejects_event_before_clock_relation_measurement():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475180000,
+        event_upper_time_ms=1791475180999,
+        dispatch_time_ms=1791475195000,
+        observation_time_ms=1791475205000,
+    )
+    assert timing.classify() == "clock-relation-does-not-cover-event"
+
+
+def test_temporal_effect_rejects_event_interval_after_clock_relation_expiry():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        event_upper_time_ms=1791475200999,
+        dispatch_time_ms=1791475199000,
+        observation_time_ms=1791475200500,
+        clock_relation=clock_relation_fixture(
+            valid_until_local_time_ms=1791475200500,
+        ),
+    )
+    assert timing.classify() == "clock-relation-does-not-cover-event"
+
+
 def test_temporal_effect_with_asymmetric_offset_bounds_is_admissible():
     timing = effect_timing_fixture(
         event_time_ms=1791475200400,
@@ -2376,6 +2404,31 @@ def test_temporal_effect_drift_can_turn_boundary_into_uncertainty():
         ),
     )
     assert timing.classify() == "cross-domain-time-uncertain"
+
+
+def test_temporal_timing_rejects_monotonic_clock_identity_missing():
+    timing = effect_timing_fixture(monotonic_clock_id=None)
+    assert timing.classify() == "local-monotonic-clock-identity-missing"
+
+
+def test_temporal_timing_rejects_cross_runtime_monotonic_clock_identity():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=timing.provider_timestamp_policy,
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id="runtime-monotonic-2",
+        clock_relation=timing.clock_relation,
+    )
+    assert tampered.identity_digest() != timing.identity_digest()
 
 
 def test_temporal_timing_rejects_missing_local_monotonic_time():
@@ -5008,6 +5061,8 @@ TESTS = [
     test_clock_relation_rejects_expiry_before_verification,
     test_clock_relation_expiry_blocks_late_observation,
     test_clock_relation_drift_expands_asymmetric_bounds_monotonically,
+    test_temporal_effect_rejects_event_before_clock_relation_measurement,
+    test_temporal_effect_rejects_event_interval_after_clock_relation_expiry,
     test_temporal_effect_with_asymmetric_offset_bounds_is_admissible,
     test_temporal_effect_with_valid_skew_is_admissible,
     test_timing_identity_detects_interval_tampering,
@@ -5018,6 +5073,8 @@ TESTS = [
     test_temporal_effect_interval_overlap_is_not_admissible,
     test_temporal_effect_expired_clock_relation_is_not_admissible,
     test_temporal_effect_drift_can_turn_boundary_into_uncertainty,
+    test_temporal_timing_rejects_monotonic_clock_identity_missing,
+    test_temporal_timing_rejects_cross_runtime_monotonic_clock_identity,
     test_temporal_timing_rejects_missing_local_monotonic_time,
     test_temporal_timing_rejects_local_monotonic_rollback,
     test_temporal_timing_rejects_wall_clock_valid_but_monotonic_invalid_order,
