@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn signing_bytes_bind_policy_digest() {
-        let mut a = transcript(1, 2);
+        let a = transcript(1, 2);
         let mut b = a;
         b.policy_digest_sha256 = [6; 32];
         b.transcript_sha256 = digest_transcript(
