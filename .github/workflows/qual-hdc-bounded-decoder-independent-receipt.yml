@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Independently verify bounded decoder qualification
+        id: verify
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
@@ -1379,21 +1380,11 @@ jobs:
               promotionLease.lease_state === 'ELIGIBLE' &&
               publicationFencePassed;
 
-            const statusState = promotable ? 'success' : 'pending';
-            const statusDescription = promotable
-              ? 'Qualification and decision-time promotion lease verified.'
-              : 'Qualification evidence is not currently promotion-eligible; currentness or governance fence not satisfied.';
-            const statusReceiptUrl = context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId;
-            await github.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: expected.subject,
-              state: statusState,
-              target_url: statusReceiptUrl,
-              description: statusDescription,
-              context: STATUS_CONTEXT,
-            });
-            core.info('Published decision-time status: ' + statusState);
+            core.setOutput('qualification_result', receipt.qualification_result);
+            core.setOutput('lease_state', promotionLease.lease_state);
+            core.setOutput('lease_id', promotionLease.lease_id_sha256);
+            core.setOutput('publication_fence_passed', String(publicationFencePassed));
+            core.setOutput('promotable', String(promotable));
 
             if (receipt.qualification_result !== 'PASS') {
               core.setFailed('Independent verifier refused to qualify the triggering run');
