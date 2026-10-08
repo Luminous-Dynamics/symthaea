@@ -90,6 +90,30 @@ def main() -> None:
     require(text, "ledger_rejects_valid_json_without_record_delimiter",
             "journal partial-write regression test")
 
+    # Admission is an idempotency boundary, not merely an append operation.
+    # The exclusive lock must remain held across replay lookup, transaction-id
+    # collision detection, and the start-event append so concurrent identical
+    # request IDs cannot both become New.
+    admit_start = text.find("pub(crate) fn admit(")
+    admit_end = text.find("\n    pub(crate) fn has_successful_transaction(", admit_start)
+    if admit_start < 0 or admit_end < 0:
+        fail("transaction admission boundary disappeared")
+    admit = text[admit_start:admit_end]
+    for required in (
+        'open_ledger_file(',
+        "libc::LOCK_EX",
+        "load_locked_file(&mut file)",
+        "append_locked_file(&file",
+    ):
+        require(admit, required, "atomic transaction admission invariant")
+    if "self.load()?" in admit or "self.append(" in admit:
+        fail("transaction admission regained an unlocked load/append TOCTOU")
+    require(
+        text,
+        "concurrent_duplicate_request_id_has_exactly_one_new_admission",
+        "duplicate request-id concurrency regression test",
+    )
+
     # The mutation lease remains descriptor-bound and non-blocking.
     lease_start = text.find("fn acquire_at(path: &Path)")
     lease_end = text.find("\n    }\n}\n\nimpl Drop for MutationLease", lease_start)
