@@ -218,6 +218,8 @@ The application-level qualification suite should additionally model:
 
 ## Provider race and cleanup boundary
 
+The lab also performs a synthetic application-integrity preflight: each successor candidate carries a canonical transition record containing its claimed semantic predecessor and a digest of that transition payload. A valid candidate must have its encoded predecessor equal the actual Git commit parent. A self-consistent candidate with a deliberately wrong semantic predecessor is rejected before any ref update occurs. This exercises the #7098 boundary without claiming that the production `PromotionEligibilityLeaseV1` ledger schema has been implemented.
+
 The provider-level lab is intentionally stronger than a sequential demonstration. Its acceptance condition includes a true concurrent same-parent race, where exactly one of two valid successors may advance the ref. The losing successor may remain a valid immutable Git object but is not active because it is unreachable from the current ledger ref.
 
 Successful completion also requires deletion of the temporary refs followed by an explicit 404 observation. Cleanup is therefore part of the positive lab predicate rather than an unverified best-effort side effect.
