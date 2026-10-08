@@ -184,6 +184,309 @@ class ProviderTopologyBindingV1:
         return "observed-not-cas"
 
 
+@dataclass(frozen=True)
+class ProviderMergeResultV1:
+    result_source: str
+    status: str
+    provider_uuid: str | None
+    requested_pr_number: int
+    expected_head_sha: str
+    merge_method: str
+    merge_action: str
+    observed_merge_commit: str | None = None
+
+    def directly_binds_requested_effect(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        return (
+            self.result_source == "provider-async-result"
+            and self.status == "merged"
+            and bool(self.provider_uuid)
+            and self.requested_pr_number == identity.requested_pr_number
+            and self.expected_head_sha == identity.requested_pr_head_sha
+            and self.merge_method == identity.merge_method
+            and self.merge_action == identity.merge_action
+            and bool(self.observed_merge_commit)
+        )
+
+
+@dataclass(frozen=True)
+class PromotionCausalResolutionV1:
+    outcome: str
+    requested_effect_causal: bool
+    stack_effect_causal: bool
+
+    @classmethod
+    def resolve(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        provider_result: ProviderMergeResultV1 | None,
+        effect_set: PromotionStackEffectSetV1 | None,
+        topology_binding: ProviderTopologyBindingV1 | None,
+    ) -> "PromotionCausalResolutionV1":
+        effect_observed = (
+            effect_set is not None and effect_set.validates_complete(identity)
+        )
+        requested_causal = (
+            provider_result is not None
+            and provider_result.directly_binds_requested_effect(identity)
+        )
+
+        if requested_causal and effect_observed:
+            requested_entry = effect_set.effects[-1]
+            requested_causal = (
+                requested_entry.pr_number == identity.requested_pr_number
+                and requested_entry.expected_head_sha == identity.requested_pr_head_sha
+                and requested_entry.observed_merge_commit
+                == provider_result.observed_merge_commit
+            )
+
+        topology_cas = (
+            topology_binding is not None
+            and topology_binding.classify(identity) == "provider-topology-cas"
+        )
+        stack_causal = requested_causal and effect_observed and topology_cas
+
+        if stack_causal:
+            return cls("stack-effect-causal", True, True)
+        if requested_causal:
+            return cls("requested-effect-causal", True, False)
+        if effect_observed:
+            return cls("effect-observed-only", False, False)
+        return cls("causality-unestablished", False, False)
+
+
+def provider_merge_result_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+    *,
+    status: str = "merged",
+    provider_uuid: str | None = "uuid-1",
+    observed_merge_commit: str | None = "M2",
+) -> ProviderMergeResultV1:
+    identity = identity or stack_identity_fixture()
+    return ProviderMergeResultV1(
+        result_source="provider-async-result",
+        status=status,
+        provider_uuid=provider_uuid,
+        requested_pr_number=identity.requested_pr_number,
+        expected_head_sha=identity.requested_pr_head_sha,
+        merge_method=identity.merge_method,
+        merge_action=identity.merge_action,
+        observed_merge_commit=observed_merge_commit,
+    )
+
+
+def causal_resolution_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+    *,
+    provider_result: ProviderMergeResultV1 | None = None,
+    effect_set: PromotionStackEffectSetV1 | None = None,
+    topology_binding: ProviderTopologyBindingV1 | None = None,
+) -> PromotionCausalResolutionV1:
+    identity = identity or stack_identity_fixture()
+    return PromotionCausalResolutionV1.resolve(
+        identity,
+        provider_result if provider_result is not None else provider_merge_result_fixture(identity),
+        effect_set if effect_set is not None else stack_effect_fixture(identity),
+        topology_binding if topology_binding is not None else topology_binding_fixture(identity),
+    )
+
+
+def test_requested_effect_causality_from_direct_provider_result():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "requested-effect-causal"
+    assert resolution.requested_effect_causal
+    assert not resolution.stack_effect_causal
+
+
+def test_direct_result_plus_exact_effect_set_stays_requested_causal_without_provider_cas():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    topology = topology_binding_fixture(identity)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology,
+    )
+    assert resolution.outcome == "requested-effect-causal"
+
+
+def test_direct_result_plus_exact_effect_set_becomes_stack_causal_only_with_explicit_provider_cas():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    topology = topology_binding_fixture(identity, provider_topology_cas=True)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology,
+    )
+    assert resolution.outcome == "stack-effect-causal"
+    assert resolution.stack_effect_causal
+
+
+def test_direct_result_plus_stale_topology_remains_requested_causal_only():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    initial = provider_stack_observation_fixture(identity)
+    stale = ProviderStackObservationV1(**{**initial.__dict__, "stack_number": 42})
+    topology = topology_binding_fixture(identity, stale)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology,
+    )
+    assert resolution.outcome == "requested-effect-causal"
+
+
+def test_direct_result_plus_matching_revalidation_without_cas_is_not_stack_causal():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    topology = topology_binding_fixture(identity)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology,
+    )
+    assert resolution.outcome == "requested-effect-causal"
+    assert not resolution.stack_effect_causal
+
+
+def test_enqueued_effect_set_is_observed_only():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(
+        identity,
+        status="enqueued",
+        provider_uuid="uuid-1",
+        observed_merge_commit=None,
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "effect-observed-only"
+    assert not resolution.requested_effect_causal
+
+
+def test_already_merged_retry_with_no_uuid_is_observed_only():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(
+        identity,
+        status="merged",
+        provider_uuid=None,
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "effect-observed-only"
+
+
+def test_expired_or_missing_async_result_with_exact_effect_is_observed_only():
+    identity = stack_identity_fixture()
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=None,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "effect-observed-only"
+
+
+def test_local_receipt_without_provider_result_cannot_establish_causality():
+    identity = stack_identity_fixture()
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=None,
+        effect_set=None,
+        topology_binding=None,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_wrong_requested_head_cannot_establish_causality():
+    identity = stack_identity_fixture()
+    wrong = ProviderMergeResultV1(
+        **{
+            **provider_merge_result_fixture(identity).__dict__,
+            "expected_head_sha": "H0",
+        }
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=wrong,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "effect-observed-only"
+
+
+def test_provider_result_conflicting_requested_merge_commit_is_not_causal():
+    identity = stack_identity_fixture()
+    wrong = ProviderMergeResultV1(
+        **{
+            **provider_merge_result_fixture(identity).__dict__,
+            "observed_merge_commit": "M9",
+        }
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=wrong,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "effect-observed-only"
+
+
+def test_stack_causality_requires_complete_effect_set():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    incomplete = PromotionStackEffectSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(PromotionStackEffectV1(7085, "H1", "M1"),),
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=incomplete,
+        topology_binding=topology_binding_fixture(identity, provider_topology_cas=True),
+    )
+    assert resolution.outcome == "requested-effect-causal"
+    assert not resolution.stack_effect_causal
+
+
+def test_provider_operation_result_without_result_source_is_not_causal():
+    identity = stack_identity_fixture()
+    result = ProviderMergeResultV1(
+        **{
+            **provider_merge_result_fixture(identity).__dict__,
+            "result_source": "local-receipt",
+        }
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        topology_binding=None,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
 @dataclass
 class Reservation:
     reservation_id: str
@@ -1234,6 +1537,19 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_requested_effect_causality_from_direct_provider_result,
+    test_direct_result_plus_exact_effect_set_stays_requested_causal_without_provider_cas,
+    test_direct_result_plus_exact_effect_set_becomes_stack_causal_only_with_explicit_provider_cas,
+    test_direct_result_plus_stale_topology_remains_requested_causal_only,
+    test_direct_result_plus_matching_revalidation_without_cas_is_not_stack_causal,
+    test_enqueued_effect_set_is_observed_only,
+    test_already_merged_retry_with_no_uuid_is_observed_only,
+    test_expired_or_missing_async_result_with_exact_effect_is_observed_only,
+    test_local_receipt_without_provider_result_cannot_establish_causality,
+    test_provider_result_wrong_requested_head_cannot_establish_causality,
+    test_provider_result_conflicting_requested_merge_commit_is_not_causal,
+    test_stack_causality_requires_complete_effect_set,
+    test_provider_operation_result_without_result_source_is_not_causal,
     test_provider_topology_binding_requires_an_initial_observation,
     test_provider_topology_binding_rejects_initial_topology_mismatch,
     test_provider_topology_binding_requires_pre_submit_revalidation,
