@@ -569,6 +569,10 @@ pub struct Rfc9942ReceiptEnvelope {
     protected_extensions: Vec<Vec<u8>>,
     /// Raw encoded unprotected-header extension entries preserved verbatim.
     unprotected_extensions: Vec<Vec<u8>>,
+    /// Exact serialized Receipt bytes when parsed from wire. This prevents
+    /// verification capability identity from silently normalizing the COSE_Sign1
+    /// container representation.
+    serialized_bytes: Option<Vec<u8>>,
 }
 
 impl Rfc9942ReceiptEnvelope {
@@ -584,6 +588,7 @@ impl Rfc9942ReceiptEnvelope {
             unprotected_bytes:None,
             protected_extensions:Vec::new(),
             unprotected_extensions:Vec::new(),
+            serialized_bytes:None,
         })
     }
     pub const fn algorithm_id(&self)->i64{self.algorithm_id}
@@ -954,6 +959,9 @@ impl Rfc9942ReceiptEnvelope {
     }
 
     pub fn to_cbor(&self)->Vec<u8>{
+        if let Some(bytes) = &self.serialized_bytes {
+            return bytes.clone();
+        }
         let protected=self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned);
         let mut out=Vec::new();
         cbor_tag(&mut out,COSE_SIGN1_TAG); cbor_array_len(&mut out,4);
@@ -1119,6 +1127,7 @@ impl Rfc9942ReceiptEnvelope {
         reader.finish_indefinite_array(indefinite_array).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let mut receipt=Self::new(algorithm,vdp,payload,signature)?;
+        receipt.serialized_bytes=Some(bytes.to_vec());
         receipt.protected_bytes=Some(protected);
         receipt.unprotected_bytes=Some(unprotected_bytes);
         receipt.protected_extensions=protected_extensions;
@@ -4589,6 +4598,8 @@ mod tests {
         let decoded = Rfc9942ReceiptEnvelope::from_cbor(&wire).unwrap();
         assert_eq!(decoded.algorithm_id(), COSE_ES256_ALGORITHM_ID);
         assert_eq!(decoded.vds_id(), RFC9162_VDS_ID);
+        assert_eq!(decoded.to_cbor(), wire);
+        assert_eq!(sha256(&decoded.to_cbor()), sha256(&wire));
     }
 
     #[test]
