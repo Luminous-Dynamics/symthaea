@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/monetary-interoperability-edge-v1.schema.json",
+  "title": "Monetary Interoperability Edge v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "edge_id",
+    "semantic_version",
+    "source_profile_id",
+    "source_profile_digest",
+    "target_profile_id",
+    "target_profile_digest",
+    "directionality",
+    "adapter",
+    "conversion",
+    "settlement",
+    "finality",
+    "liquidity",
+    "failure_semantics",
+    "governance_legal_finality",
+    "evidence",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": { "const": "monetary-interoperability-edge-v1" },
+    "edge_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "semantic_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "source_profile_id": { "type": "string", "minLength": 1 },
+    "source_profile_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "target_profile_id": { "type": "string", "minLength": 1 },
+    "target_profile_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "directionality": {
+      "enum": ["directed", "bidirectional_explicitly_symmetric"]
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "adapter_id"],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined"] },
+        "adapter_id": { "type": "string", "minLength": 1 },
+        "mode": {
+          "enum": [
+            "native_common_settlement_asset",
+            "redeem_reissue",
+            "escrowed_atomic_swap",
+            "correspondent_bridge",
+            "multilateral_net_settlement",
+            "message_only",
+            "absent"
+          ]
+        },
+        "implementation_ref": { "type": "string", "minLength": 1 },
+        "authority_ref": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "specified" } } },
+          "then": { "required": ["mode"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "underdetermined" } } },
+          "then": { "not": { "required": ["mode"] } }
+        }
+      ]
+    },
+    "conversion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined", "not_applicable"] },
+        "rule": { "type": "string", "minLength": 1 },
+        "quote_source": { "type": "string", "minLength": 1 },
+        "max_quote_age": { "type": "string", "minLength": 1 },
+        "fee_rule": { "type": "string", "minLength": 1 },
+        "slippage_rule": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "specified" } } },
+          "then": { "required": ["rule"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "underdetermined" } } },
+          "then": { "not": { "required": ["rule"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "not_applicable" } } },
+          "then": { "not": { "required": ["rule"] } }
+        }
+      ]
+    },
+    "settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined"] },
+        "asset": { "type": "string", "minLength": 1 },
+        "topology": { "type": "string", "minLength": 1 },
+        "prefunding": { "type": "boolean" },
+        "netting": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "specified" } } },
+          "then": { "required": ["asset", "topology"] }
+        }
+      ]
+    },
+    "finality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined"] },
+        "model": { "enum": ["atomic", "conditional_atomic", "sequential", "probabilistic", "none"] },
+        "legal_finality": { "type": "string", "minLength": 1 },
+        "timeout": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "specified" } } },
+          "then": { "required": ["model"] }
+        }
+      ]
+    },
+    "liquidity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined"] },
+        "provider": { "type": "string", "minLength": 1 },
+        "collateral_rule": { "type": "string", "minLength": 1 },
+        "backstop": { "type": "string", "minLength": 1 },
+        "limits": { "type": "object" }
+      }
+    },
+    "failure_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "timeout",
+        "source_debit_target_credit_mismatch",
+        "replay",
+        "partition",
+        "default",
+        "recovery"
+      ],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined"] },
+        "timeout": { "enum": ["refund", "hold", "loss_allocate", "manual_recovery", "undetermined"] },
+        "source_debit_target_credit_mismatch": {
+          "enum": ["forbidden_atomic", "reversible", "loss_allocate", "allowed"]
+        },
+        "replay": { "enum": ["reject", "idempotent", "undetermined"] },
+        "partition": { "enum": ["reject_cross_partition", "queue", "route_around", "undetermined"] },
+        "default": { "enum": ["counterparty_loss", "bridge_loss", "mutualize", "external_backstop", "undetermined"] },
+        "recovery": { "enum": ["automatic_reconcile", "manual_reconcile", "new_generation", "undetermined"] }
+      }
+    },
+    "governance_legal_finality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["specified", "underdetermined"] },
+        "authority": { "type": "string", "minLength": 1 },
+        "jurisdiction": { "type": "string", "minLength": 1 },
+        "ownership_mapping": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maturity", "refs"],
+      "properties": {
+        "maturity": { "enum": ["A", "B", "C", "D", "synthetic_only"] },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "claim_ceiling": { "type": "string", "minLength": 1 }
+  }
+}
