@@ -987,6 +987,7 @@ impl NixSystemdReadOnlyObserverV1 {
             &unit_properties,
             &definition_content_digest,
             &definition_bus_id,
+            post_invocation_binding_digest,
             job,
         )?;
 
@@ -1548,6 +1549,7 @@ fn build_observation_from_properties(
     properties: &HashMap<String, OwnedValue>,
     definition_content_digest: &str,
     definition_bus_id: &str,
+    post_invocation_binding_digest: Option<String>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1610,6 +1612,31 @@ fn build_observation_from_properties(
         "StateChangeTimestampMonotonic",
     )?;
     let invocation_id = required_invocation_id(properties)?;
+    let post_invocation_binding_digest =
+        if let Some(invocation_id) = invocation_id.as_deref() {
+            let invocation_bytes = hex::decode(invocation_id)
+                .map_err(|_| NixSystemdObserverErrorV1::InvalidInvocationId)?;
+            self.resolve_invocation_id_for_observed_unit(
+                &invocation_bytes,
+                &expected_unit,
+                unit_object_path,
+                manager_owner,
+                definition_bus_id,
+            )
+            .await?;
+
+            Some(
+                super::post_state::invocation_binding_digest(
+                    Some(invocation_id),
+                    unit_object_path.as_str(),
+                    Some(manager_owner),
+                    Some(definition_bus_id),
+                )
+                .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
+            )
+        } else {
+            None
+        };
     let observed_at_monotonic_us = monotonic_now_us()?;
 
     let definition_identity = NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
@@ -1639,6 +1666,7 @@ fn build_observation_from_properties(
         systemd_manager_owner: Some(manager_owner.to_string()),
         systemd_bus_id: Some(definition_bus_id.to_string()),
         invocation_id,
+        post_invocation_binding_digest,
         state_change_at_monotonic_us,
         observed_at_monotonic_us,
     })
