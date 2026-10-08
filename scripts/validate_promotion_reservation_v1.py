@@ -522,9 +522,20 @@ class ProviderPullRequestMergeObservationV1:
 class PromotionPrEffectStateV1:
     repository: str
     expected_entry: StackEntryV1
+    operation_identity_digest: str
     state: str = "Unobserved"
     effect: PromotionStackEffectV1 | None = None
     source_delivery_ids: tuple[str, ...] = ()
+
+    def validates_operation_identity(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        return (
+            self.operation_identity_digest == identity.digest()
+            and self.repository == identity.repository
+            and self.expected_entry in identity.ordered_stack
+        )
 
     def ingest(
         self,
@@ -551,6 +562,7 @@ class PromotionPrEffectStateV1:
                 PromotionPrEffectStateV1(
                     repository=self.repository,
                     expected_entry=self.expected_entry,
+                    operation_identity_digest=self.operation_identity_digest,
                     state="EffectObserved",
                     effect=candidate,
                     source_delivery_ids=(observation.delivery_id,),
@@ -566,6 +578,7 @@ class PromotionPrEffectStateV1:
                 PromotionPrEffectStateV1(
                     repository=self.repository,
                     expected_entry=self.expected_entry,
+                    operation_identity_digest=self.operation_identity_digest,
                     state="Conflict",
                     effect=None,
                     source_delivery_ids=self.source_delivery_ids,
@@ -580,6 +593,7 @@ class PromotionPrEffectStateV1:
             PromotionPrEffectStateV1(
                 repository=self.repository,
                 expected_entry=self.expected_entry,
+                operation_identity_digest=self.operation_identity_digest,
                 state=self.state,
                 effect=self.effect,
                 source_delivery_ids=self.source_delivery_ids + (observation.delivery_id,),
@@ -1126,7 +1140,29 @@ def effect_state_fixture(
     return PromotionPrEffectStateV1(
         repository=identity.repository,
         expected_entry=entry,
+        operation_identity_digest=identity.digest(),
     )
+
+
+def test_effect_state_binds_to_exact_operation_identity():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    assert state.validates_operation_identity(identity)
+
+    changed_identity = PromotionOperationIdentityV1(
+        repository=identity.repository,
+        provider_stack_number=identity.provider_stack_number,
+        requested_pr_number=identity.requested_pr_number,
+        requested_pr_head_sha=identity.requested_pr_head_sha,
+        base_ref=identity.base_ref,
+        base_tip_sha="BASE-OTHER",
+        ordered_stack=identity.ordered_stack,
+        merge_method=identity.merge_method,
+        merge_action=identity.merge_action,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+    )
+    assert not state.validates_operation_identity(changed_identity)
 
 
 def test_effect_state_admits_first_authenticated_merge():
@@ -3465,6 +3501,7 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_effect_state_binds_to_exact_operation_identity,
     test_effect_state_conflict_is_absorbing,
     test_effect_state_conflict_never_reclassifies_as_terminal_observed,
     test_effect_state_admits_first_authenticated_merge,
