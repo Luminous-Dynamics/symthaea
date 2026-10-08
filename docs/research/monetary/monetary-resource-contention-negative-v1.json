@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-resource-contention-negative-v1",
+  "cases":[
+    {"id":"RES-X01","kind":"capacity_inferred_from_monetary_profile","expected":"reject"},
+    {"id":"RES-X02","kind":"owner_inferred_from_topology","expected":"reject"},
+    {"id":"RES-X03","kind":"capacity_change_without_new_generation","expected":"reject_generation_mismatch"},
+    {"id":"RES-X04","kind":"reservation_released_before_declared_event","expected":"reject_release_violation"},
+    {"id":"RES-X05","kind":"mixed_asset_units_in_liquidity_counter","expected":"reject_typed_units"},
+    {"id":"RES-X06","kind":"queue_depth_added_to_settlement_time","expected":"reject_metric_collapse"},
+    {"id":"RES-X07","kind":"operator_capacity_treated_as_infinite","expected":"reject"},
+    {"id":"RES-X08","kind":"resource_bottleneck_hidden_inside_topology_label","expected":"reject_factor_leakage"},
+    {"id":"RES-X09","kind":"same_resource_digest_for_different_owner_scope","expected":"reject_digest_mismatch"},
+    {"id":"RES-X10","kind":"resource_exhaustion_silently_retried_as_success","expected":"reject_hidden_recovery"},
+    {"id":"RES-X11","kind":"fifo_order_mutated_without_new_resource_generation","expected":"reject_generation_mismatch"},
+    {"id":"RES-X12","kind":"resource_blast_radius_averaged_into_completion_rate","expected":"reject_hidden_concentration"}
+  ]
+}
