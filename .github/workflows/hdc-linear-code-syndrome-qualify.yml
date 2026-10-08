@@ -49,7 +49,6 @@ jobs:
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
           PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
-          gh auth setup-git
           git fetch --no-tags --depth=1 origin "$PARENT_SHA"
           test -n "$EVENT_HEAD_SHA"
           test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
