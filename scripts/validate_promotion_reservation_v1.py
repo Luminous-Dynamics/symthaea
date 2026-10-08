@@ -5028,6 +5028,13 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_clock_source_set_accepts_three_independent_sources,
+    test_clock_source_set_requires_at_least_three_sources,
+    test_clock_source_set_rejects_weak_policy,
+    test_clock_source_set_rejects_duplicate_operator,
+    test_clock_source_set_rejects_time_disagreement,
+    test_clock_source_set_binds_operation_identity,
+    test_clock_source_set_digest_changes_with_member,
     test_local_temporal_sequence_evidence_rejects_invalid_generation,
     test_local_temporal_sequence_evidence_binds_sequence_digest,
     test_temporal_effect_without_sequence_provenance_is_not_admissible,
