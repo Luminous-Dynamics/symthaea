@@ -162,17 +162,19 @@ def main() -> None:
     preflight_body = "\n".join(lines[preflight_start:next_preflight])
     if "run_cmd(" in preflight_body:
         fail("pre_install_check still uses the shell-string executor")
-    if "run_privileged_script_with_args(" not in preflight_body:
-        fail("pre_install_check lost typed script argv execution")
+    if "stage_trusted_script(" not in preflight_body:
+        fail("pre_install_check lost exact script staging")
+    if "run_privileged_script_file(" not in preflight_body:
+        fail("pre_install_check lost descriptor-bound script execution")
     if '"{disk}"' in preflight_body:
         fail("pre_install_check interpolates the browser disk into shell source")
     if '&[&disk]' not in preflight_body:
         fail("pre_install_check no longer passes disk as a script argument")
+    if "staged_preflight.file" not in preflight_body:
+        fail("pre_install_check does not execute the exact staged script descriptor")
+    if "preflight script commitment" not in preflight_body:
+        fail("pre_install_check does not record its exact script commitment")
 
-    if "run_privileged_script_with_args(" not in preflight_body:
-        fail("pre_install_check lost typed script execution")
-    if "privileged_script_command(" in preflight_body:
-        fail("pre_install_check arm bypasses the descriptor-bound script runner")
 
     script_start = text.find("fn open_trusted_script(")
     if script_start < 0:
@@ -217,7 +219,22 @@ def main() -> None:
         if needle in text:
             fail(f"secret material cleanup regressed to shell construction: {needle!r}")
 
-    # Typed execution is closed-world: bare program names must first pass
+    descriptor_start = text.find("fn stage_trusted_script(")
+    descriptor_end = text.find("\nfn open_trusted_script(", descriptor_start)
+    if descriptor_start < 0 or descriptor_end < 0:
+        fail("staged script descriptor capability disappeared")
+    descriptor_body = text[descriptor_start:descriptor_end]
+    for required in (
+        "blake3::hash(contents)",
+        "file.sync_all()",
+        "file.read_to_end",
+        "observed_hash.as_bytes() != expected.as_bytes()",
+        "file.seek(SeekFrom::Start(0))",
+    ):
+        if required not in descriptor_body:
+            fail(f"staged script capability lost required exact-byte guard {required!r}")
+
+        # Typed execution is closed-world: bare program names must first pass
     # through the trusted executable resolver, and the resolver must pin them
     # to the current NixOS system closure instead of PATH search.
     typed_start = text.find("async fn run_privileged_args(")
