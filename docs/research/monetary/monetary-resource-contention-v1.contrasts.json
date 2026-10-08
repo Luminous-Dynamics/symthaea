@@ -1,0 +1,32 @@
+{
+  "schema_version":"monetary-resource-contention-v1-contrasts",
+  "resource_effects_vs_unrestricted":{
+    "bounded_shared_settlement_liquidity":{
+      "completion_delta":-0.04166666666666663,
+      "operational_wait_delta":2.196693121693121,
+      "liquidity_queue_delta":0.27777777777777773
+    },
+    "bounded_operator_capacity":{
+      "completion_delta":0.0,
+      "operational_wait_delta":0.5333333333333332,
+      "operator_queue_delta":0.10833333333333334
+    },
+    "both_bounded":{
+      "completion_delta":-0.04166666666666663,
+      "operational_wait_delta":2.7109788359788354,
+      "liquidity_queue_delta":0.27777777777777773,
+      "operator_queue_delta":0.09166666666666666
+    }
+  },
+  "adapter_resource_interaction":{
+    "bounded_shared_settlement_liquidity":{"redeem_reissue":0.0,"escrowed_atomic_swap":-0.16666666666666663,"multilateral_net_settlement":0.0},
+    "bounded_operator_capacity":{"redeem_reissue":0.0,"escrowed_atomic_swap":0.0,"multilateral_net_settlement":0.0},
+    "both_bounded":{"redeem_reissue":0.0,"escrowed_atomic_swap":-0.16666666666666663,"multilateral_net_settlement":0.0}
+  },
+  "shock_resource_interaction":{
+    "bounded_shared_settlement_liquidity":{"normal":0.0,"liquidity_shock":-0.25,"network_partition":0.0,"issuer_default":0.0,"bridge_failure":0.0,"stale_quote":0.0},
+    "bounded_operator_capacity":{"normal":0.0,"liquidity_shock":0.0,"network_partition":0.0,"issuer_default":0.0,"bridge_failure":0.0,"stale_quote":0.0},
+    "both_bounded":{"normal":0.0,"liquidity_shock":-0.25,"network_partition":0.0,"issuer_default":0.0,"bridge_failure":0.0,"stale_quote":0.0}
+  },
+  "crn_correction":"Exogenous manual-breakpoint stream is treatment-invariant: world:{shock}:{seed}:obligation:{index}. Previous execution digests using treatment-dependent request keys are superseded."
+}

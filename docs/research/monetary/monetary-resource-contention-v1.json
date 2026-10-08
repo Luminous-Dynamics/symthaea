@@ -1,0 +1,60 @@
+{
+  "schema_version":"monetary-resource-contention-v1",
+  "experiment_id":"monetary-interop-resource-contention-v1",
+  "factorial_size":4320,
+  "batch_size":3,
+  "factors":{
+    "topology":["full_mesh","routing_only_hub","redundant_two_hub"],
+    "monetary_pair":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],
+    "adapter":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],
+    "shock":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"],
+    "seed":[11,23,47,89,131],
+    "resource_regime":["unrestricted","bounded_shared_settlement_liquidity","bounded_operator_capacity","both_bounded"]
+  },
+  "resources":{
+    "unrestricted_settlement_liquidity":{
+      "resource_id":"unrestricted-settlement-liquidity-v1","resource_kind":"settlement_liquidity","owner_scope":"experiment","unit":"synthetic_liquidity_units","capacity":30,"reservation_scope":"batch","allocation_policy":"fifo","exhaustion_disposition":"queue","release_condition":"technical_settlement_or_failure","generation":"r1","digest":"4ee5629e5bba88e39a76f4d0bf09d6f9f8cf2175cf9c705a134a85ae08b4e612"
+    },
+    "bounded_shared_settlement_liquidity":{
+      "resource_id":"bounded-shared-settlement-liquidity-v1","resource_kind":"settlement_liquidity","owner_scope":"shared_adapter_pool","unit":"synthetic_liquidity_units","capacity":15,"reservation_scope":"batch","allocation_policy":"fifo","exhaustion_disposition":"queue_or_reject_if_demand_exceeds_capacity","release_condition":"technical_settlement_or_failure","generation":"r2","digest":"8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7"
+    },
+    "bounded_operator_capacity":{
+      "resource_id":"bounded-operator-capacity-v1","resource_kind":"operator_capacity","owner_scope":"shared_operations","unit":"concurrent_manual_requests","capacity":1,"reservation_scope":"workflow","allocation_policy":"fifo","exhaustion_disposition":"queue","release_condition":"manual_intervention_complete","generation":"r3","digest":"dc31ad937f954b025b99c084f566bb747cdfe27f3b2ffa4827290e0fc1f254e1"
+    }
+  },
+  "resource_regimes":{
+    "unrestricted":["unrestricted_settlement_liquidity"],
+    "bounded_shared_settlement_liquidity":["bounded_shared_settlement_liquidity"],
+    "bounded_operator_capacity":["unrestricted_settlement_liquidity","bounded_operator_capacity"],
+    "both_bounded":["bounded_shared_settlement_liquidity","bounded_operator_capacity"]
+  },
+  "fixed_dimensions":{
+    "topology_digest_set":{
+      "full_mesh":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
+      "routing_only_hub":"90d10f6025f7200a3c4ff2863e755e29b7d40bbc437729410ef4ff06ba80d0e3",
+      "redundant_two_hub":"400c93eabda6ceb9d224fa4944f458ab410233c1c13404297c64ab53ad077a47"
+    },
+    "routing_policy_digest":"a5435036c4791a6dc0275771d73f78c2c54f02d64fbe2de88adbdb2b7c5901c3",
+    "profile_digests":{
+      "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+    },
+    "edge_digests":{
+      "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
+      "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
+      "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
+    },
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous jitter across all treatment factors",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+    "liquidity_demand_units":{"redeem_reissue":10,"escrowed_atomic_swap":15,"multilateral_net_settlement":7,"absent":0},
+    "liquidity_shock_increment":5,
+    "manual_breakpoint_probability_ppm":300000,
+    "allocation_policy":"fifo",
+    "resource_identity_rule":"capacity or owner or allocation or release mutation requires a new resource generation and digest",
+    "no_capacity_inference":true
+  },
+  "claim_ceiling":"Synthetic shared-resource contention factorial only; identifies resource-conditioned behavior inside the declared model. It does not establish empirical causal effects, monetary superiority, systemic safety, legal finality, solvency, or live interoperability."
+}
