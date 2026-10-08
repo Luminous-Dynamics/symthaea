@@ -15,7 +15,7 @@ jobs:
       - name: Exercise provider-level promotion ledger serialization
         env:
           GH_TOKEN: ${{ github.token }}
-          LAB_REF: refs/heads/_qual-promotion-cas-lab-${{ github.run_id }}
+          LAB_REF: refs/heads/_qual-promotion-cas-lab-${{ github.run_id }}-${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
@@ -23,7 +23,7 @@ jobs:
           api_root="https://api.github.com/repos/${GITHUB_REPOSITORY}"
           ref_path="${LAB_REF#refs/}"
 
-          RACE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-race"
+          RACE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-race"
           race_ref_path="${RACE_REF#refs/}"
 
           delete_ref() {
@@ -112,8 +112,9 @@ jobs:
           create_commit() {
             local message="$1"
             local parent="$2"
+            local scoped_message="qual-cas-lab:${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}: ${message}"
             jq -n \
-              --arg message "${message}" \
+              --arg message "${scoped_message}" \
               --arg tree "${TREE_SHA}" \
               --arg parent "${parent}" \
               '{message:$message, tree:$tree, parents:[$parent]}' \
@@ -251,6 +252,8 @@ jobs:
             echo "## Promotion ledger Git-ref CAS lab"
             echo
             echo "- repository: \`${GITHUB_REPOSITORY}\`"
+            echo "- run_id: \`${GITHUB_RUN_ID}\`"
+            echo "- run_attempt: \`${GITHUB_RUN_ATTEMPT}\`"
             echo "- main_head: \`${BASE_SHA}\`"
             echo "- lab_ref: \`${LAB_REF}\`"
             echo "- winner_success_http: \`${winner_status}\`"
