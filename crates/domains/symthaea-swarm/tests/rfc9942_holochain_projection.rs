@@ -390,13 +390,6 @@ fn unprotected_outer_metadata_is_not_authenticated_but_is_provenance_bound() {
         .windows(4)
         .position(|window| window == [0xa1, 0x19, 0x01, 0x8a])
         .expect("receipt header marker");
-    let payload_marker = baseline_wire
-        .windows(1)
-        .enumerate()
-        .skip(collection_start + 4)
-        .find(|(_, byte)| **byte == 0x49)
-        .map(|(index, _)| index)
-        .expect("payload bstr marker");
 
     // The existing unprotected map is {394: collection}; replace its map
     // header with a two-member map and insert an opaque extension before 394.
@@ -428,7 +421,6 @@ fn unprotected_outer_metadata_is_not_authenticated_but_is_provenance_bound() {
         modified_verified.outer_signature_with_receipt_sha256()
     );
     assert_ne!(modified_wire, baseline_wire);
-    let _ = payload_marker;
 }
 #[cfg(feature = "semantic-receipts")]
 #[test]
