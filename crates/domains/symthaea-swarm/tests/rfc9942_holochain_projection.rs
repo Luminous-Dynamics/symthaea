@@ -232,8 +232,10 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
         symthaea_swarm::rfc9942_selection::ReceiptSelectionCandidateStatus::NotEvaluatedAfterSelection
     ));
 
-    let witness =
-        Rfc9942VerifiedReceiptSelection::bind(&decision, &collection, &first_verified).unwrap();
+    // Durable witness construction is exercised by the atomic API in the
+    // dedicated end-to-end regression below; here the manually verified
+    // Receipt path remains useful for testing exact capability/collection
+    // compatibility.
     let context = ReceiptSelectionContext::from_verified_selection(&witness).unwrap();
 
     assert_eq!(
