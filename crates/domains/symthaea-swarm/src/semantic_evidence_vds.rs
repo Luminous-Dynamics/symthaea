@@ -4664,6 +4664,40 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_rejects_receipts_header_in_both_buckets() {
+        let proof =
+            Rfc9162InclusionProof::new(1, 0, Vec::new()).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+        let receipt = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached([0x22; 32]),
+            vec![0xAA; 64],
+        )
+        .unwrap();
+        let collection =
+            Rfc9942ReceiptCollection::new(vec![receipt]).unwrap().to_cbor();
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 1);
+        cbor_int(&mut protected, RFC9942_RECEIPTS_HEADER_LABEL);
+        protected.extend_from_slice(&collection);
+
+        let mut wire = vec![0xd2, 0x84];
+        cbor_bytes(&mut wire, &protected);
+        cbor_map_len(&mut wire, 1);
+        cbor_int(&mut wire, RFC9942_RECEIPTS_HEADER_LABEL);
+        wire.extend_from_slice(&collection);
+        cbor_bytes(&mut wire, &[0x00]);
+        cbor_bytes(&mut wire, &[0xAA; 64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&wire),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+    }
+
+    #[test]
     fn rfc9942_receipt_accepts_indefinite_cose_sign1_array() {
         let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
         let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
