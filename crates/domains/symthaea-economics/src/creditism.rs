@@ -16,7 +16,7 @@
 //!
 //! It is not a macroeconomic simulator, governance engine, or policy oracle.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map::Entry};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreditismError {
@@ -37,6 +37,7 @@ pub enum CreditismError {
     },
     NonFiniteAmount,
     NonFiniteResult,
+    DuplicateAccount(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -73,8 +74,16 @@ impl PersonalCreditLedger {
     ) -> Result<Self, CreditismError> {
         let mut ledger = Self::new();
         for (account, amount) in balances {
+            validate_account(&account)?;
             validate_amount(amount)?;
-            ledger.balances.insert(account, amount);
+            match ledger.balances.entry(account) {
+                Entry::Vacant(entry) => {
+                    entry.insert(amount);
+                }
+                Entry::Occupied(entry) => {
+                    return Err(CreditismError::DuplicateAccount(entry.key().clone()));
+                }
+            }
         }
         ledger.opening_stock = ledger.total_balance();
         Ok(ledger)
@@ -249,9 +258,7 @@ impl PersonalCreditLedger {
 
     fn issue(&mut self, account: &str, amount: f64) -> Result<(), CreditismError> {
         validate_amount(amount)?;
-        if account.is_empty() {
-            return Err(CreditismError::UnknownAccount(account.to_owned()));
-        }
+        validate_account(account)?;
         let current_balance = self.balance(account);
         let new_balance = current_balance + amount;
         let new_issued = self.issued + amount;
@@ -288,6 +295,13 @@ impl Default for PersonalCreditLedger {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn validate_account(account: &str) -> Result<(), CreditismError> {
+    if account.is_empty() {
+        return Err(CreditismError::UnknownAccount(account.to_owned()));
+    }
+    Ok(())
 }
 
 fn validate_amount(amount: f64) -> Result<(), CreditismError> {
@@ -420,6 +434,25 @@ mod tests {
         assert_eq!(settlement.buyer_deleted, 20.0);
         assert_eq!(settlement.seller_recognized, 0.0);
         assert!(ledger.reconciles(0.0));
+    }
+
+    #[test]
+    fn opening_state_rejects_duplicate_accounts() {
+        assert_eq!(
+            PersonalCreditLedger::from_opening_balances([
+                ("alice".to_owned(), 10.0),
+                ("alice".to_owned(), 20.0),
+            ]),
+            Err(CreditismError::DuplicateAccount("alice".to_owned()))
+        );
+    }
+
+    #[test]
+    fn opening_state_rejects_empty_accounts() {
+        assert_eq!(
+            PersonalCreditLedger::from_opening_balances([("".to_owned(), 10.0)]),
+            Err(CreditismError::UnknownAccount(String::new()))
+        );
     }
 
     fn malformed_amounts_fail_closed() {
