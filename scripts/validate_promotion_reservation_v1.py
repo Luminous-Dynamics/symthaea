@@ -31,6 +31,7 @@ class StackEntryV1:
 @dataclass(frozen=True)
 class PromotionOperationIdentityV1:
     repository: str
+    provider_stack_number: int
     requested_pr_number: int
     requested_pr_head_sha: str
     base_ref: str
@@ -44,6 +45,7 @@ class PromotionOperationIdentityV1:
     def canonical_bytes(self) -> bytes:
         payload = {
             "base_ref": self.base_ref,
+            "provider_stack_number": self.provider_stack_number,
             "base_tip_sha": self.base_tip_sha,
             "governance_generation": self.governance_generation,
             "merge_action": self.merge_action,
@@ -112,10 +114,10 @@ class ProviderStackObservationV1:
     base_ref: str
     base_tip_sha: str
     ordered_stack: tuple[StackEntryV1, ...]
-    observation_id: str = ""
+    observation_id: str | None = None
 
     def internally_consistent(self, requested_pr_number: int) -> bool:
-        if not self.observation_source or not self.observation_id:
+        if not self.observation_source:
             return False
         if self.stack_number <= 0 or self.stack_size <= 0:
             return False
@@ -134,6 +136,8 @@ class ProviderStackObservationV1:
         if not self.internally_consistent(identity.requested_pr_number):
             return False
         operation_depth = len(identity.ordered_stack)
+        if self.stack_number != identity.provider_stack_number:
+            return False
         if self.stack_position != operation_depth:
             return False
         if tuple(self.ordered_stack[:operation_depth]) != identity.ordered_stack:
@@ -482,6 +486,7 @@ def run_race_schedule(schedule):
 def stack_identity_fixture() -> PromotionOperationIdentityV1:
     return PromotionOperationIdentityV1(
         repository="Luminous-Dynamics/symthaea",
+        provider_stack_number=41,
         requested_pr_number=7087,
         requested_pr_head_sha="H3",
         base_ref="main",
@@ -516,7 +521,7 @@ def provider_stack_observation_fixture(
     identity = identity or stack_identity_fixture()
     return ProviderStackObservationV1(
         observation_source="rest-pull-request-stack",
-        stack_number=41,
+        stack_number=identity.provider_stack_number,
         stack_size=3,
         stack_position=2,
         base_ref=identity.base_ref,
@@ -536,11 +541,9 @@ def test_provider_stack_observation_exact_selected_prefix_matches():
     assert observation.matches_reserved(identity)
 
 
-def test_provider_stack_observation_missing_identity_is_unrepresented():
+def test_provider_stack_observation_missing_value_fails_closed():
     identity = stack_identity_fixture()
-    observation = provider_stack_observation_fixture(identity)
-    assert observation.operation_depth if False else True
-    assert observation.matches_reserved(identity)
+    assert not provider_stack_observation_matches_reserved(None, identity)
 
 
 def test_provider_stack_observation_rejects_stack_number_drift():
@@ -657,13 +660,12 @@ def test_provider_stack_observation_rejects_malformed_size_or_position():
     assert not bad_position.matches_reserved(identity)
 
 
-def test_provider_stack_observation_rejects_missing_observation_identity():
+def test_provider_stack_observation_allows_missing_optional_observation_id():
     identity = stack_identity_fixture()
-    observation = provider_stack_observation_fixture(identity)
-    changed = ProviderStackObservationV1(
-        **{**observation.__dict__, "observation_id": ""}
+    observation = ProviderStackObservationV1(
+        **{**provider_stack_observation_fixture(identity).__dict__, "observation_id": None}
     )
-    assert not changed.matches_reserved(identity)
+    assert observation.matches_reserved(identity)
 
 
 def test_stack_effect_set_exact_match_is_complete():
@@ -825,6 +827,14 @@ def test_stack_identity_binds_authority_generations():
     )
     assert original.digest() != changed_root.digest()
     assert original.digest() != changed_governance.digest()
+
+
+def test_stack_identity_binds_provider_stack_number():
+    original = stack_identity_fixture()
+    changed = PromotionOperationIdentityV1(
+        **{**original.__dict__, "provider_stack_number": 42},
+    )
+    assert original.digest() != changed.digest()
 
 
 def test_stack_identity_binds_requested_subject_identity():
@@ -1107,7 +1117,7 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 TESTS = [
     test_provider_stack_observation_exact_selected_prefix_matches,
-    test_provider_stack_observation_missing_identity_is_unrepresented,
+    test_provider_stack_observation_missing_value_fails_closed,
     test_provider_stack_observation_rejects_stack_number_drift,
     test_provider_stack_observation_rejects_base_ref_drift,
     test_provider_stack_observation_rejects_base_tip_drift,
@@ -1118,7 +1128,7 @@ TESTS = [
     test_provider_stack_observation_rejects_requested_head_drift,
     test_provider_stack_observation_allows_unrelated_upper_stack_growth,
     test_provider_stack_observation_rejects_malformed_size_or_position,
-    test_provider_stack_observation_rejects_missing_observation_identity,
+    test_provider_stack_observation_allows_missing_optional_observation_id,
     test_stack_effect_set_exact_match_is_complete,
     test_stack_effect_set_missing_bottom_entry_is_incomplete,
     test_stack_effect_set_missing_requested_entry_is_incomplete,
@@ -1135,6 +1145,7 @@ TESTS = [
     test_stack_identity_binds_base_tip,
     test_stack_identity_binds_merge_parameters,
     test_stack_identity_binds_authority_generations,
+    test_stack_identity_binds_provider_stack_number,
     test_stack_identity_binds_requested_subject_identity,
     test_exact_20_schedules_are_executed,
     test_single_use_reservation,
