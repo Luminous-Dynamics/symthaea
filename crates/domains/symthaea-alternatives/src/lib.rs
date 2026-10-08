@@ -8368,6 +8368,43 @@ mod tests {
             .frontier_digest = "different-frontier-record-digest".into();
         assert_ne!(first, frontier_record_drift.canonical_digest().unwrap());
 
+        let mut branch_location_drift = topology.clone();
+        branch_location_drift.input_bindings[0].node_id = "reference-a".into();
+        assert_eq!(
+            topology.input_frontier.input_set_digest,
+            branch_location_drift.input_frontier.input_set_digest
+        );
+        assert_ne!(first, branch_location_drift.canonical_digest().unwrap());
+
+        let mut role_drift = topology.clone();
+        role_drift.input_bindings[0].role = MeasurementModelInputRole::Influence;
+        role_drift.input_frontier.input_set_digest =
+            canonical_measurement_model_input_frontier_digest(&role_drift.input_bindings).unwrap();
+        assert_ne!(first, role_drift.canonical_digest().unwrap());
+        role_drift
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        let mut specification_drift = topology.clone();
+        specification_drift.input_bindings[0]
+            .input_specification
+            .specification_revision = "v2".into();
+        specification_drift.input_frontier.input_set_digest =
+            canonical_measurement_model_input_frontier_digest(&specification_drift.input_bindings)
+                .unwrap();
+        assert_ne!(first, specification_drift.canonical_digest().unwrap());
+        specification_drift
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
         topology.nodes.reverse();
         topology.edges.reverse();
         topology.input_bindings.reverse();
@@ -8797,11 +8834,10 @@ mod tests {
         ));
 
         let mut wrong_frontier_set = topology.clone();
+        let mut wrong_frontier_input = wrong_frontier_set.input_bindings[0].clone();
+        wrong_frontier_input.input_quantity_id = "fixture-input-other".into();
         wrong_frontier_set.input_frontier.input_set_digest =
-            canonical_measurement_model_input_frontier_digest(&[
-                "fixture-input-other".into(),
-            ])
-            .unwrap();
+            canonical_measurement_model_input_frontier_digest(&[wrong_frontier_input]).unwrap();
         assert!(matches!(
             wrong_frontier_set
                 .validate_against_observation(
