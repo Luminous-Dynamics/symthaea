@@ -702,6 +702,45 @@ jobs:
             const staleAssociationViewPassed =
               staleAssociationEvaluation.qualificationResult === 'PASS';
 
+            const syntheticGovernanceVerified = {
+              observation_identity_sha256: 'g'.repeat(64),
+              default_branch: 'main',
+              verified: true,
+              verification_basis: 'synthetic_test',
+              ruleset_count: 1,
+              branch_protection_accessible: true,
+              required_status_context: STATUS_CONTEXT,
+            };
+            const syntheticLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: syntheticEvidence(),
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const syntheticLeasePassed =
+              syntheticLease.lease_state === 'ELIGIBLE' &&
+              syntheticLease.invalidation_reasons.length === 0 &&
+              /^[0-9a-f]{64}$/.test(syntheticLease.lease_id_sha256);
+
+            const governanceUnverifiedLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: syntheticEvidence(),
+              governanceObservation: {
+                ...syntheticGovernanceVerified,
+                verified: false,
+              },
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const governanceLeaseInvalidationPassed =
+              governanceUnverifiedLease.lease_state === 'NOT_ELIGIBLE' &&
+              governanceUnverifiedLease.invalidation_reasons.includes(
+                'governance_authority_unverified'
+              );
+
             const adversarialResults = [];
             for (const [name, mutate] of attackCases) {
               const mutated = JSON.parse(JSON.stringify(syntheticEvidence()));
@@ -720,7 +759,9 @@ jobs:
               adversarialCorpusShapeValid &&
               syntheticBaselinePassed &&
               adversarialResults.length === attackCases.length &&
-              adversarialResults.every((result) => result.passed);
+              adversarialResults.every((result) => result.passed) &&
+              syntheticLeasePassed &&
+              governanceLeaseInvalidationPassed;
 
             const runId = context.payload.workflow_run?.id;
             if (!Number.isInteger(runId) || runId <= 0) {
@@ -1058,6 +1099,8 @@ jobs:
                 baseline_result: syntheticBaseline.qualificationResult,
                 baseline_passed: syntheticBaselinePassed,
                 passed: adversarialCorpusPassed,
+                lease_baseline_passed: syntheticLeasePassed,
+                governance_invalidation_lease_passed: governanceLeaseInvalidationPassed,
                 cases: adversarialResults,
               },
               subject: {
