@@ -275,6 +275,24 @@ def main() -> None:
     if '"NIX_PATH"' not in nix_script_body:
         fail("installer script capability lost its explicit NIX_PATH environment")
 
+    process_start = text.find("fn preservation_process_identity(")
+    process_end = text.find("\nfn preservation_user_identity", process_start)
+    if process_start < 0 or process_end < 0:
+        fail("preservation process identity helper disappeared")
+    process_body = text[process_start:process_end]
+    for required in (
+        "parse_proc_effective_uid",
+        "status",
+        "read_link",
+        "exe",
+        "uid()",
+        "permissions().mode()",
+    ):
+        if required not in process_body:
+            fail(f"preservation process identity lost required discriminator {required!r}")
+    if "preservation_process_exists(" in text:
+        fail("name-only preservation_process_exists helper regressed into relay source")
+
     sensitive_start = text.find("fn cleanup_sensitive_file(path: &str) -> Result<(), String> {")
     sensitive_end = text.find("\nfn cleanup_sensitive_files(", sensitive_start)
     if sensitive_start < 0 or sensitive_end < 0:
