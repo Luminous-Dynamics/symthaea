@@ -649,9 +649,14 @@ impl TransactionLedger {
                     MAX_JOURNAL_EVENT_BYTES
                 ));
             }
-            if line.last().copied() == Some(b'\n') {
-                line.pop();
+            if line.last().copied() != Some(b'\n') {
+                return Err(format!(
+                    "transaction ledger {} line {} is unterminated; refusing a potentially partial event",
+                    self.path.display(),
+                    line_number
+                ));
             }
+            line.pop();
             if line.last().copied() == Some(b'\r') {
                 line.pop();
             }
@@ -2067,6 +2072,36 @@ mod tests {
         let ledger = TransactionLedger::open_at(&path).unwrap();
         let error = ledger.load().expect_err("truncated JSON must fail closed");
         assert!(error.contains("malformed"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ledger_rejects_valid_json_without_record_delimiter() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-transaction-ledger-missing-newline-{name}.jsonl"));
+        let event = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "event": "started",
+            "request_id": "missing-newline-0001",
+            "transaction_id": "0123456789abcdef0123456789abcdef",
+            "mutation": "install",
+            "target_machine_digest": null,
+            "request_digest": "a".repeat(64),
+            "outcome": null
+        });
+        std::fs::write(&path, event.to_string()).unwrap();
+        std::fs::set_permissions(
+            &path,
+            std::os::unix::fs::PermissionsExt::from_mode(0o600),
+        )
+        .unwrap();
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let error = ledger
+            .load()
+            .expect_err("valid JSON without newline must fail closed");
+        assert!(error.contains("unterminated"));
         let _ = std::fs::remove_file(path);
     }
 
