@@ -1,0 +1,28 @@
+{
+  "schema_version":"monetary-crn-supersession-v1",
+  "namespace":"world:{shock}:{seed}:obligation:{index}",
+  "entries":[
+    {
+      "experiment":"topology-factorial-v1",
+      "superseded_digest":"59467a5bdfb712205c1582ab3a125f820fb9cf734cd5152c687ba2f3cfb792e8",
+      "replacement_digest":"6bd40ac4a502a2f44cd1f9dd0d6e38a95906006bab980eccd58bb3c8e62dfe54",
+      "status":"superseded",
+      "reason":"manual-breakpoint randomness was keyed through a topology-dependent request identifier; corrected run uses a treatment-independent exogenous namespace."
+    },
+    {
+      "experiment":"resource-contention-v1",
+      "superseded_digest":"a8f79ed8c5a3fd372cbbe482e5ae69c07fc681f1151509432f01631fc78d9cce",
+      "replacement_digest":"f295421ad864e47b2f00e81a13f2cb3e7d44457e2da1e6444d1271a545502130",
+      "status":"superseded",
+      "reason":"manual-breakpoint randomness was keyed through treatment-dependent resource/topology identifiers; corrected run uses world:{shock}:{seed}:obligation:{index}."
+    },
+    {
+      "experiment":"causal-factorial-v1",
+      "superseded_digest":"3b29048fd3bd6ed222caded873d54f8c5c1cdfd555fc2cbcb858980e3ea57a64",
+      "replacement_digest":"3b29048fd3bd6ed222caded873d54f8c5c1cdfd555fc2cbcb858980e3ea57a64",
+      "status":"confirmed",
+      "reason":"the runner already used a treatment-independent request key and the operational baseline has zero manual-breakpoint probability; explicit namespace binding was added without changing the execution trace."
+    }
+  ],
+  "claim_ceiling":"Evidence bookkeeping only. Supersession controls repository evidence reuse; it is not qualification, empirical validation, or proof of model correctness."
+}
