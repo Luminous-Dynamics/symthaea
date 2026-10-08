@@ -218,6 +218,20 @@ impl VulkanSynchronizationFeatureProfile {
     }
 }
 
+fn synchronization_feature_profile_from_device_create(
+    timeline_semaphore_supported: bool,
+    synchronization2_supported: bool,
+    timeline_semaphore_enabled: vk::Bool32,
+    synchronization2_enabled: vk::Bool32,
+) -> VulkanSynchronizationFeatureProfile {
+    VulkanSynchronizationFeatureProfile::new(
+        timeline_semaphore_supported,
+        synchronization2_supported,
+        timeline_semaphore_enabled != 0,
+        synchronization2_enabled != 0,
+    )
+}
+
 pub struct VulkanBarrierExecutionReceipt {
     pub version: u16,
     pub graph_digest: String,
@@ -543,12 +557,6 @@ impl VulkanBarrierWorkloadRuntime {
                 return Err(VulkanBarrierError::NoQualifiedDevice);
             }
         };
-        let synchronization_features = VulkanSynchronizationFeatureProfile::new(
-            timeline_semaphore_supported,
-            synchronization2_supported,
-            true,
-            true,
-        );
         let props = unsafe { instance.get_physical_device_properties(physical) };
         let queue_family_identity_digest =
             queue_family_identity_digest(family, &queue_family_properties);
@@ -595,6 +603,13 @@ impl VulkanBarrierWorkloadRuntime {
         let queue_info = vk::DeviceQueueCreateInfo::default().queue_family_index(family).queue_priorities(&priorities);
         let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
         let mut sync2 = vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true);
+        // Bind the receipt to the exact feature values passed through this device-create pNext chain.
+        let synchronization_features = synchronization_feature_profile_from_device_create(
+            timeline_semaphore_supported,
+            synchronization2_supported,
+            timeline.timeline_semaphore,
+            sync2.synchronization2,
+        );
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(std::slice::from_ref(&queue_info))
             .push_next(&mut timeline)
@@ -3103,6 +3118,35 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::ImplementationIdentity)
         ));
+    }
+
+    #[test]
+    fn synchronization_feature_profile_is_derived_from_device_create_values() {
+        let timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default()
+            .timeline_semaphore(true);
+        let sync2 = vk::PhysicalDeviceSynchronization2Features::default()
+            .synchronization2(true);
+
+        let enabled = synchronization_feature_profile_from_device_create(
+            true,
+            true,
+            timeline.timeline_semaphore,
+            sync2.synchronization2,
+        );
+        assert!(enabled.verify().is_ok());
+
+        let disabled = synchronization_feature_profile_from_device_create(
+            true,
+            true,
+            timeline.timeline_semaphore,
+            0,
+        );
+        assert_ne!(enabled.identity_digest, disabled.identity_digest);
+        assert_eq!(disabled.synchronization2_enabled, false);
+        assert_eq!(
+            disabled.verify(),
+            Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity)
+        );
     }
 
     #[test]
