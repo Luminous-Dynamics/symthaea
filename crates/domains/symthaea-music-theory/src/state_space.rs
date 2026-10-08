@@ -13,7 +13,9 @@
 //! The same canonical frame vector can later be encoded into HDC/VSA without
 //! changing the musical semantics.
 
-use crate::score::{Score, ScoreNote, VoiceRole};
+use crate::rhythm::Duration;
+use crate::score::{PartId, Score, ScoreNote};
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 /// Number of dimensions in a frame's canonical structural vector.
@@ -42,8 +44,16 @@ pub struct MusicalStateFrame {
     pub onset_density: f64,
     pub pitch_class_hist: [f64; PITCH_CLASS_BINS],
     pub rhythm_hist: [f64; RHYTHM_BINS],
-    pub interval_hist: [f64; INTERVAL_BINS],
-    pub contour_hist: [f64; CONTOUR_BINS],
+    /// Per-part interval magnitudes; zeroed when persistent part identity is unavailable.
+    pub line_interval_hist: [f64; INTERVAL_BINS],
+    /// Per-part contour distribution; zeroed when persistent part identity is unavailable.
+    pub line_contour_hist: [f64; CONTOUR_BINS],
+    /// Duration-weighted MIDI register occupancy in eight bins.
+    pub register_hist: [f64; REGISTER_BINS],
+    /// True only when every note in this frame has a real PartId.
+    pub part_identity_available: bool,
+    /// Number of verified transitions between adjacent singleton onsets within a part.
+    pub line_transition_count: usize,
     pub pitch_entropy: f64,
     pub rhythm_entropy: f64,
     pub mean_interval: f64,
@@ -58,22 +68,43 @@ impl MusicalStateFrame {
     /// or later HDC/VSA encoding.
     pub fn vector(&self) -> [f64; STATE_DIMS] {
         let mut v = [0.0; STATE_DIMS];
-        v[0] = self.onset_density;
+        // Bound scalar magnitudes so density cannot overwhelm distributional
+        // features merely because its natural unit is unbounded attacks/beat.
+        v[0] = (self.onset_density / 4.0).clamp(0.0, 1.0);
         v[1] = self.pitch_entropy;
         v[2] = self.rhythm_entropy;
         v[3] = self.mean_interval;
         v[4] = self.contour_asymmetry;
         v[5] = self.structural_intensity;
+        v[6] = if self.part_identity_available { 1.0 } else { 0.0 };
 
-        let mut offset = 6;
+        let mut offset = 7;
         v[offset..offset + PITCH_CLASS_BINS].copy_from_slice(&self.pitch_class_hist);
         offset += PITCH_CLASS_BINS;
         v[offset..offset + RHYTHM_BINS].copy_from_slice(&self.rhythm_hist);
         offset += RHYTHM_BINS;
-        v[offset..offset + INTERVAL_BINS].copy_from_slice(&self.interval_hist);
+        v[offset..offset + INTERVAL_BINS].copy_from_slice(&self.line_interval_hist);
         offset += INTERVAL_BINS;
-        v[offset..offset + CONTOUR_BINS].copy_from_slice(&self.contour_hist);
+        v[offset..offset + CONTOUR_BINS].copy_from_slice(&self.line_contour_hist);
+        offset += CONTOUR_BINS;
+        v[offset..offset + REGISTER_BINS].copy_from_slice(&self.register_hist);
         v
+    }
+
+    /// Build one deterministic frame for a caller-selected region.
+    /// Returns None for empty, reversed, negative, out-of-score, or silent regions.
+    pub fn from_region(score: &Score, start: Duration, end: Duration) -> Option<Self> {
+        let start_beat = start.beats();
+        let end_beat = end.beats();
+        let total = score.total_beats.beats();
+        if start_beat < 0.0 || end_beat <= start_beat || end_beat > total + 1e-9 {
+            return None;
+        }
+        let notes = notes_in_window(score, start_beat, end_beat);
+        if notes.is_empty() {
+            return None;
+        }
+        Some(frame_from_notes(score, start_beat, end_beat, &notes))
     }
 
     /// Cosine similarity between two canonical frame states.
@@ -214,15 +245,13 @@ fn notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
 fn frame_from_notes(score: &Score, start: f64, end: f64, notes: &[ScoreNote]) -> MusicalStateFrame {
     let mut pitch_class_hist = [0.0; PITCH_CLASS_BINS];
     let mut rhythm_hist = [0.0; RHYTHM_BINS];
-    let mut interval_hist = [0.0; INTERVAL_BINS];
-    let mut contour_hist = [0.0; CONTOUR_BINS];
+    let mut line_interval_hist = [0.0; INTERVAL_BINS];
+    let mut line_contour_hist = [0.0; CONTOUR_BINS];
+    let mut register_hist = [0.0; REGISTER_BINS];
 
     let tonic = score.key.tonic.value() as i32;
-    let melody: Vec<_> = notes
-        .iter()
-        .copied()
-        .filter(|note| note.role == VoiceRole::Melody)
-        .collect();
+    let part_identity_available =
+        !notes.is_empty() && notes.iter().all(|note| note.part.is_assigned());
 
     let mut intensity_sum = 0.0;
     for note in notes {
@@ -238,33 +267,67 @@ fn frame_from_notes(score: &Score, start: f64, end: f64, notes: &[ScoreNote]) ->
             .position(|&threshold| duration <= threshold + 1e-12)
             .unwrap_or(RHYTHM_BINS - 1);
         rhythm_hist[duration_bin] += 1.0;
+
+        let midi = note.pitch.midi().clamp(0, 127) as usize;
+        register_hist[(midi / 16).min(REGISTER_BINS - 1)] += duration;
     }
 
+    // PartId—not VoiceRole—is the identity of a continuing line. If any event
+    // lacks part identity, do not infer a line by sorting functional roles.
+    let mut line_transition_count = 0usize;
     let mut interval_sum = 0.0;
-    for pair in melody.windows(2) {
-        let delta = pair[1].pitch.midi() as i32 - pair[0].pitch.midi() as i32;
-        let magnitude = delta.unsigned_abs() as usize;
-        interval_hist[magnitude.min(INTERVAL_BINS - 1)] += 1.0;
-        interval_sum += magnitude as f64;
+    if part_identity_available {
+        let mut lines: BTreeMap<PartId, Vec<ScoreNote>> = BTreeMap::new();
+        for note in notes {
+            lines.entry(note.part).or_default().push(*note);
+        }
+        for line in lines.values_mut() {
+            line.sort_by(|a, b| a.onset.beats().total_cmp(&b.onset.beats()));
+            // Same-onset groups with multiple notes are ambiguous as melodic
+            // transitions. Preserve the gap instead of making a false edge.
+            let mut unique_onsets: Vec<Option<ScoreNote>> = Vec::new();
+            let mut i = 0;
+            while i < line.len() {
+                let mut j = i + 1;
+                while j < line.len()
+                    && (line[j].onset.beats() - line[i].onset.beats()).abs() <= 1e-9
+                {
+                    j += 1;
+                }
+                unique_onsets.push(if j - i == 1 { Some(line[i]) } else { None });
+                i = j;
+            }
+            for pair in unique_onsets.windows(2) {
+                let (Some(left), Some(right)) = (pair[0], pair[1]) else {
+                    continue;
+                };
+                let delta = right.pitch.midi() as i32 - left.pitch.midi() as i32;
+                let magnitude = delta.unsigned_abs() as usize;
+                line_interval_hist[magnitude.min(INTERVAL_BINS - 1)] += 1.0;
+                interval_sum += magnitude as f64;
+                line_transition_count += 1;
 
-        let contour_bin = match delta.cmp(&0) {
-            std::cmp::Ordering::Greater => 0,
-            std::cmp::Ordering::Less => 1,
-            std::cmp::Ordering::Equal => 2,
-        };
-        contour_hist[contour_bin] += 1.0;
+                let contour_bin = match delta.cmp(&0) {
+                    std::cmp::Ordering::Greater => 0,
+                    std::cmp::Ordering::Less => 1,
+                    std::cmp::Ordering::Equal => 2,
+                };
+                line_contour_hist[contour_bin] += 1.0;
+            }
+        }
     }
 
     normalize(&mut pitch_class_hist);
     normalize(&mut rhythm_hist);
-    normalize(&mut interval_hist);
-    normalize(&mut contour_hist);
+    normalize(&mut line_interval_hist);
+    normalize(&mut line_contour_hist);
+    normalize(&mut register_hist);
 
-    let directional = contour_hist[0] + contour_hist[1];
+    let directional = line_contour_hist[0] + line_contour_hist[1];
     let contour_asymmetry = if directional <= f64::EPSILON {
         0.0
     } else {
-        (contour_hist[0] - contour_hist[1]).abs().min(directional) / directional
+        (line_contour_hist[0] - line_contour_hist[1]).abs() / directional
     };
 
     MusicalStateFrame {
@@ -274,14 +337,17 @@ fn frame_from_notes(score: &Score, start: f64, end: f64, notes: &[ScoreNote]) ->
         onset_density: notes.len() as f64 / (end - start).max(1e-9),
         pitch_class_hist,
         rhythm_hist,
-        interval_hist,
-        contour_hist,
+        line_interval_hist,
+        line_contour_hist,
+        register_hist,
+        part_identity_available,
+        line_transition_count,
         pitch_entropy: normalized_entropy(&pitch_class_hist),
         rhythm_entropy: normalized_entropy(&rhythm_hist),
-        mean_interval: if melody.len() < 2 {
+        mean_interval: if line_transition_count == 0 {
             0.0
         } else {
-            (interval_sum / (melody.len() - 1) as f64 / 11.0).clamp(0.0, 1.0)
+            (interval_sum / line_transition_count as f64 / 11.0).clamp(0.0, 1.0)
         },
         contour_asymmetry,
         structural_intensity: (intensity_sum / notes.len().max(1) as f64).clamp(0.0, 1.0),
@@ -330,7 +396,7 @@ mod tests {
     use crate::harmony::Key;
     use crate::pitch::{Pitch, PitchClass};
     use crate::rhythm::Duration;
-    use crate::score::{Emphasis, PartId};
+    use crate::score::{Emphasis, PartId, VoiceRole};
 
     fn note(pc: u8, octave: i32, onset: i64) -> ScoreNote {
         ScoreNote {
@@ -425,6 +491,47 @@ mod tests {
         assert_eq!(trajectory.frames.len(), 2);
         assert!(trajectory.frames[1].novelty.unwrap() > 0.01);
         assert!(trajectory.recurrence_pairs(0.99).is_empty());
+    }
+
+    #[test]
+    fn line_motion_requires_explicit_part_identity() {
+        let unassigned = score(&[note(0, 4, 0), note(2, 4, 1), note(4, 4, 2)], 0);
+        let frame = MusicalStateTrajectory::from_score(&unassigned, 3.0, 3.0)
+            .unwrap()
+            .frames
+            .remove(0);
+        assert!(!frame.part_identity_available);
+        assert_eq!(frame.line_transition_count, 0);
+        assert!(frame.line_interval_hist.iter().all(|value| *value == 0.0));
+
+        let mut assigned = Score::new(Key::major(PitchClass::new(0)), 120.0, 4);
+        for (pc, onset) in [(0, 0), (2, 1), (4, 2)] {
+            let mut n = note(pc, 4, onset);
+            n.part = PartId(7);
+            assigned.push(n);
+        }
+        let frame = MusicalStateTrajectory::from_score(&assigned, 3.0, 3.0)
+            .unwrap()
+            .frames
+            .remove(0);
+        assert!(frame.part_identity_available);
+        assert_eq!(frame.line_transition_count, 2);
+    }
+
+    #[test]
+    fn register_profile_is_transposition_sensitive() {
+        let low = score(&[note(0, 2, 0), note(2, 2, 1)], 0);
+        let high = score(&[note(0, 6, 0), note(2, 6, 1)], 0);
+        let low_frame = MusicalStateTrajectory::from_score(&low, 2.0, 2.0)
+            .unwrap()
+            .frames
+            .remove(0);
+        let high_frame = MusicalStateTrajectory::from_score(&high, 2.0, 2.0)
+            .unwrap()
+            .frames
+            .remove(0);
+        assert_ne!(low_frame.register_hist, high_frame.register_hist);
+        assert!(low_frame.similarity(&high_frame) < 0.999);
     }
 
     #[test]
