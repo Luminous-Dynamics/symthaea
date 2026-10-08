@@ -92,6 +92,38 @@ impl QualificationReceipt {
     }
 }
 
+fn qualification_identity(
+    evidence: EvidenceProfile,
+    tier: ConsequenceTier,
+) -> Digest {
+    match (
+        evidence.candidate,
+        evidence.evaluator,
+        evidence.profile,
+        tier,
+    ) {
+        (
+            Digest("candidate-v1"),
+            Digest("evaluator-independent-v1"),
+            Digest("profile-v1"),
+            ConsequenceTier::Low,
+        ) => Digest("qualification-candidate-v1-profile-v1-low"),
+        (
+            Digest("candidate-v1"),
+            Digest("evaluator-independent-v1"),
+            Digest("profile-v1"),
+            ConsequenceTier::Critical,
+        ) => Digest("qualification-candidate-v1-profile-v1-critical"),
+        (
+            Digest("candidate-v2"),
+            Digest("evaluator-independent-v1"),
+            Digest("profile-v2"),
+            ConsequenceTier::Critical,
+        ) => Digest("qualification-candidate-v2-profile-v2-critical"),
+        _ => Digest("qualification-other"),
+    }
+}
+
 fn evaluate_evidence(
     evidence: EvidenceProfile,
     tier: ConsequenceTier,
@@ -119,11 +151,7 @@ fn evaluate_evidence(
     }
 
     Ok(QualificationReceipt {
-        id: match tier {
-            ConsequenceTier::Low => Digest("qualification-low-v1"),
-            ConsequenceTier::Significant => Digest("qualification-significant-v1"),
-            ConsequenceTier::Critical => Digest("qualification-critical-v1"),
-        },
+        id: qualification_identity(evidence, tier),
         candidate: evidence.candidate,
         evaluator: evidence.evaluator,
         profile: evidence.profile,
@@ -251,6 +279,14 @@ fn main() {
     let low_qualification = evaluate_evidence(low_tier_evidence, ConsequenceTier::Low)
         .expect("evidence should satisfy low-tier requirements");
     assert_eq!(low_qualification.tier, ConsequenceTier::Low);
+
+    let alternate_profile = EvidenceProfile {
+        profile: Digest("profile-v2"),
+        ..strong_evidence
+    };
+    let alternate_critical = evaluate_evidence(alternate_profile, ConsequenceTier::Critical)
+        .expect("alternate critical evidence should qualify");
+    assert_ne!(critical.id, alternate_critical.id);
 
     assert_eq!(
         low_qualification.admits(ConsequenceTier::Critical),
