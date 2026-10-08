@@ -215,6 +215,24 @@ fn trusted_script_shell() -> &'static str {
         "/bin/sh"
     }
 }
+fn trusted_nix_script_process(
+    script: std::fs::File,
+    args: &[&str],
+) -> tokio::process::Command {
+    let shell = trusted_script_shell();
+    let mut command = privileged_nix_process(shell).expect("trusted script shell is on the executable allowlist");
+    if shell.ends_with("/bash") {
+        command.arg("-p");
+    }
+    command
+        .arg("-s")
+        .arg("--")
+        .arg("nixforhumanity-install")
+        .args(args)
+        .stdin(std::process::Stdio::from(script));
+    command
+}
+
 
 fn trusted_script_process(
     script: std::fs::File,
@@ -520,7 +538,7 @@ async fn spawn_privileged_background_script_with_args(
 ) -> Result<u32, std::io::Error> {
     let script = open_trusted_script(script_path)?;
     spawn_privileged_background_process(
-        trusted_script_process(script, args),
+        trusted_nix_script_process(script, args),
         log_path,
         status_path,
         pid_path,
