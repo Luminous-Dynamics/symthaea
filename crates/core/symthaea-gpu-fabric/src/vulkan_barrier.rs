@@ -795,11 +795,19 @@ impl VulkanBarrierWorkloadRuntime {
             physical_device_api_version: self.physical_device_api_version,
             queue_family_index: self.queue_family_index,
             device_uuid: self.device_uuid,
+            implementation_identity_digest: self.implementation_identity_digest.clone(),
+            physical_device_identity_digest: self.physical_device_identity_digest.clone(),
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         qualification_stage("receipt_verified");
         receipt
-            .verify_runtime_binding(self.physical_device_api_version, self.queue_family_index)
+            .verify_runtime_binding(
+                self.physical_device_api_version,
+                self.queue_family_index,
+                self.device_uuid,
+                &self.implementation_identity_digest,
+                &self.physical_device_identity_digest,
+            )
             .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
     }
@@ -1123,6 +1131,55 @@ fn resource_digest(value: &BinaryHypervector) -> String {
     h.update(&value.dimensions.to_le_bytes());
     h.update(value.as_bytes());
     h.finalize().to_hex().to_string()
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn sha256_len_prefixed_update(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
+fn spirv_to_bytes(spirv: &[u32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(spirv.len() * std::mem::size_of::<u32>());
+    for word in spirv {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    bytes
+}
+
+fn vulkan_implementation_identity_digest(spirv: &[u32]) -> String {
+    let spirv_bytes = spirv_to_bytes(spirv);
+    let mut hasher = Sha256::new();
+    hasher.update(VULKAN_IMPLEMENTATION_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    sha256_len_prefixed_update(&mut hasher, WGSL_ABI_MARKER.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, HDC_BIND_XOR_KERNEL_ID.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, WGSL.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, &spirv_bytes);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> String {
+    let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.gpu-fabric.vulkan-device.v1 ");
+    hasher.update(&props.vendor_id.to_le_bytes());
+    hasher.update(&props.device_id.to_le_bytes());
+    hasher.update(&(props.device_type.as_raw() as u32).to_le_bytes());
+    hasher.update(&props.api_version.to_le_bytes());
+    hasher.update(&props.driver_version.to_le_bytes());
+    sha256_len_prefixed_update(&mut hasher, device_name);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| (b'0'..=b'9').contains(&byte) || (b'a'..=b'f').contains(&byte))
 }
 
 fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFlags2) {
