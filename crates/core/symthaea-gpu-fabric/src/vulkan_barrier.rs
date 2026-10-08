@@ -2832,6 +2832,7 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                &test_synchronization_feature_profile(),
                 "4444444444444444444444444444444444444444444444444444444444444444",
                 vk::QueueFlags::COMPUTE.as_raw(),
                 1,
