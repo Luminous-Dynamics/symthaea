@@ -8586,6 +8586,40 @@ mod tests {
     }
 
     #[test]
+    fn heuristic_measurement_target_requires_exact_comparison_scale() {
+        let scale = fixture_requirement().comparison_scales[&Dimension::Water].clone();
+        let mut target = MeasurementDiscriminationTarget {
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            dimension: Dimension::Water,
+            unit: scale.unit,
+            scope: scale.scope,
+            basis: scale.basis,
+        };
+        target.validate().unwrap();
+
+        target.unit.clear();
+        assert_eq!(
+            target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.unit = "unit".into();
+        target.scope.clear();
+        assert_eq!(
+            target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.scope = "scope".into();
+        target.basis.basis_digest.clear();
+        assert_eq!(
+            target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+    }
+
+    #[test]
     fn single_field_observation_cannot_promote_entire_candidate() {
         let mut c = candidate(
             "field",
