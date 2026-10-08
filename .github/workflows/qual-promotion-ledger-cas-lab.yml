@@ -225,6 +225,8 @@ jobs:
             echo "- final_current_ref_sha: \`${CURRENT_AFTER_ROLLBACK}\`"
             echo "- stale_candidate_remained_reachable_as_object: true"
             echo "- stale_candidate_became_active: false"
+          } >> "$GITHUB_STEP_SUMMARY"
+
           # A successful lab requires proven cleanup, not merely an attempted DELETE.
           if ! delete_ref "${ref_path}" || ! delete_ref "${race_ref_path}"; then
             echo "temporary promotion-ledger lab ref cleanup failed" >&2
