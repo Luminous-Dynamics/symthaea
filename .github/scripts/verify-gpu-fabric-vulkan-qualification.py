@@ -231,10 +231,6 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str]:
     if any(value < 0 or value > 0xFFFFFFFF for value in
            (vendor_id, device_id, device_type, api_version, driver_version)):
         fail("physical-device identity numeric field outside u32 range")
-    physical_digest = sha256_len_prefixed(
-        [],
-        b"symthaea.gpu-fabric.vulkan-device.v1",
-    )
     physical_hash = hashlib.sha256()
     physical_hash.update(b"symthaea.gpu-fabric.vulkan-device.v1")
     physical_hash.update(b"\\x00")
@@ -251,8 +247,6 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str]:
     if len(values.get("physical_device_identity_sha256", "")) != 64:
         fail("malformed physical-device identity digest")
 
-    if values.get("physical_device_api_version") != values.get("physical_device_api_version"):
-        fail("physical-device API version self-binding failed")
     if int(values.get("vulkan_api_version", "-1")) != VULKAN_API_1_3:
         fail("Vulkan API version changed")
     if api_version < VULKAN_API_1_3:
