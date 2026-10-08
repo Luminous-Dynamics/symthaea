@@ -1303,8 +1303,8 @@ def webhook_effect_timing_from_observation(
     )
     return ProviderWebhookEffectTimingV1.from_observation(
         observation,
-        local_reservation_time_ms=1728402900000,
-        local_dispatch_time_ms=1728402950000,
+        local_reservation_time_ms=1791475190000,
+        local_dispatch_time_ms=1791475195000,
         clock_relation=clock_relation_fixture(),
     )
 
