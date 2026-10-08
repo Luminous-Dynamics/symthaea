@@ -5,6 +5,8 @@ claim_ceiling=deterministic local transaction/reconciliation model only
 promotion_authority=false
 """
 
+import hashlib
+import json
 from dataclasses import dataclass
 from itertools import permutations
 
@@ -16,6 +18,59 @@ class PromotionEffectReceipt:
     promotion_operation_id: str
     expected_pr_head_sha: str
     observed_merge_commit: str
+
+
+@dataclass(frozen=True)
+class StackEntryV1:
+    pr_number: int
+    head_sha: str
+    base_ref: str
+    base_head_sha: str
+
+
+@dataclass(frozen=True)
+class PromotionOperationIdentityV1:
+    repository: str
+    requested_pr_number: int
+    requested_pr_head_sha: str
+    base_ref: str
+    base_tip_sha: str
+    ordered_stack: tuple[StackEntryV1, ...]
+    merge_method: str
+    merge_action: str
+    trust_root_generation: int
+    governance_generation: int
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "base_ref": self.base_ref,
+            "base_tip_sha": self.base_tip_sha,
+            "governance_generation": self.governance_generation,
+            "merge_action": self.merge_action,
+            "merge_method": self.merge_method,
+            "ordered_stack": [
+                {
+                    "base_head_sha": entry.base_head_sha,
+                    "base_ref": entry.base_ref,
+                    "head_sha": entry.head_sha,
+                    "pr_number": entry.pr_number,
+                }
+                for entry in self.ordered_stack
+            ],
+            "repository": self.repository,
+            "requested_pr_head_sha": self.requested_pr_head_sha,
+            "requested_pr_number": self.requested_pr_number,
+            "trust_root_generation": self.trust_root_generation,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
 @dataclass
@@ -350,6 +405,100 @@ def run_race_schedule(schedule):
     return ledger, results
 
 
+def stack_identity_fixture() -> PromotionOperationIdentityV1:
+    return PromotionOperationIdentityV1(
+        repository="Luminous-Dynamics/symthaea",
+        requested_pr_number=7087,
+        requested_pr_head_sha="H3",
+        base_ref="main",
+        base_tip_sha="T1",
+        ordered_stack=(
+            StackEntryV1(7085, "H1", "main", "T1"),
+            StackEntryV1(7087, "H3", "stack/7085", "H1"),
+        ),
+        merge_method="squash",
+        merge_action="direct_merge",
+        trust_root_generation=7,
+        governance_generation=11,
+    )
+
+
+def test_stack_identity_is_deterministic():
+    a = stack_identity_fixture()
+    b = stack_identity_fixture()
+    assert a.canonical_bytes() == b.canonical_bytes()
+    assert a.digest() == b.digest()
+
+
+def test_stack_identity_binds_ordered_stack_topology():
+    original = stack_identity_fixture()
+    reversed_stack = PromotionOperationIdentityV1(
+        **{
+            **original.__dict__,
+            "ordered_stack": tuple(reversed(original.ordered_stack)),
+        }
+    )
+    assert original.digest() != reversed_stack.digest()
+
+
+def test_stack_identity_binds_lower_stack_head_sha():
+    original = stack_identity_fixture()
+    changed = PromotionOperationIdentityV1(
+        **{
+            **original.__dict__,
+            "ordered_stack": (
+                StackEntryV1(7085, "H1-CHANGED", "main", "T1"),
+                original.ordered_stack[1],
+            ),
+        }
+    )
+    assert original.digest() != changed.digest()
+
+
+def test_stack_identity_binds_base_tip():
+    original = stack_identity_fixture()
+    changed = PromotionOperationIdentityV1(
+        **{**original.__dict__, "base_tip_sha": "T2"},
+    )
+    assert original.digest() != changed.digest()
+
+
+def test_stack_identity_binds_merge_parameters():
+    original = stack_identity_fixture()
+    changed_method = PromotionOperationIdentityV1(
+        **{**original.__dict__, "merge_method": "merge"},
+    )
+    changed_action = PromotionOperationIdentityV1(
+        **{**original.__dict__, "merge_action": "default"},
+    )
+    assert original.digest() != changed_method.digest()
+    assert original.digest() != changed_action.digest()
+
+
+def test_stack_identity_binds_authority_generations():
+    original = stack_identity_fixture()
+    changed_root = PromotionOperationIdentityV1(
+        **{**original.__dict__, "trust_root_generation": 8},
+    )
+    changed_governance = PromotionOperationIdentityV1(
+        **{**original.__dict__, "governance_generation": 12},
+    )
+    assert original.digest() != changed_root.digest()
+    assert original.digest() != changed_governance.digest()
+
+
+def test_stack_identity_binds_requested_subject_identity():
+    original = stack_identity_fixture()
+    changed_pr = PromotionOperationIdentityV1(
+        **{**original.__dict__, "requested_pr_number": 7090},
+    )
+    changed_head = PromotionOperationIdentityV1(
+        **{**original.__dict__, "requested_pr_head_sha": "H4"},
+    )
+    assert original.digest() != changed_pr.digest()
+    assert original.digest() != changed_head.digest()
+
+
 def test_exact_20_schedules_are_executed():
     sequential = 0
     concurrent = 0
@@ -615,6 +764,13 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_stack_identity_is_deterministic,
+    test_stack_identity_binds_ordered_stack_topology,
+    test_stack_identity_binds_lower_stack_head_sha,
+    test_stack_identity_binds_base_tip,
+    test_stack_identity_binds_merge_parameters,
+    test_stack_identity_binds_authority_generations,
+    test_stack_identity_binds_requested_subject_identity,
     test_exact_20_schedules_are_executed,
     test_single_use_reservation,
     test_dispatch_intent_fences_crash,
