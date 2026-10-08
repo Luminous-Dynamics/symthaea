@@ -79,19 +79,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-es256-cose-
       - name: Run COSE_Key interoperability corpus
-        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
       # The private CborReader unit module is compiled with the crate-wide
       # #[cfg(test)] suite, which currently contains unrelated stale tests.
       # The authoritative qualification boundary is the public integration
       # corpus below; keep private-reader regressions as developer-only coverage.
       - name: Run focused RFC 9942 semantic qualification
-        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_semantic_qualification
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_semantic_qualification
       - name: Run RFC 8392 ES256 known-answer vector
-        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_es256_interop
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_es256_interop
       - name: Run RFC 9942 receipt-selection qualification
-        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_receipt_selection
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_receipt_selection
       - name: Run Holochain evidence projection qualification
-        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_holochain_projection
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_holochain_projection
 
   fuzz-build:
     name: ES256 COSE fuzz target build
@@ -156,7 +156,7 @@ jobs:
               raise SystemExit(f"duplicate fuzz target names: {targets!r}")
           PY
       - name: Check fuzz manifest
-        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
+        run: cargo check --locked --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
 
   fuzz-smoke:
     name: ES256 COSE bounded fuzz smoke
