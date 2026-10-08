@@ -2032,6 +2032,126 @@ def test_stack_timing_rejects_crosswired_effect_evidence_identity():
     assert not crosswired.validates_complete(identity, evidence)
 
 
+def test_effect_state_binds_to_exact_operation_identity():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    assert state.validates_operation_identity(identity)
+
+    changed_identity = PromotionOperationIdentityV1(
+        repository=identity.repository,
+        provider_stack_number=identity.provider_stack_number,
+        requested_pr_number=identity.requested_pr_number,
+        requested_pr_head_sha=identity.requested_pr_head_sha,
+        base_ref=identity.base_ref,
+        base_tip_sha="BASE-OTHER",
+        ordered_stack=identity.ordered_stack,
+        merge_method=identity.merge_method,
+        merge_action=identity.merge_action,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+    )
+    assert not state.validates_operation_identity(changed_identity)
+
+def test_effect_state_same_delivery_id_with_changed_payload_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="first-payload",
+    )
+    conflicting_payload = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="second-payload",
+    )
+    assert first.payload_bytes_digest != conflicting_payload.payload_bytes_digest
+    assert first.to_stack_effect(identity) == conflicting_payload.to_stack_effect(identity)
+
+    state, decision = state.ingest(first)
+    assert decision == "admitted"
+    state_after, decision = state.ingest(conflicting_payload)
+    assert decision == "delivery-identity-conflict"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+def test_effect_state_rejects_inconsistent_source_delivery_bindings():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    state = PromotionPrEffectStateV1(
+        repository=identity.repository,
+        expected_entry=identity.ordered_stack[-1],
+        operation_identity_digest=identity.digest(),
+        state="EffectObserved",
+        effect=observation.to_stack_effect(identity),
+        source_delivery_ids=(observation.delivery_id,),
+    )
+    assert not state.validates_source_delivery_bindings()
+    assert not state.is_terminally_observed()
+
+def test_effect_state_conflict_is_absorbing():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-first",
+        merge_commit="M2",
+    )
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-conflict",
+        merge_commit="M9",
+    )
+    compatible = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-late",
+        merge_commit="M2",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state.state == "Conflict"
+    state_after, decision = state.ingest(compatible)
+    assert decision == "rejected-invalid-state"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+def test_effect_state_conflict_never_reclassifies_as_terminal_observed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-reclass-first")
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-reclass-conflict",
+        head_sha="H0",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert not state.is_terminally_observed()
+    assert state.effect is None
+
+def test_webhook_delivery_registry_rejects_same_id_with_changed_context():
+    payload = b"{}"
+    first = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    second = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-2",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    registry = ProviderDeliveryRegistryV1().record(first)
+    assert registry.observe(second) == "delivery-id-conflict"
+
 def test_effect_state_admits_first_authenticated_merge():
     identity = stack_identity_fixture()
     state = effect_state_fixture(identity)
@@ -4356,6 +4476,11 @@ TESTS = [
     test_temporal_timing_rejects_local_observation_rollback,
     test_complete_stack_timing_requires_every_member_admissible,
     test_stack_timing_rejects_crosswired_effect_evidence_identity,
+    test_effect_state_binds_to_exact_operation_identity,
+    test_effect_state_same_delivery_id_with_changed_payload_fails_closed,
+    test_effect_state_rejects_inconsistent_source_delivery_bindings,
+    test_effect_state_conflict_is_absorbing,
+    test_effect_state_conflict_never_reclassifies_as_terminal_observed,
     test_effect_state_admits_first_authenticated_merge,
     test_effect_state_merged_then_non_effect_does_not_downgrade,
     test_effect_state_equivalent_second_delivery_is_idempotent,
@@ -4407,6 +4532,7 @@ TESTS = [
     test_webhook_context_mismatch_rejects_even_with_valid_hmac,
     test_webhook_delivery_registry_accepts_new_delivery,
     test_webhook_delivery_registry_rejects_same_id_with_different_payload,
+    test_webhook_delivery_registry_rejects_same_id_with_changed_context,
     test_webhook_authentication_does_not_prove_merge_result_causality,
     test_attestation_material_does_not_rescue_untrusted_capture,
     test_fabricated_local_capture_cannot_establish_requested_causality,
