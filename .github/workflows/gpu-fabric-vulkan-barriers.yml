@@ -81,6 +81,7 @@ jobs:
           } > qualification-environment.txt
           find src -type f -print0 | sort -z | xargs -0 sha256sum > source-sha256.txt
           sha256sum Cargo.toml Cargo.lock metadata.json > qualification-input-sha256.txt
+          sha256sum ${GITHUB_WORKSPACE}/.github/workflows/gpu-fabric-vulkan-barriers.yml ${GITHUB_WORKSPACE}/.github/scripts/check-workflow-draft-safety.py >> qualification-input-sha256.txt
 
       - name: Compile barrier workload harness
         working-directory: .ci/gpu-fabric-workspace
