@@ -415,6 +415,28 @@ def main() -> None:
         if forbidden in patch_body:
             fail(f"system_config_patch regained inline shell-source generation: {forbidden!r}")
 
+    # Install has one additional monotonic authority requirement: the exact
+    # staged script digest must be journal-bound before the background worker starts.
+    install_start = arm_indexes["install"]
+    install_position = next(
+        (position for position, (start, name) in enumerate(ordered) if name == "install"),
+        None,
+    )
+    install_end = (
+        ordered[install_position + 1][0]
+        if install_position is not None and install_position + 1 < len(ordered)
+        else len(lines)
+    )
+    install_body = "\n".join(lines[install_start:install_end])
+    bind_at = install_body.find("transaction_ledger.bind_execution_commitment")
+    spawn_at = install_body.find("spawn_privileged_background_script_file")
+    digest_at = install_body.find('role: "install-script"')
+    if bind_at < 0 or spawn_at < 0 or bind_at > spawn_at or digest_at < 0:
+        fail(
+            "install mutation must durably bind the install-script commitment "
+            "before spawning its privileged worker"
+        )
+
     # Nested interpreters inside generated privileged scripts create a second
     # parsing authority underneath the already-controlled relay interpreter.
     # Keep this global because the relevant helpers live outside the mutation arms.
