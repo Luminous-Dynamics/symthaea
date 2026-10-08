@@ -69,6 +69,21 @@ A -> S      conflicts
 
 S may still exist as an immutable Git object, but it is not active authority because the current ledger ref does not reach it.
 
+## Convergence with existing release lineage
+
+The repository already implements an append-only lineage pattern in `crates/domains/symthaea-fabrication-kernel/src/release_lineage.rs`. Its events bind:
+
+- monotonically increasing sequence;
+- previous active promotion digest;
+- previous event digest;
+- resulting active promotion digest;
+- authority digest;
+- an event digest computed over the complete transition payload.
+
+Validation rejects sequence discontinuity, time regression, previous-event mismatch, previous-active mismatch, and event-digest mismatch. This is the desired application-level shape for the future promotion ledger transition record: the Git parent provides provider-level history, while the encoded transition should independently bind the semantic predecessor and transition payload so a semantically malformed fast-forward successor cannot be mistaken for a valid state transition.
+
+The CAS lab intentionally does not implement that domain schema yet; its claim remains limited to provider-level ref serialization.
+
 ## Trust-root race closure
 
 A trust-root invalidation is itself a ledger transition.
