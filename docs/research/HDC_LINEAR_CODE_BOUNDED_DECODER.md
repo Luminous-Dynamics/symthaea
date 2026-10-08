@@ -227,7 +227,7 @@ then re-fetches the live Actions run and requires its repository ID, exact workf
 ref, and event type to agree with the triggering event. For a pull-request run, GitHub's Actions run
 `head_sha` is the synthetic merge-ref SHA rather than the PR-head commit; the qualification therefore
 binds that run SHA to the event's synthetic merge SHA while independently binding the PR-head SHA to
-the checkout and PR association. The receipt records these validated values in schema v19.
+the checkout and PR association. The receipt records these validated values in schema v21.
 
 The same execution boundary also revalidates the uploaded artifact against the live run after upload. The artifact name binds the exact PR-head SHA, while the artifact's `workflow_run.head_sha` is checked against the synthetic merge SHA used for the pull-request execution. The receipt records both identities separately, so a successful receipt cannot conflate the research subject with GitHub's merge-ref execution object.
 
