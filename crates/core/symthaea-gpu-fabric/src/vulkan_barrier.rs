@@ -2254,7 +2254,56 @@ mod tests {
     }
 
     #[test]
-    fn receipt_rejects_tampered_queue_family_binding() {
+    #[test]
+    fn receipt_rejects_runtime_provenance_binding_mismatch() {
+        let mut receipt = minimal_receipt_for_binding_tests();
+        assert!(receipt
+            .verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            )
+            .is_ok());
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                "2222222222222222222222222222222222222222222222222222222222222222",
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ),
+            Err(VulkanBarrierReceiptError::ImplementationIdentityBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                "3333333333333333333333333333333333333333333333333333333333333333",
+            ),
+            Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding)
+        ));
+
+        receipt.device_uuid = [9; 16];
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ),
+            Err(VulkanBarrierReceiptError::DeviceUuidBinding)
+        ));
+    }
+
+    #[test]
+        fn receipt_rejects_tampered_queue_family_binding() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
         let digests = final_state
