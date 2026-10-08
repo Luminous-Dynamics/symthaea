@@ -38,6 +38,7 @@ pub enum CreditismError {
     NonFiniteAmount,
     NonFiniteResult,
     DuplicateAccount(String),
+    SelfExchange,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -160,6 +161,9 @@ impl PersonalCreditLedger {
     ) -> Result<ExchangeSettlement, CreditismError> {
         validate_amount(purchase_price)?;
         validate_nonnegative_amount(seller_acquisition_cost)?;
+        if buyer == seller {
+            return Err(CreditismError::SelfExchange);
+        }
         if seller.is_empty() {
             return Err(CreditismError::UnknownAccount(seller.to_owned()));
         }
@@ -417,6 +421,21 @@ mod tests {
         assert_eq!(
             ledger.exchange("buyer", "", 50.0, 10.0),
             Err(CreditismError::UnknownAccount(String::new()))
+        );
+        assert_eq!(ledger, before);
+    }
+
+    #[test]
+    fn self_exchange_fails_closed_without_mutation() {
+        let mut ledger = PersonalCreditLedger::from_opening_balances([
+            ("same".to_owned(), 100.0),
+        ])
+        .unwrap();
+        let before = ledger.clone();
+
+        assert_eq!(
+            ledger.exchange("same", "same", 50.0, 10.0),
+            Err(CreditismError::SelfExchange)
         );
         assert_eq!(ledger, before);
     }
