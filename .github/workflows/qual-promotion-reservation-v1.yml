@@ -63,6 +63,8 @@ jobs:
           required_classes = {
               "ProviderMergeResultV1",
               "PromotionCausalResolutionV1",
+              "ProviderResultRetentionV1",
+              "PromotionCausalResolutionV1",
               "ProviderTopologyBindingV1",
               "PromotionStackEffectSetV1",
           }
