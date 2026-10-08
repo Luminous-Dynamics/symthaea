@@ -109,6 +109,9 @@ fn selection_dependency_identity_is_canonical() {
 }
 
 #[cfg(feature = "semantic-receipts")]
+use sha2::Digest;
+
+#[cfg(feature = "semantic-receipts")]
 use ring::{
     rand::SystemRandom,
     signature::{EcdsaKeyPair, KeyPair},
