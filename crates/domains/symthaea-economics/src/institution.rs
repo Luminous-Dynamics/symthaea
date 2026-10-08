@@ -529,12 +529,12 @@ mod tests {
     }
 
     #[test]
-    fn same_profile_hash_cannot_be_reimplemented() {
+    fn implemented_proposal_cannot_replay_against_a_new_parent_profile() {
         let mut evolution = InstitutionalEvolution::new(initial());
         evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
         evolution.decide(adopted_operational_decision()).unwrap();
         evolution.implement("p1").unwrap();
-        assert_eq!(evolution.implement("p1"), Err(FailureDisposition::AlreadyImplemented));
+        assert_eq!(evolution.implement("p1"), Err(FailureDisposition::ParentMismatch));
     }
 
     #[test]
