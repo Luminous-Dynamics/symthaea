@@ -583,6 +583,8 @@ impl VulkanBarrierWorkloadRuntime {
             }
         }
 
+        record_host_readback_barrier(&self.device, command_guard.command());
+
         unsafe {
             self.device
                 .end_command_buffer(command_guard.command())
@@ -607,7 +609,7 @@ impl VulkanBarrierWorkloadRuntime {
         let signal_info = vk::SemaphoreSubmitInfo::default()
             .semaphore(semaphore)
             .value(completion_expected)
-            .stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+            .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
             .device_index(0);
         let submit = vk::SubmitInfo2::default()
             .command_buffer_infos(std::slice::from_ref(&command_buffer_info))
@@ -769,6 +771,16 @@ fn simulate(
         state.insert(writes[0].resource.clone(), BinaryHypervector::from_bytes(dimensions, bytes).map_err(|_| VulkanBarrierError::OracleMismatch(writes[0].resource.clone()))?);
     }
     Ok(state)
+}
+
+fn record_host_readback_barrier(device: &Device, command: vk::CommandBuffer) {
+    let barrier = vk::MemoryBarrier2::default()
+        .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+        .src_access_mask(vk::AccessFlags2::SHADER_STORAGE_WRITE)
+        .dst_stage_mask(vk::PipelineStageFlags2::HOST)
+        .dst_access_mask(vk::AccessFlags2::HOST_READ);
+    let dependency = vk::DependencyInfo::default().memory_barriers(std::slice::from_ref(&barrier));
+    unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
 }
 
 fn record_barriers(
@@ -1049,7 +1061,13 @@ fn completion_lowering_digest(
     h.update(b"completion-policy:max-plan-signal-value\0");
     h.update(b"submit-api:vkQueueSubmit2\0");
     h.update(b"signal-api:VkSemaphoreSubmitInfo\0");
+    h.update(b"signal-scope:all-commands-after-host-readback-barrier\0");
+    h.update(&vk::PipelineStageFlags2::ALL_COMMANDS.as_raw().to_le_bytes());
+    h.update(b"host-readback-barrier:compute-shader-storage-write-to-host-read\0");
     h.update(&vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw().to_le_bytes());
+    h.update(&vk::AccessFlags2::SHADER_STORAGE_WRITE.as_raw().to_le_bytes());
+    h.update(&vk::PipelineStageFlags2::HOST.as_raw().to_le_bytes());
+    h.update(&vk::AccessFlags2::HOST_READ.as_raw().to_le_bytes());
     h.update(b"wait-api:vkWaitSemaphores\0");
     h.update(b"counter-api:vkGetSemaphoreCounterValue\0");
     h.update(&VULKAN_TIMELINE_TIMEOUT_NS.to_le_bytes());
