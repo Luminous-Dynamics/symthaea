@@ -9380,6 +9380,118 @@ mod tests {
             .evaluation
             .calibration_topology_digest = Some(topology.canonical_digest().unwrap());
 
+        let mut input_result_topology = topology.clone();
+        input_result_topology.input_bindings[0].node_id = "input-result".into();
+        input_result_topology.input_bindings[0].input_result_ref =
+            Some(MeasurementModelInputResultRef {
+                result_id: "fixture-input-result".into(),
+                result_revision: "v1".into(),
+                result_record_digest: "fixture-input-result-digest".into(),
+            });
+        input_result_topology.nodes.push(CalibrationTraceabilityNodeRef {
+            node_id: "input-result".into(),
+            kind: CalibrationTraceabilityNodeKind::ModelInputResult,
+            record_id: "fixture-input-result".into(),
+            record_revision: "v1".into(),
+            record_digest: "fixture-input-result-digest".into(),
+            used_at_epoch_seconds: 1_650,
+        });
+        input_result_topology.edges = vec![
+            CalibrationTraceabilityEdge {
+                from_node_id: "result".into(),
+                to_node_id: "input-result".into(),
+            },
+            CalibrationTraceabilityEdge {
+                from_node_id: "input-result".into(),
+                to_node_id: "calibration".into(),
+            },
+            CalibrationTraceabilityEdge {
+                from_node_id: "calibration".into(),
+                to_node_id: "reference".into(),
+            },
+        ];
+        input_result_topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        let mut wrong_input_result_kind = input_result_topology.clone();
+        wrong_input_result_kind.nodes
+            .iter_mut()
+            .find(|node| node.node_id == "input-result")
+            .unwrap()
+            .kind = CalibrationTraceabilityNodeKind::CalibrationRecord;
+        assert!(matches!(
+            wrong_input_result_kind
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "input-result"
+        ));
+
+        let mut wrong_input_result_identity = input_result_topology.clone();
+        wrong_input_result_identity
+            .nodes
+            .iter_mut()
+            .find(|node| node.node_id == "input-result")
+            .unwrap()
+            .record_digest = "different-input-result-digest".into();
+        assert!(matches!(
+            wrong_input_result_identity
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "input-result"
+        ));
+
+        let mut missing_input_result_node = input_result_topology.clone();
+        missing_input_result_node
+            .nodes
+            .retain(|node| node.node_id != "input-result");
+        assert!(matches!(
+            missing_input_result_node
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "input-result"
+        ));
+
+        let mut missing_input_result_ref = input_result_topology.clone();
+        missing_input_result_ref.input_bindings[0].input_result_ref = None;
+        assert!(matches!(
+            missing_input_result_ref
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityOrphanedInputResultNode {
+                node_id,
+            } if node_id == "input-result"
+        ));
+
         let mut duplicate_input = topology.clone();
         duplicate_input.input_bindings.push(CalibrationTraceabilityInputBinding {
             input_quantity_id: "fixture-input".into(),
