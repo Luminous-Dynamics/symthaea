@@ -96,7 +96,7 @@ pub fn nix_string_literal(value: &str) -> String {
     while let Some(ch) = chars.next() {
         match ch {
             '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\\\\\"),
+            '\\' => out.push_str("\\\\"),
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
@@ -352,6 +352,23 @@ mod tests {
     fn sanitize_slash_gating() {
         assert!(sanitize_input("America/Chicago", "tz", false).is_err());
         assert!(sanitize_input("America/Chicago", "tz", true).is_ok());
+    }
+
+    // ── nix_string_literal ──
+
+    #[test]
+    fn nix_string_literal_escapes_quotes_backslashes_and_interpolation() {
+        let input = r#"hello"\${builtins.abort "pwned"}"#;
+        assert_eq!(
+            nix_string_literal(input),
+            r#""hello\"\\\${builtins.abort \"pwned\"}""#,
+        );
+    }
+
+    #[test]
+    fn nix_string_literal_escapes_common_control_characters() {
+        assert_eq!(nix_string_literal("a\nb\tc\rd"), r#""a\nb\tc\rd""#);
+        assert!(!nix_string_literal("a\0b").contains("\0"));
     }
 
     // ── validate_username ──
