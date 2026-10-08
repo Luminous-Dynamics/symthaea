@@ -12,8 +12,7 @@
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 use crate::action::post_state::{
-    NixPostStateReceiptV1, NixServicePostStateExpectationV1,
-    NixVerifiedPostStateObservationV1,
+    NixPostStateReceiptV1, NixServicePostStateExpectationV1, NixVerifiedPostStateObservationV1,
 };
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
@@ -1089,10 +1088,7 @@ impl NixOSExecutor {
         &mut self,
         command: NixOSCommand,
         authority: NixLocalExecutionAuthorityV1,
-    ) -> (
-        ExecutionResult,
-        Option<NixPostStateReceiptV1>,
-    ) {
+    ) -> (ExecutionResult, Option<NixPostStateReceiptV1>) {
         let NixOSCommand::Service { operation, unit } = &command else {
             let (result, _witness) = self
                 .execute_authorized_with_witness(command, authority)
@@ -1155,9 +1151,9 @@ impl NixOSExecutor {
             }
         };
 
-        let (result, witness, observation) =
-            self.execute_authorized_with_witness(command.clone(), authority)
-                .await;
+        let (result, witness, observation) = self
+            .execute_authorized_with_witness(command.clone(), authority)
+            .await;
 
         let (Some(witness), Some(observation)) = (witness, observation) else {
             return (result, None);
@@ -1471,8 +1467,8 @@ impl NixOSExecutor {
                         NixServiceOperationKindV1::Stop => "stop",
                         NixServiceOperationKindV1::Restart => "restart",
                         NixServiceOperationKindV1::Reload => "reload",
-                        NixServiceOperationKindV1::Enable
-                        | NixServiceOperationKindV1::Disable => "unsupported",
+                        NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable =>
+                            "unsupported",
                     },
                     observation
                         .as_ref()
@@ -1494,8 +1490,8 @@ impl NixOSExecutor {
                         NixServiceOperationKindV1::Stop => "stop",
                         NixServiceOperationKindV1::Restart => "restart",
                         NixServiceOperationKindV1::Reload => "reload",
-                        NixServiceOperationKindV1::Enable
-                        | NixServiceOperationKindV1::Disable => "unsupported",
+                        NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable =>
+                            "unsupported",
                     },
                     unit,
                     job_result.unwrap_or("unknown"),

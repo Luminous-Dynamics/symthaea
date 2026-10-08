@@ -401,12 +401,7 @@ impl NixSystemdReadOnlyObserverV1 {
         }
 
         let second = self
-            .observe_service_post_state_internal(
-                operation,
-                unit,
-                generation,
-                Some(completed_job),
-            )
+            .observe_service_post_state_internal(operation, unit, generation, Some(completed_job))
             .await?;
         let second_at = second.as_ref().observed_at_monotonic_us;
 
