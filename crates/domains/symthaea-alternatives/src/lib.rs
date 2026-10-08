@@ -1896,7 +1896,7 @@ impl EvidenceRecord {
                         );
                     }
                 }
-                }
+            }
             (None, true) => return Err(AssessmentError::MissingMeasurementUncertainty(self.kind)),
             (None, false) => {}
         }
