@@ -228,6 +228,7 @@ Temporary ref names and synthetic candidate commit identities are scoped to both
 GitHub's REST reference API defines non-forced reference updates as fast-forward updates and documents conflict responses. GitHub's GraphQL `updateRefs` additionally provides an atomic multi-ref mutation with `beforeOid` preconditions. This lab deliberately exercises the single-ref REST-compatible primitive; it does not establish an application-level authorization theorem.
 
 The lab also contains a deliberate force-writer negative control. It advances a separate temporary ref, force-resets that ref to its historical predecessor, and then demonstrates that a normal non-force successor can be accepted from the resurrected predecessor. This is an explicit boundary finding: `force=false` in the evaluator is not sufficient to establish monotonic currentness when an alternate privileged writer can force-reset the same ref. The production authority theorem must therefore include force-writer exclusion (including delete/recreate paths) or use another non-rollbackable currentness anchor.
+This requirement also applies when the implementation chooses GitHub GraphQL `updateRefs`: its atomic transaction and `beforeOid` predicates do not themselves provide an anti-ABA history guarantee. A privileged `A -> B -> A` force/reset sequence can restore the expected OID before a later transaction checks `beforeOid = A`. Cross-ref atomicity and non-rollbackable currentness are therefore separate properties.
 
 ## Claim ceiling
 
