@@ -54,7 +54,7 @@ jobs:
           cp -R crates/core/symthaea-gpu-fabric/src/. .ci/gpu-fabric-workspace/src/
           cp .github/scripts/verify-gpu-fabric-vulkan-qualification.py .ci/gpu-fabric-workspace/qualification-independent-verifier.py
           cp crates/core/symthaea-gpu-fabric/Cargo.toml .ci/gpu-fabric-workspace/Cargo.toml
-          sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "=1.8.5"/' -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' .ci/gpu-fabric-workspace/Cargo.toml
+          sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "=1.8.5"/' -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' -e 's/sha2 = { workspace = true }/sha2 = "=0.10.9"/' .ci/gpu-fabric-workspace/Cargo.toml
           printf '\n[workspace]\nresolver = "2"\n' >> .ci/gpu-fabric-workspace/Cargo.toml
 
       - name: Resolve isolated dependency lock
