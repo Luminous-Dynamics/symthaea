@@ -616,8 +616,11 @@ jobs:
                   : 'NOT_PASS',
               trusted_verifier: {
                 repository: expected.repository,
+                default_branch: repositoryMetadata.default_branch,
                 verifier_ref: context.ref,
                 verifier_sha: context.sha,
+                live_default_branch_tip_sha: liveEvidence.currentMainSha,
+                verifier_root_current: liveEvaluation.checks.verifier_root_current,
                 workflow_run_id: run.id,
               },
               adversarial_verifier_corpus: {
@@ -677,6 +680,17 @@ jobs:
                 step_conclusions: liveEvaluation.stepConclusions,
               },
               artifact: liveEvaluation.artifact,
+              artifact_lifecycle: {
+                artifact_id: liveEvaluation.artifact?.id ?? null,
+                created_at: liveEvaluation.artifact?.created_at ?? null,
+                expires_at: liveEvaluation.artifact?.expires_at ?? null,
+                lifetime_ordered:
+                  liveEvaluation.artifact == null
+                    ? false
+                    : artifactLifecycleVerified(liveEvaluation.artifact),
+                provider_expired:
+                  liveEvaluation.artifact?.expired ?? null,
+              },
               live_checks: liveEvaluation.checks,
             };
 
