@@ -137,10 +137,6 @@ impl HybridReceiptAssuranceContext {
     pub const fn classical_capability_sha256(&self) -> [u8; 32] { self.classical_capability_sha256 }
     pub const fn transcript_sha256(&self) -> [u8; 32] { self.transcript_sha256 }
 
-    pub const fn hybrid_required(&self) -> bool { self.hybrid_required }
-    pub fn hybrid_assurance(&self) -> Option<&HybridReceiptAssuranceContext> {
-        self.hybrid_assurance.as_ref()
-    }
     #[cfg(feature = "semantic-receipts")]
     fn from_verified(
         hybrid: &crate::rfc9942_hybrid::Rfc9942HybridVerifiedReceipt,
@@ -191,6 +187,16 @@ impl HybridReceiptAssuranceContext {
 }
 
 impl ReceiptSelectionContext {
+    /// Whether the assurance policy explicitly required PQ-bound verification.
+    pub const fn hybrid_required(&self) -> bool {
+        self.hybrid_required
+    }
+
+    /// Read-only reference to the hybrid assurance metadata, if admitted.
+    pub fn hybrid_assurance(&self) -> Option<&HybridReceiptAssuranceContext> {
+        self.hybrid_assurance.as_ref()
+    }
+
     /// Internal structural conversion used only after both source-collection
     /// and verified-capability binding have succeeded.
     #[cfg(feature = "semantic-receipts")]
