@@ -107,20 +107,19 @@ pub fn run_scenario(
     .unwrap_or_else(|error| panic!("invalid energy scheduling scenario: {error:?}"))
 }
 
-/// Run a validated scenario atomically with respect to battery state.
-///
-/// The runner rejects invalid time steps, invalid profiles and non-finite
-/// control outputs; it prevents a zero timestep from creating an infinite
-/// loop; it uses a shorter final step when the horizon is not divisible by
-/// dt; and it reports only the equivalent-full-cycle increment caused by
-/// this scenario. Battery state is committed back to the caller only when
-/// the complete scenario succeeds.
-#[allow(clippy::too_many_arguments)]
 /// Maximum number of discrete steps accepted for one scenario. This prevents
 /// an extremely small but positive timestep from creating an effectively
 /// unbounded CPU loop. Larger studies should be split into bounded windows.
-const MAX_SCENARIO_STEPS: f64 = 1_000_000.0;
+const MAX_SCENARIO_STEPS: usize = 1_000_000;
 
+/// Run a validated scenario atomically with respect to battery state.
+///
+/// The runner rejects invalid time steps, invalid profiles and non-finite
+/// control outputs; it bounds the work for each scenario; uses a shorter
+/// final step when the horizon is not divisible by dt; and reports only the
+/// equivalent-full-cycle increment caused by this scenario. Battery state
+/// is committed back to the caller only when the complete scenario succeeds.
+#[allow(clippy::too_many_arguments)]
 pub fn try_run_scenario(
     battery: &mut Battery,
     tariff: &TariffSchedule,
@@ -139,7 +138,7 @@ pub fn try_run_scenario(
         return Err(ScenarioError::InvalidHorizon);
     }
     let estimated_steps = (total_hours / dt_hours).ceil();
-    if !estimated_steps.is_finite() || estimated_steps > MAX_SCENARIO_STEPS {
+    if !estimated_steps.is_finite() || estimated_steps > MAX_SCENARIO_STEPS as f64 {
         return Err(ScenarioError::TooManySteps);
     }
     if !start_hour.is_finite() {
@@ -188,10 +187,15 @@ pub fn try_run_scenario(
     let mut working_battery = battery.clone();
     let initial_cycles = working_battery.equivalent_full_cycles();
     let mut elapsed = 0.0;
+    let mut steps = 0usize;
     let mut total_cost = 0.0;
     let mut unserved_energy_kwh = 0.0;
 
     while elapsed < total_hours {
+        if steps >= MAX_SCENARIO_STEPS {
+            return Err(ScenarioError::TooManySteps);
+        }
+        steps += 1;
         let remaining_hours = total_hours - elapsed;
         let step_hours = dt_hours.min(remaining_hours);
         let final_step = dt_hours >= remaining_hours;
