@@ -550,6 +550,74 @@ architectural guarantee against hallucination.
 
 ---
 
+## Typed Speech-Production Plan
+
+The Broca domain now exposes an additive `SpeechPlan` boundary between the deterministic
+structured readout and downstream linguistic/voice realization.
+
+```
+StructuredReadout + ThoughtChannels
+              |
+              v
+        SpeechPlan v1
+        /     |      \
+       /      |       \
+ linguistic  prosody  monitoring
+ frame       intent   / repair
+       \      |       /
+        \     |      /
+          realization
+```
+
+The plan preserves the existing role/filler structure instead of asking a downstream
+translator to re-infer it. It also makes three decisions explicit before realization:
+
+1. **Clause mode** — statement, question, directive, reflective, relational, or abstention.
+2. **Epistemic delivery** — assertive, qualified, or non-assertive.
+3. **Prosodic intent + monitoring** — rate, pitch range, prominence, pause pressure,
+   intonation, and whether produced output should be compared against the intended plan.
+
+The implementation is deliberately additive: it does not alter CfC/HDC checkpoints or
+the native decoder path. `grounding_surface()` provides a deterministic compact surface
+for tracing and evidence capture.
+
+The design follows the useful computational distinction in speech-production research
+between conceptual message formation, linguistic formulation, articulation, and
+monitoring, while avoiding the stronger claim that the software reproduces the anatomy
+or exact function of human Broca's area.
+
+## Closed-Loop Speech Feedback
+
+Broca also exposes an implementation-neutral feedback contract:
+
+```
+SpeechPlan
+   |
+   v
+SpeechSensoryTarget
+   |
+   v
+downstream realization
+   |
+   v
+SpeechSensoryObservation
+   |
+   v
+SpeechFeedbackError
+   |
+   +----> repair / adaptation
+```
+
+The observation type uses optional values deliberately: an unavailable pitch,
+rate, prominence, or pause measurement is **missing evidence**, not a measured
+zero. The resulting receipt retains the exact deterministic plan surface,
+target, observation, per-feature discrepancies, and aggregate error.
+
+This creates the software equivalent of a forward-model boundary without
+pretending that an acoustic mismatch proves a particular anatomical mechanism.
+The target is realization-neutral so vocal-tract, neural TTS, or external
+synthesizers can each provide their own measurement adapter.
+
 ## Translation Engine (Broca's Area)
 
 The `LLMOrgan` (`src/language/llm_organ.rs`) implements the translation interface.
@@ -667,3 +735,174 @@ provides context that modulates translation warmth, formality, and engagement
 depth. The partnership model tracks relationship stage and trust across
 interactions, producing responses that evolve with the relationship rather than
 treating every interaction as stateless.
+
+
+---
+
+## Typed Phonological Planning
+
+The speech-production boundary is now explicitly split into:
+
+    StructuredReadout + ThoughtChannels
+            |
+            v
+        SpeechPlan
+            |
+            v
+    PhonologicalPlan
+            |
+            v
+    phoneme/syllable slots
+            |
+            v
+    vocal-tract realization
+            |
+            v
+    sensory observation -> SpeechFeedbackReceipt
+
+PhonologicalPlan exists specifically to prevent the realization layer from having to
+re-infer linguistic structure from acoustic state. It carries intonation, rate, pause
+pressure, focus provenance, syllable stress, syllable boundaries, and explicit phoneme
+slots when an upstream linguistic formatter provides them.
+
+### Content-binding states
+
+Three states make absence of linguistic content explicit:
+
+- RoleStructureOnly: semantic roles and prosodic intent exist, but no word/phoneme
+  sequence is available. The plan is not ready for segment-level realization.
+- PhonologicallyBound: an explicit phoneme sequence and syllable structure have been
+  supplied without asserting lexical provenance.
+- LexicallyBound: the caller has both lexical provenance and an explicit phonological
+  sequence. The plan itself does not invent or synthesize lexical strings.
+
+This is intentionally loss-aware. A role-only readout such as PATIENT:SOMETHING does
+not become a guessed word merely because a voice subsystem needs segments.
+
+### Validation invariants
+
+The phonological contract fails closed on:
+
+- empty phoneme symbols;
+- non-contiguous syllable indices;
+- lexical binding without explicit segments;
+- phonological binding without explicit segments;
+- role-only status carrying segment data.
+
+Stress ordering is represented as Primary > Secondary > None, matching the realization
+layer's existing 0/1/2 stress convention after the bridge conversion.
+
+### Realization boundary
+
+BrocaFramePosition::from_phoneme_slot() copies only phonological ownership into the
+voice frame: stress, syllable onset, and information-structural focus. Timing, phrase
+progress, and neighboring source types remain scheduler-owned. This keeps the semantic,
+phonological, and biomechanical responsibilities separable and makes ablation possible.
+
+### Research correspondence and non-claims
+
+This split corresponds to computational speech-production models that distinguish
+higher-level phonological sequencing from lower-level articulatory control and combine
+feedforward production with auditory/somatosensory feedback. DIVA/GODIVA explicitly
+bridges linguistic/phonological sequencing into speech-sound planning and then into
+articulatory control; sensory targets and prediction errors are used for feedback-based
+correction. This repository's implementation is an engineering correspondence, not a
+claim of anatomical identity with human Broca's area or of human-level speech
+naturalness.
+
+
+### Current formulation ceiling
+
+The typed phonological boundary does not claim to solve lexical selection or grammatical
+encoding. The current deterministic StructuredDecoder can still emit generic role fillers
+such as PATIENT:SOMETHING. PhonologicalPlan therefore remains unbound until an upstream
+linguistic formatter supplies an actual phoneme sequence.
+
+The intended evolution is:
+
+    semantic structure
+        -> lexical / morphosyntactic formulation
+        -> phonological sequence
+        -> syllable / prosodic structure
+        -> articulatory realization
+        -> sensory observation
+
+The important invariant is that each newly introduced layer must preserve explicit
+provenance for what is known versus what is merely a realization placeholder.
+
+
+## Semantic Delivery Feedback
+
+Acoustic fidelity is necessary but not sufficient. A realization can hit a pitch/rate target
+while still changing the intended linguistic act—for example, converting a qualified answer
+into an assertive one, or turning a statement into a question.
+
+SpeechDeliveryReceipt therefore compares a downstream observation against four explicit
+semantic targets:
+
+- intent;
+- clause mode;
+- epistemic delivery;
+- information-structural focus.
+
+Each feature is independently optional. Missing observations remain missing evidence, and an
+observation of no focus is distinct from an unobserved focus field.
+
+The semantic and acoustic receipts are intentionally separate:
+
+    SpeechPlan
+       |\\
+       | +--> acoustic sensory target -> observation -> acoustic error
+       |
+       +----> semantic delivery target -> observation -> delivery error
+
+This mirrors a useful systems principle from contemporary speech-prediction research:
+error signals need not live at one level. Recent work reports prediction errors emerging at
+higher linguistic levels while sensory sharpening operates at lower levels, supporting
+hierarchical rather than single-score feedback. The implementation therefore keeps semantic,
+phonological, and acoustic discrepancies separately inspectable.
+
+
+## Linguistic Formulation Boundary
+
+The speech-production path now makes the formulation stage explicit:
+
+    StructuredReadout + ThoughtChannels
+                |
+                v
+           SpeechPlan
+                |
+                v
+        LinguisticFrame
+                |
+                v
+       PhonologicalPlan
+                |
+                v
+      motor realization
+                |
+          +-----+-----+
+          |           |
+          v           v
+   semantic error   acoustic error
+
+LinguisticFrame is a conservative linearization skeleton over the canonical semantic
+roles already present in SpeechPlan. Its job is to make clause strategy, constituent
+ordering, focus attachment, and lexical-binding provenance explicit before phonological
+realization.
+
+It does not invent:
+- lexical words;
+- inflection or agreement;
+- omitted semantic arguments;
+- morphology that is not present in upstream state.
+
+This boundary matters because recent 2026 speech-production work reports distinct neural
+processes for speech planning and execution, with discrete planned syllable/phoneme units
+being dynamically integrated into continuous motor sequences. A separate 2026 production
+study also reports that morphosyntactic speech planning can influence phonetic realization
+under changes in syntactic boundary and speaking rate.
+
+For Symthaea, the engineering implication is not to imitate those neural mechanisms
+literally, but to preserve the same separability in software so semantic, linguistic,
+phonological, and motor evidence can be measured independently.

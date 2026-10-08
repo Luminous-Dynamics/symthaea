@@ -98,6 +98,11 @@ if [[ -n "${BROCA_CHECKPOINT_PATH:-}" ]]; then
   echo "[broca] NOTE: exercism-bench drives the separate Liquid-Mamba fusion pathway, not the checkpoint at \$BROCA_CHECKPOINT_PATH — its results below are informational only, not a promotion signal for that checkpoint."
 fi
 
+# Deterministic architecture-contract evidence: exercises the full intent × epistemic matrix
+# without invoking a stochastic language or acoustic backend.
+cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-production-contract-audit -- \
+  --json-out "$OUT_DIR/production-contract-audit.json"
+
 if [[ "${BROCA_SKIP_EXERCISM:-0}" == "1" ]]; then
   cat > "$OUT_DIR/exercism-bench.json" <<'JSON'
 {

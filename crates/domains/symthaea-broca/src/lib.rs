@@ -18,6 +18,8 @@ pub mod checkpoint;
 #[cfg(feature = "code-sheaf-eval")]
 pub mod code_analysis;
 pub mod cognitive_loop;
+pub mod linguistic_frame;
+pub mod phonological_plan;
 pub mod compiler_trainer;
 pub mod consensus_engine;
 pub mod controller;
@@ -51,6 +53,9 @@ pub mod self_actualization;
 pub mod self_optimization;
 pub mod species_learning;
 pub mod speech_encoder;
+pub mod speech_plan;
+pub mod speech_feedback;
+pub mod speech_delivery_feedback;
 pub mod structural_generator;
 pub mod structural_scorer;
 pub mod substrate_binding;
@@ -128,6 +133,26 @@ pub use secure_dreaming::{SecureDreamResult, SecureDreamingEngine};
 pub use self_actualization::ReflectionEngine;
 pub use self_optimization::SelfOptimizationEngine;
 pub use species_learning::MemoryConsolidator;
+pub use linguistic_frame::{
+    ConstituentSlot, FormulationStrategy, LinguisticBindingStatus, LinguisticFrame,
+    LinguisticFrameError, LINGUISTIC_FRAME_VERSION,
+};
+pub use phonological_plan::{
+    ContentBindingStatus, PhonemeSlot, PhonologicalPlan, PhonologicalPlanError, SyllableSlot,
+    SyllableStress, PHONOLOGICAL_PLAN_VERSION,
+};
+pub use speech_delivery_feedback::{
+    ObservedFocus, SpeechDeliveryError, SpeechDeliveryObservation, SpeechDeliveryReceipt,
+    SpeechDeliveryReceiptError, SpeechDeliveryTarget, SPEECH_DELIVERY_FEEDBACK_VERSION,
+};
+pub use speech_feedback::{
+    SpeechFeedbackError, SpeechFeedbackReceipt, SpeechFeedbackReceiptError,
+    SpeechSensoryObservation, SpeechSensoryTarget, SPEECH_FEEDBACK_VERSION,
+};
+pub use speech_plan::{
+    ClauseMode, EpistemicDelivery, IntonationIntent, ProsodicIntent, SpeechMonitorPlan,
+    SpeechPlan, SpeechPlanError, SpeechPlanRole, SPEECH_PLAN_VERSION,
+};
 pub use structural_generator::StructuralGenerator;
 pub use structural_scorer::{NixStructuralScorer, StructuralVerdict};
 pub use substrate_binding::{AnticipatedImpact, ImpactRecommendation, SubstrateBindingEngine};
