@@ -300,12 +300,9 @@ fn noncanonical_receipt_wire_identity_survives_verified_projection() {
     );
 
     let decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
-    let context = ReceiptSelectionContext::from_verified_decision(
-        &decision,
-        &collection,
-        &verified,
-    )
-    .unwrap();
+    let witness =
+        Rfc9942VerifiedReceiptSelection::bind(&decision, &collection, &verified).unwrap();
+    let context = ReceiptSelectionContext::from_verified_selection(&witness).unwrap();
     assert_eq!(
         context.selected_receipt_sha256,
         sha2::Sha256::digest(&noncanonical_wire).into()
