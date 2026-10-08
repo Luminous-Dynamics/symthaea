@@ -5,6 +5,8 @@ claim_ceiling=deterministic local transaction/reconciliation model only
 promotion_authority=false
 """
 
+from datetime import datetime
+
 import hashlib
 import hmac
 import json
@@ -361,6 +363,7 @@ class ProviderWebhookRequestContextV1:
     hook_id: str
     event_type: str
     repository: str
+    received_at_ms: int | None = None
 
     def matches_receipt(self, receipt: ProviderWebhookReceiptV1) -> bool:
         return (
@@ -382,6 +385,8 @@ class ProviderPullRequestMergeObservationV1:
     head_sha: str
     merge_commit_sha: str
     payload_bytes_digest: str
+    merged_at: str = ""
+    local_received_at_ms: int | None = None
     hook_id: str = ""
     source_authentication: str = ""
 
@@ -412,6 +417,7 @@ class ProviderPullRequestMergeObservationV1:
             repository = document["repository"]
             head = pull_request["head"]
             merge_commit_sha = pull_request["merge_commit_sha"]
+            merged_at = pull_request.get("merged_at") or ""
             pr_number = int(document["number"])
             nested_pr_number = int(pull_request["number"])
             event_type = receipt.event_type
@@ -444,6 +450,8 @@ class ProviderPullRequestMergeObservationV1:
             head_sha=head_sha,
             merge_commit_sha=str(merge_commit_sha),
             payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
+            merged_at=str(merged_at),
+            local_received_at_ms=received_context.received_at_ms,
             hook_id=receipt.hook_id,
             source_authentication="webhook-hmac-verified",
         )
@@ -589,6 +597,131 @@ class PromotionPrEffectStateV1:
 
     def is_terminally_observed(self) -> bool:
         return self.state == "EffectObserved" and self.effect is not None
+
+def parse_provider_timestamp_ms(value: str) -> int | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return int(parsed.timestamp() * 1000)
+
+
+@dataclass(frozen=True)
+class ClockRelationV1:
+    provider_clock_domain: str
+    local_clock_domain: str
+    max_skew_ms: int
+    verified: bool = False
+
+    def usable(self) -> bool:
+        return (
+            bool(self.provider_clock_domain)
+            and bool(self.local_clock_domain)
+            and self.max_skew_ms >= 0
+            and self.verified
+        )
+
+
+@dataclass(frozen=True)
+class ProviderWebhookEffectTimingV1:
+    provider_event_time_ms: int | None
+    provider_delivery_time_ms: int | None
+    local_reservation_time_ms: int | None
+    local_dispatch_time_ms: int | None
+    local_observation_time_ms: int | None
+    clock_relation: ClockRelationV1 | None
+
+    @classmethod
+    def from_observation(
+        cls,
+        observation: ProviderPullRequestMergeObservationV1,
+        local_reservation_time_ms: int | None,
+        local_dispatch_time_ms: int | None,
+        clock_relation: ClockRelationV1 | None,
+        provider_delivery_time_ms: int | None = None,
+    ) -> "ProviderWebhookEffectTimingV1":
+        return cls(
+            provider_event_time_ms=parse_provider_timestamp_ms(observation.merged_at),
+            provider_delivery_time_ms=provider_delivery_time_ms,
+            local_reservation_time_ms=local_reservation_time_ms,
+            local_dispatch_time_ms=local_dispatch_time_ms,
+            local_observation_time_ms=observation.local_received_at_ms,
+            clock_relation=clock_relation,
+        )
+
+    def classify(self) -> str:
+        values = (
+            self.provider_event_time_ms,
+            self.provider_delivery_time_ms,
+            self.local_reservation_time_ms,
+            self.local_dispatch_time_ms,
+            self.local_observation_time_ms,
+        )
+        if any(value is not None and value < 0 for value in values):
+            return "invalid-negative-time"
+        if self.provider_event_time_ms is None:
+            return "provider-event-time-missing"
+        if self.local_reservation_time_ms is None:
+            return "local-reservation-time-missing"
+        if self.local_dispatch_time_ms is None:
+            return "local-dispatch-time-missing"
+        if self.local_observation_time_ms is None:
+            return "local-observation-time-missing"
+        if self.local_dispatch_time_ms < self.local_reservation_time_ms:
+            return "invalid-local-time-order"
+        if self.provider_delivery_time_ms is not None:
+            if self.provider_delivery_time_ms < self.provider_event_time_ms:
+                return "invalid-provider-time-order"
+        if self.clock_relation is None or not self.clock_relation.usable():
+            return "cross-domain-time-unbounded"
+
+        skew = self.clock_relation.max_skew_ms
+        event = self.provider_event_time_ms
+        dispatch = self.local_dispatch_time_ms
+        observed = self.local_observation_time_ms
+
+        if event + skew < dispatch:
+            return "provider-event-before-dispatch"
+        if event - skew > observed:
+            return "provider-event-after-observation"
+        if event - skew < dispatch or event + skew > observed:
+            return "cross-domain-time-uncertain"
+        return "temporally-admissible"
+
+    def temporally_admissible(self) -> bool:
+        return self.classify() == "temporally-admissible"
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectTimingV1:
+    pr_number: int
+    timing: ProviderWebhookEffectTimingV1
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectTimingSetV1:
+    operation_identity_digest: str
+    timings: tuple[PromotionStackEffectTimingV1, ...]
+
+    def validates_complete(self, identity: PromotionOperationIdentityV1) -> bool:
+        if self.operation_identity_digest != identity.digest():
+            return False
+        expected = identity.ordered_stack
+        if len(self.timings) != len(expected):
+            return False
+        observed_prs = [item.pr_number for item in self.timings]
+        if len(observed_prs) != len(set(observed_prs)):
+            return False
+        return all(
+            item.pr_number == entry.pr_number
+            and item.timing.temporally_admissible()
+            for entry, item in zip(expected, self.timings)
+        )
+
 
 @dataclass(frozen=True)
 class PromotionStackEffectEvidenceV1:
@@ -1027,12 +1160,14 @@ def test_webhook_hmac_verification_rejects_wrong_secret():
 
 def webhook_received_context(
     receipt: ProviderWebhookReceiptV1,
+    received_at_ms: int | None = None,
 ) -> ProviderWebhookRequestContextV1:
     return ProviderWebhookRequestContextV1(
         delivery_id=receipt.delivery_id,
         hook_id=receipt.hook_id,
         event_type=receipt.event_type,
         repository=receipt.repository,
+        received_at_ms=received_at_ms,
     )
 
 
@@ -1057,6 +1192,11 @@ def webhook_merge_payload(
                     merge_commit
                     if merge_commit is not None
                     else ("M2" if merged else None)
+                ),
+                "merged_at": (
+                    "2026-10-08T16:00:00Z"
+                    if merged
+                    else None
                 ),
             },
             "repository": {"full_name": repository},
@@ -1090,6 +1230,7 @@ def stack_webhook_observation(
     merge_commit: str = "M2",
     delivery_id: str = "delivery-merge",
     repository: str = "Luminous-Dynamics/symthaea",
+    received_at_ms: int = 1728403200000,
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
     payload = webhook_merge_payload(
@@ -1109,13 +1250,63 @@ def stack_webhook_observation(
         receipt,
         payload,
         b"secret",
-        webhook_received_context(receipt),
+        webhook_received_context(receipt, received_at_ms),
         "hook-1",
         "pull_request",
         "Luminous-Dynamics/symthaea",
     )
     assert observation is not None
     return observation
+
+
+def clock_relation_fixture(
+    *,
+    max_skew_ms: int = 1000,
+    verified: bool = True,
+) -> ClockRelationV1:
+    return ClockRelationV1(
+        provider_clock_domain="github",
+        local_clock_domain="local",
+        max_skew_ms=max_skew_ms,
+        verified=verified,
+    )
+
+
+def effect_timing_fixture(
+    *,
+    event_time_ms: int | None = 1728402960000,
+    delivery_time_ms: int | None = None,
+    reservation_time_ms: int | None = 1728402900000,
+    dispatch_time_ms: int | None = 1728402950000,
+    observation_time_ms: int | None = 1728403200000,
+    clock_relation: ClockRelationV1 | None = None,
+) -> ProviderWebhookEffectTimingV1:
+    return ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=event_time_ms,
+        provider_delivery_time_ms=delivery_time_ms,
+        local_reservation_time_ms=reservation_time_ms,
+        local_dispatch_time_ms=dispatch_time_ms,
+        local_observation_time_ms=observation_time_ms,
+        clock_relation=(
+            clock_relation if clock_relation is not None else clock_relation_fixture()
+        ),
+    )
+
+
+def webhook_effect_timing_from_observation(
+    identity: PromotionOperationIdentityV1 | None = None,
+) -> ProviderWebhookEffectTimingV1:
+    identity = identity or stack_identity_fixture()
+    observation = stack_webhook_observation(
+        identity,
+        received_at_ms=1728403200000,
+    )
+    return ProviderWebhookEffectTimingV1.from_observation(
+        observation,
+        local_reservation_time_ms=1728402900000,
+        local_dispatch_time_ms=1728402950000,
+        clock_relation=clock_relation_fixture(),
+    )
 
 
 def effect_state_fixture(
@@ -1127,6 +1318,128 @@ def effect_state_fixture(
         repository=identity.repository,
         expected_entry=entry,
     )
+
+
+def test_provider_timestamp_parser_accepts_utc_and_offset():
+    assert parse_provider_timestamp_ms("2026-10-08T16:00:00Z") == parse_provider_timestamp_ms(
+        "2026-10-08T18:00:00+02:00"
+    )
+
+
+def test_provider_timestamp_parser_rejects_malformed_timestamp():
+    assert parse_provider_timestamp_ms("not-a-timestamp") is None
+    assert parse_provider_timestamp_ms("2026-10-08T16:00:00") is None
+
+
+def test_clock_relation_unverified_is_unusable():
+    assert not clock_relation_fixture(verified=False).usable()
+
+
+def test_clock_relation_negative_skew_is_unusable():
+    assert not clock_relation_fixture(max_skew_ms=-1, verified=True).usable()
+
+
+def test_temporal_effect_with_valid_skew_is_admissible():
+    timing = effect_timing_fixture()
+    assert timing.classify() == "temporally-admissible"
+    assert timing.temporally_admissible()
+
+
+def test_temporal_effect_without_clock_relation_is_unbounded():
+    timing = effect_timing_fixture(clock_relation=None)
+    assert timing.classify() == "cross-domain-time-unbounded"
+
+
+def test_temporal_effect_with_event_before_dispatch_is_rejected():
+    timing = effect_timing_fixture(
+        event_time_ms=1728400000000,
+        reservation_time_ms=1728402000000,
+        dispatch_time_ms=1728402500000,
+    )
+    assert timing.classify() == "provider-event-before-dispatch"
+
+
+def test_temporal_effect_with_event_after_observation_is_rejected():
+    timing = effect_timing_fixture(
+        event_time_ms=1728405000000,
+        observation_time_ms=1728403200000,
+    )
+    assert timing.classify() == "provider-event-after-observation"
+
+
+def test_temporal_effect_with_uncertain_clock_overlap_is_not_admissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1728402949500,
+        dispatch_time_ms=1728402950000,
+        clock_relation=clock_relation_fixture(max_skew_ms=1000),
+    )
+    assert timing.classify() == "cross-domain-time-uncertain"
+    assert not timing.temporally_admissible()
+
+
+def test_temporal_effect_accepts_exact_skew_boundaries():
+    timing = effect_timing_fixture(
+        event_time_ms=1728402959000,
+        dispatch_time_ms=1728402958000,
+        observation_time_ms=1728402960000,
+        clock_relation=clock_relation_fixture(max_skew_ms=1000),
+    )
+    assert timing.classify() == "temporally-admissible"
+
+
+def test_provider_delivery_time_before_event_is_invalid():
+    timing = effect_timing_fixture(
+        delivery_time_ms=1728402959000,
+        event_time_ms=1728402960000,
+    )
+    assert timing.classify() == "invalid-provider-time-order"
+
+
+def test_temporal_timing_can_be_derived_from_authenticated_observation():
+    timing = webhook_effect_timing_from_observation()
+    assert timing.provider_event_time_ms == parse_provider_timestamp_ms(
+        "2026-10-08T16:00:00Z"
+    )
+    assert timing.local_observation_time_ms == 1728403200000
+    assert timing.temporally_admissible()
+
+
+def test_historical_merge_delivered_after_new_reservation_is_inadmissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1728402000000,
+        reservation_time_ms=1728403000000,
+        dispatch_time_ms=1728403050000,
+        observation_time_ms=1728403200000,
+        clock_relation=clock_relation_fixture(max_skew_ms=1000),
+    )
+    assert timing.classify() == "provider-event-before-dispatch"
+
+
+def test_temporal_timing_rejects_missing_event_time():
+    timing = effect_timing_fixture(event_time_ms=None)
+    assert timing.classify() == "provider-event-time-missing"
+
+
+def test_temporal_timing_rejects_invalid_local_order():
+    timing = effect_timing_fixture(
+        reservation_time_ms=1728403100000,
+        dispatch_time_ms=1728403000000,
+    )
+    assert timing.classify() == "invalid-local-time-order"
+
+
+def test_complete_stack_timing_requires_every_member_admissible():
+    identity = stack_identity_fixture()
+    good = PromotionStackEffectTimingV1(7085, effect_timing_fixture())
+    bad = PromotionStackEffectTimingV1(
+        7087,
+        effect_timing_fixture(event_time_ms=1728402000000),
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        (good, bad),
+    )
+    assert not timings.validates_complete(identity)
 
 
 def test_effect_state_admits_first_authenticated_merge():
@@ -3421,6 +3734,22 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_timestamp_parser_accepts_utc_and_offset,
+    test_provider_timestamp_parser_rejects_malformed_timestamp,
+    test_clock_relation_unverified_is_unusable,
+    test_clock_relation_negative_skew_is_unusable,
+    test_temporal_effect_with_valid_skew_is_admissible,
+    test_temporal_effect_without_clock_relation_is_unbounded,
+    test_temporal_effect_with_event_before_dispatch_is_rejected,
+    test_temporal_effect_with_event_after_observation_is_rejected,
+    test_temporal_effect_with_uncertain_clock_overlap_is_not_admissible,
+    test_temporal_effect_accepts_exact_skew_boundaries,
+    test_provider_delivery_time_before_event_is_invalid,
+    test_temporal_timing_can_be_derived_from_authenticated_observation,
+    test_historical_merge_delivered_after_new_reservation_is_inadmissible,
+    test_temporal_timing_rejects_missing_event_time,
+    test_temporal_timing_rejects_invalid_local_order,
+    test_complete_stack_timing_requires_every_member_admissible,
     test_effect_state_admits_first_authenticated_merge,
     test_effect_state_merged_then_non_effect_does_not_downgrade,
     test_effect_state_equivalent_second_delivery_is_idempotent,
