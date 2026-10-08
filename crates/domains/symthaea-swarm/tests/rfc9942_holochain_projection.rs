@@ -232,6 +232,97 @@ fn signed_outer_with_receipts(
 }
 
 #[cfg(feature = "semantic-receipts")]
+fn signed_detached_outer_with_receipts(
+    collection: &Rfc9942ReceiptCollection,
+    signer: &EcdsaKeyPair,
+    rng: &SystemRandom,
+) -> Rfc9942SignatureWithReceipts {
+    let collection_bytes = collection.to_cbor();
+    let protected = [0xa1, 0x01, 0x26];
+
+    let mut unsigned_wire = vec![0xd2, 0x84, 0x43];
+    unsigned_wire.extend_from_slice(&protected);
+    unsigned_wire.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
+    unsigned_wire.extend_from_slice(&collection_bytes);
+    unsigned_wire.push(0xf6);
+    unsigned_wire.extend_from_slice(&cbor_bstr(&[0; 64]));
+
+    let unsigned = Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
+    let signature = signer
+        .sign(rng, &unsigned.signature1_tbs(b"", Some(b"candidate")).unwrap())
+        .unwrap()
+        .as_ref()
+        .to_vec();
+
+    let mut signed_wire = vec![0xd2, 0x84, 0x43];
+    signed_wire.extend_from_slice(&protected);
+    signed_wire.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
+    signed_wire.extend_from_slice(&collection_bytes);
+    signed_wire.push(0xf6);
+    signed_wire.extend_from_slice(&cbor_bstr(&signature));
+
+    Rfc9942SignatureWithReceipts::from_cbor(&signed_wire).unwrap()
+}
+
+#[cfg(feature = "semantic-receipts")]
+#[test]
+fn detached_outer_payload_is_exactly_bound_through_selection() {
+    let rng = SystemRandom::new();
+    let receipt_signer = signing_key(&rng);
+    let outer_signer = signing_key(&rng);
+    let receipt_key = receipt_signer.public_key().as_ref().to_vec();
+    let outer_key = outer_signer.public_key().as_ref().to_vec();
+
+    let collection = Rfc9942ReceiptCollection::new(vec![
+        signed_inclusion_receipt(
+            &[b"candidate".to_vec(), b"other".to_vec()],
+            &receipt_signer,
+            &rng,
+        ),
+    ])
+    .unwrap();
+    let outer = signed_detached_outer_with_receipts(&collection, &outer_signer, &rng);
+
+    assert_eq!(
+        outer.verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        ),
+        Err(symthaea_swarm::Rfc9942VdpError::DetachedPayloadRequired)
+    );
+
+    let (verified, witness) = outer
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            Some(b"candidate"),
+        )
+        .unwrap();
+    assert_eq!(verified.outer_payload_mode(), symthaea_swarm::Rfc9942PayloadMode::Detached);
+    assert_eq!(
+        verified.outer_payload_sha256(),
+        sha2::Sha256::digest(b"candidate").into()
+    );
+    assert_eq!(witness.decision().selected_index, Some(0));
+
+    assert_eq!(
+        outer.verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            Some(b"tampered"),
+        ),
+        Err(symthaea_swarm::Rfc9942VdpError::InvalidEs256Signature)
+    );
+}
+
+#[cfg(feature = "semantic-receipts")]
 #[test]
 fn verified_selection_projection_requires_exact_capability_and_collection() {
     let rng = SystemRandom::new();
