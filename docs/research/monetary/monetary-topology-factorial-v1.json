@@ -18,11 +18,10 @@
       "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
     },
     "edge_digests":{
-      "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
-      "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
-      "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
+      "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b","bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db","tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
     },
-    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous jitter across topologies",
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous jitter across all topology treatments",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
     "no_financial_hub_inference":true,
     "technical_settlement_semantics":"topology must not mutate adapter-declared technical settlement semantics except explicit routing-overhead effects are operational, not settlement finality",
     "composition_identity_rule":"topology change requires new topology and composition generation identities"
