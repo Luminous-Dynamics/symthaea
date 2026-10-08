@@ -79,6 +79,33 @@ jobs:
               });
             }
 
+            function qualificationRunMatchesExpected(candidate) {
+              return (
+                candidate !== null &&
+                candidate.path === expected.workflowPath &&
+                candidate.name === expected.workflowName &&
+                candidate.event === 'pull_request' &&
+                candidate.head_branch === expected.branch &&
+                candidate.head_sha === expected.subject &&
+                Number(candidate.repository?.id) === expected.repositoryId &&
+                Number(candidate.head_repository?.id) === expected.repositoryId &&
+                candidate.head_repository?.full_name === expected.repository
+              );
+            }
+
+            function newestQualificationRun(runs) {
+              return [...runs]
+                .filter(qualificationRunMatchesExpected)
+                .sort((a, b) => {
+                  const aCreated = Date.parse(a.created_at ?? '');
+                  const bCreated = Date.parse(b.created_at ?? '');
+                  if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) {
+                    return bCreated - aCreated;
+                  }
+                  return Number(b.id) - Number(a.id);
+                })[0] ?? null;
+            }
+
             function buildPromotionEligibilityLease({
               evaluation,
               evidence,
@@ -98,6 +125,10 @@ jobs:
               if (!governanceObservation.verified) reasons.push('governance_authority_unverified');
               if (evidence.finalPr?.state !== 'open') reasons.push('pr_not_open');
               if (evidence.finalPr?.draft !== false) reasons.push('pr_not_ready_for_review');
+              if (evidence.latestExactHeadRunMatchesTrigger !== true ||
+                  evidence.finalLatestExactHeadRunMatchesTrigger !== true) {
+                reasons.push('qualification_run_superseded');
+              }
 
               const lease = {
                 schema_version: 'PromotionEligibilityLeaseV1',
@@ -127,6 +158,12 @@ jobs:
                   triggering_run_attempt: evidence.triggerRunAttempt,
                   head_sha: evidence.run.head_sha,
                   workflow_path: evidence.run.path,
+                  latest_exact_head_run_id: evidence.latestExactHeadRun?.id ?? null,
+                  latest_exact_head_run_attempt: evidence.latestExactHeadRun?.run_attempt ?? null,
+                  latest_exact_head_run_matches_trigger: evidence.latestExactHeadRunMatchesTrigger,
+                  final_latest_exact_head_run_id: evidence.finalLatestExactHeadRun?.id ?? null,
+                  final_latest_exact_head_run_attempt: evidence.finalLatestExactHeadRun?.run_attempt ?? null,
+                  final_latest_exact_head_run_matches_trigger: evidence.finalLatestExactHeadRunMatchesTrigger,
                 },
                 evidence_lifecycle: {
                   artifact_id: evidence.finalArtifacts?.[0]?.id ?? null,
@@ -495,6 +532,16 @@ jobs:
                 },
                 initialBaseBranchTipSha: expected.parent,
                 finalBaseBranchTipSha: expected.parent,
+                latestExactHeadRun: {
+                  id: runId,
+                  run_attempt: 1,
+                },
+                finalLatestExactHeadRun: {
+                  id: runId,
+                  run_attempt: 1,
+                },
+                latestExactHeadRunMatchesTrigger: true,
+                finalLatestExactHeadRunMatchesTrigger: true,
                 finalPr: {
                   number: expected.pr,
                   state: 'open',
@@ -773,6 +820,32 @@ jobs:
               draftPrLease.lease_state === 'NOT_ELIGIBLE' &&
               draftPrLease.invalidation_reasons.includes('pr_not_ready_for_review');
 
+            const supersededRunSynthetic = syntheticEvidence();
+            supersededRunSynthetic.latestExactHeadRun = { id: 2, run_attempt: 1 };
+            const supersededRunLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: supersededRunSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const finalSupersededRunSynthetic = syntheticEvidence();
+            finalSupersededRunSynthetic.finalLatestExactHeadRun = { id: 2, run_attempt: 1 };
+            const finalSupersededRunLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: finalSupersededRunSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const qualificationRunSupersessionLeasePassed =
+              supersededRunLease.lease_state === 'NOT_ELIGIBLE' &&
+              supersededRunLease.invalidation_reasons.includes('qualification_run_superseded') &&
+              finalSupersededRunLease.lease_state === 'NOT_ELIGIBLE' &&
+              finalSupersededRunLease.invalidation_reasons.includes('qualification_run_superseded');
+
             const adversarialResults = [];
             for (const [name, mutate] of attackCases) {
               const mutated = JSON.parse(JSON.stringify(syntheticEvidence()));
@@ -795,6 +868,7 @@ jobs:
               syntheticLeasePassed &&
               governanceLeaseInvalidationPassed &&
               prStateLeaseInvalidationPassed;
+              qualificationRunSupersessionLeasePassed;
 
             const runId = context.payload.workflow_run?.id;
             if (!Number.isInteger(runId) || runId <= 0) {
@@ -810,6 +884,29 @@ jobs:
               repo: context.repo.repo,
               run_id: runId,
             })).data;
+
+            if (!Number.isSafeInteger(run.workflow_id) || run.workflow_id <= 0) {
+              throw new Error('trusted runner workflow_id is missing or invalid');
+            }
+
+            const initialQualificationRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForWorkflow,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: run.workflow_id,
+                event: 'pull_request',
+                head_sha: expected.subject,
+                per_page: 100,
+              }
+            );
+            const latestExactHeadRun = newestQualificationRun(initialQualificationRuns);
+            if (latestExactHeadRun === null) {
+              throw new Error('no exact-head trusted qualification run was observed');
+            }
+            const latestExactHeadRunMatchesTrigger =
+              latestExactHeadRun.id === run.id &&
+              latestExactHeadRun.run_attempt === run.run_attempt;
 
             const verifierWorkflowFile = await github.rest.repos.getContent({
               owner: context.repo.owner,
@@ -977,6 +1074,23 @@ jobs:
               throw new Error('final base-branch ref did not resolve to a canonical commit SHA');
             }
 
+            const finalQualificationRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForWorkflow,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: run.workflow_id,
+                event: 'pull_request',
+                head_sha: expected.subject,
+                per_page: 100,
+              }
+            );
+            const finalLatestExactHeadRun = newestQualificationRun(finalQualificationRuns);
+            const finalLatestExactHeadRunMatchesTrigger =
+              finalLatestExactHeadRun !== null &&
+              finalLatestExactHeadRun.id === run.id &&
+              finalLatestExactHeadRun.run_attempt === run.run_attempt;
+
             const finalArtifacts = await github.paginate(
               github.rest.actions.listWorkflowRunArtifacts,
               {
@@ -1133,6 +1247,10 @@ jobs:
               run,
               jobs,
               pr,
+              latestExactHeadRun,
+              latestExactHeadRunMatchesTrigger,
+              finalLatestExactHeadRun,
+              finalLatestExactHeadRunMatchesTrigger,
               finalPr,
               parentCommit,
               mergeCommit,
@@ -1165,7 +1283,7 @@ jobs:
             });
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v13',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v14',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -1210,6 +1328,7 @@ jobs:
                 lease_baseline_passed: syntheticLeasePassed,
                 governance_invalidation_lease_passed: governanceLeaseInvalidationPassed,
                 pr_state_invalidation_lease_passed: prStateLeaseInvalidationPassed,
+                qualification_run_supersession_lease_passed: qualificationRunSupersessionLeasePassed,
                 cases: adversarialResults,
               },
               subject: {
@@ -1296,7 +1415,7 @@ jobs:
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V13.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V14.json'
             );
 
             const publicationMainRef = (await github.rest.git.getRef({
@@ -1465,6 +1584,7 @@ jobs:
               publicationPr.base?.sha === liveEvidence.finalPr.base?.sha &&
               publicationPr.merge_commit_sha === liveEvidence.finalPr.merge_commit_sha &&
               publicationPrIdentityStable &&
+              finalLatestExactHeadRunMatchesTrigger &&
               publicationBaseSha === liveEvidence.finalBaseBranchTipSha &&
               publicationGovernanceIdentitySha256 === governanceIdentitySha256 &&
               publicationRunStable &&
@@ -1485,6 +1605,7 @@ jobs:
               artifact_digest: publicationArtifact?.digest ?? null,
               artifact_lifecycle_stable: publicationArtifactStable,
               pr_identity_stable: publicationPrIdentityStable,
+              latest_exact_head_run_is_triggering: finalLatestExactHeadRunMatchesTrigger,
             };
             if (!publicationFencePassed) {
               if (!promotionLease.invalidation_reasons.includes('publication_fence_failed')) {
@@ -1525,6 +1646,8 @@ jobs:
             core.setOutput('final_pr_merge_sha', publicationPr.merge_commit_sha ?? '');
             core.setOutput('run_id', String(publicationRun.id));
             core.setOutput('run_attempt', String(publicationRun.run_attempt));
+            core.setOutput('latest_exact_head_run_id', String(finalLatestExactHeadRun?.id ?? ''));
+            core.setOutput('latest_exact_head_run_attempt', String(finalLatestExactHeadRun?.run_attempt ?? ''));
             core.setOutput('artifact_id', String(publicationArtifact?.id ?? ''));
             core.setOutput('artifact_digest', publicationArtifact?.digest ?? '');
             core.setOutput('artifact_created_at', publicationArtifact?.created_at ?? '');
@@ -1540,7 +1663,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V13.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V14.json
           if-no-files-found: error
           retention-days: 90
 
@@ -1686,6 +1809,44 @@ jobs:
               run_id: Number(process.env.EXPECTED_RUN_ID),
             })).data;
 
+            if (!Number.isSafeInteger(currentRun.workflow_id) || currentRun.workflow_id <= 0) {
+              throw new Error('current trusted runner workflow_id is missing or invalid');
+            }
+            const currentQualificationRuns = await github.paginate(
+              github.rest.actions.listWorkflowRunsForWorkflow,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: currentRun.workflow_id,
+                event: 'pull_request',
+                head_sha: process.env.EXPECTED_PR_HEAD_SHA,
+                per_page: 100,
+              }
+            );
+            const currentLatestQualificationRun = [...currentQualificationRuns]
+              .filter((candidate) =>
+                candidate.path === '.github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml' &&
+                candidate.name === 'QUAL HDC bounded decoder trusted runner' &&
+                candidate.event === 'pull_request' &&
+                candidate.head_branch === 'research/hdc-linear-code-bounded-decoder-v2' &&
+                candidate.head_sha === process.env.EXPECTED_PR_HEAD_SHA &&
+                Number(candidate.repository?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+                Number(candidate.head_repository?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+                candidate.head_repository?.full_name === context.repo.owner + '/' + context.repo.repo
+              )
+              .sort((a, b) => {
+                const aCreated = Date.parse(a.created_at ?? '');
+                const bCreated = Date.parse(b.created_at ?? '');
+                if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) {
+                  return bCreated - aCreated;
+                }
+                return Number(b.id) - Number(a.id);
+              })[0] ?? null;
+            const currentLatestQualificationRunStable =
+              currentLatestQualificationRun !== null &&
+              currentLatestQualificationRun.id === currentRun.id &&
+              currentLatestQualificationRun.run_attempt === currentRun.run_attempt;
+
             const currentArtifacts = await github.paginate(
               github.rest.actions.listWorkflowRunArtifacts,
               {
@@ -1803,6 +1964,7 @@ jobs:
               currentRun.run_attempt === Number(process.env.EXPECTED_RUN_ATTEMPT) &&
               currentRun.conclusion === 'success' &&
               currentRun.head_sha === process.env.EXPECTED_PR_HEAD_SHA &&
+              currentLatestQualificationRunStable &&
               currentProducerArtifact?.id === Number(process.env.EXPECTED_ARTIFACT_ID) &&
               currentProducerArtifact?.digest === process.env.EXPECTED_ARTIFACT_DIGEST &&
               currentProducerArtifact?.created_at === process.env.EXPECTED_ARTIFACT_CREATED_AT &&
