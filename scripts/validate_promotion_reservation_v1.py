@@ -827,8 +827,12 @@ class PromotionCausalResolutionV1:
         return cls("causality-unestablished", False, False)
 
 
+def provider_result_request_bytes() -> bytes:
+    return b'{"requested_pr":7087,"head":"H3","merge_method":"squash","merge_action":"direct_merge"}'
+
+
 def provider_result_response_bytes() -> bytes:
-    return b'{"status":"merged","uuid":"uuid-1","requested_pr":7087,"head":"H3","merge_commit":"M2"}'
+    return b'{"status":"merged","uuid":"uuid-1","merge_commit":"M2"}'
 
 
 def provider_merge_result_fixture(
@@ -837,7 +841,8 @@ def provider_merge_result_fixture(
     status: str = "merged",
     provider_uuid: str | None = "uuid-1",
     observed_merge_commit: str | None = "M2",
-    result_payload_digest: str | None = None,
+    request_payload_digest: str | None = None,
+    response_payload_digest: str | None = None,
 ) -> ProviderMergeResultV1:
     identity = identity or stack_identity_fixture()
     return ProviderMergeResultV1(
@@ -849,10 +854,15 @@ def provider_merge_result_fixture(
         merge_method=identity.merge_method,
         merge_action=identity.merge_action,
         observed_merge_commit=observed_merge_commit,
-        result_payload_digest=(
+        request_payload_digest=(
+            hashlib.sha256(provider_result_request_bytes()).hexdigest()
+            if request_payload_digest is None
+            else request_payload_digest
+        ),
+        response_payload_digest=(
             hashlib.sha256(provider_result_response_bytes()).hexdigest()
-            if result_payload_digest is None
-            else result_payload_digest
+            if response_payload_digest is None
+            else response_payload_digest
         ),
     )
 
@@ -863,12 +873,20 @@ def provider_evidence_fixture(
     verified: bool = True,
     durable: bool = True,
     sequence: int = 1,
-) -> ProviderEvidenceEnvelopeV1:
-    capture = ProviderCaptureIntegrityV1(
+) -> ProviderAsyncMergeEvidencePairV1:
+    request_capture = ProviderCaptureIntegrityV1(
+        raw_bytes_digest=hashlib.sha256(
+            provider_result_request_bytes()
+        ).hexdigest(),
+        storage_id="request-capture-1",
+        capture_sequence=sequence,
+        durable=durable,
+    )
+    response_capture = ProviderCaptureIntegrityV1(
         raw_bytes_digest=hashlib.sha256(
             provider_result_response_bytes()
         ).hexdigest(),
-        storage_id="capture-1",
+        storage_id="response-capture-1",
         capture_sequence=sequence,
         durable=durable,
     )
@@ -877,7 +895,22 @@ def provider_evidence_fixture(
         verified=verified,
         provider_identity="github",
     )
-    return ProviderEvidenceEnvelopeV1(capture, source)
+    return ProviderAsyncMergeEvidencePairV1(
+        request=ProviderAsyncMergeRequestEvidenceV1(
+            capture=ProviderEvidenceEnvelopeV1(request_capture, source),
+            repository="Luminous-Dynamics/symthaea",
+            requested_pr_number=7087,
+            expected_head_sha="H3",
+            merge_method="squash",
+            merge_action="direct_merge",
+        ),
+        response=ProviderAsyncMergeResponseEvidenceV1(
+            capture=ProviderEvidenceEnvelopeV1(response_capture, source),
+            status=status,
+            provider_uuid=provider_uuid,
+            observed_merge_commit=observed_merge_commit,
+        ),
+    )
 
 
 def causal_resolution_fixture(
@@ -886,7 +919,7 @@ def causal_resolution_fixture(
     provider_result: ProviderMergeResultV1 | None | object = _UNSET,
     effect_set: PromotionStackEffectSetV1 | None | object = _UNSET,
     topology_binding: ProviderTopologyBindingV1 | None | object = _UNSET,
-    provider_evidence: ProviderEvidenceEnvelopeV1 | None | object = _UNSET,
+    provider_evidence: ProviderAsyncMergeEvidencePairV1 | None | object = _UNSET,
 ) -> PromotionCausalResolutionV1:
     identity = identity or stack_identity_fixture()
     if provider_result is _UNSET:
