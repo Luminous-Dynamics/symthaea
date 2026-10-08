@@ -230,11 +230,27 @@ then re-fetches the live Actions run and requires its repository ID, exact workf
 ref, and event type to agree with the triggering event. For a pull-request run, GitHub's Actions run
 `head_sha` is the PR-head commit, while the pull-request execution context's `GITHUB_SHA` is the
 synthetic merge-ref SHA. The qualification therefore binds the run to the exact PR-head subject and
-records the synthetic merge SHA separately as execution-context provenance. The receipt records these validated values in schema v22. Its local status
-field is explicitly pre-artifact; final qualification remains contingent on successful artifact revalidation
-and the completed hosted run.
+records the synthetic merge SHA separately as execution-context provenance.
 
-The same execution boundary also revalidates the uploaded artifact against the live run after upload. The artifact name binds the exact PR-head SHA, and the artifact's `workflow_run.head_sha` is checked against that same PR-head subject. The pull-request merge-ref SHA is recorded separately and is never substituted for the research subject, so the evidence cannot conflate GitHub's execution object with the code identity under qualification.
+A further distinction is required for historical runs: `workflow_run.pull_requests` is treated only
+as a PR association view. Its embedded head/base metadata can reflect the PR's later state after a
+force-push or base movement, so those fields are not admitted as immutable run identity. Historical
+run identity comes from the run's own `head_sha` / head ref plus the immutable triggering event
+fields and the independently fetched PR snapshot used by the verifier. This prevents a mutable
+association record from either falsifying a valid historical run or silently replacing its subject.
+
+The executed workflow definition is bound separately by requiring `GITHUB_WORKFLOW_SHA` to equal
+the observed synthetic merge SHA and comparing the exact Git blob of the workflow file at the PR
+head with the same file in the synthetic merge snapshot. The receipt records these distinctions in
+schema v23, using explicit blob-SHA and non-authoritative association fields. Its local status field
+is pre-artifact; final qualification remains contingent on successful artifact revalidation and the
+completed hosted run.
+
+The same execution boundary also revalidates the uploaded artifact against the live run after upload.
+The artifact name binds the exact PR-head SHA, and the artifact's `workflow_run.head_sha` is checked
+against that same PR-head subject. The pull-request merge-ref SHA is recorded separately and is never
+substituted for the research subject, so the evidence cannot conflate GitHub's execution object with
+the code identity under qualification.
 
 ## Walsh/dual-fiber structure
 
