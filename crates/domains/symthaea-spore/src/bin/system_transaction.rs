@@ -1572,7 +1572,8 @@ mod tests {
             }
         });
 
-        assert!(errors.lock().unwrap().is_empty(), "concurrent admission errors: {:?}", errors.lock().unwrap());
+        let error_guard = errors.lock().unwrap();
+        assert!(error_guard.is_empty(), "concurrent admission errors: {:?}", *error_guard);
 
         let ledger = TransactionLedger::open_at(&path).unwrap();
         let records = ledger.load().unwrap();
