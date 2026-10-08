@@ -8,7 +8,7 @@ HistoricalQualificationReceipt -> QualificationClaimDispositionV1 -> PromotionEl
 
 A reservation binds the exact ledger predecessor/head, lease identity, qualification disposition generation, trust-root identity/generation, governance snapshot, repository and PR identity, exact expected PR-head SHA, a unique local promotion_operation_id, and the provider capability profile.
 
-The successful reservation is itself a ledger successor and consumes the active lease. A competing coordinator cannot reserve the same lease from the old predecessor.
+The successful reservation is itself a ledger successor and consumes the active lease. Reservation admission also requires the supplied trust-root generation to equal the current ledger trust-root generation. A competing coordinator cannot reserve the same lease from the old predecessor or from a stale trust root.
 
 ## Dispatch-time re-fencing
 
@@ -31,7 +31,7 @@ persist reservation -> persist dispatch intent -> provider may accept -> process
 
 PromotionDispatchIntentV1 is therefore durable before the external call. It records the reservation identity, local operation identity, exact expected subject SHA, provider/profile, action, deadline, and attempt sequence.
 
-After dispatch intent exists, uncertainty is never resolved by blindly creating a new operation identity. Recovery must first reconcile the external effect.
+After dispatch intent exists, uncertainty is never resolved by blindly creating a new operation identity. Recovery must first reconcile the external effect. Completion additionally requires a receipt bound to the same local promotion-operation identity and exact expected PR-head SHA; a local "completed" transition without effect evidence is invalid.
 
 ## Two-writer publication model
 

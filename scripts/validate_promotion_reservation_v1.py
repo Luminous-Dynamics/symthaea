@@ -10,6 +10,13 @@ from itertools import permutations
 
 
 @dataclass
+class PromotionEffectReceipt:
+    promotion_operation_id: str
+    expected_pr_head_sha: str
+    observed_merge_commit: str
+
+
+@dataclass
 class Reservation:
     reservation_id: str
     operation_id: str
@@ -17,6 +24,11 @@ class Reservation:
     predecessor: str
     state: str = "PromotionReserved"
     dispatch_intent: bool = False
+    reservation_head: str = ""
+    fencing_token: int = 0
+    expected_pr_head_sha: str = "H1"
+    trust_root_generation: int = 1
+    effect_receipt: PromotionEffectReceipt | None = None
 
 
 class Ledger:
@@ -24,29 +36,47 @@ class Ledger:
         self.head = "L0"
         self.active_lease = "LEASE-1"
         self.reservation: Reservation | None = None
+        self.fencing_token = 0
+        self.trust_root_generation = 1
         self.transitions = []
         self._reservation_n = 0
 
-    def reserve(self, observed_head: str, lease_id: str, candidate: str) -> bool:
+    def reserve(
+        self,
+        observed_head: str,
+        lease_id: str,
+        candidate: str,
+        trust_root_generation: int = 1,
+        expected_pr_head_sha: str = "H1",
+    ) -> bool:
         if observed_head != self.head or lease_id != self.active_lease:
+            return False
+        if trust_root_generation != self.trust_root_generation:
             return False
         if self.reservation is not None:
             return False
         self._reservation_n += 1
+        self.fencing_token += 1
         self.reservation = Reservation(
             f"RES-{self._reservation_n}",
             f"OP-{self._reservation_n}",
             lease_id,
             observed_head,
         )
+        self.reservation.reservation_head = candidate
+        self.reservation.fencing_token = self.fencing_token
+        self.reservation.expected_pr_head_sha = expected_pr_head_sha
+        self.reservation.trust_root_generation = trust_root_generation
         self.active_lease = None
         self.head = candidate
         self.transitions.append(("reservation", observed_head, candidate))
         return True
 
-    def invalidate(self, observed_head: str, candidate: str) -> bool:
+    def invalidate(self, observed_head: str, candidate: str, trust_root_generation: int) -> bool:
         if observed_head != self.head:
             return False
+        self.fencing_token += 1
+        self.trust_root_generation = trust_root_generation
         self.head = candidate
         self.transitions.append(("invalidation", observed_head, candidate))
         if self.reservation is not None and self.reservation.state == "PromotionReserved":
@@ -138,7 +168,7 @@ def run_race_schedule(schedule):
             ok = (
                 ledger.reserve(snapshots[writer], "LEASE-1", candidates[writer])
                 if writer == "E"
-                else ledger.invalidate(snapshots[writer], candidates[writer])
+                else ledger.invalidate(snapshots[writer], candidates[writer], 2)
             )
             results[event] = ok
 
@@ -167,7 +197,7 @@ def test_exact_20_schedules_are_executed():
 
 def test_single_use_reservation():
     ledger = Ledger()
-    assert ledger.reserve("L0", "LEASE-1", "L1")
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
     assert not ledger.reserve("L1", "LEASE-1", "L2")
     assert not ledger.reserve("L0", "LEASE-1", "L3")
     assert ledger.active_lease is None
@@ -175,7 +205,7 @@ def test_single_use_reservation():
 
 def test_dispatch_intent_fences_crash():
     ledger = Ledger()
-    assert ledger.reserve("L0", "LEASE-1", "L1")
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
     assert ledger.prepare_dispatch("L1", 1, 1)
     assert ledger.reservation.dispatch_intent
     assert ledger.reservation.state == "PromotionDispatchPrepared"
@@ -187,7 +217,7 @@ def test_dispatch_intent_fences_crash():
 def test_timeout_after_acceptance_is_unknown():
     ledger = Ledger()
     provider = GitHubAsyncModel()
-    ledger.reserve("L0", "LEASE-1", "L1")
+    ledger.reserve("L0", "LEASE-1", "L1", 1)
     ledger.prepare_dispatch("L1", 1, 1)
     outcome = provider.submit("H1", timeout_after_accept=True)
     assert outcome.kind == "timeout-after-accept"
@@ -239,7 +269,7 @@ def test_expired_uuid_with_merged_pr_uses_pr_state():
 def test_expired_uuid_without_effect_stays_unknown():
     ledger = Ledger()
     provider = GitHubAsyncModel()
-    ledger.reserve("L0", "LEASE-1", "L1")
+    ledger.reserve("L0", "LEASE-1", "L1", 1)
     ledger.prepare_dispatch("L1", 1, 1)
     first = provider.submit("H1")
     assert first.uuid is not None
@@ -261,8 +291,8 @@ def test_exact_subject_mismatch_rejects():
 def test_root_change_before_dispatch_blocks_effect():
     ledger = Ledger()
     provider = GitHubAsyncModel()
-    assert ledger.reserve("L0", "LEASE-1", "L1")
-    assert ledger.invalidate("L1", "I1")
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
+    assert ledger.invalidate("L1", "I1", 2)
     assert ledger.reservation.state == "PromotionSuperseded"
     assert not ledger.prepare_dispatch("L1", 1, 1)
     assert provider.calls == 0
@@ -271,7 +301,7 @@ def test_root_change_before_dispatch_blocks_effect():
 def test_root_change_after_dispatch_is_not_retroactive():
     ledger = Ledger()
     provider = GitHubAsyncModel()
-    assert ledger.reserve("L0", "LEASE-1", "L1")
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
     assert ledger.prepare_dispatch("L1", 1, 1)
     outcome = provider.submit("H1")
     assert outcome.http == 202
@@ -282,9 +312,34 @@ def test_root_change_after_dispatch_is_not_retroactive():
 
 def test_stale_coordinator_cannot_reserve_after_new_head():
     ledger = Ledger()
-    assert ledger.reserve("L0", "LEASE-1", "L1")
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
     assert not ledger.reserve("L0", "LEASE-1", "L-stale")
     assert ledger.head == "L1"
+
+
+def test_stale_trust_root_rejects_reservation():
+    ledger = Ledger()
+    assert not ledger.reserve("L0", "LEASE-1", "L1", 2)
+    assert ledger.head == "L0"
+
+
+def test_completion_requires_effect_receipt():
+    ledger = Ledger()
+    assert ledger.reserve("L0", "LEASE-1", "L1", 1)
+    assert ledger.prepare_dispatch("L1", 1, 1)
+    ledger.record_unknown()
+    op = ledger.reservation.operation_id
+    assert not ledger.reconcile_complete(PromotionEffectReceipt("wrong", "H1", "M1"))
+    assert ledger.reconcile_complete(PromotionEffectReceipt(op, "H1", "M1"))
+    assert ledger.reservation.state == "PromotionCompleted"
+
+
+def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
+    ledger = Ledger()
+    ledger.reserve("L0", "LEASE-1", "L1", 1)
+    ledger.fencing_token += 1
+    ledger.head = "L2"
+    assert not ledger.prepare_dispatch("L1", 1, 1)
 
 
 TESTS = [

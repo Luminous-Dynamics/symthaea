@@ -33,6 +33,13 @@ pub struct PromotionReservationV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PromotionEffectReceiptV1 {
+    pub promotion_operation_id: String,
+    pub expected_pr_head_sha: String,
+    pub observed_merge_commit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PromotionDispatchIntentV1 {
     pub reservation_id: String,
     pub promotion_operation_id: String,
@@ -48,6 +55,7 @@ pub struct PromotionDispatchIntentV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReservationError {
     StaleLedgerHead,
+    StaleTrustRoot,
     StaleDispatchFence,
     LeaseUnavailable,
     LeaseAlreadyConsumed,
@@ -64,6 +72,7 @@ pub struct PromotionReservationLedgerV1 {
     active_lease: Option<String>,
     reservation: Option<PromotionReservationV1>,
     dispatch_intent: Option<PromotionDispatchIntentV1>,
+    effect_receipt: Option<PromotionEffectReceiptV1>,
     consumed_leases: HashSet<String>,
     next_reservation: u64,
 }
@@ -105,6 +114,9 @@ impl PromotionReservationLedgerV1 {
     ) -> Result<&PromotionReservationV1, ReservationError> {
         if observed_head != self.current_head {
             return Err(ReservationError::StaleLedgerHead);
+        }
+        if trust_root_generation != self.current_trust_root_generation {
+            return Err(ReservationError::StaleTrustRoot);
         }
         if self.active_lease.as_deref() != Some(lease_id) {
             if self.consumed_leases.contains(lease_id) {
@@ -230,20 +242,36 @@ impl PromotionReservationLedgerV1 {
         Ok(())
     }
 
-    pub fn reconcile_complete(&mut self, operation_id: &str) -> Result<(), ReservationError> {
-        let reservation = self
-            .reservation
+    pub fn reconcile_complete(
+        &mut self,
+        operation_id: &str,
+        receipt: PromotionEffectReceiptV1,
+    ) -> Result<(), ReservationError> {
+        {
+            let reservation = self
+                .reservation
+                .as_ref()
+                .ok_or(ReservationError::ReservationNotDispatchable)?;
+
+            if reservation.promotion_operation_id != operation_id {
+                return Err(ReservationError::OperationIdentityMismatch);
+            }
+            if reservation.state != PromotionState::ReconciliationRequired {
+                return Err(ReservationError::ReservationNotDispatchable);
+            }
+            if receipt.promotion_operation_id != reservation.promotion_operation_id
+                || receipt.expected_pr_head_sha != reservation.expected_pr_head_sha
+                || receipt.observed_merge_commit.is_empty()
+            {
+                return Err(ReservationError::OperationIdentityMismatch);
+            }
+        }
+
+        self.effect_receipt = Some(receipt);
+        self.reservation
             .as_mut()
-            .ok_or(ReservationError::ReservationNotDispatchable)?;
-
-        if reservation.promotion_operation_id != operation_id {
-            return Err(ReservationError::OperationIdentityMismatch);
-        }
-        if reservation.state != PromotionState::ReconciliationRequired {
-            return Err(ReservationError::ReservationNotDispatchable);
-        }
-
-        reservation.state = PromotionState::Completed;
+            .expect("reservation was checked above")
+            .state = PromotionState::Completed;
         Ok(())
     }
 }
@@ -309,10 +337,39 @@ mod tests {
     }
 
     #[test]
+    fn reservation_rejects_stale_trust_root() {
+        let mut ledger = PromotionReservationLedgerV1::new("L0", "LEASE-1");
+        assert_eq!(
+            ledger.reserve("L0", "LEASE-1", "L1", "repo", 1, "H1", 2, "gov", "github"),
+            Err(ReservationError::StaleTrustRoot)
+        );
+    }
+
+    #[test]
+    fn completion_requires_bound_effect_receipt() {
+        let mut ledger = reserve_one();
+        let op = ledger.reservation().unwrap().promotion_operation_id.clone();
+        ledger.prepare_dispatch(&op, "L1", 1, 1, 1).unwrap();
+        ledger.record_unknown(&op).unwrap();
+
+        assert_eq!(
+            ledger.reconcile_complete(
+                &op,
+                PromotionEffectReceiptV1 {
+                    promotion_operation_id: "wrong".into(),
+                    expected_pr_head_sha: "H1".into(),
+                    observed_merge_commit: "M1".into(),
+                },
+            ),
+            Err(ReservationError::OperationIdentityMismatch)
+        );
+    }
+
+    #[test]
     fn unknown_outcome_requires_same_operation_identity() {
         let mut ledger = reserve_one();
         let op = ledger.reservation().unwrap().promotion_operation_id.clone();
-        ledger.prepare_dispatch(&op, "L1", 7, 1, 1).unwrap();
+        ledger.prepare_dispatch(&op, "L1", 1, 1, 1).unwrap();
 
         assert_eq!(
             ledger.record_unknown("different-operation"),
@@ -320,7 +377,14 @@ mod tests {
         );
 
         ledger.record_unknown(&op).unwrap();
-        ledger.reconcile_complete(&op).unwrap();
+        ledger.reconcile_complete(
+            &op,
+            PromotionEffectReceiptV1 {
+                promotion_operation_id: op.clone(),
+                expected_pr_head_sha: "H1".into(),
+                observed_merge_commit: "M1".into(),
+            },
+        ).unwrap();
         assert_eq!(ledger.reservation().unwrap().state, PromotionState::Completed);
     }
 
