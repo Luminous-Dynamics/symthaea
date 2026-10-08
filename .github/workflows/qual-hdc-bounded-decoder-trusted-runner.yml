@@ -141,7 +141,6 @@ jobs:
           echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
           echo "workflow_ref=$GITHUB_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
           echo "trusted_workflow_path=$TRUSTED_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
-          echo "trusted_workflow_definition_match=true" >> "$GITHUB_OUTPUT"
 
       - name: Enforce stacked research surface
         id: scope
