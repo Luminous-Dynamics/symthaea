@@ -186,6 +186,36 @@ def has_runner_allocation(block: str) -> bool:
     return any(RUNNER_JOB.match(line) for line in block.splitlines())
 
 
+def expression_match_is_active(expression: str, start: int) -> bool:
+    """Reject predicate matches hidden inside string literals or comments."""
+    single = False
+    double = False
+    escaped = False
+    for character in expression[:start]:
+        if escaped:
+            escaped = False
+            continue
+        if (single or double) and character == "\\":
+            escaped = True
+            continue
+        if character == "'" and not double:
+            single = not single
+            continue
+        if character == '"' and not single:
+            double = not double
+            continue
+        if character == '#' and not single and not double:
+            return False
+    return not single and not double
+
+
+def active_pattern_search(pattern: re.Pattern[str], expression: str) -> re.Match[str] | None:
+    for match in pattern.finditer(expression):
+        if expression_match_is_active(expression, match.start()):
+            return match
+    return None
+
+
 def explicitly_excludes_pull_request(expression: str | None) -> bool:
     if expression is None:
         return False
