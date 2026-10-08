@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 use ash::{vk, Device, Entry, Instance};
@@ -8,6 +8,7 @@ use naga::back::spv;
 use naga::front::wgsl;
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
@@ -20,6 +21,8 @@ const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
 const RECEIPT_VERSION: u16 = 4;
+const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
+const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -133,6 +136,14 @@ pub enum VulkanBarrierReceiptError {
     QueueFamilyBinding,
     #[error("receipt physical-device UUID is all zeroes")]
     DeviceUuidMissing,
+    #[error("receipt implementation identity digest is missing or malformed")]
+    ImplementationIdentity,
+    #[error("receipt physical-device identity digest is missing or malformed")]
+    PhysicalDeviceIdentity,
+    #[error("receipt implementation identity does not match the execution runtime")]
+    ImplementationIdentityBinding,
+    #[error("receipt physical-device identity does not match the execution runtime")]
+    PhysicalDeviceIdentityBinding,
     #[error("receipt physical-device UUID does not match the execution runtime")]
     DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -164,6 +175,8 @@ pub struct VulkanBarrierExecutionReceipt {
     pub physical_device_api_version: u32,
     pub queue_family_index: u32,
     pub device_uuid: [u8; 16],
+    pub implementation_identity_digest: String,
+    pub physical_device_identity_digest: String,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -175,6 +188,12 @@ impl VulkanBarrierExecutionReceipt {
         final_resources: &BTreeMap<ResourceId, BinaryHypervector>,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.version != RECEIPT_VERSION { return Err(VulkanBarrierReceiptError::Version(self.version)); }
+        if !is_sha256_hex(&self.implementation_identity_digest) {
+            return Err(VulkanBarrierReceiptError::ImplementationIdentity);
+        }
+        if !is_sha256_hex(&self.physical_device_identity_digest) {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentity);
+        }
         if schedule.nodes.is_empty() { return Err(VulkanBarrierReceiptError::EmptyWorkload); }
         if self.graph_digest != graph.digest_hex().map_err(|_| VulkanBarrierReceiptError::GraphDigest)? {
             return Err(VulkanBarrierReceiptError::GraphDigest);
@@ -262,6 +281,8 @@ impl VulkanBarrierExecutionReceipt {
         physical_device_api_version: u32,
         queue_family_index: u32,
         device_uuid: [u8; 16],
+        implementation_identity_digest: &str,
+        physical_device_identity_digest: &str,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
@@ -271,6 +292,12 @@ impl VulkanBarrierExecutionReceipt {
         }
         if self.device_uuid != device_uuid {
             return Err(VulkanBarrierReceiptError::DeviceUuidBinding);
+        }
+        if self.implementation_identity_digest != implementation_identity_digest {
+            return Err(VulkanBarrierReceiptError::ImplementationIdentityBinding);
+        }
+        if self.physical_device_identity_digest != physical_device_identity_digest {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding);
         }
         Ok(())
     }
@@ -292,6 +319,17 @@ pub struct VulkanBarrierWorkloadRuntime {
     physical_device_api_version: u32,
     queue_family_index: u32,
     device_uuid: [u8; 16],
+    implementation_identity_digest: String,
+    shader_spirv_sha256: String,
+    implementation_wgsl_sha256: String,
+    implementation_wgsl_hex: String,
+    shader_spirv_hex: String,
+    physical_device_vendor_id: u32,
+    physical_device_device_id: u32,
+    physical_device_type: u32,
+    physical_device_driver_version: u32,
+    physical_device_name_hex: String,
+    physical_device_identity_digest: String,
     // Must be dropped after Instance/Device because ash requires Entry to outlive them.
     _entry: Entry,
 }
