@@ -164,6 +164,9 @@ impl PersonalCreditLedger {
         if seller.is_empty() {
             return Err(CreditismError::UnknownAccount(seller.to_owned()));
         }
+        if !self.balances.contains_key(seller) {
+            return Err(CreditismError::UnknownAccount(seller.to_owned()));
+        }
 
         let buyer_balance = self
             .balances
@@ -423,6 +426,23 @@ mod tests {
             ledger.exchange("buyer", "", 50.0, 10.0),
             Err(CreditismError::UnknownAccount(String::new()))
         );
+        assert_eq!(ledger, before);
+    }
+
+
+    #[test]
+    fn unknown_seller_fails_without_creating_account() {
+        let mut ledger = PersonalCreditLedger::from_opening_balances([
+            ("buyer".to_owned(), 100.0),
+        ])
+        .unwrap();
+        let before = ledger.clone();
+
+        assert_eq!(
+            ledger.exchange("buyer", "missing-seller", 20.0, 10.0),
+            Err(CreditismError::UnknownAccount("missing-seller".to_owned()))
+        );
+        assert!(!ledger.balances.contains_key("missing-seller"));
         assert_eq!(ledger, before);
     }
 
