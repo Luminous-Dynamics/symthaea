@@ -8,13 +8,15 @@
 //! obligations, or performance constraints.
 
 use crate::cognitive_analysis::{ScoreCognitiveProfile, profile_score_region};
+use crate::form::SectionRole;
 use crate::grammar::PerformanceDialect;
-use crate::harmony::Tonality;
+use crate::harmony::{HarmonicFunction, Tonality};
 use crate::motif_return::MotifReturnEvidence;
 use crate::obligation::ObligationPressure;
 use crate::pitch::PitchClass;
 use crate::rhythm::Duration;
 use crate::score::{Score, VoiceRole};
+use crate::state_space::MusicalStateFrame;
 use serde::{Deserialize, Serialize};
 
 /// Schema identifier for the typed Melothaea musical world-state boundary.
@@ -25,6 +27,11 @@ pub const MUSICAL_WORLD_STATE_V1: &str = "musical-world-state-v1";
 pub struct MusicalWorldStateContext {
     /// Renderer-level performance intent, when a grammar has declared one.
     pub performance_dialect: Option<PerformanceDialect>,
+    /// Section role supplied by the formal plan, not guessed from note statistics.
+    pub section_role: Option<SectionRole>,
+    /// Harmonic function supplied by formal harmonic analysis, not inferred
+    /// from pitch-class frequency alone.
+    pub harmonic_function: Option<HarmonicFunction>,
     /// Independently computed thematic relations. These are observations,
     /// not claims that a listener recognizes the relation.
     pub motif_relations: Vec<MotifReturnEvidence>,
@@ -46,8 +53,12 @@ pub struct MusicalWorldStateV1 {
     pub end: Duration,
     /// Midpoint location normalized against the complete score length.
     pub normalized_position: f64,
-    pub tonic: PitchClass,
-    pub tonality: Tonality,
+    /// Score-level declared key. This is not a local modulation estimate.
+    pub declared_tonic: PitchClass,
+    pub declared_tonality: Tonality,
+    /// Attack-based temporal state, absent for a silent region. The existing
+    /// cognitive profile separately handles notes carried into a region.
+    pub temporal_state: Option<MusicalStateFrame>,
     pub active_voice_roles: Vec<VoiceRole>,
     /// True only when every score note carries an assigned PartId.
     pub part_identity_available: bool,
@@ -61,24 +72,28 @@ pub struct MusicalWorldStateV1 {
 impl MusicalWorldStateV1 {
     /// Observe a region using exact rational beat boundaries.
     ///
-    /// Returns None for an empty or reversed region. Carry-in notes are
-    /// handled by profile_score_region exactly as in the existing cognitive
-    /// analysis contract.
+    /// Returns None for negative, empty, reversed, or out-of-score regions.
+    /// Carry-in notes are handled by profile_score_region exactly as in the
+    /// existing cognitive analysis contract; temporal_state uses onsets in the
+    /// region only and is None when the region has no attacks.
     pub fn observe_region(
         score: &Score,
         start: Duration,
         end: Duration,
         context: MusicalWorldStateContext,
     ) -> Option<Self> {
-        let profile = profile_score_region(score, start, end)?;
-
         let start_beats = start.beats();
         let end_beats = end.beats();
-        let total = score.total_beats.beats().max(1e-9);
+        let score_end = score.total_beats.beats();
+        if start_beats < 0.0 || end_beats <= start_beats || end_beats > score_end + 1e-9 {
+            return None;
+        }
+        let profile = profile_score_region(score, start, end)?;
+        let total = score_end.max(1e-9);
         let midpoint = ((start_beats + end_beats) * 0.5 / total).clamp(0.0, 1.0);
 
         let active_voice_roles = active_voice_roles(score, start_beats, end_beats);
-        let part_identity_available = score
+        let overlapping_notes: Vec<_> = score
             .notes
             .iter()
             .filter(|note| {
@@ -86,15 +101,19 @@ impl MusicalWorldStateV1 {
                 let note_end = (note.onset + note.duration).beats();
                 note_end > start_beats && onset < end_beats
             })
-            .all(|note| note.part.is_assigned());
+            .collect();
+        let part_identity_available = !overlapping_notes.is_empty()
+            && overlapping_notes.iter().all(|note| note.part.is_assigned());
+        let temporal_state = MusicalStateFrame::from_region(score, start, end);
 
         Some(Self {
             schema_version: MUSICAL_WORLD_STATE_V1.into(),
             start,
             end,
             normalized_position: midpoint,
-            tonic: score.key.tonic,
-            tonality: score.key.tonality,
+            declared_tonic: score.key.tonic,
+            declared_tonality: score.key.tonality,
+            temporal_state,
             active_voice_roles,
             part_identity_available,
             cognitive_profile: profile,
@@ -188,7 +207,8 @@ mod tests {
         .expect("valid region");
 
         assert_eq!(state.schema_version, MUSICAL_WORLD_STATE_V1);
-        assert_eq!(state.tonic, PitchClass::C);
+        assert_eq!(state.declared_tonic, PitchClass::C);
+        assert!(state.temporal_state.is_some());
         assert_eq!(state.active_voice_roles.len(), 3);
         assert!(state.part_identity_available);
         assert!(state.cognitive_profile.note_count > 0);
@@ -219,6 +239,41 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn score_level_key_is_not_reported_for_out_of_bounds_regions() {
+        let score = score();
+        assert!(MusicalWorldStateV1::observe_region(
+            &score,
+            Duration::new(-1, 1),
+            Duration::new(1, 1),
+            Default::default()
+        ).is_none());
+        assert!(MusicalWorldStateV1::observe_region(
+            &score,
+            Duration::new(2, 1),
+            Duration::new(4, 1),
+            Default::default()
+        ).is_none());
+    }
+
+    #[test]
+    fn silent_region_keeps_world_state_but_does_not_claim_part_identity() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(PitchClass::C, 4, 0, VoiceRole::Melody, PartId(1)));
+        score.push(note(PitchClass::G, 4, 4, VoiceRole::Melody, PartId(1)));
+
+        let state = MusicalWorldStateV1::observe_region(
+            &score,
+            Duration::new(2, 1),
+            Duration::new(3, 1),
+            Default::default()
+        ).expect("silent in-score region is a valid observation");
+
+        assert!(state.temporal_state.is_none());
+        assert!(!state.part_identity_available);
+        assert!(state.active_voice_roles.is_empty());
     }
 
     #[test]
