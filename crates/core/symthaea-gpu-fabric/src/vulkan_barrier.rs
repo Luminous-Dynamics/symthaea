@@ -1044,6 +1044,10 @@ fn create_shader_module(device: &Device, spirv: &[u32]) -> Result<vk::ShaderModu
 
 fn rounded_storage_bytes(bytes: u64) -> u64 { (bytes.saturating_add(3) / 4) * 4 }
 
+fn hex_bytes(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn resource_digest(value: &BinaryHypervector) -> String {
     let mut h = Hasher::new();
     h.update(b"symthaea.gpu-fabric.vulkan-barrier-resource.v1\0");
@@ -2154,7 +2158,13 @@ mod tests {
         }
     }
 
-    fn print_receipt_evidence(label: &str, receipt: &VulkanBarrierExecutionReceipt) {
+    fn print_receipt_evidence(
+        label: &str,
+        initial: &BTreeMap<ResourceId, BinaryHypervector>,
+        observed: &BTreeMap<ResourceId, BinaryHypervector>,
+        receipt: &VulkanBarrierExecutionReceipt,
+    ) {
+        println!("qualification_witness_version=1");
         println!("qualification_claim=workload_execution+synchronization_only");
         println!("qualification_fixture={label}");
         println!("receipt_version={}", receipt.version);
@@ -2173,6 +2183,12 @@ mod tests {
         println!("vulkan_api_version={}", receipt.vulkan_api_version);
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
+        for (resource, value) in initial {
+            println!("resource_initial_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
+        }
+        for (resource, value) in observed {
+            println!("resource_observed_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
+        }
     }
 
     #[test]
@@ -2206,6 +2222,8 @@ mod tests {
                 } else {
                     "hazard"
                 },
+                &initial,
+                &observed,
                 &receipt,
             );
         }
