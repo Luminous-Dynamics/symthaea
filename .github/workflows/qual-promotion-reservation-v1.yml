@@ -75,6 +75,7 @@ jobs:
               "PromotionStackEffectEvidenceV1",
               "PromotionStackEffectEvidenceSetV1",
               "PromotionPrEffectStateV1",
+              "PromotionTemporalAttemptIdentityV1",
               "ClockRelationV1",
               "ProviderTimestampPolicyV1",
               "ProviderWebhookStackMetadataV1",
@@ -125,6 +126,8 @@ jobs:
               "local-dispatch-monotonic-time-missing",
               "local-observation-monotonic-time-missing",
               "local-monotonic-clock-identity-missing",
+              "promotion-temporal-attempt-identity-missing",
+              "promotion-temporal-attempt-binding-invalid",
               "clock-relation-does-not-cover-event",
               "invalid-local-time-order",
               "invalid-local-monotonic-order",
@@ -166,6 +169,14 @@ jobs:
           }
           webhook_temporal_identity_fields = {
               "local_monotonic_clock_id",
+              "temporal_attempt_identity",
+              "temporal_attempt_identity_digest",
+              "operation_identity_digest",
+              "reservation_id",
+              "promotion_operation_id",
+              "reservation_head",
+              "dispatch_attempt_id",
+              "fencing_token",
               "local_received_monotonic_ns",
               "local_reservation_monotonic_ns",
               "local_dispatch_monotonic_ns",
@@ -201,6 +212,10 @@ jobs:
               "no-eligible-effect",
               "parse_provider_timestamp_ms",
               "ClockRelationV1",
+              "PromotionTemporalAttemptIdentityV1",
+              "validates_operation",
+              "matches_timing",
+              "temporal_attempt_identity_digest",
               "effective_offset_bounds_ms",
               "local_minus_provider_lower_bound_ms",
               "local_minus_provider_upper_bound_ms",
@@ -243,6 +258,21 @@ jobs:
                   continue
               assert len(node.args) == expected and not node.keywords, (
                   f"{node.func.attr} call-shape drift: args={len(node.args)} "
+                  f"keywords={len(node.keywords)}"
+              )
+
+          expected_constructor_args = {
+              "PromotionStackEffectTimingV1": 4,
+              "PromotionStackEffectTimingSetV1": 5,
+          }
+          for node in ast.walk(tree):
+              if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                  continue
+              expected = expected_constructor_args.get(node.func.id)
+              if expected is None:
+                  continue
+              assert len(node.args) == expected and not node.keywords, (
+                  f"{node.func.id} constructor arity drift: args={len(node.args)} "
                   f"keywords={len(node.keywords)}"
               )
 
