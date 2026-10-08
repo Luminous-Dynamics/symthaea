@@ -95,6 +95,84 @@ These are economically different variables.
 
 A future implementation must select one or expose a vector rather than silently choosing one.
 
+## 2A. Transaction semantics: price is not necessarily producer revenue
+
+The current Exchange description creates an important semantic distinction: a buyer's Credit can be deleted at a posted/listed price while the seller is separately credited only up to what they paid previously. A secondary-market price premium therefore need not become seller purchasing power.
+
+For example, under an exact synthetic fixture:
+
+~~~text
+seller acquisition cost = 10 PC
+buyer pays = 100 PC
+buyer deletion = 100 PC
+seller recognition <= 10 PC
+~~~
+
+The remaining 90 PC is an explicit deletion, not seller income.
+
+This means price can perform at least three different functions:
+
+- access/rationing;
+- demand/scarcity information;
+- settlement/revenue under conventional markets.
+
+Creditism must not assume that all three remain identical.
+
+The primary Marketplace is similarly distinctive: the buyer's Credit deletes, while contribution recognition is a separate issuance mechanism. Therefore the transaction price can be an access signal without being the producer's direct revenue.
+
+Qualification should emit a transaction-role matrix:
+
+~~~text
+PostedPrice
+PurchaserCreditDeleted
+SellerCreditRecognized
+ContributionCreditIssued
+CommunityCreditAllocated
+PhysicalInventoryChange
+ScarcityStateChange
+~~~
+
+Do not collapse these into `revenue` or `sales`.
+
+This also creates an explicit anti-scalping fixture:
+
+~~~text
+acquire scarce asset cheaply
+-> resell at high listed price
+-> premium deleted
+-> test whether allocation behavior changes
+~~~
+
+The test should measure both concentration and availability effects rather than assuming the rule is automatically beneficial.
+
+## 2B. Scalar credit volume is not sufficient
+
+Because Personal Credit is heterogeneous across households and goods are heterogeneous across supply constraints, the aggregate Credit stock cannot uniquely determine effective buying pressure.
+
+At minimum preserve:
+
+- aggregate Credit stock;
+- unspent balances;
+- distribution across households;
+- spending velocity;
+- basket/preferences;
+- per-good supply;
+- substitution possibilities;
+- external prices/FX where applicable.
+
+Required paired fixture:
+
+~~~text
+same total PC
+same household count
+same physical supply
+different demand composition
+-> relative scarcity may change
+-> a single global price adjustment must not erase the distinction
+~~~
+
+A controller that reduces the entire economy to one `credit volume` scalar can therefore pass simple aggregate tests while failing heterogeneous scarcity tests.
+
 ## 3. Balance-control stability fixtures
 
 ### Fixture B1 — benign stationary world
