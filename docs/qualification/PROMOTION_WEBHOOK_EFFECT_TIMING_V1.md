@@ -144,3 +144,16 @@ The timing record retains the policy identity digest and rejects a tampered poli
 `PromotionStackEffectTimingSetV1` now carries one `timestamp_policy_identity_digest` and requires every timing record in the complete set to reference that same policy identity.
 
 This prevents a complete stack from mixing, for example, a newer exact-resolution interpretation for one PR with an older/coarser interpretation for another PR. A policy generation change therefore creates a new temporal evidence identity instead of silently coexisting inside one stack result.
+
+## Monotonic local-time witness
+
+Wall-clock ordering is no longer sufficient. Each local reservation, dispatch, and observation point also carries a monotonic-clock reading from the local runtime.
+
+The reference model requires both:
+
+    wall:      reservation <= dispatch <= observation
+    monotonic: reservation <= dispatch <= observation
+
+Missing monotonic readings and any monotonic rollback fail closed. A wall-clock sequence that appears valid while the monotonic sequence regresses is therefore not temporally admissible.
+
+This still does not prove the correctness of the local clock source; it only prevents a local wall-clock-only timestamp sequence from being treated as the sole temporal ordering witness.
