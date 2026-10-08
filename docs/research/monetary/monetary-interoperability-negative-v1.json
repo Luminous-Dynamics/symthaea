@@ -1,0 +1,157 @@
+{
+  "schema_version": "monetary-interoperability-negative-v1",
+  "cases": [
+    {
+      "id": "IO-X01",
+      "kind": "shared_unit_without_bridge",
+      "source": "conventional-bank-money-v1",
+      "target": "sovereign-money-v1",
+      "shared_unit_of_account": true,
+      "adapter_present": false,
+      "expected": "reject_transfer_or_mark_unsettled"
+    },
+    {
+      "id": "IO-X02",
+      "kind": "bridge_claims_atomicity_but_debits_first",
+      "source": "tokenized-deposit-v1",
+      "target": "reserve-backed-stablecoin-v1",
+      "adapter_mode": "correspondent_bridge",
+      "atomicity_claim": "atomic",
+      "failure": "source_debit_then_target_credit_fails",
+      "expected": "reject_atomic_claim"
+    },
+    {
+      "id": "IO-X03",
+      "kind": "implicit_conversion_rate_inheritance",
+      "source": "mutual-credit-v1",
+      "target": "conventional-bank-money-v1",
+      "conversion_rule": "inherit_source_profile",
+      "expected": "reject"
+    },
+    {
+      "id": "IO-X04",
+      "kind": "hidden_backstop_inheritance",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "mutual-credit-v1",
+      "backstop": "inherit_target_public_backstop",
+      "expected": "reject"
+    },
+    {
+      "id": "IO-X05",
+      "kind": "double_redemption",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "conventional-bank-money-v1",
+      "event_ids": [
+        "r1",
+        "r1"
+      ],
+      "expected": "reject_replay"
+    },
+    {
+      "id": "IO-X06",
+      "kind": "stale_quote",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "mutual-credit-v1",
+      "quote_age": "beyond_declared_max",
+      "expected": "reject_or_requote"
+    },
+    {
+      "id": "IO-X07",
+      "kind": "reserve_depletion",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "sovereign-money-v1",
+      "available_reserves": 50,
+      "requested_redemption": 100,
+      "expected": "partial_or_rejected_under_declared_loss_rule"
+    },
+    {
+      "id": "IO-X08",
+      "kind": "partition_stranding",
+      "source": "mutual-credit-v1",
+      "target": "conventional-bank-money-v1",
+      "partitioned": true,
+      "source_debited": true,
+      "target_credited": false,
+      "expected": "explicit_stranded_funds_state"
+    },
+    {
+      "id": "IO-X09",
+      "kind": "finality_mismatch",
+      "source": "tokenized-deposit-v1",
+      "target": "reserve-backed-stablecoin-v1",
+      "source_finality": "final",
+      "target_finality": "probabilistic",
+      "atomicity_claim": "atomic",
+      "expected": "reject_incompatible_finality"
+    },
+    {
+      "id": "IO-X10",
+      "kind": "asymmetric_credit_limits",
+      "source": "mutual-credit-v1",
+      "target": "mutual-credit-v1",
+      "source_limit": 100,
+      "target_limit": 0,
+      "expected": "direction_specific_failure"
+    },
+    {
+      "id": "IO-X11",
+      "kind": "silent_liability_substitution",
+      "source": "conventional-bank-money-v1",
+      "target": "reserve-backed-stablecoin-v1",
+      "target_liability": "issuer_token",
+      "stated_as": "bank_deposit",
+      "expected": "reject"
+    },
+    {
+      "id": "IO-X12",
+      "kind": "bridge_default",
+      "source": "mutual-credit-v1",
+      "target": "tokenized-deposit-v1",
+      "bridge_default": true,
+      "loss_rule_missing": true,
+      "expected": "reject_or_undertermine_loss"
+    },
+    {
+      "id": "IO-X13",
+      "kind": "triangular_round_trip_leakage",
+      "path": [
+        "mutual-credit-v1",
+        "reserve-backed-stablecoin-v1",
+        "conventional-bank-money-v1",
+        "mutual-credit-v1"
+      ],
+      "fees_zero": true,
+      "expected": "measure_nonzero_leakage_or_flag_arbitrage/invariant_failure"
+    },
+    {
+      "id": "IO-X14",
+      "kind": "central_hub_failure",
+      "path": [
+        "mutual-credit-v1",
+        "sovereign-money-v1",
+        "conventional-bank-money-v1"
+      ],
+      "hub": "sovereign-money-v1",
+      "expected": "disconnect_or_route_around_explicitly"
+    },
+    {
+      "id": "IO-X15",
+      "kind": "privacy_policy_mismatch",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "tokenized-deposit-v1",
+      "source_identity": "self_custodied",
+      "target_identity": "permissioned_kyt",
+      "expected": "reject_or_explicit_policy_adapter"
+    },
+    {
+      "id": "IO-X16",
+      "kind": "recovery_reuses_old_trace",
+      "source": "mutual-credit-v1",
+      "target": "conventional-bank-money-v1",
+      "pre_outage_generation": "g1",
+      "post_outage_generation": "g2",
+      "reused_trace_generation": "g1",
+      "expected": "reject_stale_generation"
+    }
+  ]
+}
