@@ -45,6 +45,8 @@ pub enum VulkanBarrierError {
     Vk(vk::Result),
     #[error("no Vulkan 1.3 compute device with synchronization2")]
     NoQualifiedDevice,
+    #[error("empty workload cannot produce a valid Vulkan completion witness")]
+    EmptyWorkload,
     #[error("workload has {0} nodes; bound is {MAX_WORKLOAD_NODES}")]
     WorkloadNodeLimit(usize),
     #[error("multiple logical queues are not supported by the single-queue workload runtime")]
@@ -99,6 +101,8 @@ pub enum VulkanBarrierReceiptError {
     SyncPlanDigest,
     #[error("barrier digest mismatch")]
     BarrierDigest,
+    #[error("empty workload cannot produce a valid Vulkan completion receipt")]
+    EmptyWorkload,
     #[error("node count mismatch")]
     NodeCount,
     #[error("barrier count mismatch")]
@@ -158,6 +162,7 @@ impl VulkanBarrierExecutionReceipt {
         final_resources: &BTreeMap<ResourceId, BinaryHypervector>,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.version != RECEIPT_VERSION { return Err(VulkanBarrierReceiptError::Version(self.version)); }
+        if schedule.nodes.is_empty() { return Err(VulkanBarrierReceiptError::EmptyWorkload); }
         if self.graph_digest != graph.digest_hex().map_err(|_| VulkanBarrierReceiptError::GraphDigest)? {
             return Err(VulkanBarrierReceiptError::GraphDigest);
         }
@@ -477,6 +482,7 @@ impl VulkanBarrierWorkloadRuntime {
     ) -> Result<(BTreeMap<ResourceId, BinaryHypervector>, VulkanBarrierExecutionReceipt), VulkanBarrierError> {
         schedule.verify_against(graph).map_err(VulkanBarrierError::Schedule)?;
         plan.verify_against_schedule(schedule).map_err(VulkanBarrierError::SyncPlan)?;
+        if schedule.nodes.is_empty() { return Err(VulkanBarrierError::EmptyWorkload); }
         if schedule.nodes.len() > MAX_WORKLOAD_NODES { return Err(VulkanBarrierError::WorkloadNodeLimit(schedule.nodes.len())); }
         if plan.queue_count > 1 || plan.assignments.iter().any(|a| a.queue.get() != 0) { return Err(VulkanBarrierError::MultipleLogicalQueues); }
 
@@ -589,12 +595,6 @@ impl VulkanBarrierWorkloadRuntime {
                 .map_err(VulkanBarrierError::Vk)?;
         }
         let completion_expected = expected_final_timeline_value(plan);
-        if completion_expected == 0 && !schedule.nodes.is_empty() {
-            return Err(VulkanBarrierError::TimelineCompletionNotReached {
-                expected: 1,
-                observed: 0,
-            });
-        }
 
         let mut timeline_info = vk::SemaphoreTypeCreateInfo::default()
             .semaphore_type(vk::SemaphoreType::TIMELINE)
@@ -1519,6 +1519,35 @@ mod tests {
         let error = validate_initial_resources(&graph, &initial).unwrap_err();
         assert!(matches!(error, VulkanBarrierError::UnexpectedResource(ref resource) if resource.as_str() == "unused"));
         assert_eq!(plan.queue_count, 1);
+    }
+
+    #[test]
+    fn receipt_rejects_empty_workload() {
+        let graph = ExecutionGraph::new(Vec::new(), Vec::new()).unwrap();
+        let schedule = ExecutionSchedule::from_graph(&graph).unwrap();
+        let plan = VulkanSyncPlan::from_schedule(&schedule, &[]).unwrap();
+        let receipt = VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: String::new(),
+            schedule_digest: String::new(),
+            sync_plan_digest: String::new(),
+            barrier_digest: String::new(),
+            barrier_lowering_digest: String::new(),
+            completion_lowering_digest: String::new(),
+            node_count: 0,
+            barrier_count: 0,
+            resource_digests: BTreeMap::new(),
+            resource_storage_sizes: BTreeMap::new(),
+            completion_expected: 0,
+            completion_observed: 0,
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
+        };
+        assert_eq!(
+            receipt.verify_against(&graph, &schedule, &plan, &BTreeMap::new()),
+            Err(VulkanBarrierReceiptError::EmptyWorkload)
+        );
     }
 
     #[test]
