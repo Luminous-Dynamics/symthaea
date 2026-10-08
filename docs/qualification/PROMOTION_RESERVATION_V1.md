@@ -138,11 +138,13 @@ mint the stronger causal proposition by itself. This is why #7101 is a separate 
 
 The distinction is especially important for stacked merges: GitHub documents that a stack merge can
 merge or queue every open PR in the stack up to the requested PR, so a later observed group effect must
-not be compressed into one single-PR operation identity. citeturn965026search2turn965026search6
+not be compressed into one single-PR operation identity.
 
 The provider API currently documents `enqueued` as final for the merge-queue request, with eventual
 merge state exposed separately through pull-request state; asynchronous result records expire after
-24 hours. citeturn965026search0
+24 hours.
+
+GitHub's current pull-request REST documentation states that an asynchronous merge result can be `merged`, `enqueued`, or `failed`; `enqueued` is final for the merge-queue request and eventual merge state must be checked separately. The async result expires after 24 hours. The pull-request resource also exposes the post-merge `merge_commit_sha` according to the merge method.
 
 ## Claim ceiling
 
