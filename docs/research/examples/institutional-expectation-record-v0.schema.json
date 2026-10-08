@@ -9,6 +9,7 @@
     "subject_id",
     "observation_time",
     "referenced_institution_hash",
+    "referenced_institution_status",
     "expectation_rule_hash",
     "information_set",
     "representation",
@@ -91,6 +92,15 @@
       "type": [
         "string",
         "null"
+      ]
+    },
+    "referenced_institution_status": {
+      "type": "string",
+      "enum": [
+        "current",
+        "historical",
+        "future",
+        "unknown"
       ]
     }
   }
