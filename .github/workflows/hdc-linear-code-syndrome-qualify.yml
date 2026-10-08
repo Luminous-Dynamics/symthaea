@@ -88,8 +88,7 @@ jobs:
           EXECUTED_WORKFLOW_SHA256="$(gh api --method GET \
             -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/contents/${WORKFLOW_PATH}?ref=${GITHUB_WORKFLOW_SHA}" \
-            --jq '.content' | tr -d '
-' | base64 --decode | sha256sum | cut -d" " -f1)"
+            --jq '.content' | tr -d '\n' | base64 --decode | sha256sum | cut -d" " -f1)"
           test "$EXECUTED_WORKFLOW_SHA256" = "$CHECKED_OUT_WORKFLOW_SHA256"
           if test "$GITHUB_EVENT_NAME" = "pull_request"; then
             test "$LIVE_RUN_PR_COUNT" -eq 1
