@@ -53,3 +53,7 @@ mod integration_tests {
         assert!(payment * 60.0 > 10_000.0);
     }
 }
+pub use institutional_expectations::{
+    ActualInstitutionObservation, ExpectationBook, ExpectationError, ExpectationRecord,
+    ExpectationRepresentation, ExpectationUpdate, InformationSetIdentity,
+};
