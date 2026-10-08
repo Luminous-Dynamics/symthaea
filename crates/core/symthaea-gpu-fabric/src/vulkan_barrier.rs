@@ -374,6 +374,8 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         let props = unsafe { instance.get_physical_device_properties(physical) };
+        let physical_device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
+        let physical_device_identity_digest = physical_device_identity_digest(&props);
         let mut id_properties = vk::PhysicalDeviceIDProperties::default();
         let mut properties2 = vk::PhysicalDeviceProperties2::default().push_next(&mut id_properties);
         unsafe { instance.get_physical_device_properties2(physical, &mut properties2); }
