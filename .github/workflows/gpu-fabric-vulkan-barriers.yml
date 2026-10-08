@@ -97,7 +97,16 @@ jobs:
 
       - name: Execute real workload barrier qualification
         working-directory: .ci/gpu-fabric-workspace
-        run: cargo test --locked --features vulkan --lib -- --ignored --nocapture
+        run: |
+          set -o pipefail
+          cargo test --locked --features vulkan --lib -- --ignored --nocapture 2>&1 | tee qualification-runtime.txt
+
+      - name: Seal runtime evidence digest
+        if: always()
+        working-directory: .ci/gpu-fabric-workspace
+        run: |
+          test -f qualification-runtime.txt
+          sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
 
       - name: Upload immutable qualification evidence
         if: always()
@@ -113,3 +122,5 @@ jobs:
             .ci/gpu-fabric-workspace/source-sha256.txt
             .ci/gpu-fabric-workspace/qualification-input-sha256.txt
             .ci/gpu-fabric-workspace/qualification-environment.txt
+            .ci/gpu-fabric-workspace/qualification-runtime.txt
+            .ci/gpu-fabric-workspace/qualification-runtime.sha256
