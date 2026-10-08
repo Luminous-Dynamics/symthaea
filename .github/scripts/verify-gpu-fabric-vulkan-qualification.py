@@ -316,8 +316,12 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: Vulkan API version mismatch")
         if int(values.get("physical_device_api_version", "-1")) < VULKAN_API_1_3:
             fail(f"{name}: physical device API version below Vulkan 1.3")
-        if int(values.get("queue_family_index", "-1")) != 0:
-            fail(f"{name}: queue family mismatch")
+        try:
+            queue_family_index = int(values["queue_family_index"])
+        except (KeyError, ValueError) as exc:
+            fail(f"{name}: malformed queue family index: {exc}")
+        if queue_family_index < 0 or queue_family_index > 0xFFFFFFFF:
+            fail(f"{name}: queue family index outside u32 range")
 
         (
             implementation_digest,
