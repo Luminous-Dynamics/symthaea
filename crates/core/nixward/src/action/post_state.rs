@@ -1569,6 +1569,13 @@ fn validate_digest(value: &str, field: &'static str) -> Result<(), NixPostStateE
     Ok(())
 }
 
+fn validate_bus_id_shape(value: &str) -> Result<(), NixPostStateErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixPostStateErrorV1::InvalidBusId);
+    }
+    Ok(())
+}
+
 fn validate_optional_invocation_id(
     value: Option<&str>,
     field: &'static str,
@@ -1655,6 +1662,8 @@ pub enum NixPostStateErrorV1 {
     EmptyField(&'static str),
     #[error("invalid digest: {0}")]
     InvalidDigest(&'static str),
+    #[error("invalid D-Bus daemon incarnation")]
+    InvalidBusId,
     #[error("invalid invocation id: {0}")]
     InvalidInvocationId(&'static str),
     #[error("invalid generation")]
