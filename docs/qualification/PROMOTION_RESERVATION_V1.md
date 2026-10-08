@@ -92,6 +92,23 @@ GitHub GraphQL updateRefs is a stronger expected-OID primitive for cases that re
 
 The async pull-request merge API supports exact expected PR-head SHA binding, asynchronous provider UUIDs, duplicate-pending UUID recovery, and distinct enqueued versus merged states. Provider result retention is bounded, so durable PR merged state remains a reconciliation surface.
 
+## Independent oracle integrity
+
+The Python oracle is itself subject to the same execution-evidence discipline as the Rust reference.
+
+The repaired revision requires the dispatch-fence arguments used by its tests, implements the
+reconciliation completion transition its tests invoke, and registers every defined adversarial test
+in the executable `TESTS` list. A source-level test definition that is not actually reachable from
+the runner is not execution evidence.
+
+The current receipt object remains a local reconciliation-model record only. It does not provide
+independent provider provenance or prove that a later observed effect was caused by the specific
+provider operation. That stronger proposition is tracked separately in #7101.
+
+The dedicated qualification workflow remains deliberately provider-dispatch-free, so neither the
+reference transaction nor the oracle may be described as hosted-executed until an actual trusted
+run records their execution.
+
 ## Claim ceiling
 
 A passing lab establishes only internal consistency of the synthetic local reservation/reconciliation model under the enumerated failure cases.
