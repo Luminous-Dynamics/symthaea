@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-resource-allocation-negative-v1",
+  "cases":[
+    {"id":"ALLOC-X01","kind":"allocation_policy_changes_resource_capacity","expected":"reject_factor_leakage"},
+    {"id":"ALLOC-X02","kind":"criticality_inferred_from_adapter","expected":"reject_semantic_leak"},
+    {"id":"ALLOC-X03","kind":"amount_order_mutated_between_policies","expected":"reject_workload_mutation"},
+    {"id":"ALLOC-X04","kind":"queue_order_hidden_inside_topology","expected":"reject_factor_leakage"},
+    {"id":"ALLOC-X05","kind":"unserviceable_obligation_skipped_without_disposition","expected":"reject_hidden_drop"},
+    {"id":"ALLOC-X06","kind":"starvation_hidden_by_batch_completion_rate","expected":"reject_aggregation_loss"},
+    {"id":"ALLOC-X07","kind":"allocation_policy_mutation_without_policy_digest_change","expected":"reject_generation_mismatch"},
+    {"id":"ALLOC-X08","kind":"policy_specific_exogenous_rng_namespace","expected":"reject_common_random_number_breach"},
+    {"id":"ALLOC-X09","kind":"priority_changes_settlement_finality","expected":"reject_semantic_leak"},
+    {"id":"ALLOC-X10","kind":"minimum_demand_policy_changes_declared_demand","expected":"reject_resource_mutation"},
+    {"id":"ALLOC-X11","kind":"same_obligation_random_draw_recomputed_from_execution_position","expected":"reject_crn_breach"},
+    {"id":"ALLOC-X12","kind":"weighted_criticality_metric_replaced_by_unweighted_mean","expected":"reject_measurement_collapse"}
+  ]
+}
