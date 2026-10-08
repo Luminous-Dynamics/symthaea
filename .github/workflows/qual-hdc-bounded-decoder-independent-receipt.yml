@@ -20,7 +20,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
-          EXPECTED_SUBJECT: "69316cf3533cf87a5548226294ed227ec2acf602"
+          EXPECTED_SUBJECT: "0b94c911294867fc3a24c3068320b860fdbb3120"
           EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
@@ -28,8 +28,8 @@ jobs:
           EXPECTED_REPOSITORY_ID: "1136141775"
           EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
           EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
-          EXPECTED_WORKFLOW_BLOB_SHA: "f42b9c2f565a157dc32fb21c024caf4ff0ee0c31"
-          EXPECTED_MERGE_COMMIT: "ba71a42730ddc651fae7c2c0550512c1d5296487"
+          EXPECTED_WORKFLOW_BLOB_SHA: "219ea425437c66d1438c28a67d98cdb4cffe3aef"
+          EXPECTED_MERGE_COMMIT: "36c04f9252531af18773c333040cb3db26f49315"
         with:
           script: |
             const fs = require('fs');
@@ -83,6 +83,7 @@ jobs:
               'Existing linear-code unit suite',
               'Existing ambiguity qualification',
               'Independent syndrome decoder qualification',
+              'Capture brute-force dual-space oracle',
               'Capture fixed syndrome specification oracle',
               'Capture syndrome quotient metric ledger',
               'Capture full syndrome quotient distance spectrum',
