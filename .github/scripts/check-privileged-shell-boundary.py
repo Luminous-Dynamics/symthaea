@@ -470,6 +470,11 @@ def main() -> None:
         if forbidden in patch_body:
             fail(f"system_config_patch regained inline shell-source generation: {forbidden!r}")
 
+    install_source = "\n".join(lines[install_start:install_end])
+    if "validate_disk_path(" in install_source:
+        fail("install mutation still accepts generic disk paths; use validate_whole_disk_path")
+    if "validate_whole_disk_path(" not in install_source:
+        fail("install mutation lost whole-disk validation")
     # Install also binds every selected block device to a kernel identity
     # before the destructive worker starts.
     install_start_for_disk = arm_indexes["install"]

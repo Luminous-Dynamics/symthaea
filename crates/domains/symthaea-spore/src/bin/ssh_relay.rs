@@ -34,7 +34,7 @@ use system_transaction::{
 use symthaea_spore::security::{
     bind_block_device, nix_string_literal, sanitize_heredoc, sanitize_input, token_eq,
     validate_disk_path, validate_hostname as validate_hostname_relay, validate_username,
-    verify_block_device_binding, BlockDeviceBinding,
+    validate_whole_disk_path, verify_block_device_binding, BlockDeviceBinding,
 };
 
 // TLS support
@@ -1222,9 +1222,9 @@ fn validate_install_layout(layout: &str) -> Result<(), String> {
 
 fn validate_install_disk_topology(message: &ClientMessage) -> Result<(), String> {
     let require_distinct = |left_name: &str, left: &str, right_name: &str, right: &str| {
-        let left = validate_disk_path(left)
+        let left = validate_whole_disk_path(left)
             .map_err(|error| format!("{left_name} is invalid: {error}"))?;
-        let right = validate_disk_path(right)
+        let right = validate_whole_disk_path(right)
             .map_err(|error| format!("{right_name} is invalid: {error}"))?;
         if left == right {
             return Err(format!(
@@ -1248,12 +1248,12 @@ fn validate_install_disk_topology(message: &ClientMessage) -> Result<(), String>
         | "zfs-raidz2" => {
             let mut disks = Vec::with_capacity(1 + message.extra_disks.len());
             disks.push(
-                validate_disk_path(&message.disk)
+                validate_whole_disk_path(&message.disk)
                     .map_err(|error| format!("primary disk is invalid: {error}"))?,
             );
             for extra_disk in &message.extra_disks {
                 disks.push(
-                    validate_disk_path(extra_disk)
+                    validate_whole_disk_path(extra_disk)
                         .map_err(|error| format!("extra disk is invalid: {error}"))?,
                 );
             }
@@ -6734,7 +6734,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 let disk = if client_msg.disk.is_empty() {
                     "/dev/sda".to_string()
                 } else {
-                    match validate_disk_path(&client_msg.disk) {
+                    match validate_whole_disk_path(&client_msg.disk) {
                         Ok(d) => d,
                         Err(e) => {
                             let _ = ws_tx
@@ -6846,7 +6846,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
                 if !client_msg.fast_disk.is_empty() {
-                    if let Err(e) = validate_disk_path(&client_msg.fast_disk) {
+                    if let Err(e) = validate_whole_disk_path(&client_msg.fast_disk) {
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::error(&e).to_json()))
                             .await;
@@ -6854,7 +6854,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     }
                 }
                 if !client_msg.standard_disk.is_empty() {
-                    if let Err(e) = validate_disk_path(&client_msg.standard_disk) {
+                    if let Err(e) = validate_whole_disk_path(&client_msg.standard_disk) {
                         let _ = ws_tx
                             .send(Message::Text(RelayMessage::error(&e).to_json()))
                             .await;
