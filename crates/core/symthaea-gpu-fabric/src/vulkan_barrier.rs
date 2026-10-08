@@ -1167,7 +1167,7 @@ fn vulkan_implementation_identity_digest(spirv: &[u32]) -> String {
 fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> String {
     let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea.gpu-fabric.vulkan-device.v1 ");
+    hasher.update(b"symthaea.gpu-fabric.vulkan-device.v1\0");
     hasher.update(&props.vendor_id.to_le_bytes());
     hasher.update(&props.device_id.to_le_bytes());
     hasher.update(&(props.device_type.as_raw() as u32).to_le_bytes());
