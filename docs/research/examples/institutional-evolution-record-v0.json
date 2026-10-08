@@ -1,0 +1,58 @@
+{
+  "schema_version": "institutional-evolution-record-v0",
+  "mechanism_profile_hash": "blake3:example-mechanism-profile",
+  "seed_state_hash": "blake3:example-seed-state",
+  "problem_schedule_hash": "blake3:example-problem-schedule",
+  "mutation_grammar_hash": "blake3:example-mutation-grammar",
+  "agent_model_hash": "blake3:example-agent-model",
+  "adoption_rule_hash": "blake3:example-adoption-rule",
+  "random_seed": 7,
+  "oracle_version": "institutional-evolution-oracle-v0",
+  "institution_lineage": [
+    {
+      "parent_institution_hash": "blake3:institution-v0",
+      "candidate_institution_hash": "blake3:candidate-v1",
+      "mutation_id": "M-COORD-QUEUE-001",
+      "transition": "proposed",
+      "semantic_delta": {
+        "path": "allocation.reservation",
+        "from": "none",
+        "to": "time_bounded_reservation"
+      },
+      "proposer": "agent-03",
+      "authority": null,
+      "trigger": "commons_waiting_time_spike",
+      "evidence_refs": [
+        "receipt:problem-014",
+        "snapshot:state-022"
+      ],
+      "implementation_outcome": null,
+      "supersession": null
+    },
+    {
+      "parent_institution_hash": "blake3:institution-v0",
+      "candidate_institution_hash": "blake3:candidate-v1",
+      "mutation_id": "M-COORD-QUEUE-001",
+      "transition": "adopted",
+      "semantic_delta": {
+        "path": "allocation.reservation",
+        "from": "none",
+        "to": "time_bounded_reservation"
+      },
+      "proposer": "agent-03",
+      "authority": "authority-group-01",
+      "trigger": "commons_waiting_time_spike",
+      "evidence_refs": [
+        "decision:adoption-005"
+      ],
+      "implementation_outcome": null,
+      "supersession": null
+    }
+  ],
+  "claims": {
+    "historical_qualification": false,
+    "currentness": false,
+    "political_legitimacy": false,
+    "universal_optimality": false
+  }
+}
