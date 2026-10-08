@@ -25,6 +25,8 @@ jobs:
 
           RACE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-race"
           race_ref_path="${RACE_REF#refs/}"
+          FORCE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-force"
+          force_ref_path="${FORCE_REF#refs/}"
 
           delete_ref() {
             local target_ref_path="$1"
@@ -86,6 +88,7 @@ jobs:
           cleanup_best_effort() {
             delete_ref_if_owned "${ref_path}" "${BASE_SHA:-}" "${WINNER_SHA:-}" "${STALE_SHA:-}" "${INVALIDATION_SHA:-}" "${malformed_transition_sha:-}" || true
             delete_ref_if_owned "${race_ref_path}" "${BASE_SHA:-}" "${RACE_LEFT_SHA:-}" "${RACE_RIGHT_SHA:-}" || true
+            delete_ref_if_owned "${force_ref_path}" "${BASE_SHA:-}" "${FORCE_INTERMEDIATE_SHA:-}" "${FORCE_RESURRECTION_SHA:-}" || true
           }
           trap cleanup_best_effort EXIT
 
@@ -104,10 +107,16 @@ jobs:
             -f ref="${RACE_REF}" \
             -f sha="${BASE_SHA}" >/dev/null
 
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="${FORCE_REF}" \
+            -f sha="${BASE_SHA}" >/dev/null
+
           LAB_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
           RACE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${race_ref_path}" --jq '.object.sha')"
+          FORCE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
           test "${LAB_HEAD}" = "${BASE_SHA}"
           test "${RACE_HEAD}" = "${BASE_SHA}"
+          test "${FORCE_HEAD}" = "${BASE_SHA}"
 
           create_semantic_commit() {
             local transition_kind="$1"
@@ -192,6 +201,19 @@ jobs:
               -d "$(jq -n --arg sha "${target_sha}" '{sha:$sha, force:false}')"
           }
 
+          force_update_ref_status() {
+            local target_sha="$1"
+            local response_file="$2"
+            local target_ref_path="$3"
+            test -n "${target_ref_path}"
+            curl -sS -o "${response_file}" -w '%{http_code}' \
+              -X PATCH \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "${api_root}/git/refs/${target_ref_path}" \
+              -d "$(jq -n --arg sha "${target_sha}" '{sha:$sha, force:true}')"
+          }
           # Two valid successor candidates share the same observed predecessor.
           WINNER_SHA="$(create_semantic_commit "winner" "winner successor" "${BASE_SHA}" "${BASE_SHA}")"
           STALE_SHA="$(create_semantic_commit "stale" "stale successor" "${BASE_SHA}" "${BASE_SHA}")"
@@ -202,6 +224,27 @@ jobs:
             exit 1
           fi
           echo "malformed semantic predecessor correctly rejected before publication"
+
+          FORCE_INTERMEDIATE_SHA="$(create_semantic_commit "force-intermediate" "force intermediate successor" "${BASE_SHA}" "${BASE_SHA}")"
+          force_intermediate_response="$(mktemp)"
+          force_intermediate_status="$(update_ref_status "${FORCE_INTERMEDIATE_SHA}" "${force_intermediate_response}" "${force_ref_path}")"
+          test "${force_intermediate_status}" = "200"
+          FORCE_BEFORE_RESET="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          test "${FORCE_BEFORE_RESET}" = "${FORCE_INTERMEDIATE_SHA}"
+
+          # Negative control: a privileged force rollback can resurrect the old predecessor.
+          force_reset_response="$(mktemp)"
+          force_reset_status="$(force_update_ref_status "${BASE_SHA}" "${force_reset_response}" "${force_ref_path}")"
+          test "${force_reset_status}" = "200"
+          FORCE_AFTER_RESET="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          test "${FORCE_AFTER_RESET}" = "${BASE_SHA}"
+
+          FORCE_RESURRECTION_SHA="$(create_semantic_commit "force-resurrection" "post-force resurrection candidate" "${BASE_SHA}" "${BASE_SHA}")"
+          force_resurrection_response="$(mktemp)"
+          force_resurrection_status="$(update_ref_status "${FORCE_RESURRECTION_SHA}" "${force_resurrection_response}" "${force_ref_path}")"
+          test "${force_resurrection_status}" = "200"
+          FORCE_AFTER_RESURRECTION="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          test "${FORCE_AFTER_RESURRECTION}" = "${FORCE_RESURRECTION_SHA}"
 
 
           winner_response="$(mktemp)"
