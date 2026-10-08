@@ -264,6 +264,11 @@ def main(out_dir):
                 "mean_focal_completion_gain_ticks": mean([c["gain"] for c in common]),
                 "max_focal_completion_gain_ticks": max(c["gain"] for c in common),
                 "mean_rank_improvement": mean([c["rank_improvement"] for c in contrasts]),
+                "report_only_rate": mean([1 if c["report_only"] else 0 for c in contrasts]),
+                "truth_only_rate": mean([1 if c["truth_only"] else 0 for c in contrasts]),
+                "mean_other_completion_externality_ticks": mean([
+                    c["other_externality"] for c in contrasts if c["other_externality"] is not None
+                ]),
             }
 
     focal_breakdown = {}
