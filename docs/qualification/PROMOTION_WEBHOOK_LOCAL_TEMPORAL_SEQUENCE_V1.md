@@ -170,3 +170,34 @@ This still does not implement Ed25519 or another signature primitive inside the 
 Roughtime's response validation requires the client to verify the certificate's long-term signature, the request-derived Merkle path, and the response signature over the SREP value, while explicitly stating that a valid response does not prove the timestamp itself is correct. This distinction is preserved here. citeturn946860search1
 
 The schema remains algorithm-agile rather than declaring post-quantum readiness. NIST's ML-DSA standard is available as a separate signature family, but introducing a string such as ML-DSA-65 into this receipt must not be interpreted as implementation support; the verifier policy must establish the allowed algorithm set. citeturn946860search2
+
+
+## Independent cryptographic replay
+
+The receipt schema is now exercised against an actual Ed25519 signature rather than only synthetic digests.
+
+The captured vector is:
+
+    docs/qualification/fixtures/CLOCK_RELATION_CRYPTO_RFC8032_V1.json
+
+and the independent replay harness is:
+
+    scripts/verify_clock_relation_crypto_v1.py
+
+The harness is intentionally separate from the provider-free promotion oracle. It independently reconstructs the SHA-256 digests of the exact signed payload, signature, and public key; verifies the Ed25519 signature equation; confirms the typed receipt says `signature-valid`; and rejects mutated payload, signature, and public-key material.
+
+This establishes an important distinction:
+
+    receipt schema integrity
+        !=
+    independent verification of captured cryptographic material
+        !=
+    proof that a real external provider response was truthful
+
+The implementation is a deterministic qualification/test harness, not production cryptographic code. It is not constant-time, never handles private signing keys, and does not claim to replace a maintained cryptographic library.
+
+The vector follows the Ed25519 verification structure specified by RFC 8032, including decoding R and A, requiring S < L, computing the challenge from R || A || M, and checking the cofactor-cleared group equation. RFC 8032 also supplies standardized Ed25519 test vectors. citeturn348751search3turn348751search5
+
+Roughtime remains a separate protocol-level source of truth about how a real time response should be validated: RFC 10049 requires validation of the long-term certificate signature, request-derived Merkle proof, and response signature, and explicitly says a valid response does not by itself prove the timestamp is correct. citeturn348751search0turn348751search2
+
+Hosted qualification remains fail-closed: the PR-triggered workflows for this draft branch are still not a qualification claim. The new replay step only becomes executable as part of the existing trusted-default-branch manual lab.
