@@ -14,6 +14,7 @@
 pub mod partner_model;
 pub mod phi_dyad;
 pub mod relational_harmonics;
+pub mod relational_identification;
 pub mod relational_prediction;
 pub mod trajectory;
 

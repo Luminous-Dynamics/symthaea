@@ -68,7 +68,7 @@ getrandom = "0.2"
 mycelix-zkp-core = { path = "stubs/mycelix-zkp-core", features = ["dilithium"] }
 
 # Mycelix Shared Deps (Bundled Standalone)
-sha2 = { version = "0.10", optional = true }
+sha2 = "0.10"
 # Research-only relational prediction schedule commitments need SHA-256 on
 # ordinary/default builds without changing the existing feature-gated sha2 edge.
 sha2-relational-schedule = { package = "sha2", version = "0.10", features = ["oid"] }
