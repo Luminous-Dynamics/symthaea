@@ -1,0 +1,167 @@
+{
+  "schema": "civos.socioeconomic_interoperability.scenario.v1",
+  "status": "research",
+  "claim_ceiling": "synthetic_deterministic_only",
+  "world": {
+    "persons": 100,
+    "communities": 4,
+    "projects": 20,
+    "scarce_resource_classes": 8,
+    "mixed_regimes": true,
+    "global_shared_constraints": [
+      "energy",
+      "water",
+      "ecology",
+      "transport",
+      "critical_intermediate_goods"
+    ]
+  },
+  "regimes": [
+    "debt_equity_market",
+    "market_ubi",
+    "cooperative_pooled_capital",
+    "mutual_credit",
+    "creditism",
+    "commons_polycentric",
+    "public_budget_planning",
+    "hybrid"
+  ],
+  "bridge_profiles": [
+    "none",
+    "trade_only",
+    "explicit_conversion",
+    "synchronized_settlement",
+    "mutual_recognition",
+    "shared_commons",
+    "transition_corridor"
+  ],
+  "capital_profiles": [
+    "debt",
+    "equity",
+    "cooperative_pool",
+    "public_budget",
+    "community_credit_staged",
+    "mutual_credit_commitment",
+    "hybrid"
+  ],
+  "world_shocks": [
+    "supply_shock",
+    "energy_shock",
+    "demand_surge",
+    "productivity_boom",
+    "demographic_transition",
+    "migration",
+    "ecological_tightening",
+    "long_horizon_project",
+    "maintenance_shock",
+    "verification_failure",
+    "governance_capture",
+    "financial_contagion",
+    "strategic_import_cutoff",
+    "network_partition",
+    "compound_multi_shock"
+  ],
+  "power_attacks": [
+    "settlement_bridge_monopoly",
+    "verifier_cartel",
+    "housing_allocator_capture",
+    "dominant_supplier",
+    "information_monopoly",
+    "governance_agenda_capture",
+    "infrastructure_control",
+    "emergency_authority_persistence"
+  ],
+  "invariants": [
+    "instrument != entitlement",
+    "entitlement != ownership",
+    "ownership != authority",
+    "authority != physical_capacity",
+    "valuation != settlement",
+    "settlement != legal_discharge",
+    "foreign_recognition != local_issuance",
+    "evidence_validity != political_legitimacy",
+    "unknown_capacity != available_capacity",
+    "balance_equality != structural_power_equality",
+    "simulation_recommendation != authorization",
+    "closed_conversion_loop_net_claim_creation == 0_without_external_subsidy"
+  ],
+  "metrics": {
+    "access": [
+      "essential_service_coverage",
+      "unmet_essential_demand",
+      "housing_access",
+      "queue_wait",
+      "switching_cost"
+    ],
+    "physical": [
+      "capacity_utilization",
+      "idle_capacity",
+      "inventory_coverage",
+      "bottleneck_severity",
+      "maintenance_backlog",
+      "ecological_overshoot"
+    ],
+    "distribution": [
+      "purchasing_power_concentration",
+      "productive_asset_concentration",
+      "housing_concentration",
+      "authority_concentration",
+      "verifier_concentration",
+      "claim_burden"
+    ],
+    "power": [
+      "bridge_centrality",
+      "dependency_asymmetry",
+      "single_point_of_failure_count",
+      "substitute_depth",
+      "exit_accessibility"
+    ],
+    "interoperability": [
+      "bridge_volume",
+      "bridge_concentration",
+      "settlement_failures",
+      "replay_incidents",
+      "double_settlement_incidents",
+      "contagion_radius",
+      "external_leakage"
+    ],
+    "intergenerational": [
+      "inherited_claims",
+      "inherited_assets",
+      "inherited_liabilities",
+      "future_feasible_choice_set",
+      "ecological_legacy"
+    ]
+  },
+  "controls": [
+    "multiple_random_seeds",
+    "multiple_initial_institutions",
+    "fixed_institution",
+    "no_bridge",
+    "proposal_ablation",
+    "adoption_ablation",
+    "random_mutation_control",
+    "holdout_shocks",
+    "parameter_perturbation",
+    "mutation_order_permutation",
+    "replay_determinism",
+    "counterfactual_bridge_removal",
+    "independent_accounting_oracle",
+    "independent_power_oracle",
+    "stock_flow_reconciliation"
+  ],
+  "record_binding": [
+    "regime_profile_hash",
+    "world_seed_hash",
+    "shock_schedule_hash",
+    "agent_model_hash",
+    "governance_profile_hash",
+    "resource_state_hash",
+    "evidence_policy_generation",
+    "bridge_profile_hash",
+    "settlement_finality_profile_hash",
+    "random_seed",
+    "oracle_version",
+    "claim_ceiling"
+  ]
+}
