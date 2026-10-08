@@ -8223,11 +8223,24 @@ mod tests {
                 0.9,
             )],
         );
+        let mut water_evidence = evidence(
+            "basis-water",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        water_evidence.basis.basis_revision = "v2".into();
+        c.evidence.push(water_evidence);
         c.burdens
             .get_mut(&Dimension::Water)
             .unwrap()
             .basis
             .basis_revision = "v2".into();
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["basis-water".into()];
 
         let result = AlternativesEngine
             .assess(&fixture_requirement(), &[c.clone()], None)
@@ -8292,12 +8305,26 @@ mod tests {
                 0.9,
             )],
         );
+        let mut water_evidence = evidence(
+            "bc-water",
+            "authority-b",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        water_evidence.basis.basis_revision = "v2".into();
+        candidate.evidence.push(water_evidence);
         candidate
             .burdens
             .get_mut(&Dimension::Water)
             .unwrap()
             .basis
             .basis_revision = "v2".into();
+        candidate
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["bc-water".into()];
 
         let result = AlternativesEngine
             .assess(
