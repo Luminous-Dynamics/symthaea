@@ -2950,6 +2950,8 @@ def test_clock_source_challenge_rejects_wrong_nonce_length():
         issued_local_time_ms=1,
         expires_local_time_ms=2,
         trust_anchor_id="anchor",
+        source_id="source",
+        operator_id="operator",
     )
     assert not challenge.internally_consistent()
 
@@ -2962,6 +2964,8 @@ def test_clock_source_challenge_rejects_zero_nonce():
         issued_local_time_ms=1,
         expires_local_time_ms=2,
         trust_anchor_id="anchor",
+        source_id="source",
+        operator_id="operator",
     )
     assert not challenge.internally_consistent()
 
