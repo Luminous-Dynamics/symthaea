@@ -1768,3 +1768,4 @@ jobs:
           cargo run --manifest-path "$manifest" --bin civ_consequence_tiered_credibility_smoke
           cargo run --manifest-path "$manifest" --bin civ_plural_authority_quorum_smoke
           cargo run --manifest-path "$manifest" --bin civ_governance_audit_chain_smoke
+          cargo run --manifest-path "$manifest" --bin civ_merkle_governance_checkpoint_smoke
