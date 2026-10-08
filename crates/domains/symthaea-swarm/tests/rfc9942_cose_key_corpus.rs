@@ -8,8 +8,9 @@
 
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942Es256CoseKey, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload,
-    Rfc9942Vdp, Rfc9942ProofKind, Rfc9942VdpError, Rfc9162InclusionProof,
-    COSE_ES256_ALGORITHM_ID,
+    Rfc9942SignaturePayload, Rfc9942SignatureWithReceipts, Rfc9942Vdp,
+    Rfc9942ProofKind, Rfc9942VdpError, Rfc9942ReceiptCollection, Rfc9162InclusionProof,
+    COSE_ES256_ALGORITHM_ID, MAX_CBOR_BSTR_CHUNKS, MAX_CBOR_TSTR_CHUNKS,
 };
 
 const X: [u8; 32] = [
@@ -26,8 +27,34 @@ const Y: [u8; 32] = [
 ];
 
 fn bstr(bytes: &[u8]) -> Vec<u8> {
-    assert!(bytes.len() < 24);
-    let mut out = vec![0x40 + bytes.len() as u8];
+    let mut out = match bytes.len() {
+        0..=23 => vec![0x40 + bytes.len() as u8],
+        24..=255 => vec![0x58, bytes.len() as u8],
+        _ => panic!("fixture bstr too large"),
+    };
+    out.extend_from_slice(bytes);
+    out
+}
+fn bstr_large(bytes: &[u8]) -> Vec<u8> {
+    let mut out = match bytes.len() {
+        0..=23 => vec![0x40 + bytes.len() as u8],
+        24..=255 => vec![0x58, bytes.len() as u8],
+        256..=65_535 => {
+            let len = bytes.len() as u16;
+            vec![0x59, (len >> 8) as u8, len as u8]
+        }
+        65_536.. => {
+            let len = u32::try_from(bytes.len())
+                .expect("fixture bstr exceeds CBOR 32-bit length form");
+            vec![
+                0x5a,
+                (len >> 24) as u8,
+                (len >> 16) as u8,
+                (len >> 8) as u8,
+                len as u8,
+            ]
+        }
+    };
     out.extend_from_slice(bytes);
     out
 }
@@ -39,11 +66,7 @@ fn neg1_field(value: u8) -> Vec<u8> {
 }
 fn bstr_field(label: u8, bytes: &[u8]) -> Vec<u8> {
     let mut out = vec![label];
-    out.extend_from_slice(&if bytes.len() < 24 {
-        bstr(bytes)
-    } else {
-        panic!("fixture too large")
-    });
+    out.extend_from_slice(&bstr(bytes));
     out
 }
 fn valid_fields() -> Vec<Vec<u8>> {
@@ -67,6 +90,402 @@ fn key(fields: &[Vec<u8>]) -> Vec<u8> {
 }
 fn valid_key() -> Vec<u8> {
     key(&valid_fields())
+}
+
+fn indefinite_map(fields: &[Vec<u8>], include_break: bool) -> Vec<u8> {
+    let mut out = vec![0xbf];
+    for field in fields {
+        out.extend_from_slice(field);
+    }
+    if include_break {
+        out.push(0xff);
+    }
+    out
+}
+
+fn cose_key_with_indefinite_root(extra_fields: usize, include_break: bool) -> Vec<u8> {
+    let mut fields = valid_fields();
+    for label in 0..extra_fields {
+        let label = 5u8.checked_add(label as u8).expect("test label must fit");
+        let mut key = match label {
+            0..=23 => vec![label],
+            _ => vec![0x18, label],
+        };
+        key.push(0x00);
+        fields.push(key);
+    }
+    indefinite_map(&fields, include_break)
+}
+
+fn indefinite_bstr_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
+    assert!(MAX_CBOR_BSTR_CHUNKS >= 1);
+    let mut out = vec![0x5f];
+    for _ in 0..MAX_CBOR_BSTR_CHUNKS - 1 {
+        out.push(0x40);
+    }
+    match bytes.len() {
+        0..=23 => out.push(0x40 + bytes.len() as u8),
+        24..=255 => out.extend_from_slice(&[0x58, bytes.len() as u8]),
+        _ => panic!("test bstr too large"),
+    }
+    out.extend_from_slice(bytes);
+    out.push(0xff);
+    out
+}
+
+fn indefinite_text_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
+    assert!(MAX_CBOR_TSTR_CHUNKS >= 1);
+    std::str::from_utf8(bytes).expect("test text must be UTF-8");
+    let mut out = vec![0x7f];
+    for _ in 0..MAX_CBOR_TSTR_CHUNKS - 1 {
+        out.push(0x60);
+    }
+    assert!(bytes.len() <= 23);
+    out.push(0x60 + bytes.len() as u8);
+    out.extend_from_slice(bytes);
+    out.push(0xff);
+    out
+}
+
+
+fn oversized_inclusion_proof_wire() -> Vec<u8> {
+    let mut out = vec![0x83, 0x1b];
+    out.extend_from_slice(&u64::MAX.to_be_bytes());
+    out.extend_from_slice(&[0x00, 0x98, 0x40]);
+    for _ in 0..64 {
+        out.push(0x5f);
+        for _ in 0..32 {
+            out.extend_from_slice(&[0x41, 0x00]);
+        }
+        out.push(0xff);
+    }
+    out
+}
+
+#[test]
+fn rfc9942_vdp_accepts_more_than_generic_64_item_array_cap() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let proofs = (0..65).map(|_| proof.clone()).collect::<Vec<_>>();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, proofs)
+        .expect("65 proofs are within the RFC9942 implementation bound");
+    let wire = vdp.to_cbor();
+    let parsed = Rfc9942Vdp::from_cbor(&wire)
+        .expect("VDP proof array must not inherit the generic 64-item opaque array cap");
+    assert_eq!(parsed.proofs().len(), 65);
+}
+
+#[test]
+fn rfc9942_vdp_accepts_proof_bstr_above_generic_skip_value_cap() {
+    let proof = oversized_inclusion_proof_wire();
+    assert!(proof.len() > 4096);
+
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof.clone()])
+        .expect("RFC9162 inclusion proof remains structurally valid above the generic opaque-value cap");
+    let wire = vdp.to_cbor();
+    let parsed = Rfc9942Vdp::from_cbor(&wire)
+        .expect("RFC9942 VDP proof bstr must use its protocol-specific 8 KiB bound");
+    assert_eq!(parsed.proofs()[0].len(), proof.len());
+}
+
+#[test]
+fn rfc9942_receipt_collection_accepts_receipt_bstr_above_generic_skip_value_cap() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached([0u8; 32]),
+        vec![0u8; 4097],
+    ).unwrap();
+
+    let encoded = receipt.to_cbor();
+    assert!(encoded.len() > 4096);
+
+    let mut wire = vec![0x9f];
+    wire.extend_from_slice(&bstr_large(&encoded));
+    wire.push(0xff);
+
+    let parsed = Rfc9942ReceiptCollection::from_cbor(&wire)
+        .expect("RFC9942 receipt bstr must use its protocol-specific 4 MiB bound");
+    assert_eq!(parsed.receipts()[0].signature().len(), 4097);
+}
+
+#[test]
+fn cose_key_accepts_indefinite_map_root() {
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(0, true))
+        .expect("RFC 8949 indefinite map must be accepted at the COSE_Key root");
+    assert_eq!(parsed.kid(), Some(b"rfc9052-c7.1".as_slice()));
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn cose_key_accepts_exact_indefinite_map_entry_cap_before_break() {
+    let extra = 32 - valid_fields().len();
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, true))
+        .expect("the break after exactly 32 map entries is valid");
+    assert_eq!(&parsed.public_key_sec1()[33..65], &Y);
+}
+
+#[test]
+fn cose_key_accepts_unknown_label_with_nested_opaque_cbor_value() {
+    let mut fields = valid_fields();
+    let mut field = vec![0x18, 30];
+    field.extend_from_slice(&[0xa1, 0x41, 0x00, 0x01]);
+    fields.push(field);
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("an unknown COSE label must consume its complete arbitrary CBOR value");
+    assert_eq!(parsed.kid(), Some(b"rfc9052-c7.1".as_slice()));
+}
+
+fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof])
+        .expect("fixture VDP must be valid")
+        .to_cbor();
+
+    let mut protected = if protected_extension {
+        vec![0xa3, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]
+    } else {
+        vec![0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]
+    };
+    if protected_extension {
+        protected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]);
+    }
+
+    let mut unprotected = if protected_extension {
+        vec![0xa1, 0x19, 0x01, 0x8c]
+    } else {
+        vec![0xa2, 0x19, 0x01, 0x8c]
+    };
+    unprotected.extend_from_slice(&vdp);
+    if !protected_extension {
+        unprotected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]);
+    }
+
+    let mut out = vec![0xd2, 0x84];
+    out.extend_from_slice(&bstr(&protected));
+    out.extend_from_slice(&unprotected);
+    out.extend_from_slice(&bstr(&[0u8; 32]));
+    out.extend_from_slice(&bstr(&[0u8; 64]));
+    out
+}
+
+fn receipt_with_large_unprotected_extension(extension_len: usize) -> Vec<u8> {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof])
+        .expect("fixture VDP must be valid")
+        .to_cbor();
+    let protected = vec![0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01];
+    let extension = vec![0xaa; extension_len];
+
+    let mut unprotected = vec![0xa2, 0x19, 0x01, 0x8c];
+    unprotected.extend_from_slice(&vdp);
+    unprotected.extend_from_slice(&[0x18, 0x1e]);
+    unprotected.extend_from_slice(&bstr_large(&extension));
+
+    let mut out = vec![0xd2, 0x84];
+    out.extend_from_slice(&bstr(&protected));
+    out.extend_from_slice(&unprotected);
+    out.push(0xf6);
+    out.extend_from_slice(&bstr(&[0u8; 64]));
+    out
+}
+
+fn outer_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
+    let protected = if protected_extension {
+        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]
+    } else {
+        vec![0xa0]
+    };
+    let unprotected = if protected_extension {
+        vec![0xa0]
+    } else {
+        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]
+    };
+
+    let mut out = vec![0xd2, 0x84];
+    out.extend_from_slice(&bstr(&protected));
+    out.extend_from_slice(&unprotected);
+    out.push(0xf6);
+    out.extend_from_slice(&bstr(&[0u8; 64]));
+    out
+}
+
+#[test]
+fn outer_cose_accepts_receipts_collection_above_single_receipt_map_cap() {
+    let receipt_a = receipt_with_large_unprotected_extension(2_100_000);
+    let receipt_b = receipt_with_large_unprotected_extension(2_100_000);
+    assert!(receipt_a.len() < 4 * 1024 * 1024);
+    assert!(receipt_b.len() < 4 * 1024 * 1024);
+
+    let mut receipts = vec![0x82];
+    receipts.extend_from_slice(&bstr_large(&receipt_a));
+    receipts.extend_from_slice(&bstr_large(&receipt_b));
+    assert!(receipts.len() > 4 * 1024 * 1024);
+    assert!(receipts.len() < 33 * 1024 * 1024);
+
+    let mut bytes = vec![0xd2, 0x84];
+    bytes.extend_from_slice(&bstr(&[0xa0]));
+    bytes.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
+    bytes.extend_from_slice(&receipts);
+    bytes.push(0xf6);
+    bytes.extend_from_slice(&bstr(&[0u8; 64]));
+
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("outer receipts collection must use the aggregate 33 MiB defensive bound");
+    assert!(parsed.unprotected_receipts().is_some());
+    assert_eq!(parsed.unprotected_receipts().unwrap().len(), 2);
+}
+
+#[test]
+fn receipt_accepts_unknown_protected_extension_and_round_trips() {
+    let bytes = receipt_with_unknown_extension(true);
+    let parsed = Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+        .expect("unknown protected COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn receipt_accepts_unknown_unprotected_extension_and_round_trips() {
+    let bytes = receipt_with_unknown_extension(false);
+    let parsed = Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+        .expect("unknown unprotected COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn receipt_accepts_large_unknown_unprotected_extension_and_round_trips() {
+    let bytes = receipt_with_large_unprotected_extension(4097);
+    let parsed = Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+        .expect("receipt extension bstrs above the generic 4 KiB scanner cap must use the protocol-specific bound");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn outer_cose_accepts_large_tagged_opaque_extension_and_round_trips() {
+    let mut payload = vec![0x5a, 0x00, 0x00, 0x10, 0x01];
+    payload.extend_from_slice(&[0xaa; 4097]);
+    let protected = vec![0xa0];
+    let mut unprotected = vec![0xa1, 0x18, 0x1e, 0xd8, 0x18];
+    unprotected.extend_from_slice(&payload);
+
+    let mut bytes = vec![0xd2, 0x84];
+    bytes.extend_from_slice(&bstr(&protected));
+    bytes.extend_from_slice(&unprotected);
+    bytes.push(0xf6);
+    bytes.extend_from_slice(&bstr(&[0u8; 64]));
+
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("tagged opaque bstr values must remain accepted under the protocol-specific bound");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn outer_cose_accepts_unknown_protected_extension_and_round_trips() {
+    let bytes = outer_with_unknown_extension(true);
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("unknown protected outer COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+    assert_eq!(parsed.payload(), &Rfc9942SignaturePayload::Detached);
+}
+
+#[test]
+fn outer_cose_accepts_unknown_unprotected_extension_and_round_trips() {
+    let bytes = outer_with_unknown_extension(false);
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("unknown unprotected outer COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn cose_key_rejects_indefinite_map_entry_count_above_cap() {
+    let extra = 33 - valid_fields().len();
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, true)),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn cose_key_rejects_unterminated_exact_indefinite_map_entry_cap() {
+    let extra = 32 - valid_fields().len();
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, false)),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+
+
+#[test]
+fn cose_key_accepts_exact_indefinite_bstr_chunk_cap_before_break() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x21];
+    encoded.extend_from_slice(&indefinite_bstr_with_exact_chunk_cap(&X));
+    fields[5] = encoded;
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("the break after exactly MAX_CBOR_BSTR_CHUNKS chunks is valid");
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn cose_key_accepts_exact_indefinite_tstr_chunk_cap_before_break() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x01];
+    encoded.extend_from_slice(&indefinite_text_with_exact_chunk_cap(b"EC2"));
+    fields[0] = encoded;
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("the break after exactly MAX_CBOR_TSTR_CHUNKS chunks is valid");
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn cose_key_rejects_bstr_chunk_count_above_exact_cap() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x21, 0x5f];
+    for _ in 0..=MAX_CBOR_BSTR_CHUNKS {
+        encoded.push(0x40);
+    }
+    encoded.push(0xff);
+    fields[5] = encoded;
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn cose_key_rejects_tstr_chunk_count_above_exact_cap() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x01, 0x7f];
+    for _ in 0..=MAX_CBOR_TSTR_CHUNKS {
+        encoded.push(0x60);
+    }
+    encoded.push(0xff);
+    fields[0] = encoded;
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
+
+#[test]
+fn rfc9162_inclusion_path_accepts_indefinite_32_byte_hash_bstr() {
+    let mut proof = vec![0x83, 0x02, 0x00, 0x81, 0x5f];
+    proof.push(0x50);
+    proof.extend_from_slice(&[0x11; 16]);
+    proof.push(0x50);
+    proof.extend_from_slice(&[0x11; 16]);
+    proof.push(0xff);
+
+    let decoded = symthaea_swarm::semantic_evidence_vds::Rfc9162InclusionProof::from_cbor(&proof)
+        .expect("an indefinite-length bstr remains a valid 32-byte hash value");
+    assert_eq!(decoded.tree_size, 2);
+    assert_eq!(decoded.leaf_index, 0);
+    assert_eq!(decoded.inclusion_path, vec![[0x11; 32]]);
 }
 
 #[test]
@@ -109,7 +528,8 @@ fn cose_key_rejects_wrong_curve() {
 #[test]
 fn cose_key_rejects_mismatched_algorithm() {
     let mut bytes = valid_key();
-    bytes[bytes.windows(2).position(|w| w == [0x03, 0x26]).unwrap() + 1] = 0x38;
+    let alg_pos = bytes.windows(2).position(|w| w == [0x03, 0x26]).unwrap();
+    bytes[alg_pos + 1] = 0x38;
     bytes.insert(
         bytes.windows(2).position(|w| w == [0x03, 0x38]).unwrap() + 2,
         0x22,
@@ -132,6 +552,15 @@ fn cose_key_rejects_key_without_verify_operation() {
 }
 
 #[test]
+fn cose_key_accepts_unknown_textual_key_ops_alongside_verify() {
+    let mut fields = valid_fields();
+    fields[3] = vec![0x04, 0x82, 0x02, 0x63, b'f', b'o', b'o'];
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("unknown textual key operation is extensible when verify is present");
+    assert_eq!(parsed.public_key_sec1()[0], 0x04);
+}
+
+#[test]
 fn cose_key_rejects_private_d_material() {
     let mut bytes = valid_key();
     bytes[0] = 0xa8;
@@ -151,7 +580,59 @@ fn cose_key_rejects_wrong_coordinate_length() {
     bytes.remove(pos + 4);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
+
+#[test]
+fn cose_key_rejects_truncated_coordinate_bstr() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    bytes.truncate(pos + 3 + 10);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes),
         Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+#[test]
+fn receipt_rejects_duplicate_semantic_protected_label_with_nonminimal_integer_encoding() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+    // Protected = {1: -7, 1: -7 using non-minimal uint label encoding, 395: 1}.
+    let protected = [
+        0xa3, 0x01, 0x26, 0x18, 0x01, 0x26,
+        0x19, 0x01, 0x8b, 0x01,
+    ];
+
+    let mut encoded = vec![0xd2, 0x84];
+    encoded.extend_from_slice(&bstr(&protected));
+    encoded.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8c]);
+    encoded.extend_from_slice(&vdp.to_cbor());
+    encoded.extend_from_slice(&bstr(&[0u8; 32]));
+    encoded.extend_from_slice(&bstr(&[0u8; 64]));
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+}
+
+#[test]
+fn outer_cose_rejects_duplicate_semantic_protected_label_with_nonminimal_integer_encoding() {
+    // Protected = {1: -7, 1: -7 using non-minimal uint label encoding}.
+    let protected = [0xa2, 0x01, 0x26, 0x18, 0x01, 0x26];
+
+    let mut encoded = vec![0xd2, 0x84];
+    encoded.extend_from_slice(&bstr(&protected));
+    encoded.push(0xa0);
+    encoded.push(0xf6);
+    encoded.extend_from_slice(&bstr(&[0u8; 64]));
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidStructure)
     );
 }
 
@@ -162,6 +643,30 @@ fn cose_key_rejects_duplicate_labels() {
     bytes.extend_from_slice(&[0x01, 0x02]);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
+
+#[test]
+fn cose_key_rejects_non_label_root_map_key() {
+    let mut wire=vec![0xbf];
+    wire.push(0x01); wire.push(0x02);
+    wire.extend_from_slice(&[0x42,0xaa,0xbb,0x00]);
+    wire.push(0xff);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&wire),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+#[test]
+fn cose_key_rejects_duplicate_semantic_label_with_nonminimal_integer_encoding() {
+    let mut wire=valid_key();
+    assert_eq!(wire[0],0xa7);
+    wire[0]=0xa8;
+    wire.extend_from_slice(&[0x18,0x01,0x02]);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&wire),
         Err(Rfc9942VdpError::InvalidEs256CoseKey)
     );
 }
@@ -196,13 +701,13 @@ fn cose_key_accepts_textual_ec2_p256_es256_and_verify() {
 
 
 #[test]
-fn cose_key_rejects_noncanonical_integer_and_indefinite_forms() {
+fn cose_key_accepts_noncanonical_integer_but_rejects_indefinite_forms() {
     let mut bytes = valid_key();
     let pos = bytes.windows(2).position(|w| w == [0x01, 0x02]).unwrap();
     bytes.splice(pos..pos + 2, [0x01, 0x18, 0x02]);
-    assert_eq!(
-        Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEncoding)
+    assert!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes).is_ok(),
+        "valid non-minimal integer encoding must remain interoperable"
     );
 
     let mut indefinite = valid_key();
@@ -218,6 +723,34 @@ fn cose_key_rejects_noncanonical_integer_and_indefinite_forms() {
     indefinite_bstr.remove(pos + 2);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&indefinite_bstr),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+#[test]
+fn cose_key_accepts_indefinite_coordinate_bstr() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    let mut replacement = vec![0x21, 0x5f, 0x50];
+    replacement.extend_from_slice(&X[..16]);
+    replacement.extend_from_slice(&[0x50]);
+    replacement.extend_from_slice(&X[16..]);
+    replacement.push(0xff);
+    bytes.splice(pos..pos + 35, replacement);
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&bytes)
+        .expect("indefinite coordinate bstr must be accepted");
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+    assert_eq!(&parsed.public_key_sec1()[33..65], &Y);
+}
+
+#[test]
+fn malformed_indefinite_coordinate_bstr_is_rejected() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    bytes.splice(pos..pos + 35, [0x21, 0x5f, 0x01, 0xff]);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes),
         Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
@@ -245,3 +778,4 @@ fn syntactically_valid_but_invalid_p256_point_is_rejected_by_crypto_boundary() {
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
 }
+

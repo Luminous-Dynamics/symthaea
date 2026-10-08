@@ -2,11 +2,37 @@ name: ES256 COSE Qualification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-swarm/src/semantic_evidence_vds.rs"
       - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
       - "crates/domains/symthaea-swarm/tests/rfc9942_cose_key_corpus.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_es256_interop.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_semantic_qualification.rs"
       - "crates/domains/symthaea-swarm/fuzz/**"
+      - "crates/domains/symthaea-swarm/src/rfc9942_selection.rs"
+      - "crates/domains/symthaea-swarm/src/holochain_projection.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_receipt_selection.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_holochain_projection.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/es256-cose-qualification.yml"
+  push:
+    branches:
+      - "hardening/**"
+    paths:
+      - "crates/domains/symthaea-swarm/src/semantic_evidence_vds.rs"
+      - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_cose_key_corpus.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_es256_interop.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_semantic_qualification.rs"
+      - "crates/domains/symthaea-swarm/fuzz/**"
+      - "crates/domains/symthaea-swarm/src/rfc9942_selection.rs"
+      - "crates/domains/symthaea-swarm/src/holochain_projection.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_receipt_selection.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_holochain_projection.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/es256-cose-qualification.yml"
   workflow_dispatch:
 
@@ -20,17 +46,30 @@ concurrency:
 jobs:
   corpus:
     name: ES256 COSE corpus
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          # Pull-request qualification must execute the exact proposed head,
+          # not GitHub's synthetic pull/<number>/merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -40,23 +79,46 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-es256-cose-
       - name: Run COSE_Key interoperability corpus
-        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
-      - name: Run semantic_evidence_vds unit tests
-        run: cargo test -p symthaea-swarm --features semantic-receipts --lib semantic_evidence_vds
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
+      # The private CborReader unit module is compiled with the crate-wide
+      # #[cfg(test)] suite, which currently contains unrelated stale tests.
+      # The authoritative qualification boundary is the public integration
+      # corpus below; keep private-reader regressions as developer-only coverage.
+      - name: Run focused RFC 9942 semantic qualification
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_semantic_qualification
+      - name: Run RFC 8392 ES256 known-answer vector
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_es256_interop
+      - name: Run RFC 9942 receipt-selection qualification
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_receipt_selection
+      - name: Run Holochain evidence projection qualification
+        run: cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_holochain_projection
 
   fuzz-build:
     name: ES256 COSE fuzz target build
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          # Pull-request qualification must execute the exact proposed head,
+          # not GitHub's synthetic pull/<number>/merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
       - name: Cache fuzz Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -65,5 +127,321 @@ jobs:
           key: ${{ runner.os }}-es256-cose-fuzz-${{ hashFiles('crates/domains/symthaea-swarm/fuzz/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-es256-cose-fuzz-
+      - name: Assert exact fuzz target inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_TARGETS='["fuzz_cose_key_es256","fuzz_rfc9942_receipt","fuzz_rfc9942_signature_with_receipts","fuzz_rfc9942_proofs"]'
+          metadata="$(cargo metadata --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --no-deps --format-version 1)"
+          python3 - "$EXPECTED_TARGETS" "$metadata" <<'PY'
+          import json
+          import sys
+
+          expected = json.loads(sys.argv[1])
+          metadata = json.loads(sys.argv[2])
+          packages = metadata["packages"]
+          if len(packages) != 1:
+              raise SystemExit(f"expected one fuzz package, found {len(packages)}")
+          targets = [
+              target["name"]
+              for target in packages[0]["targets"]
+              if "bin" in target["kind"]
+          ]
+          if sorted(targets) != sorted(expected):
+              raise SystemExit(
+                  "fuzz target inventory mismatch: "
+                  f"expected={expected!r} actual={targets!r}"
+              )
+          if len(targets) != len(set(targets)):
+              raise SystemExit(f"duplicate fuzz target names: {targets!r}")
+          PY
       - name: Check fuzz manifest
-        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bin fuzz_cose_key_es256
+        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
+
+  fuzz-smoke:
+    name: ES256 COSE bounded fuzz smoke
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_FUZZ_VERSION: 0.12.0
+      FUZZ_RUST_TOOLCHAIN: nightly-2026-05-03
+      FUZZ_RUNS: 1024
+      FUZZ_SEED: 9942
+      FUZZ_MAX_LEN: 8192
+      FUZZ_TIMEOUT_SECONDS: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          # Pull-request qualification must execute the exact proposed head,
+          # not GitHub's synthetic pull/<number>/merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
+      - name: Install nightly Rust for libFuzzer instrumentation
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
+        with:
+          toolchain: ${{ env.FUZZ_RUST_TOOLCHAIN }}
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version "${{ env.CARGO_FUZZ_VERSION }}" --locked
+      - name: Prepare deterministic parser seeds
+        working-directory: crates/domains/symthaea-swarm/fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from base64 import b64decode
+          from pathlib import Path
+
+          seeds = {
+              "fuzz_cose_key_es256/seed-valid-public-key.cbor":
+                  "pAECIAEhWCAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBCJYIAUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUF",
+              "fuzz_rfc9942_receipt/seed-inclusion-receipt.cbor":
+                  "0oRHogEmGQGLAaEZAYyhIIFYJoMCAIFYIBERERERERERERERERERERERERERERERERERERERERER9lhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_receipt/seed-consistency-receipt.cbor":
+                  "0oRHogEmGQGLAaEZAYyhIYFYJoMBAoFYIBERERERERERERERERERERERERERERERERERERERERER9lhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_signature_with_receipts/seed-signature-with-receipt.cbor":
+                  "0oRDoQEmoRkBioFYfNKER6IBJhkBiwGhGQGMoSCBWCaDAgCBWCAREREREREREREREREREREREREREREREREREREREREREfZYQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABHcGF5bG9hZFhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_proofs/seed-inclusion-vdp.cbor":
+                  "oSCBWCaDAgCBWCAREREREREREREREREREREREREREREREREREREREREREQ==",
+              "fuzz_rfc9942_proofs/seed-consistency-vdp.cbor":
+                  "oSGBWCaDAQKBWCAREREREREREREREREREREREREREREREREREREREREREQ==",
+          }
+
+          for relative, encoded in seeds.items():
+              path = Path("corpus") / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(b64decode(encoded, validate=True))
+
+          proof = b"\x83\x02\x00\x81\x58\x20" + (b"\x00" * 32)
+          # 65 proofs is valid under MAX_RFC9942_PROOFS=256; this guards
+          # against accidentally conflating the 64-hash inclusion-path cap
+          # with the 256-proof VDP container cap.
+          vdp_65 = b"\xa1\x20\x98\x41" + b"".join(
+              b"\x58\x26" + proof for _ in range(65)
+          )
+
+          # Exercise the latest fixed-field and label taxonomy boundaries.
+          key_kid_257 = b"\xa1\x02\x59\x01\x01" + (b"\x00" * 257)
+          key_label_257 = b"\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
+          key_x_33 = b"\xa1\x21\x58\x21" + (b"\x00" * 33)
+
+          # Each extension value stays within the 4 KiB per-value bound, but
+          # four entries plus framing exceed MAX_RFC9942_COSE_KEY_ENCODED_BYTES.
+          # This prevents the aggregate map budget from being bypassed by
+          # distributing attacker-controlled material across otherwise-valid
+          # individual values.
+          key_aggregate_map_limit = bytearray([0xa4])
+          for label in range(1000, 1004):
+              key_aggregate_map_limit.extend((0x19, label >> 8, label & 0xff))
+              key_aggregate_map_limit.extend(b"\x59\x10\x00")
+              key_aggregate_map_limit.extend(b"\x00" * 4096)
+
+          receipt_payload_33 = (
+              b"\xd2\x84"
+              + b"\x58\x06\xa2\x01\x26\x19\x01\x8b"
+              + b"\xa1\x19\x01\x8c\xa1\x20\x81\x58\x26" + proof
+              + b"\x58\x21" + (b"\x00" * 33)
+              + b"\x58\x40" + (b"\x00" * 64)
+          )
+
+          receipt_payload_chunk_limit = (
+              b"\xd2\x84"
+              + b"\x47\xa2\x01\x26\x19\x01\x8b\x01"
+              + b"\xa1\x19\x01\x8c\xa1\x20\x81\x58\x26" + proof
+              + b"\x5f"
+              + (b"\x40" * 4097)
+              + b"\xff"
+              + b"\x58\x40"
+              + (b"\x00" * 64)
+          )
+
+          protected_receipt_recursion = (
+              b"\xd2\x84"
+              + b"\x58\x1b\xa3\x01\x26\x19\x01\x8b\x01\x18\x1e"
+              + (b"\xc0" * 17)
+              + b"\xf6\xa0\xf6\x58\x40"
+              + (b"\x00" * 64)
+          )
+          protected_outer_recursion = (
+              b"\xd2\x84"
+              + b"\x58\x17\xa2\x01\x26\x18\x1e"
+              + (b"\xc0" * 17)
+              + b"\xf6\xa0\xf6\x58\x40"
+              + (b"\x00" * 64)
+          )
+
+          outer_label_257 = (
+              b"\xd2\x84"
+              + b"\x59\x01\x06\xa1\x79\x01\x01" + (b"x" * 257) + b"\x00"
+              + b"\xa0"
+              + b"\xf6"
+              + b"\x58\x40" + (b"\x00" * 64)
+          )
+
+          large_tagged_outer = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x18\x1e\xd8\x18\x59\x10\x01"
+              + (b"\x00" * 4097)
+              + b"\xf6"
+              + b"\x58\x40"
+              + (b"\x00" * 64)
+          )
+
+          # Exercise the VDP array admission ceiling itself. The outer VDP map
+          # scanner is bounded at 256 array members, so 257 must fail closed
+          # before attempting to allocate/parse individual proof payloads.
+          vdp_257 = b"\xa1\x20\x99\x01\x01" + b"".join(
+              b"\x40" for _ in range(257)
+          )
+
+          # Exercise the RFC9162 hash-node bstr chunk ceiling directly. The
+          # proof decoder must classify 4097 zero-length chunks as a resource
+          # failure while retaining fixed 32-byte hash length as semantic.
+          proof_hash_chunk_limit = (
+              b"\x83\x02\x00\x81\x5f"
+              + (b"\x40" * 4097)
+              + b"\xff"
+          )
+
+          # Exercise the outer receipt-collection count ceiling with small
+          # opaque receipt values. The collection limit is 16, while the
+          # enclosing COSE map scanner permits the array to reach this boundary.
+          receipt_count_17 = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x19\x01\x8a\x91"
+              + (b"\x40" * 17)
+              + b"\xf6"
+              + b"\x40"
+          )
+
+          nested_receipt_signature_limit = (
+              b"\xd2\x84"
+              + b"\x47\xa2\x01\x26\x19\x01\x8b\x01"
+              + b"\xa1\x19\x01\x8c\xa1\x20\x81\x58\x26"
+              + b"\x83\x02\x00\x81\x58\x20"
+              + (b"\x00" * 32)
+              + b"\xf6\x5a\x00\x01\x00\x01"
+              + (b"\x00" * 65537)
+          )
+          nested_receipt_collection = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x19\x01\x8a\x81\x5a"
+              + bytes([(len(nested_receipt_signature_limit) >> 24) & 0xff,
+                      (len(nested_receipt_signature_limit) >> 16) & 0xff,
+                      (len(nested_receipt_signature_limit) >> 8) & 0xff,
+                      len(nested_receipt_signature_limit) & 0xff])
+              + nested_receipt_signature_limit
+              + b"\xf6\x58\x40"
+              + (b"\x00" * 64)
+          )
+
+          # Exercise the bounded indefinite-bstr chunk-count ceiling with
+          # 4097 zero-length chunks. This is distinct from the large definite
+          # bstr seed: it reaches the MAX_CBOR_BSTR_CHUNKS admission path.
+          indefinite_bstr_4097_chunks = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x18\x1e\x5f"
+              + (b"\x40" * 4097)
+              + b"\xff"
+              + b"\xf6"
+              + b"\x40"
+          )
+
+          # Exercise the equivalent bounded indefinite-tstr chunk ceiling.
+          indefinite_tstr_4097_chunks = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x18\x1e\x5f"
+              + (b"\x60" * 4097)
+              + b"\xff"
+              + b"\xf6"
+              + b"\x40"
+          )
+
+          generated = {
+              "fuzz_cose_key_es256/seed-kid-257.cbor": key_kid_257,
+              "fuzz_cose_key_es256/seed-label-257.cbor": key_label_257,
+              "fuzz_cose_key_es256/seed-x-33.cbor": key_x_33,
+              "fuzz_cose_key_es256/seed-aggregate-map-budget.cbor":
+                  bytes(key_aggregate_map_limit),
+              "fuzz_rfc9942_receipt/seed-attached-payload-33.cbor": receipt_payload_33,
+              "fuzz_rfc9942_receipt/seed-payload-4097-chunks.cbor":
+                  receipt_payload_chunk_limit,
+              "fuzz_rfc9942_receipt/seed-protected-recursion.cbor":
+                  protected_receipt_recursion,
+              "fuzz_rfc9942_signature_with_receipts/seed-protected-recursion.cbor":
+                  protected_outer_recursion,
+              "fuzz_rfc9942_signature_with_receipts/seed-label-257.cbor": outer_label_257,
+              "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
+              "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
+              "fuzz_rfc9942_proofs/seed-proof-hash-4097-chunks.cbor":
+                  proof_hash_chunk_limit,
+              "fuzz_rfc9942_signature_with_receipts/seed-tagged-large-opaque.cbor":
+                  large_tagged_outer,
+              "fuzz_rfc9942_signature_with_receipts/seed-17-receipts.cbor":
+                  receipt_count_17,
+              "fuzz_rfc9942_signature_with_receipts/seed-nested-receipt-signature-limit.cbor":
+                  nested_receipt_collection,
+              "fuzz_rfc9942_signature_with_receipts/seed-indefinite-bstr-4097-chunks.cbor":
+                  indefinite_bstr_4097_chunks,
+              "fuzz_rfc9942_signature_with_receipts/seed-indefinite-tstr-4097-chunks.cbor":
+                  indefinite_tstr_4097_chunks,
+          }
+          for relative, data in generated.items():
+              path = Path("corpus") / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+
+          expected = sorted(set(seeds) | set(generated))
+          actual = sorted(
+              str(path.relative_to("corpus"))
+              for path in Path("corpus").rglob("*")
+              if path.is_file()
+          )
+          if actual != expected:
+              raise SystemExit(
+                  "deterministic corpus inventory mismatch: "
+                  f"expected={expected!r} actual={actual!r}"
+              )
+          PY
+      - name: Run bounded fuzz smoke corpus
+        working-directory: crates/domains/symthaea-swarm/fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc +${FUZZ_RUST_TOOLCHAIN} --version --verbose
+          cargo +${FUZZ_RUST_TOOLCHAIN} fuzz --version
+          for target in \
+            fuzz_cose_key_es256 \
+            fuzz_rfc9942_receipt \
+            fuzz_rfc9942_signature_with_receipts \
+            fuzz_rfc9942_proofs
+          do
+            log_file="$(mktemp)"
+            trap 'rm -f "${log_file}"' EXIT
+            cargo +${FUZZ_RUST_TOOLCHAIN} fuzz run "$target" -- \
+              -runs="${FUZZ_RUNS}" \
+              -seed="${FUZZ_SEED}" \
+              -max_len="${FUZZ_MAX_LEN}" \
+              -timeout="${FUZZ_TIMEOUT_SECONDS}" \
+              -print_final_stats=1 2>&1 | tee "${log_file}"
+            # Qualification evidence must prove that the requested run budget
+            # actually executed; a zero/partial run must not be treated as PASS.
+            grep -Fqx "stat::number_of_executed_units: ${FUZZ_RUNS}" "${log_file}"
+            rm -f "${log_file}"
+            trap - EXIT
+          done

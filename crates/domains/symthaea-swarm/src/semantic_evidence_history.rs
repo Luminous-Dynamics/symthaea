@@ -202,7 +202,7 @@ fn snapshot_commitment(length: u64, head: Option<HistoryEntryCommitment>) -> His
             hasher.update(&[1]);
             hasher.update(head.as_bytes());
         }
-        None => hasher.update(&[0]),
+        None => { hasher.update(&[0]); }
     }
     HistoryEntryCommitment(*hasher.finalize().as_bytes())
 }
@@ -223,7 +223,7 @@ fn entry_commitment(
             hasher.update(&[1]);
             hasher.update(previous.as_bytes());
         }
-        None => hasher.update(&[0]),
+        None => { hasher.update(&[0]); }
     }
 
     hasher.update(evidence_digest.as_bytes());

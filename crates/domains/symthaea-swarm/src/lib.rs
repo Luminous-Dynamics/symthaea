@@ -800,6 +800,9 @@ mod domain_tests {
 }
 
 pub mod semantic_admission;
+pub mod holochain_projection;
+#[cfg(feature = "semantic-receipts")]
+pub mod rfc9942_selection;
 pub mod semantic_canonical;
 pub mod semantic_commit;
 #[cfg(feature = "semantic-digest")]
