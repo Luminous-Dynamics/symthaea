@@ -92,6 +92,7 @@
         "parent_institution_hash",
         "candidate_institution_hash",
         "mutation_id",
+        "rule_level",
         "transition",
         "semantic_delta"
       ],
@@ -107,6 +108,21 @@
         "mutation_id": {
           "type": "string",
           "minLength": 1
+        },
+        "rule_level": {
+          "type": "string",
+          "enum": [
+            "operational",
+            "collective_choice",
+            "constitutional",
+            "meta_constitutional"
+          ]
+        },
+        "authorizing_rule_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "transition": {
           "type": "string",
