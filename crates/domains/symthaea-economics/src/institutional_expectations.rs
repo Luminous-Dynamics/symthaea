@@ -64,6 +64,7 @@ pub struct ExpectationUpdate {
 pub enum ExpectationError {
     DuplicateExpectation,
     DuplicateUpdate,
+    DuplicateActualObservation,
     EmptyIdentity,
     EmptyProfileHash,
     InformationSetAfterObservation,
@@ -118,7 +119,7 @@ impl ExpectationBook {
             return Err(ExpectationError::EmptyIdentity);
         }
         if self.actual_observations.contains_key(&observation.observation_id) {
-            return Err(ExpectationError::DuplicateExpectation);
+            return Err(ExpectationError::DuplicateActualObservation);
         }
         self.actual_observations.insert(observation.observation_id.clone(), observation);
         Ok(())
@@ -288,6 +289,26 @@ mod tests {
         }).unwrap();
         assert_eq!(book.records()["e1"].referenced_institution_hash, "profile-v0");
         assert_eq!(book.actual_observations()["o1"].institution_hash, "profile-v1");
+    }
+
+    #[test]
+    fn duplicate_actual_observation_is_rejected() {
+        let mut book = ExpectationBook::new();
+        book.record_actual_observation(ActualInstitutionObservation {
+            observation_id: "o1".into(),
+            observation_time: 30,
+            institution_hash: "profile-v1".into(),
+            source: "holdout-observation".into(),
+        }).unwrap();
+        assert_eq!(
+            book.record_actual_observation(ActualInstitutionObservation {
+                observation_id: "o1".into(),
+                observation_time: 31,
+                institution_hash: "profile-v2".into(),
+                source: "other-observation".into(),
+            }),
+            Err(ExpectationError::DuplicateActualObservation)
+        );
     }
 
     #[test]
