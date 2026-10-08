@@ -1108,7 +1108,7 @@ def test_webhook_effect_provenance_rejects_effect_disagreement():
     evidence = PromotionStackEffectEvidenceSetV1(
         operation_identity_digest=identity.digest(),
         effects=(altered, PromotionStackEffectEvidenceV1(
-            effect=requested.to_stack_effect(identity).effect if False else PromotionStackEffectV1(7087, "H3", "M2"),
+            effect=PromotionStackEffectV1(7087, "H3", "M2"),
             source_delivery_id=requested.delivery_id,
             source_payload_digest=requested.payload_bytes_digest,
             source_hook_id=requested.hook_id,
