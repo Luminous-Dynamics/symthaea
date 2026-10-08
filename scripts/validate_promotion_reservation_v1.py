@@ -1257,8 +1257,10 @@ class ClockSourceMeasurementSequenceV1:
                 json.dumps(
                     {
                         "chain_link_digest": step.chain_link_digest,
+                        "chain_random_digest": step.chain_random_digest,
                         "operation_identity_digest": step.operation_identity_digest,
                         "previous_response_digest": step.previous_response_digest,
+                        "request_nonce_digest": step.request_nonce_digest,
                         "received_local_time_ms": step.received_local_time_ms,
                         "relation_digest": step.relation.digest(),
                         "round_index": step.round_index,
