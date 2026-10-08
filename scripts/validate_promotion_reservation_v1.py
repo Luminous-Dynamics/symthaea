@@ -540,6 +540,9 @@ class ProviderTopologyCasVerificationV1:
     subject_repository: str
     operation_identity_digest: str
     key_id: str
+    trust_policy_id: str
+    trust_policy_generation: int
+    trust_policy_digest: str
 
     def canonical_bytes(self) -> bytes:
         return json.dumps(
@@ -555,6 +558,9 @@ class ProviderTopologyCasVerificationV1:
                 "subject_repository": self.subject_repository,
                 "operation_identity_digest": self.operation_identity_digest,
                 "key_id": self.key_id,
+                "trust_policy_id": self.trust_policy_id,
+                "trust_policy_generation": self.trust_policy_generation,
+                "trust_policy_digest": self.trust_policy_digest,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -574,6 +580,9 @@ class ProviderTopologyCasVerificationV1:
         request: ProviderTopologyCasRequestV1,
         submission: ProviderTopologyCasSubmissionV1,
         execution: ProviderTopologyCasExecutionV1,
+        trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_trust_policy_digest: str | None,
+        expected_trust_policy_generation: int | None,
     ) -> bool:
         verified = verify_provider_topology_cas_attestation(
             attestation,
@@ -584,6 +593,9 @@ class ProviderTopologyCasVerificationV1:
             request,
             submission,
             execution,
+            trust_policy,
+            expected_trust_policy_digest,
+            expected_trust_policy_generation,
         )
         return verified is not None and self == verified
 
@@ -634,6 +646,9 @@ class ProviderTopologyCasProviderResultV1:
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
         trust_root: ProviderTopologyCasTrustRootV1,
+        trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_trust_policy_digest: str | None,
+        expected_trust_policy_generation: int | None,
     ) -> bool:
         if (
             self.result_source != "provider-operation-result"
@@ -665,6 +680,9 @@ class ProviderTopologyCasProviderResultV1:
             request,
             submission,
             execution,
+            trust_policy,
+            expected_trust_policy_digest,
+            expected_trust_policy_generation,
         )
 
 
@@ -685,6 +703,7 @@ def _provider_topology_statement(
     submission: ProviderTopologyCasSubmissionV1,
     execution: ProviderTopologyCasExecutionV1,
     trust_root: ProviderTopologyCasTrustRootV1,
+    trust_policy: ProviderTopologyCasTrustPolicyV1,
 ) -> dict:
     return {
         "_type": "https://in-toto.io/Statement/v1",
@@ -710,6 +729,9 @@ def _provider_topology_statement(
             "pre_submit_sequence": pre_submit_sequence,
             "trust_root_id": trust_root.trust_root_id,
             "trust_root_generation": trust_root.generation,
+            "trust_policy_id": trust_policy.policy_id,
+            "trust_policy_generation": trust_policy.generation,
+            "trust_policy_digest": trust_policy.digest(),
             "governance_generation": identity.governance_generation,
         },
     }
@@ -755,12 +777,23 @@ def verify_provider_topology_cas_attestation(
     request: ProviderTopologyCasRequestV1,
     submission: ProviderTopologyCasSubmissionV1,
     execution: ProviderTopologyCasExecutionV1,
+    trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+    expected_trust_policy_digest: str | None,
+    expected_trust_policy_generation: int | None,
 ) -> ProviderTopologyCasVerificationV1 | None:
     """Cryptographically verify DSSE PAE with Ed25519 and then enforce exact claims.
 
-    The trusted key and signer/repository policy are supplied out-of-band. This is
-    intentionally not a GitHub-topology-CAS adapter; it only verifies evidence.
+    The trust policy digest and generation are supplied as independent pins.
+    The policy cannot authenticate itself and is not loaded from the attestation.
+    This is not a GitHub-topology-CAS adapter; it only verifies evidence.
     """
+    if trust_policy is None or not trust_policy.authorizes(
+        trust_root,
+        identity,
+        expected_trust_policy_digest,
+        expected_trust_policy_generation,
+    ):
+        return None
     if (
         trust_root.generation != identity.trust_root_generation
         or trust_root.repository != identity.repository
@@ -795,6 +828,7 @@ def verify_provider_topology_cas_attestation(
             submission,
             execution,
             trust_root,
+            trust_policy,
         )
         if parsed != expected:
             return None
@@ -845,6 +879,9 @@ def verify_provider_topology_cas_attestation(
         subject_repository=identity.repository,
         operation_identity_digest=identity.digest(),
         key_id=trust_root.key_id,
+        trust_policy_id=trust_policy.policy_id,
+        trust_policy_generation=trust_policy.generation,
+        trust_policy_digest=trust_policy.digest(),
     )
 
 
