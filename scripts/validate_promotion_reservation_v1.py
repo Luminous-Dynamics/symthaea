@@ -776,7 +776,10 @@ class ClockRelationEvidenceV1:
             "max_skew_ms": self.max_skew_ms,
             "measured_at_local_time_ms": self.measured_at_local_time_ms,
             "provider_clock_domain": self.provider_clock_domain,
+            "source_attestation_digest": self.source_attestation.digest(),
+            "source_challenge_digest": self.source_challenge.digest(),
             "source_origin": self.source_origin,
+            "source_response_digest": self.source_response.digest(),
             "valid_from_local_time_ms": self.valid_from_local_time_ms,
             "valid_until_local_time_ms": self.valid_until_local_time_ms,
         }
@@ -2192,6 +2195,36 @@ def test_clock_relation_accepts_exact_validity_and_freshness_boundaries():
         verification_time_ms=1791475190000,
     )
     assert relation.classify(1791475190000, 1791475205000) == "clock-relation-admissible"
+
+
+def test_clock_relation_digest_binds_source_challenge_response_and_attestation():
+    relation = clock_relation_fixture()
+    assert relation.evidence is not None
+    original = relation.evidence.digest()
+
+    altered_challenge = ClockRelationSourceChallengeV1(
+        **{**relation.evidence.source_challenge.__dict__, "challenge_id": "challenge-2"},
+    )
+    assert ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_challenge": altered_challenge},
+    ).digest() != original
+
+    altered_response = ClockRelationSourceResponseV1(
+        **{**relation.evidence.source_response.__dict__, "response_id": "response-2"},
+    )
+    assert ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_response": altered_response},
+    ).digest() != original
+
+    altered_attestation = ClockRelationSourceAttestationV1(
+        **{
+            **relation.evidence.source_attestation.__dict__,
+            "verifier_identity": "clock-source-verifier-v2",
+        },
+    )
+    assert ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_attestation": altered_attestation},
+    ).digest() != original
 
 
 def test_clock_relation_digest_binds_all_three_evidence_layers():
@@ -4729,6 +4762,7 @@ TESTS = [
     test_clock_relation_rejects_stale_relation,
     test_clock_relation_rejects_expired_validity_before_observation,
     test_clock_relation_accepts_exact_validity_and_freshness_boundaries,
+    test_clock_relation_digest_binds_source_challenge_response_and_attestation,
     test_clock_relation_digest_binds_all_three_evidence_layers,
     test_local_temporal_sequence_validates_monotonic_order,
     test_local_temporal_sequence_rejects_nonpositive_values,
