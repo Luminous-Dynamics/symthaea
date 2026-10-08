@@ -4,6 +4,8 @@ GitHub documents that webhook deliveries can arrive out of order. Therefore the 
 
 ## Terminal effect state
 
+The per-PR reducer is additionally bound to the exact `PromotionOperationIdentityV1` digest that created the reservation. This prevents an effect-state record from being silently reused across a new operation whose PR/head happens to remain identical while another authority-bearing dimension (such as stack topology, base tip, trust-root generation, or governance generation) changes.
+
 For each reserved stack entry, the reducer has the monotonic states:
 
     Unobserved -> EffectObserved
