@@ -120,6 +120,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd invocation ID changed during definition capture")]
     InvocationIdChanged,
 
+    #[error("post-state InvocationID resolves to a different unit object")]
+    InvocationUnitObjectMismatch,
+
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
 
@@ -220,6 +223,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                         job_type: expected.job_type,
                         unit: removed.unit,
                         object_path: removed.object_path.as_str().to_string(),
+                        removed_at_monotonic_us: Some(monotonic_now_us()?),
                         result: removed.result,
                         manager_owner: self.manager_owner.clone(),
                     });
@@ -916,6 +920,27 @@ impl NixSystemdReadOnlyObserverV1 {
             return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
         }
 
+        let post_invocation_id = required_invocation_id(&unit_properties)?;
+        if let Some(invocation_id) = post_invocation_id.as_deref() {
+            let invocation_bytes = hex::decode(invocation_id)
+                .map_err(|_| NixSystemdObserverErrorV1::InvalidInvocationId)?;
+            let resolved_path = self
+                .resolve_invocation_id(&invocation_bytes, &expected_unit)
+                .await?;
+            let lookup_owner = self.systemd_manager_owner().await?;
+            let lookup_bus_id = self.dbus_bus_id().await?;
+            if lookup_owner != manager_owner {
+                return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+            }
+            if lookup_bus_id != bus_id {
+                return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+            }
+            validate_invocation_unit_object_binding(
+                object_path.as_str(),
+                resolved_path.as_str(),
+            )?;
+        }
+
         let service_result =
             required_string(&service_properties, SYSTEMD_SERVICE_INTERFACE, "Result")?;
         if service_result.trim().is_empty() {
@@ -1066,6 +1091,16 @@ impl NixSystemdJobHandleV1 {
         }
         Ok(())
     }
+}
+
+fn validate_invocation_unit_object_binding(
+    expected_object_path: &str,
+    resolved_object_path: &str,
+) -> Result<(), NixSystemdObserverErrorV1> {
+    if expected_object_path != resolved_object_path {
+        return Err(NixSystemdObserverErrorV1::InvocationUnitObjectMismatch);
+    }
+    Ok(())
 }
 
 fn validate_bus_id_shape(value: &str) -> Result<(), NixSystemdObserverErrorV1> {
@@ -1709,6 +1744,20 @@ mod tests {
         );
         assert!(invocation_id_to_string(vec![0; 15]).is_err());
         assert!(invocation_id_to_string(vec![0; 17]).is_err());
+    }
+
+    #[test]
+    fn post_invocation_unit_object_binding_is_exact() {
+        let expected = "/org/freedesktop/systemd1/unit/nginx_2eservice";
+        assert!(validate_invocation_unit_object_binding(expected, expected).is_ok());
+        assert_eq!(
+            validate_invocation_unit_object_binding(
+                expected,
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+            )
+            .unwrap_err(),
+            NixSystemdObserverErrorV1::InvocationUnitObjectMismatch
+        );
     }
 
     #[test]
