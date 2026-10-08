@@ -387,7 +387,12 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
-        put_opt_str(&mut h, self.bus_id.as_deref());
+        // Preserve the historical sample digest byte layout when bus identity is
+        // absent; new observer-sealed samples extend the commitment with bus epoch.
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            put_u8(&mut h, 1);
+            put_str(&mut h, bus_id);
+        }
         put_opt_str(&mut h, self.invocation_id.as_deref());
         put_u64(&mut h, self.state_change_at_monotonic_us);
         put_u64(&mut h, self.captured_at_monotonic_us);
@@ -882,6 +887,13 @@ impl NixPostStateReceiptV1 {
             required_stability_us: self.required_stability_us,
         };
         validate_expectation_against_intent(intent, &rebound_expectation)?;
+        if let Some(context) = intent.service_effect_context() {
+            match self.systemd_bus_id.as_deref() {
+                Some(observed) if observed == context.authorized_bus_id => {}
+                None if self.claim != NixPostStateClaimV1::Proven => {}
+                _ => return Err(NixPostStateErrorV1::BusIncarnationMismatch),
+            }
+        }
         Ok(())
     }
 
@@ -1202,7 +1214,11 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, unit_file_state_tag(self.observed_unit_file_state));
         put_str(&mut h, &self.observed_service_result);
         put_str(&mut h, &self.systemd_manager_owner);
-        put_opt_str(&mut h, self.systemd_bus_id.as_deref());
+        // Preserve the legacy v1 receipt digest for records that predate bus identity.
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            put_u8(&mut h, 1);
+            put_str(&mut h, bus_id);
+        }
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
