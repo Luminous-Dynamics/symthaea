@@ -57,4 +57,5 @@ mod integration_tests {
 pub use institutional_expectations::{
     ActualInstitutionObservation, ExpectationBook, ExpectationError, ExpectationRecord,
     ExpectationRepresentation, ExpectationUpdate, InformationSetIdentity,
+    ReferencedInstitutionStatus,
 };
