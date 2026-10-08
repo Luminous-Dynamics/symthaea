@@ -1121,9 +1121,7 @@ class ClockRelationSourceSetV1:
             if challenge.operation_identity_digest != self.operation_identity_digest:
                 return "clock-source-operation-identity-mismatch"
             source_state = relation.classify(dispatch_time_ms, observation_time_ms)
-            if source_state != "clock-relation-admissible" and (
-                dispatch_time_ms is not None and observation_time_ms is not None
-            ):
+            if source_state != "clock-relation-admissible":
                 return source_state
             source_ids.append(challenge.source_id)
             operator_ids.append(challenge.operator_id)
@@ -1313,28 +1311,24 @@ class ClockSourceMeasurementSequenceV1:
         ]
         if len(response_ids) != len(set(response_ids)):
             return "clock-source-measurement-replay"
-        for earlier, later in zip(steps, steps[1:]):
-            if earlier.relation.evidence is None or later.relation.evidence is None:
+        for earlier_index, earlier in enumerate(steps[:-1]):
+            if earlier.relation.evidence is None:
                 return "clock-source-measurement-invalid"
             earlier_response = earlier.relation.evidence.source_response
-            later_response = later.relation.evidence.source_response
-            earlier_upper = (
-                earlier_response.provider_time_ms
-                + earlier_response.uncertainty_radius_ms
-            )
-            later_lower = (
-                later_response.provider_time_ms
-                - later_response.uncertainty_radius_ms
-            )
-            if earlier_upper < later_lower:
-                continue
-            if (
-                earlier_response.provider_time_ms
-                - earlier_response.uncertainty_radius_ms
-                > later_response.provider_time_ms
-                + later_response.uncertainty_radius_ms
-            ):
-                return "clock-source-causal-order-contradiction"
+            for later in steps[earlier_index + 1:]:
+                if later.relation.evidence is None:
+                    return "clock-source-measurement-invalid"
+                later_response = later.relation.evidence.source_response
+                earlier_lower = (
+                    earlier_response.provider_time_ms
+                    - earlier_response.uncertainty_radius_ms
+                )
+                later_upper = (
+                    later_response.provider_time_ms
+                    + later_response.uncertainty_radius_ms
+                )
+                if earlier_lower > later_upper:
+                    return "clock-source-causal-order-contradiction"
         return None
 
     def classify(self) -> str:
@@ -2615,6 +2609,84 @@ def test_clock_measurement_sequence_digest_binds_rounds():
         ),
     )
     assert tampered.digest() != sequence.digest()
+
+
+def test_clock_source_set_rejects_invalid_member_without_time_window():
+    source_set = clock_relation_source_set_fixture()
+    invalid_relation = clock_relation_fixture(verified=False)
+    altered = replace(
+        source_set,
+        relations=(invalid_relation, *source_set.relations[1:]),
+    )
+    assert altered.classify() == "clock-relation-source-attestation-invalid"
+
+
+def test_clock_measurement_sequence_checks_nonadjacent_causal_pairs():
+    sequence = clock_source_measurement_sequence_fixture()
+    first, second, third = sequence.second_round
+    assert first.relation.evidence is not None
+    assert second.relation.evidence is not None
+    assert third.relation.evidence is not None
+
+    first_relation = first.relation
+    second_relation = second.relation
+    third_relation = third.relation
+
+    def with_provider_time(
+        relation: ClockRelationV1,
+        provider_time_ms: int,
+    ) -> ClockRelationV1:
+        assert relation.evidence is not None
+        response = replace(
+            relation.evidence.source_response,
+            provider_time_ms=provider_time_ms,
+        )
+        evidence = replace(
+            relation.evidence,
+            source_response=response,
+            source_attestation=replace(
+                relation.evidence.source_attestation,
+                response_digest=response.digest(),
+            ),
+        )
+        verification = replace(
+            relation.verification,
+            evidence_digest=evidence.digest(),
+        )
+        return replace(
+            relation,
+            evidence=evidence,
+            verification=verification,
+        )
+
+    first_relation = with_provider_time(first_relation, 1791475210000)
+    second_relation = with_provider_time(second_relation, 1791475200000)
+    third_relation = with_provider_time(third_relation, 1791475190000)
+
+    tampered = replace(
+        sequence,
+        second_round=(
+            replace(first, relation=first_relation),
+            replace(
+                second,
+                relation=second_relation,
+                previous_response_digest=first_relation.evidence.source_response.digest(),
+            ),
+            replace(
+                third,
+                relation=third_relation,
+                previous_response_digest=second_relation.evidence.source_response.digest(),
+            ),
+        ),
+    )
+    tampered = replace(
+        tampered,
+        second_round=tuple(
+            replace(step, chain_link_digest=step.expected_chain_link_digest())
+            for step in tampered.second_round
+        ),
+    )
+    assert tampered.classify() == "clock-source-causal-order-contradiction"
 
 
 def test_clock_source_set_accepts_three_independent_sources():
@@ -5538,6 +5610,7 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 TESTS = [
     test_clock_measurement_sequence_accepts_two_causal_rounds,
+    test_clock_measurement_sequence_checks_nonadjacent_causal_pairs,
     test_clock_measurement_sequence_requires_two_rounds,
     test_clock_measurement_sequence_requires_same_source_order,
     test_clock_measurement_sequence_rejects_chain_link_tamper,
@@ -5547,6 +5620,7 @@ TESTS = [
     test_clock_measurement_sequence_requires_three_sources,
     test_clock_measurement_sequence_digest_binds_rounds,
     test_clock_source_set_accepts_three_independent_sources,
+    test_clock_source_set_rejects_invalid_member_without_time_window,
     test_clock_source_set_rejects_duplicate_source_or_anchor,
     test_clock_source_set_rejects_mixed_provider_clock_domain,
     test_clock_source_set_digest_is_order_invariant,
