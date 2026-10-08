@@ -157,3 +157,9 @@ The reference model requires both:
 Missing monotonic readings and any monotonic rollback fail closed. A wall-clock sequence that appears valid while the monotonic sequence regresses is therefore not temporally admissible.
 
 This still does not prove the correctness of the local clock source; it only prevents a local wall-clock-only timestamp sequence from being treated as the sole temporal ordering witness.
+
+## Stack-level clock-relation pin
+
+`PromotionStackEffectTimingSetV1` also carries one `clock_relation_identity_digest` and requires every timing record to resolve to that same relation identity.
+
+This prevents one stack result from silently mixing different skew baselines, validity windows, or drift bounds. A clock-relation change is therefore a new temporal evidence generation rather than a local reinterpretation of only one stack member.
