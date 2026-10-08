@@ -91,3 +91,29 @@ The bounded temporal gate therefore remains a qualification predicate, not an or
 The local monotonic sequence remains a separate ordering primitive. Its fixture semantics were also corrected so an explicit missing sequence stays missing instead of being silently replaced by a default sequence.
 
 Related: #7176, #7180.
+
+## Source-message lineage
+
+The clock relation is now bound to a fresh source-message lineage:
+
+    promotion operation identity
+        +
+    fresh challenge
+        ↓ exact challenge digest
+    provider time response
+        ↓ exact response digest
+    verifier attestation
+        ↓
+    ClockRelationEvidenceV1
+
+The challenge carries a 32-byte non-zero nonce, the exact promotion operation identity digest, a challenge validity interval, and a pinned trust-anchor identifier.
+
+The response binds the exact challenge digest, provider clock domain, provider time, uncertainty radius, response identity/digest, and the same trust anchor.
+
+The verifier attestation binds the exact challenge and response digests, trust anchor, verifier identity and policy, verification time, validity interval, cryptographic verification scheme, and accepted decision.
+
+The timing artifact carries the same promotion operation identity digest and rejects a time-source challenge belonging to another operation as clock-relation-operation-identity-mismatch.
+
+This is a stronger provenance shape than a free-form source-authentication string. It still does not implement the external signature verification primitive inside this provider-free oracle: signature_verified represents an external verifier decision and is not itself claimed to be cryptographic proof.
+
+Roughtime provides the relevant protocol precedent: responses are bound to a fresh client nonce, include a timestamp and uncertainty radius, and are verified against configured long-term trust roots. RFC 10049 also explicitly distinguishes a valid response from proof that the timestamp itself is globally correct. citeturn577066search2turn577066search1
