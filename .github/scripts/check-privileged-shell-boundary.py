@@ -410,6 +410,13 @@ def main() -> None:
     if cleanup_start < 0 or cleanup_end < 0:
         fail("transaction cleanup helper disappeared")
     cleanup_body = text[cleanup_start:cleanup_end]
+    transaction_dir_start = text.find("fn create_transaction_artifact_dir(")
+    transaction_dir_end = text.find("\nfn remove_transaction_artifact_dir(", transaction_dir_start)
+    if transaction_dir_start < 0 or transaction_dir_end < 0:
+        fail("transaction artifact directory helper disappeared")
+    transaction_dir_body = text[transaction_dir_start:transaction_dir_end]
+    if "sync_parent_directory(&path)" not in transaction_dir_body:
+        fail("transaction artifact directory creation lost parent fsync durability")
     for required in (
         "remove_transaction_artifact_dir_blocking(",
         "O_NOFOLLOW",
@@ -497,6 +504,23 @@ def main() -> None:
     for needle in nested_interpreters:
         if needle in text:
             fail(f"relay source contains forbidden nested interpreter {needle!r}")
+
+    private_dir_start = text.find("fn create_private_directory(")
+    private_dir_end = text.find("\nfn sync_parent_directory(", private_dir_start)
+    if private_dir_start < 0 or private_dir_end < 0:
+        fail("private directory capability disappeared")
+    private_dir_body = text[private_dir_start:private_dir_end]
+    for required in (
+        "DirBuilderExt",
+        "O_DIRECTORY",
+        "O_NOFOLLOW",
+        "O_CLOEXEC",
+        "mode(0o700)",
+        "directory.sync_all()",
+        "sync_parent_directory(path)",
+    ):
+        if required not in private_dir_body:
+            fail(f"private directory capability lost required durability guard {required!r}")
 
     print(
         "privileged-shell-boundary: PASS: "

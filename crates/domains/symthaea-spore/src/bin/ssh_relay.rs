@@ -381,6 +381,81 @@ fn trusted_script_process_from_stdin(
         .args(args))
 }
 
+fn create_private_directory(path: &str) -> Result<(), String> {
+    let path = std::path::Path::new(path);
+    if path.as_os_str().is_empty() {
+        return Err("private directory path is empty".into());
+    }
+
+    let mut builder = std::fs::DirBuilder::new();
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(path).map_err(|error| {
+        format!(
+            "unable to create private directory {}: {error}",
+            path.display()
+        )
+    })?;
+
+    let directory = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| {
+            format!(
+                "unable to reopen private directory {}: {error}",
+                path.display()
+            )
+        })?;
+
+    directory
+        .set_permissions(std::fs::Permissions::from_mode(0o700))
+        .map_err(|error| {
+            format!(
+                "unable to protect private directory {}: {error}",
+                path.display()
+            )
+        })?;
+
+    let metadata = directory.metadata().map_err(|error| {
+        format!(
+            "unable to inspect private directory {}: {error}",
+            path.display()
+        )
+    })?;
+    if !metadata.is_dir() || metadata.permissions().mode() & 0o777 != 0o700 {
+        return Err(format!(
+            "private directory {} has invalid type or permissions {:04o}",
+            path.display(),
+            metadata.permissions().mode() & 0o777
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(format!(
+            "private directory {} is not owned by relay user",
+            path.display()
+        ));
+    }
+
+    directory
+        .sync_all()
+        .map_err(|error| {
+            format!(
+                "unable to synchronize private directory {}: {error}",
+                path.display()
+            )
+        })?;
+    sync_parent_directory(path).map_err(|error| {
+        format!(
+            "unable to synchronize private directory parent {}: {error}",
+            path.parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .display()
+        )
+    })?;
+
+    Ok(())
+}
+
 fn sync_parent_directory(path: &std::path::Path) -> Result<(), std::io::Error> {
     let parent = match path.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
@@ -1398,6 +1473,22 @@ fn create_transaction_artifact_dir(transaction_id: &str) -> Result<String, Strin
             path.display()
         ));
     }
+    sync_parent_directory(&path).map_err(|error| {
+        format!(
+            "unable to synchronize transaction artifact parent {}: {error}",
+            path.parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .display()
+        )
+    })?;
+    directory
+        .sync_all()
+        .map_err(|error| {
+            format!(
+                "unable to synchronize transaction artifact directory {}: {error}",
+                path.display()
+            )
+        })?;
 
     Ok(path.to_string_lossy().into_owned())
 }
@@ -6949,28 +7040,11 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // to this transaction. Other local users cannot replace status,
                 // PID, log, script, or staged configuration paths from /tmp.
                 let config_staging_dir = format!("{transaction_dir}/config");
-                if let Err(error) = std::fs::create_dir(&config_staging_dir) {
+                if let Err(error) = create_private_directory(&config_staging_dir) {
                     let _ = ws_tx
                         .send(Message::Text(
                             RelayMessage::error(&format!(
-                                "Unable to create transaction config staging namespace: {}",
-                                error
-                            ))
-                            .to_json(),
-                        ))
-                        .await;
-                    remove_transaction_artifact_dir(&transaction_dir);
-                    continue;
-                }
-
-                if let Err(error) = std::fs::set_permissions(
-                    &config_staging_dir,
-                    std::fs::Permissions::from_mode(0o700),
-                ) {
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Unable to secure transaction config staging namespace: {error}"
+                                "Unable to create transaction config staging namespace: {error}"
                             ))
                             .to_json(),
                         ))
