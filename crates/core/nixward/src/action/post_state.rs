@@ -595,6 +595,9 @@ pub struct NixPostStateReceiptV1 {
     pub observed_service_result: String,
     /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
     pub systemd_manager_owner: String,
+    /// D-Bus daemon incarnation for the observed service-manager epoch.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -1062,6 +1065,9 @@ impl NixPostStateReceiptV1 {
         require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
         require_nonempty(&self.observed_service_result, "observed service result")?;
         validate_unique_manager_owner(&self.systemd_manager_owner)?;
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         let recomputed_state_digest = semantic_state_digest(
             self.operation,
             &self.target_unit,
@@ -1150,6 +1156,9 @@ impl NixPostStateReceiptV1 {
                 if self.approval_request_id.is_none() || self.approval_projection_digest.is_none() {
                     return Err(NixPostStateErrorV1::MissingLiveExecutionWitness);
                 }
+                if self.systemd_bus_id.is_none() {
+                    return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+                }
             }
             _ => {}
         }
@@ -1193,6 +1202,7 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, unit_file_state_tag(self.observed_unit_file_state));
         put_str(&mut h, &self.observed_service_result);
         put_str(&mut h, &self.systemd_manager_owner);
+        put_opt_str(&mut h, self.systemd_bus_id.as_deref());
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
@@ -1676,6 +1686,8 @@ pub enum NixPostStateErrorV1 {
     MissingManagerOwner,
     #[error("systemd manager incarnation does not match the observation/job binding")]
     ManagerOwnerMismatch,
+    #[error("D-Bus daemon incarnation does not match the bound observation")]
+    BusIncarnationMismatch,
     #[error("incomplete systemd job evidence")]
     IncompleteJobEvidence,
     #[error("duplicate drop-in path")]
