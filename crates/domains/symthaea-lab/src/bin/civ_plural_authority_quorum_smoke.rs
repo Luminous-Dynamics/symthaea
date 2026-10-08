@@ -108,6 +108,38 @@ struct EmergencySuspension {
     effective_epoch: u64,
 }
 
+fn decision_identity(
+    evaluation: Digest,
+    tier: ConsequenceTier,
+    scope: Digest,
+    approver_set_digest: Digest,
+    effective_epoch: u64,
+) -> Digest {
+    match (
+        evaluation,
+        tier,
+        scope,
+        approver_set_digest,
+        effective_epoch,
+    ) {
+        (
+            Digest("evaluation-v1"),
+            ConsequenceTier::Critical,
+            Digest("critical-scope-v1"),
+            Digest("approver-set-v1"),
+            100,
+        ) => Digest("authority-decision-evaluation-v1-critical-scope-v1-100"),
+        (
+            Digest("evaluation-v1"),
+            ConsequenceTier::Critical,
+            Digest("expanded-critical-scope"),
+            Digest("approver-set-v1"),
+            120,
+        ) => Digest("authority-decision-evaluation-v1-expanded-scope-120"),
+        _ => Digest("authority-decision-other"),
+    }
+}
+
 fn approve(
     evaluation: EvaluationReceipt,
     tier: ConsequenceTier,
@@ -158,16 +190,39 @@ fn approve(
         return Err(QuorumFailure::TooFewDistinctRoles);
     }
 
+    let approver_set_digest = Digest("approver-set-v1");
+
     Ok(AuthorityDecision {
-        id: Digest("authority-decision-v1"),
+        id: decision_identity(
+            evaluation.id,
+            tier,
+            scope,
+            approver_set_digest,
+            effective_epoch,
+        ),
         candidate,
         evaluation: evaluation.id,
         tier,
         scope,
-        approver_set_digest: Digest("approver-set-v1"),
+        approver_set_digest,
         rationale,
         effective_epoch,
     })
+}
+
+fn emergency_suspension_identity(
+    deployment: Digest,
+    authority: Digest,
+    effective_epoch: u64,
+) -> Digest {
+    match (deployment, authority, effective_epoch) {
+        (
+            Digest("deployment-v1"),
+            Digest("emergency-guardian-1"),
+            110,
+        ) => Digest("emergency-suspension-deployment-v1-110"),
+        _ => Digest("emergency-suspension-other"),
+    }
 }
 
 fn emergency_suspend(
@@ -184,7 +239,7 @@ fn emergency_suspend(
     }
 
     Ok(EmergencySuspension {
-        id: Digest("emergency-suspension-v1"),
+        id: emergency_suspension_identity(deployment, member.id, effective_epoch),
         deployment,
         authority: member.id,
         reason,
@@ -237,6 +292,22 @@ fn main() {
     assert_eq!(decision.candidate, candidate);
     assert_eq!(decision.evaluation, evaluation.id);
     assert_eq!(decision.tier, ConsequenceTier::Critical);
+
+    // Decision identity binds scope and effective epoch, rather than being a
+    // reusable action label.
+    let expanded_decision = approve(
+        evaluation,
+        ConsequenceTier::Critical,
+        Digest("expanded-critical-scope"),
+        candidate,
+        evaluator,
+        &[safety, technical, public],
+        Digest("expanded-scope"),
+        120,
+    )
+    .expect("expanded scope can be represented as a fresh authority decision");
+    assert_ne!(decision.id, expanded_decision.id);
+    assert_ne!(decision.scope, expanded_decision.scope);
 
     // Repeating the same signer does not create a quorum.
     let duplicate = approve(
@@ -376,6 +447,15 @@ fn main() {
     assert_eq!(suspension.deployment, Digest("deployment-v1"));
     assert_eq!(suspension.reason, Digest("immediate-safety-concern"));
     assert_ne!(suspension.id, decision.id);
+
+    let later_suspension = emergency_suspend(
+        emergency,
+        Digest("deployment-v1"),
+        Digest("second-safety-event"),
+        111,
+    )
+    .expect("a later emergency action can be represented");
+    assert_ne!(suspension.id, later_suspension.id);
 
     // A normal authority member cannot pretend to be the emergency role.
     assert_eq!(
