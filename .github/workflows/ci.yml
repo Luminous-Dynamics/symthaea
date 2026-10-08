@@ -226,6 +226,8 @@ jobs:
 
       - name: Verify transaction ledger durability invariants
         run: python3 .github/scripts/check-transaction-ledger-boundary.py
+      - name: Verify generated Nix codegen boundary
+        run: python3 .github/scripts/check-nix-codegen-boundary.py
 
   muse:
     name: Muse (tests, studio, wasm UI)
