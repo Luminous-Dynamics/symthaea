@@ -470,6 +470,28 @@ def main() -> None:
         if forbidden in patch_body:
             fail(f"system_config_patch regained inline shell-source generation: {forbidden!r}")
 
+    # Install also binds every selected block device to a kernel identity
+    # before the destructive worker starts.
+    install_start_for_disk = arm_indexes["install"]
+    install_position_for_disk = next(
+        (position for position, (start, name) in enumerate(ordered) if name == "install"),
+        None,
+    )
+    install_end_for_disk = (
+        ordered[install_position_for_disk + 1][0]
+        if install_position_for_disk is not None and install_position_for_disk + 1 < len(ordered)
+        else len(lines)
+    )
+    install_disk_body = "\n".join(lines[install_start_for_disk:install_end_for_disk])
+    for required in (
+        "bind_install_disk_identities(",
+        "disk_binding_values",
+        "verify_block_device_binding(",
+        "disk binding changed before destructive execution",
+    ):
+        if required not in install_disk_body:
+            fail(f"install mutation lost disk identity binding guard {required!r}")
+
     # Install has one additional monotonic authority requirement: the exact
     # staged script digest must be journal-bound before the background worker starts.
     install_start = arm_indexes["install"]

@@ -32,8 +32,9 @@ use system_transaction::{
 
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
-    nix_string_literal, sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
-    validate_hostname as validate_hostname_relay, validate_username,
+    bind_block_device, nix_string_literal, sanitize_heredoc, sanitize_input, token_eq,
+    validate_disk_path, validate_hostname as validate_hostname_relay, validate_username,
+    verify_block_device_binding, BlockDeviceBinding,
 };
 
 // TLS support
@@ -3819,7 +3820,33 @@ async fn handle_connection(
 }
 
 /// Handle an already-upgraded WebSocket connection (works for both plain and TLS streams)
-const REQUEST_FINGERPRINT_VERSION: u16 = 2;
+const REQUEST_FINGERPRINT_VERSION: u16 = 3;
+
+fn bind_install_disk_identities(
+    message: &ClientMessage,
+    primary_disk: &str,
+) -> Result<Vec<(String, String, BlockDeviceBinding)>, String> {
+    let mut candidates = Vec::<(String, String)>::new();
+    candidates.push(("primary".to_string(), primary_disk.to_string()));
+
+    if !message.fast_disk.is_empty() {
+        candidates.push(("fast".to_string(), message.fast_disk.clone()));
+    }
+    if !message.standard_disk.is_empty() {
+        candidates.push(("standard".to_string(), message.standard_disk.clone()));
+    }
+    for (index, disk) in message.extra_disks.iter().enumerate() {
+        candidates.push((format!("extra_{index}"), disk.clone()));
+    }
+
+    let mut bindings = Vec::with_capacity(candidates.len());
+    for (role, path) in candidates {
+        let binding = bind_block_device(&path)
+            .map_err(|error| format!("unable to bind install {role} disk {path}: {error}"))?;
+        bindings.push((role, path, binding));
+    }
+    Ok(bindings)
+}
 
 fn build_install_transaction_payload(
     message: &ClientMessage,
@@ -3829,10 +3856,12 @@ fn build_install_transaction_payload(
     target_machine_digest: &str,
     user_password_commitment: Option<&str>,
     luks_passphrase_commitment: Option<&str>,
+    disk_bindings: &[serde_json::Value],
 ) -> Result<Vec<u8>, String> {
     let payload = serde_json::json!({
         "fingerprint_version": REQUEST_FINGERPRINT_VERSION,
         "disk": disk,
+        "disk_bindings": disk_bindings,
         "layout": &message.layout,
         "fast_disk": &message.fast_disk,
         "standard_disk": &message.standard_disk,
@@ -6849,6 +6878,16 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     continue;
                 }
 
+                let disk_bindings = match bind_install_disk_identities(&client_msg, &disk) {
+                    Ok(bindings) => bindings,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(RelayMessage::error(&error).to_json()))
+                            .await;
+                        continue;
+                    }
+                };
+
                 // Authoritative target architecture check. Browser-generated flakes
                 // currently default to x86_64-linux; never silently realize one on a
                 // different machine architecture.
@@ -6981,6 +7020,19 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         &client_msg.luks_passphrase,
                     )
                 });
+                let disk_binding_values: Vec<serde_json::Value> = disk_bindings
+                    .iter()
+                    .map(|(role, path, binding)| {
+                        serde_json::json!({
+                            "role": role,
+                            "path": path,
+                            "major": binding.major,
+                            "minor": binding.minor,
+                            "size_bytes": binding.size_bytes,
+                        })
+                    })
+                    .collect();
+
                 let install_payload_bytes = match build_install_transaction_payload(
                     &client_msg,
                     &disk,
@@ -6989,6 +7041,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                     &target_machine_digest,
                     user_password_commitment.as_deref(),
                     luks_passphrase_commitment.as_deref(),
+                    &disk_binding_values,
                 ) {
                     Ok(bytes) => bytes,
                     Err(error) => {
@@ -7411,6 +7464,27 @@ echo "  User password set."
                     peer_addr,
                     transaction.transaction_id
                 );
+
+                let mut disk_binding_error = None;
+                for (role, path, binding) in &disk_bindings {
+                    if let Err(error) = verify_block_device_binding(path, *binding) {
+                        disk_binding_error = Some(format!(
+                            "Install {role} disk binding changed before destructive execution: {error}"
+                        ));
+                        break;
+                    }
+                }
+                if let Some(error) = disk_binding_error {
+                    for secret_path in &staged_secret_paths {
+                        let _ = cleanup_sensitive_file(secret_path);
+                    }
+                    let _ = tokio::fs::remove_file(&script_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(RelayMessage::error(&error).to_json()))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
 
                 if let Err(error) = spawn_privileged_background_script_file(
                     staged_script.file,
