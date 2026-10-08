@@ -1,0 +1,238 @@
+{
+  "schema_version": "mutual-credit-fixtures-v0",
+  "member_limit": {
+    "debit_limit": 100,
+    "credit_limit": 100
+  },
+  "initial_members": [
+    "alice",
+    "bob",
+    "carol"
+  ],
+  "valid": [
+    {
+      "id": "MC-001",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 40
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": -40,
+          "bob": 40,
+          "carol": 0
+        },
+        "total": 0
+      }
+    },
+    {
+      "id": "MC-002",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 40
+        },
+        {
+          "op": "trade",
+          "buyer": "bob",
+          "seller": "carol",
+          "amount": 40
+        },
+        {
+          "op": "trade",
+          "buyer": "carol",
+          "seller": "alice",
+          "amount": 40
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": 0,
+          "bob": 0,
+          "carol": 0
+        },
+        "total": 0
+      }
+    },
+    {
+      "id": "MC-003",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 40
+        },
+        {
+          "op": "settle_external",
+          "member": "bob",
+          "amount": 15
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": -40,
+          "bob": 25,
+          "carol": 0
+        },
+        "total": -15
+      }
+    },
+    {
+      "id": "MC-004",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 40
+        },
+        {
+          "op": "trade",
+          "buyer": "bob",
+          "seller": "carol",
+          "amount": 40
+        },
+        {
+          "op": "trade",
+          "buyer": "carol",
+          "seller": "alice",
+          "amount": 20
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": -20,
+          "bob": 0,
+          "carol": 20
+        },
+        "total": 0
+      }
+    },
+    {
+      "id": "MC-005",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 100
+        },
+        {
+          "op": "trade",
+          "buyer": "bob",
+          "seller": "alice",
+          "amount": 100
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": 0,
+          "bob": 0,
+          "carol": 0
+        },
+        "total": 0
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "id": "MC-X01",
+      "event": {
+        "op": "trade",
+        "buyer": "unknown",
+        "seller": "bob",
+        "amount": 1
+      },
+      "error": "UnknownMember"
+    },
+    {
+      "id": "MC-X02",
+      "event": {
+        "op": "trade",
+        "buyer": "alice",
+        "seller": "alice",
+        "amount": 1
+      },
+      "error": "SelfTrade"
+    },
+    {
+      "id": "MC-X03",
+      "event": {
+        "op": "trade",
+        "buyer": "alice",
+        "seller": "bob",
+        "amount": 0
+      },
+      "error": "NonPositiveAmount"
+    },
+    {
+      "id": "MC-X04",
+      "event": {
+        "op": "trade",
+        "buyer": "alice",
+        "seller": "bob",
+        "amount": 101
+      },
+      "error": "CreditLimitExceeded"
+    },
+    {
+      "id": "MC-X05",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 40
+        },
+        {
+          "op": "settle_external",
+          "member": "alice",
+          "amount": 15
+        }
+      ],
+      "error": "InsufficientPositiveBalance"
+    },
+    {
+      "id": "MC-X06",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 40
+        },
+        {
+          "op": "settle_external",
+          "member": "bob",
+          "amount": 50
+        }
+      ],
+      "error": "InsufficientPositiveBalance"
+    },
+    {
+      "id": "MC-X07",
+      "events": [
+        {
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 100
+        },
+        {
+          "op": "trade",
+          "buyer": "bob",
+          "seller": "carol",
+          "amount": 101
+        }
+      ],
+      "error": "CreditLimitExceeded"
+    }
+  ]
+}
