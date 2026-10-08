@@ -69,6 +69,7 @@ jobs:
               "ProviderAttestationV1",
               "ProviderEvidenceEnvelopeV1",
               "ProviderWebhookReceiptV1",
+              "ProviderWebhookRequestContextV1",
               "ProviderPullRequestMergeObservationV1",
               "PromotionStackEffectSetV1",
               "PromotionStackEffectEvidenceV1",
@@ -156,6 +157,8 @@ jobs:
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
               "record_unknown": 1,       # self omitted; operation identity
               "reconcile_complete": 2,   # self omitted; operation + receipt
+              "verify": 6,               # payload + secret + context + three expectations
+              "from_authenticated_delivery": 7,  # receipt + payload + secret + context + three expectations
           }
           for node in ast.walk(tree):
               if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
