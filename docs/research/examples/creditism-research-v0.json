@@ -1,0 +1,83 @@
+{
+  "profile_id": "creditism-research-v0",
+  "status": "research",
+  "semantics_source": [
+    "https://common-planet.org/creditism",
+    "https://common-planet.org/creditism/architecture",
+    "https://common-planet.org/creditism/transition"
+  ],
+  "mechanisms": {
+    "personal_credit": {
+      "existence_issuance": true,
+      "contribution_issuance": true,
+      "bonus_issuance": true,
+      "marketplace_deletion": true,
+      "exchange_deletion": true,
+      "exchange_seller_recognition": true,
+      "transferable": false,
+      "collateralizable": false,
+      "interest_bearing": false,
+      "investable_for_autonomous_return": false,
+      "inheritable_as_concentrated_power": false
+    },
+    "community_credit": {
+      "population_allocation": true,
+      "personal_directed_share": true,
+      "group_account_spending": true,
+      "local_regional_global_scope": true,
+      "purpose_governance": true
+    },
+    "contribution_recognition": {
+      "base_pay_scale": "public_revisable",
+      "shortage_multiplier": true,
+      "modes": [
+        "time",
+        "fixed_activity",
+        "milestone"
+      ]
+    },
+    "commons": {
+      "productive_asset_stewardship": true,
+      "housing_stewardship": true,
+      "private_personal_property_retained": true
+    },
+    "exchange": {
+      "resale_premium_to_seller": false,
+      "buyer_credit_deletes_in_full": true
+    }
+  },
+  "policy_dimensions": {
+    "purpose_selection": "democratic_polycentric",
+    "pay_rate_selection": "public_revisable",
+    "product_selection": "community_purpose_plus_quality_competition",
+    "housing": "stewardship_with_scarce_access_tier"
+  },
+  "governance": {
+    "voice": "affectedness_sensitive",
+    "scale": [
+      "local",
+      "regional",
+      "global"
+    ],
+    "verification_authority": "explicit_profile_required",
+    "appeal_authority": "explicit_profile_required"
+  },
+  "information_channels": [
+    "demand_signal",
+    "observed_price",
+    "scarcity_signal",
+    "contribution_signal",
+    "capacity_signal",
+    "resource_constraint_signal"
+  ],
+  "accounting": {
+    "native_credit_semantics": true,
+    "forced_conventional_financial_asset_equivalence": false,
+    "unknown_mapping_allowed": true
+  },
+  "scientific_boundary": {
+    "claims_are_conditional_simulations": true,
+    "political_recommendation_authority": false,
+    "universal_optimality_claim": false
+  }
+}
