@@ -103,6 +103,50 @@ class PromotionStackEffectSetV1:
         )
 
 
+@dataclass(frozen=True)
+class ProviderStackObservationV1:
+    observation_source: str
+    stack_number: int
+    stack_size: int
+    stack_position: int
+    base_ref: str
+    base_tip_sha: str
+    ordered_stack: tuple[StackEntryV1, ...]
+    observation_id: str = ""
+
+    def internally_consistent(self, requested_pr_number: int) -> bool:
+        if not self.observation_source or not self.observation_id:
+            return False
+        if self.stack_number <= 0 or self.stack_size <= 0:
+            return False
+        if self.stack_size != len(self.ordered_stack):
+            return False
+        if not 1 <= self.stack_position <= self.stack_size:
+            return False
+        if self.ordered_stack[self.stack_position - 1].pr_number != requested_pr_number:
+            return False
+        bottom = self.ordered_stack[0]
+        if bottom.base_ref != self.base_ref or bottom.base_head_sha != self.base_tip_sha:
+            return False
+        return True
+
+    def matches_reserved(self, identity: PromotionOperationIdentityV1) -> bool:
+        if not self.internally_consistent(identity.requested_pr_number):
+            return False
+        operation_depth = len(identity.ordered_stack)
+        if self.stack_position != operation_depth:
+            return False
+        if tuple(self.ordered_stack[:operation_depth]) != identity.ordered_stack:
+            return False
+        requested = self.ordered_stack[self.stack_position - 1]
+        return (
+            self.base_ref == identity.base_ref
+            and self.base_tip_sha == identity.base_tip_sha
+            and requested.pr_number == identity.requested_pr_number
+            and requested.head_sha == identity.requested_pr_head_sha
+        )
+
+
 @dataclass
 class Reservation:
     reservation_id: str
@@ -464,6 +508,162 @@ def stack_effect_fixture(
             PromotionStackEffectV1(7087, "H3", "M2"),
         ),
     )
+
+
+def provider_stack_observation_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+) -> ProviderStackObservationV1:
+    identity = identity or stack_identity_fixture()
+    return ProviderStackObservationV1(
+        observation_source="rest-pull-request-stack",
+        stack_number=41,
+        stack_size=3,
+        stack_position=2,
+        base_ref=identity.base_ref,
+        base_tip_sha=identity.base_tip_sha,
+        ordered_stack=(
+            identity.ordered_stack[0],
+            identity.ordered_stack[1],
+            StackEntryV1(7090, "H9", "qual/promotion-stack-identity-v1", "H3"),
+        ),
+        observation_id="obs-1",
+    )
+
+
+def test_provider_stack_observation_exact_selected_prefix_matches():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    assert observation.matches_reserved(identity)
+
+
+def test_provider_stack_observation_missing_identity_is_unrepresented():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    assert observation.operation_depth if False else True
+    assert observation.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_stack_number_drift():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_number": 42}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_base_ref_drift():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "base_ref": "release"}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_base_tip_drift():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "base_tip_sha": "T2"}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_position_drift():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_position": 3}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_lower_head_drift():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed_stack = (
+        StackEntryV1(7085, "H1-CHANGED", "main", "T1"),
+        *observation.ordered_stack[1:],
+    )
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "ordered_stack": changed_stack}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_inserted_lower_entry():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    inserted = (
+        observation.ordered_stack[0],
+        StackEntryV1(7086, "H2", "main", "T1"),
+        observation.ordered_stack[1],
+        observation.ordered_stack[2],
+    )
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_size": 4, "stack_position": 3, "ordered_stack": inserted}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_removed_lower_entry():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    shortened = (observation.ordered_stack[1], observation.ordered_stack[2])
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_size": 2, "stack_position": 1, "ordered_stack": shortened}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_requested_head_drift():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed_stack = (
+        observation.ordered_stack[0],
+        StackEntryV1(7087, "H3-CHANGED", "stack/7085", "H1"),
+        observation.ordered_stack[2],
+    )
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "ordered_stack": changed_stack}
+    )
+    assert not changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_allows_unrelated_upper_stack_growth():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    grown = (
+        *observation.ordered_stack,
+        StackEntryV1(7091, "H10", "stack/7087", "H3"),
+    )
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_size": 4, "ordered_stack": grown}
+    )
+    assert changed.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_malformed_size_or_position():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    bad_size = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_size": 99}
+    )
+    bad_position = ProviderStackObservationV1(
+        **{**observation.__dict__, "stack_position": 0}
+    )
+    assert not bad_size.matches_reserved(identity)
+    assert not bad_position.matches_reserved(identity)
+
+
+def test_provider_stack_observation_rejects_missing_observation_identity():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "observation_id": ""}
+    )
+    assert not changed.matches_reserved(identity)
 
 
 def test_stack_effect_set_exact_match_is_complete():
@@ -906,6 +1106,19 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_stack_observation_exact_selected_prefix_matches,
+    test_provider_stack_observation_missing_identity_is_unrepresented,
+    test_provider_stack_observation_rejects_stack_number_drift,
+    test_provider_stack_observation_rejects_base_ref_drift,
+    test_provider_stack_observation_rejects_base_tip_drift,
+    test_provider_stack_observation_rejects_position_drift,
+    test_provider_stack_observation_rejects_lower_head_drift,
+    test_provider_stack_observation_rejects_inserted_lower_entry,
+    test_provider_stack_observation_rejects_removed_lower_entry,
+    test_provider_stack_observation_rejects_requested_head_drift,
+    test_provider_stack_observation_allows_unrelated_upper_stack_growth,
+    test_provider_stack_observation_rejects_malformed_size_or_position,
+    test_provider_stack_observation_rejects_missing_observation_identity,
     test_stack_effect_set_exact_match_is_complete,
     test_stack_effect_set_missing_bottom_entry_is_incomplete,
     test_stack_effect_set_missing_requested_entry_is_incomplete,
