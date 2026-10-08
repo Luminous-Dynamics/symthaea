@@ -34,11 +34,15 @@
       "exogenous_random_namespace":{"const":"world:{shock}:{seed}:obligation:{index}"},
       "resource_digest_set":{"type":"array","const":["4ee5629e5bba88e39a76f4d0bf09d6f9f8cf2175cf9c705a134a85ae08b4e612","8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7","dc31ad937f954b025b99c084f566bb747cdfe27f3b2ffa4827290e0fc1f254e1"]},
       "topology_digest_set":{"type":"object","additionalProperties":false,"required":["full_mesh","routing_only_hub","redundant_two_hub"],"properties":{
-        "full_mesh":{"type":"string","pattern":"^[a-f0-9]{64}$"},"routing_only_hub":{"type":"string","pattern":"^[a-f0-9]{64}$"},"redundant_two_hub":{"type":"string","pattern":"^[a-f0-9]{64}$"}
-      }},
+        "full_mesh":{"type":"string","pattern":"^[a-f0-9]{64}$"},"routing_only_hub":{"type":"string","pattern":"^[a-f0-9]{64}$"},"redundant_two_hub":{"type":"string","pattern":"^[a-f0-9]{64}$"}}
+      },
       "routing_policy_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-      "profile_digests":{"type":"object","additionalProperties":false,"minProperties":5},
-      "edge_digests":{"type":"object","additionalProperties":false,"minProperties":3},
+      "profile_digests":{"type":"object","additionalProperties":false,"required":["conventional-bank-money-v1","sovereign-money-v1","mutual-credit-v1","tokenized-deposit-v1","reserve-backed-stablecoin-v1"],"properties":{
+        "conventional-bank-money-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"sovereign-money-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"mutual-credit-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"tokenized-deposit-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"reserve-backed-stablecoin-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+      }},
+      "edge_digests":{"type":"object","additionalProperties":false,"required":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],"properties":{
+        "bank_mutual":{"type":"string","pattern":"^[a-f0-9]{64}$"},"bank_stablecoin":{"type":"string","pattern":"^[a-f0-9]{64}$"},"tokenized_deposit_stablecoin":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+      }},
       "policy_invariant":{"const":"allocation policy changes admission order only; it does not alter amount, criticality, resource capacity, monetary mechanism, topology, settlement finality, or exogenous random draws"},
       "no_policy_mutation_of_capacity":{"const":true}
     }},
