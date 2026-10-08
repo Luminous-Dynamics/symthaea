@@ -1820,80 +1820,82 @@ impl EvidenceRecord {
                     }
                 }
 
-                    if let Some(topology) = &observation.calibration_topology {
-                        if topology.measurement_model_id != uncertainty.measurement_model_id
-                            || topology.measurement_model_revision
-                                != uncertainty.measurement_model_revision
-                            || topology.measurement_model_digest != uncertainty.measurement_model_digest
-                        {
+                if let Some(observation) = &self.observation {
+                if let Some(topology) = &observation.calibration_topology {
+                    if topology.measurement_model_id != uncertainty.measurement_model_id
+                        || topology.measurement_model_revision
+                            != uncertainty.measurement_model_revision
+                        || topology.measurement_model_digest != uncertainty.measurement_model_digest
+                    {
+                        return Err(
+                            AssessmentError::CalibrationTraceabilityMeasurementModelMismatch {
+                                expected_model_id: uncertainty.measurement_model_id.clone(),
+                                expected_model_revision: uncertainty.measurement_model_revision.clone(),
+                                expected_model_digest: uncertainty.measurement_model_digest.clone(),
+                                actual_model_id: topology.measurement_model_id.clone(),
+                                actual_model_revision: topology.measurement_model_revision.clone(),
+                                actual_model_digest: topology.measurement_model_digest.clone(),
+                            },
+                        );
+                    }
+                }
+                match (
+                    &observation.calibration_topology,
+                    &uncertainty.evaluation.calibration_topology_digest,
+                ) {
+                    (Some(topology), Some(actual_digest)) => {
+                        let expected_digest = topology.canonical_digest()?;
+                        if actual_digest != &expected_digest {
                             return Err(
-                                AssessmentError::CalibrationTraceabilityMeasurementModelMismatch {
-                                    expected_model_id: uncertainty.measurement_model_id.clone(),
-                                    expected_model_revision: uncertainty.measurement_model_revision.clone(),
-                                    expected_model_digest: uncertainty.measurement_model_digest.clone(),
-                                    actual_model_id: topology.measurement_model_id.clone(),
-                                    actual_model_revision: topology.measurement_model_revision.clone(),
-                                    actual_model_digest: topology.measurement_model_digest.clone(),
+                                AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+                                    uncertainty_id: uncertainty.uncertainty_id.clone(),
+                                    expected_topology_digest: expected_digest,
+                                    actual_topology_digest: actual_digest.clone(),
                                 },
                             );
                         }
                     }
-                    match (
-                        &observation.calibration_topology,
-                        &uncertainty.evaluation.calibration_topology_digest,
-                    ) {
-                        (Some(topology), Some(actual_digest)) => {
-                            let expected_digest = topology.canonical_digest()?;
-                            if actual_digest != &expected_digest {
-                                return Err(
-                                    AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
-                                        uncertainty_id: uncertainty.uncertainty_id.clone(),
-                                        expected_topology_digest: expected_digest,
-                                        actual_topology_digest: actual_digest.clone(),
-                                    },
-                                );
-                            }
-                        }
-                        (Some(_), None) => {
-                            return Err(
-                                AssessmentError::MissingMeasurementUncertaintyCalibrationTopologyBinding(
-                                    uncertainty.uncertainty_id.clone(),
-                                ),
-                            );
-                        }
-                        (None, Some(_)) => {
-                            return Err(
-                                AssessmentError::UnboundMeasurementUncertaintyCalibrationTopology(
-                                    uncertainty.uncertainty_id.clone(),
-                                ),
-                            );
-                        }
-                        (None, None) => {}
-                    }
-                    let expected_calibration_chain_digest =
-                        canonical_calibration_chain_hash(&observation.calibration_chain_refs)?;
-                    let expected_calibration_chain_count =
-                        observation.calibration_chain_refs.len();
-                    if uncertainty.evaluation.calibration_chain_digest
-                        != expected_calibration_chain_digest
-                        || uncertainty.evaluation.calibration_chain_count
-                            != expected_calibration_chain_count
-                    {
+                    (Some(_), None) => {
                         return Err(
-                            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch {
-                                uncertainty_id: uncertainty.uncertainty_id.clone(),
-                                expected_calibration_chain_digest,
-                                actual_calibration_chain_digest: uncertainty
-                                    .evaluation
-                                    .calibration_chain_digest
-                                    .clone(),
-                                expected_calibration_chain_count,
-                                actual_calibration_chain_count: uncertainty
-                                    .evaluation
-                                    .calibration_chain_count,
-                            },
+                            AssessmentError::MissingMeasurementUncertaintyCalibrationTopologyBinding(
+                                uncertainty.uncertainty_id.clone(),
+                            ),
                         );
                     }
+                    (None, Some(_)) => {
+                        return Err(
+                            AssessmentError::UnboundMeasurementUncertaintyCalibrationTopology(
+                                uncertainty.uncertainty_id.clone(),
+                            ),
+                        );
+                    }
+                    (None, None) => {}
+                }
+                let expected_calibration_chain_digest =
+                    canonical_calibration_chain_hash(&observation.calibration_chain_refs)?;
+                let expected_calibration_chain_count =
+                    observation.calibration_chain_refs.len();
+                if uncertainty.evaluation.calibration_chain_digest
+                    != expected_calibration_chain_digest
+                    || uncertainty.evaluation.calibration_chain_count
+                        != expected_calibration_chain_count
+                {
+                    return Err(
+                        AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+                            uncertainty_id: uncertainty.uncertainty_id.clone(),
+                            expected_calibration_chain_digest,
+                            actual_calibration_chain_digest: uncertainty
+                                .evaluation
+                                .calibration_chain_digest
+                                .clone(),
+                            expected_calibration_chain_count,
+                            actual_calibration_chain_count: uncertainty
+                                .evaluation
+                                .calibration_chain_count,
+                        },
+                    );
+                }
+            }
                 }
             }
             (None, true) => return Err(AssessmentError::MissingMeasurementUncertainty(self.kind)),
