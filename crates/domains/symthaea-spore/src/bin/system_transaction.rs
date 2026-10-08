@@ -879,6 +879,19 @@ impl TransactionLedger {
             ));
         };
 
+        // Serialize the journal's size-check + append + fsync critical section
+        // independently of the outer mutation fence. This keeps the ledger
+        // internally safe if a future append caller is introduced outside the
+        // relay mutation handlers.
+        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+        if lock_result != 0 {
+            return Err(format!(
+                "unable to lock transaction ledger {} for append: {}",
+                self.path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+
         let metadata = file.metadata().map_err(|error| {
             format!(
                 "unable to inspect transaction ledger {}: {error}",
