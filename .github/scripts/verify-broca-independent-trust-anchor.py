@@ -727,6 +727,7 @@ def main() -> int:
             "run_attempt": TRIGGER_RUN_ATTEMPT,
             "run_name": TRIGGER_RUN_NAME,
             "event": TRIGGER_RUN_EVENT,
+            "workflow_id": trigger_run.get("workflow_id"),
             "head_branch": TRIGGER_RUN_HEAD_BRANCH,
             "head_sha": TRIGGER_RUN_HEAD_SHA,
             "conclusion": TRIGGER_RUN_CONCLUSION,
@@ -738,6 +739,7 @@ def main() -> int:
         if TRUST_ANCHOR_MODE == "workflow_dispatch":
             manual_run_id = int(env_required("MANUAL_WORKFLOW_RUN_ID"))
             manual_run = api_request("GET", f"/actions/runs/{manual_run_id}")
+            trigger_run = manual_run
             TRIGGER_RUN_ID = manual_run_id
             TRIGGER_RUN_NAME = str(manual_run.get("name", ""))
             TRIGGER_RUN_EVENT = str(manual_run.get("event", ""))
@@ -755,6 +757,7 @@ def main() -> int:
                 TRIGGER_RUN_REPOSITORY_ID != REPOSITORY_ID
                 or TRIGGER_RUN_EVENT != "pull_request"
                 or TRIGGER_RUN_NAME not in REQUIRED_WORKFLOWS
+                or manual_run.get("workflow_id") != EXPECTED_WORKFLOW_IDS.get(TRIGGER_RUN_NAME)
                 or not TRIGGER_RUN_HEAD_SHA
                 or not TRIGGER_RUN_HEAD_BRANCH
                 or not TRIGGER_RUN_ATTEMPT
