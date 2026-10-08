@@ -5724,7 +5724,7 @@ impl AlternativesEngine {
         });
 
         ranked.first().and_then(|(dimension, unresolved_count)| {
-            let mut candidate_ids = frontier_assessments
+            let mut unresolved_candidate_ids = frontier_assessments
                 .iter()
                 .filter(|candidate| {
                     candidate.observed_evidence_count[dimension] == 0
@@ -5747,7 +5747,36 @@ impl AlternativesEngine {
                 })
                 .map(|candidate| candidate.candidate_id.clone())
                 .collect::<Vec<_>>();
+            unresolved_candidate_ids.sort();
+
+            // A measurement must compare every unresolved frontier candidate
+            // against any frontier comparator whose interval overlaps it.
+            // Comparators do not become "unresolved" merely because they are
+            // included in the discrimination set.
+            let mut candidate_ids = unresolved_candidate_ids.clone();
+            for comparator in &frontier_assessments {
+                if unresolved_candidate_ids.contains(&comparator.candidate_id) {
+                    continue;
+                }
+                let Some(comparator_burden) = comparator.burdens.get(dimension) else {
+                    continue;
+                };
+                let overlaps_unresolved = unresolved_candidate_ids.iter().any(|unresolved_id| {
+                    frontier_assessments
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == *unresolved_id)
+                        .and_then(|candidate| candidate.burdens.get(dimension))
+                        .is_some_and(|unresolved_burden| {
+                            !(unresolved_burden.interval.upper < comparator_burden.interval.lower
+                                || comparator_burden.interval.upper < unresolved_burden.interval.lower)
+                        })
+                });
+                if overlaps_unresolved {
+                    candidate_ids.push(comparator.candidate_id.clone());
+                }
+            }
             candidate_ids.sort();
+            candidate_ids.dedup();
 
             let mut expected_discrimination = Vec::new();
             for left in 0..candidate_ids.len() {
@@ -5759,6 +5788,11 @@ impl AlternativesEngine {
                         .iter()
                         .find(|candidate| candidate.candidate_id == candidate_ids[right]);
                     if let (Some(a), Some(b)) = (a, b) {
+                        if !(unresolved_candidate_ids.contains(&a.candidate_id)
+                            || unresolved_candidate_ids.contains(&b.candidate_id))
+                        {
+                            continue;
+                        }
                         if let (Some(a_burden), Some(b_burden)) =
                             (a.burdens.get(dimension), b.burdens.get(dimension))
                         {
@@ -5776,7 +5810,7 @@ impl AlternativesEngine {
                 }
             }
 
-            let unresolved_uncertainty_refs = candidate_ids
+            let unresolved_uncertainty_refs = unresolved_candidate_ids
                 .iter()
                 .filter_map(|candidate_id| {
                     candidates
@@ -5817,7 +5851,7 @@ impl AlternativesEngine {
                 unresolved_uncertainty_refs,
                 candidate_ids,
                 expected_discrimination,
-                rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets are interval-overlap candidates; no cross-dimension unit scalarization".to_string(),
+                rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets include unresolved frontier candidates plus overlapping frontier comparators; exact uncertainty identities are emitted only from unresolved linked evidence; no cross-dimension unit scalarization".to_string(),
             })
         })
     }
@@ -8440,6 +8474,88 @@ mod tests {
                 "uncertainty:contradict".into()
             ]
         );
+    }
+
+    #[test]
+    fn heuristic_measurement_includes_overlapping_frontier_comparator() {
+        let mut unresolved = candidate(
+            "unresolved",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "derived-unresolved",
+                "source-derived",
+                EvidenceKind::Derived,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let comparator = candidate(
+            "comparator",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "observed-comparator",
+                "source-observed",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+
+        for estimate in unresolved.burdens.values_mut() {
+            estimate.evidence_ids = vec!["derived-unresolved".into()];
+        }
+        for estimate in comparator.burdens.values_mut() {
+            estimate.evidence_ids = vec!["observed-comparator".into()];
+        }
+
+        let unresolved_water = unresolved.burdens.get(&Dimension::Water).unwrap().clone();
+        unresolved.burdens.insert(
+            Dimension::Water,
+            BurdenEstimate {
+                interval: Interval::new(2.0, 4.0).unwrap(),
+                unit: unresolved_water.unit,
+                scope: unresolved_water.scope,
+                basis: unresolved_water.basis,
+                evidence_ids: unresolved_water.evidence_ids,
+            },
+        );
+        let comparator_water = comparator.burdens.get(&Dimension::Water).unwrap().clone();
+        let mut comparator = comparator;
+        comparator.burdens.insert(
+            Dimension::Water,
+            BurdenEstimate {
+                interval: Interval::new(3.0, 5.0).unwrap(),
+                unit: comparator_water.unit,
+                scope: comparator_water.scope,
+                basis: comparator_water.basis,
+                evidence_ids: comparator_water.evidence_ids,
+            },
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[unresolved, comparator], None)
+            .unwrap();
+        let next = result.next_measurement.as_ref().unwrap();
+
+        assert_eq!(next.dimension, Dimension::Water);
+        assert_eq!(next.unresolved_candidate_count, 1);
+        assert_eq!(
+            next.candidate_ids,
+            vec!["comparator".to_string(), "unresolved".to_string()]
+        );
+        assert_eq!(
+            next.expected_discrimination,
+            vec![MeasurementDiscriminationTarget {
+                left_candidate_id: "comparator".into(),
+                right_candidate_id: "unresolved".into(),
+                dimension: Dimension::Water,
+            }]
+        );
+        assert!(next.unresolved_uncertainty_refs.is_empty());
     }
 
     #[test]
