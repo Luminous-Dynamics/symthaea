@@ -74,6 +74,7 @@ jobs:
               "PromotionStackEffectSetV1",
               "PromotionStackEffectEvidenceV1",
               "PromotionStackEffectEvidenceSetV1",
+              "PromotionPrEffectStateV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
           }
@@ -136,6 +137,12 @@ jobs:
               "PromotionStackEffectEvidenceSetV1",
               "to_provenance_effect",
               "to_compact_effect_set",
+              "PromotionPrEffectStateV1",
+              "EffectObserved",
+              "Conflict",
+              "compatible-repeat",
+              "duplicate-delivery",
+              "no-eligible-effect",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"

@@ -519,6 +519,159 @@ class ProviderPullRequestMergeObservationV1:
 
 
 @dataclass(frozen=True)
+class ProviderDeliveryIdentityV1:
+    delivery_id: str
+    payload_bytes_digest: str
+    hook_id: str
+    event_type: str
+    repository: str
+
+    @classmethod
+    def from_observation(
+        cls,
+        observation: ProviderPullRequestMergeObservationV1,
+    ) -> "ProviderDeliveryIdentityV1":
+        return cls(
+            delivery_id=observation.delivery_id,
+            payload_bytes_digest=observation.payload_bytes_digest,
+            hook_id=observation.hook_id,
+            event_type=observation.event_type,
+            repository=observation.repository,
+        )
+
+    def matches(self, other: "ProviderDeliveryIdentityV1") -> bool:
+        return self == other
+
+
+@dataclass(frozen=True)
+class PromotionPrEffectStateV1:
+    repository: str
+    expected_entry: StackEntryV1
+    operation_identity_digest: str
+    state: str = "Unobserved"
+    effect: PromotionStackEffectV1 | None = None
+    source_delivery_ids: tuple[str, ...] = ()
+    source_delivery_identities: tuple[ProviderDeliveryIdentityV1, ...] = ()
+
+    def validates_operation_identity(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        return (
+            self.operation_identity_digest == identity.digest()
+            and self.repository == identity.repository
+            and self.expected_entry in identity.ordered_stack
+        )
+
+    def ingest(
+        self,
+        observation: ProviderPullRequestMergeObservationV1 | None,
+    ) -> tuple["PromotionPrEffectStateV1", str]:
+        if observation is None:
+            return self, "no-eligible-effect"
+
+        if not observation.has_authenticated_source_provenance():
+            return self, "rejected-untrusted"
+
+        if observation.repository != self.repository:
+            return self, "ignored-unrelated"
+
+        if observation.pr_number != self.expected_entry.pr_number:
+            return self, "ignored-unrelated"
+
+        candidate = observation.to_effect_for_stack_entry(self.expected_entry)
+        if candidate is None:
+            return self, "rejected-non-effect"
+
+        delivery_identity = ProviderDeliveryIdentityV1.from_observation(observation)
+
+        if self.state == "Unobserved":
+            return (
+                PromotionPrEffectStateV1(
+                    repository=self.repository,
+                    expected_entry=self.expected_entry,
+                    operation_identity_digest=self.operation_identity_digest,
+                    state="EffectObserved",
+                    effect=candidate,
+                    source_delivery_ids=(observation.delivery_id,),
+                    source_delivery_identities=(delivery_identity,),
+                ),
+                "admitted",
+            )
+
+        if self.state != "EffectObserved" or self.effect is None:
+            return self, "rejected-invalid-state"
+
+        for prior_identity in self.source_delivery_identities:
+            if prior_identity.delivery_id != delivery_identity.delivery_id:
+                continue
+            if prior_identity.matches(delivery_identity):
+                return self, "duplicate-delivery"
+            return (
+                PromotionPrEffectStateV1(
+                    repository=self.repository,
+                    expected_entry=self.expected_entry,
+                    operation_identity_digest=self.operation_identity_digest,
+                    state="Conflict",
+                    effect=None,
+                    source_delivery_ids=self.source_delivery_ids,
+                    source_delivery_identities=self.source_delivery_identities,
+                ),
+                "delivery-identity-conflict",
+            )
+
+        if candidate != self.effect:
+            return (
+                PromotionPrEffectStateV1(
+                    repository=self.repository,
+                    expected_entry=self.expected_entry,
+                    operation_identity_digest=self.operation_identity_digest,
+                    state="Conflict",
+                    effect=None,
+                    source_delivery_ids=self.source_delivery_ids,
+                    source_delivery_identities=self.source_delivery_identities,
+                ),
+                "conflict",
+            )
+
+        return (
+            PromotionPrEffectStateV1(
+                repository=self.repository,
+                expected_entry=self.expected_entry,
+                operation_identity_digest=self.operation_identity_digest,
+                state=self.state,
+                effect=self.effect,
+                source_delivery_ids=self.source_delivery_ids + (observation.delivery_id,),
+                source_delivery_identities=self.source_delivery_identities + (delivery_identity,),
+            ),
+            "compatible-repeat",
+        )
+
+    def validates_source_delivery_bindings(self) -> bool:
+        identities = self.source_delivery_identities
+        delivery_ids = self.source_delivery_ids
+        return (
+            len(delivery_ids) == len(identities)
+            and delivery_ids == tuple(identity.delivery_id for identity in identities)
+            and len(delivery_ids) == len(set(delivery_ids))
+            and all(
+                bool(identity.delivery_id)
+                and bool(identity.payload_bytes_digest)
+                and bool(identity.hook_id)
+                and bool(identity.event_type)
+                and bool(identity.repository)
+                for identity in identities
+            )
+        )
+
+    def is_terminally_observed(self) -> bool:
+        return (
+            self.state == "EffectObserved"
+            and self.effect is not None
+            and self.validates_source_delivery_bindings()
+        )
+
+@dataclass(frozen=True)
 class PromotionStackEffectEvidenceV1:
     effect: PromotionStackEffectV1
     source_delivery_id: str
@@ -624,13 +777,23 @@ class PromotionStackEffectEvidenceSetV1:
 
 @dataclass(frozen=True)
 class ProviderDeliveryRegistryV1:
-    deliveries: tuple[tuple[str, str], ...] = ()
+    deliveries: tuple[ProviderDeliveryIdentityV1, ...] = ()
+
+    def _identity(self, receipt: ProviderWebhookReceiptV1) -> ProviderDeliveryIdentityV1:
+        return ProviderDeliveryIdentityV1(
+            delivery_id=receipt.delivery_id,
+            payload_bytes_digest=receipt.payload_bytes_digest,
+            hook_id=receipt.hook_id,
+            event_type=receipt.event_type,
+            repository=receipt.repository,
+        )
 
     def observe(self, receipt: ProviderWebhookReceiptV1) -> str:
-        for delivery_id, payload_digest in self.deliveries:
-            if delivery_id != receipt.delivery_id:
+        identity = self._identity(receipt)
+        for prior in self.deliveries:
+            if prior.delivery_id != identity.delivery_id:
                 continue
-            if payload_digest == receipt.payload_bytes_digest:
+            if prior.matches(identity):
                 return "duplicate-identical"
             return "delivery-id-conflict"
         return "new-delivery"
@@ -639,7 +802,7 @@ class ProviderDeliveryRegistryV1:
         classification = self.observe(receipt)
         if classification == "new-delivery":
             return ProviderDeliveryRegistryV1(
-                self.deliveries + ((receipt.delivery_id, receipt.payload_bytes_digest),)
+                self.deliveries + (self._identity(receipt),)
             )
         return self
 
@@ -972,12 +1135,12 @@ def webhook_merge_payload(
     merged: bool = True,
     action: str = "closed",
     merge_commit: str | None = None,
+    extra_field: str | None = None,
 ) -> bytes:
-    return json.dumps(
-        {
-            "action": action,
-            "number": pr_number,
-            "pull_request": {
+    document = {
+        "action": action,
+        "number": pr_number,
+        "pull_request": {
                 "number": pr_number,
                 "merged": merged,
                 "head": {"sha": head_sha},
@@ -987,8 +1150,12 @@ def webhook_merge_payload(
                     else ("M2" if merged else None)
                 ),
             },
-            "repository": {"full_name": repository},
-        },
+        "repository": {"full_name": repository},
+    }
+    if extra_field is not None:
+        document["qualification_extra"] = extra_field
+    return json.dumps(
+        document,
         separators=(",", ":"),
     ).encode("utf-8")
 
@@ -1018,6 +1185,7 @@ def stack_webhook_observation(
     merge_commit: str = "M2",
     delivery_id: str = "delivery-merge",
     repository: str = "Luminous-Dynamics/symthaea",
+    payload_extra: str | None = None,
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
     payload = webhook_merge_payload(
@@ -1027,6 +1195,7 @@ def stack_webhook_observation(
         merged=True,
         action="closed",
         merge_commit=merge_commit,
+        extra_field=payload_extra,
     )
     receipt = webhook_merge_receipt(
         payload,
@@ -1044,6 +1213,268 @@ def stack_webhook_observation(
     )
     assert observation is not None
     return observation
+
+
+def effect_state_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+) -> PromotionPrEffectStateV1:
+    identity = identity or stack_identity_fixture()
+    entry = identity.ordered_stack[-1]
+    return PromotionPrEffectStateV1(
+        repository=identity.repository,
+        expected_entry=entry,
+        operation_identity_digest=identity.digest(),
+    )
+
+
+def test_effect_state_binds_to_exact_operation_identity():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    assert state.validates_operation_identity(identity)
+
+    changed_identity = PromotionOperationIdentityV1(
+        repository=identity.repository,
+        provider_stack_number=identity.provider_stack_number,
+        requested_pr_number=identity.requested_pr_number,
+        requested_pr_head_sha=identity.requested_pr_head_sha,
+        base_ref=identity.base_ref,
+        base_tip_sha="BASE-OTHER",
+        ordered_stack=identity.ordered_stack,
+        merge_method=identity.merge_method,
+        merge_action=identity.merge_action,
+        trust_root_generation=identity.trust_root_generation,
+        governance_generation=identity.governance_generation,
+    )
+    assert not state.validates_operation_identity(changed_identity)
+
+
+def test_effect_state_admits_first_authenticated_merge():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    observation = stack_webhook_observation(identity)
+    state, decision = state.ingest(observation)
+    assert decision == "admitted"
+    assert state.is_terminally_observed()
+    assert state.effect is not None
+    assert state.effect.observed_merge_commit == "M2"
+
+
+def test_effect_state_merged_then_non_effect_does_not_downgrade():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    merged = stack_webhook_observation(identity)
+    state, decision = state.ingest(merged)
+    assert decision == "admitted"
+    state, decision = state.ingest(None)
+    assert decision == "no-eligible-effect"
+    assert state.is_terminally_observed()
+    assert state.effect == merged.to_stack_effect(identity)
+
+
+def test_effect_state_equivalent_second_delivery_is_idempotent():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-first",
+    )
+    second = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-second",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(second)
+    assert decision == "compatible-repeat"
+    assert state.is_terminally_observed()
+    assert state.source_delivery_ids == ("delivery-first", "delivery-second")
+
+
+def test_effect_state_repeated_same_delivery_is_idempotent():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    observation = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-repeat",
+    )
+    state, _ = state.ingest(observation)
+    state_after, decision = state.ingest(observation)
+    assert decision == "duplicate-delivery"
+    assert state_after == state
+    assert state_after.source_delivery_identities == (
+        ProviderDeliveryIdentityV1.from_observation(observation),
+    )
+
+
+def test_effect_state_same_delivery_id_with_changed_payload_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="first-payload",
+    )
+    conflicting_payload = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="second-payload",
+    )
+    assert first.payload_bytes_digest != conflicting_payload.payload_bytes_digest
+    assert first.to_stack_effect(identity) == conflicting_payload.to_stack_effect(identity)
+
+    state, decision = state.ingest(first)
+    assert decision == "admitted"
+    state_after, decision = state.ingest(conflicting_payload)
+    assert decision == "delivery-identity-conflict"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+
+def test_effect_state_rejects_inconsistent_source_delivery_bindings():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    state = PromotionPrEffectStateV1(
+        repository=identity.repository,
+        expected_entry=identity.ordered_stack[-1],
+        operation_identity_digest=identity.digest(),
+        state="EffectObserved",
+        effect=observation.to_stack_effect(identity),
+        source_delivery_ids=(observation.delivery_id,),
+    )
+    assert not state.validates_source_delivery_bindings()
+    assert not state.is_terminally_observed()
+
+
+def test_effect_state_conflicting_merge_commit_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-conflict-first",
+        merge_commit="M2",
+    )
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-conflict-second",
+        merge_commit="M9",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state.state == "Conflict"
+    assert state.effect is None
+
+
+def test_effect_state_conflicting_head_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-head-first")
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-head-second",
+        head_sha="H0",
+    )
+    state, _ = state.ingest(first)
+    state_after, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state_after.state == "Conflict"
+    assert not state_after.is_terminally_observed()
+
+
+def test_effect_state_conflict_is_absorbing():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-first",
+        merge_commit="M2",
+    )
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-conflict",
+        merge_commit="M9",
+    )
+    compatible = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-absorbing-late",
+        merge_commit="M2",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state.state == "Conflict"
+    state_after, decision = state.ingest(compatible)
+    assert decision == "rejected-invalid-state"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
+
+
+def test_effect_state_conflict_never_reclassifies_as_terminal_observed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-reclass-first")
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-reclass-conflict",
+        head_sha="H0",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert not state.is_terminally_observed()
+    assert state.effect is None
+
+
+def test_effect_state_untrusted_after_merge_does_not_downgrade():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-trust-first")
+    state, _ = state.ingest(first)
+    untrusted = ProviderPullRequestMergeObservationV1(
+        delivery_id="delivery-untrusted",
+        repository=identity.repository,
+        pr_number=identity.requested_pr_number,
+        event_type="pull_request",
+        action="closed",
+        merged=True,
+        head_sha=identity.requested_pr_head_sha,
+        merge_commit_sha="M2",
+        payload_bytes_digest="digest",
+    )
+    state_after, decision = state.ingest(untrusted)
+    assert decision == "rejected-untrusted"
+    assert state_after == state
+
+
+def test_effect_state_unrelated_pr_does_not_downgrade():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity)
+    state, _ = state.ingest(first)
+    unrelated = stack_webhook_observation(
+        identity,
+        pr_number=7090,
+        head_sha="H9",
+        merge_commit="M9",
+        delivery_id="delivery-unrelated",
+    )
+    state_after, decision = state.ingest(unrelated)
+    assert decision == "ignored-unrelated"
+    assert state_after == state
+
+
+def test_effect_state_is_not_latest_delivery_wins():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-terminal",
+    )
+    state, _ = state.ingest(first)
+    later_non_effect = None
+    state_after, decision = state.ingest(later_non_effect)
+    assert decision == "no-eligible-effect"
+    assert state_after.effect == first.to_stack_effect(identity)
+    assert state_after.state == "EffectObserved"
 
 
 def test_webhook_effect_provenance_set_is_complete():
@@ -1766,6 +2197,28 @@ def test_webhook_delivery_registry_rejects_same_id_with_different_payload():
         "pull_request",
         "Luminous-Dynamics/symthaea",
         b'{"action":"different"}',
+        b"secret",
+    )
+    registry = ProviderDeliveryRegistryV1().record(first)
+    assert registry.observe(second) == "delivery-id-conflict"
+
+
+def test_webhook_delivery_registry_rejects_same_id_with_changed_context():
+    payload = b"{}"
+    first = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    second = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-2",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
         b"secret",
     )
     registry = ProviderDeliveryRegistryV1().record(first)
@@ -3195,6 +3648,20 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_effect_state_binds_to_exact_operation_identity,
+    test_effect_state_same_delivery_id_with_changed_payload_fails_closed,
+    test_effect_state_rejects_inconsistent_source_delivery_bindings,
+    test_effect_state_conflict_is_absorbing,
+    test_effect_state_conflict_never_reclassifies_as_terminal_observed,
+    test_effect_state_admits_first_authenticated_merge,
+    test_effect_state_merged_then_non_effect_does_not_downgrade,
+    test_effect_state_equivalent_second_delivery_is_idempotent,
+    test_effect_state_repeated_same_delivery_is_idempotent,
+    test_effect_state_conflicting_merge_commit_fails_closed,
+    test_effect_state_conflicting_head_fails_closed,
+    test_effect_state_untrusted_after_merge_does_not_downgrade,
+    test_effect_state_unrelated_pr_does_not_downgrade,
+    test_effect_state_is_not_latest_delivery_wins,
     test_webhook_effect_provenance_set_is_complete,
     test_webhook_effect_provenance_normalizes_input_order,
     test_webhook_effect_provenance_rejects_missing_source_provenance,
@@ -3237,6 +3704,7 @@ TESTS = [
     test_webhook_context_mismatch_rejects_even_with_valid_hmac,
     test_webhook_delivery_registry_accepts_new_delivery,
     test_webhook_delivery_registry_rejects_same_id_with_different_payload,
+    test_webhook_delivery_registry_rejects_same_id_with_changed_context,
     test_webhook_authentication_does_not_prove_merge_result_causality,
     test_attestation_material_does_not_rescue_untrusted_capture,
     test_fabricated_local_capture_cannot_establish_requested_causality,
