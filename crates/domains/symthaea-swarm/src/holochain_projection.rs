@@ -120,21 +120,41 @@ impl ReceiptSelectionContext {
         })
     }
 
-    /// Build the durable selection context only after binding the decision,
-    /// exact source collection, and cryptographically verified Receipt capability.
+    /// Build the durable selection context from the proof-carrying witness.
+    ///
+    /// The witness is the only input needed here: its private fields can only
+    /// have been produced after exact collection binding and verified-capability
+    /// binding succeeded.
     #[cfg(feature = "semantic-receipts")]
+    pub fn from_verified_selection(
+        selection: &crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection,
+    ) -> Result<Self, HolochainProjectionError> {
+        Self::from_decision(
+            selection.decision(),
+            selection.verified_capability_sha256(),
+        )
+    }
+
+    /// Compatibility wrapper for callers still holding the three independent
+    /// verification inputs. New durable callers should construct the bound
+    /// witness first and use from_verified_selection.
+    #[cfg(feature = "semantic-receipts")]
+    #[deprecated(
+        note = "use Rfc9942VerifiedReceiptSelection::bind followed by from_verified_selection"
+    )]
     pub fn from_verified_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
         collection: &crate::semantic_evidence_vds::Rfc9942ReceiptCollection,
         verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
     ) -> Result<Self, HolochainProjectionError> {
-        decision
-            .validate_against_collection(collection)
+        let selection =
+            crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection::bind(
+                decision,
+                collection,
+                verified,
+            )
             .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
-        let capability_sha256 = decision
-            .verified_capability_sha256(verified)
-            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
-        Self::from_decision(decision, capability_sha256)
+        Self::from_verified_selection(&selection)
     }
 
     fn validate(&self) -> Result<(), HolochainProjectionError> {
