@@ -28,9 +28,19 @@ jobs:
           FORCE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-force"
           force_ref_path="${FORCE_REF#refs/}"
 
+          is_lab_ref_path() {
+            case "$1" in
+              "${ref_path}"|"${race_ref_path}"|"${force_ref_path}") return 0 ;;
+              *)
+                echo "ref helper target is outside this run's temporary namespace: $1" >&2
+                return 1
+                ;;
+            esac
+          }
           delete_ref() {
             local target_ref_path="$1"
             local status
+            is_lab_ref_path "${target_ref_path}" || return 1
             status="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -48,6 +58,7 @@ jobs:
           delete_ref_if_owned() {
             local target_ref_path="$1"
             shift
+            is_lab_ref_path "${target_ref_path}" || return 1
             local get_response_file current_status current_sha expected
             get_response_file="$(mktemp)"
             current_status="$(curl -sS -o "${get_response_file}" -w '%{http_code}' \
@@ -191,7 +202,7 @@ jobs:
             local target_sha="$1"
             local response_file="$2"
             local target_ref_path="$3"
-            test -n "${target_ref_path}"
+            is_lab_ref_path "${target_ref_path}" || return 1
             curl -sS -o "${response_file}" -w '%{http_code}' \
               -X PATCH \
               -H "Accept: application/vnd.github+json" \
