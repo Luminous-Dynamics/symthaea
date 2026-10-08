@@ -1351,6 +1351,26 @@ impl NixOSExecutor {
             );
         }
 
+        // Final authoritative definition/content revalidation occurs after the
+        // JobRemoved watcher is armed and its observation epoch is verified.
+        // The earlier pre-state/content check remains defense-in-depth, but this
+        // capture is the last content/InvocationID gate before witness minting.
+        if let Err(error) = self
+            .validate_authorized_service_definition_content(&authority, *operation, unit)
+            .await
+        {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "final Service definition revalidation failed before dispatch: {error}"
+                    ),
+                    safety_level: command.safety_level(),
+                },
+                None,
+                None,
+            );
+        }
+
         let transport = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
             Ok(transport) => transport,
             Err(error) => {
