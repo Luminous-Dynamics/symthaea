@@ -2567,15 +2567,19 @@ def test_complete_stack_timing_requires_every_member_admissible():
         (bottom, requested),
     )
     assert evidence is not None
+    good_timing = effect_timing_fixture()
+    bad_timing = effect_timing_fixture(event_time_ms=1791475000000)
     good = PromotionStackEffectTimingV1(
         7085,
         evidence.effects[0].identity_digest(),
-        effect_timing_fixture(),
+        good_timing.identity_digest(),
+        good_timing,
     )
     bad = PromotionStackEffectTimingV1(
         7087,
         evidence.effects[1].identity_digest(),
-        effect_timing_fixture(event_time_ms=1791475000000),
+        bad_timing.identity_digest(),
+        bad_timing,
     )
     timings = PromotionStackEffectTimingSetV1(
         identity.digest(),
