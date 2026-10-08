@@ -509,6 +509,37 @@ impl NixLocalExecutionAuthorityV1 {
     }
 
     /// Validate that the execution command is exactly the action that was approved.
+    /// Reconstruct the exact historical authorization record corresponding to
+    /// this already-consumed approval. No current clock value is substituted.
+    pub fn historical_authorization_record(
+        &self,
+    ) -> Result<NixExecutionAuthorizationRecordV1, NixAuthorizationErrorV1> {
+        if self.approval.decision_kind() != LocalApprovalDecisionKindV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
+
+        let record = NixExecutionAuthorizationRecordV1 {
+            action_intent_digest: self.intent.digest()?,
+            service_effect_context_digest: service_effect_context_digest_for_intent(&self.intent)?,
+            profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
+            authority_ref: format!(
+                "nixward-local-approval-v2:{}",
+                self.approval.request_id()
+            ),
+            issued_at_unix_ms: self.approval.request_created_at().as_u64(),
+            expires_at_unix_ms: Some(self.approval.request_expires_at().as_u64()),
+            decision: NixAuthorizationDecisionV1::Approved,
+        };
+        record.validate_against_intent(&self.intent)?;
+        Ok(record)
+    }
+
+    pub fn authorization_record_digest(
+        &self,
+    ) -> Result<String, NixAuthorizationErrorV1> {
+        self.historical_authorization_record()?.digest()
+    }
+
     pub(crate) fn validate_command(
         &self,
         command: &NixOSCommand,
