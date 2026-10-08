@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 50;
+pub const SCHEMA_VERSION: u16 = 51;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-v69";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-v70";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -577,6 +577,33 @@ impl MeasurementModelInputUnitDefinitionRef {
     }
 }
 
+/// Exact external identity of the result record carrying a measurement-model input value.
+///
+/// This is intentionally opaque. Symthaea does not parse, recompute, or authenticate
+/// the referenced result/value record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputResultRef {
+    /// Stable identity of the exact external input-result record.
+    pub result_id: String,
+    /// Revision of the exact external input-result record.
+    pub result_revision: String,
+    /// Digest of the exact external input-result record.
+    pub result_record_digest: String,
+}
+
+impl MeasurementModelInputResultRef {
+    /// Validate the opaque external input-result identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.result_id.is_empty()
+            || self.result_revision.is_empty()
+            || self.result_record_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityInputBinding);
+        }
+        Ok(())
+    }
+}
+
 /// Exact external identity of the specification governing one measurement-model input.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MeasurementModelInputSpecificationRef {
@@ -626,6 +653,12 @@ pub struct CalibrationTraceabilityInputBinding {
     pub input_quantity_id: String,
     /// Exact external specification governing this input quantity.
     pub input_specification: MeasurementModelInputSpecificationRef,
+    /// Optional exact external result record carrying the input quantity value.
+    ///
+    /// This is topology/evidence provenance rather than authoritative frontier semantics;
+    /// changing it changes the topology receipt without changing the model-input set digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_result_ref: Option<MeasurementModelInputResultRef>,
     /// Frontier-attested role of this input quantity in the measurement model.
     pub role: MeasurementModelInputRole,
     /// Topology node at which the input quantity's traceability branch begins.
@@ -639,6 +672,9 @@ impl CalibrationTraceabilityInputBinding {
             return Err(AssessmentError::InvalidCalibrationTraceabilityInputBinding);
         }
         self.input_specification.validate()?;
+        if let Some(input_result_ref) = &self.input_result_ref {
+            input_result_ref.validate()?;
+        }
         Ok(())
     }
 }
@@ -8417,6 +8453,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                 },
+                input_result_ref: None,
                 role: MeasurementModelInputRole::Measured,
                 node_id: "calibration".into(),
             }])
@@ -8445,6 +8482,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                 },
+                input_result_ref: None,
                 role: MeasurementModelInputRole::Measured,
                 node_id: "calibration".into(),
             }],
@@ -8592,6 +8630,7 @@ mod tests {
                     definition_digest: digest.into(),
                 }),
             },
+            input_result_ref: None,
             role: MeasurementModelInputRole::Influence,
             node_id: "temperature-calibration".into(),
         };
@@ -8632,6 +8671,7 @@ mod tests {
                 }),
                 unit_definition: None,
             },
+            input_result_ref: None,
             role: MeasurementModelInputRole::Influence,
             node_id: "temperature-calibration".into(),
         };
@@ -8675,6 +8715,7 @@ mod tests {
                     definition_digest: "unit-definition-v1".into(),
                 }),
             },
+            input_result_ref: None,
             role: MeasurementModelInputRole::Influence,
             node_id: "temperature-calibration".into(),
         };
@@ -8785,6 +8826,78 @@ mod tests {
     }
 
     #[test]
+    fn measurement_model_input_result_reference_is_topology_significant_but_frontier_opaque() {
+        let binding = CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: None,
+                unit_definition: None,
+            },
+            input_result_ref: Some(MeasurementModelInputResultRef {
+                result_id: "fixture-temperature-result".into(),
+                result_revision: "v1".into(),
+                result_record_digest: "temperature-result-v1".into(),
+            }),
+            role: MeasurementModelInputRole::Measured,
+            node_id: "temperature-calibration".into(),
+        };
+        binding.validate().unwrap();
+
+        let frontier_digest =
+            canonical_measurement_model_input_frontier_digest(std::slice::from_ref(&binding))
+                .unwrap();
+
+        let topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "fixture-model".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-model-digest".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-frontier".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: "fixture-frontier-record-digest".into(),
+                input_set_digest: frontier_digest.clone(),
+                measurement_model_id: "fixture-model".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-model-digest".into(),
+                input_count: 1,
+            },
+            input_bindings: vec![binding],
+            reference_node_ids: Vec::new(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+        };
+        let topology_digest = topology.canonical_digest().unwrap();
+
+        let mut changed = topology.clone();
+        changed.input_bindings[0]
+            .input_result_ref
+            .as_mut()
+            .unwrap()
+            .result_revision = "v2".into();
+
+        assert_eq!(
+            frontier_digest,
+            canonical_measurement_model_input_frontier_digest(&changed.input_bindings).unwrap()
+        );
+        assert_ne!(topology_digest, changed.canonical_digest().unwrap());
+
+        let mut malformed = changed;
+        malformed.input_bindings[0]
+            .input_result_ref
+            .as_mut()
+            .unwrap()
+            .result_record_digest = String::new();
+        assert_eq!(
+            malformed.input_bindings[0].validate().unwrap_err(),
+            AssessmentError::InvalidCalibrationTraceabilityInputBinding
+        );
+    }
+
+    #[test]
     fn branched_traceability_topology_is_typed_and_uncertainty_bound() {
         let mut candidate = candidate(
             "branched-traceability-topology",
@@ -8821,6 +8934,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                     },
+                    input_result_ref: None,
                     role: MeasurementModelInputRole::Measured,
                     node_id: "calibration-a".into(),
                 },
@@ -8833,6 +8947,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                     },
+                    input_result_ref: None,
                     role: MeasurementModelInputRole::Influence,
                     node_id: "calibration-b".into(),
                 },
@@ -8863,6 +8978,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                     },
+                    input_result_ref: None,
                     role: MeasurementModelInputRole::Measured,
                     node_id: "calibration-a".into(),
                 },
@@ -8875,6 +8991,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                     },
+                    input_result_ref: None,
                     role: MeasurementModelInputRole::Influence,
                     node_id: "calibration-b".into(),
                 },
@@ -9078,6 +9195,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                 },
+                input_result_ref: None,
                 role: MeasurementModelInputRole::Correction,
                 node_id: "calibration".into(),
             }])
@@ -9106,6 +9224,7 @@ mod tests {
                     quantity_definition: None,
                     unit_definition: None,
                 },
+                input_result_ref: None,
                 role: MeasurementModelInputRole::Correction,
                 node_id: "calibration".into(),
             }],
