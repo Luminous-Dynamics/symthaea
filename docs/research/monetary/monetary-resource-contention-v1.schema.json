@@ -1,0 +1,57 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/monetary-resource-contention-v1.schema.json",
+  "title":"Monetary Shared Resource Contention v1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","experiment_id","factorial_size","batch_size","factors","resources","resource_regimes","fixed_dimensions","claim_ceiling"],
+  "properties":{
+    "schema_version":{"const":"monetary-resource-contention-v1"},
+    "experiment_id":{"type":"string","minLength":1},
+    "factorial_size":{"const":4320,"type":"integer"},
+    "batch_size":{"const":3,"type":"integer"},
+    "factors":{"type":"object","additionalProperties":false,"required":["topology","monetary_pair","adapter","shock","seed","resource_regime"],"properties":{
+      "topology":{"const":["full_mesh","routing_only_hub","redundant_two_hub"]},
+      "monetary_pair":{"const":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"]},
+      "adapter":{"const":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"]},
+      "shock":{"const":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"]},
+      "seed":{"const":[11,23,47,89,131]},
+      "resource_regime":{"const":["unrestricted","bounded_shared_settlement_liquidity","bounded_operator_capacity","both_bounded"]}
+    }},
+    "resources":{"type":"object","additionalProperties":false,"required":["unrestricted_settlement_liquidity","bounded_shared_settlement_liquidity","bounded_operator_capacity"],"properties":{
+      "unrestricted_settlement_liquidity":{"$ref":"#/$defs/resource"},
+      "bounded_shared_settlement_liquidity":{"$ref":"#/$defs/resource"},
+      "bounded_operator_capacity":{"$ref":"#/$defs/resource"}
+    }},
+    "resource_regimes":{"type":"object","additionalProperties":false,"required":["unrestricted","bounded_shared_settlement_liquidity","bounded_operator_capacity","both_bounded"],"properties":{
+      "unrestricted":{"type":"array","items":{"type":"string"},"const":["unrestricted_settlement_liquidity"]},
+      "bounded_shared_settlement_liquidity":{"type":"array","items":{"type":"string"},"const":["bounded_shared_settlement_liquidity"]},
+      "bounded_operator_capacity":{"type":"array","items":{"type":"string"},"const":["unrestricted_settlement_liquidity","bounded_operator_capacity"]},
+      "both_bounded":{"type":"array","items":{"type":"string"},"const":["bounded_shared_settlement_liquidity","bounded_operator_capacity"]}
+    }},
+    "fixed_dimensions":{"type":"object","additionalProperties":false,"required":["topology_digest_set","routing_policy_digest","profile_digests","edge_digests","common_random_number_identity","liquidity_demand_units","liquidity_shock_increment","manual_breakpoint_probability_ppm","allocation_policy","resource_identity_rule","no_capacity_inference"],"properties":{
+      "topology_digest_set":{"type":"object","minProperties":3,"additionalProperties":false},
+      "routing_policy_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+      "profile_digests":{"type":"object","minProperties":5,"additionalProperties":false},
+      "edge_digests":{"type":"object","minProperties":3,"additionalProperties":false},
+      "common_random_number_identity":{"type":"string","minLength":1},
+      "liquidity_demand_units":{"type":"object","additionalProperties":false,"required":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],"properties":{
+        "redeem_reissue":{"const":10,"type":"integer"},"escrowed_atomic_swap":{"const":15,"type":"integer"},
+        "multilateral_net_settlement":{"const":7,"type":"integer"},"absent":{"const":0,"type":"integer"}
+      }},
+      "liquidity_shock_increment":{"const":5,"type":"integer"},
+      "manual_breakpoint_probability_ppm":{"const":300000,"type":"integer"},
+      "allocation_policy":{"const":"fifo"},
+      "resource_identity_rule":{"const":"capacity_or_owner_or_allocation_or_release mutation requires a new resource generation and digest"},
+      "no_capacity_inference":{"const":true}
+    }},
+    "claim_ceiling":{"type":"string","minLength":1}
+  },
+  "$defs":{"resource":{"type":"object","additionalProperties":false,"required":["resource_id","resource_kind","owner_scope","unit","capacity","reservation_scope","allocation_policy","exhaustion_disposition","release_condition","generation","digest"],"properties":{
+    "resource_id":{"type":"string","minLength":1},"resource_kind":{"enum":["settlement_liquidity","operator_capacity"]},
+    "owner_scope":{"type":"string","minLength":1},"unit":{"type":"string","minLength":1},"capacity":{"type":"integer","minimum":0},
+    "reservation_scope":{"enum":["batch","workflow"]},"allocation_policy":{"const":"fifo"},
+    "exhaustion_disposition":{"type":"string","minLength":1},"release_condition":{"type":"string","minLength":1},
+    "generation":{"type":"string","minLength":1},"digest":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+  }}
+}
