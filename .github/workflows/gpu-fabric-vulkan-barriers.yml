@@ -26,6 +26,14 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Assert exact qualification checkout
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          ACTUAL_QUALIFICATION_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_QUALIFICATION_SHA" = "$EXPECTED_QUALIFICATION_SHA"
+          echo "qualification_head=$ACTUAL_QUALIFICATION_SHA"
+
       - name: Install Vulkan runtime and validation
         run: |
           sudo apt-get update
