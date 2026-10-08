@@ -4,28 +4,19 @@
   "factorial_size":360,
   "factors":{"monetary_pair":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],"adapter":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],"shock":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"],"seed":[11,23,47,89,131]},
   "fixed_dimensions":{
-    "synthetic_world":"single-transaction controlled world v1",
-    "amount":10,
-    "topology_id":"fully-connected-planned-v1",
-    "topology_digest":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
-    "routing_policy_id":"explicit-shortest-feasible-route-v1",
-    "routing_policy_digest":"a5435036c4791a6dc0275771d73f78c2c54f02d64fbe2de88adbdb2b7c5901c3",
-    "operational_baseline_generation":"policy-v1",
-    "composition_generation":"g1",
-    "composition_digest":"45db3287f169ca4335026da8a7ab30af4b97efe550341508b1c12e9f86a35cc8",
+    "synthetic_world":"single-transaction controlled world v1","amount":10,
+    "topology_id":"fully-connected-planned-v1","topology_digest":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
+    "routing_policy_id":"explicit-shortest-feasible-route-v1","routing_policy_digest":"a5435036c4791a6dc0275771d73f78c2c54f02d64fbe2de88adbdb2b7c5901c3",
+    "operational_baseline_generation":"policy-v1","composition_generation":"g1","composition_digest":"45db3287f169ca4335026da8a7ab30af4b97efe550341508b1c12e9f86a35cc8",
     "fixed_topology":true,"fixed_routing":true,
     "common_random_number_identity":"factorial-{shock}-{seed}",
-    "same_profile_and_edge_digests":true,
-    "direction_policy":"one fixed directed edge per monetary pair in v1",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+    "same_profile_and_edge_digests":true,"direction_policy":"one fixed directed edge per monetary pair in v1",
     "seed_environment_jitter":"sha256(world:{shock}:{seed}) mod 3 ticks, applied identically to every treatment cell sharing shock and seed",
     "no_cross_asset_scalar_conservation":true
   },
   "profile_digests":{
-    "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
-    "sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
-    "mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
-    "tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
-    "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+    "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e","sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32","mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e","tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e","reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
   },
   "pairs":{
     "bank_mutual":{"source":"conventional-bank-money-v1","target":"mutual-credit-v1","edge_digest":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b","technical_settlement_duration":{"redeem_reissue":3,"escrowed_atomic_swap":2,"multilateral_net_settlement":2},"requires_redemption_by_adapter":{"redeem_reissue":true,"escrowed_atomic_swap":false,"multilateral_net_settlement":false}},
@@ -46,7 +37,7 @@
     "operational_waiting_time":"end_to_end_completion_time minus technical_settlement_time for completed runs.",
     "reconciliation_backlog":"Count of reconciliation items created by the workflow; not a latency measure.",
     "trace_binding":"Each observation binds scenario_id, policy_digest, settlement_receipt_digest, seed, edge_digest and trace_digest.",
-    "seed_binding":"Seed controls only exogenous world jitter; the same shock+seed jitter is shared across all adapter treatments."
+    "seed_binding":"Seed controls only exogenous world jitter through the explicit treatment-independent random namespace."
   },
   "claim_ceiling":"Synthetic balanced factorial only; identifies contrasts inside this declared model. It does not establish empirical causality, macroeconomic superiority, legal interoperability, solvency, market liquidity, policy desirability, or live-system safety.",
   "seeds":[11,23,47,89,131]
