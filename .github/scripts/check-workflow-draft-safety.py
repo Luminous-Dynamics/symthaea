@@ -72,6 +72,25 @@ def top_level_section(text: str, key: str) -> list[str]:
 
 
 def pull_request_block(text: str) -> list[str] | None:
+    lines = text.splitlines()
+    top_level_on = next(
+        (line for line in lines if line.startswith("on:")),
+        None,
+    )
+    if top_level_on is not None and top_level_on != "on:":
+        inline = top_level_on.removeprefix("on:").strip()
+        # Flow-style trigger declarations are supported only when their entire
+        # trigger surface is visible on the same line. This prevents a PR
+        # workflow from disappearing from the ratchet merely by switching the
+        # top-level `on:` mapping to flow syntax.
+        if "pull_request" in inline:
+            return [top_level_on]
+        if any(event in inline for event in ("push", "workflow_dispatch", "schedule")):
+            return None
+        raise SafetyError(
+            "unsupported inline top-level on: declaration; refusing to infer PR safety"
+        )
+
     on_lines = top_level_section(text, "on")
     for index, line in enumerate(on_lines):
         match = re.fullmatch(r"  pull_request:\s*(.*)", line)
@@ -311,6 +330,30 @@ jobs:
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
     assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+
+    inline = """on: {pull_request: {types: [opened, synchronize, reopened, ready_for_review]}}
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(inline)
+    assert pr is not None
+    assert validate_generic(Path("inline-safe.yml"), inline, pr) == (1, 1)
+
+    inline_no_ready = inline.replace(", ready_for_review", "")
+    try:
+        validate_generic(
+            Path("inline-no-ready.yml"),
+            inline_no_ready,
+            pull_request_block(inline_no_ready) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("inline pull_request workflow without ready_for_review was accepted")
 
 
 def main() -> int:
