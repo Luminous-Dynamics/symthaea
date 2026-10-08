@@ -1,0 +1,115 @@
+name: QUAL promotion reservation v1 deterministic lab
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reservation-lab:
+    if: github.repository == 'Luminous-Dynamics/symthaea' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove trusted checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          grep -Fq "claim_ceiling=deterministic local transaction/reconciliation model only" scripts/validate_promotion_reservation_v1.py
+          grep -Fq "promotion_authority=false" scripts/validate_promotion_reservation_v1.py
+
+      - name: Self-audit independent oracle structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path("scripts/validate_promotion_reservation_v1.py")
+          tree = ast.parse(path.read_text(), filename=str(path))
+
+          ledger = next(
+              node for node in tree.body
+              if isinstance(node, ast.ClassDef) and node.name == "Ledger"
+          )
+          methods = {
+              node.name: len(node.args.args)
+              for node in ledger.body
+              if isinstance(node, ast.FunctionDef)
+          }
+          expected_signatures = {
+              "prepare_dispatch": 5,  # self + four fence/attempt inputs
+              "record_unknown": 2,    # self + operation identity
+              "reconcile_complete": 3,  # self + operation + receipt
+          }
+          assert {k: methods.get(k) for k in expected_signatures} == expected_signatures, (
+              f"Ledger method signature drift: {methods}"
+          )
+
+          defined = {
+              node.name
+              for node in tree.body
+              if isinstance(node, ast.FunctionDef)
+              and node.name.startswith("test_")
+          }
+          assignment = next(
+              node for node in tree.body
+              if isinstance(node, ast.Assign)
+              and any(
+                  isinstance(target, ast.Name) and target.id == "TESTS"
+                  for target in node.targets
+              )
+          )
+          registered = {
+              elt.id
+              for elt in assignment.value.elts
+              if isinstance(elt, ast.Name)
+          }
+          assert defined == registered, (
+              f"Oracle test registry mismatch: missing={sorted(defined - registered)} "
+              f"extra={sorted(registered - defined)}"
+          )
+          print(f"oracle_static_audit=PASS tests={len(defined)}")
+          PY
+
+      - name: Compile and run Rust reference transaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 --test validation/promotion_reservation_v1.rs -o /tmp/promotion-reservation-v1-tests
+          /tmp/promotion-reservation-v1-tests --nocapture | tee /tmp/promotion-reservation-v1-rust.out
+
+      - name: Run independent Python oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_promotion_reservation_v1.py | tee /tmp/promotion-reservation-v1-python.out
+
+      - name: Record model evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Promotion Reservation v1 deterministic lab"
+            echo
+            echo "trusted_head=$GITHUB_SHA"
+            echo "rust_reference=validation/promotion_reservation_v1.rs"
+            echo "python_oracle=scripts/validate_promotion_reservation_v1.py"
+            echo "promotion_authority=false"
+            echo "provider_dispatch=not invoked"
+            echo
+            echo "### Rust reference"
+            cat /tmp/promotion-reservation-v1-rust.out
+            echo
+            echo "### Python oracle"
+            cat /tmp/promotion-reservation-v1-python.out
+          } >> "$GITHUB_STEP_SUMMARY"
