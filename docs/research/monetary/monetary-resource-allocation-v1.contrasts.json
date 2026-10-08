@@ -1,0 +1,31 @@
+{
+  "schema_version":"monetary-resource-allocation-v1-contrasts",
+  "policy_effect_vs_fifo":{
+    "unrestricted":{
+      "criticality_priority":{"weighted_critical_completion_time_delta":-0.17555555555555458,"mean_completion_time_delta":0.45111111111111235},
+      "minimum_liquidity_demand":{"weighted_critical_completion_time_delta":-0.33000000000000007,"mean_completion_time_delta":-0.013333333333333641}
+    },
+    "bounded_shared_settlement_liquidity":{
+      "criticality_priority":{"weighted_critical_completion_time_delta":-1.0199999999999978,"mean_completion_time_delta":1.2466666666666661},
+      "minimum_liquidity_demand":{"weighted_critical_completion_time_delta":-1.187777777777777,"mean_completion_time_delta":-0.9355555555555544}
+    },
+    "bounded_operator_capacity":{
+      "criticality_priority":{"weighted_critical_completion_time_delta":-0.17555555555555458,"mean_completion_time_delta":0.45111111111111235},
+      "minimum_liquidity_demand":{"weighted_critical_completion_time_delta":-0.33000000000000007,"mean_completion_time_delta":-0.013333333333333641}
+    },
+    "both_bounded":{
+      "criticality_priority":{"weighted_critical_completion_time_delta":-1.0199999999999978,"mean_completion_time_delta":1.2466666666666661},
+      "minimum_liquidity_demand":{"weighted_critical_completion_time_delta":-1.187777777777777,"mean_completion_time_delta":-0.9355555555555544}
+    }
+  },
+  "key_result":"Allocation changes distribution and completion ordering without changing aggregate completion rate in this synthetic model.",
+  "max_policy_difference_on_weighted_critical_time":{
+    "topology":"redundant_two_hub","pairs":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],
+    "adapter":"redeem_reissue","shock":"network_partition",
+    "resource_regime":"bounded_shared_settlement_liquidity",
+    "fifo":18.6,"criticality_priority":18.4,"minimum_liquidity_demand":16.066666666666666,
+    "minimum_policy_delta_vs_fifo":-2.533333333333335
+  },
+  "crn_validation":{"namespace":"world:{shock}:{seed}:obligation:{index}","manual_draw_mismatches":0,"treatment_factors_in_random_key":false},
+  "claim_ceiling":"Synthetic allocation-policy contrasts only; no empirical causal identification or policy recommendation."
+}
