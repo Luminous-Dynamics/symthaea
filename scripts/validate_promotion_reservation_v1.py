@@ -2289,8 +2289,8 @@ def test_clock_relation_drift_expands_asymmetric_bounds_monotonically():
         max_drift_ppm=1000,
         valid_until_local_time_ms=1791475290000,
     )
-    assert relation.effective_offset_bounds_ms(1791475200000) == (-1100, 1050)
-    assert relation.effective_offset_bounds_ms(1791475210000) == (-1110, 1060)
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-110, 60)
+    assert relation.effective_offset_bounds_ms(1791475210000) == (-120, 70)
 
 
 def test_temporal_effect_with_asymmetric_offset_bounds_is_admissible():
