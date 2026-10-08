@@ -286,6 +286,7 @@ pub(crate) struct TransactionReceipt {
     pub(crate) target_machine_digest: Option<String>,
     pub(crate) request_digest: String,
     pub(crate) authorization: &'static str,
+    pub(crate) execution_commitment: Option<ExecutionCommitment>,
     pub(crate) outcome: TransactionOutcome,
     pub(crate) artifact_commitment: Option<ArtifactCommitment>,
     pub(crate) configuration_commitment: Option<ArtifactCommitment>,
