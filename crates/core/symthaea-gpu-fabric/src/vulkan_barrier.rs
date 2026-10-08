@@ -3142,7 +3142,7 @@ mod tests {
             0,
         );
         assert_ne!(enabled.identity_digest, disabled.identity_digest);
-        assert_eq!(disabled.synchronization2_enabled, false);
+        assert!(!disabled.synchronization2_enabled);
         assert_eq!(
             disabled.verify(),
             Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity)
