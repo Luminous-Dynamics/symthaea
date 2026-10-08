@@ -342,6 +342,7 @@ mod tests {
                 selected_index: 1,
                 selected_receipt_sha256: [5; 32],
                 verified_capability_sha256: [6; 32],
+                verified_composition_capability_sha256: [9; 32],
                 selection_decision_sha256: [7; 32],
                 selection_policy: "rfc9942/priority-first-valid-v1".into(),
                 selection_policy_version: 1,
