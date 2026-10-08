@@ -1953,6 +1953,23 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
                         );
                     }
 
+                    let (original_work_outcome, original_work) =
+                        decoder.decode_with_work(&observation, bound);
+                    let (shifted_work_outcome, shifted_work) =
+                        decoder.decode_with_work(&shifted_observation, bound);
+                    assert_eq!(
+                        original_work_outcome, listed_a.outcome,
+                        "scalar work-ledger outcome diverged from list outcome: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+                    assert_eq!(
+                        shifted_work_outcome, shifted.outcome,
+                        "translated work-ledger outcome diverged from translated list outcome: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+                    assert_eq!(
+                        shifted_work, original_work,
+                        "codeword translation changed exact decoder work ledger: regime={dimension}x{rank} seed=0x{seed:X} mask={mask:#x}"
+                    );
+
                     match (&listed_a.outcome, &shifted.outcome) {
                         (
                             BoundedDistanceDecode::Unique {
@@ -2077,7 +2094,7 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
             .collect::<Vec<_>>()
             .join(",");
         println!(
-            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true;translation_equivariant=true",
+            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true;independent_codeword_oracle=true;translation_equivariant=true;translation_work_ledger_equivariant=true",
         );
     }
 }
