@@ -497,7 +497,7 @@ impl Rfc9942SignatureWithReceipts {
         let witness = Rfc9942VerifiedReceiptSelection::bind(
             &decision,
             collection,
-            &verified.receipt(),
+            &verified,
         )
         .map_err(|_| Rfc9942VdpError::InvalidStructure)?;
 
@@ -526,8 +526,8 @@ where
     for (index, receipt) in collection.iter().enumerate() {
         let receipt_bytes = collection
             .serialized_receipt_bytes(index)
-            .unwrap_or_else(|| receipt.to_cbor());
-        let receipt_sha256 = sha256(receipt_bytes);
+            .map_or_else(|| receipt.to_cbor(), ToOwned::to_owned);
+        let receipt_sha256 = sha256(&receipt_bytes);
 
         if selected_index.is_some() {
             candidates.push(ReceiptSelectionCandidate {
@@ -559,7 +559,7 @@ where
     }
 
     let decision = ReceiptSelectionDecision {
-        collection_sha256: sha256(collection_bytes),
+        collection_sha256: sha256(&collection_bytes),
         collection_len: collection.len() as u32,
         policy_id: POLICY_ID,
         policy_version: POLICY_VERSION,
