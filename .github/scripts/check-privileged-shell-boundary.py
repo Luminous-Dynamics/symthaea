@@ -445,7 +445,7 @@ def main() -> None:
         else len(lines)
     )
     install_body = "\n".join(lines[install_start:install_end])
-    bind_at = install_body.find("transaction_ledger.bind_execution_commitment")
+    bind_at = install_body.find("bind_execution_commitment(&transaction")
     spawn_at = install_body.find("spawn_privileged_background_script_file")
     digest_at = install_body.find('role: "install-script"')
     if bind_at < 0 or spawn_at < 0 or bind_at > spawn_at or digest_at < 0:
