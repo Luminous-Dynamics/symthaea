@@ -66,6 +66,7 @@ pub struct ScenarioResult {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScenarioError {
     InvalidTimeStep,
+    TooManySteps,
     InvalidHorizon,
     InvalidStartHour,
     InvalidTariff,
@@ -115,6 +116,11 @@ pub fn run_scenario(
 /// this scenario. Battery state is committed back to the caller only when
 /// the complete scenario succeeds.
 #[allow(clippy::too_many_arguments)]
+/// Maximum number of discrete steps accepted for one scenario. This prevents
+/// an extremely small but positive timestep from creating an effectively
+/// unbounded CPU loop. Larger studies should be split into bounded windows.
+const MAX_SCENARIO_STEPS: f64 = 1_000_000.0;
+
 pub fn try_run_scenario(
     battery: &mut Battery,
     tariff: &TariffSchedule,
@@ -131,6 +137,10 @@ pub fn try_run_scenario(
     }
     if !total_hours.is_finite() || total_hours < 0.0 {
         return Err(ScenarioError::InvalidHorizon);
+    }
+    let estimated_steps = (total_hours / dt_hours).ceil();
+    if !estimated_steps.is_finite() || estimated_steps > MAX_SCENARIO_STEPS {
+        return Err(ScenarioError::TooManySteps);
     }
     if !start_hour.is_finite() {
         return Err(ScenarioError::InvalidStartHour);
@@ -158,10 +168,12 @@ pub fn try_run_scenario(
         battery.state_of_health(),
         battery.effective_capacity_kwh(),
         battery.equivalent_full_cycles(),
+        battery.degradation_per_cycle,
     ];
     if !battery_values.iter().all(|value| value.is_finite())
         || battery.capacity_kwh < 0.0
         || battery.power_rating_kw < 0.0
+        || battery.degradation_per_cycle < 0.0
         || !(0.0..=1.0).contains(&battery.round_trip_efficiency)
         || !(0.0..=1.0).contains(&battery.soc())
         || !(0.0..=1.0).contains(&battery.state_of_health())
@@ -555,6 +567,49 @@ mod tests {
             assert_eq!(result, Err(ScenarioError::InvalidTimeStep));
             assert_eq!(battery.soc(), before_soc);
         }
+    }
+
+    #[test]
+    fn test_tiny_positive_timestep_is_rejected_before_simulation() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 0.9).with_soc(0.6);
+        let before_soc = battery.soc();
+        let result = try_run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 1.0,
+            |_t| 0.0,
+            1.0e-12,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (0.0, 0.0),
+        );
+        assert_eq!(result, Err(ScenarioError::TooManySteps));
+        assert_eq!(battery.soc(), before_soc);
+    }
+
+    #[test]
+    fn test_non_finite_battery_degradation_is_rejected_atomically() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 0.9).with_soc(0.5);
+        battery.degradation_per_cycle = f64::NAN;
+        let before_soc = battery.soc();
+        let before_health = battery.state_of_health();
+        let result = try_run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 0.0,
+            |_t| 2.0,
+            0.25,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (0.0, 1.0),
+        );
+        assert_eq!(result, Err(ScenarioError::InvalidBatteryConfiguration));
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.state_of_health(), before_health);
     }
 
     #[test]
