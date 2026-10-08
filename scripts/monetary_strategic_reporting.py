@@ -24,6 +24,7 @@ CAP = M["fixed_dimensions"]["resource_capacity"]
 DEMAND_MULT = M["fixed_dimensions"]["liquidity_demand_multiplier_by_adapter"]
 TECH = {"redeem_reissue": 3, "escrowed_atomic_swap": 2, "multilateral_net_settlement": 2, "absent": None}
 POLICY_DIGESTS = {k: v["digest"] for k, v in M["reporting_policies"].items()}
+ALLOCATION_POLICY_DIGESTS = M["fixed_dimensions"]["allocation_policy_digests"]
 
 def mean(values):
     return sum(values) / len(values) if values else None
@@ -153,7 +154,7 @@ def run_one(pair, adapter, shock, seed, allocation_policy, focal, reporting_poli
         "shock": shock,
         "seed": seed,
         "allocation_policy": allocation_policy,
-        "allocation_policy_digest": M["fixed_dimensions"].get("allocation_policy_digest", None),
+        "allocation_policy_digest": ALLOCATION_POLICY_DIGESTS[allocation_policy],
         "focal_obligation": focal,
         "reporting_policy": reporting_policy,
         "reporting_policy_digest": POLICY_DIGESTS[reporting_policy],
