@@ -1,0 +1,193 @@
+{
+  "schema_version": "monetary-reporting-authority-v1-execution",
+  "run_count": 38880,
+  "obligation_count": 116640,
+  "common_random_number_cells": 90,
+  "exogenous_random_namespace": "world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest": "35609124f8be23b83d4b392144e49c9192d83c992e8e2d1c48a46aa99ac7222f",
+  "authority_headline": {
+    "claim_driven": {
+      "nontruth_cells": 9720,
+      "common_completion_pairs": 4050,
+      "positive_gain_rate": 0.2222222222222222,
+      "mean_gain_ticks": 1.3274074074074074,
+      "max_gain_ticks": 14,
+      "report_only_rate": 0,
+      "truth_only_rate": 0
+    },
+    "verified_truth": {
+      "nontruth_cells": 9720,
+      "common_completion_pairs": 4050,
+      "positive_gain_rate": 0,
+      "mean_gain_ticks": 0,
+      "max_gain_ticks": 0,
+      "report_only_rate": 0,
+      "truth_only_rate": 0
+    },
+    "mismatch_rejected": {
+      "nontruth_cells": 9720,
+      "common_completion_pairs": 360,
+      "positive_gain_rate": 0,
+      "mean_gain_ticks": 0,
+      "max_gain_ticks": 0,
+      "report_only_rate": 0,
+      "truth_only_rate": 0.37962962962962965
+    }
+  },
+  "aggregate_by_authority_and_reporting_policy": {
+    "claim_driven": {
+      "criticality_inflation": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 16.77979797979798
+      },
+      "dual_misreport": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 16.77979797979798
+      },
+      "liquidity_demand_underreport": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      },
+      "truthful": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      }
+    },
+    "verified_truth": {
+      "criticality_inflation": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      },
+      "dual_misreport": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      },
+      "liquidity_demand_underreport": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      },
+      "truthful": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      }
+    },
+    "mismatch_rejected": {
+      "criticality_inflation": {
+        "authority_rejection_rate": 1,
+        "cells": 3240,
+        "mean_completion_rate": 0.2777777777777778,
+        "mean_system_completion_time": 13.733333333333333
+      },
+      "dual_misreport": {
+        "authority_rejection_rate": 1,
+        "cells": 3240,
+        "mean_completion_rate": 0.2777777777777778,
+        "mean_system_completion_time": 13.733333333333333
+      },
+      "liquidity_demand_underreport": {
+        "authority_rejection_rate": 0.5416666666666666,
+        "cells": 3240,
+        "mean_completion_rate": 0.3148148148148148,
+        "mean_system_completion_time": 13.987878787878788
+      },
+      "truthful": {
+        "authority_rejection_rate": 0,
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "mean_system_completion_time": 17.236363636363638
+      }
+    }
+  },
+  "rejection_summary": {
+    "claim_driven": {
+      "truthful": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "criticality_inflation": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "liquidity_demand_underreport": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "dual_misreport": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      }
+    },
+    "verified_truth": {
+      "truthful": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "criticality_inflation": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "liquidity_demand_underreport": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "dual_misreport": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      }
+    },
+    "mismatch_rejected": {
+      "truthful": {
+        "cells": 3240,
+        "mean_completion_rate": 0.4166666666666667,
+        "authority_rejection_rate": 0
+      },
+      "criticality_inflation": {
+        "cells": 3240,
+        "mean_completion_rate": 0.2777777777777778,
+        "authority_rejection_rate": 1
+      },
+      "liquidity_demand_underreport": {
+        "cells": 3240,
+        "mean_completion_rate": 0.3148148148148148,
+        "authority_rejection_rate": 0.5416666666666666
+      },
+      "dual_misreport": {
+        "cells": 3240,
+        "mean_completion_rate": 0.2777777777777778,
+        "authority_rejection_rate": 1
+      }
+    }
+  },
+  "invariants": {
+    "crn_invariant": true,
+    "true_values_immutable": true,
+    "nonfocal_reporting_truthful": true,
+    "resource_integrity_failures": 0,
+    "verified_truth_positive_focal_gains": 0
+  },
+  "claim_ceiling": "Deterministic authority-boundary experiment only; this tests synthetic reporting manipulation under alternative authority controls and does not establish empirical truthfulness, equilibrium, welfare, systemic-safety, legal-finality, or production-readiness claims."
+}
