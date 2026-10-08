@@ -376,20 +376,19 @@ impl Rfc9942VerifiedReceiptSelection {
 
         let verified_capability_sha256 =
             decision.verified_capability_sha256(&verified.receipt())?;
-        if verified.receipt_collection_sha256() != decision.collection_sha256
-            || verified.receipt_sha256() != verified.receipt().receipt_sha256()
-        {
+        if verified.receipt_collection_sha256() != decision.collection_sha256 {
             return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
         }
 
+        let selected_index = decision
+            .selected_index
+            .ok_or(ReceiptSelectionDecisionError::SelectedCandidateMismatch)?;
         let selected = decision
             .selected_receipt_sha256
             .ok_or(ReceiptSelectionDecisionError::SelectedCandidateMismatch)?;
-        if verified.receipt_sha256() != selected {
-            return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
-        }
-
-        if verified.receipt_index() as u32 != decision.selected_index.unwrap_or(u32::MAX) {
+        if verified.receipt_sha256() != selected
+            || verified.receipt_index() as u32 != selected_index
+        {
             return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
         }
 
