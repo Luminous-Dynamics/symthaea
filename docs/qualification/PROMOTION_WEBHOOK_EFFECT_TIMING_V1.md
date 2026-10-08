@@ -100,3 +100,29 @@ The local evidence path also requires:
     reservation <= dispatch <= observation
 
 A local wall-clock rollback between dispatch and observation is invalid temporal evidence and cannot be rescued by a provider timestamp or skew bound.
+
+
+## Timestamp occurrence semantics
+
+A parsed provider timestamp is not automatically an exact event instant. The timing model requires explicit occurrence semantics:
+
+- `truncated` means the reported value is the lower edge of its represented timestamp bucket; the admissible occurrence interval extends to the end of that reported precision bucket.
+- `exact` is accepted only for a timestamp represented at 1 ms resolution.
+- unsupported fractional precision or unknown occurrence semantics are not admissible.
+
+Therefore a second-resolution provider timestamp is modeled as an interval rather than a point. Temporal admission requires the entire provider occurrence interval, expanded by clock uncertainty, to fit between local dispatch and observation; overlap remains `cross-domain-time-uncertain`.
+
+## Clock-relation validity and drift
+
+A usable cross-domain clock relation now binds:
+
+- provider and local clock-domain identities;
+- baseline maximum skew;
+- relation verification state;
+- local verification time;
+- local expiry time;
+- maximum drift in parts per million.
+
+The effective uncertainty grows monotonically from the verification time according to the declared drift bound. A relation used after its validity window, before its verification instant, or with invalid bounds is not usable for temporal admission.
+
+The model therefore does not treat a one-time skew measurement as an indefinitely valid synchronized-clock fact.
