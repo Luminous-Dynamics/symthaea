@@ -10,8 +10,8 @@
 use crate::cognitive_analysis::{ScoreCognitiveProfile, profile_score_region};
 use crate::form::SectionRole;
 use crate::grammar::PerformanceDialect;
-use crate::harmony::{HarmonicFunction, Tonality};
-use crate::motif_return::MotifReturnEvidence;
+use crate::harmony::{HarmonicFunction, Key, Tonality};
+use crate::motif_return::{MotifReturnEvidence, compare_melodic_regions};
 use crate::obligation::ObligationPressure;
 use crate::pitch::PitchClass;
 use crate::rhythm::Duration;
@@ -29,15 +29,73 @@ pub struct MusicalWorldStateContext {
     pub performance_dialect: Option<PerformanceDialect>,
     /// Section role supplied by the formal plan, not guessed from note statistics.
     pub section_role: Option<SectionRole>,
+    /// Local formal tonal region from the declared plan; distinct from the
+    /// score-level key and never inferred from pitch-class frequency alone.
+    pub tonal_region: Option<Key>,
     /// Harmonic function supplied by formal harmonic analysis, not inferred
     /// from pitch-class frequency alone.
     pub harmonic_function: Option<HarmonicFunction>,
-    /// Independently computed thematic relations. These are observations,
-    /// not claims that a listener recognizes the relation.
-    pub motif_relations: Vec<MotifReturnEvidence>,
+    /// Thematic relations bound to exact source/target score regions.
+    pub motif_relations: Vec<MotifRelationObservationV1>,
     /// Current prospective-memory pressure, when an obligation ledger is
     /// active for this composition.
     pub obligation_pressure: Option<ObligationPressure>,
+}
+
+/// A motif-return measurement bound to exact half-open source and target regions.
+///
+/// The envelope preserves where the comparison was measured; the nested
+/// evidence records symbolic similarity channels. This still does not claim
+/// that a listener recognizes the return.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MotifRelationObservationV1 {
+    pub source_start: Duration,
+    pub source_end: Duration,
+    pub target_start: Duration,
+    pub target_end: Duration,
+    pub evidence: MotifReturnEvidence,
+}
+
+impl MotifRelationObservationV1 {
+    /// Measure a relation from the score instead of accepting an unlocalized
+    /// similarity value. Returns None when either region is invalid, outside
+    /// the score, or contains no melody attacks.
+    pub fn from_score(
+        score: &Score,
+        source_start: Duration,
+        source_end: Duration,
+        target_start: Duration,
+        target_end: Duration,
+        expected: crate::obligation::ReturnTransformation,
+    ) -> Option<Self> {
+        let total = score.total_beats.beats();
+        let valid_region = |start: Duration, end: Duration| {
+            start.beats() >= 0.0
+                && end.beats() > start.beats()
+                && end.beats() <= total + 1e-9
+        };
+        if !valid_region(source_start, source_end) || !valid_region(target_start, target_end) {
+            return None;
+        }
+        let evidence = compare_melodic_regions(
+            score,
+            source_start,
+            source_end,
+            target_start,
+            target_end,
+            expected,
+        );
+        if evidence.source_note_count == 0 || evidence.target_note_count == 0 {
+            return None;
+        }
+        Some(Self {
+            source_start,
+            source_end,
+            target_start,
+            target_end,
+            evidence,
+        })
+    }
 }
 
 /// Typed, renderer-independent symbolic observation of a musical region.
@@ -191,6 +249,59 @@ mod tests {
             PartId(3),
         ));
         score
+    }
+
+    #[test]
+    fn motif_relation_is_bound_to_measured_source_and_target_regions() {
+        let mut piece = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (pc, onset) in [(0, 0), (2, 1), (4, 2), (0, 3), (2, 4), (4, 5)] {
+            piece.push(note(
+                PitchClass::new(pc),
+                4,
+                onset,
+                VoiceRole::Melody,
+                PartId(1),
+            ));
+        }
+
+        let relation = MotifRelationObservationV1::from_score(
+            &piece,
+            Duration::new(0, 1),
+            Duration::new(3, 1),
+            Duration::new(3, 1),
+            Duration::new(6, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        )
+        .expect("both score regions contain melody");
+
+        assert_eq!(relation.source_start, Duration::zero());
+        assert_eq!(relation.source_end, Duration::new(3, 1));
+        assert_eq!(relation.target_start, Duration::new(3, 1));
+        assert_eq!(relation.target_end, Duration::new(6, 1));
+        assert_eq!(relation.evidence.source_note_count, 3);
+        assert_eq!(relation.evidence.target_note_count, 3);
+        assert!(relation.evidence.meets_threshold(0.9));
+    }
+
+    #[test]
+    fn motif_relation_rejects_unmeasurable_regions() {
+        let piece = score();
+        assert!(MotifRelationObservationV1::from_score(
+            &piece,
+            Duration::new(0, 1),
+            Duration::new(1, 1),
+            Duration::new(3, 1),
+            Duration::new(4, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        ).is_none());
+        assert!(MotifRelationObservationV1::from_score(
+            &piece,
+            Duration::new(0, 1),
+            Duration::new(1, 1),
+            Duration::new(1, 1),
+            Duration::new(4, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        ).is_none());
     }
 
     #[test]
