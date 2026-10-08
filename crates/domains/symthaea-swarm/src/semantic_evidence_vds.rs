@@ -289,6 +289,39 @@ impl Rfc9942VerifiedSignatureWithReceipt {
     pub const fn receipt_index(&self) -> usize { self.receipt_index }
     pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
     pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
+
+    /// Domain-separated identity of this verified outer Signature_With_Receipt composition.
+    ///
+    /// This binds the verified outer COSE layer, its exact authenticated and
+    /// provenance-bearing header inputs, the selected Receipt placement/index,
+    /// the exact receipt collection and receipt wire identities, and the inner
+    /// verified Receipt capability.
+    ///
+    /// This is a capability identity, not a truth or authorization claim.
+    pub fn capability_sha256(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(b"symthaea-swarm/rfc9942-verified-signature-with-receipt-capability-v1");
+        hasher.update(&self.outer_algorithm_id.to_be_bytes());
+        hasher.update(&self.outer_payload_sha256);
+        hasher.update(&[match self.outer_payload_mode {
+            Rfc9942PayloadMode::Attached => 1,
+            Rfc9942PayloadMode::Detached => 2,
+        }]);
+        hasher.update(&self.outer_verification_key_sha256);
+        hasher.update(&self.outer_protected_header_sha256);
+        hasher.update(&self.outer_unprotected_header_sha256);
+        hasher.update(&self.outer_external_aad_sha256);
+        hasher.update(&self.outer_signature_sha256);
+        hasher.update(&self.receipt_collection_sha256);
+        hasher.update(&self.receipt_sha256);
+        hasher.update(&(self.receipt_index as u64).to_be_bytes());
+        hasher.update(&[match self.receipt_placement {
+            Rfc9942ReceiptPlacement::Protected => 1,
+            Rfc9942ReceiptPlacement::Unprotected => 2,
+        }]);
+        hasher.update(&self.receipt.capability_sha256());
+        hasher.finalize().into()
+    }
 }
 
 impl Rfc9942VerifiedProof {
