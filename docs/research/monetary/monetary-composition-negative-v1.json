@@ -1,0 +1,13 @@
+{
+  "schema_version":"monetary-composition-negative-v1",
+  "cases":[
+    {"id":"COMP-X01","kind":"hidden_shared_backstop","nodes":["mutual-credit-v1","reserve-backed-stablecoin-v1"],"shared_dependencies":[],"hidden_dependency":{"kind":"backstop"},"expected":"reject"},
+    {"id":"COMP-X02","kind":"stale_edge_generation","component_generation":"g1","composition_generation":"g2","edge_generation":"g1","expected":"reject_stale_generation"},
+    {"id":"COMP-X03","kind":"routing_mutation_without_new_generation","composition_generation":"g7","routing_policy":"p8","expected":"reject_requires_new_generation"},
+    {"id":"COMP-X04","kind":"hub_non_interference_claim","node":"mutual-credit-v1","embedded_hub":"sovereign-money-v1","expected":"measure_interaction_not_component_purity"},
+    {"id":"COMP-X05","kind":"component_digest_substitution","node":"conventional-bank-money-v1","expected":"reject_digest_mismatch"},
+    {"id":"COMP-X06","kind":"edge_dropped_from_composition_digest","expected":"reject"},
+    {"id":"COMP-X07","kind":"shared_settlement_asset_added_silently","expected":"reject_requires_new_generation"},
+    {"id":"COMP-X08","kind":"component_property_average_used_as_composed_property","expected":"reject_derived_inference"}
+  ]
+}
