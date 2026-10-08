@@ -481,10 +481,7 @@ impl NixLocalExecutionAuthorityV1 {
             return Err(NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture);
         }
         service_effect_context_digest_for_intent(&intent)?;
-        Ok(Self {
-            intent,
-            approval,
-        })
+        Ok(Self { intent, approval })
     }
 
     /// Promote a consumed Service approval only after an observer-sealed definition-content capture.
@@ -508,10 +505,7 @@ impl NixLocalExecutionAuthorityV1 {
 
         validate_service_definition_capture_binding(&intent, content)?;
         service_effect_context_digest_for_intent(&intent)?;
-        Ok(Self {
-            intent,
-            approval,
-        })
+        Ok(Self { intent, approval })
     }
 
     /// Validate that the execution command is exactly the action that was approved.
@@ -577,7 +571,6 @@ impl NixLocalExecutionAuthorityV1 {
     }
 }
 
-
 pub(crate) struct LiveNixAuthorizationV1 {
     record: NixExecutionAuthorizationRecordV1,
     consumed: bool,
@@ -634,7 +627,10 @@ impl LiveNixAuthorizationV1 {
             decision: NixAuthorizationDecisionV1::Approved,
         };
         record.validate_shape()?;
-        Ok(Self { record, consumed: false })
+        Ok(Self {
+            record,
+            consumed: false,
+        })
     }
 
     pub(crate) fn audit_record(&self) -> &NixExecutionAuthorizationRecordV1 {
@@ -808,21 +804,21 @@ fn validate_service_effect_context_binding(
     let Some(rest) = pre_state_identity.strip_prefix(prefix) else {
         return Err(NixAuthorizationErrorV1::MissingServiceEffectContext);
     };
-    let (generation, rest) = rest
-        .split_once("|unit=")
-        .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+    let (generation, rest) =
+        rest.split_once("|unit=")
+            .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+                NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+            ))?;
+    let generation = generation.parse::<u64>().map_err(|_| {
+        NixAuthorizationErrorV1::InvalidServiceEffectContext(
             NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
-        ))?;
-    let generation = generation
-        .parse::<u64>()
-        .map_err(|_| NixAuthorizationErrorV1::InvalidServiceEffectContext(
-            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
-        ))?;
-    let (identity_unit, state_digest) = rest
-        .split_once("|state=")
-        .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
-            NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
-        ))?;
+        )
+    })?;
+    let (identity_unit, state_digest) =
+        rest.split_once("|state=")
+            .ok_or(NixAuthorizationErrorV1::InvalidServiceEffectContext(
+                NixServiceEffectContextErrorV1::InvalidDigest("pre-state identity"),
+            ))?;
     if generation != context.authorized_generation
         || identity_unit != context.unit
         || state_digest != context.pre_state_digest
@@ -839,7 +835,9 @@ fn validate_service_definition_capture(
     let NixActionDescriptorV1::Service { operation, unit } = &intent.action else {
         return Err(NixAuthorizationErrorV1::UnexpectedServiceEffectContext);
     };
-    let context = intent.service_effect_context.as_ref()
+    let context = intent
+        .service_effect_context
+        .as_ref()
         .ok_or(NixAuthorizationErrorV1::MissingServiceEffectContext)?;
     let evidence = content.as_ref();
     if evidence.unit != *unit
@@ -851,7 +849,8 @@ fn validate_service_definition_capture(
     {
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
     }
-    let content_digest = content.digest()
+    let content_digest = content
+        .digest()
         .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?;
     if context.authorized_definition_content_digest != content_digest {
         return Err(NixAuthorizationErrorV1::DefinitionContentCaptureMismatch);
@@ -915,11 +914,9 @@ fn service_effect_context_digest_for_intent(
                 unit,
                 intent.pre_state_identity.as_deref(),
             )?;
-            Ok(Some(
-                context
-                    .digest()
-                    .map_err(NixAuthorizationErrorV1::InvalidServiceEffectContext)?,
-            ))
+            Ok(Some(context.digest().map_err(
+                NixAuthorizationErrorV1::InvalidServiceEffectContext,
+            )?))
         }
         _ => {
             if intent.service_effect_context.is_some() {
@@ -931,10 +928,7 @@ fn service_effect_context_digest_for_intent(
     }
 }
 
-fn validate_hex_digest(
-    value: &str,
-    field: &'static str,
-) -> Result<(), NixAuthorizationErrorV1> {
+fn validate_hex_digest(value: &str, field: &'static str) -> Result<(), NixAuthorizationErrorV1> {
     if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(NixAuthorizationErrorV1::InvalidServiceEffectContext(
             NixServiceEffectContextErrorV1::InvalidDigest(field),
@@ -1048,7 +1042,9 @@ fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 
         | NixActionDescriptorV1::HomeManagerSwitch { .. } => NixActionScopeV1::UserModify,
         NixActionDescriptorV1::EnvSwitchGeneration { .. } => NixActionScopeV1::SystemCritical,
         NixActionDescriptorV1::EnvDeleteGenerations { .. }
-        | NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { .. } => NixActionScopeV1::Destructive,
+        | NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { .. } => {
+            NixActionScopeV1::Destructive
+        }
 
         NixActionDescriptorV1::RebuildTest { .. }
         | NixActionDescriptorV1::RebuildBoot { .. }
@@ -1313,11 +1309,10 @@ fn postcondition_status_tag(value: NixPostconditionStatusV1) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::service_effect::{
-        NixSystemdUnitDefinitionContentEvidenceV1,
-        NixSystemdUnitDefinitionContentFileV1,
+        NixSystemdUnitDefinitionContentEvidenceV1, NixSystemdUnitDefinitionContentFileV1,
     };
+    use super::*;
 
     fn rebuild() -> NixOSCommand {
         NixOSCommand::RebuildSwitch {
@@ -1420,22 +1415,26 @@ mod tests {
 
     #[test]
     fn invalid_new_typed_effect_parameters_fail_closed() {
-        assert!(validate_action_shape(&NixActionDescriptorV1::EnvSwitchGeneration {
-            generation: 0,
-        })
-        .is_err());
-        assert!(validate_action_shape(&NixActionDescriptorV1::EnvDeleteGenerations {
-            keep_last: 0,
-        })
-        .is_err());
-        assert!(validate_action_shape(
-            &NixActionDescriptorV1::EnvDeleteGenerationsOlderThan { days: 0 }
-        )
-        .is_err());
-        assert!(validate_action_shape(&NixActionDescriptorV1::FlakeInit {
-            template: Some(String::new()),
-        })
-        .is_err());
+        assert!(
+            validate_action_shape(&NixActionDescriptorV1::EnvSwitchGeneration { generation: 0 })
+                .is_err()
+        );
+        assert!(
+            validate_action_shape(&NixActionDescriptorV1::EnvDeleteGenerations { keep_last: 0 })
+                .is_err()
+        );
+        assert!(
+            validate_action_shape(&NixActionDescriptorV1::EnvDeleteGenerationsOlderThan {
+                days: 0
+            })
+            .is_err()
+        );
+        assert!(
+            validate_action_shape(&NixActionDescriptorV1::FlakeInit {
+                template: Some(String::new()),
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -1544,7 +1543,11 @@ mod tests {
     fn service_effect_context_is_part_of_intent_identity() {
         let base = contextual_service_intent();
         let mut changed = base.clone();
-        changed.service_effect_context.as_mut().unwrap().authorized_definition_digest =
+        changed
+            .service_effect_context
+            .as_mut()
+            .unwrap()
+            .authorized_definition_digest =
             "4444444444444444444444444444444444444444444444444444444444444444".into();
         changed.validate_shape().unwrap();
         assert_ne!(base.digest().unwrap(), changed.digest().unwrap());
@@ -1638,13 +1641,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            LiveNixAuthorizationV1::local_explicit_confirmation(
-                &intent,
-                "approval:test",
-                1,
-                None,
-            )
-            .unwrap_err(),
+            LiveNixAuthorizationV1::local_explicit_confirmation(&intent, "approval:test", 1, None,)
+                .unwrap_err(),
             NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
         );
     }
@@ -1653,13 +1651,8 @@ mod tests {
     fn service_authorization_with_unsealed_context_still_fails_closed() {
         let intent = contextual_service_intent();
         assert_eq!(
-            LiveNixAuthorizationV1::local_explicit_confirmation(
-                &intent,
-                "approval:test",
-                1,
-                None,
-            )
-            .unwrap_err(),
+            LiveNixAuthorizationV1::local_explicit_confirmation(&intent, "approval:test", 1, None,)
+                .unwrap_err(),
             NixAuthorizationErrorV1::MissingServiceDefinitionContentCapture
         );
     }
@@ -1670,8 +1663,9 @@ mod tests {
             operation: NixServiceOperationKindV1::Restart,
             unit: "nginx.service".into(),
         };
-        let intent = NixActionIntentV1::from_command("host:x", Some("generation:42".into()), &command)
-            .unwrap();
+        let intent =
+            NixActionIntentV1::from_command("host:x", Some("generation:42".into()), &command)
+                .unwrap();
         let mut context = service_context();
         context.operation = NixServiceOperationKindV1::Stop;
         assert_eq!(
@@ -1823,12 +1817,12 @@ mod tests {
             .digest()
             .unwrap();
         assert_eq!(
-            live.audit_record()
-                .service_effect_context_digest
-                .as_deref(),
+            live.audit_record().service_effect_context_digest.as_deref(),
             Some(expected.as_str())
         );
-        live.audit_record().validate_against_intent(&intent).unwrap();
+        live.audit_record()
+            .validate_against_intent(&intent)
+            .unwrap();
     }
 
     #[test]
