@@ -1,0 +1,13227 @@
+//! Evidence-first alternatives assessment.
+//!
+//! This crate deliberately avoids a single "green score". Burden dimensions
+//! remain separate, hard constraints fail closed, Pareto dominance is
+//! conservative over uncertainty intervals, and qualification cannot exceed
+//! what the linked evidence demonstrates.
+//!
+//! Intended composition:
+//!
+//! FunctionalRequirement -> CandidatePathway[] -> EvidenceBundle[]
+//! -> ConstraintEvaluation -> ParetoFrontier -> QualificationState
+//! -> AssessmentReceipt
+//!
+//! No type in this crate authorizes physical execution.
+
+#![deny(unsafe_code)]
+#![warn(missing_docs)]
+
+use blake3::Hasher;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Reusable adversarial benchmark scenarios.
+pub mod corpus;
+
+/// Serialized assessment schema version.
+pub const SCHEMA_VERSION: u16 = 53;
+/// Assessment algorithm version.
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-heuristic-scale-target-link-uncertainty-target-surface-lineage-v77";
+
+/// A burden dimension. Lower values are better for every dimension.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum Dimension {
+    /// Intrinsic human/ecological hazard burden.
+    Hazard,
+    /// Human/ecological exposure burden.
+    Exposure,
+    /// Climate/carbon burden.
+    Carbon,
+    /// Water burden.
+    Water,
+    /// Energy burden.
+    Energy,
+    /// Critical/virgin-material burden.
+    CriticalMaterial,
+    /// Waste/disposal burden.
+    Waste,
+    /// End-of-life/circularity burden; lower means more circular.
+    CircularityBurden,
+    /// Worker safety burden.
+    WorkerSafety,
+    /// Economic cost burden.
+    Cost,
+    /// Manufacturing difficulty/capability burden.
+    Manufacturability,
+    /// Supply-chain fragility burden.
+    SupplyChainFragility,
+}
+
+impl Dimension {
+    /// All dimensions in deterministic order.
+    pub const ALL: [Self; 12] = [
+        Self::Hazard,
+        Self::Exposure,
+        Self::Carbon,
+        Self::Water,
+        Self::Energy,
+        Self::CriticalMaterial,
+        Self::Waste,
+        Self::CircularityBurden,
+        Self::WorkerSafety,
+        Self::Cost,
+        Self::Manufacturability,
+        Self::SupplyChainFragility,
+    ];
+}
+
+/// An uncertainty interval for a burden value.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Interval {
+    /// Lower plausible bound.
+    pub lower: f64,
+    /// Upper plausible bound.
+    pub upper: f64,
+}
+
+impl Interval {
+    /// Construct a validated interval.
+    pub fn new(lower: f64, upper: f64) -> Result<Self, AssessmentError> {
+        if !lower.is_finite() || !upper.is_finite() {
+            return Err(AssessmentError::NonFinite);
+        }
+        if lower > upper {
+            return Err(AssessmentError::InvalidInterval { lower, upper });
+        }
+        Ok(Self { lower, upper })
+    }
+
+    /// Construct a point estimate.
+    pub fn point(value: f64) -> Result<Self, AssessmentError> {
+        Self::new(value, value)
+    }
+
+    /// Midpoint of the interval.
+    pub fn midpoint(self) -> f64 {
+        (self.lower + self.upper) / 2.0
+    }
+
+    /// Width of the uncertainty interval.
+    pub fn width(self) -> f64 {
+        self.upper - self.lower
+    }
+
+    fn clearly_better_than(self, other: Self) -> bool {
+        self.upper < other.lower
+    }
+
+    fn clearly_no_worse_than(self, other: Self) -> bool {
+        self.upper <= other.lower
+    }
+
+    fn clearly_worse_than(self, other: Self) -> bool {
+        self.lower > other.upper
+    }
+}
+
+/// The type of evidence behind an assertion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum EvidenceKind {
+    /// Direct physical or operational observation.
+    Observed,
+    /// Value reported by an external source.
+    Reported,
+    /// Simulation/model output.
+    Simulated,
+    /// Deterministically derived value.
+    Derived,
+    /// Explicit lifecycle-assessment evidence covering the declared scope.
+    LifecycleAssessed,
+    /// Unverified conjecture.
+    Hypothesis,
+    /// Observation from manufacturing-scale operation.
+    ManufacturingObserved,
+    /// Observation from field deployment.
+    FieldObserved,
+    /// Repeated operational monitoring.
+    ContinuouslyMonitored,
+}
+
+impl EvidenceKind {
+    /// All evidence kinds in deterministic enum order.
+    pub const ALL: [Self; 9] = [
+        Self::Observed,
+        Self::Reported,
+        Self::Simulated,
+        Self::Derived,
+        Self::LifecycleAssessed,
+        Self::Hypothesis,
+        Self::ManufacturingObserved,
+        Self::FieldObserved,
+        Self::ContinuouslyMonitored,
+    ];
+}
+
+/// Explicit decision-profile freshness semantics for evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceFreshnessPolicy {
+    /// Stable identity of the freshness policy profile.
+    pub policy_id: String,
+    /// Policy revision.
+    pub policy_revision: String,
+    /// Digest of the exact policy semantics.
+    pub policy_digest: String,
+    /// Maximum evidence age by evidence kind in seconds.
+    ///
+    /// Kinds absent from this map are not freshness-bounded by this policy.
+    pub max_age_seconds_by_kind: BTreeMap<EvidenceKind, u64>,
+}
+
+impl EvidenceFreshnessPolicy {
+    /// Validate the explicit freshness-policy identity and rules.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.policy_id.is_empty()
+            || self.policy_revision.is_empty()
+            || self.policy_digest.is_empty()
+        {
+            return Err(AssessmentError::EmptyFreshnessPolicyIdentity);
+        }
+        if self.max_age_seconds_by_kind.is_empty() {
+            return Err(AssessmentError::EmptyFreshnessPolicy);
+        }
+        Ok(())
+    }
+
+    fn max_age_for(&self, kind: EvidenceKind) -> Option<u64> {
+        self.max_age_seconds_by_kind.get(&kind).copied()
+    }
+}
+
+/// Reproducible provenance for candidate generation or simulated/derived evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DerivationRecord {
+    /// Stable identifier for the model, solver, transformation, or reasoning procedure.
+    pub method_id: String,
+    /// Version of the derivation method.
+    pub method_version: String,
+    /// Stable references to the inputs consumed by the derivation.
+    pub input_refs: Vec<String>,
+    /// Optional digest of the derivation configuration or source artifact.
+    pub configuration_hash: Option<String>,
+}
+
+impl DerivationRecord {
+    /// Validate derivation identity and input references.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.method_id.is_empty() || self.method_version.is_empty() || self.input_refs.is_empty()
+        {
+            return Err(AssessmentError::EmptyDerivationIdentity);
+        }
+        if self.input_refs.iter().any(|input| input.is_empty()) {
+            return Err(AssessmentError::EmptyDerivationInput);
+        }
+        if self
+            .configuration_hash
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::EmptyDerivationConfigurationHash);
+        }
+        Ok(())
+    }
+}
+
+/// Whether evidence supports or contradicts the linked assertion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceStance {
+    /// Evidence supports the assertion.
+    Supports,
+    /// Evidence contradicts the assertion.
+    Contradicts,
+}
+
+/// Canonical identity for the provenance source of an evidence record.
+///
+/// This is an identity contract, not an authenticity proof. External
+/// admission/attestation must establish that the declared authority actually
+/// controls the referenced source.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceSourceIdentity {
+    /// Stable authority/organization identity used for authority-diversity accounting.
+    pub authority_id: String,
+    /// Stable identifier for the referenced artifact, dataset, report, or observation stream.
+    pub artifact_id: String,
+    /// Digest of the referenced artifact or canonical source payload.
+    pub artifact_digest: String,
+    /// Optional issuer key fingerprint for future cryptographic attestation.
+    pub issuer_key_fingerprint: Option<String>,
+    /// Optional externally qualified source-authority admission reference.
+    pub admission: Option<SourceAdmissionRef>,
+}
+
+/// Reference to an externally qualified source-authority admission.
+///
+/// This structure carries the exact policy/admission identity used by an
+/// external authority boundary such as Mycelix. It does not perform or imply
+/// cryptographic verification inside this crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceAdmissionRef {
+    /// Stable authority identity to which this admission belongs.
+    pub authority_id: String,
+    /// Stable identifier for the source-admissibility policy.
+    pub policy_id: String,
+    /// Policy revision.
+    pub policy_revision: String,
+    /// Digest of the exact source-admissibility policy.
+    pub policy_digest: String,
+    /// Stable identity of the admission record.
+    pub admission_id: String,
+    /// Authority epoch/generation under which the admission was issued.
+    pub authority_epoch: String,
+    /// Optional digest binding this admission to the exact source subject.
+    ///
+    /// The bound subject is the source authority, artifact identity, artifact
+    /// digest, and issuer key fingerprint. Key rotation therefore requires a
+    /// new subject binding but does not create a new authority group.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_binding_digest: Option<String>,
+    /// Optional canonical fault-domain identity supplied by the authority policy.
+    pub fault_domain_id: Option<String>,
+    /// Optional Unix timestamp from which the admission is valid.
+    pub valid_from_epoch_seconds: Option<i64>,
+    /// Optional Unix timestamp through which the admission is valid.
+    pub valid_until_epoch_seconds: Option<i64>,
+}
+
+impl SourceAdmissionRef {
+    /// Validate the externally supplied admission reference structurally.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.authority_id.is_empty()
+            || self.policy_id.is_empty()
+            || self.policy_revision.is_empty()
+            || self.policy_digest.is_empty()
+            || self.admission_id.is_empty()
+            || self.authority_epoch.is_empty()
+        {
+            return Err(AssessmentError::EmptySourceAdmissionReference);
+        }
+        if self
+            .fault_domain_id
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::EmptySourceAdmissionReference);
+        }
+        if let (Some(from), Some(until)) = (
+            self.valid_from_epoch_seconds,
+            self.valid_until_epoch_seconds,
+        ) && from > until
+        {
+            return Err(AssessmentError::InvalidSourceAdmissionValidity { from, until });
+        }
+        Ok(())
+    }
+}
+
+impl EvidenceSourceIdentity {
+    /// Compute the canonical digest an admission must bind to this exact source subject.
+    ///
+    /// The admission reference itself is intentionally excluded to avoid recursive
+    /// self-reference. This binds authority, artifact identity, artifact digest,
+    /// and issuer-key fingerprint, while leaving authority-group identity anchored
+    /// only to the authority itself.
+    pub fn canonical_subject_binding_digest(&self) -> Result<String, AssessmentError> {
+        let bytes = serde_json::to_vec(&(
+            &self.authority_id,
+            &self.artifact_id,
+            &self.artifact_digest,
+            &self.issuer_key_fingerprint,
+        ))
+        .map_err(|_| AssessmentError::NonFinite)?;
+        let mut hasher = Hasher::new();
+        hasher.update(b"symthaea:source-admission-subject:v1\n");
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
+    /// Validate the canonical source identity fields.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.authority_id.is_empty()
+            || self.artifact_id.is_empty()
+            || self.artifact_digest.is_empty()
+        {
+            return Err(AssessmentError::EmptySourceIdentity);
+        }
+        if self
+            .issuer_key_fingerprint
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::EmptySourceIdentity);
+        }
+        if let Some(admission) = &self.admission {
+            admission.validate()?;
+            if admission.authority_id != self.authority_id {
+                return Err(AssessmentError::SourceAdmissionAuthorityMismatch {
+                    source_authority_id: self.authority_id.clone(),
+                    admission_authority_id: admission.authority_id.clone(),
+                });
+            }
+            if let Some(actual_binding) = &admission.subject_binding_digest {
+                let expected_binding = self.canonical_subject_binding_digest()?;
+                if actual_binding != &expected_binding {
+                    return Err(AssessmentError::SourceAdmissionSubjectBindingMismatch {
+                        expected_binding,
+                        actual_binding: actual_binding.clone(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Derive the stable identity used when counting distinct authority groups.
+    ///
+    /// This is structural source diversity, not proof of epistemic or organizational independence.
+    pub fn authority_group_id(&self) -> String {
+        let bytes = serde_json::to_vec(&self.authority_id)
+            .expect("source authority identity is serializable");
+        let mut hasher = Hasher::new();
+        hasher.update(&bytes);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Return authority diversity identity only when the admission is bound to
+    /// this exact source subject.
+    ///
+    /// An unbound admission reference remains provenance metadata but cannot
+    /// contribute to higher-tier authority diversity. Symthaea does not verify
+    /// the admission cryptographically; the authoritative admission/attestation
+    /// boundary remains external.
+    pub fn admitted_authority_group_id(&self) -> Option<String> {
+        let admission = self.admission.as_ref()?;
+        let actual_binding = admission.subject_binding_digest.as_ref()?;
+        let expected_binding = self.canonical_subject_binding_digest().ok()?;
+        (actual_binding == &expected_binding).then(|| self.authority_group_id())
+    }
+}
+
+/// Exact external reference for one link in a declared calibration/traceability chain.
+///
+/// This is a structural provenance reference only. Symthaea does not verify
+/// the external calibration record or the continuity of the chain.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityRef {
+    /// Stable identity of the exact calibration/comparison record.
+    pub calibration_id: String,
+    /// Revision of the exact calibration/comparison record.
+    pub calibration_revision: String,
+    /// Digest of the exact calibration/comparison record.
+    pub calibration_record_digest: String,
+    /// Unix timestamp at which this calibration/comparison reference was used.
+    pub used_at_epoch_seconds: i64,
+}
+
+impl CalibrationTraceabilityRef {
+    /// Validate the exact external calibration-record reference.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.calibration_id.is_empty()
+            || self.calibration_revision.is_empty()
+            || self.calibration_record_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        Ok(())
+    }
+}
+
+/// Role of a node in a declared metrological traceability topology.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum CalibrationTraceabilityNodeKind {
+    /// The measurement result whose traceability is being declared.
+    MeasurementResult,
+    /// An external result record supplying a value for a measurement-model input.
+    ModelInputResult,
+    /// An intermediate calibration/comparison record.
+    CalibrationRecord,
+    /// A terminal specified reference standard or realization.
+    ReferenceStandard,
+}
+
+/// One typed node in a declared metrological traceability topology.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityNodeRef {
+    /// Stable topology-local node identity.
+    pub node_id: String,
+    /// Semantic role of this node.
+    pub kind: CalibrationTraceabilityNodeKind,
+    /// Stable identity of the external result/calibration/reference record.
+    pub record_id: String,
+    /// Revision of the external result/calibration/reference record.
+    pub record_revision: String,
+    /// Digest of the exact external result/calibration/reference record.
+    pub record_digest: String,
+    /// Unix timestamp at which the referenced result/calibration/reference context was used.
+    pub used_at_epoch_seconds: i64,
+}
+
+impl CalibrationTraceabilityNodeRef {
+    /// Validate one topology node's structural identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.node_id.is_empty()
+            || self.record_id.is_empty()
+            || self.record_revision.is_empty()
+            || self.record_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        Ok(())
+    }
+}
+
+/// One directed relation in a declared metrological traceability topology.
+///
+/// The edge direction is from a result/calibration record to the reference
+/// node it relies upon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityEdge {
+    /// Node whose result/calibration depends on the referenced node.
+    pub from_node_id: String,
+    /// Node representing the reference used by the originating node.
+    pub to_node_id: String,
+}
+
+impl CalibrationTraceabilityEdge {
+    /// Validate one topology edge's endpoint identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.from_node_id.is_empty()
+            || self.to_node_id.is_empty()
+            || self.from_node_id == self.to_node_id
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        Ok(())
+    }
+}
+
+/// How the measurement-model input frontier classifies an input quantity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum MeasurementModelInputRole {
+    /// Quantity value obtained by direct or indirect measurement.
+    Measured,
+    /// Quantity value obtained by a calculation or other model.
+    Derived,
+    /// Quantity used to correct an observed/input quantity.
+    Correction,
+    /// Quantity that influences the relation between indication and result.
+    Influence,
+    /// A model-specific role not covered by the common classifications above.
+    Other,
+}
+
+/// Exact machine-readable external definition bound to a measurement-model input specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputQuantityDefinitionRef {
+    /// Stable identity of the external quantity-definition vocabulary/graph.
+    pub vocabulary_id: String,
+    /// Revision of the external quantity-definition vocabulary/graph.
+    pub vocabulary_revision: String,
+    /// Stable identity of the exact external quantity definition.
+    pub definition_id: String,
+    /// Revision of the exact external quantity definition.
+    pub definition_revision: String,
+    /// Digest of the exact external quantity definition record.
+    pub definition_digest: String,
+}
+
+impl MeasurementModelInputQuantityDefinitionRef {
+    /// Validate the opaque external quantity-definition identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.vocabulary_id.is_empty()
+            || self.vocabulary_revision.is_empty()
+            || self.definition_id.is_empty()
+            || self.definition_revision.is_empty()
+            || self.definition_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputQuantityDefinition);
+        }
+        Ok(())
+    }
+}
+
+/// Exact external identity of a machine-readable unit definition.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputUnitDefinitionRef {
+    /// Stable identity of the external unit vocabulary/graph.
+    pub vocabulary_id: String,
+    /// Revision of the external unit vocabulary/graph.
+    pub vocabulary_revision: String,
+    /// Stable identity of the exact external unit definition.
+    pub definition_id: String,
+    /// Revision of the exact external unit definition.
+    pub definition_revision: String,
+    /// Digest of the exact external unit definition record.
+    pub definition_digest: String,
+}
+
+impl MeasurementModelInputUnitDefinitionRef {
+    /// Validate the opaque external unit-definition identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.vocabulary_id.is_empty()
+            || self.vocabulary_revision.is_empty()
+            || self.definition_id.is_empty()
+            || self.definition_revision.is_empty()
+            || self.definition_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputUnitDefinition);
+        }
+        Ok(())
+    }
+}
+
+/// Exact external identity of the result record carrying a measurement-model input value.
+///
+/// This is intentionally opaque. Symthaea does not parse, recompute, or authenticate
+/// the referenced result/value record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputResultRef {
+    /// Stable identity of the exact external input-result record.
+    pub result_id: String,
+    /// Revision of the exact external input-result record.
+    pub result_revision: String,
+    /// Digest of the exact external input-result record.
+    pub result_record_digest: String,
+}
+
+impl MeasurementModelInputResultRef {
+    /// Validate the opaque external input-result identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.result_id.is_empty()
+            || self.result_revision.is_empty()
+            || self.result_record_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputResultReference);
+        }
+        Ok(())
+    }
+}
+
+/// Exact external identity of the specification governing one measurement-model input.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputSpecificationRef {
+    /// Stable identity of the authoritative input specification.
+    pub specification_id: String,
+    /// Revision of the authoritative input specification.
+    pub specification_revision: String,
+    /// Digest of the exact authoritative input specification record.
+    pub specification_digest: String,
+    /// Optional exact machine-readable quantity definition bound by the authoritative specification.
+    ///
+    /// Symthaea treats this as an opaque external reference. It does not parse,
+    /// infer, or independently validate quantity kind, dimensions, units, or context
+    /// from the referenced external vocabulary.
+    pub quantity_definition: Option<MeasurementModelInputQuantityDefinitionRef>,
+    /// Optional exact machine-readable unit definition bound by the authoritative specification.
+    ///
+    /// Symthaea treats this as an opaque external reference. It does not perform unit
+    /// conversion or infer compatibility from the referenced external vocabulary.
+    pub unit_definition: Option<MeasurementModelInputUnitDefinitionRef>,
+}
+
+impl MeasurementModelInputSpecificationRef {
+    /// Validate the external input-specification identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.specification_id.is_empty()
+            || self.specification_revision.is_empty()
+            || self.specification_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputSpecification);
+        }
+        if let Some(quantity_definition) = &self.quantity_definition {
+            quantity_definition.validate()?;
+        }
+        if let Some(unit_definition) = &self.unit_definition {
+            unit_definition.validate()?;
+        }
+        Ok(())
+    }
+}
+
+/// Exact identity binding between a measurement-model input quantity and the
+/// top-level traceability node carrying that input's declared lineage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityInputBinding {
+    /// Stable identity of the exact input quantity in the external measurement model.
+    pub input_quantity_id: String,
+    /// Exact external specification governing this input quantity.
+    pub input_specification: MeasurementModelInputSpecificationRef,
+    /// Optional exact external result record carrying the input quantity value.
+    ///
+    /// This is topology/evidence provenance rather than authoritative frontier semantics;
+    /// changing it changes the topology receipt without changing the model-input set digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_result_ref: Option<MeasurementModelInputResultRef>,
+    /// Frontier-attested role of this input quantity in the measurement model.
+    pub role: MeasurementModelInputRole,
+    /// Topology node at which the input quantity's traceability branch begins.
+    pub node_id: String,
+}
+
+impl CalibrationTraceabilityInputBinding {
+    /// Validate one input-to-branch binding structurally.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.input_quantity_id.is_empty() || self.node_id.is_empty() {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityInputBinding);
+        }
+        self.input_specification.validate()?;
+        if let Some(input_result_ref) = &self.input_result_ref {
+            input_result_ref.validate()?;
+        }
+        Ok(())
+    }
+}
+
+/// Exact external identity for the authoritative declared input frontier of a
+/// measurement model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementModelInputFrontierRef {
+    /// Stable identity of the authoritative model-input frontier record.
+    pub frontier_id: String,
+    /// Revision of the authoritative model-input frontier record.
+    pub frontier_revision: String,
+    /// Digest of the exact authoritative model-input frontier record.
+    pub frontier_digest: String,
+    /// Digest of the canonical input-quantity set attested by the authoritative frontier.
+    pub input_set_digest: String,
+    /// Exact measurement-model identity governed by this frontier.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model governed by this frontier.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model governed by this frontier.
+    pub measurement_model_digest: String,
+    /// Number of input quantities declared by the authoritative frontier.
+    pub input_count: usize,
+}
+
+impl MeasurementModelInputFrontierRef {
+    /// Validate the external input-frontier identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.frontier_id.is_empty()
+            || self.frontier_revision.is_empty()
+            || self.frontier_digest.is_empty()
+            || self.input_set_digest.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+            || self.input_count == 0
+        {
+            return Err(AssessmentError::InvalidMeasurementModelInputFrontier);
+        }
+        Ok(())
+    }
+}
+
+/// Explicit branched/network representation of metrological traceability.
+///
+/// This is a structural graph declaration, not a certification that the
+/// external calibration records are authentic, complete, or scientifically
+/// sufficient. The graph must be a connected DAG from the measurement result
+/// to one or more terminal reference standards.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CalibrationTraceabilityTopology {
+    /// Node representing the measurement result under assessment.
+    pub result_node_id: String,
+    /// Exact measurement-model identity governing the traceability topology.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+    /// Exact authoritative measurement-model input frontier.
+    pub input_frontier: MeasurementModelInputFrontierRef,
+    /// Exact measurement-model input-to-branch bindings.
+    ///
+    /// These bindings identify which top-level traceability branch is declared
+    /// for each model input. They must match the authoritative frontier's
+    /// exact input count and canonical input-set digest.
+    pub input_bindings: Vec<CalibrationTraceabilityInputBinding>,
+    /// Terminal specified reference-standard node identities.
+    pub reference_node_ids: Vec<String>,
+    /// Complete declared graph node set.
+    pub nodes: Vec<CalibrationTraceabilityNodeRef>,
+    /// Directed dependency/traceability edges.
+    pub edges: Vec<CalibrationTraceabilityEdge>,
+}
+
+impl CalibrationTraceabilityTopology {
+    /// Validate graph integrity and bind the topology to its observation result.
+    pub fn validate_against_observation(
+        &self,
+        observation_id: &str,
+        observation_record_digest: &str,
+        calibration_chain_refs: &[CalibrationTraceabilityRef],
+    ) -> Result<(), AssessmentError> {
+        if self.result_node_id.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+            || self.input_bindings.is_empty()
+            || self.reference_node_ids.is_empty()
+            || self.nodes.is_empty()
+        {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        self.input_frontier.validate()?;
+        if self.input_frontier.measurement_model_id != self.measurement_model_id
+            || self.input_frontier.measurement_model_revision != self.measurement_model_revision
+            || self.input_frontier.measurement_model_digest != self.measurement_model_digest
+        {
+            return Err(
+                AssessmentError::CalibrationTraceabilityInputFrontierModelMismatch {
+                    topology_model_id: self.measurement_model_id.clone(),
+                    topology_model_revision: self.measurement_model_revision.clone(),
+                    topology_model_digest: self.measurement_model_digest.clone(),
+                    frontier_model_id: self.input_frontier.measurement_model_id.clone(),
+                    frontier_model_revision: self.input_frontier.measurement_model_revision.clone(),
+                    frontier_model_digest: self.input_frontier.measurement_model_digest.clone(),
+                },
+            );
+        }
+        if self.input_bindings.is_empty() {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        let mut seen_input_quantities = BTreeSet::new();
+        for binding in &self.input_bindings {
+            binding.validate()?;
+            if !seen_input_quantities.insert(binding.input_quantity_id.as_str()) {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityInputBinding(
+                    binding.input_quantity_id.clone(),
+                ));
+            }
+        }
+        if self.input_frontier.input_count != self.input_bindings.len() {
+            return Err(
+                AssessmentError::MeasurementModelInputFrontierCountMismatch {
+                    frontier_id: self.input_frontier.frontier_id.clone(),
+                    expected_input_count: self.input_frontier.input_count,
+                    actual_input_count: self.input_bindings.len(),
+                },
+            );
+        }
+        let mut canonical_input_bindings = self.input_bindings.clone();
+        canonical_input_bindings.sort_by(|a, b| {
+            a.input_quantity_id
+                .cmp(&b.input_quantity_id)
+                .then_with(|| a.node_id.cmp(&b.node_id))
+        });
+        let expected_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&canonical_input_bindings)?;
+        if self.input_frontier.input_set_digest != expected_frontier_digest {
+            return Err(
+                AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                    frontier_id: self.input_frontier.frontier_id.clone(),
+                    expected_input_set_digest: expected_frontier_digest,
+                    actual_input_set_digest: self.input_frontier.input_set_digest.clone(),
+                },
+            );
+        }
+        let mut nodes_by_id = BTreeMap::<String, &CalibrationTraceabilityNodeRef>::new();
+        for node in &self.nodes {
+            node.validate()?;
+            if nodes_by_id.insert(node.node_id.clone(), node).is_some() {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityNode(
+                    node.node_id.clone(),
+                ));
+            }
+        }
+        let mut input_result_node_binding_counts = BTreeMap::<&str, usize>::new();
+        for binding in &self.input_bindings {
+            if let Some(input_result_ref) = &binding.input_result_ref {
+                let node = nodes_by_id
+                    .get(&binding.node_id)
+                    .ok_or_else(|| {
+                        AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                            input_quantity_id: binding.input_quantity_id.clone(),
+                            node_id: binding.node_id.clone(),
+                        }
+                    })?;
+                if node.kind != CalibrationTraceabilityNodeKind::ModelInputResult
+                    || node.record_id != input_result_ref.result_id
+                    || node.record_revision != input_result_ref.result_revision
+                    || node.record_digest != input_result_ref.result_record_digest
+                {
+                    return Err(
+                        AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                            input_quantity_id: binding.input_quantity_id.clone(),
+                            node_id: binding.node_id.clone(),
+                        },
+                    );
+                }
+                *input_result_node_binding_counts
+                    .entry(binding.node_id.as_str())
+                    .or_default() += 1;
+            }
+        }
+        for node in nodes_by_id.values() {
+            if node.kind == CalibrationTraceabilityNodeKind::ModelInputResult
+                && input_result_node_binding_counts
+                    .get(node.node_id.as_str())
+                    .copied()
+                    != Some(1)
+            {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityOrphanedInputResultNode {
+                        node_id: node.node_id.clone(),
+                    },
+                );
+            }
+        }
+
+        let result = nodes_by_id
+            .get(&self.result_node_id)
+            .ok_or(AssessmentError::CalibrationTraceabilityResultNodeMissing)?;
+        if result.kind != CalibrationTraceabilityNodeKind::MeasurementResult
+            || result.record_id != observation_id
+            || result.record_digest != observation_record_digest
+        {
+            return Err(AssessmentError::CalibrationTraceabilityResultObservationMismatch);
+        }
+        if self.nodes.iter().filter(|node| {
+            node.kind == CalibrationTraceabilityNodeKind::MeasurementResult
+        }).count() != 1 {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        if !self.nodes.iter().any(|node| {
+            node.kind == CalibrationTraceabilityNodeKind::CalibrationRecord
+        }) {
+            return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+        }
+        let mut reference_ids = BTreeSet::new();
+        for reference_id in &self.reference_node_ids {
+            if !reference_ids.insert(reference_id) {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityReference(
+                    reference_id.clone(),
+                ));
+            }
+            let reference = nodes_by_id
+                .get(reference_id)
+                .ok_or(AssessmentError::CalibrationTraceabilityReferenceMissing)?;
+            if reference.kind != CalibrationTraceabilityNodeKind::ReferenceStandard {
+                return Err(AssessmentError::InvalidCalibrationTraceabilityTopology);
+            }
+        }
+        let mut adjacency = BTreeMap::<String, BTreeSet<String>>::new();
+        let mut reverse = BTreeMap::<String, BTreeSet<String>>::new();
+        for node_id in nodes_by_id.keys() {
+            adjacency.insert(node_id.clone(), BTreeSet::new());
+            reverse.insert(node_id.clone(), BTreeSet::new());
+        }
+        for edge in &self.edges {
+            edge.validate()?;
+            if !nodes_by_id.contains_key(&edge.from_node_id)
+                || !nodes_by_id.contains_key(&edge.to_node_id)
+            {
+                return Err(AssessmentError::CalibrationTraceabilityEdgeEndpointMissing);
+            }
+            if !adjacency
+                .get_mut(&edge.from_node_id)
+                .expect("validated edge origin exists")
+                .insert(edge.to_node_id.clone())
+            {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityEdge {
+                    from_node_id: edge.from_node_id.clone(),
+                    to_node_id: edge.to_node_id.clone(),
+                });
+            }
+            reverse
+                .get_mut(&edge.to_node_id)
+                .expect("validated edge target exists")
+                .insert(edge.from_node_id.clone());
+        }
+        let result_children = adjacency
+            .get(&self.result_node_id)
+            .cloned()
+            .unwrap_or_default();
+        for binding in &self.input_bindings {
+            let binding_node = nodes_by_id.get(&binding.node_id).ok_or_else(|| {
+                AssessmentError::CalibrationTraceabilityInputBindingNodeMissing {
+                    input_quantity_id: binding.input_quantity_id.clone(),
+                    node_id: binding.node_id.clone(),
+                }
+            })?;
+            if !result_children.contains(&binding.node_id) {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityInputBindingNotDirectChild {
+                        input_quantity_id: binding.input_quantity_id.clone(),
+                        node_id: binding.node_id.clone(),
+                    },
+                );
+            }
+            if binding_node.kind == CalibrationTraceabilityNodeKind::ReferenceStandard {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityInputBindingInvalidNodeKind {
+                        input_quantity_id: binding.input_quantity_id.clone(),
+                        node_id: binding.node_id.clone(),
+                        kind: binding_node.kind,
+                    },
+                );
+            }
+        }
+        for reference_id in &self.reference_node_ids {
+            if adjacency
+                .get(reference_id)
+                .is_some_and(|targets| !targets.is_empty())
+            {
+                return Err(
+                    AssessmentError::CalibrationTraceabilityReferenceHasOutgoingEdge(
+                        reference_id.clone(),
+                    ),
+                );
+            }
+        }
+        if reverse
+            .get(&self.result_node_id)
+            .is_some_and(|parents| !parents.is_empty())
+        {
+            return Err(AssessmentError::CalibrationTraceabilityResultHasIncomingEdge);
+        }
+        let mut indegree = BTreeMap::<String, usize>::new();
+        for node_id in nodes_by_id.keys() {
+            indegree.insert(
+                node_id.clone(),
+                reverse.get(node_id).map_or(0, BTreeSet::len),
+            );
+        }
+        let mut ready = indegree
+            .iter()
+            .filter_map(|(node_id, degree)| (*degree == 0).then_some(node_id.clone()))
+            .collect::<BTreeSet<_>>();
+        let mut topo_count = 0usize;
+        while let Some(node_id) = ready.pop_first() {
+            topo_count += 1;
+            for target in adjacency
+                .get(&node_id)
+                .into_iter()
+                .flat_map(|targets| targets.iter())
+            {
+                let degree = indegree
+                    .get_mut(target)
+                    .expect("validated topology node exists");
+                *degree -= 1;
+                if *degree == 0 {
+                    ready.insert(target.clone());
+                }
+            }
+        }
+        if topo_count != nodes_by_id.len() {
+            return Err(AssessmentError::CalibrationTraceabilityTopologyCycle);
+        }
+        let mut reachable_from_result = BTreeSet::new();
+        let mut stack = vec![self.result_node_id.clone()];
+        while let Some(node_id) = stack.pop() {
+            if !reachable_from_result.insert(node_id.clone()) {
+                continue;
+            }
+            if let Some(targets) = adjacency.get(&node_id) {
+                stack.extend(targets.iter().cloned());
+            }
+        }
+        if reachable_from_result.len() != nodes_by_id.len() {
+            return Err(AssessmentError::CalibrationTraceabilityTopologyDisconnected);
+        }
+        let mut reaches_reference = BTreeSet::new();
+        let mut reverse_stack = self.reference_node_ids.clone();
+        while let Some(node_id) = reverse_stack.pop() {
+            if !reaches_reference.insert(node_id.clone()) {
+                continue;
+            }
+            if let Some(parents) = reverse.get(&node_id) {
+                reverse_stack.extend(parents.iter().cloned());
+            }
+        }
+        if reaches_reference.len() != nodes_by_id.len() {
+            return Err(AssessmentError::CalibrationTraceabilityDeadEnd);
+        }
+        for calibration in calibration_chain_refs {
+            let represented = self.nodes.iter().any(|node| {
+                node.kind == CalibrationTraceabilityNodeKind::CalibrationRecord
+                    && node.record_id == calibration.calibration_id
+                    && node.record_revision == calibration.calibration_revision
+                    && node.record_digest == calibration.calibration_record_digest
+                    && node.used_at_epoch_seconds == calibration.used_at_epoch_seconds
+            });
+            if !represented {
+                return Err(AssessmentError::CalibrationTraceabilityChainLinkMissing {
+                    calibration_id: calibration.calibration_id.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Compute the canonical digest of the complete topology.
+    pub fn canonical_digest(&self) -> Result<String, AssessmentError> {
+        let mut canonical = self.clone();
+        canonical.nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+        canonical.edges.sort_by(|a, b| {
+            a.from_node_id
+                .cmp(&b.from_node_id)
+                .then_with(|| a.to_node_id.cmp(&b.to_node_id))
+        });
+        canonical.input_bindings.sort_by(|a, b| {
+            a.input_quantity_id
+                .cmp(&b.input_quantity_id)
+                .then_with(|| a.node_id.cmp(&b.node_id))
+        });
+        canonical.reference_node_ids.sort();
+        let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+        let mut hasher = Hasher::new();
+        hasher.update(b"symthaea:calibration-traceability-topology:v1\n");
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+}
+
+/// Compute the canonical digest of an authoritative measurement-model input frontier.
+fn canonical_measurement_model_input_frontier_digest(
+    input_bindings: &[CalibrationTraceabilityInputBinding],
+) -> Result<String, AssessmentError> {
+    let mut canonical = input_bindings
+        .iter()
+        .map(|binding| {
+            (
+                &binding.input_quantity_id,
+                &binding.input_specification.specification_id,
+                &binding.input_specification.specification_revision,
+                &binding.input_specification.specification_digest,
+                binding.input_specification.quantity_definition.as_ref().map(|definition| {
+                    (
+                        &definition.vocabulary_id,
+                        &definition.vocabulary_revision,
+                        &definition.definition_id,
+                        &definition.definition_revision,
+                        &definition.definition_digest,
+                    )
+                }),
+                binding.input_specification.unit_definition.as_ref().map(|definition| {
+                    (
+                        &definition.vocabulary_id,
+                        &definition.vocabulary_revision,
+                        &definition.definition_id,
+                        &definition.definition_revision,
+                        &definition.definition_digest,
+                    )
+                }),
+                binding.role,
+            )
+        })
+        .collect::<Vec<_>>();
+    canonical.sort_by(|a, b| a.0.cmp(b.0));
+    let mut unique = canonical.iter().map(|entry| entry.0.as_str()).collect::<Vec<_>>();
+    unique.dedup();
+    if unique.len() != canonical.len() {
+        return Err(AssessmentError::DuplicateMeasurementModelInputQuantity);
+    }
+    let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea:measurement-model-input-frontier:v1\n");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+/// Exact provenance reference for a physical or operational observation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObservationProvenanceRef {
+    /// Stable identity of the observation result/record.
+    pub observation_id: String,
+    /// Exact specimen, lot, batch, product instance, or process-run identity observed.
+    pub subject_id: String,
+    /// Stable identity of the measurement/test activity.
+    pub activity_id: String,
+    /// Stable identity of the measurand/quantity actually subject to measurement.
+    pub measurand_id: String,
+    /// Stable identity of the documented measurement/test procedure.
+    pub procedure_id: String,
+    /// Digest of the exact documented measurement/test procedure or canonical procedure payload.
+    pub procedure_digest: String,
+    /// Digest of the underlying measurement record or canonical observation payload.
+    pub record_digest: String,
+    /// Optional measurement-system identity.
+    pub measurement_system_id: Option<String>,
+    /// Ordered exact references forming the declared calibration/traceability chain.
+    pub calibration_chain_refs: Vec<CalibrationTraceabilityRef>,
+    /// Optional branched/network topology for multi-input traceability cases.
+    pub calibration_topology: Option<CalibrationTraceabilityTopology>,
+    /// Optional experimental-design identity that caused this observation to be collected.
+    pub experimental_design_id: Option<String>,
+    /// Optional exact discrimination target within that experimental design.
+    pub experimental_target_id: Option<String>,
+}
+
+impl ObservationProvenanceRef {
+    /// Validate the structural observation-provenance reference.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.observation_id.is_empty()
+            || self.subject_id.is_empty()
+            || self.activity_id.is_empty()
+            || self.measurand_id.is_empty()
+            || self.procedure_id.is_empty()
+            || self.procedure_digest.is_empty()
+            || self.record_digest.is_empty()
+            || self.calibration_chain_refs.is_empty()
+        {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        if self
+            .measurement_system_id
+            .as_ref()
+            .is_some_and(String::is_empty)
+            || self
+                .experimental_design_id
+                .as_ref()
+                .is_some_and(String::is_empty)
+            || self
+                .experimental_target_id
+                .as_ref()
+                .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        if self.experimental_target_id.is_some() && self.experimental_design_id.is_none() {
+            return Err(AssessmentError::InvalidObservationProvenance);
+        }
+        let mut seen_calibration_links = BTreeSet::new();
+        for calibration in &self.calibration_chain_refs {
+            calibration.validate()?;
+            let identity = (
+                calibration.calibration_id.as_str(),
+                calibration.calibration_revision.as_str(),
+                calibration.calibration_record_digest.as_str(),
+                calibration.used_at_epoch_seconds,
+            );
+            if !seen_calibration_links.insert(identity) {
+                return Err(AssessmentError::DuplicateCalibrationTraceabilityLink {
+                    calibration_id: calibration.calibration_id.clone(),
+                    calibration_revision: calibration.calibration_revision.clone(),
+                    calibration_record_digest: calibration.calibration_record_digest.clone(),
+                    used_at_epoch_seconds: calibration.used_at_epoch_seconds,
+                });
+            }
+        }
+        if let Some(topology) = &self.calibration_topology {
+            topology.validate_against_observation(
+                &self.observation_id,
+                &self.record_digest,
+                &self.calibration_chain_refs,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Quantitative uncertainty statement attached to an observation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MeasurementUncertaintyStatement {
+    /// Combined standard uncertainty.
+    Standard { value: f64, unit: String },
+    /// Expanded uncertainty with an explicit coverage factor.
+    Expanded { value: f64, unit: String, coverage_factor: f64 },
+}
+
+impl MeasurementUncertaintyStatement {
+    /// Validate the quantitative uncertainty statement.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        match self {
+            Self::Standard { value, unit } => {
+                if !value.is_finite() || *value <= 0.0 || unit.is_empty() {
+                    return Err(AssessmentError::InvalidMeasurementUncertainty);
+                }
+            }
+            Self::Expanded {
+                value,
+                unit,
+                coverage_factor,
+            } => {
+                if !value.is_finite()
+                    || *value <= 0.0
+                    || unit.is_empty()
+                    || !coverage_factor.is_finite()
+                    || *coverage_factor <= 0.0
+                {
+                    return Err(AssessmentError::InvalidMeasurementUncertainty);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn unit(&self) -> &str {
+        match self {
+            Self::Standard { unit, .. } | Self::Expanded { unit, .. } => unit,
+        }
+    }
+}
+
+/// How an uncertainty component was evaluated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MeasurementUncertaintyComponentEvaluationType {
+    /// Statistical evaluation from repeated observations or equivalent statistical analysis.
+    TypeA,
+    /// Evaluation by means other than statistical analysis of repeated observations.
+    TypeB,
+}
+
+/// Exact provenance for one uncertainty-budget component.
+///
+/// The component remains an external reference: Symthaea verifies only that
+/// the declared component identity/digest is bound to the exact uncertainty
+/// budget and measurement model named by the parent uncertainty record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyComponentRef {
+    /// Stable identity of the uncertainty-budget component.
+    pub component_id: String,
+    /// Classification of how this component's standard uncertainty was evaluated.
+    pub evaluation_type: MeasurementUncertaintyComponentEvaluationType,
+    /// Digest of the exact component record or canonical component payload.
+    pub component_record_digest: String,
+    /// Stable identity of the exact uncertainty-budget record.
+    pub uncertainty_budget_id: String,
+    /// Revision of the exact uncertainty-budget record.
+    pub uncertainty_budget_revision: String,
+    /// Digest of the exact uncertainty-budget record.
+    pub uncertainty_budget_digest: String,
+    /// Stable identity of the exact measurement model used by the budget.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+}
+
+impl MeasurementUncertaintyComponentRef {
+    /// Validate component identity and exact budget/model lineage.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.component_id.is_empty()
+            || self.component_record_digest.is_empty()
+            || self.uncertainty_budget_id.is_empty()
+            || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyComponentReference);
+        }
+        Ok(())
+    }
+}
+
+/// Exact provenance for how an uncertainty result was evaluated and combined.
+///
+/// These references identify the authoritative evaluation record, uncertainty
+/// evaluation method, combination rule, covariance/dependence model, and—when
+/// an expanded statement is used—the coverage-factor method. Symthaea verifies
+/// identity completeness and binds these references into the uncertainty
+/// integrity commitment; it does not recompute or certify the scientific result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyEvaluationRef {
+    /// Stable identity of the exact uncertainty evaluation record.
+    pub evaluation_id: String,
+    /// Exact uncertainty identity evaluated by this record.
+    pub uncertainty_id: String,
+    /// Exact observation identity evaluated by this record.
+    pub observation_id: String,
+    /// Exact observation-record digest evaluated by this record.
+    pub observation_record_digest: String,
+    /// Exact uncertainty-budget identity evaluated by this record.
+    pub uncertainty_budget_id: String,
+    /// Revision of the exact uncertainty-budget record.
+    pub uncertainty_budget_revision: String,
+    /// Digest of the exact uncertainty-budget record.
+    pub uncertainty_budget_digest: String,
+    /// Canonical component-frontier digest evaluated by this record.
+    pub component_set_digest: String,
+    /// Number of uncertainty components evaluated by this record.
+    pub component_count: usize,
+    /// BLAKE3 digest over the exact ordered calibration/traceability chain used by the evaluation.
+    pub calibration_chain_digest: String,
+    /// Number of calibration/traceability links used by the evaluation.
+    pub calibration_chain_count: usize,
+    /// Optional digest binding the evaluation to a branched/network traceability topology.
+    pub calibration_topology_digest: Option<String>,
+    /// Exact measurement-model identity evaluated by this record.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+    /// Exact measurand identity evaluated by this record.
+    pub measurand_id: String,
+    /// Exact measurement-procedure identity evaluated by this record.
+    pub procedure_id: String,
+    /// Digest of the exact measurement procedure evaluated by this record.
+    pub procedure_digest: String,
+    /// Revision of the exact uncertainty evaluation record.
+    pub evaluation_revision: String,
+    /// Digest of the exact uncertainty evaluation record.
+    pub evaluation_digest: String,
+    /// Stable identity of the uncertainty evaluation method.
+    pub method_id: String,
+    /// Revision of the uncertainty evaluation method.
+    pub method_revision: String,
+    /// Digest of the exact uncertainty evaluation method.
+    pub method_digest: String,
+    /// Stable identity of the uncertainty-component combination method.
+    pub combination_method_id: String,
+    /// Revision of the exact combination method.
+    pub combination_method_revision: String,
+    /// Digest of the exact combination method.
+    pub combination_method_digest: String,
+    /// Stable identity of the covariance/dependence model.
+    pub covariance_model_id: String,
+    /// Revision of the exact covariance/dependence model.
+    pub covariance_model_revision: String,
+    /// Digest of the exact covariance/dependence model.
+    pub covariance_model_digest: String,
+    /// Stable identity of the probability-distribution treatment used by the evaluation.
+    pub probability_distribution_id: String,
+    /// Revision of the exact probability-distribution treatment.
+    pub probability_distribution_revision: String,
+    /// Digest of the exact probability-distribution treatment.
+    pub probability_distribution_digest: String,
+    /// Stable identity of the degrees-of-freedom record supporting the evaluation.
+    pub degrees_of_freedom_id: String,
+    /// Revision of the exact degrees-of-freedom record.
+    pub degrees_of_freedom_revision: String,
+    /// Digest of the exact degrees-of-freedom record.
+    pub degrees_of_freedom_digest: String,
+    /// Exact coverage probability associated with expanded uncertainty, when applicable.
+    pub coverage_probability: Option<f64>,
+    /// Optional provenance for the coverage-factor method; required for expanded uncertainty.
+    pub coverage_method: Option<MeasurementUncertaintyCoverageMethodRef>,
+}
+
+impl MeasurementUncertaintyEvaluationRef {
+    /// Validate exact evaluation-method lineage without evaluating the science.
+    pub fn validate(&self, expanded: bool) -> Result<(), AssessmentError> {
+        if self.evaluation_id.is_empty()
+            || self.uncertainty_id.is_empty()
+            || self.observation_id.is_empty()
+            || self.observation_record_digest.is_empty()
+            || self.uncertainty_budget_id.is_empty()
+            || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
+            || self.component_set_digest.is_empty()
+            || self.component_count == 0
+            || self.calibration_chain_digest.is_empty()
+            || self.calibration_chain_count == 0
+            || self
+                .calibration_topology_digest
+                .as_ref()
+                .is_some_and(String::is_empty)
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+            || self.measurand_id.is_empty()
+            || self.procedure_id.is_empty()
+            || self.procedure_digest.is_empty()
+            || self.evaluation_revision.is_empty()
+            || self.evaluation_digest.is_empty()
+            || self.method_id.is_empty()
+            || self.method_revision.is_empty()
+            || self.method_digest.is_empty()
+            || self.combination_method_id.is_empty()
+            || self.combination_method_revision.is_empty()
+            || self.combination_method_digest.is_empty()
+            || self.covariance_model_id.is_empty()
+            || self.covariance_model_revision.is_empty()
+            || self.covariance_model_digest.is_empty()
+            || self.probability_distribution_id.is_empty()
+            || self.probability_distribution_revision.is_empty()
+            || self.probability_distribution_digest.is_empty()
+            || self.degrees_of_freedom_id.is_empty()
+            || self.degrees_of_freedom_revision.is_empty()
+            || self.degrees_of_freedom_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+        }
+        match (&self.coverage_method, &self.coverage_probability, expanded) {
+            (Some(method), Some(probability), true) => {
+                method.validate()?;
+                if !probability.is_finite() || !(0.0..1.0).contains(probability) {
+                    return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+                }
+            }
+            (Some(method), None, true) => method.validate()?,
+            (None, None, false) => {}
+            _ => return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation),
+        }
+        Ok(())
+    }
+}
+
+/// Exact provenance for the coverage-factor method used by an expanded uncertainty statement.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyCoverageMethodRef {
+    /// Stable identity of the exact coverage-factor method.
+    pub method_id: String,
+    /// Revision of the exact coverage-factor method.
+    pub method_revision: String,
+    /// Digest of the exact coverage-factor method.
+    pub method_digest: String,
+}
+
+impl MeasurementUncertaintyCoverageMethodRef {
+    /// Validate exact coverage-method provenance.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.method_id.is_empty()
+            || self.method_revision.is_empty()
+            || self.method_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyEvaluation);
+        }
+        Ok(())
+    }
+}
+
+/// Machine-readable reference to the uncertainty analysis accompanying an observation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyRef {
+    /// Stable identity of the uncertainty statement.
+    pub uncertainty_id: String,
+    /// Exact observation identity to which the uncertainty statement applies.
+    pub observation_id: String,
+    /// Digest of the exact observation record to which the uncertainty statement applies.
+    pub observation_record_digest: String,
+    /// Exact uncertainty-budget identity governing the component set and combination.
+    pub uncertainty_budget_id: String,
+    /// Revision of the exact uncertainty-budget record.
+    pub uncertainty_budget_revision: String,
+    /// Digest of the exact uncertainty-budget record.
+    pub uncertainty_budget_digest: String,
+    /// Digest attested by the exact budget record for its complete canonical component frontier.
+    pub uncertainty_budget_component_set_digest: String,
+    /// Component count attested by the exact uncertainty-budget record.
+    pub uncertainty_budget_component_count: usize,
+    /// Exact measurement-model identity governing the uncertainty evaluation.
+    pub measurement_model_id: String,
+    /// Revision of the exact measurement model.
+    pub measurement_model_revision: String,
+    /// Digest of the exact measurement model.
+    pub measurement_model_digest: String,
+    /// Quantitative statement reported with the observation.
+    pub statement: MeasurementUncertaintyStatement,
+    /// Exact provenance for evaluation, combination, dependence, distribution, degrees-of-freedom, and coverage methodology.
+    pub evaluation: MeasurementUncertaintyEvaluationRef,
+    /// Exact measurand identity to which the uncertainty statement applies.
+    pub measurand_id: String,
+    /// Exact measurement/test procedure identity to which the uncertainty applies.
+    pub procedure_id: String,
+    /// Digest of the exact measurement/test procedure or canonical procedure payload.
+    pub procedure_digest: String,
+    /// References to the exact uncertainty-budget components considered.
+    pub component_refs: Vec<MeasurementUncertaintyComponentRef>,
+    /// BLAKE3 digest of the canonical sorted uncertainty-component reference set.
+    pub component_refs_digest: String,
+    /// Digest of the canonical uncertainty statement/record supplied by the source.
+    pub record_digest: String,
+    /// Integrity commitment only; the authoritative uncertainty calculation remains external.
+    pub binding_digest: String,
+}
+
+impl MeasurementUncertaintyRef {
+    /// Validate the structural and integrity-binding uncertainty statement.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.uncertainty_id.is_empty()
+            || self.observation_id.is_empty()
+            || self.observation_record_digest.is_empty()
+            || self.uncertainty_budget_id.is_empty()
+            || self.uncertainty_budget_revision.is_empty()
+            || self.uncertainty_budget_digest.is_empty()
+            || self.uncertainty_budget_component_set_digest.is_empty()
+            || self.uncertainty_budget_component_count == 0
+            || self.measurement_model_id.is_empty()
+            || self.measurement_model_revision.is_empty()
+            || self.measurement_model_digest.is_empty()
+            || self.measurand_id.is_empty()
+            || self.procedure_id.is_empty()
+            || self.procedure_digest.is_empty()
+            || self.record_digest.is_empty()
+            || self.binding_digest.is_empty()
+            || self.component_refs_digest.is_empty()
+            || self.component_refs.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertainty);
+        }
+        self.statement.validate()?;
+        self.evaluation.validate(matches!(
+            &self.statement,
+            MeasurementUncertaintyStatement::Expanded { .. }
+        ))?;
+        let evaluation_scope = &self.evaluation;
+        let scope_pairs = [
+            ("uncertainty_id", evaluation_scope.uncertainty_id.as_str(), self.uncertainty_id.as_str()),
+            ("observation_id", evaluation_scope.observation_id.as_str(), self.observation_id.as_str()),
+            ("observation_record_digest", evaluation_scope.observation_record_digest.as_str(), self.observation_record_digest.as_str()),
+            ("uncertainty_budget_id", evaluation_scope.uncertainty_budget_id.as_str(), self.uncertainty_budget_id.as_str()),
+            ("uncertainty_budget_revision", evaluation_scope.uncertainty_budget_revision.as_str(), self.uncertainty_budget_revision.as_str()),
+            ("uncertainty_budget_digest", evaluation_scope.uncertainty_budget_digest.as_str(), self.uncertainty_budget_digest.as_str()),
+            ("component_set_digest", evaluation_scope.component_set_digest.as_str(), self.component_refs_digest.as_str()),
+            ("measurement_model_id", evaluation_scope.measurement_model_id.as_str(), self.measurement_model_id.as_str()),
+            ("measurement_model_revision", evaluation_scope.measurement_model_revision.as_str(), self.measurement_model_revision.as_str()),
+            ("measurement_model_digest", evaluation_scope.measurement_model_digest.as_str(), self.measurement_model_digest.as_str()),
+            ("measurand_id", evaluation_scope.measurand_id.as_str(), self.measurand_id.as_str()),
+            ("procedure_id", evaluation_scope.procedure_id.as_str(), self.procedure_id.as_str()),
+            ("procedure_digest", evaluation_scope.procedure_digest.as_str(), self.procedure_digest.as_str()),
+        ];
+        for (field, expected, actual) in scope_pairs {
+            if expected != actual {
+                return Err(AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    field: field.to_string(),
+                    expected: expected.to_string(),
+                    actual: actual.to_string(),
+                });
+            }
+        }
+        if evaluation_scope.component_count != self.component_refs.len() {
+            return Err(AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch {
+                uncertainty_id: self.uncertainty_id.clone(),
+                field: "component_count".into(),
+                expected: self.component_refs.len().to_string(),
+                actual: evaluation_scope.component_count.to_string(),
+            });
+        }
+
+        let mut canonical_component_refs = self.component_refs.clone();
+        for component in &canonical_component_refs {
+            component.validate()?;
+            if component.uncertainty_budget_id != self.uncertainty_budget_id
+                || component.uncertainty_budget_revision != self.uncertainty_budget_revision
+            {
+                return Err(
+                    AssessmentError::MeasurementUncertaintyComponentBudgetMismatch {
+                        uncertainty_id: self.uncertainty_id.clone(),
+                        component_id: component.component_id.clone(),
+                        expected_budget_id: self.uncertainty_budget_id.clone(),
+                        actual_budget_id: component.uncertainty_budget_id.clone(),
+                        expected_budget_revision: self.uncertainty_budget_revision.clone(),
+                        actual_budget_revision: component.uncertainty_budget_revision.clone(),
+                    },
+                );
+            }
+            if component.uncertainty_budget_digest != self.uncertainty_budget_digest {
+                return Err(
+                    AssessmentError::MeasurementUncertaintyComponentBudgetDigestMismatch {
+                        uncertainty_id: self.uncertainty_id.clone(),
+                        component_id: component.component_id.clone(),
+                        expected_budget_digest: self.uncertainty_budget_digest.clone(),
+                        actual_budget_digest: component.uncertainty_budget_digest.clone(),
+                    },
+                );
+            }
+            if component.measurement_model_id != self.measurement_model_id
+                || component.measurement_model_revision != self.measurement_model_revision
+            {
+                return Err(AssessmentError::MeasurementUncertaintyComponentModelMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    component_id: component.component_id.clone(),
+                    expected_model_id: self.measurement_model_id.clone(),
+                    actual_model_id: component.measurement_model_id.clone(),
+                    expected_model_revision: self.measurement_model_revision.clone(),
+                    actual_model_revision: component.measurement_model_revision.clone(),
+                });
+            }
+            if component.measurement_model_digest != self.measurement_model_digest {
+                return Err(
+                    AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch {
+                        uncertainty_id: self.uncertainty_id.clone(),
+                        component_id: component.component_id.clone(),
+                        expected_model_digest: self.measurement_model_digest.clone(),
+                        actual_model_digest: component.measurement_model_digest.clone(),
+                    },
+                );
+            }
+        }
+
+        canonical_component_refs.sort_by(|a, b| a.component_id.cmp(&b.component_id));
+        let mut unique_component_ids = canonical_component_refs
+            .iter()
+            .map(|component| component.component_id.as_str())
+            .collect::<Vec<_>>();
+        unique_component_ids.dedup();
+        if unique_component_ids.len() != canonical_component_refs.len() {
+            return Err(AssessmentError::InvalidMeasurementUncertaintyComponentReference);
+        }
+
+        if self.uncertainty_budget_component_count != canonical_component_refs.len() {
+            return Err(
+                AssessmentError::MeasurementUncertaintyBudgetComponentCountMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    expected_component_count: self.uncertainty_budget_component_count,
+                    actual_component_count: canonical_component_refs.len(),
+                },
+            );
+        }
+
+        let expected_component_refs_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&canonical_component_refs)?;
+        if self.uncertainty_budget_component_set_digest != expected_component_refs_digest {
+            return Err(
+                AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch {
+                    uncertainty_id: self.uncertainty_id.clone(),
+                    expected_component_set_digest: self
+                        .uncertainty_budget_component_set_digest
+                        .clone(),
+                    actual_component_set_digest: expected_component_refs_digest.clone(),
+                },
+            );
+        }
+        if self.component_refs_digest != expected_component_refs_digest {
+            return Err(AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch {
+                uncertainty_id: self.uncertainty_id.clone(),
+                expected_component_refs_digest,
+                actual_component_refs_digest: self.component_refs_digest.clone(),
+            });
+        }
+
+        let expected_binding_digest = canonical_measurement_uncertainty_binding_hash(self)?;
+        if self.binding_digest != expected_binding_digest {
+            return Err(AssessmentError::MeasurementUncertaintyBindingDigestMismatch {
+                uncertainty_id: self.uncertainty_id.clone(),
+                expected_binding_digest,
+                actual_binding_digest: self.binding_digest.clone(),
+            });
+        }
+
+        Ok(())
+    }
+}
+
+/// Provenance-aware evidence metadata.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvidenceRecord {
+    /// Stable evidence identifier.
+    pub id: String,
+    /// Evidence classification.
+    pub kind: EvidenceKind,
+    /// Support or contradiction.
+    pub stance: EvidenceStance,
+    /// Caller-supplied confidence in [0, 1].
+    pub confidence: f64,
+    /// Canonical provenance identity used for source-diversity accounting.
+    pub source: EvidenceSourceIdentity,
+    /// Exact methodological/comparability basis of the evidence itself.
+    pub basis: ComparisonBasisRef,
+    /// Exact observation/test provenance when the evidence represents a physical observation.
+    pub observation: Option<ObservationProvenanceRef>,
+    /// Exact uncertainty-analysis reference accompanying a physical observation.
+    pub uncertainty: Option<MeasurementUncertaintyRef>,
+    /// Human-readable scope: functional unit, geography, process, etc.
+    pub scope: String,
+    /// Optional unit for the associated quantity.
+    pub unit: Option<String>,
+    /// Optional source timestamp/version label.
+    pub as_of: Option<String>,
+    /// Optional Unix timestamp representing when the observation or measurement occurred.
+    ///
+    /// This is distinct from validity windows and the human/source version label in as_of.
+    pub observed_at_epoch_seconds: Option<i64>,
+    /// Optional Unix timestamp from which this evidence is valid.
+    pub valid_from_epoch_seconds: Option<i64>,
+    /// Optional Unix timestamp through which this evidence is valid.
+    pub valid_until_epoch_seconds: Option<i64>,
+    /// Reproducible derivation provenance for simulated/derived evidence.
+    pub derivation: Option<DerivationRecord>,
+}
+
+impl EvidenceRecord {
+    /// Validate identity and confidence.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if !self.confidence.is_finite() || !(0.0..=1.0).contains(&self.confidence) {
+            return Err(AssessmentError::InvalidConfidence(self.confidence));
+        }
+        if self.id.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyEvidenceIdentity);
+        }
+        self.source.validate()?;
+        self.basis.validate()?;
+        let observation_required = matches!(
+            self.kind,
+            EvidenceKind::Observed
+                | EvidenceKind::ManufacturingObserved
+                | EvidenceKind::FieldObserved
+                | EvidenceKind::ContinuouslyMonitored
+        );
+        match (&self.observation, observation_required) {
+            (Some(observation), _) => observation.validate()?,
+            (None, true) => return Err(AssessmentError::MissingObservationProvenance(self.kind)),
+            (None, false) => {}
+        }
+        if observation_required && self.unit.as_ref().is_none_or(String::is_empty) {
+            return Err(AssessmentError::MissingObservationUnit(self.kind));
+        }
+        match (&self.uncertainty, observation_required) {
+            (Some(_), false) if self.observation.is_none() => {
+                return Err(AssessmentError::UnboundMeasurementUncertainty(
+                    self.id.clone(),
+                ));
+            }
+            (Some(uncertainty), _) => {
+                // Report cross-record identity mismatches before deep validation so the error
+                // identifies the boundary that was actually violated.
+                if let Some(observation) = &self.observation {
+                    if uncertainty.observation_id != observation.observation_id {
+                        return Err(AssessmentError::MeasurementUncertaintyObservationMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_observation_id: observation.observation_id.clone(),
+                            uncertainty_observation_id: uncertainty.observation_id.clone(),
+                        });
+                    }
+                    if uncertainty.observation_record_digest != observation.record_digest {
+                        return Err(AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
+                            evidence_id: self.id.clone(),
+                            expected_observation_record_digest: observation.record_digest.clone(),
+                            actual_observation_record_digest: uncertainty.observation_record_digest.clone(),
+                        });
+                    }
+                    if uncertainty.measurand_id != observation.measurand_id {
+                        return Err(AssessmentError::MeasurementUncertaintyMeasurandMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_measurand_id: observation.measurand_id.clone(),
+                            uncertainty_measurand_id: uncertainty.measurand_id.clone(),
+                        });
+                    }
+                    if uncertainty.procedure_id != observation.procedure_id {
+                        return Err(AssessmentError::MeasurementUncertaintyProcedureMismatch {
+                            evidence_id: self.id.clone(),
+                            expected_procedure_id: observation.procedure_id.clone(),
+                            actual_procedure_id: uncertainty.procedure_id.clone(),
+                        });
+                    }
+                    if uncertainty.procedure_digest != observation.procedure_digest {
+                        return Err(
+                            AssessmentError::MeasurementUncertaintyProcedureDigestMismatch {
+                                evidence_id: self.id.clone(),
+                                expected_procedure_digest: observation.procedure_digest.clone(),
+                                actual_procedure_digest: uncertainty.procedure_digest.clone(),
+                            },
+                        );
+                    }
+                }
+                uncertainty.validate()?;
+                if let Some(unit) = &self.unit {
+                    if uncertainty.statement.unit() != unit {
+                        return Err(AssessmentError::MeasurementUncertaintyUnitMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_unit: unit.clone(),
+                            uncertainty_unit: uncertainty.statement.unit().to_string(),
+                        });
+                    }
+                }
+
+                if let Some(observation) = &self.observation {
+                    if let Some(topology) = &observation.calibration_topology {
+                        if topology.measurement_model_id != uncertainty.measurement_model_id
+                            || topology.measurement_model_revision
+                                != uncertainty.measurement_model_revision
+                            || topology.measurement_model_digest != uncertainty.measurement_model_digest
+                        {
+                            return Err(
+                                AssessmentError::CalibrationTraceabilityMeasurementModelMismatch {
+                                    expected_model_id: uncertainty.measurement_model_id.clone(),
+                                    expected_model_revision: uncertainty.measurement_model_revision.clone(),
+                                    expected_model_digest: uncertainty.measurement_model_digest.clone(),
+                                    actual_model_id: topology.measurement_model_id.clone(),
+                                    actual_model_revision: topology.measurement_model_revision.clone(),
+                                    actual_model_digest: topology.measurement_model_digest.clone(),
+                                },
+                            );
+                        }
+                    }
+                    match (
+                        &observation.calibration_topology,
+                        &uncertainty.evaluation.calibration_topology_digest,
+                    ) {
+                        (Some(topology), Some(actual_digest)) => {
+                            let expected_digest = topology.canonical_digest()?;
+                            if actual_digest != &expected_digest {
+                                return Err(
+                                    AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+                                        uncertainty_id: uncertainty.uncertainty_id.clone(),
+                                        expected_topology_digest: expected_digest,
+                                        actual_topology_digest: actual_digest.clone(),
+                                    },
+                                );
+                            }
+                        }
+                        (Some(_), None) => {
+                            return Err(
+                                AssessmentError::MissingMeasurementUncertaintyCalibrationTopologyBinding(
+                                    uncertainty.uncertainty_id.clone(),
+                                ),
+                            );
+                        }
+                        (None, Some(_)) => {
+                            return Err(
+                                AssessmentError::UnboundMeasurementUncertaintyCalibrationTopology(
+                                    uncertainty.uncertainty_id.clone(),
+                                ),
+                            );
+                        }
+                        (None, None) => {}
+                    }
+                    let expected_calibration_chain_digest =
+                        canonical_calibration_chain_hash(&observation.calibration_chain_refs)?;
+                    let expected_calibration_chain_count =
+                        observation.calibration_chain_refs.len();
+                    if uncertainty.evaluation.calibration_chain_digest
+                        != expected_calibration_chain_digest
+                        || uncertainty.evaluation.calibration_chain_count
+                            != expected_calibration_chain_count
+                    {
+                        return Err(
+                            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+                                uncertainty_id: uncertainty.uncertainty_id.clone(),
+                                expected_calibration_chain_digest,
+                                actual_calibration_chain_digest: uncertainty
+                                    .evaluation
+                                    .calibration_chain_digest
+                                    .clone(),
+                                expected_calibration_chain_count,
+                                actual_calibration_chain_count: uncertainty
+                                    .evaluation
+                                    .calibration_chain_count,
+                            },
+                        );
+                    }
+                }
+            }
+            (None, true) => return Err(AssessmentError::MissingMeasurementUncertainty(self.kind)),
+            (None, false) => {}
+        }
+        if let (Some(from), Some(until)) = (
+            self.valid_from_epoch_seconds,
+            self.valid_until_epoch_seconds,
+        ) && from > until
+        {
+            return Err(AssessmentError::InvalidEvidenceValidity { from, until });
+        }
+        if matches!(self.kind, EvidenceKind::Simulated | EvidenceKind::Derived) {
+            let Some(derivation) = &self.derivation else {
+                return Err(AssessmentError::MissingDerivationMetadata(self.kind));
+            };
+            derivation.validate()?;
+        } else if let Some(derivation) = &self.derivation {
+            derivation.validate()?;
+        }
+        Ok(())
+    }
+}
+
+/// A burden estimate linked to the evidence that supports or contradicts it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BurdenEstimate {
+    /// Plausible burden interval.
+    pub interval: Interval,
+    /// Unit of measure used for cross-candidate comparison.
+    pub unit: String,
+    /// Scope in which this value is comparable: geography, functional unit,
+    /// lifecycle boundary, process boundary, time basis, etc.
+    pub scope: String,
+    /// Exact methodological/comparability basis for the burden value.
+    pub basis: ComparisonBasisRef,
+    /// Evidence IDs that specifically bear on this dimension.
+    pub evidence_ids: Vec<String>,
+}
+
+/// A bound on a functional requirement.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum RequirementBound {
+    /// Performance must be at least this value.
+    AtLeast(f64),
+    /// Performance must be at most this value.
+    AtMost(f64),
+    /// Performance must lie in this inclusive range.
+    Between { min: f64, max: f64 },
+}
+
+impl RequirementBound {
+    fn check(self, interval: Option<Interval>) -> ConstraintStatus {
+        let Some(interval) = interval else {
+            return ConstraintStatus::Unresolved;
+        };
+        match self {
+            Self::AtLeast(min) if interval.lower >= min => ConstraintStatus::Pass,
+            Self::AtLeast(min) if interval.upper < min => ConstraintStatus::Fail,
+            Self::AtMost(max) if interval.upper <= max => ConstraintStatus::Pass,
+            Self::AtMost(max) if interval.lower > max => ConstraintStatus::Fail,
+            Self::Between { min, max } if interval.lower >= min && interval.upper <= max => {
+                ConstraintStatus::Pass
+            }
+            Self::Between { max, .. } if interval.lower > max => ConstraintStatus::Fail,
+            Self::Between { min, .. } if interval.upper < min => ConstraintStatus::Fail,
+            _ => ConstraintStatus::Unresolved,
+        }
+    }
+}
+
+/// Exact methodological/comparability identity for a measured quantity.
+///
+/// This is intentionally opaque: the authority defining the basis can encode
+/// the functional unit, system boundary, allocation rules, normalization method,
+/// or engineering test protocol behind this exact profile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonBasisRef {
+    /// Stable identifier for the comparison methodology/profile.
+    pub basis_id: String,
+    /// Revision of the comparison methodology/profile.
+    pub basis_revision: String,
+    /// Digest of the exact comparison methodology/profile semantics.
+    pub basis_digest: String,
+}
+
+impl ComparisonBasisRef {
+    /// Validate the exact comparison-basis identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.basis_id.is_empty() || self.basis_revision.is_empty() || self.basis_digest.is_empty() {
+            return Err(AssessmentError::EmptyComparisonBasis);
+        }
+        Ok(())
+    }
+}
+
+/// The explicit comparison scale for one burden dimension.
+///
+/// The engine never infers a comparison cohort's scale from the candidates.
+/// This prevents a mutually inconsistent set of candidate units/scopes from
+/// silently becoming its own reference frame.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonScale {
+    /// Unit shared by all comparable candidates for the dimension.
+    pub unit: String,
+    /// Functional-unit / lifecycle / geography / temporal scope identifier.
+    pub scope: String,
+    /// Exact methodology/comparability basis for the scale.
+    pub basis: ComparisonBasisRef,
+}
+
+impl ComparisonScale {
+    /// Validate that the comparison scale is explicit and non-empty.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.unit.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyBurdenScale);
+        }
+        self.basis.validate()?;
+        Ok(())
+    }
+}
+
+/// Required operating range for one physical/environmental condition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OperatingRequirement {
+    /// Required interval that the candidate must cover.
+    pub interval: Interval,
+    /// Unit for the operating condition.
+    pub unit: String,
+    /// Functional/geographic/system scope for the condition.
+    pub scope: String,
+    /// Exact methodology/test-protocol basis for the operating measurement.
+    pub basis: ComparisonBasisRef,
+}
+
+impl OperatingRequirement {
+    /// Validate the required range and comparison metadata.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        Interval::new(self.interval.lower, self.interval.upper)?;
+        if self.unit.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyOperatingScale);
+        }
+        self.basis.validate()?;
+        Ok(())
+    }
+}
+
+/// Immutable identity of the product/component/design context being assessed.
+///
+/// This binds an assessment to an exact externally identified subject without
+/// making that identity authoritative inside Symthaea.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AssessmentSubjectRef {
+    /// Stable identifier assigned by the owning system.
+    pub subject_id: String,
+    /// Versioned identity of the subject/profile namespace.
+    pub profile_id: String,
+    /// Revision of the subject/profile namespace.
+    pub profile_revision: String,
+    /// Digest of the exact BOM/design/product/routing context being assessed.
+    pub subject_digest: String,
+}
+
+impl AssessmentSubjectRef {
+    /// Validate the immutable subject identity fields.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.subject_id.is_empty()
+            || self.profile_id.is_empty()
+            || self.profile_revision.is_empty()
+            || self.subject_digest.is_empty()
+        {
+            return Err(AssessmentError::EmptyAssessmentSubject);
+        }
+        Ok(())
+    }
+}
+
+/// The function that must be satisfied independently of the incumbent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FunctionalRequirement {
+    /// Stable requirement identifier.
+    pub id: String,
+    /// Exact product/component/design context to which this requirement applies.
+    pub subject: AssessmentSubjectRef,
+    /// Human-readable description.
+    pub description: String,
+    /// Named performance constraints.
+    pub constraints: BTreeMap<String, RequirementBound>,
+    /// Explicit comparison scales for every burden dimension.
+    pub comparison_scales: BTreeMap<Dimension, ComparisonScale>,
+    /// Explicit comparison scales for every constrained performance metric.
+    pub performance_scales: BTreeMap<String, ComparisonScale>,
+    /// Required operating envelope keyed by condition (for example temperature or pressure).
+    pub operating_envelope: BTreeMap<String, OperatingRequirement>,
+}
+
+impl FunctionalRequirement {
+    /// Validate identity, numeric bounds, and explicit comparison scales.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.id.is_empty() || self.description.is_empty() {
+            return Err(AssessmentError::EmptyRequirementIdentity);
+        }
+        self.subject.validate()?;
+        if self.constraints.is_empty() {
+            return Err(AssessmentError::EmptyFunctionalConstraints);
+        }
+        for bound in self.constraints.values() {
+            match bound {
+                RequirementBound::AtLeast(v) | RequirementBound::AtMost(v) => {
+                    if !v.is_finite() {
+                        return Err(AssessmentError::NonFinite);
+                    }
+                }
+                RequirementBound::Between { min, max } => {
+                    if !min.is_finite() || !max.is_finite() || min > max {
+                        return Err(AssessmentError::InvalidRequirementRange {
+                            min: *min,
+                            max: *max,
+                        });
+                    }
+                }
+            }
+        }
+        for dimension in Dimension::ALL {
+            let Some(scale) = self.comparison_scales.get(&dimension) else {
+                return Err(AssessmentError::MissingComparisonScale(dimension));
+            };
+            scale.validate()?;
+        }
+        for metric in self.constraints.keys() {
+            let Some(scale) = self.performance_scales.get(metric) else {
+                return Err(AssessmentError::MissingPerformanceScale(metric.clone()));
+            };
+            scale.validate()?;
+        }
+        for (condition, requirement) in &self.operating_envelope {
+            if condition.is_empty() {
+                return Err(AssessmentError::EmptyOperatingCondition);
+            }
+            requirement.validate()?;
+        }
+        Ok(())
+    }
+}
+
+/// How a candidate changes the incumbent pathway.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PathwayKind {
+    /// Material drop-in or close substitution.
+    MaterialSubstitution,
+    /// Different process providing the same function.
+    ProcessSubstitution,
+    /// Product/system redesign.
+    ProductRedesign,
+    /// Elimination of the material or process.
+    Elimination,
+    /// Sourcing or logistics redesign.
+    SupplyChainRedesign,
+    /// Reuse/remanufacturing pathway.
+    ReuseRemanufacture,
+}
+
+/// Evidence-linked functional performance measurement.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PerformanceEstimate {
+    /// Plausible performance interval.
+    pub interval: Interval,
+    /// Unit declared by the functional requirement.
+    pub unit: String,
+    /// Scope in which this performance value applies.
+    pub scope: String,
+    /// Exact methodological/test-protocol basis for the performance value.
+    pub basis: ComparisonBasisRef,
+    /// Evidence IDs supporting or contradicting the value.
+    pub evidence_ids: Vec<String>,
+}
+
+impl PerformanceEstimate {
+    /// Validate the performance value and scale metadata.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        Interval::new(self.interval.lower, self.interval.upper)?;
+        if self.unit.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyPerformanceScale);
+        }
+        self.basis.validate()?;
+        Ok(())
+    }
+}
+
+/// One candidate solution pathway.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CandidatePathway {
+    /// Stable candidate identifier.
+    pub id: String,
+    /// Human-readable candidate name.
+    pub name: String,
+    /// Candidate pathway class.
+    pub kind: PathwayKind,
+    /// Evidence-linked performance values keyed by requirement metric.
+    pub performance: BTreeMap<String, PerformanceEstimate>,
+    /// Burden estimates by dimension.
+    pub burdens: BTreeMap<Dimension, BurdenEstimate>,
+    /// Evidence-linked operating capabilities keyed by condition.
+    pub operating_capabilities: BTreeMap<String, PerformanceEstimate>,
+    /// Candidate-level evidence bundle.
+    pub evidence: Vec<EvidenceRecord>,
+    /// Optional reproducible derivation lineage for a generated candidate.
+    ///
+    /// This records the activity/method and input identities that produced the
+    /// candidate pathway. It does not establish evidence quality or authority;
+    /// those remain separate assessment concerns.
+    pub derivation: Option<DerivationRecord>,
+}
+
+impl CandidatePathway {
+    /// Compute the canonical semantic digest committed by experimental designs.
+    ///
+    /// The digest covers candidate identity, pathway kind, functional performance,
+    /// operating capabilities, burdens, and candidate derivation lineage. Evidence
+    /// records and linked evidence IDs are intentionally excluded because they are
+    /// an evolving provenance surface committed separately by the assessment receipt.
+    pub fn canonical_digest(&self) -> Result<String, AssessmentError> {
+        canonical_candidate_pathway_hash(self)
+    }
+
+    /// Validate the candidate, performance values, burden intervals, evidence
+    /// references, and evidence records.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.id.is_empty() || self.name.is_empty() {
+            return Err(AssessmentError::EmptyCandidateIdentity);
+        }
+        if self.burdens.is_empty() {
+            return Err(AssessmentError::NoBurdenData);
+        }
+        if let Some(derivation) = &self.derivation {
+            derivation.validate()?;
+        }
+        for performance in self.performance.values() {
+            performance.validate()?;
+            validate_unique_evidence_refs(&performance.evidence_ids)?;
+        }
+        for capability in self.operating_capabilities.values() {
+            capability.validate()?;
+            validate_unique_evidence_refs(&capability.evidence_ids)?;
+        }
+        let evidence_ids = self
+            .evidence
+            .iter()
+            .map(|e| e.id.as_str())
+            .collect::<BTreeSet<_>>();
+        if evidence_ids.len() != self.evidence.len() {
+            let duplicate = self
+                .evidence
+                .iter()
+                .find(|evidence| {
+                    self.evidence
+                        .iter()
+                        .filter(|other| other.id == evidence.id)
+                        .count()
+                        > 1
+                })
+                .map(|evidence| evidence.id.clone())
+                .unwrap_or_default();
+            return Err(AssessmentError::DuplicateEvidenceId(duplicate));
+        }
+        for performance in self.performance.values() {
+            for evidence_id in &performance.evidence_ids {
+                let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
+                    return Err(AssessmentError::MissingEvidenceReference(
+                        evidence_id.clone(),
+                    ));
+                };
+                if evidence.scope != performance.scope {
+                    return Err(AssessmentError::PerformanceEvidenceScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_scope: performance.scope.clone(),
+                        evidence_scope: evidence.scope.clone(),
+                    });
+                }
+                let Some(evidence_unit) = &evidence.unit else {
+                    return Err(AssessmentError::MissingEvidenceUnit(evidence.id.clone()));
+                };
+                if evidence_unit != &performance.unit {
+                    return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_unit: performance.unit.clone(),
+                        evidence_unit: evidence_unit.clone(),
+                    });
+                }
+                if evidence.basis != performance.basis {
+                    return Err(AssessmentError::EvidenceBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: performance.basis.clone(),
+                        actual: evidence.basis.clone(),
+                    });
+                }
+            }
+        }
+        for capability in self.operating_capabilities.values() {
+            for evidence_id in &capability.evidence_ids {
+                let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
+                    return Err(AssessmentError::MissingEvidenceReference(
+                        evidence_id.clone(),
+                    ));
+                };
+                if evidence.scope != capability.scope {
+                    return Err(AssessmentError::PerformanceEvidenceScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_scope: capability.scope.clone(),
+                        evidence_scope: evidence.scope.clone(),
+                    });
+                }
+                let Some(evidence_unit) = &evidence.unit else {
+                    return Err(AssessmentError::MissingEvidenceUnit(evidence.id.clone()));
+                };
+                if evidence_unit != &capability.unit {
+                    return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_unit: capability.unit.clone(),
+                        evidence_unit: evidence_unit.clone(),
+                    });
+                }
+                if evidence.basis != capability.basis {
+                    return Err(AssessmentError::EvidenceBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: capability.basis.clone(),
+                        actual: evidence.basis.clone(),
+                    });
+                }
+            }
+        }
+        for estimate in self.burdens.values() {
+            Interval::new(estimate.interval.lower, estimate.interval.upper)?;
+            validate_unique_evidence_refs(&estimate.evidence_ids)?;
+            if estimate.unit.is_empty() || estimate.scope.is_empty() {
+                return Err(AssessmentError::EmptyBurdenScale);
+            }
+            for evidence_id in &estimate.evidence_ids {
+                let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
+                    if !evidence_ids.contains(evidence_id.as_str()) {
+                        return Err(AssessmentError::MissingEvidenceReference(
+                            evidence_id.clone(),
+                        ));
+                    }
+                    continue;
+                };
+                if evidence.scope != estimate.scope {
+                    return Err(AssessmentError::EvidenceScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        burden_scope: estimate.scope.clone(),
+                        evidence_scope: evidence.scope.clone(),
+                    });
+                }
+                let Some(evidence_unit) = &evidence.unit else {
+                    return Err(AssessmentError::MissingEvidenceUnit(evidence.id.clone()));
+                };
+                if evidence_unit != &estimate.unit {
+                    return Err(AssessmentError::EvidenceUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        burden_unit: estimate.unit.clone(),
+                        evidence_unit: evidence_unit.clone(),
+                    });
+                }
+                if evidence.basis != estimate.basis {
+                    return Err(AssessmentError::EvidenceBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: estimate.basis.clone(),
+                        actual: evidence.basis.clone(),
+                    });
+                }
+            }
+        }
+        for evidence in &self.evidence {
+            evidence.validate()?;
+        }
+        Ok(())
+    }
+
+    fn linked_evidence<'a>(
+        &'a self,
+        estimate: &'a BurdenEstimate,
+    ) -> impl Iterator<Item = &'a EvidenceRecord> {
+        let ids = estimate
+            .evidence_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        self.evidence.iter().filter(move |e| ids.contains(e.id.as_str()))
+    }
+
+    fn evidence_is_valid_at(evidence: &EvidenceRecord, as_of: Option<i64>) -> bool {
+        match as_of {
+            Some(timestamp) => {
+                evidence
+                    .valid_from_epoch_seconds
+                    .is_none_or(|from| from <= timestamp)
+                    && evidence
+                        .valid_until_epoch_seconds
+                        .is_none_or(|until| timestamp <= until)
+            }
+            None => {
+                evidence.valid_from_epoch_seconds.is_none()
+                    && evidence.valid_until_epoch_seconds.is_none()
+            }
+        }
+    }
+
+    fn evidence_is_usable_at(
+        evidence: &EvidenceRecord,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        if !Self::evidence_is_valid_at(evidence, as_of) {
+            return false;
+        }
+        if let Some(admission) = &evidence.source.admission {
+            match as_of {
+                Some(timestamp) => {
+                    if admission
+                        .valid_from_epoch_seconds
+                        .is_some_and(|from| from > timestamp)
+                        || admission
+                            .valid_until_epoch_seconds
+                            .is_some_and(|until| until < timestamp)
+                    {
+                        return false;
+                    }
+                }
+                None => {
+                    if admission.valid_from_epoch_seconds.is_some()
+                        || admission.valid_until_epoch_seconds.is_some()
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        if let (Some(assessed_at), Some(observed_at)) =
+            (as_of, evidence.observed_at_epoch_seconds)
+            && observed_at > assessed_at
+        {
+            return false;
+        }
+
+        let Some(policy) = freshness_policy else {
+            return true;
+        };
+        let Some(max_age_seconds) = policy.max_age_for(evidence.kind) else {
+            return true;
+        };
+        let Some(assessed_at) = as_of else {
+            return false;
+        };
+        let Some(observed_at) = evidence.observed_at_epoch_seconds else {
+            return false;
+        };
+
+        let age = i128::from(assessed_at) - i128::from(observed_at);
+        age >= 0 && age <= i128::from(max_age_seconds)
+    }
+
+    fn linked_evidence_at<'a>(
+        &'a self,
+        ids: &'a [String],
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> impl Iterator<Item = &'a EvidenceRecord> {
+        self.evidence.iter().filter(move |e| {
+            ids.iter().any(|id| id == &e.id)
+                && Self::evidence_is_usable_at(e, as_of, freshness_policy)
+        })
+    }
+
+    fn target_surface_has_non_design_bound_uncertainty(
+        &self,
+        target: &ExperimentalDiscriminationTarget,
+        uncertainty_id: &str,
+    ) -> bool {
+        let evidence_ids = match &target.surface {
+            ExperimentalDiscriminationSurface::Burden(dimension) => self
+                .burdens
+                .get(dimension)
+                .map(|estimate| estimate.evidence_ids.as_slice()),
+            ExperimentalDiscriminationSurface::PerformanceMetric(metric) => self
+                .performance
+                .get(metric)
+                .map(|estimate| estimate.evidence_ids.as_slice()),
+            ExperimentalDiscriminationSurface::OperatingCondition(condition) => self
+                .operating_capabilities
+                .get(condition)
+                .map(|estimate| estimate.evidence_ids.as_slice()),
+        };
+        let Some(evidence_ids) = evidence_ids else {
+            return false;
+        };
+
+        self.evidence.iter().any(|evidence| {
+            evidence_ids.iter().any(|id| id == &evidence.id)
+                && evidence.observation.as_ref().is_some_and(|observation| {
+                    observation.experimental_design_id.is_none()
+                        && observation.experimental_target_id.is_none()
+                })
+                && evidence.uncertainty.as_ref().is_some_and(|uncertainty| {
+                    uncertainty.uncertainty_id == uncertainty_id
+                })
+        })
+    }
+
+    fn all_burden_dimensions_have_usable_evidence(
+        &self,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .is_some_and(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                        .next()
+                        .is_some()
+                })
+        })
+    }
+
+    fn all_burden_dimensions_have_supported_evidence(
+        &self,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .is_some_and(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                        .any(|e| {
+                            e.stance == EvidenceStance::Supports
+                                && e.confidence >= 0.7
+                                && matches!(
+                                    e.kind,
+                                    EvidenceKind::Observed
+                                        | EvidenceKind::Reported
+                                        | EvidenceKind::Derived
+                                        | EvidenceKind::LifecycleAssessed
+                                        | EvidenceKind::ManufacturingObserved
+                                        | EvidenceKind::FieldObserved
+                                        | EvidenceKind::ContinuouslyMonitored
+                                )
+                        })
+                })
+        })
+    }
+
+    fn dimension_has_conflict_at(
+        &self,
+        estimate: &BurdenEstimate,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        let support = self
+            .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+            .any(|e| e.stance == EvidenceStance::Supports);
+        let contradict = self
+            .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+            .any(|e| e.stance == EvidenceStance::Contradicts);
+        support && contradict
+    }
+
+    fn has_conflict_at(
+        &self,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.burdens
+            .values()
+            .any(|estimate| self.dimension_has_conflict_at(estimate, as_of, freshness_policy))
+    }
+
+    fn performance_evidence_is_supported_at(
+        &self,
+        metric: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.performance
+            .get(metric)
+            .map(|estimate| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                let supports = linked.iter().any(|e| {
+                    matches!(
+                        e.kind,
+                        EvidenceKind::Observed
+                            | EvidenceKind::Reported
+                            | EvidenceKind::Derived
+                            | EvidenceKind::ManufacturingObserved
+                            | EvidenceKind::FieldObserved
+                            | EvidenceKind::ContinuouslyMonitored
+                    ) && e.stance == EvidenceStance::Supports
+                        && e.confidence >= 0.7
+                });
+                let contradicts = linked
+                    .iter()
+                    .any(|e| e.stance == EvidenceStance::Contradicts);
+                supports && !contradicts
+            })
+            .unwrap_or(false)
+    }
+
+    fn performance_evidence_conflicts_at(
+        &self,
+        metric: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.performance
+            .get(metric)
+            .map(|estimate| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                linked.iter().any(|e| e.stance == EvidenceStance::Supports)
+                    && linked.iter().any(|e| e.stance == EvidenceStance::Contradicts)
+            })
+            .unwrap_or(false)
+    }
+
+    fn operating_evidence_conflicts_at(
+        &self,
+        condition: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.operating_capabilities
+            .get(condition)
+            .map(|estimate| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                linked.iter().any(|e| e.stance == EvidenceStance::Supports)
+                    && linked.iter().any(|e| e.stance == EvidenceStance::Contradicts)
+            })
+            .unwrap_or(false)
+    }
+
+    fn operating_evidence_is_supported_at(
+        &self,
+        condition: &str,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        self.operating_capabilities
+            .get(condition)
+            .map(|estimate| {
+                let linked = self
+                    .linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                    .collect::<Vec<_>>();
+                linked.iter().any(|e| {
+                        matches!(
+                            e.kind,
+                            EvidenceKind::Observed
+                                | EvidenceKind::Reported
+                                | EvidenceKind::Derived
+                                | EvidenceKind::ManufacturingObserved
+                                | EvidenceKind::FieldObserved
+                                | EvidenceKind::ContinuouslyMonitored
+                        ) && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    }) && !linked.iter().any(|e| e.stance == EvidenceStance::Contradicts)
+            })
+            .unwrap_or(false)
+    }
+
+    fn operating_envelope_is_supported(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.operating_envelope.iter().all(|(condition, required)| {
+            let Some(capability) = self.operating_capabilities.get(condition) else {
+                return false;
+            };
+            capability.unit == required.unit
+                && capability.scope == required.scope
+                && capability.basis == required.basis
+                && capability.interval.lower <= required.interval.lower
+                && capability.interval.upper >= required.interval.upper
+                && self.operating_evidence_is_supported_at(condition, as_of, freshness_policy)
+        })
+    }
+
+    fn burden_scales_match_requirement(&self, requirement: &FunctionalRequirement) -> bool {
+        Dimension::ALL.iter().all(|dimension| {
+            let Some(estimate) = self.burdens.get(dimension) else {
+                return false;
+            };
+            let Some(scale) = requirement.comparison_scales.get(dimension) else {
+                return false;
+            };
+            estimate.unit == scale.unit
+                && estimate.scope == scale.scope
+                && estimate.basis == scale.basis
+        })
+    }
+
+    fn performance_is_supported(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.constraints.keys().all(|metric| {
+            let Some(estimate) = self.performance.get(metric) else {
+                return false;
+            };
+            let Some(scale) = requirement.performance_scales.get(metric) else {
+                return false;
+            };
+            estimate.unit == scale.unit
+                && estimate.scope == scale.scope
+                && estimate.basis == scale.basis
+                && self.performance_evidence_is_supported_at(metric, as_of, freshness_policy)
+        })
+    }
+
+    /// Return true only when every required performance surface is either
+    /// positively supported or explicitly unresolved by a contradiction on
+    /// that exact metric. A conflict on one metric must never mask a missing
+    /// or unsupported different required metric.
+    fn performance_surface_is_supported_or_conflicted(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.constraints.keys().all(|metric| {
+            let Some(estimate) = self.performance.get(metric) else {
+                return false;
+            };
+            let Some(scale) = requirement.performance_scales.get(metric) else {
+                return false;
+            };
+            if estimate.unit != scale.unit
+                || estimate.scope != scale.scope
+                || estimate.basis != scale.basis
+            {
+                return false;
+            }
+            self.performance_evidence_is_supported_at(metric, as_of, freshness_policy)
+                || self.performance_evidence_conflicts_at(metric, as_of, freshness_policy)
+        })
+    }
+
+    /// Return true only when every required operating surface is either
+    /// positively supported or explicitly unresolved by a contradiction on
+    /// that exact condition. A conflict on one condition must never mask a
+    /// missing or unsupported different required condition.
+    fn operating_surface_is_supported_or_conflicted(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> bool {
+        requirement.operating_envelope.iter().all(|(condition, required)| {
+            let Some(capability) = self.operating_capabilities.get(condition) else {
+                return false;
+            };
+            if capability.unit != required.unit
+                || capability.scope != required.scope
+                || capability.basis != required.basis
+                || capability.interval.lower > required.interval.lower
+                || capability.interval.upper < required.interval.upper
+            {
+                return false;
+            }
+            self.operating_evidence_is_supported_at(condition, as_of, freshness_policy)
+                || self.operating_evidence_conflicts_at(condition, as_of, freshness_policy)
+        })
+    }
+
+    fn performance_has_supported_kind_at(
+        &self,
+        requirement: &FunctionalRequirement,
+        kind: EvidenceKind,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        admitted_only: bool,
+    ) -> bool {
+        requirement.constraints.keys().all(|metric| {
+            self.performance
+                .get(metric)
+                .map(|estimate| {
+                    self.linked_evidence_at(
+                        &estimate.evidence_ids,
+                        as_of,
+                        freshness_policy,
+                    )
+                    .any(|e| {
+                        e.kind == kind
+                            && (!admitted_only || e.source.admission.is_some())
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        })
+    }
+
+    fn operating_has_supported_kind_at(
+        &self,
+        requirement: &FunctionalRequirement,
+        kind: EvidenceKind,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        admitted_only: bool,
+    ) -> bool {
+        requirement.operating_envelope.keys().all(|condition| {
+            self.operating_capabilities
+                .get(condition)
+                .map(|estimate| {
+                    self.linked_evidence_at(
+                        &estimate.evidence_ids,
+                        as_of,
+                        freshness_policy,
+                    )
+                    .any(|e| {
+                        e.kind == kind
+                            && (!admitted_only || e.source.admission.is_some())
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        })
+    }
+
+    fn qualification_ceiling(
+        &self,
+        requirement: &FunctionalRequirement,
+        as_of: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> QualificationState {
+        let burden_conflict = self.has_conflict_at(as_of, freshness_policy);
+        let functional_or_operating_conflict =
+            requirement_conflicts(requirement, self, as_of, freshness_policy);
+
+        if !self.performance_surface_is_supported_or_conflicted(
+            requirement,
+            as_of,
+            freshness_policy,
+        ) || !self.operating_surface_is_supported_or_conflicted(
+            requirement,
+            as_of,
+            freshness_policy,
+        ) || !self.burden_scales_match_requirement(requirement)
+            || self.burdens.is_empty()
+            || !self.all_burden_dimensions_have_usable_evidence(as_of, freshness_policy)
+        {
+            return QualificationState::Hypothesis;
+        }
+
+        if burden_conflict || functional_or_operating_conflict {
+            return QualificationState::ComputationallyPlausible;
+        }
+
+        let any_simulation = self.burdens.values().any(|estimate| {
+            self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                .any(|e| e.kind == EvidenceKind::Simulated)
+        });
+        let all_dimensions_supported_evidence =
+            self.all_burden_dimensions_have_supported_evidence(as_of, freshness_policy);
+        let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
+                        e.source.admission.is_some() &&
+                        matches!(
+                            e.kind,
+                            EvidenceKind::Observed
+                                | EvidenceKind::Reported
+                                | EvidenceKind::Derived
+                                | EvidenceKind::LifecycleAssessed
+                                | EvidenceKind::ManufacturingObserved
+                                | EvidenceKind::FieldObserved
+                                | EvidenceKind::ContinuouslyMonitored
+                        ) && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        });
+        let all_dimensions_lifecycle_assessed = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .is_some_and(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+                        .any(|e| {
+                            e.source.admission.is_some()
+                                && e.kind == EvidenceKind::LifecycleAssessed
+                                && e.stance == EvidenceStance::Supports
+                                && e.confidence >= 0.7
+                        })
+                })
+        });
+        let lifecycle_distinct_authority_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| {
+                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+            })
+            .filter(|e| {
+                e.source.admission.is_some()
+                    && e.kind == EvidenceKind::LifecycleAssessed
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .filter_map(|e| e.source.admitted_authority_group_id())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let manufacturing_distinct_authority_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| {
+                self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy)
+            })
+            .filter(|e| {
+                e.source.admission.is_some()
+                    && e.kind == EvidenceKind::ManufacturingObserved
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .filter_map(|e| e.source.admitted_authority_group_id())
+            .collect::<BTreeSet<_>>()
+            .len();
+
+        let field_distinct_authority_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy))
+            .filter(|e| {
+                e.kind == EvidenceKind::FieldObserved
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .filter_map(|e| e.source.admitted_authority_group_id())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let monitoring_distinct_authority_sources = self
+            .burdens
+            .values()
+            .flat_map(|estimate| self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy))
+            .filter(|e| {
+                e.kind == EvidenceKind::ContinuouslyMonitored
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+            .filter_map(|e| e.source.admitted_authority_group_id())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let all_dimensions_field_observed = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
+                        e.source.admission.is_some()
+                            && e.kind == EvidenceKind::FieldObserved
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        });
+        let all_dimensions_monitored = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
+                        e.source.admission.is_some()
+                            && e.kind == EvidenceKind::ContinuouslyMonitored
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        });
+        let all_dimensions_manufacturing_observed = Dimension::ALL.iter().all(|dimension| {
+            self.burdens
+                .get(dimension)
+                .map(|estimate| {
+                    self.linked_evidence_at(
+                        &estimate.evidence_ids,
+                        as_of,
+                        freshness_policy,
+                    )
+                    .any(|e| {
+                        e.source.admission.is_some()
+                            && e.kind == EvidenceKind::ManufacturingObserved
+                            && e.stance == EvidenceStance::Supports
+                            && e.confidence >= 0.7
+                    })
+                })
+                .unwrap_or(false)
+        });
+        let performance_field_observed = self.performance_has_supported_kind_at(
+            requirement,
+            EvidenceKind::FieldObserved,
+            as_of,
+            freshness_policy,
+            true,
+        );
+        let operating_field_observed = self.operating_has_supported_kind_at(
+            requirement,
+            EvidenceKind::FieldObserved,
+            as_of,
+            freshness_policy,
+            true,
+        );
+        let performance_monitored = self.performance_has_supported_kind_at(
+            requirement,
+            EvidenceKind::ContinuouslyMonitored,
+            as_of,
+            freshness_policy,
+            true,
+        );
+        let operating_monitored = self.operating_has_supported_kind_at(
+            requirement,
+            EvidenceKind::ContinuouslyMonitored,
+            as_of,
+            freshness_policy,
+            true,
+        );
+
+        if all_dimensions_monitored
+            && performance_monitored
+            && operating_monitored
+            && monitoring_distinct_authority_sources >= 2
+        {
+            QualificationState::ContinuouslyMonitored
+        } else if all_dimensions_field_observed
+            && performance_field_observed
+            && operating_field_observed
+            && field_distinct_authority_sources >= 2
+        {
+            QualificationState::FieldQualified
+        } else if manufacturing_distinct_authority_sources >= 2
+            && has_all_dimension_evidence
+            && all_dimensions_manufacturing_observed
+        {
+            QualificationState::ManufacturingQualified
+        } else if lifecycle_distinct_authority_sources >= 2
+            && has_all_dimension_evidence
+            && all_dimensions_lifecycle_assessed
+        {
+            QualificationState::LifecycleQualified
+        } else if all_dimensions_supported_evidence {
+            QualificationState::EvidenceSupported
+        } else if any_simulation {
+            QualificationState::ComputationallyPlausible
+        } else {
+            QualificationState::Hypothesis
+        }
+    }
+}
+
+fn validate_unique_evidence_refs(evidence_ids: &[String]) -> Result<(), AssessmentError> {
+    let mut seen = BTreeSet::new();
+    for evidence_id in evidence_ids {
+        if !seen.insert(evidence_id) {
+            return Err(AssessmentError::DuplicateLinkedEvidenceReference(
+                evidence_id.clone(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn requirement_conflicts(
+    requirement: &FunctionalRequirement,
+    candidate: &CandidatePathway,
+    as_of: Option<i64>,
+    freshness_policy: Option<&EvidenceFreshnessPolicy>,
+) -> bool {
+    requirement.constraints.keys().any(|metric| {
+        candidate.performance_evidence_conflicts_at(metric, as_of, freshness_policy)
+    }) || requirement.operating_envelope.keys().any(|condition| {
+        candidate.operating_evidence_conflicts_at(condition, as_of, freshness_policy)
+    })
+}
+
+/// Qualification ceiling derived only from supplied evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum QualificationState {
+    /// Only a proposed hypothesis exists.
+    Hypothesis,
+    /// Computational evidence exists.
+    ComputationallyPlausible,
+    /// At least one substantive empirical/reporting claim is supported.
+    EvidenceSupported,
+    /// Multiple distinct admitted authority groups provide supported evidence.
+    LifecycleQualified,
+    /// Multiple distinct authority groups plus full manufacturing-scale dimension coverage exist.
+    ManufacturingQualified,
+    /// Field deployment has been observed.
+    FieldQualified,
+    /// Post-deployment monitoring is active.
+    ContinuouslyMonitored,
+}
+
+/// Functional constraint status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConstraintStatus {
+    /// Requirement is satisfied.
+    Pass,
+    /// Requirement is violated.
+    Fail,
+    /// No trustworthy value is available.
+    Unresolved,
+}
+
+/// Result for one named functional constraint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConstraintEvaluation {
+    /// Metric name.
+    pub metric: String,
+    /// Required bound.
+    pub requirement: RequirementBound,
+    /// Evaluation status.
+    pub status: ConstraintStatus,
+}
+
+/// Assessment of one candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CandidateAssessment {
+    /// Candidate identifier.
+    pub candidate_id: String,
+    /// Candidate-generation derivation lineage, when declared.
+    pub derivation: Option<DerivationRecord>,
+    /// BLAKE3 digest of the complete canonical candidate evidence bundle.
+    ///
+    /// This binds source identity, admission, timestamps, validity, stance,
+    /// confidence, and evidence derivation metadata into the receipt without
+    /// duplicating the full bundle in every assessment.
+    pub evidence_digest: String,
+    /// Evidence-linked functional performance estimates.
+    pub performance: BTreeMap<String, PerformanceEstimate>,
+    /// Evidence-linked operating capabilities.
+    pub operating_capabilities: BTreeMap<String, PerformanceEstimate>,
+    /// Per-constraint outcomes.
+    pub constraints: Vec<ConstraintEvaluation>,
+    /// Burdens with dimension-specific evidence linkage.
+    pub burdens: BTreeMap<Dimension, BurdenEstimate>,
+    /// Conservative qualification ceiling.
+    pub qualification: QualificationState,
+    /// Whether linked evidence contains explicit contradiction.
+    pub evidence_conflict: bool,
+    /// Whether blocked from Pareto comparison.
+    pub frontier_blocked: bool,
+    /// Number of directly observed/field-observed/monitored items per dimension.
+    pub observed_evidence_count: BTreeMap<Dimension, usize>,
+}
+
+/// Why a candidate is blocked from the frontier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FrontierBlocker {
+    /// A hard functional constraint failed.
+    ConstraintFailed(String),
+    /// A hard functional constraint is unresolved.
+    ConstraintUnresolved(String),
+    /// A burden dimension is missing.
+    MissingDimension(Dimension),
+    /// Candidate and comparison cohort use different units or scopes.
+    IncompatibleScale {
+        /// Dimension whose comparison scale differs.
+        dimension: Dimension,
+        /// Expected comparison unit.
+        expected_unit: String,
+        /// Candidate unit.
+        actual_unit: String,
+        /// Expected comparison scope.
+        expected_scope: String,
+        /// Candidate comparison scope.
+        actual_scope: String,
+    },
+    /// A candidate and requirement use different comparison methodology identities.
+    ComparisonBasisMismatch {
+        /// Comparison context, such as a burden dimension, performance metric, or operating condition.
+        context: String,
+        /// Exact basis required by the assessment.
+        expected: ComparisonBasisRef,
+        /// Exact basis declared by the candidate.
+        actual: ComparisonBasisRef,
+    },
+    /// A burden has explicit evidence references, but none are valid at assessment time.
+    EvidenceUnavailable(Dimension),
+    /// A required operating condition is not covered by the candidate.
+    OperatingConditionUnresolved(String),
+    /// A required operating condition lies outside the candidate capability.
+    OperatingConditionFailed(String),
+    /// Functional performance uses a different unit or scope from the requirement.
+    PerformanceIncompatibleScale {
+        /// Functional requirement metric.
+        metric: String,
+        /// Expected comparison unit.
+        expected_unit: String,
+        /// Candidate unit.
+        actual_unit: String,
+        /// Expected comparison scope.
+        expected_scope: String,
+        /// Candidate scope.
+        actual_scope: String,
+    },
+}
+
+/// Candidate-versus-incumbent burden transfer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BurdenTransfer {
+    /// Candidate identifier.
+    pub candidate_id: String,
+    /// Dimensions where the candidate is clearly better.
+    pub clearly_better: Vec<Dimension>,
+    /// Dimensions where the candidate is clearly worse.
+    pub clearly_worse: Vec<Dimension>,
+}
+
+impl BurdenTransfer {
+    /// True when benefits and harms move across different dimensions.
+    pub fn is_regrettable_substitution(&self) -> bool {
+        !self.clearly_better.is_empty() && !self.clearly_worse.is_empty()
+    }
+}
+
+/// Exact identity of a documented experimental/measurement protocol.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentalProtocolRef {
+    /// Stable protocol identity.
+    pub protocol_id: String,
+    /// Protocol revision.
+    pub protocol_revision: String,
+    /// Digest of the exact protocol document or canonical protocol payload.
+    pub protocol_digest: String,
+    /// Exact documented measurement procedure identity prescribed by this protocol.
+    pub procedure_id: String,
+    /// Digest of the exact documented measurement procedure or canonical procedure payload.
+    pub procedure_digest: String,
+    /// Exact comparison/metrology basis the protocol is intended to satisfy.
+    pub basis: ComparisonBasisRef,
+}
+
+impl ExperimentalProtocolRef {
+    /// Validate protocol identity and comparison basis.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.protocol_id.is_empty()
+            || self.protocol_revision.is_empty()
+            || self.protocol_digest.is_empty()
+            || self.procedure_id.is_empty()
+            || self.procedure_digest.is_empty()
+        {
+            return Err(AssessmentError::InvalidExperimentalDesign);
+        }
+        self.basis.validate()
+    }
+}
+
+/// Typed property surface targeted by an experimental discrimination.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExperimentalDiscriminationSurface {
+    /// A burden dimension.
+    Burden(Dimension),
+    /// A named constrained performance metric.
+    PerformanceMetric(String),
+    /// A named operating-envelope condition.
+    OperatingCondition(String),
+}
+
+impl ExperimentalDiscriminationSurface {
+    /// Validate named surfaces without inferring their meaning.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        match self {
+            Self::Burden(_) => Ok(()),
+            Self::PerformanceMetric(name) | Self::OperatingCondition(name) => {
+                if name.is_empty() {
+                    Err(AssessmentError::InvalidExperimentalDesign)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
+/// Exact identity of the decision rule used to interpret an experimental result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentalDecisionRuleRef {
+    /// Stable decision-rule identity.
+    pub rule_id: String,
+    /// Rule revision.
+    pub rule_revision: String,
+    /// Digest of the exact decision-rule semantics.
+    pub rule_digest: String,
+}
+
+impl ExperimentalDecisionRuleRef {
+    /// Validate decision-rule identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.rule_id.is_empty() || self.rule_revision.is_empty() || self.rule_digest.is_empty() {
+            Err(AssessmentError::InvalidExperimentalDesign)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Typed candidate-discrimination target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentalDiscriminationTarget {
+    /// Stable identity of the target.
+    pub target_id: String,
+    /// Exact measurand identity intended to discriminate the candidate pair.
+    pub measurand_id: String,
+    /// Left-hand candidate identity.
+    pub left_candidate_id: String,
+    /// Right-hand candidate identity.
+    pub right_candidate_id: String,
+    /// Exact property/surface to be measured.
+    pub surface: ExperimentalDiscriminationSurface,
+    /// Exact decision rule that determines what result counts as discrimination.
+    pub decision_rule: ExperimentalDecisionRuleRef,
+}
+
+impl ExperimentalDiscriminationTarget {
+    /// Validate the candidate relationship and rule/surface identities.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.target_id.is_empty()
+            || self.measurand_id.is_empty()
+            || self.left_candidate_id.is_empty()
+            || self.right_candidate_id.is_empty()
+            || self.left_candidate_id == self.right_candidate_id
+        {
+            return Err(AssessmentError::InvalidExperimentalDiscriminationTarget);
+        }
+        self.surface.validate()?;
+        self.decision_rule.validate()
+    }
+
+    fn requirement_scale<'a>(
+        &'a self,
+        requirement: &'a FunctionalRequirement,
+    ) -> Option<(&'a str, &'a str, &'a ComparisonBasisRef)> {
+        match &self.surface {
+            ExperimentalDiscriminationSurface::Burden(dimension) => requirement
+                .comparison_scales
+                .get(dimension)
+                .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
+            ExperimentalDiscriminationSurface::PerformanceMetric(metric)
+                if requirement.constraints.contains_key(metric) =>
+            {
+                requirement
+                    .performance_scales
+                    .get(metric)
+                    .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis))
+            }
+            ExperimentalDiscriminationSurface::PerformanceMetric(_) => None,
+            ExperimentalDiscriminationSurface::OperatingCondition(condition) => requirement
+                .operating_envelope
+                .get(condition)
+                .map(|scale| (scale.unit.as_str(), scale.scope.as_str(), &scale.basis)),
+        }
+    }
+}
+
+/// Explicit stopping rule for a proposed measurement campaign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentalUncertaintyStoppingTarget {
+    /// Exact discrimination target whose uncertainty width is being bounded.
+    pub target_id: String,
+    /// Maximum allowed interval width.
+    pub max_interval_width: f64,
+    /// Unit of the target measurand in which the interval width is expressed.
+    pub unit: String,
+}
+
+impl ExperimentalUncertaintyStoppingTarget {
+    /// Validate target identity and quantitative stop bound.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.target_id.is_empty()
+            || !self.max_interval_width.is_finite()
+            || self.max_interval_width <= 0.0
+            || self.unit.is_empty()
+        {
+            return Err(AssessmentError::InvalidExperimentalStoppingCriteria);
+        }
+        Ok(())
+    }
+}
+
+/// Explicit stopping rule for a proposed measurement campaign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentalStoppingCriteria {
+    /// Minimum number of usable observations required before evaluating the stopping rule.
+    pub min_valid_observations: u32,
+    /// Hard maximum number of observations permitted by the protocol.
+    pub max_valid_observations: u32,
+    /// Optional hard wall-clock duration in seconds.
+    pub max_duration_seconds: Option<u64>,
+    /// Optional target-specific uncertainty stopping bound.
+    pub uncertainty_target: Option<ExperimentalUncertaintyStoppingTarget>,
+}
+
+impl ExperimentalStoppingCriteria {
+    /// Validate the stopping rule without deciding whether it is scientifically sufficient.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.min_valid_observations == 0
+            || self.max_valid_observations < self.min_valid_observations
+            || self.max_duration_seconds == Some(0)
+        {
+            return Err(AssessmentError::InvalidExperimentalStoppingCriteria);
+        }
+        Ok(())
+    }
+}
+
+/// Provenance for a proposed experiment/measurement campaign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentalDesignProvenance {
+    /// Stable identity for this exact proposed campaign.
+    pub design_id: String,
+    /// Exact functional-requirement identity this campaign is scoped to.
+    pub requirement_id: String,
+    /// Canonical BLAKE3 digest of the complete functional requirement payload.
+    pub requirement_digest: String,
+    /// Exact hypothesis identity.
+    pub hypothesis_id: String,
+    /// Human-readable statement of the hypothesis being tested.
+    pub hypothesis_statement: String,
+    /// Stable identities of unresolved uncertainties this campaign targets.
+    pub unresolved_uncertainty_refs: Vec<String>,
+    /// Exact candidate identities included in the discrimination set.
+    pub candidate_ids: Vec<String>,
+    /// Canonical semantic digest for each candidate identity in the discrimination set.
+    ///
+    /// This binds the design to the exact candidate pathway payload rather than
+    /// allowing a stable candidate ID to be silently reused for changed semantics.
+    pub candidate_digests: BTreeMap<String, String>,
+    /// Typed candidate-discrimination targets.
+    pub expected_discrimination: Vec<ExperimentalDiscriminationTarget>,
+    /// Exact documented protocol identity.
+    pub protocol: ExperimentalProtocolRef,
+    /// Explicit stopping criteria.
+    pub stopping_criteria: ExperimentalStoppingCriteria,
+    /// Exact comparison basis governing comparability of the proposed result.
+    pub comparison_basis: ComparisonBasisRef,
+}
+
+impl ExperimentalDesignProvenance {
+    /// Validate the design's structural identity and deterministic scope.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.design_id.is_empty()
+            || self.requirement_id.is_empty()
+            || self.requirement_digest.is_empty()
+            || self.hypothesis_id.is_empty()
+            || self.hypothesis_statement.is_empty()
+            || self.unresolved_uncertainty_refs.is_empty()
+            || self.candidate_ids.is_empty()
+            || self.candidate_digests.is_empty()
+            || self.expected_discrimination.is_empty()
+            || self.unresolved_uncertainty_refs.iter().any(String::is_empty)
+            || self.candidate_ids.iter().any(String::is_empty)
+        {
+            return Err(AssessmentError::InvalidExperimentalDesign);
+        }
+        let mut ids = self.candidate_ids.clone();
+        ids.sort();
+        ids.dedup();
+        if ids.len() != self.candidate_ids.len()
+            || self
+                .candidate_digests
+                .iter()
+                .any(|(id, digest)| !ids.binary_search(id).is_ok() || digest.is_empty())
+            || ids
+                .iter()
+                .any(|id| self.candidate_digests.get(id).is_none_or(String::is_empty))
+        {
+            return Err(AssessmentError::InvalidExperimentalDesign);
+        }
+
+        let mut uncertainty_ids = self.unresolved_uncertainty_refs.clone();
+        uncertainty_ids.sort();
+        uncertainty_ids.dedup();
+        if uncertainty_ids.len() != self.unresolved_uncertainty_refs.len() {
+            return Err(AssessmentError::DuplicateExperimentalUncertaintyReference);
+        }
+
+        let mut target_ids = BTreeSet::new();
+        for target in &self.expected_discrimination {
+            target.validate()?;
+            if !target_ids.insert(target.target_id.clone()) {
+                return Err(AssessmentError::DuplicateExperimentalDiscriminationTarget(
+                    target.target_id.clone(),
+                ));
+            }
+        }
+        self.protocol.validate()?;
+        self.stopping_criteria.validate()?;
+        self.comparison_basis.validate()?;
+        if let Some(target) = &self.stopping_criteria.uncertainty_target {
+            target.validate()?;
+        }
+        if self.protocol.basis != self.comparison_basis {
+            return Err(AssessmentError::ExperimentalDesignBasisMismatch {
+                expected: self.comparison_basis.clone(),
+                actual: self.protocol.basis.clone(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Return the deterministic canonical representation of this design.
+    ///
+    /// Candidate, uncertainty-reference, and target collections are sets for
+    /// semantic purposes, so their insertion order must not alter the receipt.
+    pub fn canonicalized(mut self) -> Self {
+        self.candidate_ids.sort();
+        self.unresolved_uncertainty_refs.sort();
+        self.expected_discrimination
+            .sort_by(|a, b| a.target_id.cmp(&b.target_id));
+        self
+    }
+
+    /// Validate this design against the exact functional/comparison context.
+    pub fn validate_against(
+        &self,
+        requirement: &FunctionalRequirement,
+    ) -> Result<(), AssessmentError> {
+        requirement.validate()?;
+        self.validate()?;
+        if self.requirement_id != requirement.id {
+            return Err(AssessmentError::ExperimentalDesignRequirementMismatch {
+                expected_requirement_id: requirement.id.clone(),
+                actual_requirement_id: self.requirement_id.clone(),
+            });
+        }
+        let expected_requirement_digest = canonical_requirement_hash(requirement)?;
+        if self.requirement_digest != expected_requirement_digest {
+            return Err(AssessmentError::ExperimentalDesignRequirementDigestMismatch {
+                expected_requirement_digest,
+                actual_requirement_digest: self.requirement_digest.clone(),
+            });
+        }
+        if let Some(stop_target) = &self.stopping_criteria.uncertainty_target {
+            let Some(target) = self
+                .expected_discrimination
+                .iter()
+                .find(|target| target.target_id == stop_target.target_id)
+            else {
+                return Err(AssessmentError::ExperimentalDesignStoppingTargetUndeclared(
+                    stop_target.target_id.clone(),
+                ));
+            };
+            let Some((required_unit, _, _)) = target.requirement_scale(requirement) else {
+                return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
+                    target.target_id.clone(),
+                ));
+            };
+            if stop_target.unit != required_unit {
+                return Err(AssessmentError::ExperimentalDesignStoppingUnitMismatch {
+                    target_id: stop_target.target_id.clone(),
+                    expected_unit: required_unit.to_string(),
+                    actual_unit: stop_target.unit.clone(),
+                });
+            }
+        }
+        let declared = self.candidate_ids.iter().collect::<BTreeSet<_>>();
+        for target in &self.expected_discrimination {
+            if !declared.contains(&target.left_candidate_id)
+                || !declared.contains(&target.right_candidate_id)
+            {
+                return Err(AssessmentError::ExperimentalDesignTargetCandidateNotDeclared(
+                    target.target_id.clone(),
+                ));
+            }
+            let Some((_, _, required_basis)) = target.requirement_scale(requirement) else {
+                return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
+                    target.target_id.clone(),
+                ));
+            };
+            if required_basis != &self.comparison_basis {
+                return Err(AssessmentError::ExperimentalDesignBasisMismatch {
+                    expected: required_basis.clone(),
+                    actual: self.comparison_basis.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Conservative next-measurement target.
+///
+/// This is explicitly a heuristic rather than a formal expected-value-of-
+/// information calculation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeasurementDiscriminationTarget {
+    /// Left-hand frontier candidate identity.
+    pub left_candidate_id: String,
+    /// Right-hand frontier candidate identity.
+    pub right_candidate_id: String,
+    /// Burden dimension whose intervals overlap and motivate the measurement.
+    pub dimension: Dimension,
+    /// Exact comparison unit declared by the functional requirement.
+    pub unit: String,
+    /// Exact scope in which the measurement is comparable.
+    pub scope: String,
+    /// Exact methodology/comparability basis for the measurement.
+    pub basis: ComparisonBasisRef,
+}
+
+impl MeasurementDiscriminationTarget {
+    /// Validate candidate identities, dimension, and exact comparison scale.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.left_candidate_id.is_empty()
+            || self.right_candidate_id.is_empty()
+            || self.left_candidate_id == self.right_candidate_id
+            || self.unit.is_empty()
+            || self.scope.is_empty()
+        {
+            return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
+        }
+        self.basis
+            .validate()
+            .map_err(|_| AssessmentError::InvalidMeasurementDiscriminationTarget)?;
+        Ok(())
+    }
+
+    /// Validate the exact comparison scale against the authoritative requirement.
+    pub fn validate_against(
+        &self,
+        requirement: &FunctionalRequirement,
+    ) -> Result<(), AssessmentError> {
+        requirement.validate()?;
+        self.validate()?;
+        let Some(scale) = requirement.comparison_scales.get(&self.dimension) else {
+            return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
+        };
+        if self.unit != scale.unit || self.scope != scale.scope || self.basis != scale.basis {
+            return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
+        }
+        Ok(())
+    }
+}
+
+/// Conservative next-measurement target.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeasurementPriority {
+    /// Dimension to investigate next.
+    pub dimension: Dimension,
+    /// Number of frontier candidates lacking direct observed evidence for this dimension or carrying a conflict on this dimension.
+    pub unresolved_candidate_count: usize,
+    /// Number of candidates on the current frontier.
+    pub frontier_candidate_count: usize,
+    /// Exact uncertainty identities already present on linked evidence; empty when no such identity is available.
+    pub unresolved_uncertainty_refs: Vec<String>,
+    /// Candidate IDs that the measurement is intended to discriminate.
+    pub candidate_ids: Vec<String>,
+    /// Typed candidate-pair discrimination targets whose current intervals are not clearly ordered.
+    pub expected_discrimination: Vec<MeasurementDiscriminationTarget>,
+    /// Rationale.
+    pub rationale: String,
+}
+
+/// A set of functional requirements that must all be satisfied by one pathway.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FunctionalRequirementSet {
+    /// Requirements keyed by their stable IDs.
+    pub requirements: BTreeMap<String, FunctionalRequirement>,
+}
+
+impl FunctionalRequirementSet {
+    /// Construct a requirement set from an ordered map.
+    pub fn new(requirements: BTreeMap<String, FunctionalRequirement>) -> Result<Self, AssessmentError> {
+        if requirements.is_empty() {
+            return Err(AssessmentError::EmptyRequirementSet);
+        }
+        for (id, requirement) in &requirements {
+            requirement.validate()?;
+            if id != &requirement.id {
+                return Err(AssessmentError::RequirementSetKeyMismatch {
+                    key: id.clone(),
+                    requirement_id: requirement.id.clone(),
+                });
+            }
+        }
+        Ok(Self { requirements })
+    }
+
+    /// Validate every requirement and its map identity.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.requirements.is_empty() {
+            return Err(AssessmentError::EmptyRequirementSet);
+        }
+        for (id, requirement) in &self.requirements {
+            requirement.validate()?;
+            if id != &requirement.id {
+                return Err(AssessmentError::RequirementSetKeyMismatch {
+                    key: id.clone(),
+                    requirement_id: requirement.id.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Why a pathway is excluded from joint requirement-set eligibility.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequirementSetBlocker {
+    /// Requirement that produced the blocker.
+    pub requirement_id: String,
+    /// Underlying fail-closed assessment blocker.
+    pub blocker: FrontierBlocker,
+}
+
+/// Joint assessment across multiple functions of one system.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RequirementSetAssessment {
+    /// Version of the requirement-set result schema.
+    pub schema_version: u16,
+    /// Version of the joint-gating algorithm.
+    pub algorithm_version: String,
+    /// Individual requirement assessments.
+    pub assessments: BTreeMap<String, AssessmentResult>,
+    /// Candidate IDs that satisfy every requirement without unresolved blockers.
+    pub jointly_eligible_candidate_ids: Vec<String>,
+    /// Qualification ceiling limited by the least-qualified requirement assessment.
+    pub joint_qualification: BTreeMap<String, QualificationState>,
+    /// All blockers grouped by candidate across the requirement set.
+    pub blockers: BTreeMap<String, Vec<RequirementSetBlocker>>,
+    /// Deterministic receipt over the complete joint assessment payload.
+    pub receipt: AssessmentReceipt,
+}
+
+/// Schema version for multi-requirement assessment results.
+pub const REQUIREMENT_SET_SCHEMA_VERSION: u16 = 1;
+/// Algorithm version for multi-requirement intersection gating.
+pub const REQUIREMENT_SET_ALGORITHM_VERSION: &str = "multi-requirement-intersection-v1";
+
+/// Complete deterministic assessment.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssessmentResult {
+    /// Schema version.
+    pub schema_version: u16,
+    /// Algorithm version.
+    pub algorithm_version: String,
+    /// Functional requirement.
+    pub requirement: FunctionalRequirement,
+    /// Optional Unix timestamp at which time-bounded evidence was evaluated.
+    pub assessed_at_epoch_seconds: Option<i64>,
+    /// Exact evidence-freshness policy applied during the assessment.
+    pub freshness_policy: Option<EvidenceFreshnessPolicy>,
+    /// Candidate assessments.
+    pub candidates: Vec<CandidateAssessment>,
+    /// Candidate IDs on the conservative Pareto frontier.
+    ///
+    /// Frontier membership is a comparison result, not a recommendation or
+    /// authorization to deploy a candidate.
+    pub pareto_frontier: Vec<String>,
+    /// Candidate comparisons against the incumbent.
+    pub burden_transfers: Vec<BurdenTransfer>,
+    /// Candidate blockers.
+    pub frontier_blockers: BTreeMap<String, Vec<FrontierBlocker>>,
+    /// Heuristic next-measurement target.
+    pub next_measurement: Option<MeasurementPriority>,
+    /// Explicit experimental-design provenance supplied for the assessment, when available.
+    pub experimental_design: Option<ExperimentalDesignProvenance>,
+    /// Deterministic receipt.
+    pub receipt: AssessmentReceipt,
+}
+
+/// Deterministic integrity receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AssessmentReceipt {
+    /// Schema version included in the hash.
+    pub schema_version: u16,
+    /// Algorithm version included in the hash.
+    pub algorithm_version: String,
+    /// BLAKE3 digest over the receipt-free canonical payload.
+    pub payload_hash: String,
+}
+
+/// Assessment construction errors.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AssessmentError {
+    /// Encountered a non-finite number.
+    NonFinite,
+    /// Interval bounds were inverted.
+    InvalidInterval { lower: f64, upper: f64 },
+    /// Confidence was outside [0, 1].
+    InvalidConfidence(f64),
+    /// Evidence identity metadata is incomplete.
+    EmptyEvidenceIdentity,
+    /// Requirement identity is incomplete.
+    EmptyRequirementIdentity,
+    /// Candidate identity is incomplete.
+    EmptyCandidateIdentity,
+    /// Candidate has no burden dimensions.
+    NoBurdenData,
+    /// A burden estimate lacks a comparable unit or scope.
+    EmptyBurdenScale,
+    /// Evidence validity bounds are inverted.
+    InvalidEvidenceValidity { from: i64, until: i64 },
+    /// An operating condition lacks a unit or scope.
+    EmptyOperatingScale,
+    /// An operating condition has an empty identity.
+    EmptyOperatingCondition,
+    /// A functional requirement contains no performance constraints.
+    EmptyFunctionalConstraints,
+    /// A performance estimate lacks a comparable unit or scope.
+    EmptyPerformanceScale,
+    /// The requirement does not declare a comparison scale for a dimension.
+    MissingComparisonScale(Dimension),
+    /// The requirement does not declare a comparison scale for a performance metric.
+    MissingPerformanceScale(String),
+    /// Linked evidence uses a different scope from a performance estimate.
+    PerformanceEvidenceScopeMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Performance comparison scope.
+        performance_scope: String,
+        /// Evidence scope.
+        evidence_scope: String,
+    },
+    /// Quantitative evidence linked to an estimate does not declare its unit.
+    MissingEvidenceUnit(String),
+    /// Linked evidence uses a different unit from a performance estimate.
+    PerformanceEvidenceUnitMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Performance comparison unit.
+        performance_unit: String,
+        /// Evidence unit.
+        evidence_unit: String,
+    },
+    /// Linked evidence uses a different scope from the burden estimate.
+    EvidenceScopeMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Burden comparison scope.
+        burden_scope: String,
+        /// Evidence scope.
+        evidence_scope: String,
+    },
+    /// Linked evidence uses a different unit from the burden estimate.
+    EvidenceUnitMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Burden comparison unit.
+        burden_unit: String,
+        /// Evidence unit.
+        evidence_unit: String,
+    },
+    /// Requirement range is invalid.
+    InvalidRequirementRange { min: f64, max: f64 },
+    /// Linked evidence uses a different methodological/comparability basis.
+    EvidenceBasisMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Exact basis required by the linked estimate.
+        expected: ComparisonBasisRef,
+        /// Exact basis declared by the evidence record.
+        actual: ComparisonBasisRef,
+    },
+    /// A physical/operational observation lacks its exact observation provenance.
+    MissingObservationProvenance(EvidenceKind),
+    /// Observation provenance identity is structurally incomplete.
+    InvalidObservationProvenance,
+    /// A physical/operational observation lacks a measurement-uncertainty statement.
+    MissingMeasurementUncertainty(EvidenceKind),
+    /// A physical/operational observation lacks an explicit unit.
+    MissingObservationUnit(EvidenceKind),
+    /// An uncertainty reference is present without observation provenance to bind it.
+    UnboundMeasurementUncertainty(String),
+    /// Measurement-uncertainty reference is structurally incomplete.
+    InvalidMeasurementUncertainty,
+    /// Evaluation provenance names a different uncertainty scope than its parent.
+    MeasurementUncertaintyEvaluationScopeMismatch {
+        /// Parent uncertainty identity.
+        uncertainty_id: String,
+        /// Scope field that disagrees.
+        field: String,
+        /// Value expected from the parent uncertainty.
+        expected: String,
+        /// Value declared by the evaluation provenance.
+        actual: String,
+    },
+    /// Measurement-uncertainty evaluation provenance is structurally incomplete.
+    InvalidMeasurementUncertaintyEvaluation,
+    /// Stated measurement uncertainty uses a different unit from the evidence.
+    MeasurementUncertaintyUnitMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Evidence unit.
+        evidence_unit: String,
+        /// Stated uncertainty unit.
+        uncertainty_unit: String,
+    },
+    /// Stated measurement uncertainty names a different observation result.
+    MeasurementUncertaintyObservationMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Observation identity carried by the evidence.
+        evidence_observation_id: String,
+        /// Observation identity carried by the uncertainty analysis.
+        uncertainty_observation_id: String,
+    },
+    /// Stated measurement uncertainty carries a different observation record digest.
+    MeasurementUncertaintyObservationRecordDigestMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Observation record digest expected by the evidence.
+        expected_observation_record_digest: String,
+        /// Observation record digest carried by the uncertainty analysis.
+        actual_observation_record_digest: String,
+    },
+    /// The uncertainty evaluation is bound to a different calibration/traceability chain.
+    MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Digest derived from the exact observation's ordered calibration chain.
+        expected_calibration_chain_digest: String,
+        /// Digest declared by the uncertainty evaluation record.
+        actual_calibration_chain_digest: String,
+        /// Number of links in the exact observation's ordered calibration chain.
+        expected_calibration_chain_count: usize,
+        /// Number of links declared by the uncertainty evaluation record.
+        actual_calibration_chain_count: usize,
+    },
+    /// Stated measurement uncertainty carries a digest different from its component-reference set.
+    MeasurementUncertaintyComponentRefsDigestMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Canonical digest expected from the sorted component-reference set.
+        expected_component_refs_digest: String,
+        /// Digest carried by the uncertainty record.
+        actual_component_refs_digest: String,
+    },
+    /// A component reference is structurally incomplete.
+    InvalidMeasurementUncertaintyComponentReference,
+    /// A component names a different uncertainty-budget identity/revision.
+    MeasurementUncertaintyComponentBudgetMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_budget_id: String,
+        actual_budget_id: String,
+        expected_budget_revision: String,
+        actual_budget_revision: String,
+    },
+    /// The submitted uncertainty component count differs from the count attested by the budget.
+    MeasurementUncertaintyBudgetComponentCountMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Count attested by the uncertainty budget.
+        expected_component_count: usize,
+        /// Count represented by the submitted component frontier.
+        actual_component_count: usize,
+    },
+    /// The submitted component frontier differs from the frontier attested by the budget.
+    MeasurementUncertaintyBudgetComponentSetDigestMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Canonical component-set digest attested by the uncertainty budget.
+        expected_component_set_digest: String,
+        /// Canonical component-set digest computed from submitted components.
+        actual_component_set_digest: String,
+    },
+    /// A component carries a different uncertainty-budget digest.
+    MeasurementUncertaintyComponentBudgetDigestMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_budget_digest: String,
+        actual_budget_digest: String,
+    },
+    /// A component names a different measurement-model identity/revision.
+    MeasurementUncertaintyComponentModelMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_model_id: String,
+        actual_model_id: String,
+        expected_model_revision: String,
+        actual_model_revision: String,
+    },
+    /// A component carries a different measurement-model digest.
+    MeasurementUncertaintyComponentModelDigestMismatch {
+        uncertainty_id: String,
+        component_id: String,
+        expected_model_digest: String,
+        actual_model_digest: String,
+    },
+    /// The uncertainty binding digest does not match its canonical payload.
+    MeasurementUncertaintyBindingDigestMismatch {
+        uncertainty_id: String,
+        expected_binding_digest: String,
+        actual_binding_digest: String,
+    },
+    /// Stated measurement uncertainty applies to a different measurand than the observation.
+    MeasurementUncertaintyMeasurandMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Measurand identity carried by the observation.
+        evidence_measurand_id: String,
+        /// Measurand identity carried by the uncertainty analysis.
+        uncertainty_measurand_id: String,
+    },
+    /// Stated measurement uncertainty uses a different procedure identity than the observation.
+    MeasurementUncertaintyProcedureMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Procedure identity expected from the observation.
+        expected_procedure_id: String,
+        /// Procedure identity carried by the uncertainty analysis.
+        actual_procedure_id: String,
+    },
+    /// Stated measurement uncertainty uses a different procedure payload than the observation.
+    MeasurementUncertaintyProcedureDigestMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Procedure digest expected from the observation.
+        expected_procedure_digest: String,
+        /// Procedure digest carried by the uncertainty analysis.
+        actual_procedure_digest: String,
+    },
+    /// A quantitative estimate lists the same evidence identifier more than once.
+    DuplicateLinkedEvidenceReference(String),
+    /// A burden references unknown evidence.
+    MissingEvidenceReference(String),
+    /// Explicit experimental-design provenance is structurally incomplete.
+    InvalidExperimentalDesign,
+    /// A heuristic measurement target has an invalid candidate relationship.
+    InvalidMeasurementDiscriminationTarget,
+    /// An experimental design is bound to a different functional requirement.
+    ExperimentalDesignRequirementMismatch {
+        /// Requirement identity expected by the assessment.
+        expected_requirement_id: String,
+        /// Requirement identity carried by the design.
+        actual_requirement_id: String,
+    },
+    /// An experimental design carries a different digest from the complete requirement semantics.
+    ExperimentalDesignRequirementDigestMismatch {
+        /// Canonical requirement digest expected by the assessment.
+        expected_requirement_digest: String,
+        /// Digest carried by the experimental design.
+        actual_requirement_digest: String,
+    },
+    /// An experimental discrimination target names a surface absent from the requirement.
+    ExperimentalDesignSurfaceUndeclared(String),
+    /// Two unresolved experimental uncertainty references share one identity.
+    DuplicateExperimentalUncertaintyReference,
+    /// Two experimental discrimination targets share one target identity.
+    DuplicateExperimentalDiscriminationTarget(String),
+    /// An experimental discrimination target uses a candidate not declared in the design set.
+    ExperimentalDesignTargetCandidateNotDeclared(String),
+    /// An experimental discrimination target has an invalid candidate relationship.
+    InvalidExperimentalDiscriminationTarget,
+    /// An observation references an experimental design that is not present in the assessment.
+    OrphanedExperimentalDesignObservation(String),
+    /// An observation carries a target identity without a corresponding design identity.
+    OrphanedExperimentalDesignTarget(String),
+    /// An observation references a target that is not declared by its design.
+    ExperimentalDesignTargetMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Referenced target identity.
+        target_id: String,
+    },
+    /// An observation is attributed to a design target for a different candidate.
+    ExperimentalDesignTargetCandidateMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Candidate carrying the observation.
+        candidate_id: String,
+        /// Target identity referenced by the observation.
+        target_id: String,
+    },
+    /// A design-bound observation is not linked to the estimate named by its experimental target.
+    ExperimentalDesignObservationNotLinkedToTargetSurface {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Candidate carrying the observation.
+        candidate_id: String,
+        /// Experimental target identity.
+        target_id: String,
+    },
+    /// A design-bound observation uses a different unit from the requirement surface.
+    ExperimentalDesignObservationUnitMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Required unit.
+        expected_unit: String,
+        /// Actual unit.
+        actual_unit: String,
+    },
+    /// A design-bound observation uses a different scope from the requirement surface.
+    ExperimentalDesignObservationScopeMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Required scope.
+        expected_scope: String,
+        /// Actual scope.
+        actual_scope: String,
+    },
+    /// A design-bound observation uses a different comparison basis from the requirement surface.
+    ExperimentalDesignObservationBasisMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Required basis.
+        expected: ComparisonBasisRef,
+        /// Actual evidence basis.
+        actual: ComparisonBasisRef,
+    },
+    /// An observation's procedure differs from the exact procedure prescribed by the design protocol.
+    ExperimentalDesignProcedureMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected procedure identity.
+        expected_procedure_id: String,
+        /// Actual procedure identity.
+        actual_procedure_id: String,
+    },
+    /// An observation uses a different exact procedure payload from the design protocol.
+    ExperimentalDesignProcedureDigestMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected procedure digest.
+        expected_procedure_digest: String,
+        /// Actual procedure digest.
+        actual_procedure_digest: String,
+    },
+    /// An observation's measurand differs from the exact target measurand.
+    ExperimentalDesignMeasurandMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected measurand identity.
+        expected_measurand_id: String,
+        /// Actual observation measurand identity.
+        actual_measurand_id: String,
+    },
+    /// An observation references a different experimental design from the assessment.
+    ExperimentalDesignObservationMismatch {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Expected design identity.
+        expected_design_id: String,
+        /// Actual design identity.
+        actual_design_id: String,
+    },
+    /// Experimental stopping criteria are structurally invalid.
+    InvalidExperimentalStoppingCriteria,
+    /// An experimental stopping rule references a target not declared by the design.
+    ExperimentalDesignStoppingTargetUndeclared(String),
+    /// An experimental stopping uncertainty threshold uses a unit different from its target.
+    ExperimentalDesignStoppingUnitMismatch {
+        /// Target identity.
+        target_id: String,
+        /// Unit required by the target surface.
+        expected_unit: String,
+        /// Unit declared by the stopping criterion.
+        actual_unit: String,
+    },
+    /// A declared uncertainty identity is not linked to non-design-bound evidence on any target surface.
+    ExperimentalDesignUncertaintyNotLinkedToTargetSurface(String),
+    /// An experimental design carries a different semantic digest for a candidate.
+    ExperimentalDesignCandidateDigestMismatch {
+        /// Candidate identity whose semantics drifted.
+        candidate_id: String,
+        /// Canonical digest computed from the supplied candidate.
+        expected_digest: String,
+        /// Digest committed by the experimental design.
+        actual_digest: String,
+    },
+    /// An experimental design references a candidate not present in the assessment.
+    ExperimentalDesignCandidateMissing(String),
+    /// An experimental design uses a comparison basis not declared by the assessment requirement.
+    ExperimentalDesignBasisMismatch {
+        /// Expected/declared assessment basis context.
+        expected: ComparisonBasisRef,
+        /// Actual design basis.
+        actual: ComparisonBasisRef,
+    },
+    /// Requested incumbent does not exist.
+    MissingIncumbent(String),
+    /// Two candidates have the same stable identifier.
+    DuplicateCandidateId(String),
+    /// Two evidence records within one candidate have the same stable identifier.
+    DuplicateEvidenceId(String),
+    /// Evidence provenance source identity is incomplete.
+    EmptySourceIdentity,
+    /// Assessment subject identity is incomplete.
+    EmptyAssessmentSubject,
+    /// External source admission reference is incomplete.
+    EmptySourceAdmissionReference,
+    /// Authority admission is bound to a different source subject.
+    SourceAdmissionSubjectBindingMismatch {
+        /// Canonical subject-binding digest expected from the source identity.
+        expected_binding: String,
+        /// Subject-binding digest carried by the admission.
+        actual_binding: String,
+    },
+    /// A declared traceability topology is structurally invalid.
+    InvalidCalibrationTraceabilityTopology,
+    /// Two topology nodes use the same node identity.
+    DuplicateCalibrationTraceabilityNode(String),
+    /// A declared reference node is listed more than once.
+    DuplicateCalibrationTraceabilityReference(String),
+    /// The declared topology is missing its measurement-result node.
+    CalibrationTraceabilityResultNodeMissing,
+    /// The topology's result node does not match the observation result.
+    CalibrationTraceabilityResultObservationMismatch,
+    /// The measured-result node incorrectly has an incoming topology edge.
+    CalibrationTraceabilityResultHasIncomingEdge,
+    /// An edge names a node not present in the topology.
+    CalibrationTraceabilityEdgeEndpointMissing,
+    /// Two identical topology edges were declared.
+    DuplicateCalibrationTraceabilityEdge {
+        /// Edge origin.
+        from_node_id: String,
+        /// Edge target.
+        to_node_id: String,
+    },
+    /// A terminal reference node incorrectly has an outgoing dependency.
+    CalibrationTraceabilityReferenceHasOutgoingEdge(String),
+    /// The topology contains a cycle.
+    CalibrationTraceabilityTopologyCycle,
+    /// The topology contains a disconnected node.
+    CalibrationTraceabilityTopologyDisconnected,
+    /// A topology node cannot reach a declared terminal reference.
+    CalibrationTraceabilityDeadEnd,
+    /// A declared linear calibration-chain link is absent from the topology.
+    CalibrationTraceabilityChainLinkMissing { calibration_id: String },
+    /// A measurement-model input binding is structurally empty.
+    InvalidCalibrationTraceabilityInputBinding,
+    /// Two input quantities are assigned duplicate branch bindings.
+    DuplicateCalibrationTraceabilityInputBinding(String),
+    /// An input binding references a missing topology node.
+    CalibrationTraceabilityInputBindingNodeMissing {
+        /// Exact model input identity.
+        input_quantity_id: String,
+        /// Referenced topology node identity.
+        node_id: String,
+    },
+    /// An input binding does not anchor to a direct child of the measurement result.
+    CalibrationTraceabilityInputBindingNotDirectChild {
+        /// Exact model input identity.
+        input_quantity_id: String,
+        /// Referenced topology node identity.
+        node_id: String,
+    },
+    /// An input binding anchors a terminal reference-standard node rather than an input lineage node.
+    CalibrationTraceabilityInputBindingInvalidNodeKind {
+        /// Exact model input identity.
+        input_quantity_id: String,
+        /// Referenced topology node identity.
+        node_id: String,
+        /// Actual topology node kind.
+        kind: CalibrationTraceabilityNodeKind,
+    },
+    /// The topology's measurement-model scope disagrees with the uncertainty evaluation.
+    CalibrationTraceabilityMeasurementModelMismatch {
+        /// Expected model identity.
+        expected_model_id: String,
+        /// Expected model revision.
+        expected_model_revision: String,
+        /// Expected model digest.
+        expected_model_digest: String,
+        /// Actual topology model identity.
+        actual_model_id: String,
+        /// Actual topology model revision.
+        actual_model_revision: String,
+        /// Actual topology model digest.
+        actual_model_digest: String,
+    },
+    /// The frontier reference is bound to a different measurement model than the topology.
+    CalibrationTraceabilityInputFrontierModelMismatch {
+        /// Topology measurement-model identity.
+        topology_model_id: String,
+        /// Topology measurement-model revision.
+        topology_model_revision: String,
+        /// Topology measurement-model digest.
+        topology_model_digest: String,
+        /// Frontier measurement-model identity.
+        frontier_model_id: String,
+        /// Frontier measurement-model revision.
+        frontier_model_revision: String,
+        /// Frontier measurement-model digest.
+        frontier_model_digest: String,
+    },
+    /// The ordered linear calibration traversal contains a duplicate exact link.
+    DuplicateCalibrationTraceabilityLink {
+        /// Calibration record identity.
+        calibration_id: String,
+        /// Calibration record revision.
+        calibration_revision: String,
+        /// Calibration record digest.
+        calibration_record_digest: String,
+        /// Link-use timestamp.
+        used_at_epoch_seconds: i64,
+    },
+    /// An explicitly named reference node is missing.
+    CalibrationTraceabilityReferenceMissing,
+    /// The measurement-model input frontier reference is structurally incomplete.
+    InvalidMeasurementModelInputFrontier,
+    /// An authoritative input specification reference is structurally incomplete.
+    InvalidMeasurementModelInputSpecification,
+    /// An external machine-readable quantity-definition reference is structurally incomplete.
+    InvalidMeasurementModelInputQuantityDefinition,
+    /// An external machine-readable unit-definition reference is structurally incomplete.
+    InvalidMeasurementModelInputUnitDefinition,
+    /// An external measurement-model input-result reference is structurally incomplete.
+    InvalidMeasurementModelInputResultReference,
+    /// The topology binding count differs from the authoritative input frontier.
+    MeasurementModelInputFrontierCountMismatch {
+        /// Frontier identity.
+        frontier_id: String,
+        /// Declared authoritative input count.
+        expected_input_count: usize,
+        /// Actual topology binding count.
+        actual_input_count: usize,
+    },
+    /// An input-result reference is not bound to a matching model-input-result topology node.
+    CalibrationTraceabilityInputResultBindingMismatch {
+        /// Model input identity.
+        input_quantity_id: String,
+        /// Topology node identity.
+        node_id: String,
+    },
+    /// A model-input-result node is not bound to exactly one input-result reference.
+    CalibrationTraceabilityOrphanedInputResultNode {
+        /// Topology node identity.
+        node_id: String,
+    },
+    /// The topology input set does not match the authoritative input frontier's attested set digest.
+    MeasurementModelInputFrontierInputSetDigestMismatch {
+        /// Frontier identity.
+        frontier_id: String,
+        /// Digest computed from the topology's input set.
+        expected_input_set_digest: String,
+        /// Digest supplied by the authoritative frontier reference.
+        actual_input_set_digest: String,
+    },
+    /// The model-input frontier itself contains a duplicate input quantity.
+    DuplicateMeasurementModelInputQuantity,
+    /// The uncertainty evaluation's topology digest does not match the observation topology.
+    MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+        /// Uncertainty identity.
+        uncertainty_id: String,
+        /// Expected topology digest.
+        expected_topology_digest: String,
+        /// Actual topology digest.
+        actual_topology_digest: String,
+    },
+    /// A topology-bound observation has no topology digest in its uncertainty evaluation.
+    MissingMeasurementUncertaintyCalibrationTopologyBinding(String),
+    /// An uncertainty evaluation carries a topology digest without an observed topology.
+    UnboundMeasurementUncertaintyCalibrationTopology(String),
+    /// The admission authority does not match the evidence source authority.
+    SourceAdmissionAuthorityMismatch {
+        /// Authority named by the evidence source identity.
+        source_authority_id: String,
+        /// Authority named by the admission reference.
+        admission_authority_id: String,
+    },
+    /// Freshness policy identity is incomplete.
+    EmptyFreshnessPolicyIdentity,
+    /// Comparison methodology/basis identity is incomplete.
+    EmptyComparisonBasis,
+    /// Freshness policy contains no rules.
+    EmptyFreshnessPolicy,
+    /// A freshness policy was supplied without an assessment timestamp.
+    FreshnessPolicyRequiresAssessmentTimestamp,
+    /// External source admission validity bounds are inverted.
+    InvalidSourceAdmissionValidity { from: i64, until: i64 },
+    /// A requirement set contains no requirements.
+    EmptyRequirementSet,
+    /// A requirement-set map key does not match the requirement's stable ID.
+    RequirementSetKeyMismatch { key: String, requirement_id: String },
+    /// Simulated or derived evidence lacks reproducible derivation provenance.
+    MissingDerivationMetadata(EvidenceKind),
+    /// Derivation metadata has incomplete identity.
+    EmptyDerivationIdentity,
+    /// Derivation metadata contains an empty input reference.
+    EmptyDerivationInput,
+    /// Derivation metadata contains an empty configuration hash.
+    EmptyDerivationConfigurationHash,
+}
+
+impl std::fmt::Display for AssessmentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonFinite => write!(f, "non-finite numeric value"),
+            Self::InvalidInterval { lower, upper } => {
+                write!(f, "invalid interval [{lower}, {upper}]")
+            }
+            Self::InvalidConfidence(value) => write!(f, "invalid confidence {value}"),
+            Self::EmptyEvidenceIdentity => write!(f, "evidence identity is incomplete"),
+            Self::EmptyRequirementIdentity => write!(f, "requirement identity is incomplete"),
+            Self::EmptyCandidateIdentity => write!(f, "candidate identity is incomplete"),
+            Self::NoBurdenData => write!(f, "candidate has no burden data"),
+            Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
+            Self::InvalidEvidenceValidity { from, until } => {
+                write!(f, "evidence validity [{from}, {until}] is inverted")
+            }
+            Self::EmptyPerformanceScale => write!(f, "performance unit/scope is empty"),
+            Self::EmptyFunctionalConstraints => {
+                write!(f, "functional requirement has no performance constraints")
+            }
+            Self::MissingComparisonScale(dimension) => {
+                write!(f, "missing comparison scale for {dimension:?}")
+            }
+            Self::MissingPerformanceScale(metric) => {
+                write!(f, "missing performance scale for {metric}")
+            }
+            Self::EmptyOperatingScale => {
+                write!(f, "operating condition unit/scope is empty")
+            }
+            Self::EmptyOperatingCondition => {
+                write!(f, "operating condition identity is empty")
+            }
+            Self::PerformanceEvidenceScopeMismatch {
+                evidence_id,
+                performance_scope,
+                evidence_scope,
+            } => write!(
+                f,
+                "evidence {evidence_id} scope {evidence_scope} does not match performance scope {performance_scope}"
+            ),
+            Self::MissingEvidenceUnit(evidence_id) => {
+                write!(f, "evidence {evidence_id} linked to a quantitative estimate is missing its unit")
+            }
+            Self::PerformanceEvidenceUnitMismatch {
+                evidence_id,
+                performance_unit,
+                evidence_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {evidence_unit} does not match performance unit {performance_unit}"
+            ),
+            Self::EvidenceScopeMismatch {
+                evidence_id,
+                burden_scope,
+                evidence_scope,
+            } => write!(
+                f,
+                "evidence {evidence_id} scope {evidence_scope} does not match burden scope {burden_scope}"
+            ),
+            Self::EvidenceUnitMismatch {
+                evidence_id,
+                burden_unit,
+                evidence_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {evidence_unit} does not match burden unit {burden_unit}"
+            ),
+            Self::InvalidRequirementRange { min, max } => {
+                write!(f, "invalid requirement range [{min}, {max}]")
+            }
+            Self::EvidenceBasisMismatch { evidence_id, .. } => {
+                write!(f, "evidence {evidence_id} comparison basis does not match linked estimate")
+            }
+            Self::MissingObservationProvenance(kind) => {
+                write!(f, "{kind:?} evidence is missing observation provenance")
+            }
+            Self::InvalidObservationProvenance => {
+                write!(f, "observation provenance reference is incomplete")
+            }
+            Self::MissingMeasurementUncertainty(kind) => {
+                write!(f, "{kind:?} evidence is missing measurement uncertainty")
+            }
+            Self::MissingObservationUnit(kind) => {
+                write!(f, "{kind:?} evidence is missing its explicit measurement unit")
+            }
+            Self::UnboundMeasurementUncertainty(evidence_id) => {
+                write!(f, "evidence {evidence_id} carries measurement uncertainty without observation provenance")
+            }
+            Self::InvalidMeasurementUncertainty => {
+                write!(f, "measurement uncertainty reference is incomplete")
+            }
+            Self::MeasurementUncertaintyUnitMismatch {
+                evidence_id,
+                evidence_unit,
+                uncertainty_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {evidence_unit} does not match uncertainty unit {uncertainty_unit}"
+            ),
+            Self::MeasurementUncertaintyObservationMismatch {
+                evidence_id,
+                evidence_observation_id,
+                uncertainty_observation_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} observation {evidence_observation_id} does not match uncertainty observation {uncertainty_observation_id}"
+            ),
+            Self::MeasurementUncertaintyObservationRecordDigestMismatch {
+                evidence_id,
+                expected_observation_record_digest,
+                actual_observation_record_digest,
+            } => write!(
+                f,
+                "evidence {evidence_id} observation record digest {expected_observation_record_digest} does not match uncertainty record digest {actual_observation_record_digest}"
+            ),
+            Self::MeasurementUncertaintyEvaluationScopeMismatch {
+                uncertainty_id,
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} evaluation scope field {field} expected {expected} actual {actual}"
+            ),
+            Self::InvalidMeasurementUncertaintyEvaluation => {
+                write!(f, "measurement uncertainty evaluation provenance is invalid")
+            }
+            Self::MeasurementUncertaintyEvaluationCalibrationChainMismatch {
+                uncertainty_id,
+                expected_calibration_chain_digest,
+                actual_calibration_chain_digest,
+                expected_calibration_chain_count,
+                actual_calibration_chain_count,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} evaluation calibration chain mismatch: digest {actual_calibration_chain_digest} expected {expected_calibration_chain_digest}, count {actual_calibration_chain_count} expected {expected_calibration_chain_count}"
+            ),
+            Self::MeasurementUncertaintyComponentRefsDigestMismatch {
+                uncertainty_id,
+                expected_component_refs_digest,
+                actual_component_refs_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component-reference digest {actual_component_refs_digest} does not match canonical component-reference digest {expected_component_refs_digest}"
+            ),
+            Self::InvalidMeasurementUncertaintyComponentReference => {
+                write!(f, "measurement uncertainty component reference is incomplete")
+            }
+            Self::MeasurementUncertaintyComponentBudgetMismatch {
+                uncertainty_id,
+                component_id,
+                expected_budget_id,
+                actual_budget_id,
+                expected_budget_revision,
+                actual_budget_revision,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} budget {actual_budget_id}@{actual_budget_revision} does not match {expected_budget_id}@{expected_budget_revision}"
+            ),
+            Self::MeasurementUncertaintyBudgetComponentCountMismatch {
+                uncertainty_id,
+                expected_component_count,
+                actual_component_count,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} budget attests {expected_component_count} components but submission contains {actual_component_count}"
+            ),
+            Self::MeasurementUncertaintyBudgetComponentSetDigestMismatch {
+                uncertainty_id,
+                expected_component_set_digest,
+                actual_component_set_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} submitted component frontier digest {actual_component_set_digest} does not match budget-attested frontier {expected_component_set_digest}"
+            ),
+            Self::MeasurementUncertaintyComponentBudgetDigestMismatch {
+                uncertainty_id,
+                component_id,
+                expected_budget_digest,
+                actual_budget_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} budget digest {actual_budget_digest} does not match {expected_budget_digest}"
+            ),
+            Self::MeasurementUncertaintyComponentModelMismatch {
+                uncertainty_id,
+                component_id,
+                expected_model_id,
+                actual_model_id,
+                expected_model_revision,
+                actual_model_revision,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} model {actual_model_id}@{actual_model_revision} does not match {expected_model_id}@{expected_model_revision}"
+            ),
+            Self::MeasurementUncertaintyComponentModelDigestMismatch {
+                uncertainty_id,
+                component_id,
+                expected_model_digest,
+                actual_model_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} component {component_id} model digest {actual_model_digest} does not match {expected_model_digest}"
+            ),
+            Self::MeasurementUncertaintyBindingDigestMismatch {
+                uncertainty_id,
+                expected_binding_digest,
+                actual_binding_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} binding digest {actual_binding_digest} does not match canonical binding digest {expected_binding_digest}"
+            ),
+            Self::MeasurementUncertaintyMeasurandMismatch {
+                evidence_id,
+                evidence_measurand_id,
+                uncertainty_measurand_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} measurand {evidence_measurand_id} does not match uncertainty measurand {uncertainty_measurand_id}"
+            ),
+            Self::MeasurementUncertaintyProcedureMismatch {
+                evidence_id,
+                expected_procedure_id,
+                actual_procedure_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure {actual_procedure_id} does not match uncertainty procedure {expected_procedure_id}"
+            ),
+            Self::MeasurementUncertaintyProcedureDigestMismatch {
+                evidence_id,
+                expected_procedure_digest,
+                actual_procedure_digest,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure digest {actual_procedure_digest} does not match uncertainty procedure digest {expected_procedure_digest}"
+            ),
+            Self::DuplicateLinkedEvidenceReference(id) => {
+                write!(f, "evidence reference {id} is duplicated within a quantitative estimate")
+            }
+            Self::MissingEvidenceReference(id) => {
+                write!(f, "missing evidence reference {id}")
+            }
+            Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
+            Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
+            Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
+            Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
+            Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
+            Self::DuplicateExperimentalUncertaintyReference => {
+                write!(f, "duplicate experimental uncertainty reference")
+            }
+            Self::InvalidMeasurementDiscriminationTarget => {
+                write!(f, "measurement discrimination target is invalid")
+            }
+            Self::ExperimentalDesignRequirementMismatch {
+                expected_requirement_id,
+                actual_requirement_id,
+            } => write!(
+                f,
+                "experimental design requirement {actual_requirement_id} does not match assessment requirement {expected_requirement_id}"
+            ),
+            Self::ExperimentalDesignRequirementDigestMismatch {
+                expected_requirement_digest,
+                actual_requirement_digest,
+            } => write!(
+                f,
+                "experimental design requirement digest {actual_requirement_digest} does not match canonical requirement digest {expected_requirement_digest}"
+            ),
+            Self::ExperimentalDesignSurfaceUndeclared(id) => write!(
+                f,
+                "experimental discrimination target {id} names a surface absent from the requirement"
+            ),
+            Self::DuplicateExperimentalDiscriminationTarget(id) => {
+                write!(f, "duplicate experimental discrimination target {id}")
+            }
+            Self::ExperimentalDesignTargetCandidateNotDeclared(id) => write!(
+                f,
+                "experimental discrimination target {id} references a candidate outside the design set"
+            ),
+            Self::InvalidExperimentalDiscriminationTarget => {
+                write!(f, "experimental discrimination target is invalid")
+            }
+            Self::OrphanedExperimentalDesignObservation(id) => write!(
+                f,
+                "observation references experimental design {id} but no design was supplied"
+            ),
+            Self::OrphanedExperimentalDesignTarget(id) => write!(
+                f,
+                "evidence {id} references an experimental target without a design"
+            ),
+            Self::ExperimentalDesignTargetMismatch { evidence_id, target_id } => write!(
+                f,
+                "evidence {evidence_id} references undeclared experimental target {target_id}"
+            ),
+            Self::ExperimentalDesignTargetCandidateMismatch {
+                evidence_id,
+                candidate_id,
+                target_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} on candidate {candidate_id} is outside experimental target {target_id}"
+            ),
+            Self::ExperimentalDesignProcedureMismatch {
+                evidence_id,
+                expected_procedure_id,
+                actual_procedure_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure {actual_procedure_id} does not match protocol procedure {expected_procedure_id}"
+            ),
+            Self::ExperimentalDesignProcedureDigestMismatch {
+                evidence_id,
+                expected_procedure_digest,
+                actual_procedure_digest,
+            } => write!(
+                f,
+                "evidence {evidence_id} procedure digest {actual_procedure_digest} does not match protocol procedure digest {expected_procedure_digest}"
+            ),
+            Self::ExperimentalDesignObservationNotLinkedToTargetSurface {
+                evidence_id,
+                candidate_id,
+                target_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} on candidate {candidate_id} is not linked to experimental target {target_id}'s assessed surface"
+            ),
+            Self::ExperimentalDesignObservationUnitMismatch {
+                evidence_id,
+                expected_unit,
+                actual_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {actual_unit} does not match experimental target unit {expected_unit}"
+            ),
+            Self::ExperimentalDesignObservationScopeMismatch {
+                evidence_id,
+                expected_scope,
+                actual_scope,
+            } => write!(
+                f,
+                "evidence {evidence_id} scope {actual_scope} does not match experimental target scope {expected_scope}"
+            ),
+            Self::ExperimentalDesignObservationBasisMismatch { evidence_id, .. } => write!(
+                f,
+                "evidence {evidence_id} comparison basis does not match experimental target surface"
+            ),
+            Self::ExperimentalDesignMeasurandMismatch {
+                evidence_id,
+                expected_measurand_id,
+                actual_measurand_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} measurand {actual_measurand_id} does not match target measurand {expected_measurand_id}"
+            ),
+            Self::ExperimentalDesignCandidateDigestMismatch {
+                candidate_id,
+                expected_digest,
+                actual_digest,
+            } => write!(
+                f,
+                "experimental design candidate {candidate_id} digest {actual_digest} does not match canonical candidate digest {expected_digest}"
+            ),
+            Self::ExperimentalDesignCandidateMissing(id) => write!(
+                f,
+                "experimental design references candidate {id} not present in assessment"
+            ),
+            Self::ExperimentalDesignObservationMismatch {
+                evidence_id,
+                expected_design_id,
+                actual_design_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} references design {actual_design_id}, expected {expected_design_id}"
+            ),
+            Self::ExperimentalDesignBasisMismatch { expected, actual } => write!(
+                f,
+                "experimental design basis {} does not match required basis {}",
+                actual.basis_id,
+                expected.basis_id
+            ),
+            Self::InvalidExperimentalStoppingCriteria => {
+                write!(f, "experimental stopping criteria are invalid")
+            }
+            Self::ExperimentalDesignStoppingTargetUndeclared(id) => write!(
+                f,
+                "experimental stopping rule references undeclared target {id}"
+            ),
+            Self::ExperimentalDesignStoppingUnitMismatch {
+                target_id,
+                expected_unit,
+                actual_unit,
+            } => write!(
+                f,
+                "experimental stopping target {target_id} unit {actual_unit} does not match target unit {expected_unit}"
+            ),
+            Self::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(uncertainty_id) => write!(
+                f,
+                "experimental design uncertainty {uncertainty_id} is not linked to non-design-bound evidence on any declared target surface"
+            ),
+            Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
+            Self::EmptySourceAdmissionReference => {
+                write!(f, "source admission reference is incomplete")
+            }
+            Self::SourceAdmissionSubjectBindingMismatch {
+                expected_binding,
+                actual_binding,
+            } => write!(
+                f,
+                "source admission subject binding {actual_binding} does not match expected binding {expected_binding}"
+            ),
+            Self::InvalidCalibrationTraceabilityTopology => {
+                write!(f, "calibration traceability topology is invalid")
+            }
+            Self::DuplicateCalibrationTraceabilityNode(node_id) => {
+                write!(f, "duplicate calibration traceability node {node_id}")
+            }
+            Self::DuplicateCalibrationTraceabilityReference(node_id) => {
+                write!(f, "duplicate calibration traceability reference node {node_id}")
+            }
+            Self::CalibrationTraceabilityResultNodeMissing => {
+                write!(f, "calibration traceability result node is missing")
+            }
+            Self::CalibrationTraceabilityResultObservationMismatch => {
+                write!(f, "calibration traceability result node does not match observation")
+            }
+            Self::CalibrationTraceabilityResultHasIncomingEdge => {
+                write!(f, "calibration traceability result node has an incoming edge")
+            }
+            Self::CalibrationTraceabilityEdgeEndpointMissing => {
+                write!(f, "calibration traceability edge endpoint is missing")
+            }
+            Self::DuplicateCalibrationTraceabilityEdge {
+                from_node_id,
+                to_node_id,
+            } => write!(
+                f,
+                "duplicate calibration traceability edge {from_node_id}->{to_node_id}"
+            ),
+            Self::CalibrationTraceabilityReferenceHasOutgoingEdge(node_id) => {
+                write!(f, "calibration traceability reference {node_id} has an outgoing edge")
+            }
+            Self::CalibrationTraceabilityTopologyCycle => {
+                write!(f, "calibration traceability topology contains a cycle")
+            }
+            Self::CalibrationTraceabilityTopologyDisconnected => {
+                write!(f, "calibration traceability topology is disconnected")
+            }
+            Self::CalibrationTraceabilityDeadEnd => {
+                write!(f, "calibration traceability topology contains a dead end")
+            }
+            Self::CalibrationTraceabilityChainLinkMissing { calibration_id } => {
+                write!(
+                    f,
+                    "calibration chain link {calibration_id} is missing from traceability topology"
+                )
+            },
+            Self::InvalidCalibrationTraceabilityInputBinding => {
+                write!(f, "calibration traceability input binding is empty")
+            }
+            Self::DuplicateCalibrationTraceabilityInputBinding(input_quantity_id) => write!(
+                f,
+                "duplicate calibration traceability input binding for {input_quantity_id}"
+            ),
+            Self::CalibrationTraceabilityInputBindingNodeMissing {
+                input_quantity_id,
+                node_id,
+            } => write!(
+                f,
+                "calibration traceability input {input_quantity_id} references missing node {node_id}"
+            ),
+            Self::CalibrationTraceabilityInputBindingNotDirectChild {
+                input_quantity_id,
+                node_id,
+            } => write!(
+                f,
+                "calibration traceability input {input_quantity_id} is not anchored at direct result child {node_id}"
+            ),
+            Self::CalibrationTraceabilityInputBindingInvalidNodeKind {
+                input_quantity_id,
+                node_id,
+                kind,
+            } => write!(
+                f,
+                "calibration traceability input {input_quantity_id} anchors invalid node kind {kind:?} at {node_id}"
+            ),
+            Self::CalibrationTraceabilityMeasurementModelMismatch {
+                expected_model_id,
+                expected_model_revision,
+                expected_model_digest,
+                actual_model_id,
+                actual_model_revision,
+                actual_model_digest,
+            } => write!(
+                f,
+                "calibration traceability measurement model mismatch: expected {expected_model_id}/{expected_model_revision}/{expected_model_digest}, actual {actual_model_id}/{actual_model_revision}/{actual_model_digest}"
+            ),
+            Self::CalibrationTraceabilityInputFrontierModelMismatch {
+                topology_model_id,
+                topology_model_revision,
+                topology_model_digest,
+                frontier_model_id,
+                frontier_model_revision,
+                frontier_model_digest,
+            } => write!(
+                f,
+                "calibration traceability input frontier model {frontier_model_id}/{frontier_model_revision}/{frontier_model_digest} does not match topology model {topology_model_id}/{topology_model_revision}/{topology_model_digest}"
+            ),
+            Self::DuplicateCalibrationTraceabilityLink {
+                calibration_id,
+                calibration_revision,
+                calibration_record_digest,
+                used_at_epoch_seconds,
+            } => write!(
+                f,
+                "duplicate calibration traceability link {calibration_id}@{calibration_revision}/{calibration_record_digest} used at {used_at_epoch_seconds}"
+            ),
+            Self::CalibrationTraceabilityReferenceMissing => {
+                write!(f, "calibration traceability reference node is missing")
+            }
+            Self::InvalidMeasurementModelInputFrontier => {
+                write!(f, "measurement-model input frontier reference is incomplete")
+            }
+            Self::InvalidMeasurementModelInputSpecification => {
+                write!(f, "measurement-model input specification reference is incomplete")
+            }
+            Self::InvalidMeasurementModelInputQuantityDefinition => {
+                write!(f, "measurement-model input quantity definition reference is incomplete")
+            }
+            Self::InvalidMeasurementModelInputUnitDefinition => {
+                write!(f, "measurement-model input unit definition reference is incomplete")
+            }
+            Self::InvalidMeasurementModelInputResultReference => {
+                write!(f, "measurement-model input result reference is incomplete")
+            }
+            Self::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } => write!(
+                f,
+                "measurement-model input {input_quantity_id} input-result reference does not match topology node {node_id}"
+            ),
+            Self::CalibrationTraceabilityOrphanedInputResultNode { node_id } => write!(
+                f,
+                "model-input-result topology node {node_id} is not bound to exactly one input-result reference"
+            ),
+            Self::MeasurementModelInputFrontierCountMismatch {
+                frontier_id,
+                expected_input_count,
+                actual_input_count,
+            } => write!(
+                f,
+                "measurement-model input frontier {frontier_id} declares {expected_input_count} inputs but topology binds {actual_input_count}"
+            ),
+            Self::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                expected_input_set_digest,
+                actual_input_set_digest,
+            } => write!(
+                f,
+                "measurement-model input frontier {frontier_id} attested input-set digest {actual_input_set_digest} does not match topology input set digest {expected_input_set_digest}"
+            ),
+            Self::DuplicateMeasurementModelInputQuantity => {
+                write!(f, "measurement-model input frontier contains duplicate input quantity")
+            }
+            Self::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch {
+                uncertainty_id,
+                expected_topology_digest,
+                actual_topology_digest,
+            } => write!(
+                f,
+                "uncertainty {uncertainty_id} topology digest {actual_topology_digest} does not match expected {expected_topology_digest}"
+            ),
+            Self::MissingMeasurementUncertaintyCalibrationTopologyBinding(uncertainty_id) => {
+                write!(
+                    f,
+                    "uncertainty {uncertainty_id} is missing calibration topology binding"
+                )
+            }
+            Self::UnboundMeasurementUncertaintyCalibrationTopology(uncertainty_id) => {
+                write!(
+                    f,
+                    "uncertainty {uncertainty_id} carries an unbound calibration topology digest"
+                )
+            },
+            Self::SourceAdmissionAuthorityMismatch {
+                source_authority_id,
+                admission_authority_id,
+            } => write!(
+                f,
+                "source authority {source_authority_id} does not match admission authority {admission_authority_id}"
+            ),
+            Self::EmptyFreshnessPolicyIdentity => {
+                write!(f, "freshness policy identity is incomplete")
+            }
+            Self::EmptyFreshnessPolicy => write!(f, "freshness policy has no rules"),
+            Self::FreshnessPolicyRequiresAssessmentTimestamp => {
+                write!(f, "freshness policy requires an assessment timestamp")
+            }
+            Self::EmptyComparisonBasis => {
+                write!(f, "comparison basis identity is incomplete")
+            }
+            Self::InvalidSourceAdmissionValidity { from, until } => {
+                write!(f, "source admission validity [{from}, {until}] is inverted")
+            },
+            Self::EmptyRequirementSet => write!(f, "requirement set is empty"),
+            Self::RequirementSetKeyMismatch { key, requirement_id } => write!(
+                f,
+                "requirement set key {key} does not match requirement id {requirement_id}"
+            ),
+            Self::MissingDerivationMetadata(kind) => {
+                write!(f, "evidence kind {kind:?} requires derivation metadata")
+            }
+            Self::EmptyDerivationIdentity => write!(f, "derivation identity is incomplete"),
+            Self::EmptyDerivationInput => write!(f, "derivation input reference is empty"),
+            Self::EmptyDerivationConfigurationHash => {
+                write!(f, "derivation configuration hash is empty")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AssessmentError {}
+
+/// Evidence-first alternatives assessment engine.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct AlternativesEngine;
+
+impl AlternativesEngine {
+    /// Evaluate one candidate set against every requirement in a requirement set.
+    ///
+    /// Joint eligibility is the intersection of the individual requirement
+    /// eligibility sets. Pareto frontiers remain per-requirement because
+    /// requirements may legitimately use different functional/lifecycle scopes.
+    pub fn assess_requirement_set(
+        &self,
+        requirement_set: &FunctionalRequirementSet,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+    ) -> Result<RequirementSetAssessment, AssessmentError> {
+        self.assess_requirement_set_with_freshness(
+            requirement_set,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            None,
+        )
+    }
+
+    /// Evaluate a requirement set with an explicit evidence-freshness policy.
+    pub fn assess_requirement_set_with_freshness(
+        &self,
+        requirement_set: &FunctionalRequirementSet,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> Result<RequirementSetAssessment, AssessmentError> {
+        requirement_set.validate()?;
+        if freshness_policy.is_some() && assessed_at_epoch_seconds.is_none() {
+            return Err(AssessmentError::FreshnessPolicyRequiresAssessmentTimestamp);
+        }
+        if let Some(policy) = freshness_policy {
+            policy.validate()?;
+        }
+        let mut assessments = BTreeMap::new();
+        for (requirement_id, requirement) in &requirement_set.requirements {
+            let assessment = self.assess_at_with_freshness(
+                requirement,
+                candidates,
+                incumbent_id,
+                assessed_at_epoch_seconds,
+                freshness_policy,
+            )?;
+            assessments.insert(requirement_id.clone(), assessment);
+        }
+
+        let mut candidate_ids = candidates
+            .iter()
+            .map(|candidate| candidate.id.clone())
+            .collect::<Vec<_>>();
+        candidate_ids.sort();
+        candidate_ids.dedup();
+
+        let mut jointly_eligible_candidate_ids = candidate_ids
+            .iter()
+            .filter(|candidate_id| {
+                assessments
+                    .values()
+                    .all(|assessment| !assessment.frontier_blockers.contains_key(*candidate_id))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        jointly_eligible_candidate_ids.sort();
+
+        let mut blockers = BTreeMap::<String, Vec<RequirementSetBlocker>>::new();
+        for (requirement_id, assessment) in &assessments {
+            for (candidate_id, candidate_blockers) in &assessment.frontier_blockers {
+                blockers
+                    .entry(candidate_id.clone())
+                    .or_default()
+                    .extend(candidate_blockers.iter().cloned().map(|blocker| {
+                        RequirementSetBlocker {
+                            requirement_id: requirement_id.clone(),
+                            blocker,
+                        }
+                    }));
+            }
+        }
+
+        let mut joint_qualification = BTreeMap::new();
+        for candidate_id in &candidate_ids {
+            let minimum = assessments
+                .values()
+                .filter_map(|assessment| {
+                    assessment
+                        .candidates
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == *candidate_id)
+                        .map(|candidate| candidate.qualification)
+                })
+                .min()
+                .unwrap_or(QualificationState::Hypothesis);
+            joint_qualification.insert(candidate_id.clone(), minimum);
+        }
+
+        let mut result = RequirementSetAssessment {
+            schema_version: REQUIREMENT_SET_SCHEMA_VERSION,
+            algorithm_version: REQUIREMENT_SET_ALGORITHM_VERSION.into(),
+            assessments,
+            jointly_eligible_candidate_ids,
+            joint_qualification,
+            blockers,
+            receipt: AssessmentReceipt {
+                schema_version: REQUIREMENT_SET_SCHEMA_VERSION,
+                algorithm_version: REQUIREMENT_SET_ALGORITHM_VERSION.into(),
+                payload_hash: String::new(),
+            },
+        };
+        let mut payload = result.clone();
+        payload.receipt.payload_hash.clear();
+        let bytes = serde_json::to_vec(&payload).map_err(|_| AssessmentError::NonFinite)?;
+        let mut hasher = Hasher::new();
+        hasher.update(&bytes);
+        result.receipt.payload_hash = hasher.finalize().to_hex().to_string();
+        Ok(result)
+    }
+
+    /// Evaluate candidates against a functional requirement.
+    pub fn assess(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        self.assess_at(requirement, candidates, incumbent_id, None)
+    }
+
+    /// Evaluate candidates with explicit experimental-design provenance.
+    ///
+    /// The design is validated and bound into the deterministic receipt. This
+    /// does not certify the protocol, sample size, power, causal validity, or
+    /// scientific adequacy.
+    pub fn assess_with_experimental_design(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        experimental_design: ExperimentalDesignProvenance,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        requirement.validate()?;
+        experimental_design.validate_against(requirement)?;
+
+        for candidate_id in &experimental_design.candidate_ids {
+            let Some(candidate) = candidates.iter().find(|candidate| &candidate.id == candidate_id) else {
+                return Err(AssessmentError::ExperimentalDesignCandidateMissing(
+                    candidate_id.clone(),
+                ));
+            };
+            let expected_digest = candidate.canonical_digest()?;
+            let actual_digest = experimental_design
+                .candidate_digests
+                .get(candidate_id)
+                .expect("validated candidate digest binding exists");
+            if actual_digest != &expected_digest {
+                return Err(AssessmentError::ExperimentalDesignCandidateDigestMismatch {
+                    candidate_id: candidate_id.clone(),
+                    expected_digest,
+                    actual_digest: actual_digest.clone(),
+                });
+            }
+        }
+
+        for candidate in candidates {
+            for evidence in &candidate.evidence {
+                let Some(observation) = &evidence.observation else {
+                    continue;
+                };
+                let Some(design_id) = &observation.experimental_design_id else {
+                    if observation.experimental_target_id.is_some() {
+                        return Err(AssessmentError::OrphanedExperimentalDesignTarget(
+                            evidence.id.clone(),
+                        ));
+                    }
+                    continue;
+                };
+                if design_id != &experimental_design.design_id {
+                    return Err(AssessmentError::ExperimentalDesignObservationMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_design_id: experimental_design.design_id.clone(),
+                        actual_design_id: design_id.clone(),
+                    });
+                }
+                let Some(target_id) = &observation.experimental_target_id else {
+                    return Err(AssessmentError::OrphanedExperimentalDesignTarget(
+                        evidence.id.clone(),
+                    ));
+                };
+                let Some(target) = experimental_design
+                    .expected_discrimination
+                    .iter()
+                    .find(|target| &target.target_id == target_id)
+                else {
+                    return Err(AssessmentError::ExperimentalDesignTargetMismatch {
+                        evidence_id: evidence.id.clone(),
+                        target_id: target_id.clone(),
+                    });
+                };
+                if candidate.id != target.left_candidate_id && candidate.id != target.right_candidate_id {
+                    return Err(AssessmentError::ExperimentalDesignTargetCandidateMismatch {
+                        evidence_id: evidence.id.clone(),
+                        candidate_id: candidate.id.clone(),
+                        target_id: target.target_id.clone(),
+                    });
+                }
+                let Some((expected_unit, expected_scope, expected_basis)) =
+                    target.requirement_scale(requirement)
+                else {
+                    return Err(AssessmentError::ExperimentalDesignSurfaceUndeclared(
+                        target.target_id.clone(),
+                    ));
+                };
+                let linked_to_target_surface = match &target.surface {
+                    ExperimentalDiscriminationSurface::Burden(dimension) => candidate
+                        .burdens
+                        .get(dimension)
+                        .is_some_and(|estimate| estimate.evidence_ids.contains(&evidence.id)),
+                    ExperimentalDiscriminationSurface::PerformanceMetric(metric) => candidate
+                        .performance
+                        .get(metric)
+                        .is_some_and(|estimate| estimate.evidence_ids.contains(&evidence.id)),
+                    ExperimentalDiscriminationSurface::OperatingCondition(condition) => candidate
+                        .operating_capabilities
+                        .get(condition)
+                        .is_some_and(|estimate| estimate.evidence_ids.contains(&evidence.id)),
+                };
+                if !linked_to_target_surface {
+                    return Err(
+                        AssessmentError::ExperimentalDesignObservationNotLinkedToTargetSurface {
+                            evidence_id: evidence.id.clone(),
+                            candidate_id: candidate.id.clone(),
+                            target_id: target.target_id.clone(),
+                        },
+                    );
+                }
+                if evidence.scope != expected_scope {
+                    return Err(AssessmentError::ExperimentalDesignObservationScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_scope: expected_scope.to_string(),
+                        actual_scope: evidence.scope.clone(),
+                    });
+                }
+                if let Some(actual_unit) = evidence.unit.as_deref()
+                    && actual_unit != expected_unit
+                {
+                    return Err(AssessmentError::ExperimentalDesignObservationUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_unit: expected_unit.to_string(),
+                        actual_unit: actual_unit.to_string(),
+                    });
+                }
+                if evidence.basis != *expected_basis {
+                    return Err(AssessmentError::ExperimentalDesignObservationBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: expected_basis.clone(),
+                        actual: evidence.basis.clone(),
+                    });
+                }
+                let observation_measurand = &observation.measurand_id;
+                if observation.procedure_id != experimental_design.protocol.procedure_id {
+                    return Err(AssessmentError::ExperimentalDesignProcedureMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_procedure_id: experimental_design.protocol.procedure_id.clone(),
+                        actual_procedure_id: observation.procedure_id.clone(),
+                    });
+                }
+                if observation.procedure_digest != experimental_design.protocol.procedure_digest {
+                    return Err(AssessmentError::ExperimentalDesignProcedureDigestMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_procedure_digest: experimental_design.protocol.procedure_digest.clone(),
+                        actual_procedure_digest: observation.procedure_digest.clone(),
+                    });
+                }
+                if observation_measurand != &target.measurand_id {
+                    return Err(AssessmentError::ExperimentalDesignMeasurandMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected_measurand_id: target.measurand_id.clone(),
+                        actual_measurand_id: observation_measurand.clone(),
+                    });
+                }
+            }
+        }
+
+        for uncertainty_id in &experimental_design.unresolved_uncertainty_refs {
+            let linked_to_declared_target = experimental_design
+                .expected_discrimination
+                .iter()
+                .any(|target| {
+                    [&target.left_candidate_id, &target.right_candidate_id]
+                        .iter()
+                        .any(|candidate_id| {
+                            candidates
+                                .iter()
+                                .find(|candidate| &candidate.id == *candidate_id)
+                                .is_some_and(|candidate| {
+                                    candidate.target_surface_has_non_design_bound_uncertainty(
+                                        target,
+                                        uncertainty_id,
+                                    )
+                                })
+                        })
+                });
+            if !linked_to_declared_target {
+                return Err(
+                    AssessmentError::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(
+                        uncertainty_id.clone(),
+                    ),
+                );
+            }
+        }
+
+        let experimental_design = experimental_design.canonicalized();
+        let mut result = self.assess_at_with_freshness_internal(
+            requirement,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            freshness_policy,
+            Some(&experimental_design.design_id),
+        )?;
+        result.experimental_design = Some(experimental_design);
+        result.receipt.payload_hash = canonical_payload_hash(&result)?;
+        Ok(result)
+    }
+
+    /// Evaluate candidates at an explicit Unix timestamp.
+    ///
+    /// Time-bounded evidence is used only when valid at the supplied timestamp.
+    /// An assessment without a timestamp conservatively excludes any evidence
+    /// with an explicit validity window.
+    pub fn assess_at(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        self.assess_at_with_freshness(
+            requirement,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            None,
+        )
+    }
+
+    /// Evaluate candidates at an explicit timestamp with an explicit freshness policy.
+    pub fn assess_at_with_freshness(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        self.assess_at_with_freshness_internal(
+            requirement,
+            candidates,
+            incumbent_id,
+            assessed_at_epoch_seconds,
+            freshness_policy,
+            None,
+        )
+    }
+
+    fn assess_at_with_freshness_internal(
+        &self,
+        requirement: &FunctionalRequirement,
+        candidates: &[CandidatePathway],
+        incumbent_id: Option<&str>,
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        allowed_experimental_design_id: Option<&str>,
+    ) -> Result<AssessmentResult, AssessmentError> {
+        requirement.validate()?;
+        if freshness_policy.is_some() && assessed_at_epoch_seconds.is_none() {
+            return Err(AssessmentError::FreshnessPolicyRequiresAssessmentTimestamp);
+        }
+        if let Some(policy) = freshness_policy {
+            policy.validate()?;
+        };
+        if let Some(id) = incumbent_id {
+            if !candidates.iter().any(|candidate| candidate.id == id) {
+                return Err(AssessmentError::MissingIncumbent(id.to_string()));
+            }
+        }
+
+        let mut normalized_candidates = candidates.to_vec();
+        normalized_candidates.sort_by(|a, b| a.id.cmp(&b.id));
+        if normalized_candidates
+            .windows(2)
+            .any(|pair| pair[0].id == pair[1].id)
+        {
+            return Err(AssessmentError::DuplicateCandidateId(
+                normalized_candidates
+                    .first()
+                    .map(|candidate| candidate.id.clone())
+                    .unwrap_or_default(),
+            ));
+        }
+        for candidate in &mut normalized_candidates {
+            candidate
+                .evidence
+                .sort_by(|a, b| a.id.cmp(&b.id));
+            for estimate in candidate.performance.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+            for estimate in candidate.operating_capabilities.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+            for estimate in candidate.burdens.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+            candidate.validate()?;
+            for evidence in &candidate.evidence {
+                if let Some(observation) = &evidence.observation
+                    && let Some(design_id) = &observation.experimental_design_id
+                {
+                    if observation.experimental_target_id.is_none() {
+                        return Err(AssessmentError::OrphanedExperimentalDesignTarget(
+                            evidence.id.clone(),
+                        ));
+                    }
+                    match allowed_experimental_design_id {
+                        None => {
+                            return Err(AssessmentError::OrphanedExperimentalDesignObservation(
+                                design_id.clone(),
+                            ));
+                        }
+                        Some(expected_design_id) if design_id != expected_design_id => {
+                            return Err(AssessmentError::ExperimentalDesignObservationMismatch {
+                                evidence_id: evidence.id.clone(),
+                                expected_design_id: expected_design_id.to_string(),
+                                actual_design_id: design_id.clone(),
+                            });
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
+        }
+
+        let mut assessments = Vec::with_capacity(normalized_candidates.len());
+        let mut blockers = BTreeMap::new();
+        let expected_scales = requirement
+            .comparison_scales
+            .iter()
+            .map(|(dimension, scale)| {
+                (
+                    dimension,
+                    (scale.unit.clone(), scale.scope.clone(), scale.basis.clone()),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        for candidate in &normalized_candidates {
+            let constraints = requirement
+                .constraints
+                .iter()
+                .map(|(metric, bound)| {
+                    let status = match (
+                        candidate.performance.get(metric),
+                        requirement.performance_scales.get(metric),
+                    ) {
+                        (Some(estimate), Some(scale))
+                            if estimate.unit == scale.unit
+                                && estimate.scope == scale.scope
+                                && estimate.basis == scale.basis
+                                && candidate.performance_evidence_is_supported_at(
+                                    metric,
+                                    assessed_at_epoch_seconds,
+                                    freshness_policy,
+                                ) =>
+                        {
+                            bound.check(Some(estimate.interval))
+                        }
+                        _ => ConstraintStatus::Unresolved,
+                    };
+                    ConstraintEvaluation {
+                        metric: metric.clone(),
+                        requirement: *bound,
+                        status,
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let mut candidate_blockers = Vec::new();
+            for (metric, scale) in &requirement.performance_scales {
+                if let Some(estimate) = candidate.performance.get(metric)
+                    && (estimate.unit != scale.unit || estimate.scope != scale.scope)
+                {
+                    candidate_blockers.push(FrontierBlocker::PerformanceIncompatibleScale {
+                        metric: metric.clone(),
+                        expected_unit: scale.unit.clone(),
+                        actual_unit: estimate.unit.clone(),
+                        expected_scope: scale.scope.clone(),
+                        actual_scope: estimate.scope.clone(),
+                    });
+                } else if let Some(estimate) = candidate.performance.get(metric)
+                    && estimate.basis != scale.basis
+                {
+                    candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
+                        context: format!("performance:{metric}"),
+                        expected: scale.basis.clone(),
+                        actual: estimate.basis.clone(),
+                    });
+                }
+            }
+            for (condition, required) in &requirement.operating_envelope {
+                match candidate.operating_capabilities.get(condition) {
+                    None => candidate_blockers.push(FrontierBlocker::OperatingConditionUnresolved(
+                        condition.clone(),
+                    )),
+                    Some(capability)
+                        if capability.unit != required.unit || capability.scope != required.scope =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::PerformanceIncompatibleScale {
+                            metric: format!("operating:{condition}"),
+                            expected_unit: required.unit.clone(),
+                            actual_unit: capability.unit.clone(),
+                            expected_scope: required.scope.clone(),
+                            actual_scope: capability.scope.clone(),
+                        });
+                    }
+                    Some(capability) if capability.basis != required.basis => {
+                        candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
+                            context: format!("operating:{condition}"),
+                            expected: required.basis.clone(),
+                            actual: capability.basis.clone(),
+                        });
+                    }
+                    Some(capability)
+                        if capability.interval.lower > required.interval.lower
+                            || capability.interval.upper < required.interval.upper =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::OperatingConditionFailed(
+                            condition.clone(),
+                        ));
+                    }
+                    Some(capability)
+                        if !candidate.operating_evidence_is_supported_at(
+                            condition,
+                            assessed_at_epoch_seconds,
+                            freshness_policy,
+                        ) =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::OperatingConditionUnresolved(
+                            condition.clone(),
+                        ));
+                    }
+                    Some(_) => {}
+                }
+            }
+            for evaluation in &constraints {
+                match evaluation.status {
+                    ConstraintStatus::Fail => candidate_blockers
+                        .push(FrontierBlocker::ConstraintFailed(evaluation.metric.clone())),
+                    ConstraintStatus::Unresolved => candidate_blockers
+                        .push(FrontierBlocker::ConstraintUnresolved(evaluation.metric.clone())),
+                    ConstraintStatus::Pass => {}
+                }
+            }
+            for dimension in Dimension::ALL {
+                match (candidate.burdens.get(&dimension), expected_scales.get(&dimension)) {
+                    (None, _) => candidate_blockers.push(FrontierBlocker::MissingDimension(dimension)),
+                    (Some(estimate), Some((expected_unit, expected_scope, _expected_basis)))
+                        if estimate.unit != *expected_unit || estimate.scope != *expected_scope =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::IncompatibleScale {
+                            dimension,
+                            expected_unit: expected_unit.clone(),
+                            actual_unit: estimate.unit.clone(),
+                            expected_scope: expected_scope.clone(),
+                            actual_scope: estimate.scope.clone(),
+                        });
+                    }
+                    (Some(estimate), Some((_, _, expected_basis)))
+                        if estimate.basis != *expected_basis =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::ComparisonBasisMismatch {
+                            context: format!("burden:{dimension:?}"),
+                            expected: expected_basis.clone(),
+                            actual: estimate.basis.clone(),
+                        });
+                    }
+                    (Some(estimate), Some(_))
+                        if estimate.evidence_ids.is_empty()
+                            || candidate
+                                .linked_evidence_at(
+                                    &estimate.evidence_ids,
+                                    assessed_at_epoch_seconds,
+                                    freshness_policy,
+                                )
+                                .next()
+                                .is_none() =>
+                    {
+                        candidate_blockers.push(FrontierBlocker::EvidenceUnavailable(dimension));
+                    }
+                    _ => {}
+                }
+            }
+
+            let frontier_blocked = !candidate_blockers.is_empty();
+            if frontier_blocked {
+                blockers.insert(candidate.id.clone(), candidate_blockers);
+            }
+            let observed_evidence_count = Dimension::ALL
+                .into_iter()
+                .map(|dimension| {
+                    let count = candidate
+                        .burdens
+                        .get(&dimension)
+                        .map(|estimate| {
+                            candidate
+                                .linked_evidence_at(
+                                    &estimate.evidence_ids,
+                                    assessed_at_epoch_seconds,
+                                    freshness_policy,
+                                )
+                                .filter(|e| {
+                                    matches!(
+                                        e.kind,
+                                        EvidenceKind::Observed
+                                            | EvidenceKind::ManufacturingObserved
+                                            | EvidenceKind::FieldObserved
+                                            | EvidenceKind::ContinuouslyMonitored
+                                    ) && e.stance == EvidenceStance::Supports
+                                })
+                                .count()
+                        })
+                        .unwrap_or(0);
+                    (dimension, count)
+                })
+                .collect();
+
+            let evidence_digest = canonical_candidate_evidence_hash(candidate)?;
+            assessments.push(CandidateAssessment {
+                candidate_id: candidate.id.clone(),
+                derivation: candidate.derivation.clone(),
+                evidence_digest,
+                performance: candidate.performance.clone(),
+                operating_capabilities: candidate.operating_capabilities.clone(),
+                constraints,
+                burdens: candidate.burdens.clone(),
+                qualification: candidate.qualification_ceiling(
+                    requirement,
+                    assessed_at_epoch_seconds,
+                    freshness_policy,
+                ),
+                evidence_conflict: candidate.has_conflict_at(
+                    assessed_at_epoch_seconds,
+                    freshness_policy,
+                ),
+                frontier_blocked,
+                observed_evidence_count,
+            });
+        }
+
+        let eligible = assessments
+            .iter()
+            .filter(|assessment| !assessment.frontier_blocked)
+            .collect::<Vec<_>>();
+
+        let mut frontier = Vec::new();
+        for candidate in &eligible {
+            let dominated = eligible.iter().any(|other| {
+                other.candidate_id != candidate.candidate_id
+                    && Self::dominates(&other.burdens, &candidate.burdens)
+            });
+            if !dominated {
+                frontier.push(candidate.candidate_id.clone());
+            }
+        }
+        frontier.sort();
+
+        let burden_transfers = if let Some(incumbent_id) = incumbent_id {
+            let incumbent = normalized_candidates
+                .iter()
+                .find(|candidate| candidate.id == incumbent_id)
+                .expect("validated incumbent exists");
+            normalized_candidates
+                .iter()
+                .filter(|candidate| candidate.id != incumbent_id)
+                .map(|candidate| Self::burden_transfer(candidate, incumbent))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let next_measurement = Self::next_measurement(
+            requirement,
+            &frontier,
+            &assessments,
+            &normalized_candidates,
+            assessed_at_epoch_seconds,
+            freshness_policy,
+        );
+
+        let mut result = AssessmentResult {
+            schema_version: SCHEMA_VERSION,
+            algorithm_version: ALGORITHM_VERSION.to_string(),
+            requirement: requirement.clone(),
+            assessed_at_epoch_seconds,
+            freshness_policy: freshness_policy.cloned(),
+            candidates: assessments,
+            pareto_frontier: frontier,
+            burden_transfers,
+            frontier_blockers: blockers,
+            next_measurement,
+            experimental_design: None,
+            receipt: AssessmentReceipt {
+                schema_version: SCHEMA_VERSION,
+                algorithm_version: ALGORITHM_VERSION.to_string(),
+                payload_hash: String::new(),
+            },
+        };
+
+        result.receipt.payload_hash = canonical_payload_hash(&result)?;
+        Ok(result)
+    }
+
+    /// Conservative interval Pareto dominance.
+    pub fn dominates(
+        a: &BTreeMap<Dimension, BurdenEstimate>,
+        b: &BTreeMap<Dimension, BurdenEstimate>,
+    ) -> bool {
+        if !Dimension::ALL
+            .iter()
+            .all(|dimension| a.contains_key(dimension) && b.contains_key(dimension))
+        {
+            return false;
+        }
+
+        let mut strict = false;
+        for dimension in Dimension::ALL {
+            let a_estimate = &a[&dimension];
+            let b_estimate = &b[&dimension];
+            if a_estimate.unit != b_estimate.unit
+                || a_estimate.scope != b_estimate.scope
+                || a_estimate.basis != b_estimate.basis
+            {
+                return false;
+            }
+            let ai = a_estimate.interval;
+            let bi = b_estimate.interval;
+            if !ai.clearly_no_worse_than(bi) {
+                return false;
+            }
+            if ai.clearly_better_than(bi) {
+                strict = true;
+            }
+        }
+        strict
+    }
+
+    fn burden_transfer(
+        candidate: &CandidatePathway,
+        incumbent: &CandidatePathway,
+    ) -> BurdenTransfer {
+        let mut clearly_better = Vec::new();
+        let mut clearly_worse = Vec::new();
+        for dimension in Dimension::ALL {
+            let Some(candidate_interval) = candidate.burdens.get(&dimension).map(|b| b.interval)
+            else {
+                continue;
+            };
+            let Some(incumbent_interval) = incumbent.burdens.get(&dimension).map(|b| b.interval)
+            else {
+                continue;
+            };
+            let candidate_scale = candidate.burdens.get(&dimension).unwrap();
+            let incumbent_scale = incumbent.burdens.get(&dimension).unwrap();
+            if candidate_scale.unit != incumbent_scale.unit
+                || candidate_scale.scope != incumbent_scale.scope
+                || candidate_scale.basis != incumbent_scale.basis
+            {
+                continue;
+            }
+            if candidate_interval.clearly_better_than(incumbent_interval) {
+                clearly_better.push(dimension);
+            } else if candidate_interval.clearly_worse_than(incumbent_interval) {
+                clearly_worse.push(dimension);
+            }
+        }
+        BurdenTransfer {
+            candidate_id: candidate.id.clone(),
+            clearly_better,
+            clearly_worse,
+        }
+    }
+
+    fn next_measurement(
+        requirement: &FunctionalRequirement,
+        frontier: &[String],
+        assessments: &[CandidateAssessment],
+        candidates: &[CandidatePathway],
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
+    ) -> Option<MeasurementPriority> {
+        if frontier.is_empty() {
+            return None;
+        }
+
+        let frontier_assessments = assessments
+            .iter()
+            .filter(|candidate| frontier.contains(&candidate.candidate_id))
+            .collect::<Vec<_>>();
+
+        let mut ranked = Dimension::ALL
+            .iter()
+            .filter_map(|dimension| {
+                let unresolved_count = frontier_assessments
+                    .iter()
+                    .filter(|candidate| {
+                        candidate.observed_evidence_count[dimension] == 0
+                            || candidates
+                            .iter()
+                            .find(|pathway| pathway.id == candidate.candidate_id)
+                            .and_then(|pathway| pathway.burdens.get(dimension))
+                            .is_some_and(|estimate| {
+                                candidates
+                                    .iter()
+                                    .find(|pathway| pathway.id == candidate.candidate_id)
+                                    .is_some_and(|pathway| {
+                                        pathway.dimension_has_conflict_at(
+                                            estimate,
+                                            assessed_at_epoch_seconds,
+                                            freshness_policy,
+                                        )
+                                    })
+                            })
+                    })
+                    .count();
+                (unresolved_count > 0).then_some((*dimension, unresolved_count))
+            })
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|a, b| {
+            b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
+        });
+
+        ranked.first().and_then(|(dimension, unresolved_count)| {
+            let mut unresolved_candidate_ids = frontier_assessments
+                .iter()
+                .filter(|candidate| {
+                    candidate.observed_evidence_count[dimension] == 0
+                        || candidates
+                            .iter()
+                            .find(|pathway| pathway.id == candidate.candidate_id)
+                            .and_then(|pathway| pathway.burdens.get(dimension))
+                            .is_some_and(|estimate| {
+                                candidates
+                                    .iter()
+                                    .find(|pathway| pathway.id == candidate.candidate_id)
+                                    .is_some_and(|pathway| {
+                                        pathway.dimension_has_conflict_at(
+                                            estimate,
+                                            assessed_at_epoch_seconds,
+                                            freshness_policy,
+                                        )
+                                    })
+                            })
+                })
+                .map(|candidate| candidate.candidate_id.clone())
+                .collect::<Vec<_>>();
+            unresolved_candidate_ids.sort();
+
+            // A measurement must compare every unresolved frontier candidate
+            // against any frontier comparator whose interval overlaps it.
+            // Comparators do not become "unresolved" merely because they are
+            // included in the discrimination set.
+            let mut candidate_ids = unresolved_candidate_ids.clone();
+            for comparator in &frontier_assessments {
+                if unresolved_candidate_ids.contains(&comparator.candidate_id) {
+                    continue;
+                }
+                let Some(comparator_burden) = comparator.burdens.get(dimension) else {
+                    continue;
+                };
+                let overlaps_unresolved = unresolved_candidate_ids.iter().any(|unresolved_id| {
+                    frontier_assessments
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == *unresolved_id)
+                        .and_then(|candidate| candidate.burdens.get(dimension))
+                        .is_some_and(|unresolved_burden| {
+                            !(unresolved_burden.interval.upper < comparator_burden.interval.lower
+                                || comparator_burden.interval.upper < unresolved_burden.interval.lower)
+                        })
+                });
+                if overlaps_unresolved {
+                    candidate_ids.push(comparator.candidate_id.clone());
+                }
+            }
+            candidate_ids.sort();
+            candidate_ids.dedup();
+
+            let mut expected_discrimination = Vec::new();
+            for left in 0..candidate_ids.len() {
+                for right in (left + 1)..candidate_ids.len() {
+                    let a = frontier_assessments
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == candidate_ids[left]);
+                    let b = frontier_assessments
+                        .iter()
+                        .find(|candidate| candidate.candidate_id == candidate_ids[right]);
+                    if let (Some(a), Some(b)) = (a, b) {
+                        if !(unresolved_candidate_ids.contains(&a.candidate_id)
+                            || unresolved_candidate_ids.contains(&b.candidate_id))
+                        {
+                            continue;
+                        }
+                        if let (Some(a_burden), Some(b_burden)) =
+                            (a.burdens.get(dimension), b.burdens.get(dimension))
+                        {
+                            if !(a_burden.interval.upper < b_burden.interval.lower
+                                || b_burden.interval.upper < a_burden.interval.lower)
+                            {
+                                let scale = requirement
+                                    .comparison_scales
+                                    .get(dimension)
+                                    .expect("validated requirement contains every burden comparison scale");
+                                expected_discrimination.push(MeasurementDiscriminationTarget {
+                                    left_candidate_id: candidate_ids[left].clone(),
+                                    right_candidate_id: candidate_ids[right].clone(),
+                                    dimension: *dimension,
+                                    unit: scale.unit.clone(),
+                                    scope: scale.scope.clone(),
+                                    basis: scale.basis.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            let unresolved_uncertainty_refs = unresolved_candidate_ids
+                .iter()
+                .filter_map(|candidate_id| {
+                    candidates
+                        .iter()
+                        .find(|candidate| candidate.id == *candidate_id)
+                })
+                .filter_map(|candidate| {
+                    candidate.burdens.get(dimension).map(|estimate| (candidate, estimate))
+                })
+                .flat_map(|(candidate, estimate)| {
+                    candidate
+                        .linked_evidence_at(
+                            &estimate.evidence_ids,
+                            assessed_at_epoch_seconds,
+                            freshness_policy,
+                        )
+                        .filter_map(|evidence| {
+                            evidence
+                                .uncertainty
+                                .as_ref()
+                                .map(|uncertainty| uncertainty.uncertainty_id.clone())
+                        })
+                })
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+
+            if expected_discrimination
+                .iter()
+                .any(|target| target.validate_against(requirement).is_err())
+            {
+                return None;
+            }
+            Some(MeasurementPriority {
+                dimension: *dimension,
+                unresolved_candidate_count: *unresolved_count,
+                frontier_candidate_count: frontier_assessments.len(),
+                unresolved_uncertainty_refs,
+                candidate_ids,
+                expected_discrimination,
+                rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets include unresolved frontier candidates plus overlapping frontier comparators and carry the exact requirement unit/scope/basis; exact uncertainty identities are emitted only from unresolved linked evidence; no cross-dimension unit scalarization".to_string(),
+            })
+        })
+    }
+}
+
+/// Compute a domain-separated BLAKE3 digest over the exact ordered calibration/traceability chain.
+fn canonical_calibration_chain_hash(
+    calibration_chain: &[CalibrationTraceabilityRef],
+) -> Result<String, AssessmentError> {
+    let bytes = serde_json::to_vec(calibration_chain).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea:calibration-traceability-chain:v1\n");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn canonical_measurement_uncertainty_component_refs_hash(
+    component_refs: &[MeasurementUncertaintyComponentRef],
+) -> Result<String, AssessmentError> {
+    let mut canonical = component_refs.to_vec();
+    canonical.sort_by(|a, b| a.component_id.cmp(&b.component_id));
+    let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+#[derive(Serialize)]
+struct CanonicalMeasurementUncertaintyBinding<'a> {
+    uncertainty_id: &'a str,
+    observation_id: &'a str,
+    observation_record_digest: &'a str,
+    uncertainty_budget_id: &'a str,
+    uncertainty_budget_revision: &'a str,
+    uncertainty_budget_digest: &'a str,
+    uncertainty_budget_component_set_digest: &'a str,
+    uncertainty_budget_component_count: usize,
+    measurement_model_id: &'a str,
+    measurement_model_revision: &'a str,
+    measurement_model_digest: &'a str,
+    statement: &'a MeasurementUncertaintyStatement,
+    evaluation: &'a MeasurementUncertaintyEvaluationRef,
+    measurand_id: &'a str,
+    procedure_id: &'a str,
+    procedure_digest: &'a str,
+    component_refs: &'a [MeasurementUncertaintyComponentRef],
+    component_refs_digest: &'a str,
+    record_digest: &'a str,
+}
+
+/// Compute the integrity commitment over the complete uncertainty assertion.
+///
+/// The digest binds the reported combined uncertainty to the exact observation,
+/// budget record, measurement model, procedure, component records, component-set
+/// digest, evaluation lineage, and source-supplied uncertainty record digest. It does not
+/// evaluate the scientific correctness of the budget's calculation.
+fn canonical_measurement_uncertainty_binding_hash(
+    uncertainty: &MeasurementUncertaintyRef,
+) -> Result<String, AssessmentError> {
+    let mut component_refs = uncertainty.component_refs.clone();
+    component_refs.sort_by(|a, b| a.component_id.cmp(&b.component_id));
+    let payload = CanonicalMeasurementUncertaintyBinding {
+        uncertainty_id: &uncertainty.uncertainty_id,
+        observation_id: &uncertainty.observation_id,
+        observation_record_digest: &uncertainty.observation_record_digest,
+        uncertainty_budget_id: &uncertainty.uncertainty_budget_id,
+        uncertainty_budget_revision: &uncertainty.uncertainty_budget_revision,
+        uncertainty_budget_digest: &uncertainty.uncertainty_budget_digest,
+        uncertainty_budget_component_set_digest: &uncertainty.uncertainty_budget_component_set_digest,
+        uncertainty_budget_component_count: uncertainty.uncertainty_budget_component_count,
+        measurement_model_id: &uncertainty.measurement_model_id,
+        measurement_model_revision: &uncertainty.measurement_model_revision,
+        measurement_model_digest: &uncertainty.measurement_model_digest,
+        statement: &uncertainty.statement,
+        evaluation: &uncertainty.evaluation,
+        measurand_id: &uncertainty.measurand_id,
+        procedure_id: &uncertainty.procedure_id,
+        procedure_digest: &uncertainty.procedure_digest,
+        component_refs: &component_refs,
+        component_refs_digest: &uncertainty.component_refs_digest,
+        record_digest: &uncertainty.record_digest,
+    };
+    let bytes = serde_json::to_vec(&payload).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn canonical_string_list_hash(values: &[String]) -> Result<String, AssessmentError> {
+    let bytes = serde_json::to_vec(values).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn canonical_requirement_hash(requirement: &FunctionalRequirement) -> Result<String, AssessmentError> {
+    let bytes = serde_json::to_vec(requirement).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn canonical_candidate_pathway_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
+    let mut canonical = candidate.clone();
+    // Evidence is an evolving provenance surface, not part of the pre-experiment
+    // pathway semantics. Experimental designs bind the declared pathway payload
+    // while observation/evidence provenance is committed separately by the
+    // assessment receipt and candidate evidence digest.
+    canonical.evidence.clear();
+    for estimate in canonical.performance.values_mut() {
+        estimate.evidence_ids.clear();
+    }
+    for estimate in canonical.operating_capabilities.values_mut() {
+        estimate.evidence_ids.clear();
+    }
+    for estimate in canonical.burdens.values_mut() {
+        estimate.evidence_ids.clear();
+    }
+    let bytes = serde_json::to_vec(&canonical).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(b"symthaea:candidate-pathway:v1\n");
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn canonical_candidate_evidence_hash(candidate: &CandidatePathway) -> Result<String, AssessmentError> {
+    let mut evidence = candidate.evidence.clone();
+    evidence.sort_by(|a, b| a.id.cmp(&b.id));
+    for record in &mut evidence {
+        if let Some(uncertainty) = &mut record.uncertainty {
+            uncertainty
+                .component_refs
+                .sort_by(|a, b| a.component_id.cmp(&b.component_id));
+        }
+    }
+    let bytes = serde_json::to_vec(&evidence).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+fn canonical_payload_hash(result: &AssessmentResult) -> Result<String, AssessmentError> {
+    let mut payload = result.clone();
+    payload.receipt.payload_hash.clear();
+    let bytes = serde_json::to_vec(&payload).map_err(|_| AssessmentError::NonFinite)?;
+    let mut hasher = Hasher::new();
+    hasher.update(&bytes);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::corpus::admitted;
+
+    fn fixture_basis() -> ComparisonBasisRef {
+        ComparisonBasisRef {
+            basis_id: "fixture-comparison-basis".into(),
+            basis_revision: "v1".into(),
+            basis_digest: "fixture-comparison-basis-digest-v1".into(),
+        }
+    }
+
+    fn all_burdens(base: f64, evidence_ids: &[&str]) -> BTreeMap<Dimension, BurdenEstimate> {
+        Dimension::ALL
+            .into_iter()
+            .map(|dimension| {
+                (
+                    dimension,
+                    BurdenEstimate {
+                        interval: Interval::point(base).unwrap(),
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
+                        evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn evidence(
+        id: &str,
+        source_id: &str,
+        kind: EvidenceKind,
+        stance: EvidenceStance,
+        confidence: f64,
+    ) -> EvidenceRecord {
+        EvidenceRecord {
+            id: id.into(),
+            kind,
+            stance,
+            confidence,
+            source: EvidenceSourceIdentity {
+                authority_id: source_id.into(),
+                artifact_id: format!("artifact:{id}"),
+                artifact_digest: format!("fixture-digest:{id}"),
+                issuer_key_fingerprint: None,
+                admission: None,
+            },
+            basis: fixture_basis(),
+            observation: matches!(
+                kind,
+                EvidenceKind::Observed
+                    | EvidenceKind::ManufacturingObserved
+                    | EvidenceKind::FieldObserved
+                    | EvidenceKind::ContinuouslyMonitored
+            )
+            .then(|| ObservationProvenanceRef {
+                observation_id: format!("observation:{id}"),
+                subject_id: format!("fixture-subject:{id}"),
+                activity_id: format!("fixture-activity:{id}"),
+                measurand_id: format!("fixture-measurand:{id}"),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                record_digest: format!("fixture-record-digest:{id}"),
+                measurement_system_id: Some("fixture-measurement-system-v1".into()),
+                calibration_chain_refs: vec![CalibrationTraceabilityRef {
+            calibration_id: "fixture-calibration-chain-v1".into(),
+            calibration_revision: "v1".into(),
+            calibration_record_digest: "fixture-calibration-chain-record-digest-v1".into(),
+            used_at_epoch_seconds: 1_700_000_000,
+        }],
+                calibration_topology: None,
+                experimental_design_id: None,
+                experimental_target_id: None,
+            }),
+            uncertainty: matches!(
+                kind,
+                EvidenceKind::Observed
+                    | EvidenceKind::ManufacturingObserved
+                    | EvidenceKind::FieldObserved
+                    | EvidenceKind::ContinuouslyMonitored
+            )
+            .then(|| {
+                let mut uncertainty = MeasurementUncertaintyRef {
+                    uncertainty_id: format!("uncertainty:{id}"),
+                    observation_id: format!("observation:{id}"),
+                    observation_record_digest: format!("fixture-record-digest:{id}"),
+                    uncertainty_budget_id: "fixture-uncertainty-budget-v1".into(),
+                    uncertainty_budget_revision: "v1".into(),
+                    uncertainty_budget_digest: "fixture-uncertainty-budget-digest-v1".into(),
+                    uncertainty_budget_component_set_digest: String::new(),
+                    uncertainty_budget_component_count: 0,
+                    measurement_model_id: "fixture-measurement-model-v1".into(),
+                    measurement_model_revision: "v1".into(),
+                    measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+                    statement: MeasurementUncertaintyStatement::Expanded {
+                        value: 0.1,
+                        unit: "unit".into(),
+                        coverage_factor: 2.0,
+                    },
+                    evaluation: MeasurementUncertaintyEvaluationRef {
+                        evaluation_id: "fixture-uncertainty-evaluation-v1".into(),
+                        uncertainty_id: format!("uncertainty:{id}"),
+                        observation_id: format!("observation:{id}"),
+                        observation_record_digest: format!("fixture-record-digest:{id}"),
+                        uncertainty_budget_id: "fixture-uncertainty-budget-v1".into(),
+                        uncertainty_budget_revision: "v1".into(),
+                        uncertainty_budget_digest: "fixture-uncertainty-budget-digest-v1".into(),
+                        component_set_digest: String::new(),
+                        component_count: 1,
+                        calibration_chain_digest: canonical_calibration_chain_hash(&[
+                            CalibrationTraceabilityRef {
+                                calibration_id: "fixture-calibration-chain-v1".into(),
+                                calibration_revision: "v1".into(),
+                                calibration_record_digest: "fixture-calibration-chain-record-digest-v1".into(),
+                                used_at_epoch_seconds: 1_700_000_000,
+                            },
+                        ])
+                        .unwrap(),
+                        calibration_chain_count: 1,
+                        calibration_topology_digest: None,
+                        measurement_model_id: "fixture-measurement-model-v1".into(),
+                        measurement_model_revision: "v1".into(),
+                        measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+                        measurand_id: format!("fixture-measurand:{id}"),
+                        procedure_id: "fixture-measurement-procedure-v1".into(),
+                        procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                        evaluation_revision: "v1".into(),
+                        evaluation_digest: "fixture-uncertainty-evaluation-digest-v1".into(),
+                        method_id: "fixture-uncertainty-method-v1".into(),
+                        method_revision: "v1".into(),
+                        method_digest: "fixture-uncertainty-method-digest-v1".into(),
+                        combination_method_id: "fixture-uncertainty-combination-v1".into(),
+                        combination_method_revision: "v1".into(),
+                        combination_method_digest: "fixture-uncertainty-combination-digest-v1".into(),
+                        covariance_model_id: "fixture-uncertainty-covariance-v1".into(),
+                        covariance_model_revision: "v1".into(),
+                        covariance_model_digest: "fixture-uncertainty-covariance-digest-v1".into(),
+                        probability_distribution_id: "fixture-uncertainty-distribution-v1".into(),
+                        probability_distribution_revision: "v1".into(),
+                        probability_distribution_digest: "fixture-uncertainty-distribution-digest-v1".into(),
+                        degrees_of_freedom_id: "fixture-uncertainty-dof-v1".into(),
+                        degrees_of_freedom_revision: "v1".into(),
+                        degrees_of_freedom_digest: "fixture-uncertainty-dof-digest-v1".into(),
+                        coverage_probability: Some(0.95),
+                        coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
+                            method_id: "fixture-coverage-method-v1".into(),
+                            method_revision: "v1".into(),
+                            method_digest: "fixture-coverage-method-digest-v1".into(),
+                        }),
+                    },
+                    measurand_id: format!("fixture-measurand:{id}"),
+                    procedure_id: "fixture-measurement-procedure-v1".into(),
+                    procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                    component_refs: vec![{
+                        let mut component = test_component("fixture-uncertainty-component-v1");
+                        component.uncertainty_budget_id = "fixture-uncertainty-budget-v1".into();
+                        component.uncertainty_budget_revision = "v1".into();
+                        component.uncertainty_budget_digest =
+                            "fixture-uncertainty-budget-digest-v1".into();
+                        component.measurement_model_id = "fixture-measurement-model-v1".into();
+                        component.measurement_model_revision = "v1".into();
+                        component.measurement_model_digest =
+                            "fixture-measurement-model-digest-v1".into();
+                        component
+                    }],
+                    component_refs_digest: String::new(),
+                    record_digest: format!("fixture-uncertainty-digest:{id}"),
+                    binding_digest: String::new(),
+                };
+                uncertainty.component_refs_digest =
+                    canonical_measurement_uncertainty_component_refs_hash(
+                        &uncertainty.component_refs,
+                    )
+                    .unwrap();
+                uncertainty.evaluation.component_set_digest =
+                    uncertainty.component_refs_digest.clone();
+                uncertainty.uncertainty_budget_component_set_digest =
+                    uncertainty.component_refs_digest.clone();
+                uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
+                uncertainty.binding_digest =
+                    canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+                uncertainty
+            }),
+            scope: "synthetic functional unit".into(),
+            unit: Some("unit".into()),
+            as_of: Some("fixture-v1".into()),
+            observed_at_epoch_seconds: Some(1_000),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+            derivation: matches!(kind, EvidenceKind::Simulated | EvidenceKind::Derived).then(
+                || DerivationRecord {
+                    method_id: "synthetic-fixture".into(),
+                    method_version: "fixture-v1".into(),
+                    input_refs: vec!["fixture-input".into()],
+                    configuration_hash: Some("fixture-config-v1".into()),
+                },
+            ),
+        }
+    }
+
+    fn test_component(component_id: &str) -> MeasurementUncertaintyComponentRef {
+        MeasurementUncertaintyComponentRef {
+            component_id: component_id.into(),
+            evaluation_type: MeasurementUncertaintyComponentEvaluationType::TypeA,
+            component_record_digest: format!("component-record:{component_id}"),
+            uncertainty_budget_id: "budget-v1".into(),
+            uncertainty_budget_revision: "r1".into(),
+            uncertainty_budget_digest: "budget-digest-v1".into(),
+            measurement_model_id: "model-v1".into(),
+            measurement_model_revision: "r1".into(),
+            measurement_model_digest: "model-digest-v1".into(),
+        }
+    }
+
+    fn test_uncertainty(component_ids: &[&str]) -> MeasurementUncertaintyRef {
+        let mut component_refs = component_ids
+            .iter()
+            .map(|id| test_component(id))
+            .collect::<Vec<_>>();
+        component_refs.sort_by(|a, b| a.component_id.cmp(&b.component_id));
+
+        let mut uncertainty = MeasurementUncertaintyRef {
+            uncertainty_id: "u".into(),
+            observation_id: "observation".into(),
+            observation_record_digest: "record".into(),
+            uncertainty_budget_id: "budget-v1".into(),
+            uncertainty_budget_revision: "r1".into(),
+            uncertainty_budget_digest: "budget-digest-v1".into(),
+            uncertainty_budget_component_set_digest: String::new(),
+            uncertainty_budget_component_count: 0,
+            measurement_model_id: "model-v1".into(),
+            measurement_model_revision: "r1".into(),
+            measurement_model_digest: "model-digest-v1".into(),
+            statement: MeasurementUncertaintyStatement::Expanded {
+                value: 0.1,
+                unit: "unit".into(),
+                coverage_factor: 2.0,
+            },
+            evaluation: MeasurementUncertaintyEvaluationRef {
+                evaluation_id: "evaluation".into(),
+                uncertainty_id: "u".into(),
+                observation_id: "observation".into(),
+                observation_record_digest: "record".into(),
+                uncertainty_budget_id: "budget-v1".into(),
+                uncertainty_budget_revision: "r1".into(),
+                uncertainty_budget_digest: "budget-digest-v1".into(),
+                component_set_digest: String::new(),
+                component_count: component_refs.len(),
+                calibration_chain_digest: "test-calibration-chain-digest".into(),
+                calibration_chain_count: 1,
+                calibration_topology_digest: None,
+                measurement_model_id: "model-v1".into(),
+                measurement_model_revision: "r1".into(),
+                measurement_model_digest: "model-digest-v1".into(),
+                measurand_id: "measurand".into(),
+                procedure_id: "procedure".into(),
+                procedure_digest: "procedure-digest".into(),
+                evaluation_revision: "r1".into(),
+                evaluation_digest: "evaluation-digest".into(),
+                method_id: "method".into(),
+                method_revision: "r1".into(),
+                method_digest: "method-digest".into(),
+                combination_method_id: "combination".into(),
+                combination_method_revision: "r1".into(),
+                combination_method_digest: "combination-digest".into(),
+                covariance_model_id: "covariance".into(),
+                covariance_model_revision: "r1".into(),
+                covariance_model_digest: "covariance-digest".into(),
+                probability_distribution_id: "distribution".into(),
+                probability_distribution_revision: "r1".into(),
+                probability_distribution_digest: "distribution-digest".into(),
+                degrees_of_freedom_id: "dof".into(),
+                degrees_of_freedom_revision: "r1".into(),
+                degrees_of_freedom_digest: "dof-digest".into(),
+                coverage_probability: Some(0.95),
+                coverage_method: Some(MeasurementUncertaintyCoverageMethodRef {
+                    method_id: "coverage".into(),
+                    method_revision: "r1".into(),
+                    method_digest: "coverage-digest".into(),
+                }),
+            },
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            component_refs,
+            component_refs_digest: String::new(),
+            record_digest: "digest".into(),
+            binding_digest: String::new(),
+        };
+        uncertainty.component_refs_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        uncertainty.evaluation.component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+        uncertainty
+    }
+
+    fn fixture_candidate_digests(
+        candidates: &[CandidatePathway],
+        ids: &[&str],
+    ) -> BTreeMap<String, String> {
+        ids.iter()
+            .map(|id| {
+                let digest = candidates
+                    .iter()
+                    .find(|candidate| candidate.id == *id)
+                    .and_then(|candidate| candidate.canonical_digest().ok())
+                    .unwrap_or_else(|| format!("missing-candidate-digest:{id}"));
+                ((*id).to_string(), digest)
+            })
+            .collect()
+    }
+
+    fn fixture_target_uncertainty_refs(
+        design: &ExperimentalDesignProvenance,
+        candidates: &[CandidatePathway],
+    ) -> Vec<String> {
+        let mut refs = BTreeSet::new();
+        for target in &design.expected_discrimination {
+            for candidate_id in [&target.left_candidate_id, &target.right_candidate_id] {
+                let Some(candidate) = candidates.iter().find(|candidate| &candidate.id == candidate_id)
+                else {
+                    continue;
+                };
+                let evidence_ids = match &target.surface {
+                    ExperimentalDiscriminationSurface::Burden(dimension) => candidate
+                        .burdens
+                        .get(dimension)
+                        .map(|estimate| estimate.evidence_ids.as_slice()),
+                    ExperimentalDiscriminationSurface::PerformanceMetric(metric) => candidate
+                        .performance
+                        .get(metric)
+                        .map(|estimate| estimate.evidence_ids.as_slice()),
+                    ExperimentalDiscriminationSurface::OperatingCondition(condition) => candidate
+                        .operating_capabilities
+                        .get(condition)
+                        .map(|estimate| estimate.evidence_ids.as_slice()),
+                };
+                let Some(evidence_ids) = evidence_ids else {
+                    continue;
+                };
+                for evidence in candidate.evidence.iter().filter(|evidence| {
+                    evidence_ids.iter().any(|id| id == &evidence.id)
+                        && evidence.observation.as_ref().is_some_and(|observation| {
+                            observation.experimental_design_id.is_none()
+                                && observation.experimental_target_id.is_none()
+                        })
+                }) {
+                    if let Some(uncertainty) = &evidence.uncertainty {
+                        refs.insert(uncertainty.uncertainty_id.clone());
+                    }
+                }
+            }
+        }
+        refs.into_iter().collect()
+    }
+
+    fn fixture_requirement() -> FunctionalRequirement {
+        FunctionalRequirement {
+            id: "seal-v1".into(),
+            subject: AssessmentSubjectRef {
+                subject_id: "fixture-product".into(),
+                profile_id: "fixture-product-profile".into(),
+                profile_revision: "v1".into(),
+                subject_digest: "fixture-product-digest".into(),
+            },
+            description: "Provide a durable chemical-resistant seal.".into(),
+            constraints: BTreeMap::from([
+                ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
+                ("throughput_per_hour".into(), RequirementBound::AtLeast(100.0)),
+            ]),
+            comparison_scales: Dimension::ALL
+                .into_iter()
+                .map(|dimension| {
+                    (
+                        dimension,
+                        ComparisonScale {
+                            unit: "unit".into(),
+                            scope: "synthetic functional unit".into(),
+                            basis: fixture_basis(),
+                        },
+                    )
+                })
+                .collect(),
+            performance_scales: BTreeMap::from([
+                (
+                    "service_life_years".into(),
+                    ComparisonScale {
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
+                    },
+                ),
+                (
+                    "throughput_per_hour".into(),
+                    ComparisonScale {
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
+                    },
+                ),
+            ]),
+            operating_envelope: BTreeMap::from([
+                (
+                    "temperature".into(),
+                    OperatingRequirement {
+                        interval: Interval::new(-20.0, 80.0).unwrap(),
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
+                    },
+                ),
+                (
+                    "pressure".into(),
+                    OperatingRequirement {
+                        interval: Interval::new(0.5, 10.0).unwrap(),
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
+                    },
+                ),
+            ]),
+        }
+    }
+
+    fn candidate(
+        id: &str,
+        kind: PathwayKind,
+        hazard: f64,
+        water: f64,
+        evidence: Vec<EvidenceRecord>,
+    ) -> CandidatePathway {
+        let evidence_ids = evidence.iter().map(|e| e.id.as_str()).collect::<Vec<_>>();
+        let mut performance = BTreeMap::new();
+        performance.insert(
+            "service_life_years".into(),
+            PerformanceEstimate {
+                interval: Interval::point(12.0).unwrap(),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+            },
+        );
+        performance.insert(
+            "throughput_per_hour".into(),
+            PerformanceEstimate {
+                interval: Interval::point(120.0).unwrap(),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+            },
+        );
+
+        let operating_capabilities = BTreeMap::from([
+            (
+                "temperature".into(),
+                PerformanceEstimate {
+                    interval: Interval::new(-40.0, 120.0).unwrap(),
+                    unit: "unit".into(),
+                    scope: "synthetic functional unit".into(),
+                    basis: fixture_basis(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+                },
+            ),
+            (
+                "pressure".into(),
+                PerformanceEstimate {
+                    interval: Interval::new(0.1, 20.0).unwrap(),
+                    unit: "unit".into(),
+                    scope: "synthetic functional unit".into(),
+                    basis: fixture_basis(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+                },
+            ),
+        ]);
+        let mut burdens = all_burdens(5.0, &evidence_ids);
+        burdens.insert(
+            Dimension::Hazard,
+            BurdenEstimate {
+                interval: Interval::point(hazard).unwrap(),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+            },
+        );
+        burdens.insert(
+            Dimension::Water,
+            BurdenEstimate {
+                interval: Interval::point(water).unwrap(),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+            },
+        );
+        CandidatePathway {
+            id: id.into(),
+            name: id.into(),
+            kind,
+            performance,
+            burdens,
+            operating_capabilities,
+            evidence,
+            derivation: None,
+        }
+    }
+
+    #[test]
+    fn evidence_basis_mismatch_fails_closed() {
+        let mut c = candidate(
+            "basis-mismatch",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "basis-e1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9,
+            )],
+        );
+        c.performance.get_mut("service_life_years").unwrap().basis = ComparisonBasisRef {
+            basis_id: "different-basis".into(),
+            basis_revision: "v1".into(),
+            basis_digest: "different-digest".into(),
+        };
+        assert!(matches!(
+            AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap_err(),
+            AssessmentError::EvidenceBasisMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn observed_evidence_requires_observation_provenance() {
+        let mut e = evidence(
+            "observed-missing-provenance",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.observation = None;
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::MissingObservationProvenance(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
+    fn observation_provenance_mutation_changes_receipt_identity() {
+        let c = candidate(
+            "observation-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "obs", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9,
+            )],
+        );
+        let baseline = AlternativesEngine.assess(&fixture_requirement(), &[c.clone()], None).unwrap();
+        let mut changed = c;
+        changed.evidence[0].observation.as_mut().unwrap().subject_id = "replacement-subject".into();
+        let updated = AlternativesEngine.assess(&fixture_requirement(), &[changed], None).unwrap();
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            updated.candidates[0].evidence_digest
+        );
+        assert_ne!(baseline.receipt.payload_hash, updated.receipt.payload_hash);
+    }
+
+    #[test]
+    fn observation_provenance_requires_measurand_and_procedure() {
+        let mut e = evidence(
+            "observation-metadata",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.observation.as_mut().unwrap().measurand_id.clear();
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+
+        let mut e = evidence(
+            "observation-procedure",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.observation.as_mut().unwrap().procedure_id.clear();
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+    }
+
+    #[test]
+    fn observed_evidence_requires_measurement_uncertainty() {
+        let mut e = evidence(
+            "observed-missing-uncertainty",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.uncertainty = None;
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::MissingMeasurementUncertainty(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
+    fn unbound_measurement_uncertainty_fails_closed() {
+        let mut c = candidate(
+            "unbound-uncertainty",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "reported",
+                "source",
+                EvidenceKind::Reported,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.uncertainty_id = "reported-uncertainty".into();
+        c.evidence[0].unit = Some("unit".into());
+        c.evidence[0].uncertainty = Some(uncertainty);
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::UnboundMeasurementUncertainty("reported".into())
+        );
+    }
+
+    #[test]
+    fn measurement_uncertainty_unit_mismatch_fails_closed() {
+        let mut e = evidence(
+            "uncertainty-unit-mismatch",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.uncertainty
+            .as_mut()
+            .unwrap()
+            .statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.1,
+            unit: "different-unit".into(),
+        };
+        let uncertainty = e.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.coverage_probability = None;
+        uncertainty.evaluation.coverage_method = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        assert!(matches!(
+            e.validate().unwrap_err(),
+            AssessmentError::MeasurementUncertaintyUnitMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_must_bind_to_observation_identity() {
+        let c = candidate(
+            "uncertainty-binding",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "uncertainty-binding-evidence",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .observation_id = "different-observation".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyObservationMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                evidence_observation_id: "observation:uncertainty-binding-evidence".into(),
+                uncertainty_observation_id: "different-observation".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .record_digest = "replacement-observation-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_observation_record_digest: "replacement-observation-record".into(),
+                actual_observation_record_digest:
+                    "fixture-record-digest:uncertainty-binding-evidence".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .observation_record_digest = "different-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyObservationRecordDigestMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_observation_record_digest:
+                    "fixture-record-digest:uncertainty-binding-evidence".into(),
+                actual_observation_record_digest: "different-record".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .measurand_id = "different-measurand".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyMeasurandMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                evidence_measurand_id:
+                    "fixture-measurand:uncertainty-binding-evidence".into(),
+                uncertainty_measurand_id: "different-measurand".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .procedure_id = "different-procedure".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyProcedureMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_procedure_id: "fixture-measurement-procedure-v1".into(),
+                actual_procedure_id: "different-procedure".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .procedure_digest = "different-procedure-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyProcedureDigestMismatch {
+                evidence_id: "uncertainty-binding-evidence".into(),
+                expected_procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                actual_procedure_digest: "different-procedure-digest".into(),
+            }
+        );
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0].component_id = "replacement-component".into();
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.uncertainty_budget_component_set_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch {
+                uncertainty_id: "uncertainty:uncertainty-binding-evidence".into(),
+                expected_component_refs_digest:
+                    canonical_string_list_hash(
+                        &vec!["replacement-component".into()]
+                    )
+                    .unwrap(),
+                actual_component_refs_digest:
+                    canonical_string_list_hash(
+                        &vec!["fixture-uncertainty-component-v1".into()]
+                    )
+                    .unwrap(),
+            }
+        );
+
+        let mut changed = c;
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs
+            .push(test_component("fixture-uncertainty-component-v1"));
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert_eq!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyComponentReference
+        );
+    }
+
+    #[test]
+    fn uncertainty_component_reference_order_is_semantically_canonical() {
+        let mut first = candidate(
+            "component-order",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-order-evidence",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut second = first.clone();
+
+        let uncertainty = first.evidence[0].uncertainty.as_mut().unwrap();
+        let prototype = uncertainty.component_refs[0].clone();
+        uncertainty.component_refs = ["component-a", "component-b", "component-c"]
+            .into_iter()
+            .map(|id| {
+                let mut component = prototype.clone();
+                component.component_id = id.into();
+                component
+            })
+            .collect();
+        uncertainty.component_refs_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        uncertainty.evaluation.component_set_digest = uncertainty.component_refs_digest.clone();
+        uncertainty.evaluation.component_count = uncertainty.component_refs.len();
+        uncertainty.uncertainty_budget_component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+
+        let uncertainty = second.evidence[0].uncertainty.as_mut().unwrap();
+        let prototype = uncertainty.component_refs[0].clone();
+        uncertainty.component_refs = ["component-c", "component-a", "component-b"]
+            .into_iter()
+            .map(|id| {
+                let mut component = prototype.clone();
+                component.component_id = id.into();
+                component
+            })
+            .collect();
+        uncertainty.component_refs_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        uncertainty.evaluation.component_set_digest = uncertainty.component_refs_digest.clone();
+        uncertainty.evaluation.component_count = uncertainty.component_refs.len();
+        uncertainty.uncertainty_budget_component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+
+        let first_result = AlternativesEngine
+            .assess(&fixture_requirement(), &[first], None)
+            .unwrap();
+        let second_result = AlternativesEngine
+            .assess(&fixture_requirement(), &[second], None)
+            .unwrap();
+
+        assert_eq!(
+            first_result.candidates[0].evidence_digest,
+            second_result.candidates[0].evidence_digest
+        );
+        assert_eq!(
+            first_result.receipt.payload_hash,
+            second_result.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_record_drift_is_integrity_bound() {
+        let c = candidate(
+            "uncertainty-component-record",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-record",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .component_record_digest = "different-component-record".into();
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.uncertainty_budget_component_set_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_budget_lineage_fails_closed() {
+        let c = candidate(
+            "uncertainty-component-lineage",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-lineage",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c.clone();
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .uncertainty_budget_id = "different-budget".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentBudgetMismatch { .. }
+        ));
+
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .uncertainty_budget_digest = "different-budget-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentBudgetDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_model_lineage_fails_closed() {
+        let c = candidate(
+            "uncertainty-component-model",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-model",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c.clone();
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .measurement_model_id = "different-model".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentModelMismatch { .. }
+        ));
+
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .measurement_model_digest = "different-model-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentModelDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_evaluation_observation_digest_scope_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-evaluation-observation-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "evaluation-observation-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .observation_record_digest = "different-observation-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_component_evaluation_type_mutation_fails_closed() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.component_refs[0].evaluation_type =
+            MeasurementUncertaintyComponentEvaluationType::TypeB;
+        uncertainty.uncertainty_budget_component_set_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyComponentRefsDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_evaluation_scope_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-evaluation-scope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "evaluation-scope",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .measurand_id = "different-measurand".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationScopeMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_evaluation_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-evaluation-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "evaluation-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .evaluation_digest = "different-evaluation-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_method_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-method-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "method-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .method_digest = "different-method-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_covariance_model_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-covariance-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "covariance-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .covariance_model_digest = "different-covariance-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_probability_distribution_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-distribution-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "distribution-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .probability_distribution_digest = "different-distribution-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_combination_method_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-combination-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "combination-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .combination_method_digest = "different-combination-digest".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_expanded_requires_coverage_method_provenance() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.evaluation.coverage_method = None;
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_expanded_allows_unspecified_coverage_probability() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.evaluation.coverage_probability = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+        assert!(uncertainty.validate().is_ok());
+    }
+
+    #[test]
+    fn measurement_uncertainty_expanded_rejects_invalid_coverage_probability() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.evaluation.coverage_probability = Some(1.0);
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_standard_rejects_expanded_coverage_metadata() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.05,
+            unit: "unit".into(),
+        };
+        uncertainty.evaluation.coverage_probability = Some(0.95);
+        uncertainty.evaluation.coverage_method = Some(MeasurementUncertaintyCoverageMethodRef {
+            method_id: "coverage".into(),
+            method_revision: "r1".into(),
+            method_digest: "coverage-digest".into(),
+        });
+        let error = uncertainty.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidMeasurementUncertaintyEvaluation
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_standard_allows_no_coverage_method_provenance() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.05,
+            unit: "unit".into(),
+        };
+        uncertainty.evaluation.coverage_method = None;
+        uncertainty.evaluation.coverage_probability = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+        assert!(uncertainty.validate().is_ok());
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_attested_frontier_digest_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-budget-attestation-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "budget-attestation-digest",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .uncertainty_budget_component_set_digest = "different-budget-frontier".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_attested_frontier_count_mutation_fails_closed() {
+        let c = candidate(
+            "uncertainty-budget-attestation-count",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "budget-attestation-count",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .uncertainty_budget_component_count = 2;
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentCountMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_component_count_fails_closed() {
+        let c = candidate(
+            "uncertainty-component-count",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-count",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        let uncertainty = changed.evidence[0].uncertainty.as_ref().unwrap();
+        let additional_component = MeasurementUncertaintyComponentRef {
+            component_id: "additional-component".into(),
+            ..uncertainty.component_refs[0].clone()
+        };
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs
+            .push(additional_component);
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.component_count = uncertainty.component_refs.len();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentCountMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_budget_component_set_digest_fails_closed() {
+        let c = candidate(
+            "uncertainty-component-frontier",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "component-frontier",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .component_refs[0]
+            .component_record_digest = "different-component-record".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBudgetComponentSetDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn measurement_uncertainty_binding_covers_reported_result_and_lineage() {
+        let c = candidate(
+            "uncertainty-binding-digest",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "binding",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        let mut changed = c.clone();
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .binding_digest = "tampered".into();
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+
+        let mut changed = c.clone();
+        changed.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .statement = MeasurementUncertaintyStatement::Expanded {
+                value: 0.2,
+                unit: "unit".into(),
+                coverage_factor: 2.0,
+        };
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+
+        let mut changed = c;
+        {
+            let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+            uncertainty.uncertainty_budget_digest = "different-budget-digest".into();
+            uncertainty.evaluation.uncertainty_budget_digest =
+                "different-budget-digest".into();
+            uncertainty.component_refs[0].uncertainty_budget_digest =
+                "different-budget-digest".into();
+            uncertainty.component_refs_digest =
+                canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                    .unwrap();
+            uncertainty.uncertainty_budget_component_set_digest =
+                uncertainty.component_refs_digest.clone();
+            uncertainty.binding_digest =
+                canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        }
+        let updated = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap();
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            updated.candidates[0].evidence_digest
+        );
+        assert_ne!(baseline.receipt.payload_hash, updated.receipt.payload_hash);
+    }
+
+    #[test]
+    fn measurement_uncertainty_mutation_changes_receipt_identity() {
+        let c = candidate(
+            "uncertainty-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "uncertainty",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .record_digest = "different-uncertainty-record".into();
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        let updated = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap();
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            updated.candidates[0].evidence_digest
+        );
+        assert_ne!(baseline.receipt.payload_hash, updated.receipt.payload_hash);
+    }
+
+    #[test]
+    fn candidate_generation_provenance_is_carried_and_affects_receipt() {
+        let mut c = candidate(
+            "generated-candidate",
+            PathwayKind::ProductRedesign,
+            2.0,
+            2.0,
+            vec![evidence(
+                "g1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        c.derivation = Some(DerivationRecord {
+            method_id: "symthaea.alternatives.candidate_search".into(),
+            method_version: "v1".into(),
+            input_refs: vec![
+                "requirement:seal-v1".into(),
+                "constraint:service-life>=10".into(),
+            ],
+            configuration_hash: Some("candidate-search-config-v1".into()),
+        });
+
+        let generated = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        assert_eq!(generated.candidates[0].derivation, c.derivation);
+        assert_ne!(
+            baseline.receipt.payload_hash,
+            generated.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn evidence_provenance_mutation_changes_receipt_identity() {
+        let c = candidate(
+            "evidence-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+
+        let mut changed = c;
+        changed.evidence[0].source.artifact_digest = "different-artifact-digest".into();
+        let changed_result = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap();
+
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            changed_result.candidates[0].evidence_digest
+        );
+        assert_ne!(
+            baseline.receipt.payload_hash,
+            changed_result.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn candidate_evidence_digest_is_order_independent() {
+        let mut c = candidate(
+            "evidence-order",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("e1", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("e2", "source-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let first = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+        c.evidence.reverse();
+        let second = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            first.candidates[0].evidence_digest,
+            second.candidates[0].evidence_digest
+        );
+        assert_eq!(first.receipt, second.receipt);
+    }
+
+    #[test]
+    fn invalid_candidate_generation_provenance_fails_closed() {
+        let mut c = candidate(
+            "invalid-generated-candidate",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "g2",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.derivation = Some(DerivationRecord {
+            method_id: "symthaea.alternatives.candidate_search".into(),
+            method_version: "v1".into(),
+            input_refs: Vec::new(),
+            configuration_hash: None,
+        });
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::EmptyDerivationIdentity
+        );
+    }
+
+    #[test]
+    fn requirement_set_intersects_functional_eligibility() {
+        let candidate = candidate(
+            "multi-function",
+            PathwayKind::ProductRedesign,
+            2.0,
+            2.0,
+            vec![evidence(
+                "m1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut safe = fixture_requirement();
+        safe.id = "safety-function".into();
+        let mut incompatible = fixture_requirement();
+        incompatible.id = "throughput-function".into();
+        incompatible
+            .constraints
+            .insert("throughput_per_hour".into(), RequirementBound::AtLeast(125.0));
+        let requirements = FunctionalRequirementSet::new(BTreeMap::from([
+            (safe.id.clone(), safe),
+            (incompatible.id.clone(), incompatible),
+        ]))
+        .unwrap();
+
+        let result = AlternativesEngine
+            .assess_requirement_set(&requirements, &[candidate], None, None)
+            .unwrap();
+
+        assert!(result.assessments["safety-function"].frontier_blockers.is_empty());
+        assert!(result.assessments["throughput-function"].frontier_blockers.contains_key("multi-function"));
+        assert!(!result.jointly_eligible_candidate_ids.contains(&"multi-function".into()));
+        assert!(result.blockers["multi-function"]
+            .iter()
+            .any(|blocker| blocker.requirement_id == "throughput-function"));
+    }
+
+    #[test]
+    fn requirement_set_receipt_is_order_independent() {
+        let a = candidate(
+            "a",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("a1", "a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let b = candidate(
+            "b",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![evidence("b1", "b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let requirements = FunctionalRequirementSet::new(BTreeMap::from([
+            ("seal-v1".into(), fixture_requirement()),
+        ]))
+        .unwrap();
+
+        let first = AlternativesEngine
+            .assess_requirement_set(&requirements, &[a.clone(), b.clone()], None, None)
+            .unwrap();
+        let second = AlternativesEngine
+            .assess_requirement_set(&requirements, &[b, a], None, None)
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert!(!first.receipt.payload_hash.is_empty());
+    }
+
+    #[test]
+    fn overlapping_performance_interval_cannot_satisfy_requirement() {
+        let mut c = candidate(
+            "uncertain-performance",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "p1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.performance.get_mut("service_life_years").unwrap().interval =
+            Interval::new(8.0, 12.0).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].constraints[0].status,
+            ConstraintStatus::Unresolved
+        );
+        assert!(result.frontier_blockers.contains_key("uncertain-performance"));
+    }
+
+    #[test]
+    fn one_field_source_cannot_promote_field_qualification() {
+        let mut c = candidate(
+            "single-field-source",
+            PathwayKind::ProcessSubstitution,
+            1.0,
+            1.0,
+            vec![evidence(
+                "field",
+                "field-source",
+                EvidenceKind::FieldObserved,
+                EvidenceStance::Supports,
+                0.95,
+            )],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["field".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_ne!(
+            result.candidates[0].qualification,
+            QualificationState::FieldQualified
+        );
+    }
+
+    #[test]
+    fn missing_operating_capability_blocks_frontier() {
+        let mut c = candidate(
+            "missing-envelope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "o1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.operating_capabilities.remove("pressure");
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert!(result.frontier_blockers["missing-envelope"]
+            .iter()
+            .any(|b| matches!(
+                b,
+                FrontierBlocker::OperatingConditionUnresolved(name)
+                    if name == "pressure"
+            )));
+    }
+
+    #[test]
+    fn insufficient_operating_capability_blocks_frontier() {
+        let mut c = candidate(
+            "narrow-envelope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "o1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.operating_capabilities
+            .get_mut("temperature")
+            .unwrap()
+            .interval = Interval::new(0.0, 60.0).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert!(result.frontier_blockers["narrow-envelope"]
+            .iter()
+            .any(|b| matches!(
+                b,
+                FrontierBlocker::OperatingConditionFailed(name)
+                    if name == "temperature"
+            )));
+    }
+
+    #[test]
+    fn expired_evidence_cannot_satisfy_functional_constraint() {
+        let mut c = candidate(
+            "expired",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.evidence[0].valid_until_epoch_seconds = Some(100);
+
+        c.evidence[0].observed_at_epoch_seconds = Some(0);
+
+        let current = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c.clone()], None, Some(200))
+            .unwrap();
+        assert!(current.frontier_blockers.contains_key("expired"));
+        assert_eq!(
+            current.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+
+        let valid = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c.clone()], None, Some(50))
+            .unwrap();
+        assert!(!valid.frontier_blockers.contains_key("expired"));
+        assert!(
+            valid
+                .candidates[0]
+                .constraints
+                .iter()
+                .all(|c| c.status == ConstraintStatus::Pass)
+        );
+        let timeless = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        assert!(timeless.frontier_blockers.contains_key("expired"));
+    }
+
+    #[test]
+    fn stale_burden_evidence_blocks_burden_comparison() {
+        let mut c = candidate(
+            "stale-burden",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence(
+                    "current",
+                    "source-current",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+                evidence(
+                    "stale",
+                    "source-stale",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+            ],
+        );
+        c.evidence
+            .iter_mut()
+            .find(|e| e.id == "stale")
+            .unwrap()
+            .valid_until_epoch_seconds = Some(100);
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["stale".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["current".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c], None, Some(200))
+            .unwrap();
+
+        assert!(result.frontier_blockers["stale-burden"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::EvidenceUnavailable(_))));
+    }
+
+    #[test]
+    fn inverted_evidence_validity_window_is_rejected() {
+        let mut c = candidate(
+            "invalid-validity",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.evidence[0].valid_from_epoch_seconds = Some(200);
+        c.evidence[0].valid_until_epoch_seconds = Some(100);
+
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidEvidenceValidity {
+                from: 200,
+                until: 100
+            }
+        ));
+    }
+
+    #[test]
+    fn missing_performance_evidence_blocks_functional_constraint() {
+        let mut c = candidate(
+            "unverified-performance",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![],
+        );
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids.clear();
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(result.frontier_blockers["unverified-performance"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::ConstraintUnresolved(_))));
+    }
+
+    #[test]
+    fn incompatible_performance_scale_blocks_candidate() {
+        let mut c = candidate(
+            "performance-scale-drift",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("p1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        c.performance.get_mut("throughput_per_hour").unwrap().unit = "other-unit".into();
+        c.evidence[0].unit = Some("other-unit".into());
+        let uncertainty = c.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.1,
+            unit: "other-unit".into(),
+        };
+        uncertainty.evaluation.coverage_probability = None;
+        uncertainty.evaluation.coverage_method = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert!(result.frontier_blockers["performance-scale-drift"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::PerformanceIncompatibleScale {
+                    metric,
+                    ..
+                } if metric == "throughput_per_hour"
+            )));
+        assert!(!result.pareto_frontier.contains(&"performance-scale-drift".into()));
+    }
+
+    #[test]
+    fn regrettable_substitution_is_not_scalarized() {
+        let incumbent = candidate(
+            "incumbent",
+            PathwayKind::MaterialSubstitution,
+            10.0,
+            10.0,
+            vec![evidence("i1", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let direct = candidate(
+            "direct",
+            PathwayKind::MaterialSubstitution,
+            3.0,
+            30.0,
+            vec![
+                admitted(evidence("d1", "source-b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)),
+                admitted(evidence("d2", "source-c", EvidenceKind::Reported, EvidenceStance::Supports, 0.9)),
+                admitted(evidence("d3", "source-lca", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9)),
+            ],
+        );
+        let process = candidate(
+            "process",
+            PathwayKind::ProcessSubstitution,
+            4.0,
+            4.0,
+            vec![
+                evidence("p1", "source-d", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("p2", "source-e", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let result = AlternativesEngine
+            .assess(
+                &fixture_requirement(),
+                &[incumbent, direct, process],
+                Some("incumbent"),
+            )
+            .unwrap();
+
+        let transfer = result
+            .burden_transfers
+            .iter()
+            .find(|transfer| transfer.candidate_id == "direct")
+            .unwrap();
+        assert!(transfer.is_regrettable_substitution());
+        assert!(transfer.clearly_better.contains(&Dimension::Hazard));
+        assert!(transfer.clearly_worse.contains(&Dimension::Water));
+
+        assert_eq!(
+            result
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == "direct")
+                .unwrap()
+                .qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn unlinked_burden_dimension_blocks_frontier_and_caps_qualification() {
+        let mut c = candidate(
+            "partial-burden-evidence",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "b1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .expect("fixture has water burden")
+            .evidence_ids
+            .clear();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        let assessment = &result.candidates[0];
+
+        assert_eq!(
+            assessment.qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(assessment.frontier_blocked);
+        assert!(result.frontier_blockers["partial-burden-evidence"]
+            .contains(&FrontierBlocker::EvidenceUnavailable(Dimension::Water)));
+        assert!(!result
+            .pareto_frontier
+            .contains(&"partial-burden-evidence".into()));
+    }
+
+    #[test]
+    fn missing_evidence_lowers_qualification_and_missing_constraints_block_frontier() {
+        let unknown = candidate("unknown", PathwayKind::Elimination, 1.0, 1.0, vec![]);
+        let mut blocked = candidate(
+            "blocked",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("b1", "b", EvidenceKind::Simulated, EvidenceStance::Supports, 0.8)],
+        );
+        blocked.performance.remove("throughput_per_hour");
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[unknown, blocked], None)
+            .unwrap();
+
+        assert_eq!(
+            result
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == "unknown")
+                .unwrap()
+                .qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(!result.pareto_frontier.contains(&"unknown".into()));
+        assert_eq!(
+            result.frontier_blockers["blocked"]
+                .iter()
+                .find(|blocker| matches!(blocker, FrontierBlocker::ConstraintUnresolved(_)))
+                .expect("constraint unresolved blocker is present"),
+            FrontierBlocker::ConstraintUnresolved("throughput_per_hour".into())
+        );
+    }
+
+    #[test]
+    fn functional_evidence_conflict_caps_qualification_and_blocks_frontier() {
+        let c = candidate(
+            "functional-conflict",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![
+                evidence(
+                    "functional-support",
+                    "source-a",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "functional-contradiction",
+                    "source-b",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Contradicts,
+                    0.95,
+                ),
+            ],
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        let assessment = &result.candidates[0];
+
+        assert!(assessment.evidence_conflict);
+        assert_eq!(
+            assessment.qualification,
+            QualificationState::ComputationallyPlausible
+        );
+        assert!(assessment.frontier_blocked);
+        assert!(result.frontier_blockers["functional-conflict"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::ConstraintUnresolved(metric)
+                    if metric == "throughput_per_hour"
+            )));
+    }
+
+    #[test]
+    fn functional_conflict_does_not_mask_missing_second_metric() {
+        let mut c = candidate(
+            "mixed-functional-boundary",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![
+                evidence(
+                    "support",
+                    "source-a",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "contradict",
+                    "source-b",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Contradicts,
+                    0.95,
+                ),
+            ],
+        );
+        c.performance.remove("service_life_years");
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(result.frontier_blockers["mixed-functional-boundary"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::ConstraintUnresolved(metric)
+                    if metric == "service_life_years"
+            )));
+    }
+
+    #[test]
+    fn conflicting_sources_remain_visible_and_cap_qualification() {
+        let candidate = candidate(
+            "conflict",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![
+                evidence("s1", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.95),
+                evidence("s2", "source-b", EvidenceKind::Observed, EvidenceStance::Contradicts, 0.95),
+            ],
+        );
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[candidate], None).unwrap();
+        let assessment = &result.candidates[0];
+        assert!(assessment.evidence_conflict);
+        assert_eq!(
+            assessment.qualification,
+            QualificationState::ComputationallyPlausible
+        );
+        assert!(assessment
+            .constraints
+            .iter()
+            .all(|constraint| constraint.status == ConstraintStatus::Unresolved));
+        assert!(result.frontier_blockers.contains_key("conflict"));
+    }
+
+    #[test]
+    fn changing_functional_requirement_changes_frontier() {
+        let a = candidate(
+            "a",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            8.0,
+            vec![
+                evidence("a1", "a1", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("a2", "a2", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let b = candidate(
+            "b",
+            PathwayKind::ProductRedesign,
+            4.0,
+            4.0,
+            vec![
+                evidence("b1", "b1", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("b2", "b2", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        let requirement_a = fixture_requirement();
+        let mut requirement_b = fixture_requirement();
+        requirement_b
+            .constraints
+            .insert("throughput_per_hour".into(), RequirementBound::AtLeast(125.0));
+
+        let baseline = AlternativesEngine.assess(&requirement_a, &[a.clone(), b.clone()], None).unwrap();
+        let constrained = AlternativesEngine.assess(&requirement_b, &[a, b], None).unwrap();
+
+        assert_ne!(baseline.pareto_frontier, constrained.pareto_frontier);
+        assert!(constrained.frontier_blockers.contains_key("a"));
+        assert!(constrained.frontier_blockers.contains_key("b"));
+    }
+
+    #[test]
+    fn receipt_is_deterministic() {
+        let c = candidate(
+            "c",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![
+                evidence("c1", "s1", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("c2", "s2", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let requirement = fixture_requirement();
+        let first = AlternativesEngine.assess(&requirement, &[c.clone()], None).unwrap();
+        let second = AlternativesEngine.assess(&requirement, &[c], None).unwrap();
+        assert_eq!(first.receipt, second.receipt);
+        assert!(!first.receipt.payload_hash.is_empty());
+    }
+
+    #[test]
+    fn heuristic_measurement_target_is_exposed() {
+        let mut c = candidate(
+            "c",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            8.0,
+            vec![
+                evidence("c1", "source-observed", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("c2", "source-reported", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let estimate = c.burdens.get(&Dimension::Water).unwrap().clone();
+        c.burdens.insert(
+            Dimension::Water,
+            BurdenEstimate {
+                interval: Interval::new(estimate.interval.lower, estimate.interval.upper + 100.0)
+                    .unwrap(),
+                unit: estimate.unit,
+                scope: estimate.scope,
+                basis: estimate.basis,
+                evidence_ids: vec!["c2".into()],
+            },
+        );
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+        assert_eq!(
+            result.next_measurement.as_ref().unwrap().dimension,
+            Dimension::Water
+        );
+        assert_eq!(
+            result
+                .next_measurement
+                .as_ref()
+                .unwrap()
+                .unresolved_candidate_count,
+            1
+        );
+        assert!(result
+            .next_measurement
+            .as_ref()
+            .unwrap()
+            .unresolved_uncertainty_refs
+            .is_empty());
+    }
+
+    #[test]
+    fn heuristic_measurement_conflict_is_dimension_scoped_and_identity_bound() {
+        let mut c = candidate(
+            "heuristic-conflict",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence(
+                    "support",
+                    "source-a",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "contradict",
+                    "source-b",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Contradicts,
+                    0.95,
+                ),
+            ],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["support".into()];
+        }
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["support".into(), "contradict".into()];
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["support".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["support".into()];
+        }
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+        let next = result.next_measurement.as_ref().unwrap();
+        assert_eq!(next.dimension, Dimension::Water);
+        assert_eq!(next.unresolved_candidate_count, 1);
+        let water_scale = fixture_requirement().comparison_scales[&Dimension::Water].clone();
+        assert_eq!(next.expected_discrimination[0].unit, water_scale.unit);
+        assert_eq!(next.expected_discrimination[0].scope, water_scale.scope);
+        assert_eq!(next.expected_discrimination[0].basis, water_scale.basis);
+        assert_eq!(
+            next.unresolved_uncertainty_refs,
+            vec![
+                "uncertainty:support".into(),
+                "uncertainty:contradict".into()
+            ]
+        );
+    }
+
+    #[test]
+    fn heuristic_measurement_includes_overlapping_frontier_comparator() {
+        let mut unresolved = candidate(
+            "unresolved",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "derived-unresolved",
+                "source-derived",
+                EvidenceKind::Derived,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let comparator = candidate(
+            "comparator",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "observed-comparator",
+                "source-observed",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+
+        for estimate in unresolved.burdens.values_mut() {
+            estimate.evidence_ids = vec!["derived-unresolved".into()];
+        }
+        for estimate in comparator.burdens.values_mut() {
+            estimate.evidence_ids = vec!["observed-comparator".into()];
+        }
+
+        let unresolved_water = unresolved.burdens.get(&Dimension::Water).unwrap().clone();
+        unresolved.burdens.insert(
+            Dimension::Water,
+            BurdenEstimate {
+                interval: Interval::new(2.0, 4.0).unwrap(),
+                unit: unresolved_water.unit,
+                scope: unresolved_water.scope,
+                basis: unresolved_water.basis,
+                evidence_ids: unresolved_water.evidence_ids,
+            },
+        );
+        let comparator_water = comparator.burdens.get(&Dimension::Water).unwrap().clone();
+        let mut comparator = comparator;
+        comparator.burdens.insert(
+            Dimension::Water,
+            BurdenEstimate {
+                interval: Interval::new(3.0, 5.0).unwrap(),
+                unit: comparator_water.unit,
+                scope: comparator_water.scope,
+                basis: comparator_water.basis,
+                evidence_ids: comparator_water.evidence_ids,
+            },
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[unresolved, comparator], None)
+            .unwrap();
+        let next = result.next_measurement.as_ref().unwrap();
+
+        assert_eq!(next.dimension, Dimension::Water);
+        assert_eq!(next.unresolved_candidate_count, 1);
+        assert_eq!(
+            next.candidate_ids,
+            vec!["comparator".to_string(), "unresolved".to_string()]
+        );
+        assert_eq!(
+            next.expected_discrimination,
+            vec![MeasurementDiscriminationTarget {
+                left_candidate_id: "comparator".into(),
+                right_candidate_id: "unresolved".into(),
+                dimension: Dimension::Water,
+                unit: fixture_requirement().comparison_scales[&Dimension::Water].unit.clone(),
+                scope: fixture_requirement().comparison_scales[&Dimension::Water].scope.clone(),
+                basis: fixture_requirement().comparison_scales[&Dimension::Water].basis.clone(),
+            }]
+        );
+        assert!(next.unresolved_uncertainty_refs.is_empty());
+    }
+
+    #[test]
+    fn heuristic_measurement_target_requires_exact_comparison_scale() {
+        let scale = fixture_requirement().comparison_scales[&Dimension::Water].clone();
+        let mut target = MeasurementDiscriminationTarget {
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            dimension: Dimension::Water,
+            unit: scale.unit,
+            scope: scale.scope,
+            basis: scale.basis,
+        };
+        target.validate().unwrap();
+
+        target.unit.clear();
+        assert_eq!(
+            target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.unit = "unit".into();
+        target.scope.clear();
+        assert_eq!(
+            target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.scope = "scope".into();
+        target.basis.basis_digest.clear();
+        assert_eq!(
+            target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+    }
+
+    #[test]
+    fn heuristic_measurement_target_must_match_requirement_scale() {
+        let requirement = fixture_requirement();
+        let scale = requirement.comparison_scales[&Dimension::Water].clone();
+        let mut target = MeasurementDiscriminationTarget {
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            dimension: Dimension::Water,
+            unit: scale.unit.clone(),
+            scope: scale.scope.clone(),
+            basis: scale.basis.clone(),
+        };
+        target.validate_against(&requirement).unwrap();
+
+        target.unit = "wrong-unit".into();
+        assert_eq!(
+            target.validate_against(&requirement).unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.unit = scale.unit;
+        target.scope = "wrong-scope".into();
+        assert_eq!(
+            target.validate_against(&requirement).unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.scope = scale.scope;
+        target.basis.basis_revision = "wrong-revision".into();
+        assert_eq!(
+            target.validate_against(&requirement).unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+    }
+
+    #[test]
+    fn single_field_observation_cannot_promote_entire_candidate() {
+        let mut c = candidate(
+            "field",
+            PathwayKind::ProcessSubstitution,
+            1.0,
+            1.0,
+            vec![
+                evidence("f1", "field-source", EvidenceKind::FieldObserved, EvidenceStance::Supports, 0.95),
+                evidence("f2", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("f3", "source-b", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        c.burdens.values_mut().skip(1).for_each(|estimate| {
+            estimate.evidence_ids = vec!["f2".into(), "f3".into()];
+        });
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn field_burden_evidence_cannot_promote_lower_tier_functional_evidence() {
+        let mut c = candidate(
+            "field-burden-only",
+            PathwayKind::ProcessSubstitution,
+            1.0,
+            1.0,
+            vec![
+                evidence(
+                    "field-a",
+                    "field-authority-a",
+                    EvidenceKind::FieldObserved,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "field-b",
+                    "field-authority-b",
+                    EvidenceKind::FieldObserved,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "functional",
+                    "functional-authority",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+            ],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["field-a".into(), "field-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_ne!(
+            result.candidates[0].qualification,
+            QualificationState::FieldQualified
+        );
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn comparison_basis_mismatch_blocks_frontier_and_dominance() {
+        let mut c = candidate(
+            "basis-drift",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "basis-evidence",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut water_evidence = evidence(
+            "basis-water",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        water_evidence.basis.basis_revision = "v2".into();
+        c.evidence.push(water_evidence);
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .basis
+            .basis_revision = "v2".into();
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["basis-water".into()];
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+        assert!(result.frontier_blockers["basis-drift"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::ComparisonBasisMismatch { context, .. }
+                    if context == "burden:Water"
+            )));
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(!result.pareto_frontier.contains(&"basis-drift".into()));
+
+        let incumbent = candidate(
+            "basis-incumbent",
+            PathwayKind::ProcessSubstitution,
+            4.0,
+            4.0,
+            vec![evidence(
+                "basis-incumbent-evidence",
+                "source-incumbent",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        assert!(!AlternativesEngine::dominates(
+            &c.burdens,
+            &incumbent.burdens
+        ));
+    }
+
+    #[test]
+    fn burden_transfer_ignores_cross_basis_dimension() {
+        let incumbent = candidate(
+            "incumbent-basis",
+            PathwayKind::MaterialSubstitution,
+            10.0,
+            10.0,
+            vec![evidence(
+                "bi",
+                "authority-a",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut candidate = candidate(
+            "candidate-basis",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            30.0,
+            vec![evidence(
+                "bc",
+                "authority-b",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let mut water_evidence = evidence(
+            "bc-water",
+            "authority-b",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        water_evidence.basis.basis_revision = "v2".into();
+        candidate.evidence.push(water_evidence);
+        candidate
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .basis
+            .basis_revision = "v2".into();
+        candidate
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["bc-water".into()];
+
+        let result = AlternativesEngine
+            .assess(
+                &fixture_requirement(),
+                &[incumbent, candidate],
+                Some("incumbent-basis"),
+            )
+            .unwrap();
+        let transfer = result
+            .burden_transfers
+            .iter()
+            .find(|transfer| transfer.candidate_id == "candidate-basis")
+            .unwrap();
+
+        assert!(transfer.clearly_better.contains(&Dimension::Hazard));
+        assert!(!transfer.clearly_better.contains(&Dimension::Water));
+        assert!(!transfer.clearly_worse.contains(&Dimension::Water));
+    }
+
+    #[test]
+    fn assessment_is_order_independent() {
+        let a = candidate(
+            "a",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            8.0,
+            vec![
+                evidence("a2", "source-2", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("a1", "source-1", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let b = candidate(
+            "b",
+            PathwayKind::ProductRedesign,
+            3.0,
+            4.0,
+            vec![
+                evidence("b2", "source-4", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("b1", "source-3", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        let first = AlternativesEngine
+            .assess(&fixture_requirement(), &[a.clone(), b.clone()], None)
+            .unwrap();
+        let second = AlternativesEngine
+            .assess(&fixture_requirement(), &[b, a], None)
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn changing_assessment_subject_changes_receipt_identity() {
+        let requirement = fixture_requirement();
+        let candidate = candidate(
+            "subject-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("s1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        let baseline = AlternativesEngine
+            .assess(&requirement, &[candidate.clone()], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+
+        let mut changed_requirement = requirement;
+        changed_requirement.subject.subject_digest = "different-design-digest".into();
+        let changed = AlternativesEngine
+            .assess(&changed_requirement, &[candidate], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+
+        assert_ne!(baseline, changed);
+    }
+
+    #[test]
+    fn source_admission_changes_assessment_identity() {
+        let mut evidence = evidence(
+            "admitted",
+            "authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        let mut c = candidate(
+            "admitted-candidate",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence.clone()],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+
+        evidence.source.admission = Some(SourceAdmissionRef {
+            authority_id: evidence.source.authority_id.clone(),
+            policy_id: "policy".into(),
+            policy_revision: "r1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: Some(100),
+            valid_until_epoch_seconds: Some(200),
+        });
+        c.evidence[0] = evidence;
+
+        let admitted = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap()
+            .receipt
+            .payload_hash;
+        assert_ne!(baseline, admitted);
+    }
+
+    #[test]
+    fn source_admission_authority_mismatch_fails_closed() {
+        let source = EvidenceSourceIdentity {
+            authority_id: "authority-a".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: None,
+            admission: Some(SourceAdmissionRef {
+                authority_id: "authority-b".into(),
+                policy_id: "policy".into(),
+                policy_revision: "r1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: "admission".into(),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
+                fault_domain_id: Some("domain-b".into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            }),
+        };
+
+        assert_eq!(
+            source.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionAuthorityMismatch {
+                source_authority_id: "authority-a".into(),
+                admission_authority_id: "authority-b".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn admission_subject_binding_tracks_exact_source_identity() {
+        let mut source = EvidenceSourceIdentity {
+            authority_id: "authority".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: Some("key-v1".into()),
+            admission: None,
+        };
+        let binding = source.canonical_subject_binding_digest().unwrap();
+        source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority".into(),
+            policy_id: "policy".into(),
+            policy_revision: "r1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: Some(binding),
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        assert!(source.validate().is_ok());
+        assert_eq!(
+            source.admitted_authority_group_id(),
+            Some(source.authority_group_id())
+        );
+
+        let mut artifact_changed = source.clone();
+        artifact_changed.artifact_id = "different-artifact".into();
+        assert!(matches!(
+            artifact_changed.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionSubjectBindingMismatch { .. }
+        ));
+
+        let mut digest_changed = source.clone();
+        digest_changed.artifact_digest = "different-digest".into();
+        assert!(matches!(
+            digest_changed.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionSubjectBindingMismatch { .. }
+        ));
+
+        let mut key_changed = source;
+        key_changed.issuer_key_fingerprint = Some("key-v2".into());
+        assert!(matches!(
+            key_changed.validate().unwrap_err(),
+            AssessmentError::SourceAdmissionSubjectBindingMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn unbound_admission_reference_cannot_count_as_admitted_authority() {
+        let source = EvidenceSourceIdentity {
+            authority_id: "authority".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: None,
+            admission: Some(SourceAdmissionRef {
+                authority_id: "authority".into(),
+                policy_id: "policy".into(),
+                policy_revision: "r1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: "admission".into(),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
+                fault_domain_id: Some("domain-a".into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            }),
+        };
+        assert!(source.validate().is_ok());
+        assert_eq!(source.admitted_authority_group_id(), None);
+    }
+
+    #[test]
+    fn duplicate_calibration_traceability_link_fails_closed() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "duplicate-link-observation".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![
+                CalibrationTraceabilityRef {
+                    calibration_id: "calibration".into(),
+                    calibration_revision: "v1".into(),
+                    calibration_record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+                CalibrationTraceabilityRef {
+                    calibration_id: "calibration".into(),
+                    calibration_revision: "v1".into(),
+                    calibration_record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+            ],
+            calibration_topology: None,
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+        assert!(matches!(
+            observation.validate().unwrap_err(),
+            AssessmentError::DuplicateCalibrationTraceabilityLink { .. }
+        ));
+
+        observation.calibration_chain_refs[1].used_at_epoch_seconds = 1_700_000_001;
+        observation.validate().unwrap();
+    }
+
+    #[test]
+    fn calibration_traceability_topology_digest_is_order_independent() {
+        let observation = ObservationProvenanceRef {
+            observation_id: "obs-order".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "calibration".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
+            }],
+            calibration_topology: None,
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[CalibrationTraceabilityInputBinding {
+                input_quantity_id: "input-primary".into(),
+                input_specification: MeasurementModelInputSpecificationRef {
+                    specification_id: "model-input-spec-primary".into(),
+                    specification_revision: "v1".into(),
+                    specification_digest: "model-input-spec-primary-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                },
+                input_result_ref: None,
+                role: MeasurementModelInputRole::Measured,
+                node_id: "calibration".into(),
+            }])
+                .unwrap();
+        let mut topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "model-v1".into(),
+            measurement_model_revision: "r1".into(),
+            measurement_model_digest: "model-digest-v1".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "model-input-frontier-v1".into(),
+                frontier_revision: "r1".into(),
+                frontier_digest: "model-input-frontier-record-digest-v1".into(),
+                input_set_digest: input_frontier_digest,
+                measurement_model_id: "model-v1".into(),
+                measurement_model_revision: "r1".into(),
+                measurement_model_digest: "model-digest-v1".into(),
+                input_count: 1,
+            },
+            input_bindings: vec![CalibrationTraceabilityInputBinding {
+                input_quantity_id: "input-primary".into(),
+                input_specification: MeasurementModelInputSpecificationRef {
+                    specification_id: "model-input-spec-primary".into(),
+                    specification_revision: "v1".into(),
+                    specification_digest: "model-input-spec-primary-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                },
+                input_result_ref: None,
+                role: MeasurementModelInputRole::Measured,
+                node_id: "calibration".into(),
+            }],
+            reference_node_ids: vec!["reference-b".into(), "reference-a".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: "calibration".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "calibration-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-a".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "ref-a".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "ref-a-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-b".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "ref-b".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "ref-b-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference-b".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference-a".into(),
+                },
+            ],
+        };
+
+        let first = topology.canonical_digest().unwrap();
+
+        let mut frontier_record_drift = topology.clone();
+        frontier_record_drift
+            .input_frontier
+            .frontier_digest = "different-frontier-record-digest".into();
+        assert_ne!(first, frontier_record_drift.canonical_digest().unwrap());
+
+        let mut branch_location_drift = topology.clone();
+        branch_location_drift.input_bindings[0].node_id = "reference-a".into();
+        assert_eq!(
+            topology.input_frontier.input_set_digest,
+            branch_location_drift.input_frontier.input_set_digest
+        );
+        assert_ne!(first, branch_location_drift.canonical_digest().unwrap());
+
+        let mut role_drift = topology.clone();
+        role_drift.input_bindings[0].role = MeasurementModelInputRole::Influence;
+        role_drift.input_frontier.input_set_digest =
+            canonical_measurement_model_input_frontier_digest(&role_drift.input_bindings).unwrap();
+        assert_ne!(first, role_drift.canonical_digest().unwrap());
+        role_drift
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        let mut specification_drift = topology.clone();
+        specification_drift.input_bindings[0]
+            .input_specification
+            .specification_revision = "v2".into();
+        specification_drift.input_frontier.input_set_digest =
+            canonical_measurement_model_input_frontier_digest(&specification_drift.input_bindings)
+                .unwrap();
+        assert_ne!(first, specification_drift.canonical_digest().unwrap());
+        specification_drift
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        topology.nodes.reverse();
+        topology.edges.reverse();
+        topology.input_bindings.reverse();
+        topology.reference_node_ids.reverse();
+        let second = topology.canonical_digest().unwrap();
+        assert_eq!(first, second);
+
+        topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        topology.edges.push(CalibrationTraceabilityEdge {
+            from_node_id: "calibration".into(),
+            to_node_id: "result".into(),
+        });
+        assert_eq!(
+            topology
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityResultHasIncomingEdge
+        );
+    }
+
+    #[test]
+    fn unit_definition_reference_is_frontier_significant_but_opaque() {
+        let make_binding = |digest: &str| CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: None,
+                unit_definition: Some(MeasurementModelInputUnitDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/unit".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/unit/K".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: digest.into(),
+                }),
+            },
+            input_result_ref: None,
+            role: MeasurementModelInputRole::Influence,
+            node_id: "temperature-calibration".into(),
+        };
+
+        let first = canonical_measurement_model_input_frontier_digest(&[make_binding("unit-v1")])
+            .unwrap();
+        let second = canonical_measurement_model_input_frontier_digest(&[make_binding("unit-v2")])
+            .unwrap();
+        assert_ne!(first, second);
+
+        let malformed = MeasurementModelInputUnitDefinitionRef {
+            vocabulary_id: "http://qudt.org/3.5.2/vocab/unit".into(),
+            vocabulary_revision: "3.5.2".into(),
+            definition_id: "http://qudt.org/vocab/unit/K".into(),
+            definition_revision: "3.5.2".into(),
+            definition_digest: "".into(),
+        };
+        assert_eq!(
+            malformed.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementModelInputUnitDefinition
+        );
+    }
+
+    #[test]
+    fn quantity_definition_reference_is_frontier_significant_but_opaque() {
+        let make_binding = |digest: &str| CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: Some(MeasurementModelInputQuantityDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/quantitykind".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/quantitykind/Temperature".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: digest.into(),
+                }),
+                unit_definition: None,
+            },
+            input_result_ref: None,
+            role: MeasurementModelInputRole::Influence,
+            node_id: "temperature-calibration".into(),
+        };
+
+        let first = canonical_measurement_model_input_frontier_digest(&[make_binding("definition-v1")])
+            .unwrap();
+        let second = canonical_measurement_model_input_frontier_digest(&[make_binding("definition-v2")])
+            .unwrap();
+        assert_ne!(first, second);
+
+        let mut malformed = make_binding("");
+        assert_eq!(
+            malformed.input_specification.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementModelInputQuantityDefinition
+        );
+
+        malformed.input_specification.quantity_definition = None;
+        malformed.input_specification.validate().unwrap();
+    }
+
+    #[test]
+    fn measurement_model_input_definition_identity_fields_are_frontier_significant() {
+        let binding = CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: Some(MeasurementModelInputQuantityDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/quantitykind".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/quantitykind/Temperature".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: "quantity-definition-v1".into(),
+                }),
+                unit_definition: Some(MeasurementModelInputUnitDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/unit".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/unit/K".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: "unit-definition-v1".into(),
+                }),
+            },
+            input_result_ref: None,
+            role: MeasurementModelInputRole::Influence,
+            node_id: "temperature-calibration".into(),
+        };
+        let baseline =
+            canonical_measurement_model_input_frontier_digest(std::slice::from_ref(&binding))
+                .unwrap();
+
+        let assert_change =
+            |label: &str, mutate: fn(&mut CalibrationTraceabilityInputBinding)| {
+                let mut mutated = binding.clone();
+                mutate(&mut mutated);
+                let digest =
+                    canonical_measurement_model_input_frontier_digest(&[mutated]).unwrap();
+                assert_ne!(
+                    baseline, digest,
+                    "{label} must be committed to the authoritative input frontier"
+                );
+            };
+
+        assert_change("quantity vocabulary identity", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_id = "http://qudt.example/alternate/quantitykind".into();
+        });
+        assert_change("quantity vocabulary revision", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_revision = "3.5.3".into();
+        });
+        assert_change("quantity definition identity", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .definition_id = "http://qudt.org/vocab/quantitykind/WetBulbTemperature".into();
+        });
+        assert_change("quantity definition revision", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .definition_revision = "3.5.3".into();
+        });
+        assert_change("quantity definition digest", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .definition_digest = "quantity-definition-v2".into();
+        });
+
+        assert_change("unit vocabulary identity", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_id = "http://qudt.example/alternate/unit".into();
+        });
+        assert_change("unit vocabulary revision", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_revision = "3.5.3".into();
+        });
+        assert_change("unit definition identity", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .definition_id = "http://qudt.org/vocab/unit/degreeCelsius".into();
+        });
+        assert_change("unit definition revision", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .definition_revision = "3.5.3".into();
+        });
+        assert_change("unit definition digest", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .definition_digest = "unit-definition-v2".into();
+        });
+
+        assert_change("quantity definition omission", |binding| {
+            binding.input_specification.quantity_definition = None;
+        });
+        assert_change("unit definition omission", |binding| {
+            binding.input_specification.unit_definition = None;
+        });
+    }
+
+    #[test]
+    fn measurement_model_input_result_reference_is_topology_significant_but_frontier_opaque() {
+        let binding = CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: None,
+                unit_definition: None,
+            },
+            input_result_ref: Some(MeasurementModelInputResultRef {
+                result_id: "fixture-temperature-result".into(),
+                result_revision: "v1".into(),
+                result_record_digest: "temperature-result-v1".into(),
+            }),
+            role: MeasurementModelInputRole::Measured,
+            node_id: "temperature-calibration".into(),
+        };
+        binding.validate().unwrap();
+
+        let serialized = serde_json::to_value(&binding).unwrap();
+        assert!(serialized.get("input_result_ref").is_some());
+        let mut legacy = serialized;
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("input_result_ref");
+        let decoded: CalibrationTraceabilityInputBinding =
+            serde_json::from_value(legacy).unwrap();
+        assert_eq!(decoded.input_result_ref, None);
+
+        let frontier_digest =
+            canonical_measurement_model_input_frontier_digest(std::slice::from_ref(&binding))
+                .unwrap();
+
+        let topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "fixture-model".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-model-digest".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-frontier".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: "fixture-frontier-record-digest".into(),
+                input_set_digest: frontier_digest.clone(),
+                measurement_model_id: "fixture-model".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-model-digest".into(),
+                input_count: 1,
+            },
+            input_bindings: vec![binding],
+            reference_node_ids: Vec::new(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+        };
+        let topology_digest = topology.canonical_digest().unwrap();
+
+        let assert_topology_change =
+            |label: &str, mutate: fn(&mut MeasurementModelInputResultRef)| {
+                let mut changed = topology.clone();
+                mutate(
+                    changed.input_bindings[0]
+                        .input_result_ref
+                        .as_mut()
+                        .unwrap(),
+                );
+                assert_eq!(
+                    frontier_digest,
+                    canonical_measurement_model_input_frontier_digest(
+                        &changed.input_bindings
+                    )
+                    .unwrap(),
+                    "{label} must remain outside the semantic input frontier"
+                );
+                assert_ne!(
+                    topology_digest,
+                    changed.canonical_digest().unwrap(),
+                    "{label} must change the topology receipt"
+                );
+            };
+
+        assert_topology_change("input-result identity", |result| {
+            result.result_id = "fixture-temperature-result-v2".into();
+        });
+        assert_topology_change("input-result revision", |result| {
+            result.result_revision = "v2".into();
+        });
+        assert_topology_change("input-result digest", |result| {
+            result.result_record_digest = "temperature-result-v2".into();
+        });
+        let mut omitted = topology.clone();
+        omitted.input_bindings[0].input_result_ref = None;
+        assert_eq!(
+            frontier_digest,
+            canonical_measurement_model_input_frontier_digest(&omitted.input_bindings).unwrap()
+        );
+        assert_ne!(topology_digest, omitted.canonical_digest().unwrap());
+
+        let mut malformed = topology.clone();
+        malformed.input_bindings[0]
+            .input_result_ref
+            .as_mut()
+            .unwrap()
+            .result_record_digest = String::new();
+        assert_eq!(
+            malformed.input_bindings[0].validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementModelInputResultReference
+        );
+    }
+
+    #[test]
+    fn branched_traceability_topology_is_typed_and_uncertainty_bound() {
+        let mut candidate = candidate(
+            "branched-traceability-topology",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "branched-traceability",
+                "authority",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let observation = candidate.evidence[0]
+            .observation
+            .as_ref()
+            .expect("fixture observation exists")
+            .clone();
+        let calibration = observation
+            .calibration_chain_refs
+            .first()
+            .expect("fixture calibration chain exists")
+            .clone();
+
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input-a".into(),
+                    input_specification: MeasurementModelInputSpecificationRef {
+                        specification_id: "fixture-input-a-spec".into(),
+                        specification_revision: "v1".into(),
+                        specification_digest: "fixture-input-a-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                    },
+                    input_result_ref: None,
+                    role: MeasurementModelInputRole::Measured,
+                    node_id: "calibration-a".into(),
+                },
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input-b".into(),
+                    input_specification: MeasurementModelInputSpecificationRef {
+                        specification_id: "fixture-input-b-spec".into(),
+                        specification_revision: "v1".into(),
+                        specification_digest: "fixture-input-b-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                    },
+                    input_result_ref: None,
+                    role: MeasurementModelInputRole::Influence,
+                    node_id: "calibration-b".into(),
+                },
+            ])
+            .unwrap();
+        let topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "fixture-measurement-model-v1".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-input-frontier-v1".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: "fixture-input-frontier-record-digest-v1".into(),
+                input_set_digest: input_frontier_digest,
+                measurement_model_id: "fixture-measurement-model-v1".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+                input_count: 2,
+            },
+            input_bindings: vec![
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input-a".into(),
+                    input_specification: MeasurementModelInputSpecificationRef {
+                        specification_id: "fixture-input-a-spec".into(),
+                        specification_revision: "v1".into(),
+                        specification_digest: "fixture-input-a-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                    },
+                    input_result_ref: None,
+                    role: MeasurementModelInputRole::Measured,
+                    node_id: "calibration-a".into(),
+                },
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input-b".into(),
+                    input_specification: MeasurementModelInputSpecificationRef {
+                        specification_id: "fixture-input-b-spec".into(),
+                        specification_revision: "v1".into(),
+                        specification_digest: "fixture-input-b-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                    },
+                    input_result_ref: None,
+                    role: MeasurementModelInputRole::Influence,
+                    node_id: "calibration-b".into(),
+                },
+            ],
+            reference_node_ids: vec!["reference-si".into(), "reference-time".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration-a".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: calibration.calibration_id.clone(),
+                    record_revision: calibration.calibration_revision.clone(),
+                    record_digest: calibration.calibration_record_digest.clone(),
+                    used_at_epoch_seconds: calibration.used_at_epoch_seconds,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration-b".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: "calibration-b".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "calibration-b-digest".into(),
+                    used_at_epoch_seconds: 1_700_000_001,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-si".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "si-reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "si-reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference-time".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "time-reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "time-reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration-a".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration-a".into(),
+                    to_node_id: "reference-si".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration-b".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration-b".into(),
+                    to_node_id: "reference-time".into(),
+                },
+            ],
+        };
+
+        topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        let topology_digest = topology.canonical_digest().unwrap();
+        candidate.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology = Some(topology);
+        candidate.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .calibration_topology_digest = Some(topology_digest);
+
+        let uncertainty = candidate.evidence[0].uncertainty.as_ref().unwrap().clone();
+        candidate.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .binding_digest = canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[candidate.clone()], None)
+            .unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+
+        let mut cycle = candidate.clone();
+        cycle
+            .evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology
+            .as_mut()
+            .unwrap()
+            .edges
+            .push(CalibrationTraceabilityEdge {
+                from_node_id: "reference-si".into(),
+                to_node_id: "calibration-a".into(),
+            });
+        assert!(matches!(
+            cycle.evidence[0]
+                .observation
+                .as_ref()
+                .unwrap()
+                .validate()
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityReferenceHasOutgoingEdge(_)
+                | AssessmentError::CalibrationTraceabilityTopologyCycle
+        ));
+
+        let mut disconnected = candidate.clone();
+        disconnected
+            .evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology
+            .as_mut()
+            .unwrap()
+            .nodes
+            .push(CalibrationTraceabilityNodeRef {
+                node_id: "orphan".into(),
+                kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                record_id: "orphan".into(),
+                record_revision: "v1".into(),
+                record_digest: "orphan-digest".into(),
+                used_at_epoch_seconds: 1_600,
+            });
+        assert!(matches!(
+            disconnected.evidence[0]
+                .observation
+                .as_ref()
+                .unwrap()
+                .validate()
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityTopologyDisconnected
+        ));
+
+        let mut topology_digest_drift = candidate;
+        topology_digest_drift
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .calibration_topology_digest = Some("wrong-topology-digest".into());
+        let uncertainty = topology_digest_drift.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        assert!(matches!(
+            topology_digest_drift.evidence[0]
+                .validate()
+                .unwrap_err(),
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn branched_traceability_topology_rejects_input_scope_drift() {
+        let mut candidate = candidate(
+            "branched-traceability-input-scope",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "branched-traceability-input-scope",
+                "authority",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let observation = candidate.evidence[0]
+            .observation
+            .as_ref()
+            .expect("fixture observation exists")
+            .clone();
+
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[CalibrationTraceabilityInputBinding {
+                input_quantity_id: "fixture-input".into(),
+                input_specification: MeasurementModelInputSpecificationRef {
+                    specification_id: "fixture-input-spec".into(),
+                    specification_revision: "v1".into(),
+                    specification_digest: "fixture-input-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                },
+                input_result_ref: None,
+                role: MeasurementModelInputRole::Correction,
+                node_id: "calibration".into(),
+            }])
+                .unwrap();
+        let topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "fixture-measurement-model-v1".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-input-frontier-v1".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: "fixture-input-frontier-record-digest-v1".into(),
+                input_set_digest: input_frontier_digest,
+                measurement_model_id: "fixture-measurement-model-v1".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-measurement-model-digest-v1".into(),
+                input_count: 1,
+            },
+            input_bindings: vec![CalibrationTraceabilityInputBinding {
+                input_quantity_id: "fixture-input".into(),
+                input_specification: MeasurementModelInputSpecificationRef {
+                    specification_id: "fixture-input-spec".into(),
+                    specification_revision: "v1".into(),
+                    specification_digest: "fixture-input-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                },
+                input_result_ref: None,
+                role: MeasurementModelInputRole::Correction,
+                node_id: "calibration".into(),
+            }],
+            reference_node_ids: vec!["reference".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: observation.calibration_chain_refs[0].calibration_id.clone(),
+                    record_revision: observation.calibration_chain_refs[0].calibration_revision.clone(),
+                    record_digest: observation.calibration_chain_refs[0].calibration_record_digest.clone(),
+                    used_at_epoch_seconds: observation.calibration_chain_refs[0].used_at_epoch_seconds,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference".into(),
+                },
+            ],
+        };
+
+        candidate.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology = Some(topology.clone());
+        candidate.evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .evaluation
+            .calibration_topology_digest = Some(topology.canonical_digest().unwrap());
+
+        let mut input_result_topology = topology.clone();
+        input_result_topology.input_bindings[0].node_id = "input-result".into();
+        input_result_topology.input_bindings[0].input_result_ref =
+            Some(MeasurementModelInputResultRef {
+                result_id: "fixture-input-result".into(),
+                result_revision: "v1".into(),
+                result_record_digest: "fixture-input-result-digest".into(),
+            });
+        input_result_topology.nodes.push(CalibrationTraceabilityNodeRef {
+            node_id: "input-result".into(),
+            kind: CalibrationTraceabilityNodeKind::ModelInputResult,
+            record_id: "fixture-input-result".into(),
+            record_revision: "v1".into(),
+            record_digest: "fixture-input-result-digest".into(),
+            used_at_epoch_seconds: 1_650,
+        });
+        input_result_topology.edges = vec![
+            CalibrationTraceabilityEdge {
+                from_node_id: "result".into(),
+                to_node_id: "input-result".into(),
+            },
+            CalibrationTraceabilityEdge {
+                from_node_id: "input-result".into(),
+                to_node_id: "calibration".into(),
+            },
+            CalibrationTraceabilityEdge {
+                from_node_id: "calibration".into(),
+                to_node_id: "reference".into(),
+            },
+        ];
+        input_result_topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap();
+
+        let mut wrong_input_result_kind = input_result_topology.clone();
+        wrong_input_result_kind.nodes
+            .iter_mut()
+            .find(|node| node.node_id == "input-result")
+            .unwrap()
+            .kind = CalibrationTraceabilityNodeKind::CalibrationRecord;
+        assert!(matches!(
+            wrong_input_result_kind
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "input-result"
+        ));
+
+        let mut wrong_input_result_identity = input_result_topology.clone();
+        wrong_input_result_identity
+            .nodes
+            .iter_mut()
+            .find(|node| node.node_id == "input-result")
+            .unwrap()
+            .record_digest = "different-input-result-digest".into();
+        assert!(matches!(
+            wrong_input_result_identity
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "input-result"
+        ));
+
+        let mut missing_input_result_node = input_result_topology.clone();
+        missing_input_result_node
+            .nodes
+            .retain(|node| node.node_id != "input-result");
+        assert!(matches!(
+            missing_input_result_node
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputResultBindingMismatch {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "input-result"
+        ));
+
+        let mut missing_input_result_ref = input_result_topology.clone();
+        missing_input_result_ref.input_bindings[0].input_result_ref = None;
+        assert!(matches!(
+            missing_input_result_ref
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityOrphanedInputResultNode {
+                node_id,
+            } if node_id == "input-result"
+        ));
+
+        let mut duplicate_input = topology.clone();
+        duplicate_input.input_bindings.push(CalibrationTraceabilityInputBinding {
+            input_quantity_id: "fixture-input".into(),
+            input_specification: duplicate_input.input_bindings[0].input_specification.clone(),
+            input_result_ref: None,
+            role: duplicate_input.input_bindings[0].role,
+            node_id: "calibration".into(),
+        });
+        assert!(matches!(
+            duplicate_input
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::DuplicateCalibrationTraceabilityInputBinding(id)
+                if id == "fixture-input"
+        ));
+
+        let mut non_root_input = topology.clone();
+        non_root_input.input_bindings[0].node_id = "reference".into();
+        assert!(matches!(
+            non_root_input
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputBindingNotDirectChild {
+                input_quantity_id,
+                node_id,
+            } if input_quantity_id == "fixture-input" && node_id == "reference"
+        ));
+
+        let mut wrong_frontier_set = topology.clone();
+        let mut wrong_frontier_input = wrong_frontier_set.input_bindings[0].clone();
+        wrong_frontier_input.input_quantity_id = "fixture-input-other".into();
+        wrong_frontier_set.input_frontier.input_set_digest =
+            canonical_measurement_model_input_frontier_digest(&[wrong_frontier_input]).unwrap();
+        assert!(matches!(
+            wrong_frontier_set
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_frontier_count = topology.clone();
+        wrong_frontier_count.input_frontier.input_count = 2;
+        assert!(matches!(
+            wrong_frontier_count
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierCountMismatch {
+                frontier_id,
+                expected_input_count: 1,
+                actual_input_count: 2,
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_input_role = topology.clone();
+        wrong_input_role.input_bindings[0].role = MeasurementModelInputRole::Influence;
+        assert!(matches!(
+            wrong_input_role
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_quantity_definition = topology.clone();
+        wrong_quantity_definition.input_bindings[0]
+            .input_specification
+            .quantity_definition = Some(MeasurementModelInputQuantityDefinitionRef {
+                vocabulary_id: "http://qudt.org/3.5.2/vocab/quantitykind".into(),
+                vocabulary_revision: "3.5.2".into(),
+                definition_id: "http://qudt.org/vocab/quantitykind/Temperature".into(),
+                definition_revision: "3.5.2".into(),
+                definition_digest: "new-definition-digest".into(),
+            });
+        assert!(matches!(
+            wrong_quantity_definition
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_input_unit_definition = topology.clone();
+        wrong_input_unit_definition.input_bindings[0]
+            .input_specification
+            .unit_definition = Some(MeasurementModelInputUnitDefinitionRef {
+                vocabulary_id: "http://qudt.org/3.5.2/vocab/unit".into(),
+                vocabulary_revision: "3.5.2".into(),
+                definition_id: "http://qudt.org/vocab/unit/K".into(),
+                definition_revision: "3.5.2".into(),
+                definition_digest: "different-unit-definition-digest".into(),
+            });
+        assert!(matches!(
+            wrong_input_unit_definition
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_input_specification = topology.clone();
+        wrong_input_specification.input_bindings[0]
+            .input_specification
+            .specification_digest = "different-input-spec-digest".into();
+        assert!(matches!(
+            wrong_input_specification
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
+        let mut wrong_frontier_model = topology.clone();
+        wrong_frontier_model.input_frontier.measurement_model_digest =
+            "other-model-digest".into();
+        assert!(matches!(
+            wrong_frontier_model
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::CalibrationTraceabilityInputFrontierModelMismatch {
+                topology_model_digest,
+                frontier_model_digest,
+                ..
+            } if topology_model_digest == "fixture-measurement-model-digest-v1"
+                && frontier_model_digest == "other-model-digest"
+        ));
+
+        let mut input_result_bound = candidate.clone();
+        {
+            let evidence = &mut input_result_bound.evidence[0];
+            let topology = evidence
+                .observation
+                .as_mut()
+                .unwrap()
+                .calibration_topology
+                .as_mut()
+                .unwrap();
+            topology.input_bindings[0].input_result_ref = Some(MeasurementModelInputResultRef {
+                result_id: "fixture-input-result".into(),
+                result_revision: "v1".into(),
+                result_record_digest: "fixture-input-result-digest-v1".into(),
+            });
+            let topology_digest = topology.canonical_digest().unwrap();
+            let uncertainty = evidence.uncertainty.as_mut().unwrap();
+            uncertainty.evaluation.calibration_topology_digest = Some(topology_digest);
+            uncertainty.binding_digest =
+                canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        }
+        input_result_bound.evidence[0].validate().unwrap();
+
+        let mut changed_input_result = input_result_bound.clone();
+        changed_input_result.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology
+            .as_mut()
+            .unwrap()
+            .input_bindings[0]
+            .input_result_ref
+            .as_mut()
+            .unwrap()
+            .result_revision = "v2".into();
+        assert!(matches!(
+            changed_input_result.evidence[0].validate().unwrap_err(),
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch { .. }
+        ));
+
+        let mut wrong_model = candidate;
+        {
+            let evidence = &mut wrong_model.evidence[0];
+            let topology = evidence
+                .observation
+                .as_mut()
+                .unwrap()
+                .calibration_topology
+                .as_mut()
+                .unwrap();
+            topology.measurement_model_digest = "wrong-measurement-model-digest".into();
+            topology.input_frontier.measurement_model_digest =
+                "wrong-measurement-model-digest".into();
+            let topology_digest = topology.canonical_digest().unwrap();
+            let uncertainty = evidence.uncertainty.as_mut().unwrap();
+            uncertainty.evaluation.calibration_topology_digest = Some(topology_digest);
+            uncertainty.binding_digest =
+                canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        }
+        assert!(matches!(
+            wrong_model.evidence[0].validate().unwrap_err(),
+            AssessmentError::CalibrationTraceabilityMeasurementModelMismatch { .. }
+        ));
+    }
+
+
+    #[test]
+    fn source_admission_reference_validates_without_claiming_authenticity() {
+        let mut source = EvidenceSourceIdentity {
+            authority_id: "authority".into(),
+            artifact_id: "artifact".into(),
+            artifact_digest: "digest".into(),
+            issuer_key_fingerprint: None,
+            admission: Some(SourceAdmissionRef {
+                authority_id: "authority".into(),
+                policy_id: "policy".into(),
+                policy_revision: "r1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: "admission".into(),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
+                fault_domain_id: Some("domain-a".into()),
+                valid_from_epoch_seconds: Some(100),
+                valid_until_epoch_seconds: Some(200),
+            }),
+        };
+        assert!(source.validate().is_ok());
+        source.admission.as_mut().unwrap().valid_until_epoch_seconds = Some(50);
+        assert!(matches!(
+            source.validate().unwrap_err(),
+            AssessmentError::InvalidSourceAdmissionValidity { from: 100, until: 50 }
+        ));
+    }
+
+    #[test]
+    fn duplicate_evidence_id_fails_closed() {
+        let mut c = candidate(
+            "duplicate-evidence",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("same", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("same", "source-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["same".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["same".into()];
+        }
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["same".into()];
+        }
+
+        let error = AlternativesEngine.assess(&fixture_requirement(), &[c.clone()], None).unwrap_err();
+        assert_eq!(error, AssessmentError::DuplicateEvidenceId("same".into()));
+
+        c.evidence.reverse();
+        let error = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap_err();
+        assert_eq!(error, AssessmentError::DuplicateEvidenceId("same".into()));
+    }
+
+    #[test]
+    fn unadmitted_authority_diversity_cannot_promote_lifecycle_qualification() {
+        let c = candidate(
+            "unadmitted-authorities",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("u1", "authority-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("u2", "authority-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+                evidence("u3", "authority-c", EvidenceKind::LifecycleAssessed, EvidenceStance::Supports, 0.9),
+            ],
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn lifecycle_artifact_and_key_diversity_under_one_authority_cannot_promote() {
+        let mut lifecycle_a = evidence(
+            "lca-a",
+            "authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_b = evidence(
+            "lca-b",
+            "authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        lifecycle_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-a".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        lifecycle_b.source.issuer_key_fingerprint = Some("rotated-key".into());
+        lifecycle_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-b".into(),
+            authority_epoch: "epoch-2".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-b".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        lifecycle_a.source.admission.as_mut().unwrap().subject_binding_digest =
+            Some(lifecycle_a.source.canonical_subject_binding_digest().unwrap());
+        lifecycle_b.source.admission.as_mut().unwrap().subject_binding_digest =
+            Some(lifecycle_b.source.canonical_subject_binding_digest().unwrap());
+
+        let functional = evidence(
+            "functional",
+            "functional-source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut c = candidate(
+            "single-authority-lifecycle",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle_a, lifecycle_b, functional],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["lca-a".into(), "lca-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn source_diversity_is_based_on_authority_identity() {
+        let a = EvidenceSourceIdentity {
+            authority_id: "authority-a".into(),
+            artifact_id: "artifact-1".into(),
+            artifact_digest: "digest-1".into(),
+            issuer_key_fingerprint: None,
+            admission: None,
+        };
+        let b = EvidenceSourceIdentity {
+            authority_id: "authority-a".into(),
+            artifact_id: "artifact-2".into(),
+            artifact_digest: "digest-2".into(),
+            issuer_key_fingerprint: None,
+            admission: None,
+        };
+        let c = EvidenceSourceIdentity {
+            authority_id: "authority-b".into(),
+            artifact_id: "artifact-3".into(),
+            artifact_digest: "digest-3".into(),
+            issuer_key_fingerprint: None,
+            admission: None,
+        };
+
+        assert_eq!(a.authority_group_id(), b.authority_group_id());
+        assert_ne!(a.authority_group_id(), c.authority_group_id());
+        assert_eq!(a.admitted_authority_group_id(), None);
+
+        let mut admitted_a = a.clone();
+        admitted_a.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "digest".into(),
+            admission_id: "admission-a".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        admitted_a.source.admission.as_mut().unwrap().subject_binding_digest =
+            Some(admitted_a.source.canonical_subject_binding_digest().unwrap());
+        assert_eq!(
+            admitted_a.admitted_authority_group_id(),
+            Some(a.authority_group_id())
+        );
+
+        let mut rotated_key = admitted_a.clone();
+        rotated_key.issuer_key_fingerprint = Some("new-key".into());
+        assert_eq!(a.authority_group_id(), rotated_key.authority_group_id());
+    }
+
+    #[test]
+    fn expired_source_admission_cannot_support_assessment() {
+        let mut e = evidence(
+            "admission-expired",
+            "admitted-authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.source.admission = Some(SourceAdmissionRef {
+            authority_id: "admitted-authority".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-1".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: Some(0),
+            valid_until_epoch_seconds: Some(100),
+        });
+        let mut c = candidate(
+            "admission-expired",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![e],
+        );
+        c.evidence[0].observed_at_epoch_seconds = Some(0);
+
+        let expired = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c.clone()], None, Some(200))
+            .unwrap();
+        assert!(expired.frontier_blockers.contains_key("admission-expired"));
+        assert_eq!(
+            expired.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+
+        let valid = AlternativesEngine
+            .assess_at(&fixture_requirement(), &[c], None, Some(50))
+            .unwrap();
+        assert!(!valid.frontier_blockers.contains_key("admission-expired"));
+    }
+
+    #[test]
+    fn uncertainty_component_binding_is_canonical_and_covers_order() {
+        let mut uncertainty = test_uncertainty(&["b", "a"]);
+        uncertainty.validate().unwrap();
+        uncertainty.component_refs.reverse();
+        uncertainty.validate().unwrap();
+        assert_eq!(
+            uncertainty.component_refs_digest,
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap()
+        );
+        assert_eq!(
+            uncertainty.binding_digest,
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap()
+        );
+        uncertainty.binding_digest = "wrong-digest".into();
+        assert!(matches!(
+            uncertainty.validate().unwrap_err(),
+            AssessmentError::MeasurementUncertaintyBindingDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn expanded_uncertainty_must_be_positive() {
+        let mut uncertainty = test_uncertainty(&["component"]);
+        uncertainty.statement = MeasurementUncertaintyStatement::Expanded {
+            value: 0.0,
+            unit: "unit".into(),
+            coverage_factor: 2.0,
+        };
+        assert_eq!(
+            uncertainty.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementUncertainty
+        );
+    }
+
+    #[test]
+    fn observed_evidence_requires_explicit_unit() {
+        let mut observation = evidence(
+            "obs-unit",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        observation.unit = None;
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::MissingObservationUnit(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
+    fn simulated_evidence_requires_derivation_metadata() {
+        let mut evidence = evidence(
+            "simulated",
+            "model",
+            EvidenceKind::Simulated,
+            EvidenceStance::Supports,
+            0.8,
+        );
+        evidence.derivation = None;
+
+        assert!(matches!(
+            evidence.validate().unwrap_err(),
+            AssessmentError::MissingDerivationMetadata(EvidenceKind::Simulated)
+        ));
+    }
+
+    #[test]
+    fn derived_evidence_rejects_empty_derivation_inputs() {
+        let mut evidence = evidence(
+            "derived",
+            "model",
+            EvidenceKind::Derived,
+            EvidenceStance::Supports,
+            0.8,
+        );
+        evidence.derivation.as_mut().unwrap().input_refs.clear();
+
+        assert!(matches!(
+            evidence.validate().unwrap_err(),
+            AssessmentError::EmptyDerivationIdentity
+        ));
+    }
+
+    #[test]
+    fn simulation_only_burden_evidence_cannot_raise_empirical_tier() {
+        let mut c = candidate(
+            "simulation-only-burden",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence(
+                    "reported-performance",
+                    "source-reported",
+                    EvidenceKind::Reported,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
+                evidence(
+                    "simulated-burden",
+                    "source-simulated",
+                    EvidenceKind::Simulated,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+            ],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["simulated-burden".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::ComputationallyPlausible
+        );
+    }
+
+    #[test]
+    fn quantitative_evidence_without_unit_fails_closed() {
+        let mut c = candidate(
+            "unitless-reported-evidence",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "unitless",
+                "source",
+                EvidenceKind::Reported,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.evidence[0].unit = None;
+        c.evidence[0].observation = None;
+        c.evidence[0].uncertainty = None;
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::MissingEvidenceUnit("unitless".into())
+        );
+    }
+
+    #[test]
+    fn duplicate_linked_evidence_reference_fails_closed() {
+        let mut c = candidate(
+            "duplicate-evidence-reference",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Reported,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .expect("fixture has water burden")
+            .evidence_ids = vec!["e1".into(), "e1".into()];
+
+        assert_eq!(
+            AlternativesEngine
+                .assess(&fixture_requirement(), &[c], None)
+                .unwrap_err(),
+            AssessmentError::DuplicateLinkedEvidenceReference("e1".into())
+        );
+    }
+
+    #[test]
+    fn evidence_scope_mismatch_is_rejected() {
+        let mut c = candidate(
+            "scope-mismatch",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("x1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        c.burdens.get_mut(&Dimension::Water).unwrap().scope = "EU".into();
+
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap_err();
+
+        assert!(matches!(error, AssessmentError::EvidenceScopeMismatch { .. }));
+    }
+
+    #[test]
+    fn evidence_unit_mismatch_is_rejected() {
+        let mut c = candidate(
+            "unit-mismatch",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("x1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        c.burdens.get_mut(&Dimension::Water).unwrap().unit = "litre".into();
+
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap_err();
+
+        assert!(matches!(error, AssessmentError::EvidenceUnitMismatch { .. }));
+    }
+
+    #[test]
+    fn manufacturing_artifact_and_key_diversity_under_one_authority_cannot_promote() {
+        let mut manufacturing_a = evidence(
+            "manufacturing-a",
+            "authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut manufacturing_b = evidence(
+            "manufacturing-b",
+            "authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        manufacturing_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-a".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-a".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        manufacturing_b.source.issuer_key_fingerprint = Some("rotated-key".into());
+        manufacturing_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-b".into(),
+            authority_epoch: "epoch-2".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-b".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+
+        let c = candidate(
+            "single-authority-manufacturing",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![manufacturing_a, manufacturing_b],
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn lifecycle_qualification_does_not_require_basic_burden_measurements() {
+        let mut lifecycle_a = evidence(
+            "lca-a",
+            "authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_b = evidence(
+            "lca-b",
+            "authority-b",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed = evidence(
+            "functional",
+            "functional-authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        for (evidence, authority, admission_id, domain) in [
+            (&mut lifecycle_a, "authority-a", "admission-a", "domain-a"),
+            (&mut lifecycle_b, "authority-b", "admission-b", "domain-b"),
+        ] {
+            evidence.source.admission = Some(SourceAdmissionRef {
+                authority_id: authority.into(),
+                policy_id: "policy".into(),
+                policy_revision: "v1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: admission_id.into(),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: Some(
+                    evidence.source.canonical_subject_binding_digest().unwrap(),
+                ),
+                fault_domain_id: Some(domain.into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            });
+        }
+        let mut c = candidate(
+            "pure-lifecycle-burdens",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle_a, lifecycle_b, observed],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["lca-a".into(), "lca-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::LifecycleQualified
+        );
+    }
+
+    #[test]
+    fn manufacturing_qualification_does_not_require_basic_burden_measurements() {
+        let mut manufacturing_a = evidence(
+            "manufacturing-a",
+            "authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut manufacturing_b = evidence(
+            "manufacturing-b",
+            "authority-b",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed = evidence(
+            "functional",
+            "functional-authority",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        for (evidence, authority, admission_id, domain) in [
+            (&mut manufacturing_a, "authority-a", "admission-a", "domain-a"),
+            (&mut manufacturing_b, "authority-b", "admission-b", "domain-b"),
+        ] {
+            evidence.source.admission = Some(SourceAdmissionRef {
+                authority_id: authority.into(),
+                policy_id: "policy".into(),
+                policy_revision: "v1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: admission_id.into(),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: Some(
+                    evidence.source.canonical_subject_binding_digest().unwrap(),
+                ),
+                fault_domain_id: Some(domain.into()),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            });
+        }
+        let mut c = candidate(
+            "pure-manufacturing-burdens",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![manufacturing_a, manufacturing_b, observed],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["manufacturing-a".into(), "manufacturing-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::ManufacturingQualified
+        );
+    }
+
+    #[test]
+    fn lifecycle_tier_accepts_two_distinct_subject_bound_authorities() {
+        let functional = evidence(
+            "functional",
+            "functional-source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_a = evidence(
+            "lifecycle-a",
+            "authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut lifecycle_b = evidence(
+            "lifecycle-b",
+            "authority-b",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+
+        for lifecycle in [&mut lifecycle_a, &mut lifecycle_b] {
+            lifecycle.source.admission = Some(SourceAdmissionRef {
+                authority_id: lifecycle.source.authority_id.clone(),
+                policy_id: "policy".into(),
+                policy_revision: "v1".into(),
+                policy_digest: "policy-digest".into(),
+                admission_id: format!("admission-{}", lifecycle.id),
+                authority_epoch: "epoch-1".into(),
+                subject_binding_digest: None,
+                fault_domain_id: Some(format!("domain-{}", lifecycle.id)),
+                valid_from_epoch_seconds: None,
+                valid_until_epoch_seconds: None,
+            });
+            let binding = lifecycle
+                .source
+                .canonical_subject_binding_digest()
+                .unwrap();
+            lifecycle
+                .source
+                .admission
+                .as_mut()
+                .unwrap()
+                .subject_binding_digest = Some(binding);
+        }
+
+        let mut c = candidate(
+            "two-subject-bound-lifecycle-authorities",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![functional, lifecycle_a, lifecycle_b],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["lifecycle-a".into(), "lifecycle-b".into()];
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::LifecycleQualified
+        );
+    }
+
+    #[test]
+    fn lifecycle_tier_requires_two_admitted_lifecycle_authorities() {
+        let mut lifecycle_a = evidence(
+            "lca-a",
+            "lca-authority-a",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut reported_b = evidence(
+            "reported-b",
+            "reported-authority-b",
+            EvidenceKind::Reported,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        lifecycle_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "lca-authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-lca".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-lca".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        reported_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "reported-authority-b".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-reported".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-reported".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        let mut c = candidate(
+            "single-lifecycle-authority",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle_a, reported_b],
+        );
+        for (dimension, estimate) in &mut c.burdens {
+            estimate.evidence_ids = if *dimension == Dimension::Hazard {
+                vec!["lca-a".into(), "reported-b".into()]
+            } else {
+                vec!["lca-a".into()]
+            };
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn partial_lifecycle_evidence_cannot_raise_lifecycle_tier() {
+        let lifecycle = evidence(
+            "lca",
+            "lca-authority",
+            EvidenceKind::LifecycleAssessed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed_a = evidence(
+            "obs-a",
+            "authority-a",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let observed_b = evidence(
+            "obs-b",
+            "authority-b",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut c = candidate(
+            "partial-lca",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![lifecycle, observed_a, observed_b],
+        );
+        for (dimension, estimate) in &mut c.burdens {
+            estimate.evidence_ids = if *dimension == Dimension::Carbon {
+                vec!["lca".into()]
+            } else if *dimension == Dimension::Hazard {
+                vec!["obs-a".into()]
+            } else {
+                vec!["obs-b".into()]
+            };
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn manufacturing_tier_requires_two_admitted_manufacturing_authorities() {
+        let mut manufacturing_a = evidence(
+            "manufacturing-a",
+            "manufacturing-authority-a",
+            EvidenceKind::ManufacturingObserved,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut reported_b = evidence(
+            "reported-b",
+            "reported-authority-b",
+            EvidenceKind::Reported,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        manufacturing_a.source.admission = Some(SourceAdmissionRef {
+            authority_id: "manufacturing-authority-a".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-manufacturing".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-manufacturing".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        reported_b.source.admission = Some(SourceAdmissionRef {
+            authority_id: "reported-authority-b".into(),
+            policy_id: "policy".into(),
+            policy_revision: "v1".into(),
+            policy_digest: "policy-digest".into(),
+            admission_id: "admission-reported".into(),
+            authority_epoch: "epoch-1".into(),
+            subject_binding_digest: None,
+            fault_domain_id: Some("domain-reported".into()),
+            valid_from_epoch_seconds: None,
+            valid_until_epoch_seconds: None,
+        });
+        let mut c = candidate(
+            "single-manufacturing-authority",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![manufacturing_a, reported_b],
+        );
+        for (dimension, estimate) in &mut c.burdens {
+            estimate.evidence_ids = if *dimension == Dimension::Hazard {
+                vec!["manufacturing-a".into(), "reported-b".into()]
+            } else {
+                vec!["manufacturing-a".into()]
+            };
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn lifecycle_qualification_requires_explicit_lifecycle_evidence() {
+        let c = candidate(
+            "reported-only",
+            PathwayKind::MaterialSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence("x1", "source-a", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("x2", "source-b", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
+        );
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::EvidenceSupported
+        );
+    }
+
+    #[test]
+    fn requirement_must_declare_every_comparison_scale() {
+        let mut requirement = fixture_requirement();
+        requirement.comparison_scales.remove(&Dimension::Water);
+
+        let error = AlternativesEngine
+            .assess(&requirement, &[], None)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::MissingComparisonScale(Dimension::Water)
+        ));
+    }
+
+    #[test]
+    fn candidate_cannot_define_its_own_comparison_scale() {
+        let mut c = candidate(
+            "cohort-authority",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "x1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let water = c.burdens.get_mut(&Dimension::Water).unwrap();
+        water.unit = "candidate-defined-unit".into();
+        water.evidence_ids.clear();
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+
+        assert!(matches!(
+            result.frontier_blockers["cohort-authority"][0],
+            FrontierBlocker::IncompatibleScale {
+                dimension: Dimension::Water,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn input_binding_rejects_terminal_reference_standard_root() {
+        let mut candidate = candidate(
+            "input-reference-root",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "input-reference-root",
+                "authority",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let observation = candidate.evidence[0]
+            .observation
+            .as_ref()
+            .expect("fixture observation exists")
+            .clone();
+
+        let input_frontier_digest =
+            canonical_measurement_model_input_frontier_digest(&[
+                CalibrationTraceabilityInputBinding {
+                    input_quantity_id: "fixture-input".into(),
+                    input_specification: MeasurementModelInputSpecificationRef {
+                        specification_id: "fixture-input-spec".into(),
+                        specification_revision: "v1".into(),
+                        specification_digest: "fixture-input-spec-digest".into(),
+                        quantity_definition: None,
+                        unit_definition: None,
+                    },
+                    input_result_ref: None,
+                    role: MeasurementModelInputRole::Correction,
+                    node_id: "reference".into(),
+                },
+            ])
+            .unwrap();
+        let mut topology = CalibrationTraceabilityTopology {
+            result_node_id: "result".into(),
+            measurement_model_id: "fixture-measurement-model".into(),
+            measurement_model_revision: "v1".into(),
+            measurement_model_digest: "fixture-measurement-model-digest".into(),
+            input_frontier: MeasurementModelInputFrontierRef {
+                frontier_id: "fixture-input-frontier".into(),
+                frontier_revision: "v1".into(),
+                frontier_digest: "fixture-input-frontier-record-digest".into(),
+                input_set_digest: input_frontier_digest,
+                measurement_model_id: "fixture-measurement-model".into(),
+                measurement_model_revision: "v1".into(),
+                measurement_model_digest: "fixture-measurement-model-digest".into(),
+                input_count: 1,
+            },
+            input_bindings: vec![CalibrationTraceabilityInputBinding {
+                input_quantity_id: "fixture-input".into(),
+                input_specification: MeasurementModelInputSpecificationRef {
+                    specification_id: "fixture-input-spec".into(),
+                    specification_revision: "v1".into(),
+                    specification_digest: "fixture-input-spec-digest".into(),
+                    quantity_definition: None,
+                    unit_definition: None,
+                },
+                input_result_ref: None,
+                role: MeasurementModelInputRole::Correction,
+                node_id: "reference".into(),
+            }],
+            reference_node_ids: vec!["reference".into()],
+            nodes: vec![
+                CalibrationTraceabilityNodeRef {
+                    node_id: "result".into(),
+                    kind: CalibrationTraceabilityNodeKind::MeasurementResult,
+                    record_id: observation.observation_id.clone(),
+                    record_revision: "v1".into(),
+                    record_digest: observation.record_digest.clone(),
+                    used_at_epoch_seconds: 1_000,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "calibration".into(),
+                    kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
+                    record_id: observation.calibration_chain_refs[0].calibration_id.clone(),
+                    record_revision: observation.calibration_chain_refs[0].calibration_revision.clone(),
+                    record_digest: observation.calibration_chain_refs[0].calibration_record_digest.clone(),
+                    used_at_epoch_seconds: observation.calibration_chain_refs[0].used_at_epoch_seconds,
+                },
+                CalibrationTraceabilityNodeRef {
+                    node_id: "reference".into(),
+                    kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+                    record_id: "reference".into(),
+                    record_revision: "v1".into(),
+                    record_digest: "reference-digest".into(),
+                    used_at_epoch_seconds: 1_600,
+                },
+            ],
+            edges: vec![
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "calibration".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "result".into(),
+                    to_node_id: "reference".into(),
+                },
+                CalibrationTraceabilityEdge {
+                    from_node_id: "calibration".into(),
+                    to_node_id: "reference".into(),
+                },
+            ],
+        };
+
+        let error = topology
+            .validate_against_observation(
+                &observation.observation_id,
+                &observation.record_digest,
+                &observation.calibration_chain_refs,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::CalibrationTraceabilityInputBindingInvalidNodeKind {
+                input_quantity_id,
+                node_id,
+                kind: CalibrationTraceabilityNodeKind::ReferenceStandard,
+            } if input_quantity_id == "fixture-input" && node_id == "reference"
+        ));
+
+        topology.input_bindings[0].node_id = "calibration".into();
+        topology.edges.retain(|edge| {
+            !(edge.from_node_id == "result" && edge.to_node_id == "reference")
+        });
+        topology.validate_against_observation(
+            &observation.observation_id,
+            &observation.record_digest,
+            &observation.calibration_chain_refs,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn overlapping_intervals_remain_incomparable() {
+        let a = Interval::new(1.0, 3.0).unwrap();
+        let b = Interval::new(2.0, 4.0).unwrap();
+
+        assert!(!a.clearly_no_worse_than(b));
+        assert!(!b.clearly_no_worse_than(a));
+        assert!(!a.clearly_better_than(b));
+        assert!(!b.clearly_better_than(a));
+    }
+
+    #[test]
+    fn missing_dimension_blocks_frontier() {
+        let mut c = candidate(
+            "missing",
+            PathwayKind::Elimination,
+            1.0,
+            1.0,
+            vec![],
+        );
+        c.burdens.remove(&Dimension::Carbon);
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+        assert!(result.frontier_blockers["missing"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::MissingDimension(Dimension::Carbon))));
+    }
+    #[test]
+    fn experimental_discrimination_target_resolves_requirement_scale() {
+        let requirement = fixture_requirement();
+        let burden = ExperimentalDiscriminationTarget {
+            target_id: "burden-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+            decision_rule: ExperimentalDecisionRuleRef {
+                rule_id: "rule".into(),
+                rule_revision: "v1".into(),
+                rule_digest: "digest".into(),
+            },
+        };
+        let performance = ExperimentalDiscriminationTarget {
+            target_id: "performance-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::PerformanceMetric(
+                "throughput_per_hour".into(),
+            ),
+            unit: "unit".into(),
+            scope: "synthetic functional unit".into(),
+            basis: fixture_basis(),
+            decision_rule: burden.decision_rule.clone(),
+        };
+        let operating = ExperimentalDiscriminationTarget {
+            target_id: "operating-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::OperatingCondition(
+                "temperature".into(),
+            ),
+            unit: "unit".into(),
+            scope: "synthetic functional unit".into(),
+            basis: fixture_basis(),
+            decision_rule: burden.decision_rule.clone(),
+        };
+
+        let expected_basis = fixture_basis();
+        for target in [&burden, &performance, &operating] {
+            let (unit, scope, basis) = target
+                .requirement_scale(&requirement)
+                .expect("fixture declares every target scale");
+            assert_eq!(unit, "unit");
+            assert_eq!(scope, "synthetic functional unit");
+            assert_eq!(basis, &expected_basis);
+        }
+
+        let mut expanded_requirement = requirement.clone();
+        expanded_requirement.performance_scales.insert(
+            "unconstrained_metric".into(),
+            ComparisonScale {
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: expected_basis,
+            },
+        );
+        let unconstrained = ExperimentalDiscriminationTarget {
+            target_id: "unconstrained-target".into(),
+            measurand_id: "measurand".into(),
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            surface: ExperimentalDiscriminationSurface::PerformanceMetric(
+                "unconstrained_metric".into(),
+            ),
+            unit: "unit".into(),
+            scope: "synthetic functional unit".into(),
+            basis: fixture_basis(),
+            decision_rule: burden.decision_rule.clone(),
+        };
+        assert!(unconstrained
+            .requirement_scale(&expanded_requirement)
+            .is_none());
+    }
+
+    #[test]
+    fn experimental_design_requires_protocol_and_stopping_metadata() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:water-v1".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:water-discrimination-v1".into(),
+            hypothesis_statement: "A direct measurement can discriminate the unresolved water-burden intervals of the selected frontier candidates.".into(),
+            unresolved_uncertainty_refs: vec!["uncertainty:direct-substitute:Water".into()],
+            candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["direct-substitute", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "water-discrimination".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "direct-substitute".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "interval-separation-v1".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "interval-separation-v1-digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol:water-test-v1".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "protocol-digest-v1".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 3,
+                max_valid_observations: 12,
+                max_duration_seconds: Some(86_400),
+                uncertainty_target: Some(ExperimentalUncertaintyStoppingTarget {
+                    target_id: "water-discrimination".into(),
+                    max_interval_width: 0.5,
+                    unit: "burden-unit".into(),
+                }),
+            },
+            comparison_basis: basis,
+        };
+        let mut design = design;
+        design.unresolved_uncertainty_refs =
+            fixture_target_uncertainty_refs(&design, &case.candidates);
+        assert!(!design.unresolved_uncertainty_refs.is_empty());
+
+        let result = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design.clone(),
+            )
+            .unwrap();
+        assert_eq!(result.experimental_design, Some(design));
+        assert!(!result.receipt.payload_hash.is_empty());
+        let next = result.next_measurement.as_ref().unwrap();
+        assert!(!next.unresolved_uncertainty_refs.is_empty());
+        assert!(!next.candidate_ids.is_empty());
+
+        let mut detached = design.clone();
+        detached.unresolved_uncertainty_refs = vec!["uncertainty:not-linked".into()];
+        assert_eq!(
+            AlternativesEngine
+                .assess_with_experimental_design(
+                    &case.requirement,
+                    &case.candidates,
+                    Some(case.incumbent_id),
+                    None,
+                    None,
+                    detached,
+                )
+                .unwrap_err(),
+            AssessmentError::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(
+                "uncertainty:not-linked".into(),
+            )
+        );
+    }
+
+    #[test]
+    fn experimental_design_rejects_unknown_candidate() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:invalid".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:invalid".into(),
+            hypothesis_statement: "Test.".into(),
+            unresolved_uncertainty_refs: vec!["u".into()],
+            candidate_ids: vec!["does-not-exist".into(), "does-not-exist-2".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["does-not-exist", "does-not-exist-2"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "invalid-target".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "does-not-exist".into(),
+                right_candidate_id: "does-not-exist-2".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "p".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "d".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 1,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            AlternativesEngine
+                .assess_with_experimental_design(
+                    &case.requirement,
+                    &case.candidates,
+                    Some(case.incumbent_id),
+                    None,
+                    None,
+                    design,
+                )
+                .unwrap_err(),
+            AssessmentError::ExperimentalDesignCandidateMissing("does-not-exist".into())
+        );
+    }
+
+    #[test]
+    fn equivalent_experimental_design_order_produces_identical_receipt() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let target_a = ExperimentalDiscriminationTarget {
+            target_id: "a-target".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+            left_candidate_id: "product-redesign".into(),
+            right_candidate_id: "process-substitute".into(),
+            surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+            decision_rule: ExperimentalDecisionRuleRef {
+                rule_id: "rule-a".into(),
+                rule_revision: "v1".into(),
+                rule_digest: "digest-a".into(),
+            },
+        };
+        let target_b = ExperimentalDiscriminationTarget {
+            target_id: "b-target".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+            left_candidate_id: "product-redesign".into(),
+            right_candidate_id: "process-substitute".into(),
+            surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+            decision_rule: ExperimentalDecisionRuleRef {
+                rule_id: "rule-b".into(),
+                rule_revision: "v1".into(),
+                rule_digest: "digest-b".into(),
+            },
+        };
+
+        let mut first = ExperimentalDesignProvenance {
+            design_id: "design:order".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:order".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u2".into(), "u1".into()],
+            candidate_ids: vec!["process-substitute".into(), "product-redesign".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["process-substitute", "product-redesign"]),
+            expected_discrimination: vec![target_b.clone(), target_a.clone()],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis.clone(),
+        };
+        first.unresolved_uncertainty_refs =
+            fixture_target_uncertainty_refs(&first, &case.candidates);
+        assert!(!first.unresolved_uncertainty_refs.is_empty());
+
+        let mut second = first.clone();
+        second.candidate_ids.reverse();
+        second.unresolved_uncertainty_refs.reverse();
+        second.expected_discrimination.reverse();
+
+        let a = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                first.clone(),
+            )
+            .unwrap();
+        let b = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                second,
+            )
+            .unwrap();
+
+        assert_eq!(a.receipt, b.receipt);
+        assert_eq!(
+            a.experimental_design.unwrap(),
+            first.canonicalized()
+        );
+    }
+
+    #[test]
+    fn experimental_design_must_match_requirement_digest() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:digest".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:digest".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+        let mut changed = case.requirement.clone();
+        changed.description.push_str(" drift");
+        let error = design.validate_against(&changed).unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::ExperimentalDesignRequirementDigestMismatch { .. }
+        ));
+
+        let mut invalid_requirement = case.requirement.clone();
+        invalid_requirement.description.clear();
+        assert_eq!(
+            design.validate_against(&invalid_requirement).unwrap_err(),
+            AssessmentError::EmptyRequirementIdentity
+        );
+    }
+
+    #[test]
+    fn experimental_design_stopping_target_must_be_declared() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:stop-target".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:stop-target".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: Some(ExperimentalUncertaintyStoppingTarget {
+                    target_id: "missing".into(),
+                    max_interval_width: 0.5,
+                    unit: "unit".into(),
+                }),
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            design.validate_against(&case.requirement).unwrap_err(),
+            AssessmentError::ExperimentalDesignStoppingTargetUndeclared("missing".into())
+        );
+    }
+
+    #[test]
+    fn experimental_design_must_match_requirement_identity() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:req".into(),
+            requirement_id: "different-requirement".into(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:req".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            design.validate_against(&case.requirement).unwrap_err(),
+            AssessmentError::ExperimentalDesignRequirementMismatch {
+                expected_requirement_id: case.requirement.id,
+                actual_requirement_id: "different-requirement".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn experimental_design_rejects_surface_basis_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let mut wrong_basis = basis.clone();
+        wrong_basis.basis_revision = "v2".into();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:drift".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:drift".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["direct-substitute".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["direct-substitute", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "direct-substitute".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: wrong_basis,
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+        assert_eq!(
+            design.validate_against(&case.requirement).unwrap_err(),
+            AssessmentError::ExperimentalDesignBasisMismatch {
+                expected: design.comparison_basis.clone(),
+                actual: design.protocol.basis.clone(),
+            }
+        );
+    }
+
+    #[test]
+    fn orphaned_experimental_design_observation_fails_closed() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidate = case.candidates[0].clone();
+        let observed = candidate
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_design_id = Some("design:orphan".into());
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_target_id = Some("target:orphan".into());
+        assert_eq!(
+            AlternativesEngine
+                .assess(&case.requirement, &[candidate], None)
+                .unwrap_err(),
+            AssessmentError::OrphanedExperimentalDesignObservation("design:orphan".into())
+        );
+    }
+
+    #[test]
+    fn mismatched_experimental_design_observation_fails_closed() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_design_id = Some("design:other".into());
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_target_id = Some("t1".into());
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:expected".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:water".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+            measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignObservationMismatch {
+                evidence_id,
+                expected_design_id: "design:expected".into(),
+                actual_design_id: "design:other".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn candidate_semantic_digest_is_stable_across_evidence_provenance_changes() {
+        let c = candidate(
+            "candidate-semantic",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source-a",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = c.canonical_digest().unwrap();
+
+        let mut changed = c.clone();
+        changed.evidence[0].source.artifact_digest = "changed-artifact-digest".into();
+        changed.evidence[0].confidence = 0.8;
+        changed.evidence.push(evidence(
+            "e2",
+            "source-b",
+            EvidenceKind::Reported,
+            EvidenceStance::Contradicts,
+            0.4,
+        ));
+        changed.performance
+            .get_mut("service_life_years")
+            .unwrap()
+            .evidence_ids = vec!["different-evidence-link".into()];
+        changed.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["different-burden-evidence-link".into()];
+        assert_eq!(baseline, changed.canonical_digest().unwrap());
+
+        changed.performance
+            .get_mut("service_life_years")
+            .unwrap()
+            .interval = Interval::new(1.0, 1.5).unwrap();
+        assert_ne!(baseline, changed.canonical_digest().unwrap());
+    }
+
+    #[test]
+    fn experimental_design_rejects_candidate_semantic_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:candidate-drift".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:candidate-drift".into(),
+            hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
+            unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(
+                &case.candidates,
+                &["product-redesign", "process-substitute"],
+            ),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let mut candidates = case.candidates.clone();
+        candidates
+            .iter_mut()
+            .find(|candidate| candidate.id == "product-redesign")
+            .expect("fixture candidate exists")
+            .performance
+            .get_mut("service_life_years")
+            .expect("fixture performance exists")
+            .interval = Interval::new(4.0, 6.0).unwrap();
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::ExperimentalDesignCandidateDigestMismatch {
+                candidate_id,
+                ..
+            } if candidate_id == "product-redesign"
+        ));
+    }
+
+    #[test]
+    fn positive_experimental_design_observation_lineage_is_accepted() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let observed_measurand = observed.observation.as_ref().unwrap().measurand_id.clone();
+        let self_referential_uncertainty_id =
+            observed.uncertainty.as_ref().unwrap().uncertainty_id.clone();
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:positive".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:water".into(),
+            hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
+            unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: observed_measurand.clone(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: observed.observation.as_ref().unwrap().procedure_id.clone(),
+                procedure_digest: observed.observation.as_ref().unwrap().procedure_digest.clone(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        observed.observation.as_mut().unwrap().experimental_design_id =
+            Some(design.design_id.clone());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+
+        let mut design = design;
+        design.unresolved_uncertainty_refs =
+            fixture_target_uncertainty_refs(&design, &candidates);
+        assert!(!design.unresolved_uncertainty_refs.is_empty());
+
+        AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design.clone(),
+            )
+            .unwrap();
+
+        let mut self_referential = design;
+        self_referential.unresolved_uncertainty_refs =
+            vec![self_referential_uncertainty_id.clone()];
+        assert_eq!(
+            AlternativesEngine
+                .assess_with_experimental_design(
+                    &case.requirement,
+                    &candidates,
+                    Some(case.incumbent_id),
+                    None,
+                    None,
+                    self_referential,
+                )
+                .unwrap_err(),
+            AssessmentError::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(
+                self_referential_uncertainty_id,
+            )
+        );
+    }
+
+    #[test]
+    fn experimental_design_requires_observation_link_to_target_surface() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed.observation.as_mut().unwrap().experimental_design_id =
+            Some("design:surface-link".into());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+
+        candidates[candidate_index]
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids
+            .clear();
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:surface-link".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:surface-link".into(),
+            hypothesis_statement: "The declared water measurement resolves the selected alternatives.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(
+                &candidates,
+                &["product-redesign", "process-substitute"],
+            ),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignObservationNotLinkedToTargetSurface {
+                evidence_id,
+                candidate_id: "product-redesign".into(),
+                target_id: "t1".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn experimental_design_rejects_observation_scale_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates.iter().position(|candidate| candidate.id == "product-redesign").unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed.observation.as_mut().unwrap().experimental_design_id = Some("design:scale".into());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+        observed.unit = Some("wrong-unit".into());
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:scale".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:scale".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignObservationUnitMismatch {
+                evidence_id,
+                expected_unit: "burden-unit".into(),
+                actual_unit: "wrong-unit".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn experimental_design_rejects_procedure_drift() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let evidence_id = candidates[candidate_index]
+            .evidence
+            .iter()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap()
+            .id
+            .clone();
+        {
+            let observed = candidates[candidate_index]
+                .evidence
+                .iter_mut()
+                .find(|evidence| evidence.kind == EvidenceKind::Observed)
+                .unwrap();
+            observed.observation.as_mut().unwrap().experimental_design_id =
+                Some("design:procedure".into());
+            observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+            observed.observation.as_mut().unwrap().procedure_id = "procedure:wrong".into();
+        }
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:procedure".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:procedure".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(&case.candidates, &["product-redesign", "process-substitute"]),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design.clone(),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignProcedureMismatch {
+                evidence_id: evidence_id.clone(),
+                expected_procedure_id: "fixture-measurement-procedure-v1".into(),
+                actual_procedure_id: "procedure:wrong".into(),
+            }
+        );
+        {
+            let observed = candidates[candidate_index]
+                .evidence
+                .iter_mut()
+                .find(|evidence| evidence.kind == EvidenceKind::Observed)
+                .unwrap();
+            observed.observation.as_mut().unwrap().procedure_id =
+                "fixture-measurement-procedure-v1".into();
+            observed.observation.as_mut().unwrap().procedure_digest =
+                "procedure-digest:wrong".into();
+        }
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignProcedureDigestMismatch {
+                evidence_id,
+                expected_procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                actual_procedure_digest: "procedure-digest:wrong".into(),
+            }
+        );
+
+    }
+
+    #[test]
+    fn observation_provenance_requires_procedure_digest() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "obs".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+            calibration_id: "calibration".into(),
+            calibration_revision: "v1".into(),
+            calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
+            }],
+            calibration_topology: None,
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+
+        observation.validate().unwrap();
+        observation.procedure_digest.clear();
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+    }
+
+    #[test]
+    fn experimental_protocol_requires_procedure_digest() {
+        let mut protocol = ExperimentalProtocolRef {
+            protocol_id: "protocol".into(),
+            protocol_revision: "v1".into(),
+            protocol_digest: "protocol-digest".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            basis: fixture_basis(),
+        };
+
+        protocol.validate().unwrap();
+        protocol.procedure_digest.clear();
+        assert_eq!(
+            protocol.validate().unwrap_err(),
+            AssessmentError::InvalidExperimentalDesign
+        );
+    }
+
+    #[test]
+    fn calibration_traceability_order_is_receipt_significant() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+
+        let mut ordered = case.clone();
+        let ordered_evidence = ordered
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        let (ordered_chain_digest, ordered_chain_count) = {
+            let observation = ordered_evidence.observation.as_mut().unwrap();
+            observation.calibration_chain_refs.push(CalibrationTraceabilityRef {
+                calibration_id: "additional-reference".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "additional-record-digest".into(),
+                used_at_epoch_seconds: 1_700_000_001,
+            });
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let ordered_uncertainty = ordered_evidence.uncertainty.as_mut().unwrap();
+        ordered_uncertainty.evaluation.calibration_chain_digest = ordered_chain_digest;
+        ordered_uncertainty.evaluation.calibration_chain_count = ordered_chain_count;
+        ordered_uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(ordered_uncertainty).unwrap();
+
+        let mut reversed = ordered.clone();
+        let reversed_evidence = reversed
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        let (reversed_chain_digest, reversed_chain_count) = {
+            let observation = reversed_evidence.observation.as_mut().unwrap();
+            observation.calibration_chain_refs.reverse();
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let reversed_uncertainty = reversed_evidence.uncertainty.as_mut().unwrap();
+        reversed_uncertainty.evaluation.calibration_chain_digest = reversed_chain_digest;
+        reversed_uncertainty.evaluation.calibration_chain_count = reversed_chain_count;
+        reversed_uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(reversed_uncertainty).unwrap();
+
+        let ordered_result = AlternativesEngine
+            .assess(&ordered.requirement, &ordered.candidates, Some(ordered.incumbent_id))
+            .unwrap();
+        let reversed_result = AlternativesEngine
+            .assess(
+                &reversed.requirement,
+                &reversed.candidates,
+                Some(reversed.incumbent_id),
+            )
+            .unwrap();
+        assert_ne!(
+            ordered_result.receipt.payload_hash,
+            reversed_result.receipt.payload_hash
+        );
+    }
+
+    #[test]
+    fn calibration_traceability_mutation_rejects_stale_uncertainty_evaluation() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut mutated = case.clone();
+        let evidence = mutated
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        evidence
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_chain_refs[0]
+            .calibration_record_digest = "tampered-calibration-record".into();
+
+        let error = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn calibration_traceability_identity_mutation_rejects_stale_uncertainty_evaluation() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+
+        for mutation in 0..2 {
+            let mut mutated = case.clone();
+            let evidence = mutated
+                .candidates
+                .iter_mut()
+                .flat_map(|candidate| candidate.evidence.iter_mut())
+                .find(|evidence| evidence.observation.is_some())
+                .unwrap();
+            let calibration = &mut evidence
+                .observation
+                .as_mut()
+                .unwrap()
+                .calibration_chain_refs[0];
+
+            match mutation {
+                0 => calibration.calibration_id = "tampered-calibration-id".into(),
+                1 => calibration.calibration_revision = "tampered-calibration-revision".into(),
+                _ => unreachable!("bounded calibration identity mutation"),
+            }
+
+            let error = AlternativesEngine
+                .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+                .unwrap_err();
+
+            assert!(matches!(
+                error,
+                AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn calibration_traceability_count_mutation_rejects_stale_uncertainty_evaluation() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut mutated = case.clone();
+        let evidence = mutated
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        let uncertainty = evidence.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.calibration_chain_count += 1;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+
+        let error = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationChainMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn observation_provenance_rejects_incomplete_calibration_link() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "obs".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "calibration".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
+            }],
+            calibration_topology: None,
+            experimental_design_id: None,
+            experimental_target_id: None,
+        };
+        observation.validate().unwrap();
+        observation.calibration_chain_refs[0].calibration_record_digest.clear();
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+
+        observation.calibration_chain_refs[0].calibration_record_digest = "calibration-digest".into();
+        observation.calibration_chain_refs[0].used_at_epoch_seconds = 1_700_000_001;
+        observation.validate().unwrap();
+    }
+
+    #[test]
+    fn calibration_traceability_mutation_changes_assessment_receipt() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let original = AlternativesEngine
+            .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
+            .unwrap();
+        let mut mutated = case.clone();
+        let mutated_candidate_id = mutated
+            .candidates
+            .iter()
+            .find(|candidate| candidate.evidence.iter().any(|e| e.observation.is_some()))
+            .unwrap()
+            .id
+            .clone();
+        let observed = mutated
+            .candidates
+            .iter_mut()
+            .find(|candidate| candidate.id == mutated_candidate_id)
+            .and_then(|candidate| {
+                candidate
+                    .evidence
+                    .iter_mut()
+                    .find(|evidence| evidence.observation.is_some())
+            })
+            .unwrap();
+        let (calibration_chain_digest, calibration_chain_count) = {
+            let observation = observed.observation.as_mut().unwrap();
+            observation.calibration_chain_refs[0].calibration_record_digest =
+                "tampered-calibration-record".into();
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let uncertainty = observed.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.calibration_chain_digest = calibration_chain_digest;
+        uncertainty.evaluation.calibration_chain_count = calibration_chain_count;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        let changed = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap();
+        let original_digest = original
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == mutated_candidate_id)
+            .unwrap()
+            .evidence_digest
+            .clone();
+        let changed_digest = changed
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == mutated_candidate_id)
+            .unwrap()
+            .evidence_digest
+            .clone();
+        assert_ne!(original.receipt.payload_hash, changed.receipt.payload_hash);
+        assert_ne!(original_digest, changed_digest);
+    }
+
+    #[test]
+    fn calibration_traceability_timestamp_mutation_changes_assessment_receipt() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let original = AlternativesEngine
+            .assess(&case.requirement, &case.candidates, Some(case.incumbent_id))
+            .unwrap();
+
+        let mut mutated = case.clone();
+        let evidence = mutated
+            .candidates
+            .iter_mut()
+            .flat_map(|candidate| candidate.evidence.iter_mut())
+            .find(|evidence| evidence.observation.is_some())
+            .unwrap();
+        let (calibration_chain_digest, calibration_chain_count) = {
+            let observation = evidence.observation.as_mut().unwrap();
+            observation.calibration_chain_refs[0].used_at_epoch_seconds += 1;
+            (
+                canonical_calibration_chain_hash(&observation.calibration_chain_refs).unwrap(),
+                observation.calibration_chain_refs.len(),
+            )
+        };
+        let uncertainty = evidence.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.calibration_chain_digest = calibration_chain_digest;
+        uncertainty.evaluation.calibration_chain_count = calibration_chain_count;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+
+        let changed = AlternativesEngine
+            .assess(&mutated.requirement, &mutated.candidates, Some(mutated.incumbent_id))
+            .unwrap();
+
+        assert_ne!(original.receipt.payload_hash, changed.receipt.payload_hash);
+    }
+
+    #[test]
+    fn observation_can_bind_to_experimental_design_identity() {
+        let mut observation = ObservationProvenanceRef {
+            observation_id: "obs".into(),
+            subject_id: "subject".into(),
+            activity_id: "activity".into(),
+            measurand_id: "measurand".into(),
+            procedure_id: "procedure".into(),
+            procedure_digest: "procedure-digest".into(),
+            record_digest: "record".into(),
+            measurement_system_id: Some("system".into()),
+            calibration_chain_refs: vec![CalibrationTraceabilityRef {
+                calibration_id: "calibration".into(),
+                calibration_revision: "v1".into(),
+                calibration_record_digest: "calibration-digest".into(),
+                used_at_epoch_seconds: 1_700_000_000,
+            }],
+            calibration_topology: None,
+            experimental_design_id: Some("design:water-v1".into()),
+            experimental_target_id: Some("target:water-v1".into()),
+        };
+        observation.validate().unwrap();
+        observation.experimental_design_id = Some(String::new());
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::InvalidObservationProvenance
+        );
+    }
+
+}

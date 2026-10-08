@@ -168,15 +168,19 @@ def has_draft_guard(expression: str | None) -> bool:
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
+    required_events = ("ready_for_review", "converted_to_draft")
+    missing = [event for event in required_events if not any(event in line for line in pr_block)]
+    if missing:
         raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
+            f"{path}: runner-capable pull_request workflow must include "
+            f"draft-transition activity types: {missing!r}"
         )
 
 
 def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
     jobs = parse_jobs(text)
     runner_jobs = 0
+    pull_request_runnable_jobs = 0
     draft_guarded = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
@@ -185,6 +189,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+        pull_request_runnable_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
@@ -192,7 +197,10 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # ready_for_review is only necessary when the workflow can actually allocate
+    # a runner for a pull_request event. A workflow may legitimately mention
+    # pull_request while all runner roots are explicitly limited to non-PR events.
+    if pull_request_runnable_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
@@ -263,7 +271,7 @@ def validate_ci_delegation() -> tuple[int, int]:
 def self_test() -> None:
     safe = """on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 jobs:
   test:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
