@@ -20,7 +20,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
-          EXPECTED_SUBJECT: "f98430450fcc6a569f526c8cca5a0ed1a88c2963"
+          EXPECTED_SUBJECT: "620bb6d8a71e2b17e7822d223a13e5ca1d636310"
           EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
@@ -28,8 +28,8 @@ jobs:
           EXPECTED_REPOSITORY_ID: "1136141775"
           EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
           EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
-          EXPECTED_WORKFLOW_BLOB_SHA: "455662ba16f50197abc9cbbe35454ebdf3f8788f"
-          EXPECTED_MERGE_COMMIT: "74af8bafab988152432d2149507612c09561e2a9"
+          EXPECTED_WORKFLOW_BLOB_SHA: "31f63a7a7d8e6791d2a16b343ed0901e9d2903b7"
+          EXPECTED_MERGE_COMMIT: "6f1fc285d8fe77b6e2ac1dedac02d5edc2a46505"
         with:
           script: |
             const fs = require('fs');
@@ -59,7 +59,7 @@ jobs:
 
             const expectedSourceBlobShas = {
               '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
-                'd9eb78ecf14a92154ea09faa9ea12742083a2c7f',
+                '00f04aa43a1a3e119cea8ec6889f9669a4821b59',
               'crates/core/symthaea-core/src/hdc/mod.rs':
                 '17b297a167b57f22070a50115f4967b820f911c1',
               'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs':
