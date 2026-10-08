@@ -184,7 +184,7 @@ impl MutualCreditNetwork {
         seller: &str,
         amount: CreditUnit,
     ) -> Result<MutualTrade, MutualCreditError> {
-        let event_id = self.reserve_event_id(event_id)?;
+        let event_id = self.validate_event_id(event_id)?;
         validate_amount(amount)?;
 
         if buyer == seller {
@@ -218,6 +218,7 @@ impl MutualCreditNetwork {
             seller_limit,
         )?;
 
+        self.seen_event_ids.insert(event_id.clone());
         self.balances.insert(buyer.to_owned(), buyer_new_balance);
         self.balances
             .insert(seller.to_owned(), seller_new_balance);
@@ -241,7 +242,7 @@ impl MutualCreditNetwork {
         member: &str,
         amount: CreditUnit,
     ) -> Result<(), MutualCreditError> {
-        let event_id = self.reserve_event_id(event_id)?;
+        let event_id = self.validate_event_id(event_id)?;
         validate_amount(amount)?;
         self.require_active_member(member)?;
 
@@ -275,9 +276,9 @@ impl MutualCreditNetwork {
             .checked_add(amount)
             .ok_or(MutualCreditError::ArithmeticOverflow)?;
 
+        self.seen_event_ids.insert(event_id);
         self.balances.insert(member.to_owned(), requested_balance);
         self.external_settled_total = next_external_total;
-        let _ = event_id;
         Ok(())
     }
 
@@ -287,15 +288,15 @@ impl MutualCreditNetwork {
         Ok(self.balance(member)? == 0)
     }
 
-    fn reserve_event_id(
-        &mut self,
+    fn validate_event_id(
+        &self,
         event_id: impl Into<String>,
     ) -> Result<String, MutualCreditError> {
         let event_id = event_id.into();
         if event_id.is_empty() {
             return Err(MutualCreditError::InvalidEventId(event_id));
         }
-        if !self.seen_event_ids.insert(event_id.clone()) {
+        if self.seen_event_ids.contains(&event_id) {
             return Err(MutualCreditError::DuplicateEventId(event_id));
         }
         Ok(event_id)
@@ -527,5 +528,6 @@ mod tests {
             network.trade("mc-1", "alice", "bob", 0),
             Err(MutualCreditError::NonPositiveAmount)
         );
+        network.trade("mc-1", "alice", "bob", 1).unwrap();
     }
 }
