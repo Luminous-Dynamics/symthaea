@@ -175,3 +175,22 @@ This prevents one stack result from silently mixing different skew baselines, va
 GitHub's stacked-PR webhooks can carry stack metadata including stack number, size, position, and the stack base ref/SHA. The model preserves this as `ProviderWebhookStackMetadataV1` and can validate it against the exact operation identity.
 
 This is deliberately an observation boundary, not provider-side CAS. Matching webhook stack metadata says the authenticated payload describes the expected topology at that delivery; it does not prove that GitHub atomically reserved or merged that topology.
+
+## Directional clock relation
+
+The cross-domain relation uses the explicit convention:
+
+    offset = local_clock - provider_clock
+
+`ClockRelationV1` now carries lower and upper offset bounds independently. Symmetric absolute skew is not assumed.
+
+At evaluation time, drift expands the interval conservatively:
+
+    effective_lower = lower_bound - drift
+    effective_upper = upper_bound + drift
+
+The provider event occurrence interval is translated into a local-time interval using these directional bounds before it is compared with local dispatch and observation.
+
+The relation also binds provider/local clock identities, verification method, verification evidence digest, measurement time, and expiry. A relation is unusable when the lower bound exceeds the upper bound, required verification evidence is absent, or the evaluation time is outside the validity window.
+
+Negative offsets are valid and do not mean an invalid relation; only inverted bounds are invalid.
