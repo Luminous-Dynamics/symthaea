@@ -131,6 +131,8 @@ struct EquivocationEvidenceStore {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum VerifyFailure {
     DuplicateKeyId,
+    InvalidKeyValidity,
+    NonMonotonicKeyEpoch,
     UnknownKey,
     WrongKeyRole,
     PrincipalMismatch,
@@ -167,6 +169,16 @@ impl KeyRegistry {
     fn register(&mut self, key: KeyRecord) -> Result<(), VerifyFailure> {
         if self.keys.contains_key(&key.key_id) {
             return Err(VerifyFailure::DuplicateKeyId);
+        }
+        if key.valid_from_epoch > key.valid_until_epoch {
+            return Err(VerifyFailure::InvalidKeyValidity);
+        }
+        if self.keys.values().any(|existing| {
+            existing.role == key.role
+                && existing.principal_id == key.principal_id
+                && existing.key_epoch >= key.key_epoch
+        }) {
+            return Err(VerifyFailure::NonMonotonicKeyEpoch);
         }
         let next_seq = self.events.len() as u64 + 1;
         self.events.push(KeyLifecycleEvent {
@@ -299,7 +311,8 @@ impl StatementAuthenticator for FixtureAuthenticator {
         message: &[u8],
         signature: &[u8],
     ) -> bool {
-        signature == Self::forgeable_fixture_tag(key_id, algorithm, message)
+        let expected = Self::forgeable_fixture_tag(key_id, algorithm, message);
+        signature == expected.as_slice()
     }
 }
 
@@ -740,6 +753,31 @@ fn main() {
     );
 
     // Key IDs are never reused; rotation requires a fresh ID and epoch.
+    assert_eq!(
+        registry.register(sample_key(
+            "log-key-invalid-window",
+            "civ-log-invalid",
+            "lineage-invalid",
+            KeyRole::LogSigner,
+            1,
+            200,
+            100,
+        )),
+        Err(VerifyFailure::InvalidKeyValidity)
+    );
+    assert_eq!(
+        registry.register(sample_key(
+            "log-key-epoch-replay",
+            "civ-log-v1",
+            "lineage-log-operator",
+            KeyRole::LogSigner,
+            1,
+            121,
+            300,
+        )),
+        Err(VerifyFailure::NonMonotonicKeyEpoch)
+    );
+
     registry
         .register(sample_key(
             "log-key-v2",
