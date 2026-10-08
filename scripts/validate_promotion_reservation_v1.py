@@ -1831,6 +1831,9 @@ def test_provider_topology_cas_verification_factory_is_deterministic():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     )
     assert verified == evidence.provider_result.verification
 
@@ -1865,6 +1868,9 @@ def test_provider_topology_cas_attestation_digest_binds_execution():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1973,6 +1979,9 @@ def test_provider_topology_cas_attestation_rejects_wrong_source():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2000,6 +2009,9 @@ def test_provider_topology_cas_verification_rejects_wrong_source():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     )
 
 
@@ -2031,6 +2043,9 @@ def test_provider_topology_cas_signature_tampering_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2062,6 +2077,9 @@ def test_provider_topology_cas_payload_size_limit_fails_closed():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2091,6 +2109,9 @@ def test_provider_topology_cas_signature_length_mismatch_fails_closed():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2114,6 +2135,9 @@ def test_provider_topology_cas_trust_root_key_id_mismatch_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2158,6 +2182,9 @@ def test_provider_topology_cas_trust_root_generation_mismatch_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2181,6 +2208,9 @@ def test_provider_topology_cas_trust_root_repository_scope_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2211,6 +2241,9 @@ def test_provider_topology_cas_signed_duplicate_json_keys_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
