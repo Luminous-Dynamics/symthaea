@@ -2057,8 +2057,10 @@ mod tests {
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
                     manager_owner: ":1.123".to_string(),
+                    bus_id: Some("0123456789abcdef0123456789abcdef".to_string()),
                 }
             }),
+            systemd_bus_id: Some("0123456789abcdef0123456789abcdef".to_string()),
             systemd_manager_owner: Some(":1.123".to_string()),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
             state_change_at_monotonic_us: 900,
@@ -2084,6 +2086,7 @@ mod tests {
                 definition_content_digest: obs.definition_content_digest.clone(),
                 state_digest: obs.state_digest().unwrap(),
                 manager_owner: obs.systemd_manager_owner.clone().unwrap(),
+                bus_id: obs.systemd_bus_id.clone(),
                 invocation_id: obs.invocation_id.clone(),
                 state_change_at_monotonic_us: obs.state_change_at_monotonic_us,
                 captured_at_monotonic_us: *captured_at_monotonic_us,
