@@ -214,26 +214,32 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
 
     let collection = Rfc9942ReceiptCollection::new(vec![first_receipt, second_receipt]).unwrap();
     let decision = evaluate_priority_first_valid(&collection, |index, _| {
-        if index == 1 {
+        if index == 0 {
             Ok(())
         } else {
-            Err(symthaea_swarm::Rfc9942VdpError::InvalidEs256Signature)
+            Err(symthaea_swarm::Rfc9942VdpError::NoMatchingProof)
         }
     });
+
+    assert_eq!(decision.selected_index, Some(0));
+    assert!(matches!(
+        decision.candidates[1].status,
+        symthaea_swarm::rfc9942_selection::ReceiptSelectionCandidateStatus::NotEvaluatedAfterSelection
+    ));
 
     let context = ReceiptSelectionContext::from_verified_decision(
         &decision,
         &collection,
-        &second_verified,
+        &first_verified,
     )
     .unwrap();
 
     assert_eq!(
         context.verified_capability_sha256,
-        second_verified.capability_sha256()
+        first_verified.capability_sha256()
     );
     assert_eq!(
-        decision.verified_capability_sha256(&second_verified).unwrap(),
+        decision.verified_capability_sha256(&first_verified).unwrap(),
         context.verified_capability_sha256
     );
 
@@ -241,7 +247,7 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
         ReceiptSelectionContext::from_verified_decision(
             &decision,
             &collection,
-            &first_verified,
+            &second_verified,
         ),
         Err(HolochainProjectionError::InvalidReceiptSelection)
     );
