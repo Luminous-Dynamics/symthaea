@@ -1274,11 +1274,11 @@ def clock_relation_fixture(
 
 def effect_timing_fixture(
     *,
-    event_time_ms: int | None = 1728402960000,
+    event_time_ms: int | None = 1791475200000,
     delivery_time_ms: int | None = None,
-    reservation_time_ms: int | None = 1728402900000,
-    dispatch_time_ms: int | None = 1728402950000,
-    observation_time_ms: int | None = 1728403200000,
+    reservation_time_ms: int | None = 1791475190000,
+    dispatch_time_ms: int | None = 1791475195000,
+    observation_time_ms: int | None = 1791475205000,
     clock_relation: ClockRelationV1 | None = None,
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
@@ -1299,7 +1299,7 @@ def webhook_effect_timing_from_observation(
     identity = identity or stack_identity_fixture()
     observation = stack_webhook_observation(
         identity,
-        received_at_ms=1728403200000,
+        received_at_ms=1791475205000,
     )
     return ProviderWebhookEffectTimingV1.from_observation(
         observation,
@@ -1379,9 +1379,9 @@ def test_temporal_effect_with_uncertain_clock_overlap_is_not_admissible():
 
 def test_temporal_effect_accepts_exact_skew_boundaries():
     timing = effect_timing_fixture(
-        event_time_ms=1728402959000,
-        dispatch_time_ms=1728402958000,
-        observation_time_ms=1728402960000,
+        event_time_ms=1791475200000,
+        dispatch_time_ms=1791475199000,
+        observation_time_ms=1791475201000,
         clock_relation=clock_relation_fixture(max_skew_ms=1000),
     )
     assert timing.classify() == "temporally-admissible"
@@ -1400,16 +1400,16 @@ def test_temporal_timing_can_be_derived_from_authenticated_observation():
     assert timing.provider_event_time_ms == parse_provider_timestamp_ms(
         "2026-10-08T16:00:00Z"
     )
-    assert timing.local_observation_time_ms == 1728403200000
+    assert timing.local_observation_time_ms == 1791475205000
     assert timing.temporally_admissible()
 
 
 def test_historical_merge_delivered_after_new_reservation_is_inadmissible():
     timing = effect_timing_fixture(
-        event_time_ms=1728402000000,
-        reservation_time_ms=1728403000000,
-        dispatch_time_ms=1728403050000,
-        observation_time_ms=1728403200000,
+        event_time_ms=1791475000000,
+        reservation_time_ms=1791475300000,
+        dispatch_time_ms=1791475350000,
+        observation_time_ms=1791475500000,
         clock_relation=clock_relation_fixture(max_skew_ms=1000),
     )
     assert timing.classify() == "provider-event-before-dispatch"
@@ -1433,7 +1433,7 @@ def test_complete_stack_timing_requires_every_member_admissible():
     good = PromotionStackEffectTimingV1(7085, effect_timing_fixture())
     bad = PromotionStackEffectTimingV1(
         7087,
-        effect_timing_fixture(event_time_ms=1728402000000),
+        effect_timing_fixture(event_time_ms=1791475000000),
     )
     timings = PromotionStackEffectTimingSetV1(
         identity.digest(),
