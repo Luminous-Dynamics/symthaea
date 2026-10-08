@@ -497,34 +497,6 @@ impl Rfc9942SignatureWithReceipts {
         Ok((verified, witness))
     }
 
-    /// Compatibility wrapper returning the raw selection decision.
-    ///
-    /// Prefer verify_es256_inclusion_priority_first_valid_receipt_selection_state
-    /// for callers crossing a durable evidence boundary.
-    #[deprecated(
-        note = "use verify_es256_inclusion_priority_first_valid_receipt_selection_state for a bound provenance witness"
-    )]
-    pub fn verify_es256_inclusion_priority_first_valid_receipt_state(
-        &self,
-        receipt_public_key: &[u8],
-        outer_public_key: &[u8],
-        receipt_external_aad: &[u8],
-        outer_external_aad: &[u8],
-        detached_outer_payload: Option<&[u8]>,
-    ) -> Result<
-        (Rfc9942VerifiedSignatureWithReceipt, ReceiptSelectionDecision),
-        Rfc9942VdpError,
-    > {
-        let (verified, witness) =
-            self.verify_es256_inclusion_priority_first_valid_receipt_selection_state(
-                receipt_public_key,
-                outer_public_key,
-                receipt_external_aad,
-                outer_external_aad,
-                detached_outer_payload,
-            )?;
-        Ok((verified, witness.decision().clone()))
-    }
 }
 
 pub fn evaluate_priority_first_valid<F>(
