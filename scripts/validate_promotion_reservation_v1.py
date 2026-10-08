@@ -2257,6 +2257,7 @@ def test_clock_relation_requires_verification_method_and_evidence():
 
 
 
+def test_clock_relation_requires_explicit_validity_window():
     relation = clock_relation_fixture(
         measured_at_local_time_ms=None,
         valid_until_local_time_ms=None,
@@ -2277,7 +2278,7 @@ def test_clock_relation_expiry_blocks_late_observation():
         measured_at_local_time_ms=1791475190000,
         valid_until_local_time_ms=1791475200000,
     )
-    assert relation.effective_offset_bounds_ms(1791475200000) == 1000
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-1000, 1000)
     assert relation.effective_offset_bounds_ms(1791475200001) is None
 
 
