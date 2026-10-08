@@ -87,8 +87,11 @@ jobs:
             echo "--- vulkaninfo --summary ---"
             vulkaninfo --summary
           } > qualification-environment.txt
+          dpkg-query -W -f='${Package}\t${Version}\n' \
+            libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers \
+            > vulkan-package-versions.txt
           find src -type f -print0 | sort -z | xargs -0 sha256sum > source-sha256.txt
-          sha256sum Cargo.toml Cargo.lock metadata.json > qualification-input-sha256.txt
+          sha256sum Cargo.toml Cargo.lock metadata.json vulkan-package-versions.txt > qualification-input-sha256.txt
           sha256sum ${GITHUB_WORKSPACE}/.github/workflows/gpu-fabric-vulkan-barriers.yml ${GITHUB_WORKSPACE}/.github/scripts/check-workflow-draft-safety.py >> qualification-input-sha256.txt
 
       - name: Compile barrier workload harness
@@ -126,5 +129,6 @@ jobs:
             .ci/gpu-fabric-workspace/source-sha256.txt
             .ci/gpu-fabric-workspace/qualification-input-sha256.txt
             .ci/gpu-fabric-workspace/qualification-environment.txt
+            .ci/gpu-fabric-workspace/vulkan-package-versions.txt
             .ci/gpu-fabric-workspace/qualification-runtime.txt
             .ci/gpu-fabric-workspace/qualification-runtime.sha256
