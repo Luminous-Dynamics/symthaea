@@ -2137,7 +2137,15 @@ def test_webhook_evidence_cannot_be_async_operation_causality_even_with_matching
         identity,
         provider_result=result,
         effect_set=None,
-        provider_evidence=webhook_evidence,
+        provider_evidence=ProviderAsyncMergeEvidencePairV1(
+            request=None,
+            response=ProviderAsyncMergeResponseEvidenceV1(
+                capture=webhook_evidence,
+                status="merged",
+                provider_uuid="uuid-1",
+                observed_merge_commit="M2",
+            ),
+        ),
     )
     assert resolution.outcome == "causality-unestablished"
 
