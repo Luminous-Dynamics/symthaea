@@ -227,18 +227,64 @@ class ProviderTopologyCasPredicateV1:
 
 
 @dataclass(frozen=True)
+class ProviderTopologyCasRequestV1:
+    """Canonical provider request that carries the conditional topology predicate."""
+    requested_pr_number: int
+    expected_head_sha: str
+    merge_method: str
+    merge_action: str
+    bypass_rules: bool
+    predicate_digest: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "bypass_rules": self.bypass_rules,
+            "expected_head_sha": self.expected_head_sha,
+            "merge_action": self.merge_action,
+            "merge_method": self.merge_method,
+            "predicate_digest": self.predicate_digest,
+            "requested_pr_number": self.requested_pr_number,
+            "request": "provider-topology-cas-v1",
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    @classmethod
+    def from_identity_predicate(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        predicate: ProviderTopologyCasPredicateV1,
+    ) -> "ProviderTopologyCasRequestV1":
+        return cls(
+            requested_pr_number=identity.requested_pr_number,
+            expected_head_sha=identity.requested_pr_head_sha,
+            merge_method=identity.merge_method,
+            merge_action=identity.merge_action,
+            bypass_rules=identity.bypass_rules,
+            predicate_digest=predicate.digest(),
+        )
+
+
+@dataclass(frozen=True)
 class ProviderTopologyCasProviderResultV1:
     """Canonical provider result carrying one topology-CAS predicate decision."""
     result_source: str
     provider_operation_id: str
-    predicate_digest: str
+    request_digest: str
     predicate_result: str
 
     def canonical_bytes(self) -> bytes:
         payload = {
-            "predicate_digest": self.predicate_digest,
             "predicate_result": self.predicate_result,
             "provider_operation_id": self.provider_operation_id,
+            "request_digest": self.request_digest,
             "result_source": self.result_source,
             "result": "provider-topology-cas-v1",
         }
@@ -252,12 +298,17 @@ class ProviderTopologyCasProviderResultV1:
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
-    def validates(self, predicate: ProviderTopologyCasPredicateV1) -> bool:
+    def validates(
+        self,
+        request: ProviderTopologyCasRequestV1,
+        predicate: ProviderTopologyCasPredicateV1,
+    ) -> bool:
         return (
             self.result_source == "provider-operation-result"
             and bool(self.provider_operation_id)
             and self.predicate_result == "accepted"
-            and self.predicate_digest == predicate.digest()
+            and self.request_digest == request.digest()
+            and request.predicate_digest == predicate.digest()
         )
 
 
@@ -284,7 +335,8 @@ class ProviderTopologyCasEvidenceV1:
             observation,
             pre_submit_sequence,
         )
-        return self.provider_result.validates(predicate)
+        request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+        return self.provider_result.validates(request, predicate)
 
 
 @dataclass(frozen=True)
@@ -760,10 +812,11 @@ def provider_topology_cas_evidence_fixture(
         observation,
         pre_submit_sequence,
     )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
     provider_result = ProviderTopologyCasProviderResultV1(
         result_source=result_source,
         provider_operation_id=provider_operation_id,
-        predicate_digest=predicate.digest(),
+        request_digest=request.digest(),
         predicate_result=predicate_result,
     )
     return ProviderTopologyCasEvidenceV1(
@@ -880,6 +933,34 @@ def test_provider_topology_cas_predicate_digest_binds_bypass_rules():
     )
     bypass = ProviderTopologyCasPredicateV1.from_binding(bypass_identity, observation, 2)
     assert normal.digest() != bypass.digest()
+
+
+def test_provider_topology_cas_request_binds_requested_operation_parameters():
+    identity = stack_identity_fixture()
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        provider_stack_observation_fixture(identity),
+        2,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    changed = ProviderTopologyCasRequestV1(
+        **{**request.__dict__, "expected_head_sha": "H0"},
+    )
+    assert request.digest() != changed.digest()
+
+
+def test_provider_topology_cas_provider_result_binds_request_digest():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(
+        identity,
+        ProviderTopologyCasPredicateV1.from_binding(
+            identity,
+            provider_stack_observation_fixture(identity),
+            2,
+        ),
+    )
+    assert evidence.provider_result.request_digest == request.digest()
 
 
 def test_provider_topology_cas_provider_result_digest_binds_operation_id():
@@ -1648,6 +1729,8 @@ TESTS = [
     test_provider_topology_cas_predicate_digest_binds_observation,
     test_provider_topology_cas_predicate_digest_binds_sequence,
     test_provider_topology_cas_predicate_digest_binds_bypass_rules,
+    test_provider_topology_cas_request_binds_requested_operation_parameters,
+    test_provider_topology_cas_provider_result_binds_request_digest,
     test_provider_topology_cas_provider_result_digest_binds_operation_id,
     test_provider_topology_cas_evidence_rejects_provider_result_digest_splice,
     test_provider_topology_cas_evidence_rejects_result_field_splice,
