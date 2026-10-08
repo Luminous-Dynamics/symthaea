@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 52;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-v73";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-v74";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -3590,11 +3590,11 @@ impl MeasurementDiscriminationTarget {
 pub struct MeasurementPriority {
     /// Dimension to investigate next.
     pub dimension: Dimension,
-    /// Number of frontier candidates lacking direct observed evidence for this dimension.
+    /// Number of frontier candidates lacking direct observed evidence for this dimension or carrying a conflict on this dimension.
     pub unresolved_candidate_count: usize,
     /// Number of candidates on the current frontier.
     pub frontier_candidate_count: usize,
-    /// Deterministic references to unresolved uncertainty surfaces.
+    /// Exact uncertainty identities already present on linked evidence; empty when no such identity is available.
     pub unresolved_uncertainty_refs: Vec<String>,
     /// Candidate IDs that the measurement is intended to discriminate.
     pub candidate_ids: Vec<String>,
@@ -5573,7 +5573,13 @@ impl AlternativesEngine {
             Vec::new()
         };
 
-        let next_measurement = Self::next_measurement(&frontier, &assessments);
+        let next_measurement = Self::next_measurement(
+            &frontier,
+            &assessments,
+            &normalized_candidates,
+            assessed_at_epoch_seconds,
+            freshness_policy,
+        );
 
         let mut result = AssessmentResult {
             schema_version: SCHEMA_VERSION,
@@ -5671,6 +5677,9 @@ impl AlternativesEngine {
     fn next_measurement(
         frontier: &[String],
         assessments: &[CandidateAssessment],
+        candidates: &[CandidatePathway],
+        assessed_at_epoch_seconds: Option<i64>,
+        freshness_policy: Option<&EvidenceFreshnessPolicy>,
     ) -> Option<MeasurementPriority> {
         if frontier.is_empty() {
             return None;
@@ -5688,7 +5697,22 @@ impl AlternativesEngine {
                     .iter()
                     .filter(|candidate| {
                         candidate.observed_evidence_count[dimension] == 0
-                            || candidate.evidence_conflict
+                            || candidates
+                            .iter()
+                            .find(|pathway| pathway.id == candidate.candidate_id)
+                            .and_then(|pathway| pathway.burdens.get(dimension))
+                            .is_some_and(|estimate| {
+                                candidates
+                                    .iter()
+                                    .find(|pathway| pathway.id == candidate.candidate_id)
+                                    .is_some_and(|pathway| {
+                                        pathway.dimension_has_conflict_at(
+                                            estimate,
+                                            assessed_at_epoch_seconds,
+                                            freshness_policy,
+                                        )
+                                    })
+                            })
                     })
                     .count();
                 (unresolved_count > 0).then_some((*dimension, unresolved_count))
@@ -5704,7 +5728,22 @@ impl AlternativesEngine {
                 .iter()
                 .filter(|candidate| {
                     candidate.observed_evidence_count[dimension] == 0
-                        || candidate.evidence_conflict
+                        || candidates
+                            .iter()
+                            .find(|pathway| pathway.id == candidate.candidate_id)
+                            .and_then(|pathway| pathway.burdens.get(dimension))
+                            .is_some_and(|estimate| {
+                                candidates
+                                    .iter()
+                                    .find(|pathway| pathway.id == candidate.candidate_id)
+                                    .is_some_and(|pathway| {
+                                        pathway.dimension_has_conflict_at(
+                                            estimate,
+                                            assessed_at_epoch_seconds,
+                                            freshness_policy,
+                                        )
+                                    })
+                            })
                 })
                 .map(|candidate| candidate.candidate_id.clone())
                 .collect::<Vec<_>>();
@@ -5739,8 +5778,31 @@ impl AlternativesEngine {
 
             let unresolved_uncertainty_refs = candidate_ids
                 .iter()
-                .map(|candidate_id| format!("uncertainty:{candidate_id}:{dimension:?}"))
-                .collect();
+                .filter_map(|candidate_id| {
+                    candidates
+                        .iter()
+                        .find(|candidate| candidate.id == *candidate_id)
+                })
+                .filter_map(|candidate| {
+                    candidate.burdens.get(dimension).map(|estimate| (candidate, estimate))
+                })
+                .flat_map(|(candidate, estimate)| {
+                    candidate
+                        .linked_evidence_at(
+                            &estimate.evidence_ids,
+                            assessed_at_epoch_seconds,
+                            freshness_policy,
+                        )
+                        .filter_map(|evidence| {
+                            evidence
+                                .uncertainty
+                                .as_ref()
+                                .map(|uncertainty| uncertainty.uncertainty_id.clone())
+                        })
+                })
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
 
             if expected_discrimination
                 .iter()
@@ -8320,6 +8382,63 @@ mod tests {
                 .unwrap()
                 .unresolved_candidate_count,
             1
+        );
+        assert!(result
+            .next_measurement
+            .as_ref()
+            .unwrap()
+            .unresolved_uncertainty_refs
+            .is_empty());
+    }
+
+    #[test]
+    fn heuristic_measurement_conflict_is_dimension_scoped_and_identity_bound() {
+        let mut c = candidate(
+            "heuristic-conflict",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![
+                evidence(
+                    "support",
+                    "source-a",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "contradict",
+                    "source-b",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Contradicts,
+                    0.95,
+                ),
+            ],
+        );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["support".into()];
+        }
+        c.burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids = vec!["support".into(), "contradict".into()];
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["support".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["support".into()];
+        }
+
+        let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
+        let next = result.next_measurement.as_ref().unwrap();
+        assert_eq!(next.dimension, Dimension::Water);
+        assert_eq!(next.unresolved_candidate_count, 1);
+        assert_eq!(
+            next.unresolved_uncertainty_refs,
+            vec![
+                "uncertainty:support".into(),
+                "uncertainty:contradict".into()
+            ]
         );
     }
 
