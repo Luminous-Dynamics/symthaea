@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 52;
+pub const SCHEMA_VERSION: u16 = 53;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-v74";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-heuristic-scale-v75";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -3570,17 +3570,28 @@ pub struct MeasurementDiscriminationTarget {
     pub right_candidate_id: String,
     /// Burden dimension whose intervals overlap and motivate the measurement.
     pub dimension: Dimension,
+    /// Exact comparison unit declared by the functional requirement.
+    pub unit: String,
+    /// Exact scope in which the measurement is comparable.
+    pub scope: String,
+    /// Exact methodology/comparability basis for the measurement.
+    pub basis: ComparisonBasisRef,
 }
 
 impl MeasurementDiscriminationTarget {
-    /// Validate candidate identities and dimension.
+    /// Validate candidate identities, dimension, and exact comparison scale.
     pub fn validate(&self) -> Result<(), AssessmentError> {
         if self.left_candidate_id.is_empty()
             || self.right_candidate_id.is_empty()
             || self.left_candidate_id == self.right_candidate_id
+            || self.unit.is_empty()
+            || self.scope.is_empty()
         {
             return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
         }
+        self.basis
+            .validate()
+            .map_err(|_| AssessmentError::InvalidMeasurementDiscriminationTarget)?;
         Ok(())
     }
 }
@@ -5574,6 +5585,7 @@ impl AlternativesEngine {
         };
 
         let next_measurement = Self::next_measurement(
+            requirement,
             &frontier,
             &assessments,
             &normalized_candidates,
@@ -5675,6 +5687,7 @@ impl AlternativesEngine {
     }
 
     fn next_measurement(
+        requirement: &FunctionalRequirement,
         frontier: &[String],
         assessments: &[CandidateAssessment],
         candidates: &[CandidatePathway],
@@ -5799,10 +5812,17 @@ impl AlternativesEngine {
                             if !(a_burden.interval.upper < b_burden.interval.lower
                                 || b_burden.interval.upper < a_burden.interval.lower)
                             {
+                                let scale = requirement
+                                    .comparison_scales
+                                    .get(dimension)
+                                    .expect("validated requirement contains every burden comparison scale");
                                 expected_discrimination.push(MeasurementDiscriminationTarget {
                                     left_candidate_id: candidate_ids[left].clone(),
                                     right_candidate_id: candidate_ids[right].clone(),
                                     dimension: *dimension,
+                                    unit: scale.unit.clone(),
+                                    scope: scale.scope.clone(),
+                                    basis: scale.basis.clone(),
                                 });
                             }
                         }
@@ -5851,7 +5871,7 @@ impl AlternativesEngine {
                 unresolved_uncertainty_refs,
                 candidate_ids,
                 expected_discrimination,
-                rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets include unresolved frontier candidates plus overlapping frontier comparators; exact uncertainty identities are emitted only from unresolved linked evidence; no cross-dimension unit scalarization".to_string(),
+                rationale: "heuristic: largest count of unresolved frontier candidates for one dimension; discrimination targets include unresolved frontier candidates plus overlapping frontier comparators and carry the exact requirement unit/scope/basis; exact uncertainty identities are emitted only from unresolved linked evidence; no cross-dimension unit scalarization".to_string(),
             })
         })
     }
@@ -8467,6 +8487,10 @@ mod tests {
         let next = result.next_measurement.as_ref().unwrap();
         assert_eq!(next.dimension, Dimension::Water);
         assert_eq!(next.unresolved_candidate_count, 1);
+        let water_scale = fixture_requirement().comparison_scales[&Dimension::Water].clone();
+        assert_eq!(next.expected_discrimination[0].unit, water_scale.unit);
+        assert_eq!(next.expected_discrimination[0].scope, water_scale.scope);
+        assert_eq!(next.expected_discrimination[0].basis, water_scale.basis);
         assert_eq!(
             next.unresolved_uncertainty_refs,
             vec![
@@ -8553,6 +8577,9 @@ mod tests {
                 left_candidate_id: "comparator".into(),
                 right_candidate_id: "unresolved".into(),
                 dimension: Dimension::Water,
+                unit: fixture_requirement().comparison_scales[&Dimension::Water].unit.clone(),
+                scope: fixture_requirement().comparison_scales[&Dimension::Water].scope.clone(),
+                basis: fixture_requirement().comparison_scales[&Dimension::Water].basis.clone(),
             }]
         );
         assert!(next.unresolved_uncertainty_refs.is_empty());
