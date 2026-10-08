@@ -52,6 +52,15 @@ jobs:
               f"Required topology classes missing: {sorted(required_classes - top_level_classes)}"
           )
 
+          source = path.read_text()
+          for marker in (
+              "provider_constraints_valid",
+              "bypass-not-supported-for-stack",
+              "test_stack_identity_rejects_bypass_for_multi_pr_stack",
+              "test_provider_model_rejects_bypass_for_multi_pr_stack",
+          ):
+              assert marker in source, f"Missing provider-option guard: {marker}"
+
           ledger = next(
               node for node in tree.body
               if isinstance(node, ast.ClassDef) and node.name == "Ledger"
