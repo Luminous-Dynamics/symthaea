@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/alternative-economic-model-profile-v0.schema.json",
+  "title": "Alternative Economic Model Profile v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model_id",
+    "name",
+    "classification",
+    "profile_version",
+    "mechanisms",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "alternative-economic-model-profile-v0"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "classification": {
+      "type": "string",
+      "enum": [
+        "whole_system",
+        "architecture",
+        "variant",
+        "overlay",
+        "macro_regime"
+      ]
+    },
+    "profile_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_model_id": {
+      "type": ["string", "null"]
+    },
+    "primary_divergence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mechanisms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "money_creation",
+        "settlement",
+        "credit_debt",
+        "ownership",
+        "governance",
+        "allocation",
+        "investment",
+        "labour",
+        "distribution",
+        "scarcity_signal",
+        "information_aggregation",
+        "risk_allocation",
+        "maintenance",
+        "externalities",
+        "crisis_resolution",
+        "legacy_transition",
+        "institutional_memory",
+        "expectations",
+        "capture_concentration"
+      ],
+      "properties": {
+        "money_creation": {"$ref": "#/$defs/mechanism"},
+        "settlement": {"$ref": "#/$defs/mechanism"},
+        "credit_debt": {"$ref": "#/$defs/mechanism"},
+        "ownership": {"$ref": "#/$defs/mechanism"},
+        "governance": {"$ref": "#/$defs/mechanism"},
+        "allocation": {"$ref": "#/$defs/mechanism"},
+        "investment": {"$ref": "#/$defs/mechanism"},
+        "labour": {"$ref": "#/$defs/mechanism"},
+        "distribution": {"$ref": "#/$defs/mechanism"},
+        "scarcity_signal": {"$ref": "#/$defs/mechanism"},
+        "information_aggregation": {"$ref": "#/$defs/mechanism"},
+        "risk_allocation": {"$ref": "#/$defs/mechanism"},
+        "maintenance": {"$ref": "#/$defs/mechanism"},
+        "externalities": {"$ref": "#/$defs/mechanism"},
+        "crisis_resolution": {"$ref": "#/$defs/mechanism"},
+        "legacy_transition": {"$ref": "#/$defs/mechanism"},
+        "institutional_memory": {"$ref": "#/$defs/mechanism"},
+        "expectations": {"$ref": "#/$defs/mechanism"},
+        "capture_concentration": {"$ref": "#/$defs/mechanism"}
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "uniqueItems": true
+    },
+    "known_failure_modes": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "qualification_status": {
+      "type": "string",
+      "enum": [
+        "specified",
+        "implemented_unqualified",
+        "synthetically_qualified",
+        "empirically_informed"
+      ]
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "mechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "description"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "explicit",
+            "absent",
+            "not_applicable",
+            "underdetermined"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": ["string", "null"],
+          "format": "uri"
+        }
+      }
+    }
+  }
+}
