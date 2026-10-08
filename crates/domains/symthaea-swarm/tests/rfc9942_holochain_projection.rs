@@ -26,7 +26,8 @@ fn anchor() -> HolochainEvidenceAnchor {
             selected_index: 1,
             selected_receipt_sha256: [5; 32],
             verified_capability_sha256: [6; 32],
-            selection_decision_sha256: [7; 32],
+            verified_composition_capability_sha256: [7; 32],
+            selection_decision_sha256: [8; 32],
             selection_policy: "rfc9942/priority-first-valid-v1".into(),
             selection_policy_version: 1,
         }),
@@ -85,6 +86,18 @@ fn verified_capability_identity_changes_projection() {
         .as_mut()
         .unwrap()
         .verified_capability_sha256[0] ^= 1;
+    assert_ne!(before, first.canonical_bytes().unwrap());
+}
+
+#[test]
+fn verified_composition_capability_identity_changes_projection() {
+    let mut first = anchor();
+    let before = first.canonical_bytes().unwrap();
+    first
+        .receipt_selection
+        .as_mut()
+        .unwrap()
+        .verified_composition_capability_sha256[0] ^= 1;
     assert_ne!(before, first.canonical_bytes().unwrap());
 }
 
@@ -297,6 +310,10 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
         context.verified_capability_sha256,
         witness.verified_capability_sha256()
     );
+    assert_eq!(
+        context.verified_composition_capability_sha256,
+        witness.verified_composition_capability_sha256()
+    );
 
     // A different valid outer signer yields a different composition capability,
     // even though the selected Receipt and collection are unchanged.
@@ -377,6 +394,10 @@ fn atomic_priority_selection_api_returns_bound_witness() {
     assert_eq!(
         witness.verified_capability_sha256(),
         verified_outer.receipt().capability_sha256()
+    );
+    assert_eq!(
+        witness.verified_composition_capability_sha256(),
+        verified_outer.capability_sha256()
     );
     assert_eq!(
         witness.selection_decision_sha256().unwrap(),
