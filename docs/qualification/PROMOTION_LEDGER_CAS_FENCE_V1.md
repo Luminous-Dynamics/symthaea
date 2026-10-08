@@ -221,6 +221,7 @@ The application-level qualification suite should additionally model:
 The provider-level lab is intentionally stronger than a sequential demonstration. Its acceptance condition includes a true concurrent same-parent race, where exactly one of two valid successors may advance the ref. The losing successor may remain a valid immutable Git object but is not active because it is unreachable from the current ledger ref.
 
 Successful completion also requires deletion of the temporary refs followed by an explicit 404 observation. Cleanup is therefore part of the positive lab predicate rather than an unverified best-effort side effect.
+Temporary ref names and synthetic candidate commit identities are scoped to both the GitHub run ID and run attempt. This prevents a rerun from sharing the same temporary namespace or deterministic candidate SHAs with an earlier attempt, and makes cleanup ownership checks materially stronger.
 
 GitHub's REST reference API defines non-forced reference updates as fast-forward updates and documents conflict responses. GitHub's GraphQL `updateRefs` additionally provides an atomic multi-ref mutation with `beforeOid` preconditions. This lab deliberately exercises the single-ref REST-compatible primitive; it does not establish an application-level authorization theorem.
 
