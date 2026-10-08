@@ -7362,6 +7362,8 @@ mod tests {
             uncertainty.component_refs_digest =
                 canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
                     .unwrap();
+            uncertainty.uncertainty_budget_component_set_digest =
+                uncertainty.component_refs_digest.clone();
             uncertainty.binding_digest =
                 canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
         }
