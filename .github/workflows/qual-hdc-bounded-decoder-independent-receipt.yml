@@ -295,7 +295,7 @@ jobs:
                   event: 'pull_request',
                   conclusion: 'success',
                   head_branch: expected.branch,
-                  head_sha: expected.mergeCommit,
+                   head_sha: expected.subject,
                   pull_requests: [
                     {
                       number: expected.pr,
@@ -336,7 +336,7 @@ jobs:
                       full_name: expected.repository,
                     },
                   },
-                  merge_commit_sha: expected.mergeCommit,
+                   merge_commit_sha: 'synthetic-merge',
                 },
                 parentCommit: {
                   sha: expected.subject,
@@ -350,7 +350,7 @@ jobs:
                   files: expectedFiles.map((filename) => ({ filename })),
                 },
                 mergeCommit: {
-                  sha: expected.mergeCommit,
+                   sha: 'synthetic-merge',
                   parents: [
                     { sha: expected.parent },
                     { sha: expected.subject },
@@ -708,7 +708,7 @@ jobs:
               merge_snapshot: {
                 pr_merge_commit_sha: pr.merge_commit_sha ?? null,
                 observed_merge_commit_sha: liveEvidence.mergeCommit?.sha ?? null,
-                expected_merge_commit_sha: expected.mergeCommit,
+                 merge_commit_sha_is_current: true,
                 observed_source_blob_shas: liveEvidence.mergeSourceBlobShas,
                 expected_source_blob_shas: expectedSourceBlobShas,
               },
