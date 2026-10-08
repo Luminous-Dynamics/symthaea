@@ -1,0 +1,68 @@
+{
+  "schema": "rh006-identified-set-propagation/v1",
+  "status": "research-diagnostic-only",
+  "identification_level_enum": {
+    "O": "directly observable target functional",
+    "MI": "point identified under an explicit qualified model",
+    "PI": "explicitly characterized non-singleton identified set",
+    "NI": "no qualified identified-set characterization currently available"
+  },
+  "state_product": [
+    "identification_level",
+    "decision_stability",
+    "regularity_status"
+  ],
+  "decision_stability_enum": [
+    "decision-stable-under-identification-set",
+    "decision-unstable-under-identification-set",
+    "unknown"
+  ],
+  "regularity_enum": [
+    "regular",
+    "nonregular-boundary",
+    "invalid-domain",
+    "unknown"
+  ],
+  "ray_surface": "Delta(tu;s)=A t^2+(B0+B1*s)t+(C0+C1*s+C2*s^2)",
+  "discriminant": "D(s)=d0+d1*s+d2*s^2",
+  "discriminant_coefficients": [
+    "d0=B0^2-4*A*C0",
+    "d1=2*B0*B1-4*A*C1",
+    "d2=B1^2-4*A*C2"
+  ],
+  "exact_range_rule": "quadratic image over a closed interval is evaluated at endpoints and any interior vertex",
+  "support_partition": [
+    "roots of D(s)",
+    "roots of C(s)",
+    "roots of B(s)",
+    "interval endpoints"
+  ],
+  "claim_rules": {
+    "point_target_claim": "allowed only for O or MI",
+    "downstream_decision_claim": "allowed for PI when decision is stable and regularity is regular",
+    "formal_inference": "not authorized by this artifact"
+  },
+  "fail_closed": [
+    "uncharacterized NI target cannot be collapsed to a point",
+    "domain violation",
+    "discriminant boundary before regularity qualification",
+    "grid-only set image treated as proof"
+  ],
+  "numerical_hardening": {
+    "quadratic_root_solver": "cancellation-resistant q-formula",
+    "effect_radius_boundary": "analytic substitution of frozen t into Delta(tu;s)=0",
+    "execution_boundary": "post-v1 code hardening is not covered by the frozen v1 execution receipt"
+  },
+  "set_representation_enum": {
+    "witness-only": "admissible witnesses without a bound on the full identified set",
+    "inner-approximation": "guaranteed subset of the true identified set",
+    "outer-approximation": "guaranteed superset of the true identified set",
+    "sharp": "exact identified set under declared assumptions"
+  },
+  "decision_claim_polarity": {
+    "outer-approximation": "stable can be certified; unstable cannot",
+    "inner-approximation": "unstable can be certified; stable cannot",
+    "sharp": "stable or unstable can be certified subject to regularity",
+    "witness-only": "neither stable nor unstable can be certified"
+  }
+}

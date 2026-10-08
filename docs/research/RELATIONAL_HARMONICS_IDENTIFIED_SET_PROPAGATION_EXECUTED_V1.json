@@ -1,0 +1,90 @@
+{
+  "execution": {
+    "date": "2026-10-08",
+    "grid_definition_used": false,
+    "method": "analytic quadratic interval image plus analytic critical-point partition",
+    "numeric_grid": "not used for scientific definition",
+    "payload_hash_basis": "SHA-256 of canonical JSON payload with sorted keys and compact separators, excluding payload_sha256",
+    "seed": 20261008,
+    "source_sha256": "1901948f5ca72195227901ec00a30fa31405f6c68fde00d06462836c1067c228",
+    "status": "executed-local"
+  },
+  "fail_closed": {
+    "discriminant_boundary": "blocks regular decision claim",
+    "domain_violation": "fatal",
+    "grid_only_image": "not accepted as proof",
+    "uncharacterized_NI_target": "cannot be collapsed to a point or finite set"
+  },
+  "fixtures": {
+    "canonical_C": {
+      "contraction_boundary_reachable": true,
+      "contraction_derivative_status": "nonregular-boundary",
+      "contraction_image": [0.0, 1.0],
+      "decision_status": "decision-unstable-under-identification-set",
+      "discriminant_formula": "D(C)=0.25-C^2",
+      "discriminant_image": [-0.75, 0.25],
+      "identification_class": "PI",
+      "identified_set": [-1.0, 1.0],
+      "regimes": ["double-root", "no-real-branch", "two-real-branches"]
+    },
+    "stable_PI": {
+      "decision_status": "decision-stable-under-identification-set",
+      "discriminant_image": [5.6, 6.0],
+      "downstream_decision_claim_permitted": true,
+      "identification_class": "PI",
+      "identified_set": [0.0, 1.0],
+      "point_target_claim_permitted": false,
+      "positive_root_counts": [1],
+      "ray_surface": {
+        "A": 1.0,
+        "B0": -2.0,
+        "B1": 0.0,
+        "C0": -0.5,
+        "C1": 0.1,
+        "C2": 0.0
+      },
+      "regularity_status": "regular"
+    },
+    "unstable": {
+      "boundary_reachable": true,
+      "decision_status": "decision-unstable-under-identification-set",
+      "discriminant_image": [-1.0, 3.0],
+      "identification_class": "PI",
+      "identified_set": [0.0, 1.0],
+      "positive_root_counts": [0, 1],
+      "ray_surface": {
+        "A": 1.0,
+        "B0": 0.0,
+        "B1": 0.0,
+        "C0": 0.25,
+        "C1": -1.0,
+        "C2": 0.0
+      },
+      "regularity_status": "nonregular-boundary"
+    }
+  },
+  "nonclaims": [
+    "No point identification of real RH-006 latent nuisances is established.",
+    "No formal p-value or confidence interval is enabled.",
+    "No bootstrap validity or uniform size control is established.",
+    "No exact Rust compile or hosted CI PASS is claimed."
+  ],
+  "payload_sha256": "b4f12c4bd01174b4d2853a9549f0ed22d2c9d3fdba562f7f09fc078e83b33723",
+  "rh006_ray_calculus": {
+    "d0": "B0^2-4*A*C0",
+    "d1": "2*B0*B1-4*A*C1",
+    "d2": "B1^2-4*A*C2",
+    "discriminant": "D(s)=d0+d1*s+d2*s^2",
+    "range_rule": "evaluate interval endpoints and any interior quadratic vertex",
+    "support_partition": "roots of D(s), C(s), B(s), plus interval endpoints",
+    "surface": "Delta(tu;s)=A*t^2+(B0+B1*s)*t+(C0+C1*s+C2*s^2)"
+  },
+  "schema": "rh006-identified-set-propagation/v1",
+  "semantic_repair": {
+    "NI": "no qualified identified-set characterization currently available",
+    "PI": "explicitly characterized non-singleton identified set",
+    "decision_stability": "separate from target point identification",
+    "regularity": "separate from decision stability"
+  },
+  "status": "research-diagnostic-only"
+}
