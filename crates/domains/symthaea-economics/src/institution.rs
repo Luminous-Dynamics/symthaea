@@ -169,7 +169,8 @@ impl InstitutionalEvolution {
         if candidate.parent_institution_hash != self.current.profile_hash {
             return Err(FailureDisposition::ParentMismatch);
         }
-        if self.proposals.contains_key(&proposal_id.into()) {
+        let proposal_id = proposal_id.into();
+        if self.proposals.contains_key(&proposal_id) {
             return Err(FailureDisposition::DuplicateProposal);
         }
         if candidate.rule_level == RuleLevel::MetaConstitutional
@@ -178,7 +179,6 @@ impl InstitutionalEvolution {
             return Err(FailureDisposition::MetaConstitutionalMutationDisabled);
         }
 
-        let proposal_id = proposal_id.into();
         let proposal = Proposal {
             proposal_id: proposal_id.clone(),
             candidate: candidate.clone(),
@@ -400,22 +400,23 @@ mod tests {
     }
 
     #[test]
-    fn stale_adoption_fails_after_parent_changes() {
+    fn competing_proposal_becomes_stale_after_intervening_implementation() {
         let mut evolution = InstitutionalEvolution::new(initial());
+
         evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
+        evolution.propose("p2", candidate(RuleLevel::Operational, "profile-v2", "m2"), "b", "another-failure").unwrap();
+
         evolution.decide(adopted_operational_decision()).unwrap();
         evolution.implement("p1").unwrap();
 
-        assert_eq!(
-            evolution.decide(AdoptionDecision {
-                proposal_id: "p1".into(),
-                adopted: false,
-                authority: None,
-                authorizing_rule_hash: None,
-                authorizing_rule_level: None,
-            }),
-            Err(FailureDisposition::AlreadyDecided)
-        );
+        let decision = AdoptionDecision {
+            proposal_id: "p2".into(),
+            adopted: true,
+            authority: Some("authority".into()),
+            authorizing_rule_hash: Some("cc-rule-v0".into()),
+            authorizing_rule_level: Some(RuleLevel::CollectiveChoice),
+        };
+        assert_eq!(evolution.decide(decision), Err(FailureDisposition::ParentMismatch));
     }
 
     #[test]
