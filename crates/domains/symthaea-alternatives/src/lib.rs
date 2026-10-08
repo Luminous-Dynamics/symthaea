@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 53;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-heuristic-scale-target-link-v76";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-heuristic-scale-target-link-uncertainty-target-surface-lineage-v77";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -2468,6 +2468,41 @@ impl CandidatePathway {
         })
     }
 
+    fn target_surface_has_preexisting_uncertainty(
+        &self,
+        target: &ExperimentalDiscriminationTarget,
+        uncertainty_id: &str,
+    ) -> bool {
+        let evidence_ids = match &target.surface {
+            ExperimentalDiscriminationSurface::Burden(dimension) => self
+                .burdens
+                .get(dimension)
+                .map(|estimate| estimate.evidence_ids.as_slice()),
+            ExperimentalDiscriminationSurface::PerformanceMetric(metric) => self
+                .performance
+                .get(metric)
+                .map(|estimate| estimate.evidence_ids.as_slice()),
+            ExperimentalDiscriminationSurface::OperatingCondition(condition) => self
+                .operating_capabilities
+                .get(condition)
+                .map(|estimate| estimate.evidence_ids.as_slice()),
+        };
+        let Some(evidence_ids) = evidence_ids else {
+            return false;
+        };
+
+        self.evidence.iter().any(|evidence| {
+            evidence_ids.iter().any(|id| id == &evidence.id)
+                && evidence.observation.as_ref().is_some_and(|observation| {
+                    observation.experimental_design_id.is_none()
+                        && observation.experimental_target_id.is_none()
+                })
+                && evidence.uncertainty.as_ref().is_some_and(|uncertainty| {
+                    uncertainty.uncertainty_id == uncertainty_id
+                })
+        })
+    }
+
     fn all_burden_dimensions_have_usable_evidence(
         &self,
         as_of: Option<i64>,
@@ -4128,6 +4163,8 @@ pub enum AssessmentError {
         /// Unit declared by the stopping criterion.
         actual_unit: String,
     },
+    /// A declared uncertainty identity is not linked to pre-existing evidence on any target surface.
+    ExperimentalDesignUncertaintyNotLinkedToTargetSurface(String),
     /// An experimental design carries a different semantic digest for a candidate.
     ExperimentalDesignCandidateDigestMismatch {
         /// Candidate identity whose semantics drifted.
@@ -4746,6 +4783,10 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "experimental stopping target {target_id} unit {actual_unit} does not match target unit {expected_unit}"
             ),
+            Self::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(uncertainty_id) => write!(
+                f,
+                "experimental design uncertainty {uncertainty_id} is not linked to pre-existing evidence on any declared target surface"
+            ),
             Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
                 write!(f, "source admission reference is incomplete")
@@ -5259,6 +5300,34 @@ impl AlternativesEngine {
                         actual_measurand_id: observation_measurand.clone(),
                     });
                 }
+            }
+        }
+
+        for uncertainty_id in &experimental_design.unresolved_uncertainty_refs {
+            let linked_to_declared_target = experimental_design
+                .expected_discrimination
+                .iter()
+                .any(|target| {
+                    [&target.left_candidate_id, &target.right_candidate_id]
+                        .iter()
+                        .any(|candidate_id| {
+                            candidates
+                                .iter()
+                                .find(|candidate| &candidate.id == *candidate_id)
+                                .is_some_and(|candidate| {
+                                    candidate.target_surface_has_preexisting_uncertainty(
+                                        target,
+                                        uncertainty_id,
+                                    )
+                                })
+                        })
+                });
+            if !linked_to_declared_target {
+                return Err(
+                    AssessmentError::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(
+                        uncertainty_id.clone(),
+                    ),
+                );
             }
         }
 
@@ -6397,6 +6466,50 @@ mod tests {
                 ((*id).to_string(), digest)
             })
             .collect()
+    }
+
+    fn fixture_target_uncertainty_refs(
+        design: &ExperimentalDesignProvenance,
+        candidates: &[CandidatePathway],
+    ) -> Vec<String> {
+        let mut refs = BTreeSet::new();
+        for target in &design.expected_discrimination {
+            for candidate_id in [&target.left_candidate_id, &target.right_candidate_id] {
+                let Some(candidate) = candidates.iter().find(|candidate| &candidate.id == candidate_id)
+                else {
+                    continue;
+                };
+                let evidence_ids = match &target.surface {
+                    ExperimentalDiscriminationSurface::Burden(dimension) => candidate
+                        .burdens
+                        .get(dimension)
+                        .map(|estimate| estimate.evidence_ids.as_slice()),
+                    ExperimentalDiscriminationSurface::PerformanceMetric(metric) => candidate
+                        .performance
+                        .get(metric)
+                        .map(|estimate| estimate.evidence_ids.as_slice()),
+                    ExperimentalDiscriminationSurface::OperatingCondition(condition) => candidate
+                        .operating_capabilities
+                        .get(condition)
+                        .map(|estimate| estimate.evidence_ids.as_slice()),
+                };
+                let Some(evidence_ids) = evidence_ids else {
+                    continue;
+                };
+                for evidence in candidate.evidence.iter().filter(|evidence| {
+                    evidence_ids.iter().any(|id| id == &evidence.id)
+                        && evidence.observation.as_ref().is_some_and(|observation| {
+                            observation.experimental_design_id.is_none()
+                                && observation.experimental_target_id.is_none()
+                        })
+                }) {
+                    if let Some(uncertainty) = &evidence.uncertainty {
+                        refs.insert(uncertainty.uncertainty_id.clone());
+                    }
+                }
+            }
+        }
+        refs.into_iter().collect()
     }
 
     fn fixture_requirement() -> FunctionalRequirement {
@@ -11705,6 +11818,11 @@ mod tests {
             },
             comparison_basis: basis,
         };
+        let mut design = design;
+        design.unresolved_uncertainty_refs =
+            fixture_target_uncertainty_refs(&design, &case.candidates);
+        assert!(!design.unresolved_uncertainty_refs.is_empty());
+
         let result = AlternativesEngine
             .assess_with_experimental_design(
                 &case.requirement,
@@ -11720,6 +11838,24 @@ mod tests {
         let next = result.next_measurement.as_ref().unwrap();
         assert!(!next.unresolved_uncertainty_refs.is_empty());
         assert!(!next.candidate_ids.is_empty());
+
+        let mut detached = design.clone();
+        detached.unresolved_uncertainty_refs = vec!["uncertainty:not-linked".into()];
+        assert_eq!(
+            AlternativesEngine
+                .assess_with_experimental_design(
+                    &case.requirement,
+                    &case.candidates,
+                    Some(case.incumbent_id),
+                    None,
+                    None,
+                    detached,
+                )
+                .unwrap_err(),
+            AssessmentError::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(
+                "uncertainty:not-linked".into(),
+            )
+        );
     }
 
     #[test]
@@ -11842,6 +11978,10 @@ mod tests {
             },
             comparison_basis: basis.clone(),
         };
+        first.unresolved_uncertainty_refs =
+            fixture_target_uncertainty_refs(&first, &case.candidates);
+        assert!(!first.unresolved_uncertainty_refs.is_empty());
+
         let mut second = first.clone();
         second.candidate_ids.reverse();
         second.unresolved_uncertainty_refs.reverse();
@@ -12348,6 +12488,8 @@ mod tests {
             .find(|evidence| evidence.kind == EvidenceKind::Observed)
             .unwrap();
         let observed_measurand = observed.observation.as_ref().unwrap().measurand_id.clone();
+        let self_referential_uncertainty_id =
+            observed.uncertainty.as_ref().unwrap().uncertainty_id.clone();
 
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
@@ -12395,6 +12537,11 @@ mod tests {
             Some(design.design_id.clone());
         observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
 
+        let mut design = design;
+        design.unresolved_uncertainty_refs =
+            fixture_target_uncertainty_refs(&design, &candidates);
+        assert!(!design.unresolved_uncertainty_refs.is_empty());
+
         AlternativesEngine
             .assess_with_experimental_design(
                 &case.requirement,
@@ -12402,9 +12549,28 @@ mod tests {
                 Some(case.incumbent_id),
                 None,
                 None,
-                design,
+                design.clone(),
             )
             .unwrap();
+
+        let mut self_referential = design;
+        self_referential.unresolved_uncertainty_refs =
+            vec![self_referential_uncertainty_id.clone()];
+        assert_eq!(
+            AlternativesEngine
+                .assess_with_experimental_design(
+                    &case.requirement,
+                    &candidates,
+                    Some(case.incumbent_id),
+                    None,
+                    None,
+                    self_referential,
+                )
+                .unwrap_err(),
+            AssessmentError::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(
+                self_referential_uncertainty_id,
+            )
+        );
     }
 
     #[test]
