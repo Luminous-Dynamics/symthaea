@@ -1201,7 +1201,7 @@ impl Rfc9942ReceiptEnvelope {
 /// Header extensions remain opaque and are preserved as raw key/value encodings.
 /// The object's signature is retained as opaque bytes; cryptographic verification
 /// is intentionally external.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Rfc9942SignatureWithReceipts {
     /// Exact serialized outer COSE_Sign1 wire when parsed; `None` means the
     /// object was newly constructed and is encoded from its typed fields.
@@ -1220,6 +1220,23 @@ pub struct Rfc9942SignatureWithReceipts {
     payload: Rfc9942SignaturePayload,
     signature: Vec<u8>,
 }
+
+impl PartialEq for Rfc9942SignatureWithReceipts {
+    fn eq(&self, other: &Self) -> bool {
+        self.protected_bytes == other.protected_bytes
+            && self.unprotected_bytes == other.unprotected_bytes
+            && self.protected_extensions == other.protected_extensions
+            && self.protected_receipts == other.protected_receipts
+            && self.protected_receipts_bytes == other.protected_receipts_bytes
+            && self.unprotected_extensions == other.unprotected_extensions
+            && self.unprotected_receipts == other.unprotected_receipts
+            && self.unprotected_receipts_bytes == other.unprotected_receipts_bytes
+            && self.payload == other.payload
+            && self.signature == other.signature
+    }
+}
+
+impl Eq for Rfc9942SignatureWithReceipts {}
 
 impl Rfc9942SignatureWithReceipts {
     /// Construct the canonical unprotected-header form used by RFC9942 examples.
