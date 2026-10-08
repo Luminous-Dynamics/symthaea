@@ -5,10 +5,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import struct
 import sys
 from pathlib import Path
 
 VULKAN_API_1_3 = 4206592
+IMPLEMENTATION_IDENTITY_VERSION = "1"
+PHYSICAL_DEVICE_IDENTITY_VERSION = "1"
+WGSL_ABI_MARKER = "symthaea.hdc.bind_xor.storage-u32.v1"
+KERNEL_ID = "symthaea.hdc.bind_xor.v1"
 
 FIXTURES = {
     "fixture": {
@@ -109,11 +114,98 @@ def expected_state(spec: dict) -> dict[str, bytes]:
         state[output] = xor_bytes(state[left], state[right])
     return state
 
+def sha256_len_prefixed(parts: list[bytes], domain: bytes) -> str:
+    digest = hashlib.sha256()
+    digest.update(domain)
+    digest.update(b"\\x00")
+    for part in parts:
+        digest.update(struct.pack("<Q", len(part)))
+        digest.update(part)
+    return digest.hexdigest()
+
+
+def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, bytes]:
+    if values.get("implementation_identity_version") != IMPLEMENTATION_IDENTITY_VERSION:
+        fail("implementation identity version mismatch")
+    if values.get("physical_device_identity_version") != PHYSICAL_DEVICE_IDENTITY_VERSION:
+        fail("physical-device identity version mismatch")
+    if values.get("implementation_abi_marker") != WGSL_ABI_MARKER:
+        fail("implementation ABI marker mismatch")
+    if values.get("implementation_kernel_id") != KERNEL_ID:
+        fail("implementation kernel id mismatch")
+
+    try:
+        wgsl = bytes.fromhex(values["implementation_wgsl_hex"])
+        spirv = bytes.fromhex(values["shader_spirv_hex"])
+        name = bytes.fromhex(values["physical_device_name_hex"])
+        uuid = bytes.fromhex(values["device_uuid"])
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed provenance hex field: {exc}")
+    if not wgsl or not spirv:
+        fail("provenance WGSL/SPIR-V payload is empty")
+    if len(spirv) % 4 != 0:
+        fail("SPIR-V payload is not a multiple of four bytes")
+    if len(uuid) != 16 or not any(uuid):
+        fail("device UUID is missing or all zeroes")
+
+    wgsl_path = root / "src" / "hdc_bind_xor.wgsl"
+    if not wgsl_path.is_file():
+        fail("sealed WGSL source file is missing")
+    source_wgsl = wgsl_path.read_bytes()
+    if wgsl != source_wgsl:
+        fail("runtime WGSL bytes do not match sealed WGSL source")
+    if values.get("implementation_wgsl_sha256") != sha256_file(wgsl_path):
+        fail("WGSL source SHA-256 mismatch")
+    if values.get("shader_spirv_sha256") != hashlib.sha256(spirv).hexdigest():
+        fail("SPIR-V SHA-256 mismatch")
+
+    implementation_digest = sha256_len_prefixed(
+        [
+            WGSL_ABI_MARKER.encode("utf-8"),
+            KERNEL_ID.encode("utf-8"),
+            wgsl,
+            spirv,
+        ],
+        b"symthaea.gpu-fabric.vulkan-implementation.v1",
+    )
+    if values.get("implementation_identity_sha256") != implementation_digest:
+        fail("implementation identity digest mismatch")
+
+    try:
+        vendor_id = int(values["physical_device_vendor_id"])
+        device_id = int(values["physical_device_device_id"])
+        device_type = int(values["physical_device_type"])
+        api_version = int(values["physical_device_api_version"])
+        driver_version = int(values["physical_device_driver_version"])
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed physical-device numeric identity: {exc}")
+    numeric = (vendor_id, device_id, device_type, api_version, driver_version)
+    if any(value < 0 or value > 0xFFFFFFFF for value in numeric):
+        fail("physical-device identity numeric field outside u32 range")
+    device_hash = hashlib.sha256()
+    device_hash.update(b"symthaea.gpu-fabric.vulkan-device.v1")
+    device_hash.update(b"\\x00")
+    for value in numeric:
+        device_hash.update(struct.pack("<I", value))
+    device_hash.update(struct.pack("<Q", len(name)))
+    device_hash.update(name)
+    physical_digest = device_hash.hexdigest()
+    if values.get("physical_device_identity_sha256") != physical_digest:
+        fail("physical-device identity digest mismatch")
+
+    if int(values.get("vulkan_api_version", "-1")) != VULKAN_API_1_3:
+        fail("Vulkan API version changed")
+    if api_version < VULKAN_API_1_3:
+        fail("physical-device API version below Vulkan 1.3")
+    return implementation_digest, physical_digest, uuid
+
+
 def verify_runtime(path: Path) -> None:
     blocks = parse_runtime(path)
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
         fail("runtime witness must contain fixture then hazard exactly once")
 
+    provenance: tuple[str, str, bytes] | None = None
     for name, lines in blocks:
         spec = FIXTURES[name]
         values = parse_kv(lines)
@@ -121,7 +213,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "3":
+        if values.get("receipt_version") != "4":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -138,6 +230,17 @@ def verify_runtime(path: Path) -> None:
         if int(values.get("queue_family_index", "-1")) != 0:
             fail(f"{name}: queue family mismatch")
 
+        implementation_digest, physical_digest, uuid = verify_provenance(values, path.parent)
+        if values.get("implementation_identity_sha256") != implementation_digest:
+            fail(f"{name}: implementation identity receipt binding mismatch")
+        if values.get("physical_device_identity_sha256") != physical_digest:
+            fail(f"{name}: physical-device identity receipt binding mismatch")
+
+        current_provenance = (implementation_digest, physical_digest, uuid)
+        if provenance is None:
+            provenance = current_provenance
+        elif current_provenance != provenance:
+            fail(f"{name}: provenance identity differs from the other fixture")
         initial, observed = parse_vectors(lines)
         expected_initial = spec["initial"]
         if set(initial) != set(expected_initial) or set(observed) != set(expected_initial):
