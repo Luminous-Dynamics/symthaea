@@ -228,6 +228,30 @@ pub(crate) struct SystemTransaction {
     pub(crate) target_machine_digest: Option<String>,
     pub(crate) request_digest: String,
     pub(crate) authorization: &'static str,
+    pub(crate) execution_commitment: Option<ExecutionCommitment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ExecutionCommitment {
+    pub(crate) role: String,
+    pub(crate) size: u64,
+    pub(crate) digest: String,
+}
+
+fn validate_execution_commitment(commitment: &ExecutionCommitment) -> Result<(), String> {
+    if commitment.role != "install-script" && commitment.role != "preflight-script" {
+        return Err(format!(
+            "execution commitment has unsupported role: {}",
+            commitment.role
+        ));
+    }
+    if commitment.size == 0 || commitment.size > 256 * 1024 {
+        return Err(format!(
+            "execution commitment has unsupported size: {}",
+            commitment.size
+        ));
+    }
+    validate_digest(&commitment.digest, "execution_digest")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -291,7 +315,20 @@ impl SystemTransaction {
             target_machine_digest: target_machine_digest.map(str::to_owned),
             request_digest,
             authorization: "websocket-bearer-authenticated",
+            execution_commitment: None,
         })
+    }
+
+    pub(crate) fn bind_execution_commitment(
+        &mut self,
+        commitment: ExecutionCommitment,
+    ) -> Result<(), String> {
+        validate_execution_commitment(&commitment)?;
+        if self.execution_commitment.is_some() {
+            return Err("execution commitment is already bound".into());
+        }
+        self.execution_commitment = Some(commitment);
+        Ok(())
     }
 
     pub(crate) fn receipt(&self, outcome: TransactionOutcome) -> TransactionReceipt {
@@ -321,6 +358,7 @@ impl SystemTransaction {
             request_digest: self.request_digest.clone(),
             authorization: self.authorization,
             outcome,
+            execution_commitment: self.execution_commitment.clone(),
             artifact_commitment,
             configuration_commitment,
         }
@@ -378,6 +416,7 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
 #[serde(rename_all = "snake_case")]
 enum JournalEventKind {
     Started,
+    Bound,
     Completed,
 }
 
@@ -392,6 +431,8 @@ struct JournalEvent {
     request_digest: String,
     outcome: Option<TransactionOutcome>,
     #[serde(default)]
+    execution_commitment: Option<ExecutionCommitment>,
+    #[serde(default)]
     artifact_commitment: Option<ArtifactCommitment>,
     #[serde(default)]
     configuration_commitment: Option<ArtifactCommitment>,
@@ -404,6 +445,7 @@ struct JournalRecord {
     target_machine_digest: Option<String>,
     request_digest: String,
     outcome: Option<TransactionOutcome>,
+    execution_commitment: Option<ExecutionCommitment>,
     artifact_commitment: Option<ArtifactCommitment>,
     configuration_commitment: Option<ArtifactCommitment>,
 }
@@ -419,6 +461,7 @@ impl JournalRecord {
             request_digest: self.request_digest.clone(),
             authorization: "websocket-bearer-authenticated",
             outcome,
+            execution_commitment: self.execution_commitment.clone(),
             artifact_commitment: self.artifact_commitment.clone(),
             configuration_commitment: self.configuration_commitment.clone(),
         }
@@ -791,9 +834,12 @@ impl TransactionLedger {
                             line_number + 1
                         ));
                     }
-                    if event.artifact_commitment.is_some() || event.configuration_commitment.is_some() {
+                    if event.execution_commitment.is_some()
+                        || event.artifact_commitment.is_some()
+                        || event.configuration_commitment.is_some()
+                    {
                         return Err(format!(
-                            "transaction ledger start event at line {} carries an image commitment",
+                            "transaction ledger start event at line {} carries a post-start commitment",
                             line_number + 1
                         ));
                     }
@@ -803,6 +849,7 @@ impl TransactionLedger {
                         target_machine_digest: event.target_machine_digest,
                         request_digest: event.request_digest,
                         outcome: None,
+                        execution_commitment: None,
                         artifact_commitment: None,
                         configuration_commitment: None,
                     };
@@ -1034,6 +1081,7 @@ impl TransactionLedger {
             target_machine_digest: transaction.target_machine_digest.clone(),
             request_digest: transaction.request_digest.clone(),
             outcome: None,
+            execution_commitment: None,
             artifact_commitment: None,
             configuration_commitment: None,
         })?;
@@ -1253,6 +1301,7 @@ impl TransactionLedger {
             target_machine_digest: transaction.target_machine_digest.clone(),
             request_digest: transaction.request_digest.clone(),
             outcome: Some(outcome),
+            execution_commitment: transaction.execution_commitment.clone(),
             artifact_commitment,
             configuration_commitment,
         })
