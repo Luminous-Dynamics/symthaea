@@ -17,9 +17,9 @@ The reference implementation is in **scripts/qualify_promotion_durable_journal_v
 
 ## Journal integrity
 
-Each event has a unique ID, monotonically allocated sequence, canonical payload, previous-event digest, and SHA-256 event digest. Verification checks the hash chain, sequence continuity, SQLite integrity and foreign keys, required trigger presence, event replay, materialized ledger state, and reservation rows. SQLite triggers reject ordinary journal-row update/delete operations.
+Each event has a unique ID, monotonically allocated sequence, canonical payload, previous-event digest, and SHA-256 event digest. Verification checks the hash chain, sequence continuity, SQLite integrity and foreign keys, required trigger presence, event replay, materialized ledger state, and reservation rows. SQLite triggers reject ordinary journal-row update/delete operations. A separate ledger-state trigger rejects fence regression, revision jumps, and head/lease/generation mutation without advancing the fence.
 
-These are tamper-evidence and consistency checks, not protection against a fully privileged database owner. An owner able to alter the schema and rewrite every event can rebuild the hash chain. A hostile-owner threat model needs an independently controlled signed/checkpointed digest or a separate append-only storage authority.
+These are tamper-evidence and consistency checks, not protection against a fully privileged database owner. An owner able to alter the schema and rewrite every event can rebuild the hash chain. More importantly, SQLite does not provide per-connection database roles: any process with unrestricted write access to the file can attempt arbitrary SQL, including inserting fabricated rows/events or changing the schema. Therefore this model only demonstrates state-machine guards under a trusted database-writer boundary; it does **not** provide identity-aware fencing against a malicious or fully privileged writer. A production deployment needs a narrowly scoped storage service/API or database authorization boundary that does not give stale workers arbitrary mutation rights, plus an independently controlled signed/checkpointed digest or append-only evidence authority.
 
 ## Time semantics
 
