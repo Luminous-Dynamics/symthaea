@@ -156,7 +156,7 @@ jobs:
               raise SystemExit(f"duplicate fuzz target names: {targets!r}")
           PY
       - name: Check fuzz manifest
-        run: cargo check --locked --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
+        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
 
   fuzz-smoke:
     name: ES256 COSE bounded fuzz smoke
