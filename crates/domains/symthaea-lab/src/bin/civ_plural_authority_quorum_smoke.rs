@@ -685,6 +685,24 @@ fn main() {
     .expect("alternate independent quorum should be representable");
     assert_ne!(decision.id, alternate_quorum.id);
 
+    // Scope cannot be expanded by changing only the request while retaining the
+    // prior policy.
+    assert_eq!(
+        approve(
+            evaluation,
+            ConsequenceTier::Critical,
+            Digest("expanded-critical-scope"),
+            candidate,
+            evaluator,
+            &[safety, technical, public],
+            &roster,
+            policy,
+            Digest("scope-without-policy-change"),
+            120,
+        ),
+        Err(QuorumFailure::ScopeNotPermitted)
+    );
+
     // Higher consequence cannot be retroactively inferred from a lower-tier
     // evaluation; the evaluator must explicitly evaluate at the requested tier.
     let low_evaluation = EvaluationReceipt {
