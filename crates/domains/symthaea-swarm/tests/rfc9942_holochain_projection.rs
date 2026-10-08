@@ -335,6 +335,10 @@ fn atomic_priority_selection_api_returns_bound_witness() {
         witness.decision().selected_receipt_sha256,
         Some(witness.decision().candidates[0].receipt_sha256)
     );
+    assert!(matches!(
+        witness.decision().candidates[1].status,
+        symthaea_swarm::rfc9942_selection::ReceiptSelectionCandidateStatus::NotEvaluatedAfterSelection
+    ));
     assert_eq!(
         witness.verified_capability_sha256(),
         verified_outer.receipt().capability_sha256()
@@ -370,12 +374,31 @@ fn noncanonical_receipt_wire_identity_survives_verified_projection() {
     let parsed = collection.receipts()[0].clone();
     assert_eq!(parsed.to_cbor(), noncanonical_wire);
 
+    // The noncanonical top-level array is semantically equivalent for COSE
+    // processing, but its exact wire identity is different. Both therefore
+    // verify the same semantic receipt state while retaining distinct
+    // provenance capabilities.
+    let canonical_verified = canonical_receipt
+        .verify_es256_inclusion_state(b"candidate", &key, &[], None)
+        .unwrap();
     let verified = parsed
         .verify_es256_inclusion_state(b"candidate", &key, &[], None)
         .unwrap();
     assert_eq!(
         verified.receipt_sha256(),
         sha2::Sha256::digest(&noncanonical_wire).into()
+    );
+    assert_ne!(
+        canonical_verified.receipt_sha256(),
+        verified.receipt_sha256()
+    );
+    assert_ne!(
+        canonical_verified.capability_sha256(),
+        verified.capability_sha256()
+    );
+    assert_eq!(
+        canonical_verified.proof(),
+        verified.proof()
     );
 
     let decision = evaluate_priority_first_valid(&collection, |_index, _| Ok(()));
