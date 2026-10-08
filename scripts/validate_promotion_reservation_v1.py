@@ -841,40 +841,74 @@ class ProviderTimestampPolicyV1:
 
 @dataclass(frozen=True)
 class ClockRelationV1:
-    provider_clock_domain: str
-    local_clock_domain: str
-    max_skew_ms: int
+    provider_clock_id: str
+    local_clock_id: str
+    local_minus_provider_lower_bound_ms: int
+    local_minus_provider_upper_bound_ms: int
     verified: bool = False
-    verified_at_local_time_ms: int | None = None
+    measured_at_local_time_ms: int | None = None
     valid_until_local_time_ms: int | None = None
     max_drift_ppm: int = 0
+    verification_method: str = ""
+    verification_evidence_digest: str = ""
 
     def usable(self) -> bool:
         return (
-            bool(self.provider_clock_domain)
-            and bool(self.local_clock_domain)
-            and self.provider_clock_domain != self.local_clock_domain
-            and self.max_skew_ms >= 0
+            bool(self.provider_clock_id)
+            and bool(self.local_clock_id)
+            and self.provider_clock_id != self.local_clock_id
+            and self.local_minus_provider_lower_bound_ms
+            <= self.local_minus_provider_upper_bound_ms
             and self.max_drift_ppm >= 0
             and self.verified
-            and self.verified_at_local_time_ms is not None
+            and self.measured_at_local_time_ms is not None
             and self.valid_until_local_time_ms is not None
-            and self.verified_at_local_time_ms >= 0
-            and self.valid_until_local_time_ms >= self.verified_at_local_time_ms
+            and self.measured_at_local_time_ms >= 0
+            and self.valid_until_local_time_ms >= self.measured_at_local_time_ms
+            and bool(self.verification_method)
+            and bool(self.verification_evidence_digest)
         )
 
-    def effective_skew_ms(self, at_local_time_ms: int) -> int | None:
+    def identity_digest(self) -> str:
+        payload = {
+            "local_clock_id": self.local_clock_id,
+            "local_minus_provider_lower_bound_ms": self.local_minus_provider_lower_bound_ms,
+            "local_minus_provider_upper_bound_ms": self.local_minus_provider_upper_bound_ms,
+            "max_drift_ppm": self.max_drift_ppm,
+            "measured_at_local_time_ms": self.measured_at_local_time_ms,
+            "provider_clock_id": self.provider_clock_id,
+            "valid_until_local_time_ms": self.valid_until_local_time_ms,
+            "verification_evidence_digest": self.verification_evidence_digest,
+            "verification_method": self.verification_method,
+            "verified": self.verified,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def effective_offset_bounds_ms(
+        self,
+        at_local_time_ms: int,
+    ) -> tuple[int, int] | None:
         if not self.usable():
             return None
-        if at_local_time_ms < self.verified_at_local_time_ms:
+        if at_local_time_ms < self.measured_at_local_time_ms:
             return None
         if at_local_time_ms > self.valid_until_local_time_ms:
             return None
-        elapsed_ms = at_local_time_ms - self.verified_at_local_time_ms
+        elapsed_ms = at_local_time_ms - self.measured_at_local_time_ms
         drift_ms = (
             self.max_drift_ppm * elapsed_ms + 999_999
         ) // 1_000_000
-        return self.max_skew_ms + drift_ms
+        return (
+            self.local_minus_provider_lower_bound_ms - drift_ms,
+            self.local_minus_provider_upper_bound_ms + drift_ms,
+        )
 
 
 @dataclass(frozen=True)
@@ -994,22 +1028,25 @@ class ProviderWebhookEffectTimingV1:
         if self.clock_relation is None or not self.clock_relation.usable():
             return "cross-domain-time-unbounded"
 
-        skew = self.clock_relation.effective_skew_ms(
+        offset_bounds = self.clock_relation.effective_offset_bounds_ms(
             self.local_observation_time_ms
         )
-        if skew is None:
+        if offset_bounds is None:
             return "clock-relation-invalid-at-observation"
 
+        offset_lower, offset_upper = offset_bounds
         event_lower = self.provider_event_time_ms
         event_upper = self.provider_event_time_upper_ms
         dispatch = self.local_dispatch_time_ms
         observed = self.local_observation_time_ms
+        local_event_lower = event_lower + offset_lower
+        local_event_upper = event_upper + offset_upper
 
-        if event_upper + skew < dispatch:
+        if local_event_upper < dispatch:
             return "provider-event-before-dispatch"
-        if event_lower - skew > observed:
+        if local_event_lower > observed:
             return "provider-event-after-observation"
-        if event_lower - skew < dispatch or event_upper + skew > observed:
+        if local_event_lower < dispatch or local_event_upper > observed:
             return "cross-domain-time-uncertain"
         return "temporally-admissible"
 
@@ -1707,20 +1744,26 @@ def timestamp_policy_fixture(
 
 def clock_relation_fixture(
     *,
-    max_skew_ms: int = 1000,
+    offset_lower_ms: int = -1000,
+    offset_upper_ms: int = 1000,
     verified: bool = True,
-    verified_at_local_time_ms: int = 1791475190000,
-    valid_until_local_time_ms: int = 1791478800000,
+    measured_at_local_time_ms: int | None = 1791475190000,
+    valid_until_local_time_ms: int | None = 1791478800000,
     max_drift_ppm: int = 0,
+    verification_method: str = "authenticated-time-sample",
+    verification_evidence_digest: str = "clock-evidence-1",
 ) -> ClockRelationV1:
     return ClockRelationV1(
-        provider_clock_domain="github",
-        local_clock_domain="local",
-        max_skew_ms=max_skew_ms,
+        provider_clock_id="github",
+        local_clock_id="local",
+        local_minus_provider_lower_bound_ms=offset_lower_ms,
+        local_minus_provider_upper_bound_ms=offset_upper_ms,
         verified=verified,
-        verified_at_local_time_ms=verified_at_local_time_ms,
+        measured_at_local_time_ms=measured_at_local_time_ms,
         valid_until_local_time_ms=valid_until_local_time_ms,
         max_drift_ppm=max_drift_ppm,
+        verification_method=verification_method,
+        verification_evidence_digest=verification_evidence_digest,
     )
 
 
@@ -2011,7 +2054,7 @@ def test_stack_timing_rejects_mixed_clock_relation_identities():
     assert evidence is not None
     first_timing = effect_timing_fixture()
     second_timing = effect_timing_fixture(
-        clock_relation=clock_relation_fixture(max_skew_ms=2000),
+        clock_relation=clock_relation_fixture(offset_lower_ms=-500, offset_upper_ms=2000),
     )
     timings = PromotionStackEffectTimingSetV1(
         identity.digest(),
@@ -2068,7 +2111,7 @@ def test_timing_identity_detects_clock_relation_tampering():
         local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
-        clock_relation=clock_relation_fixture(max_skew_ms=1001),
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1001),
     )
     assert tampered.identity_digest() != timing.identity_digest()
 
@@ -2189,13 +2232,33 @@ def test_clock_relation_unverified_is_unusable():
     assert not clock_relation_fixture(verified=False).usable()
 
 
-def test_clock_relation_negative_skew_is_unusable():
-    assert not clock_relation_fixture(max_skew_ms=-1, verified=True).usable()
+def test_clock_relation_negative_or_inverted_offset_bounds_are_unusable():
+    assert not clock_relation_fixture(offset_lower_ms=0, offset_upper_ms=-1, verified=True).usable()
 
 
-def test_clock_relation_requires_explicit_validity_window():
+def test_clock_relation_accepts_asymmetric_offset_bounds():
     relation = clock_relation_fixture(
-        verified_at_local_time_ms=None,
+        offset_lower_ms=-400,
+        offset_upper_ms=200,
+    )
+    assert relation.usable()
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-400, 200)
+
+
+def test_clock_relation_requires_verification_method_and_evidence():
+    assert not clock_relation_fixture(
+        verification_method="",
+        verification_evidence_digest="clock-evidence-1",
+    ).usable()
+    assert not clock_relation_fixture(
+        verification_method="authenticated-time-sample",
+        verification_evidence_digest="",
+    ).usable()
+
+
+
+    relation = clock_relation_fixture(
+        measured_at_local_time_ms=None,
         valid_until_local_time_ms=None,
     )
     assert not relation.usable()
@@ -2203,7 +2266,7 @@ def test_clock_relation_requires_explicit_validity_window():
 
 def test_clock_relation_rejects_expiry_before_verification():
     relation = clock_relation_fixture(
-        verified_at_local_time_ms=10,
+        measured_at_local_time_ms=10,
         valid_until_local_time_ms=9,
     )
     assert not relation.usable()
@@ -2211,21 +2274,36 @@ def test_clock_relation_rejects_expiry_before_verification():
 
 def test_clock_relation_expiry_blocks_late_observation():
     relation = clock_relation_fixture(
-        verified_at_local_time_ms=1791475190000,
+        measured_at_local_time_ms=1791475190000,
         valid_until_local_time_ms=1791475200000,
     )
-    assert relation.effective_skew_ms(1791475200000) == 1000
-    assert relation.effective_skew_ms(1791475200001) is None
+    assert relation.effective_offset_bounds_ms(1791475200000) == 1000
+    assert relation.effective_offset_bounds_ms(1791475200001) is None
 
 
-def test_clock_relation_drift_expands_uncertainty_monotonically():
+def test_clock_relation_drift_expands_asymmetric_bounds_monotonically():
     relation = clock_relation_fixture(
-        max_skew_ms=100,
+        offset_lower_ms=-100,
+        offset_upper_ms=50,
         max_drift_ppm=1000,
         valid_until_local_time_ms=1791475290000,
     )
-    assert relation.effective_skew_ms(1791475200000) == 1100
-    assert relation.effective_skew_ms(1791475210000) == 1110
+    assert relation.effective_offset_bounds_ms(1791475200000) == (-1100, 1050)
+    assert relation.effective_offset_bounds_ms(1791475210000) == (-1110, 1060)
+
+
+def test_temporal_effect_with_asymmetric_offset_bounds_is_admissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200400,
+        event_upper_time_ms=1791475200499,
+        dispatch_time_ms=1791475199900,
+        observation_time_ms=1791475200800,
+        clock_relation=clock_relation_fixture(
+            offset_lower_ms=-400,
+            offset_upper_ms=200,
+        ),
+    )
+    assert timing.classify() == "temporally-admissible"
 
 
 def test_temporal_effect_with_valid_skew_is_admissible():
@@ -2242,7 +2320,7 @@ def test_temporal_effect_interval_overlap_is_not_admissible():
         event_upper_time_ms=1791475200999,
         dispatch_time_ms=1791475200500,
         observation_time_ms=1791475202000,
-        clock_relation=clock_relation_fixture(max_skew_ms=600),
+        clock_relation=clock_relation_fixture(offset_lower_ms=-600, offset_upper_ms=600),
     )
     assert timing.classify() == "cross-domain-time-uncertain"
     assert not timing.temporally_admissible()
@@ -2265,7 +2343,7 @@ def test_temporal_effect_drift_can_turn_boundary_into_uncertainty():
         dispatch_time_ms=1791475199000,
         observation_time_ms=1791475203000,
         clock_relation=clock_relation_fixture(
-            max_skew_ms=1,
+            offset_lower_ms=-1, offset_upper_ms=1,
             max_drift_ppm=1000,
             valid_until_local_time_ms=1791475203000,
         ),
@@ -2326,7 +2404,7 @@ def test_temporal_effect_with_uncertain_clock_overlap_is_not_admissible():
     timing = effect_timing_fixture(
         event_time_ms=1728402949500,
         dispatch_time_ms=1728402950000,
-        clock_relation=clock_relation_fixture(max_skew_ms=1000),
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1000),
     )
     assert timing.classify() == "cross-domain-time-uncertain"
     assert not timing.temporally_admissible()
@@ -2337,7 +2415,7 @@ def test_temporal_effect_accepts_exact_skew_boundaries():
         event_time_ms=1791475200000,
         dispatch_time_ms=1791475199000,
         observation_time_ms=1791475201000,
-        clock_relation=clock_relation_fixture(max_skew_ms=1000),
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1000),
     )
     assert timing.classify() == "temporally-admissible"
 
@@ -2365,7 +2443,7 @@ def test_historical_merge_delivered_after_new_reservation_is_inadmissible():
         reservation_time_ms=1791475300000,
         dispatch_time_ms=1791475350000,
         observation_time_ms=1791475500000,
-        clock_relation=clock_relation_fixture(max_skew_ms=1000),
+        clock_relation=clock_relation_fixture(offset_lower_ms=-1, offset_upper_ms=1000),
     )
     assert timing.classify() == "provider-event-before-dispatch"
 
@@ -4896,11 +4974,14 @@ TESTS = [
     test_temporal_effect_without_timestamp_policy_is_not_admissible,
     test_provider_timestamp_parser_rejects_malformed_timestamp,
     test_clock_relation_unverified_is_unusable,
-    test_clock_relation_negative_skew_is_unusable,
+    test_clock_relation_negative_or_inverted_offset_bounds_are_unusable,
+    test_clock_relation_accepts_asymmetric_offset_bounds,
+    test_clock_relation_requires_verification_method_and_evidence,
     test_clock_relation_requires_explicit_validity_window,
     test_clock_relation_rejects_expiry_before_verification,
     test_clock_relation_expiry_blocks_late_observation,
-    test_clock_relation_drift_expands_uncertainty_monotonically,
+    test_clock_relation_drift_expands_asymmetric_bounds_monotonically,
+    test_temporal_effect_with_asymmetric_offset_bounds_is_admissible,
     test_temporal_effect_with_valid_skew_is_admissible,
     test_timing_identity_detects_interval_tampering,
     test_timing_identity_detects_clock_relation_tampering,
