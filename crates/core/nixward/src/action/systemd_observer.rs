@@ -120,6 +120,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd invocation ID changed during definition capture")]
     InvocationIdChanged,
 
+    #[error("post-state InvocationID resolves to a different unit object")]
+    InvocationUnitObjectMismatch,
+
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
 
@@ -915,6 +918,26 @@ impl NixSystemdReadOnlyObserverV1 {
         }
         if post_bus_id != bus_id {
             return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let post_invocation_id = required_invocation_id(&unit_properties)?;
+        if let Some(invocation_id) = post_invocation_id.as_deref() {
+            let invocation_bytes = hex::decode(invocation_id)
+                .map_err(|_| NixSystemdObserverErrorV1::InvalidInvocationId)?;
+            let resolved_path = self
+                .resolve_invocation_id(&invocation_bytes, &expected_unit)
+                .await?;
+            let lookup_owner = self.systemd_manager_owner().await?;
+            let lookup_bus_id = self.dbus_bus_id().await?;
+            if lookup_owner != manager_owner {
+                return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+            }
+            if lookup_bus_id != bus_id {
+                return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+            }
+            if resolved_path.as_str() != object_path.as_str() {
+                return Err(NixSystemdObserverErrorV1::InvocationUnitObjectMismatch);
+            }
         }
 
         let service_result =
