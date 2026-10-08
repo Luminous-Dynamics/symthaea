@@ -170,9 +170,11 @@ It:
 - verifies that one winner can advance the ref;
 - verifies that the stale successor cannot overwrite the winner without force;
 - verifies that the active ref remains on the winner;
+- races two same-parent successors concurrently and requires exactly one publication winner;
 - advances the winner to a newer invalidation successor;
 - verifies rollback/non-fast-forward rejection;
-- deletes the temporary ref even on failure.
+- requires successful cleanup of every temporary ref and verifies the refs are gone;
+- deletes temporary refs on failure as a best-effort containment path.
 
 The workflow establishes provider-level behavior only. It does not make the temporary test ref itself an application authority.
 
@@ -195,6 +197,14 @@ The application-level qualification suite should additionally model:
 13. ledger rollback attempt;
 14. privileged alternate writer path;
 15. recovery from ambiguous publication result.
+
+## Provider race and cleanup boundary
+
+The provider-level lab is intentionally stronger than a sequential demonstration. Its acceptance condition includes a true concurrent same-parent race, where exactly one of two valid successors may advance the ref. The losing successor may remain a valid immutable Git object but is not active because it is unreachable from the current ledger ref.
+
+Successful completion also requires deletion of the temporary refs followed by an explicit 404 observation. Cleanup is therefore part of the positive lab predicate rather than an unverified best-effort side effect.
+
+GitHub's reference API defines non-forced reference updates as fast-forward updates and documents conflict responses; reference deletion also has an explicit provider response contract. The lab establishes those provider mechanics, not an application-level authorization theorem.
 
 ## Claim ceiling
 
