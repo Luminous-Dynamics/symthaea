@@ -65,7 +65,6 @@ pub fn validate_disk_path(d: &str) -> Result<String, String> {
 /// This identifies the opened device by its Linux device number and reported
 /// capacity. It intentionally does not claim to be a globally unique physical
 /// disk identity: device numbers can be reused after hot-unplug/replug.
-#[cfg(target_os = "linux")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockDeviceBinding {
     pub major: u32,
@@ -151,9 +150,14 @@ pub fn verify_block_device_binding(
 }
 
 #[cfg(not(target_os = "linux"))]
+pub fn bind_block_device(_path: &str) -> Result<BlockDeviceBinding, String> {
+    Err("block-device binding is only supported on Linux".into())
+}
+
+#[cfg(not(target_os = "linux"))]
 pub fn verify_block_device_binding(
     _path: &str,
-    _expected: (),
+    _expected: BlockDeviceBinding,
 ) -> Result<(), String> {
     Err("block-device binding is only supported on Linux".into())
 }
