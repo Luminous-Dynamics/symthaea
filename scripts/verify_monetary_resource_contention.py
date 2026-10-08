@@ -8,8 +8,7 @@ EXPECTED_TOPO={"full_mesh","routing_only_hub","redundant_two_hub"}
 EXPECTED_PAIRS={"bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"}
 EXPECTED_ADAPTERS={"redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"}
 EXPECTED_SHOCKS={"normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"}
-EXPECTED_SEEDS={11,23,47,89,131}
-EXPECTED_FIX={f"RES-X{i:02d}" for i in range(1,13)}
+EXPECTED_SEEDS={11,23,47,89,131}; EXPECTED_FIX={f"RES-X{i:02d}" for i in range(1,14)}
 def fail(m): raise ValueError(m)
 def main():
     if len(sys.argv)!=3:
@@ -24,8 +23,9 @@ def main():
             if res["allocation_policy"]!="fifo" or len(res["digest"])!=64: fail(f"resource {name}")
         fd=m["fixed_dimensions"]
         if fd["allocation_policy"]!="fifo" or fd["manual_breakpoint_probability_ppm"]!=300000 or fd["liquidity_shock_increment"]!=5 or fd["no_capacity_inference"] is not True: fail("fixed resource semantics")
+        if fd.get("exogenous_random_namespace")!="world:{shock}:{seed}:obligation:{index}": fail("common-random-number namespace")
         if n.get("schema_version")!="monetary-resource-contention-negative-v1" or {x.get("id") for x in n.get("cases",[])}!=EXPECTED_FIX: fail("negative fixture set")
-        print("independent resource-contention check: 4320 cells / 12960 obligations; 3 resource identities; 4 resource regimes; 12 negative fixtures"); return 0
+        print("independent resource-contention check: 4320 cells / 12960 obligations; treatment-independent CRN namespace; 3 resource identities; 4 resource regimes; 13 negative fixtures"); return 0
     except (OSError,KeyError,TypeError,json.JSONDecodeError,ValueError) as e:
         print(f"verification failed: {e}",file=sys.stderr); return 1
 if __name__=="__main__": raise SystemExit(main())
