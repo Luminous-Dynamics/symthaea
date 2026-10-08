@@ -58,6 +58,39 @@ fn privileged_process(program: &str) -> tokio::process::Command {
     command
 }
 
+fn privileged_isolated_nix_process(
+    program: &str,
+) -> Result<tokio::process::Command, std::io::Error> {
+    let mut command = trusted_typed_process(program)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
+
+    // Nix normally reads system and user configuration files in addition to
+    // process environment. Validation/query operations should not inherit
+    // those ambient local inputs.
+    command.env("NIX_CONF_DIR", "/nonexistent");
+    command.env("NIX_USER_CONF_FILES", "/dev/null");
+    command.env("NIX_CONFIG", "");
+    command.env("NIX_PATH", "");
+    command.env("HOME", "/nonexistent");
+    command.env("XDG_CONFIG_HOME", "/nonexistent");
+    command.env("XDG_CONFIG_DIRS", "/nonexistent");
+    Ok(command)
+}
+
+async fn run_privileged_isolated_nix_args(
+    program: &str,
+    args: &[&str],
+) -> Result<CmdResult, std::io::Error> {
+    let mut command = privileged_isolated_nix_process(program)?;
+    command.args(args);
+    let output = command.output().await?;
+    Ok(CmdResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_status: output.status.code().unwrap_or(1) as u32,
+    })
+}
+
 fn privileged_nix_process(program: &str) -> Result<tokio::process::Command, std::io::Error> {
     let command = trusted_typed_process(program)
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
@@ -4198,7 +4231,7 @@ async fn copy_optional_image_sidecar(
 }
 
 async fn write_installed_packages_sidecar(image_dir: &str) -> Result<(), String> {
-    let result = run_privileged_args("nix-env", &["-qa", "--installed"]).await?;
+    let result = run_privileged_isolated_nix_args("nix-env", &["-qa", "--installed"]).await?;
     if result.exit_status != 0 {
         return Ok(());
     }
@@ -6961,7 +6994,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                 // malformed Nix syntax must never reach the disk-mutation script.
                 if !client_msg.configuration_nix.is_empty() {
                     let config_path = format!("{}/configuration.nix", config_staging_dir);
-                    match run_privileged_args("nix-instantiate", &["--parse", &config_path]).await {
+                    match run_privileged_isolated_nix_args("nix-instantiate", &["--parse", &config_path]).await {
                         Ok(result) if result.exit_status == 0 => {}
                         Ok(result) => {
                             let _ = ws_tx
@@ -9437,7 +9470,7 @@ echo '}'
                     continue;
                 }
 
-                match run_privileged_args("nix-instantiate", &["--parse", &candidate_path]).await {
+                match run_privileged_isolated_nix_args("nix-instantiate", &["--parse", &candidate_path]).await {
                     Ok(result) if result.exit_status == 0 => {}
                     Ok(result) => {
                         remove_transaction_artifact_dir(&transaction_dir);
@@ -10974,7 +11007,7 @@ echo '}'
                 }
 
                 let search_args = ["search", "nixpkgs", safe_query.as_str(), "--json"];
-                match run_privileged_args("nix", &search_args).await {
+                match run_privileged_isolated_nix_args("nix", &search_args).await {
                     Ok(r) if r.exit_status == 0 && !r.stdout.trim().is_empty() => {
                         let mut results = Vec::new();
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r.stdout) {
@@ -11007,7 +11040,7 @@ echo '}'
                     Ok(r) => {
                         let pattern = format!(".*{}.*", safe_query);
                         let fallback_args = ["-qaP", &pattern];
-                        match run_privileged_args("nix-env", &fallback_args).await {
+                        match run_privileged_isolated_nix_args("nix-env", &fallback_args).await {
                             Ok(r2) if r2.exit_status == 0 && !r2.stdout.trim().is_empty() => {
                                 let mut results = Vec::new();
                                 for line in r2.stdout.lines().take(30) {
@@ -11087,7 +11120,7 @@ echo '}'
 
                     // Check if package exists in nixpkgs via nix eval
                     let attr = format!("nixpkgs#{}", pkg_clean);
-                    match run_privileged_args("nix", &["eval", &attr, "--json"]).await {
+                    match run_privileged_isolated_nix_args("nix", &["eval", &attr, "--json"]).await {
                         Ok(r) if r.exit_status == 0 => {
                             valid.push(pkg_clean.clone());
                         }
@@ -11095,7 +11128,7 @@ echo '}'
                             invalid.push(pkg_clean.clone());
                             // Try to find similar packages.
                             if let Ok(sr) =
-                                run_privileged_args("nix", &["search", "nixpkgs", &pkg_clean, "--json"]).await {
+                                run_privileged_isolated_nix_args("nix", &["search", "nixpkgs", &pkg_clean, "--json"]).await {
                                     if !sr.stdout.is_empty() && sr.stdout.trim() != "{}" {
                                         // Extract first few attribute names from JSON
                                         if let Ok(val) =
@@ -11147,7 +11180,7 @@ echo '}'
                 eprintln!("[{}] Querying nixpkgs version...", peer_addr);
                 let version = match run_privileged_args("nixos-version", &[]).await {
                     Ok(r) if r.exit_status == 0 => r.stdout.trim().to_string(),
-                    _ => match run_privileged_args(
+                    _ => match run_privileged_isolated_nix_args(
                         "nix",
                         &["eval", "nixpkgs#lib.version", "--raw"],
                     )
