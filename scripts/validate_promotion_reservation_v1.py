@@ -10,7 +10,7 @@ from datetime import datetime
 import hashlib
 import hmac
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import permutations
 
 _UNSET = object()
@@ -618,6 +618,8 @@ class ClockRelationSourceChallengeV1:
     issued_local_time_ms: int
     expires_local_time_ms: int
     trust_anchor_id: str
+    source_id: str = ""
+    operator_id: str = ""
 
     def canonical_bytes(self) -> bytes:
         payload = {
@@ -626,6 +628,8 @@ class ClockRelationSourceChallengeV1:
             "issued_local_time_ms": self.issued_local_time_ms,
             "nonce_hex": self.nonce_hex,
             "operation_identity_digest": self.operation_identity_digest,
+            "operator_id": self.operator_id,
+            "source_id": self.source_id,
             "trust_anchor_id": self.trust_anchor_id,
         }
         return json.dumps(
@@ -649,6 +653,8 @@ class ClockRelationSourceChallengeV1:
             and len(nonce) == 32
             and nonce != bytes(32)
             and bool(self.trust_anchor_id)
+            and bool(self.source_id)
+            and bool(self.operator_id)
             and self.issued_local_time_ms >= 0
             and self.expires_local_time_ms >= 0
             and self.issued_local_time_ms <= self.expires_local_time_ms
@@ -1064,6 +1070,93 @@ class ClockRelationV1:
             self.classify(dispatch_time_ms, observation_time_ms)
             == "clock-relation-admissible"
         )
+
+
+@dataclass(frozen=True)
+class ClockRelationSourceSetV1:
+    operation_identity_digest: str
+    required_independent_sources: int
+    relations: tuple[ClockRelationV1, ...]
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "operation_identity_digest": self.operation_identity_digest,
+            "relations": [relation.digest() for relation in self.relations],
+            "required_independent_sources": self.required_independent_sources,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def classify(
+        self,
+        dispatch_time_ms: int | None = None,
+        observation_time_ms: int | None = None,
+    ) -> str:
+        if self.required_independent_sources < 3:
+            return "clock-source-policy-too-weak"
+        if len(self.relations) < self.required_independent_sources:
+            return "clock-source-quorum-insufficient"
+
+        source_ids: list[str] = []
+        operator_ids: list[str] = []
+        trust_anchors: list[str] = []
+        provider_domains: list[str] = []
+        intervals: list[tuple[int, int]] = []
+
+        for relation in self.relations:
+            if relation.evidence is None:
+                return "clock-source-quorum-insufficient"
+            evidence = relation.evidence
+            challenge = evidence.source_challenge
+            response = evidence.source_response
+            if challenge is None or response is None:
+                return "clock-source-quorum-insufficient"
+            if challenge.operation_identity_digest != self.operation_identity_digest:
+                return "clock-source-operation-identity-mismatch"
+            source_state = relation.classify(dispatch_time_ms, observation_time_ms)
+            if source_state != "clock-relation-admissible" and (
+                dispatch_time_ms is not None and observation_time_ms is not None
+            ):
+                return source_state
+            source_ids.append(challenge.source_id)
+            operator_ids.append(challenge.operator_id)
+            trust_anchors.append(challenge.trust_anchor_id)
+            provider_domains.append(response.provider_clock_domain)
+            intervals.append(
+                (
+                    response.provider_time_ms - response.uncertainty_radius_ms,
+                    response.provider_time_ms + response.uncertainty_radius_ms,
+                )
+            )
+
+        if (
+            len(set(source_ids)) != len(source_ids)
+            or len(set(operator_ids)) != len(operator_ids)
+            or len(set(trust_anchors)) != len(trust_anchors)
+        ):
+            return "clock-source-independence-invalid"
+        if len(set(provider_domains)) != 1:
+            return "clock-source-domain-mismatch"
+
+        common_low = max(low for low, _ in intervals)
+        common_high = min(high for _, high in intervals)
+        if common_low > common_high:
+            return "clock-source-time-disagreement"
+        return "clock-source-quorum-admissible"
+
+    def usable(
+        self,
+        dispatch_time_ms: int | None = None,
+        observation_time_ms: int | None = None,
+    ) -> bool:
+        return self.classify(dispatch_time_ms, observation_time_ms) == "clock-source-quorum-admissible"
 
 
 @dataclass(frozen=True)
@@ -1931,6 +2024,67 @@ def clock_relation_fixture(
 DEFAULT_CLOCK_RELATION = clock_relation_fixture()
 
 
+def clock_relation_source_set_fixture(
+    *,
+    provider_time_offsets_ms: tuple[int, ...] = (-250, 0, 250),
+    required_independent_sources: int = 3,
+) -> ClockRelationSourceSetV1:
+    base = clock_relation_fixture()
+    assert base.evidence is not None
+    assert base.verification is not None
+    assert base.trust_snapshot is not None
+    relations: list[ClockRelationV1] = []
+
+    for index, offset in enumerate(provider_time_offsets_ms, start=1):
+        challenge = replace(
+            base.evidence.source_challenge,
+            challenge_id=f"clock-challenge-{index}",
+            nonce_hex=f"{10 + index:02x}" * 32,
+            trust_anchor_id=f"time-anchor-{index}",
+            source_id=f"time-source-{index}",
+            operator_id=f"time-operator-{index}",
+        )
+        response = replace(
+            base.evidence.source_response,
+            challenge_digest=challenge.digest(),
+            provider_time_ms=1791475200000 + offset,
+            response_id=f"clock-response-{index}",
+            response_payload_digest=f"{40 + index:02x}" * 32,
+            trust_anchor_id=challenge.trust_anchor_id,
+        )
+        attestation = replace(
+            base.evidence.source_attestation,
+            challenge_digest=challenge.digest(),
+            response_digest=response.digest(),
+            signed_payload_digest=response.signed_payload_digest,
+            trust_anchor_id=challenge.trust_anchor_id,
+        )
+        evidence = replace(
+            base.evidence,
+            evidence_id=f"clock-evidence-{index}",
+            source_challenge=challenge,
+            source_response=response,
+            source_attestation=attestation,
+        )
+        verification = replace(
+            base.verification,
+            evidence_digest=evidence.digest(),
+        )
+        relations.append(
+            ClockRelationV1(
+                evidence=evidence,
+                verification=verification,
+                trust_snapshot=base.trust_snapshot,
+            )
+        )
+
+    return ClockRelationSourceSetV1(
+        operation_identity_digest=stack_identity_fixture().digest(),
+        required_independent_sources=required_independent_sources,
+        relations=tuple(relations),
+    )
+
+
 def local_sequence_fixture(
     operation_identity_digest: str | None = None,
     *,
@@ -2031,6 +2185,84 @@ def test_provider_timestamp_parser_accepts_utc_and_offset():
 def test_provider_timestamp_parser_rejects_malformed_timestamp():
     assert parse_provider_timestamp_ms("not-a-timestamp") is None
     assert parse_provider_timestamp_ms("2026-10-08T16:00:00") is None
+
+
+def test_clock_source_set_accepts_three_independent_sources():
+    source_set = clock_relation_source_set_fixture()
+    assert source_set.classify() == "clock-source-quorum-admissible"
+    assert source_set.usable()
+
+
+def test_clock_source_set_requires_at_least_three_sources():
+    source_set = clock_relation_source_set_fixture(
+        provider_time_offsets_ms=(0, 100),
+        required_independent_sources=3,
+    )
+    assert source_set.classify() == "clock-source-quorum-insufficient"
+
+
+def test_clock_source_set_rejects_weak_policy():
+    source_set = clock_relation_source_set_fixture(required_independent_sources=2)
+    assert source_set.classify() == "clock-source-policy-too-weak"
+
+
+def test_clock_source_set_rejects_duplicate_operator():
+    source_set = clock_relation_source_set_fixture()
+    first = source_set.relations[0]
+    second = source_set.relations[1]
+    assert first.evidence is not None and second.evidence is not None
+    second_challenge = replace(
+        second.evidence.source_challenge,
+        operator_id=first.evidence.source_challenge.operator_id,
+    )
+    second_evidence = replace(second.evidence, source_challenge=second_challenge)
+    second_verification = replace(
+        second.verification,
+        evidence_digest=second_evidence.digest(),
+    )
+    altered = replace(
+        second,
+        evidence=second_evidence,
+        verification=second_verification,
+    )
+    relations = (first, altered, source_set.relations[2])
+    assert ClockRelationSourceSetV1(
+        source_set.operation_identity_digest,
+        source_set.required_independent_sources,
+        relations,
+    ).classify() == "clock-source-independence-invalid"
+
+
+def test_clock_source_set_rejects_time_disagreement():
+    source_set = clock_relation_source_set_fixture(
+        provider_time_offsets_ms=(-250, 0, 10000),
+    )
+    assert source_set.classify() == "clock-source-time-disagreement"
+
+
+def test_clock_source_set_binds_operation_identity():
+    source_set = clock_relation_source_set_fixture()
+    altered = replace(
+        source_set,
+        operation_identity_digest="foreign-operation",
+    )
+    assert altered.classify() == "clock-source-operation-identity-mismatch"
+
+
+def test_clock_source_set_digest_changes_with_member():
+    source_set = clock_relation_source_set_fixture()
+    altered_relation = replace(
+        source_set.relations[0],
+        trust_snapshot=replace(
+            source_set.relations[0].trust_snapshot,
+            snapshot_local_time_ms=1791475191001,
+        ),
+    )
+    altered = replace(
+        source_set,
+        relations=(altered_relation, *source_set.relations[1:]),
+    )
+    assert altered.digest() != source_set.digest()
 
 
 def test_clock_relation_unverified_is_unusable():
