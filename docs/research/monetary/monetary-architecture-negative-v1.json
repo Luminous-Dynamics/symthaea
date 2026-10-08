@@ -1,0 +1,75 @@
+{
+  "schema_version": "monetary-architecture-negative-v1",
+  "cases": [
+    {
+      "id": "MAP-X01",
+      "kind": "missing_inheritance",
+      "profile": {
+        "schema_version":"monetary-architecture-profile-v1",
+        "profile_id":"negative-missing-inheritance",
+        "semantic_version":"1.0.0",
+        "title":"Negative: missing mechanism",
+        "classification":"architecture",
+        "evidence_maturity":"A",
+        "evidence_refs":["synthetic://negative"],
+        "claim_ceiling":"Negative fixture only.",
+        "provenance":{"source_type":"synthetic_fixture","source_id":"synthetic://negative","profile_digest":"0000000000000000000000000000000000000000000000000000000000000000"},
+        "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
+        "monetary_primitives":{
+          "unit_of_account":{"status":"specified","definition":"x"},
+          "medium_of_exchange":{"status":"specified","definition":"x"},
+          "payment_instrument":{"status":"specified","definition":"x"},
+          "store_of_value_claim":{"status":"specified","definition":"x"},
+          "issuer_liability":{"status":"specified","definition":"x"},
+          "credit_creation":{"status":"specified","definition":"x"},
+          "reserve_or_backing":{"status":"specified","definition":"x"},
+          "settlement_asset":{"status":"underdetermined"},
+          "redemption_convertibility":{"status":"specified","definition":"x"},
+          "transaction_finality":{"status":"specified","definition":"x"},
+          "liquidity_backstop":{"status":"specified","definition":"x"},
+          "clearing_topology":{"status":"specified","definition":"x"},
+          "interoperability":{"status":"specified","definition":"x"},
+          "default_loss_allocation":{"status":"specified","definition":"x"},
+          "governance_legal_finality":{"status":"specified","definition":"x"}
+        },
+        "institutional_composition":{
+          "ownership":{"status":"underdetermined"},
+          "allocation":{"status":"underdetermined"},
+          "governance":{"status":"underdetermined"},
+          "ecological_constraints":{"status":"underdetermined"}
+        },
+        "transplant_contract":{"mutable_layer":"monetary_primitives","protected_layers":["ownership","allocation","governance","ecological_constraints"],"comparison_rule":"candidate may differ only in mutable_layer"}
+      }
+    },
+    {
+      "id":"MAP-X02",
+      "kind":"cross_layer_mutation",
+      "baseline": {
+        "schema_version":"monetary-architecture-profile-v1",
+        "profile_id":"negative-baseline",
+        "semantic_version":"1.0.0",
+        "title":"Negative baseline",
+        "classification":"architecture",
+        "evidence_maturity":"D",
+        "evidence_refs":["synthetic://negative"],
+        "claim_ceiling":"Negative fixture only.",
+        "provenance":{"source_type":"synthetic_fixture","source_id":"synthetic://negative","profile_digest":"0000000000000000000000000000000000000000000000000000000000000000"},
+        "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
+        "monetary_primitives":{},"institutional_composition":{},"transplant_contract":{}
+      },
+      "candidate": {
+        "schema_version":"monetary-architecture-profile-v1",
+        "profile_id":"negative-candidate",
+        "semantic_version":"1.0.0",
+        "title":"Negative candidate",
+        "classification":"architecture",
+        "evidence_maturity":"D",
+        "evidence_refs":["synthetic://negative"],
+        "claim_ceiling":"Negative fixture only.",
+        "provenance":{"source_type":"synthetic_fixture","source_id":"synthetic://negative","profile_digest":"0000000000000000000000000000000000000000000000000000000000000000"},
+        "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
+        "monetary_primitives":{},"institutional_composition":{},"transplant_contract":{}
+      }
+    }
+  ]
+}
