@@ -52,6 +52,12 @@ def main() -> None:
     completion_guard = ledger.find(
         "transaction ledger completion at line {} changes the execution commitment"
     )
+    install_success_guard = ledger.find(
+        "successful install transactions require a durable execution commitment"
+    )
+    if install_success_guard < 0:
+        fail("successful install transactions lost mandatory execution evidence")
+
     if completion_guard < 0:
         fail("completion no longer rejects execution-commitment mutation")
 
