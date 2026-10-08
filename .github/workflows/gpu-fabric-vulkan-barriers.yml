@@ -52,6 +52,7 @@ jobs:
           rm -rf .ci/gpu-fabric-workspace
           mkdir -p .ci/gpu-fabric-workspace/src
           cp -R crates/core/symthaea-gpu-fabric/src/. .ci/gpu-fabric-workspace/src/
+          cp .github/scripts/verify-gpu-fabric-vulkan-qualification.py .ci/gpu-fabric-workspace/qualification-independent-verifier.py
           cp crates/core/symthaea-gpu-fabric/Cargo.toml .ci/gpu-fabric-workspace/Cargo.toml
           sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "=1.8.5"/' -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' .ci/gpu-fabric-workspace/Cargo.toml
           printf '\n[workspace]\nresolver = "2"\n' >> .ci/gpu-fabric-workspace/Cargo.toml
@@ -93,7 +94,8 @@ jobs:
             > vulkan-package-versions.txt
           find src -type f -print0 | sort -z | xargs -0 sha256sum > source-sha256.txt
           sha256sum Cargo.toml Cargo.lock metadata.json vulkan-package-versions.txt > qualification-input-sha256.txt
-          sha256sum ${GITHUB_WORKSPACE}/.github/workflows/gpu-fabric-vulkan-barriers.yml ${GITHUB_WORKSPACE}/.github/scripts/check-workflow-draft-safety.py >> qualification-input-sha256.txt
+          sha256sum ${GITHUB_WORKSPACE}/.github/workflows/gpu-fabric-vulkan-barriers.yml ${GITHUB_WORKSPACE}/.github/scripts/check-workflow-draft-safety.py ${GITHUB_WORKSPACE}/.github/scripts/verify-gpu-fabric-vulkan-qualification.py >> qualification-input-sha256.txt
+          sha256sum qualification-independent-verifier.py > qualification-independent-verifier-source.sha256
 
       - name: Compile barrier workload harness
         working-directory: .ci/gpu-fabric-workspace
@@ -104,7 +106,7 @@ jobs:
         working-directory: .ci/gpu-fabric-workspace
         run: |
           set -o pipefail
-          cargo test --locked --features vulkan --lib -- --ignored --nocapture --test-threads=1 real_vulkan_runtime_constructs_and_drops 2>&1 | tee qualification-preflight.txt
+          timeout --foreground --kill-after=15s 180s cargo test --locked --features vulkan --lib -- --ignored --nocapture --test-threads=1 real_vulkan_runtime_constructs_and_drops 2>&1 | tee qualification-preflight.txt
 
       - name: Execute real workload barrier qualification
         id: execute_runtime
@@ -112,8 +114,17 @@ jobs:
         working-directory: .ci/gpu-fabric-workspace
         run: |
           set -o pipefail
-          cargo test --locked --features vulkan --lib -- --ignored --nocapture --test-threads=1 real_vulkan_barrier_workload_matches_cpu_oracle 2>&1 | tee qualification-runtime.txt
+          timeout --foreground --kill-after=15s 180s cargo test --locked --features vulkan --lib -- --ignored --nocapture --test-threads=1 real_vulkan_barrier_workload_matches_cpu_oracle 2>&1 | tee qualification-runtime.txt
 
+      - name: Independently verify Vulkan qualification witness
+        id: verify_witness
+        if: ${{ steps.execute_runtime.outcome == 'success' }}
+        working-directory: .ci/gpu-fabric-workspace
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 60s python3 qualification-independent-verifier.py --runtime qualification-runtime.txt --environment qualification-environment.txt --source-sha256 source-sha256.txt --lock Cargo.lock --lock-sha256 dependency-lock.sha256 --metadata metadata.json --cargo-toml Cargo.toml --package-versions vulkan-package-versions.txt --input-sha256 qualification-input-sha256.txt --expected-commit "$EXPECTED_QUALIFICATION_SHA" 2>&1 | tee qualification-independent-verifier.txt
       - name: Capture native crash backtrace
         if: ${{ failure() && (steps.runtime_preflight.outcome == 'failure' || steps.execute_runtime.outcome == 'failure') }}
         working-directory: .ci/gpu-fabric-workspace
@@ -130,7 +141,7 @@ jobs:
           {
             echo "test_binary=$TEST_BINARY"
             echo "test_filter=$TEST_FILTER"
-            gdb -q -batch \
+            timeout --foreground --kill-after=15s 180s gdb -q -batch \
               -ex 'set pagination off' \
               -ex 'set confirm off' \
               -ex 'handle SIGSEGV stop print nopass' \
@@ -171,6 +182,9 @@ jobs:
           sha256sum qualification-preflight.txt | tee qualification-preflight.sha256
           sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
           sha256sum qualification-gdb.txt | tee qualification-gdb.sha256
+          if test -f qualification-independent-verifier.txt; then :; else printf "qualification_independent_verifier=not_reached\n" > qualification-independent-verifier.txt; fi
+          sha256sum qualification-independent-verifier.txt | tee qualification-independent-verifier.sha256
+          sha256sum qualification-independent-verifier.py | tee qualification-independent-verifier-source.sha256
       - name: Upload immutable qualification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -192,3 +206,7 @@ jobs:
             .ci/gpu-fabric-workspace/qualification-runtime.sha256
             .ci/gpu-fabric-workspace/qualification-gdb.txt
             .ci/gpu-fabric-workspace/qualification-gdb.sha256
+            .ci/gpu-fabric-workspace/qualification-independent-verifier.py
+            .ci/gpu-fabric-workspace/qualification-independent-verifier.txt
+            .ci/gpu-fabric-workspace/qualification-independent-verifier.sha256
+            .ci/gpu-fabric-workspace/qualification-independent-verifier-source.sha256
