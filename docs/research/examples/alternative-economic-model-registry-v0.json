@@ -1,0 +1,103 @@
+{
+  "schema_version": "alternative-economic-model-profile-v0",
+  "registry_version": "v0",
+  "entries": [
+    {
+      "model_id": "creditism-v0",
+      "name": "Creditism",
+      "classification": "whole_system",
+      "primary_divergence": "Non-transferable or purpose-typed credit with separate contribution recognition and settlement deletion circuits.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "sovereign-money-100m-v0",
+      "name": "Sovereign Money / 100%-Money",
+      "classification": "architecture",
+      "primary_divergence": "Transaction-money issuance is institutionally separated from bank lending.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "market-socialism-cooperative-v0",
+      "name": "Market Socialism / Cooperative Ownership",
+      "classification": "whole_system",
+      "primary_divergence": "Market price coordination is retained while productive ownership and control are socialized or democratized.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "democratic-negotiated-planning-v0",
+      "name": "Democratic Negotiated Planning",
+      "classification": "whole_system",
+      "primary_divergence": "Production and allocation are coordinated through negotiated multi-level plans with substantial local autonomy.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "parecon-v0",
+      "name": "Participatory Economics",
+      "classification": "whole_system",
+      "primary_divergence": "Nested participatory councils negotiate consumption and production plans under explicit participation rules.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "distributed-commonist-planning-v0",
+      "name": "Distributed Commonist Planning",
+      "classification": "whole_system",
+      "primary_divergence": "In-kind mediation and distributed production protocols replace monetary/value mediation.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "islamic-risk-sharing-finance-v0",
+      "name": "Islamic Risk-Sharing Finance",
+      "classification": "architecture",
+      "primary_divergence": "Asset-backed and profit/loss-sharing contracts replace interest-centered risk-transfer structures.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "community-wealth-building-v0",
+      "name": "Community Wealth Building",
+      "classification": "architecture",
+      "primary_divergence": "Local/community ownership, anchor procurement, and wealth retention redirect accumulation toward place-based control.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "post-growth-degrowth-v0",
+      "name": "Post-Growth / Degrowth",
+      "classification": "macro_regime",
+      "primary_divergence": "Ecological throughput and social sufficiency are binding macro constraints rather than perpetual GDP growth.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "polycentric-commons-v0",
+      "name": "Polycentric Commons",
+      "classification": "overlay",
+      "primary_divergence": "Nested and partially autonomous governance units manage shared resources through locally adapted rules.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "piketty-participatory-socialism-v0",
+      "name": "Participatory Socialism / Predistribution",
+      "classification": "whole_system",
+      "primary_divergence": "Co-determination, broad capital circulation, public provision, and progressive wealth/inheritance taxation reshape ownership power while retaining market allocation.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "social-dividend-socialism-v0",
+      "name": "Social Dividend Socialism",
+      "classification": "variant",
+      "primary_divergence": "A universal social dividend replaces wage labour as the primary distribution mechanism inside participatory planning.",
+      "parent_model_id": "democratic-negotiated-planning-v0"
+    },
+    {
+      "model_id": "mmt-job-guarantee-v0",
+      "name": "MMT-style Fiscal-Monetary Regime + Job Guarantee",
+      "classification": "macro_regime",
+      "primary_divergence": "Sovereign fiscal-monetary coordination is coupled to a standing employment stabilizer.",
+      "parent_model_id": null
+    }
+  ],
+  "notes": [
+    "Classification is semantic, not evaluative.",
+    "A registry entry does not imply validation.",
+    "Overlays and macro regimes should be composable with whole-system profiles.",
+    "Unknown or underdetermined mechanisms must remain explicit rather than inherited from Creditism."
+  ]
+}
