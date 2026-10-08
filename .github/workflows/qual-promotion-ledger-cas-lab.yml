@@ -39,6 +39,14 @@ jobs:
                 ;;
             esac
           }
+          for lab_ref_path in "${ref_path}" "${race_ref_path}" "${force_ref_path}" "${recreate_ref_path}"; do
+            is_lab_ref_path "${lab_ref_path}"
+          done
+          if is_lab_ref_path "refs/heads/main"; then
+            echo "ref helper unexpectedly permits main" >&2
+            exit 1
+          fi
+
           delete_ref() {
             local target_ref_path="$1"
             local status
