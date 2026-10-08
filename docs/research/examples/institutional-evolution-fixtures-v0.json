@@ -6,6 +6,12 @@
     "does not establish political legitimacy",
     "does not establish economic superiority"
   ],
+  "initial_rule_set": {
+    "operational": "op-rule-v0",
+    "collective_choice": "cc-rule-v0",
+    "constitutional": "constitution-v0",
+    "meta_constitutional": "meta-v0"
+  },
   "valid": [
     {
       "id": "IE-001",
