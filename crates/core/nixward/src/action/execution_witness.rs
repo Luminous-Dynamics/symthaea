@@ -21,6 +21,7 @@ pub struct NixLiveExecutionWitnessV1 {
     projection_digest: String,
     pre_state_identity: Option<String>,
     service_definition_content_digest: Option<String>,
+    service_manager_owner: Option<String>,
     pre_invocation_id: Option<String>,
 }
 
@@ -52,6 +53,7 @@ impl NixLiveExecutionWitnessV1 {
             service_definition_content_digest: authority
                 .service_definition_content_digest()
                 .map(str::to_owned),
+            service_manager_owner: authority.service_manager_owner().map(str::to_owned),
             pre_invocation_id: authority
                 .service_effect_context_pre_invocation_id(),
         })
@@ -81,6 +83,10 @@ impl NixLiveExecutionWitnessV1 {
         self.service_definition_content_digest.as_deref()
     }
 
+    pub fn service_manager_owner(&self) -> Option<&str> {
+        self.service_manager_owner.as_deref()
+    }
+
     pub fn pre_invocation_id(&self) -> Option<&str> {
         self.pre_invocation_id.as_deref()
     }
@@ -93,6 +99,7 @@ impl NixLiveExecutionWitnessV1 {
         projection_digest: impl Into<String>,
         pre_state_identity: Option<String>,
         service_definition_content_digest: Option<String>,
+        service_manager_owner: Option<String>,
         pre_invocation_id: Option<String>,
     ) -> Self {
         Self {
@@ -102,6 +109,7 @@ impl NixLiveExecutionWitnessV1 {
             projection_digest: projection_digest.into(),
             pre_state_identity,
             service_definition_content_digest,
+            service_manager_owner,
             pre_invocation_id,
         }
     }
