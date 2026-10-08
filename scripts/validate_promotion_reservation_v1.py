@@ -5,10 +5,16 @@ claim_ceiling=deterministic local transaction/reconciliation model only
 promotion_authority=false
 """
 
+import base64
+import binascii
 import hashlib
 import json
+import subprocess
+import tempfile
 from dataclasses import dataclass
+from functools import lru_cache
 from itertools import permutations
+from pathlib import Path
 
 
 @dataclass
@@ -355,25 +361,20 @@ class ProviderTopologyCasExecutionV1:
 
 
 @dataclass(frozen=True)
-class ProviderTopologyCasAttestationV1:
-    """Synthetic provider-attestation statement bound to one execution witness."""
-    attestation_source: str
-    attestation_id: str
-    provider_operation_id: str
-    execution_digest: str
-    statement: str
+class ProviderTopologyCasDsseEnvelopeV1:
+    """Single-signature DSSE envelope for the exact provider topology statement."""
+    payload_type: str
+    payload_base64: str
+    key_id: str
+    signature_base64: str
 
     def canonical_bytes(self) -> bytes:
-        payload = {
-            "attestation": "provider-topology-cas-v1",
-            "attestation_id": self.attestation_id,
-            "attestation_source": self.attestation_source,
-            "execution_digest": self.execution_digest,
-            "provider_operation_id": self.provider_operation_id,
-            "statement": self.statement,
-        }
         return json.dumps(
-            payload,
+            {
+                "payloadType": self.payload_type,
+                "payload": self.payload_base64,
+                "signatures": [{"keyid": self.key_id, "sig": self.signature_base64}],
+            },
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=True,
@@ -382,42 +383,86 @@ class ProviderTopologyCasAttestationV1:
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
-    @classmethod
-    def from_execution(
-        cls,
-        execution: ProviderTopologyCasExecutionV1,
-        attestation_id: str = "attestation-1",
-    ) -> "ProviderTopologyCasAttestationV1":
-        return cls(
-            attestation_source="provider-attestation",
-            attestation_id=attestation_id,
-            provider_operation_id=execution.provider_operation_id,
-            execution_digest=execution.digest(),
-            statement="predicate-enforced",
+    def decoded_payload(self) -> bytes:
+        return base64.b64decode(self.payload_base64, validate=True)
+
+    def pae(self) -> bytes:
+        payload_type = self.payload_type.encode("utf-8")
+        payload = self.decoded_payload()
+        # DSSEv1 PAE: "DSSEv1 " + LEN(type) + " " + type + " " + LEN(payload) + " " + payload
+        return (
+            b"DSSEv1 "
+            + str(len(payload_type)).encode("ascii")
+            + b" "
+            + payload_type
+            + b" "
+            + str(len(payload)).encode("ascii")
+            + b" "
+            + payload
         )
 
-    def validates(self, execution: ProviderTopologyCasExecutionV1) -> bool:
-        return self == type(self).from_execution(execution, self.attestation_id)
+
+@dataclass(frozen=True)
+class ProviderTopologyCasTrustRootV1:
+    """Out-of-band verifier policy; never accepted from the attestation itself."""
+    trust_root_id: str
+    generation: int
+    repository: str
+    signer_identity: str
+    key_id: str
+    public_key_pem: str
+
+
+@dataclass(frozen=True)
+class ProviderTopologyCasAttestationV1:
+    """DSSE envelope containing a signed in-toto statement for topology enforcement."""
+    envelope: ProviderTopologyCasDsseEnvelopeV1
+
+    def canonical_bytes(self) -> bytes:
+        return json.dumps(
+            {
+                "attestation": "provider-topology-cas-v1",
+                "envelope_digest": self.envelope.digest(),
+                "envelope": json.loads(self.envelope.canonical_bytes()),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
 @dataclass(frozen=True)
 class ProviderTopologyCasVerificationV1:
-    """Synthetic independent verification witness for one provider attestation."""
+    """Receipt from actual DSSE Ed25519 verification against an out-of-band trust root."""
     verifier_source: str
     verification_method: str
     attestation_digest: str
     verification_result: str
+    trust_root_id: str
+    trust_root_generation: int
+    signer_identity: str
+    subject_repository: str
+    operation_identity_digest: str
+    key_id: str
 
     def canonical_bytes(self) -> bytes:
-        payload = {
-            "attestation_digest": self.attestation_digest,
-            "verification": "provider-topology-cas-v1",
-            "verification_method": self.verification_method,
-            "verification_result": self.verification_result,
-            "verifier_source": self.verifier_source,
-        }
         return json.dumps(
-            payload,
+            {
+                "verification": "provider-topology-cas-v1",
+                "verifier_source": self.verifier_source,
+                "verification_method": self.verification_method,
+                "attestation_digest": self.attestation_digest,
+                "verification_result": self.verification_result,
+                "trust_root_id": self.trust_root_id,
+                "trust_root_generation": self.trust_root_generation,
+                "signer_identity": self.signer_identity,
+                "subject_repository": self.subject_repository,
+                "operation_identity_digest": self.operation_identity_digest,
+                "key_id": self.key_id,
+            },
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=True,
@@ -426,25 +471,33 @@ class ProviderTopologyCasVerificationV1:
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
-    @classmethod
-    def from_attestation(
-        cls,
+    def validates(
+        self,
         attestation: ProviderTopologyCasAttestationV1,
-    ) -> "ProviderTopologyCasVerificationV1":
-        return cls(
-            verifier_source="independent-verifier",
-            verification_method="canonical-binding-v1",
-            attestation_digest=attestation.digest(),
-            verification_result="verified",
+        trust_root: ProviderTopologyCasTrustRootV1,
+        identity: PromotionOperationIdentityV1,
+        observation: ProviderStackObservationV1,
+        pre_submit_sequence: int,
+        request: ProviderTopologyCasRequestV1,
+        submission: ProviderTopologyCasSubmissionV1,
+        execution: ProviderTopologyCasExecutionV1,
+    ) -> bool:
+        verified = verify_provider_topology_cas_attestation(
+            attestation,
+            trust_root,
+            identity,
+            observation,
+            pre_submit_sequence,
+            request,
+            submission,
+            execution,
         )
-
-    def validates(self, attestation: ProviderTopologyCasAttestationV1) -> bool:
-        return self == type(self).from_attestation(attestation)
+        return verified is not None and self == verified
 
 
 @dataclass(frozen=True)
 class ProviderTopologyCasProviderResultV1:
-    """Canonical provider result separating admission, enforcement, and attestation verification."""
+    """Canonical provider result separating admission, enforcement, and authenticated statement."""
     result_source: str
     provider_operation_id: str
     request_digest: str
@@ -484,6 +537,10 @@ class ProviderTopologyCasProviderResultV1:
         request: ProviderTopologyCasRequestV1,
         submission: ProviderTopologyCasSubmissionV1,
         predicate: ProviderTopologyCasPredicateV1,
+        identity: PromotionOperationIdentityV1,
+        observation: ProviderStackObservationV1,
+        pre_submit_sequence: int,
+        trust_root: ProviderTopologyCasTrustRootV1,
     ) -> bool:
         if (
             self.result_source != "provider-operation-result"
@@ -503,12 +560,187 @@ class ProviderTopologyCasProviderResultV1:
         attestation = self.attestation
         if attestation is None or self.attestation_digest != attestation.digest():
             return False
-        if not attestation.validates(execution):
-            return False
         verification = self.verification
         if verification is None or self.verification_digest != verification.digest():
             return False
-        return verification.validates(attestation)
+        return verification.validates(
+            attestation,
+            trust_root,
+            identity,
+            observation,
+            pre_submit_sequence,
+            request,
+            submission,
+            execution,
+        )
+
+
+def _strict_json_object(pairs):
+    out = {}
+    for key, value in pairs:
+        if key in out:
+            raise ValueError("duplicate JSON object key")
+        out[key] = value
+    return out
+
+
+def _provider_topology_statement(
+    identity: PromotionOperationIdentityV1,
+    observation: ProviderStackObservationV1,
+    pre_submit_sequence: int,
+    request: ProviderTopologyCasRequestV1,
+    submission: ProviderTopologyCasSubmissionV1,
+    execution: ProviderTopologyCasExecutionV1,
+    trust_root: ProviderTopologyCasTrustRootV1,
+) -> dict:
+    return {
+        "_type": "https://in-toto.io/Statement/v1",
+        "subject": [
+            {
+                "name": identity.repository,
+                "digest": {"sha256": identity.digest()},
+            }
+        ],
+        "predicateType": "https://luminousdynamics.org/attestations/provider-topology-cas/v1",
+        "predicate": {
+            "attestation_id": "attestation-1",
+            "statement": "predicate-enforced",
+            "signer_identity": trust_root.signer_identity,
+            "repository": identity.repository,
+            "operation_identity_digest": identity.digest(),
+            "request_digest": request.digest(),
+            "submission_digest": submission.digest(),
+            "provider_operation_id": execution.provider_operation_id,
+            "execution_digest": execution.digest(),
+            "predicate_digest": request.predicate_digest,
+            "observation_digest": observation.digest(),
+            "pre_submit_sequence": pre_submit_sequence,
+            "trust_root_id": trust_root.trust_root_id,
+            "trust_root_generation": trust_root.generation,
+            "governance_generation": identity.governance_generation,
+        },
+    }
+
+
+def _canonical_json_bytes(value: dict) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+
+
+def _public_key_fingerprint(public_key_pem: str) -> str | None:
+    try:
+        with tempfile.TemporaryDirectory(prefix="topology-cas-key-") as temp:
+            key_path = Path(temp) / "public.pem"
+            key_path.write_text(public_key_pem, encoding="utf-8")
+            result = subprocess.run(
+                ["openssl", "pkey", "-pubin", "-in", str(key_path), "-outform", "DER"],
+                check=False,
+                capture_output=True,
+                timeout=10,
+            )
+            if result.returncode != 0 or not result.stdout:
+                return None
+            return "sha256:" + hashlib.sha256(result.stdout).hexdigest()
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def verify_provider_topology_cas_attestation(
+    attestation: ProviderTopologyCasAttestationV1,
+    trust_root: ProviderTopologyCasTrustRootV1,
+    identity: PromotionOperationIdentityV1,
+    observation: ProviderStackObservationV1,
+    pre_submit_sequence: int,
+    request: ProviderTopologyCasRequestV1,
+    submission: ProviderTopologyCasSubmissionV1,
+    execution: ProviderTopologyCasExecutionV1,
+) -> ProviderTopologyCasVerificationV1 | None:
+    """Cryptographically verify DSSE PAE with Ed25519 and then enforce exact claims.
+
+    The trusted key and signer/repository policy are supplied out-of-band. This is
+    intentionally not a GitHub-topology-CAS adapter; it only verifies evidence.
+    """
+    if (
+        trust_root.generation != identity.trust_root_generation
+        or trust_root.repository != identity.repository
+        or pre_submit_sequence <= 0
+        or attestation.envelope.payload_type != "application/vnd.in-toto+json"
+    ):
+        return None
+    envelope = attestation.envelope
+    if envelope.key_id != trust_root.key_id:
+        return None
+    if _public_key_fingerprint(trust_root.public_key_pem) != trust_root.key_id:
+        return None
+    try:
+        payload = envelope.decoded_payload()
+        signature = base64.b64decode(envelope.signature_base64, validate=True)
+        parsed = json.loads(payload.decode("utf-8"), object_pairs_hook=_strict_json_object)
+        if not isinstance(parsed, dict) or _canonical_json_bytes(parsed) != payload:
+            return None
+        expected = _provider_topology_statement(
+            identity,
+            observation,
+            pre_submit_sequence,
+            request,
+            submission,
+            execution,
+            trust_root,
+        )
+        if parsed != expected:
+            return None
+        with tempfile.TemporaryDirectory(prefix="topology-cas-verify-") as temp:
+            key_path = Path(temp) / "public.pem"
+            message_path = Path(temp) / "pae.bin"
+            signature_path = Path(temp) / "signature.bin"
+            key_path.write_text(trust_root.public_key_pem, encoding="utf-8")
+            message_path.write_bytes(envelope.pae())
+            signature_path.write_bytes(signature)
+            result = subprocess.run(
+                [
+                    "openssl",
+                    "pkeyutl",
+                    "-verify",
+                    "-pubin",
+                    "-inkey",
+                    str(key_path),
+                    "-rawin",
+                    "-in",
+                    str(message_path),
+                    "-sigfile",
+                    str(signature_path),
+                ],
+                check=False,
+                capture_output=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                return None
+    except (
+        OSError,
+        ValueError,
+        UnicodeDecodeError,
+        binascii.Error,
+        json.JSONDecodeError,
+        subprocess.SubprocessError,
+    ):
+        return None
+    return ProviderTopologyCasVerificationV1(
+        verifier_source="openssl-ed25519-dsse-verifier",
+        verification_method="dsse-v1-pae+in-toto-statement-v1",
+        attestation_digest=attestation.digest(),
+        verification_result="verified",
+        trust_root_id=trust_root.trust_root_id,
+        trust_root_generation=trust_root.generation,
+        signer_identity=trust_root.signer_identity,
+        subject_repository=identity.repository,
+        operation_identity_digest=identity.digest(),
+        key_id=trust_root.key_id,
+    )
 
 
 @dataclass(frozen=True)
