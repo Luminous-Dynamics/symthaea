@@ -9480,6 +9480,47 @@ mod tests {
                 && frontier_model_digest == "other-model-digest"
         ));
 
+        let mut input_result_bound = candidate.clone();
+        {
+            let evidence = &mut input_result_bound.evidence[0];
+            let topology = evidence
+                .observation
+                .as_mut()
+                .unwrap()
+                .calibration_topology
+                .as_mut()
+                .unwrap();
+            topology.input_bindings[0].input_result_ref = Some(MeasurementModelInputResultRef {
+                result_id: "fixture-input-result".into(),
+                result_revision: "v1".into(),
+                result_record_digest: "fixture-input-result-digest-v1".into(),
+            });
+            let topology_digest = topology.canonical_digest().unwrap();
+            let uncertainty = evidence.uncertainty.as_mut().unwrap();
+            uncertainty.evaluation.calibration_topology_digest = Some(topology_digest);
+            uncertainty.binding_digest =
+                canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
+        }
+        input_result_bound.evidence[0].validate().unwrap();
+
+        let mut changed_input_result = input_result_bound.clone();
+        changed_input_result.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .calibration_topology
+            .as_mut()
+            .unwrap()
+            .input_bindings[0]
+            .input_result_ref
+            .as_mut()
+            .unwrap()
+            .result_revision = "v2".into();
+        assert!(matches!(
+            changed_input_result.evidence[0].validate().unwrap_err(),
+            AssessmentError::MeasurementUncertaintyEvaluationCalibrationTopologyMismatch { .. }
+        ));
+
         let mut wrong_model = candidate;
         {
             let evidence = &mut wrong_model.evidence[0];
