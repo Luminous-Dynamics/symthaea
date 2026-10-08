@@ -109,13 +109,15 @@ jobs:
               'Publish artifact provenance summary',
             ];
 
-            function artifactLifecycleVerified(artifact) {
+            function artifactLifecycleVerified(artifact, nowMs = Date.now()) {
               if (!artifact || !Number.isSafeInteger(artifact.id) || artifact.id <= 0) {
                 return false;
               }
               if (
                 typeof artifact.created_at !== 'string' ||
-                typeof artifact.expires_at !== 'string'
+                typeof artifact.expires_at !== 'string' ||
+                !Number.isSafeInteger(artifact.size_in_bytes) ||
+                artifact.size_in_bytes <= 0
               ) {
                 return false;
               }
@@ -125,7 +127,8 @@ jobs:
               return (
                 Number.isFinite(createdAt) &&
                 Number.isFinite(expiresAt) &&
-                createdAt < expiresAt
+                createdAt <= nowMs &&
+                nowMs < expiresAt
               );
             }
 
@@ -434,6 +437,8 @@ jobs:
               ['artifact_id_missing', (e) => { delete e.artifacts[0].id; }],
               ['artifact_lifetime_equal', (e) => { e.artifacts[0].expires_at = e.artifacts[0].created_at; }],
               ['artifact_lifetime_inverted', (e) => { e.artifacts[0].created_at = '2027-01-01T00:00:00Z'; }],
+              ['artifact_created_in_future', (e) => { e.artifacts[0].created_at = '2027-01-01T00:00:00Z'; e.artifacts[0].expires_at = '2028-01-01T00:00:00Z'; }],
+              ['artifact_expired_by_timestamp', (e) => { e.artifacts[0].expires_at = '2026-01-01T00:00:00Z'; }],
               ['artifact_created_at_malformed', (e) => { e.artifacts[0].created_at = 'not-a-timestamp'; }],
               ['artifact_expires_at_malformed', (e) => { e.artifacts[0].expires_at = 'not-a-timestamp'; }],
               ['artifact_digest_nonhex', (e) => { e.artifacts[0].digest = 'sha256:' + 'g'.repeat(64); }],
