@@ -71,3 +71,7 @@ Immediately before a successful status is published, the verifier re-reads the a
 The independent policy is treated as a typed admission record, not arbitrary JSON. Every approved entry must have a non-empty path, an added/modified status, and a canonical 40-hex Git blob SHA; duplicate paths and malformed live PR file records are rejected. The trust workflow also rejects additional trigger classes such as pull_request_target, push, schedule, repository_dispatch, and workflow_call, preserving the intended default-branch workflow_run trust boundary.
 
 The checked-in policy is a bootstrap artifact for the initial compiler qualification. After the trust anchor is established on the default branch, changing the policy itself requires an independently authorized base-branch change; a target PR cannot redefine its own admission policy and then satisfy that same policy.
+
+## Workflow identity and result binding
+
+The verifier binds Broca Feature Matrix, Workflow Syntax, and PR Governance to their GitHub workflow IDs as well as their names and paths. Recreating one of those workflows therefore requires an explicit trust-root change before its runs become admissible. Non-PASS and STALE verifier results also exit non-zero, while WAITING remains a successful control-plane wait state with a pending commit status; stale outcomes explicitly replace any prior successful trust status with failure.
