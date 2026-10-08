@@ -84,7 +84,7 @@ jobs:
           }
 
           cleanup_best_effort() {
-            delete_ref_if_owned "${ref_path}" "${BASE_SHA:-}" "${WINNER_SHA:-}" "${STALE_SHA:-}" "${INVALIDATION_SHA:-}" || true
+            delete_ref_if_owned "${ref_path}" "${BASE_SHA:-}" "${WINNER_SHA:-}" "${STALE_SHA:-}" "${INVALIDATION_SHA:-}" "${malformed_transition_sha:-}" || true
             delete_ref_if_owned "${race_ref_path}" "${BASE_SHA:-}" "${RACE_LEFT_SHA:-}" "${RACE_RIGHT_SHA:-}" || true
           }
           trap cleanup_best_effort EXIT
@@ -109,16 +109,73 @@ jobs:
           test "${LAB_HEAD}" = "${BASE_SHA}"
           test "${RACE_HEAD}" = "${BASE_SHA}"
 
-          create_commit() {
-            local message="$1"
-            local parent="$2"
-            local scoped_message="qual-cas-lab:${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}: ${message}"
+          create_semantic_commit() {
+            local transition_kind="$1"
+            local message="$2"
+            local parent="$3"
+            local embedded_parent="$4"
+            local transition_id="\${GITHUB_RUN_ID}/\${GITHUB_RUN_ATTEMPT}/\${transition_kind}"
+            local unsigned_json transition_digest transition_json blob_sha transition_tree_sha
+
+            unsigned_json="\$(jq -ncS \
+              --arg schema "symthaea.qualification.promotion-ledger-transition.v1" \
+              --arg transition_id "\${transition_id}" \
+              --arg repository "\${GITHUB_REPOSITORY}" \
+              --arg previous_ledger_head "\${embedded_parent}" \
+              --arg resulting_state "\${message}" \
+              '{schema_version:$schema,transition_id:$transition_id,repository:$repository,previous_ledger_head:$previous_ledger_head,resulting_state:$resulting_state}')"
+            transition_digest="\$(printf '%s' "\${unsigned_json}" | sha256sum | cut -d' ' -f1)"
+            transition_json="\$(jq -ncS \
+              --arg schema "symthaea.qualification.promotion-ledger-transition.v1" \
+              --arg transition_id "\${transition_id}" \
+              --arg repository "\${GITHUB_REPOSITORY}" \
+              --arg previous_ledger_head "\${embedded_parent}" \
+              --arg resulting_state "\${message}" \
+              --arg transition_digest "\${transition_digest}" \
+              '{schema_version:$schema,transition_id:$transition_id,repository:$repository,previous_ledger_head:$previous_ledger_head,resulting_state:$resulting_state,transition_digest:$transition_digest}')"
+
+            blob_sha="\$(jq -n --arg content "\${transition_json}" \
+              '{content:$content,encoding:"utf-8"}' \
+              | gh api --method POST "repos/\${GITHUB_REPOSITORY}/git/blobs" --input - --jq '.sha')"
+            transition_tree_sha="\$(jq -n \
+              --arg base_tree "\${TREE_SHA}" \
+              --arg blob_sha "\${blob_sha}" \
+              '{base_tree:$base_tree,tree:[{path:"_qual-cas-lab/transition.json",mode:"100644",type:"blob",sha:$blob_sha}]}' \
+              | gh api --method POST "repos/\${GITHUB_REPOSITORY}/git/trees" --input - --jq '.sha')"
             jq -n \
-              --arg message "${scoped_message}" \
-              --arg tree "${TREE_SHA}" \
-              --arg parent "${parent}" \
-              '{message:$message, tree:$tree, parents:[$parent]}' \
-              | gh api --method POST "repos/${GITHUB_REPOSITORY}/git/commits" --input - --jq '.sha'
+              --arg message "qual-cas-lab:\${GITHUB_RUN_ID}/\${GITHUB_RUN_ATTEMPT}: \${message}" \
+              --arg tree "\${transition_tree_sha}" \
+              --arg parent "\${parent}" \
+              '{message:$message,tree:$tree,parents:[$parent]}' \
+              | gh api --method POST "repos/\${GITHUB_REPOSITORY}/git/commits" --input - --jq '.sha'
+          }
+
+          validate_semantic_transition() {
+            local commit_sha="$1"
+            local commit_payload parent_sha tree_sha blob_sha transition_json
+            local schema embedded_parent expected_digest actual_digest unsigned_json
+
+            commit_payload="\$(gh api "repos/\${GITHUB_REPOSITORY}/git/commits/\${commit_sha}")"
+            parent_sha="\$(jq -er '.parents | if length == 1 then .[0].sha else error("expected exactly one parent") end' <<<"\${commit_payload}")"
+            tree_sha="\$(jq -er '.tree.sha' <<<"\${commit_payload}")"
+            blob_sha="\$(gh api "repos/\${GITHUB_REPOSITORY}/git/trees/\${tree_sha}?recursive=1" \
+              | jq -er '.tree[] | select(.path == "_qual-cas-lab/transition.json") | .sha')"
+            transition_json="\$(gh api "repos/\${GITHUB_REPOSITORY}/git/blobs/\${blob_sha}" --jq '.content' \
+              | tr -d '\n' | base64 --decode)"
+            schema="\$(jq -er '.schema_version' <<<"\${transition_json}")"
+            test "\${schema}" = "symthaea.qualification.promotion-ledger-transition.v1"
+            embedded_parent="\$(jq -er '.previous_ledger_head' <<<"\${transition_json}")"
+            test "\${parent_sha}" = "\${embedded_parent}" || {
+              echo "semantic predecessor mismatch: git_parent=\${parent_sha} encoded_parent=\${embedded_parent}" >&2
+              return 1
+            }
+            expected_digest="\$(jq -er '.transition_digest' <<<"\${transition_json}")"
+            unsigned_json="\$(jq -ncS 'del(.transition_digest)' <<<"\${transition_json}")"
+            actual_digest="\$(printf '%s' "\${unsigned_json}" | sha256sum | cut -d' ' -f1)"
+            test "\${actual_digest}" = "\${expected_digest}" || {
+              echo "semantic transition digest mismatch" >&2
+              return 1
+            }
           }
 
           update_ref_status() {
@@ -136,8 +193,16 @@ jobs:
           }
 
           # Two valid successor candidates share the same observed predecessor.
-          WINNER_SHA="$(create_commit 'qual-cas-lab: winner successor' "${BASE_SHA}")"
-          STALE_SHA="$(create_commit 'qual-cas-lab: stale successor' "${BASE_SHA}")"
+          WINNER_SHA="$(create_semantic_commit "winner" "winner successor" "${BASE_SHA}" "${BASE_SHA}")"
+          STALE_SHA="$(create_semantic_commit "stale" "stale successor" "${BASE_SHA}" "${BASE_SHA}")"
+          validate_semantic_transition "\${WINNER_SHA}"
+          malformed_transition_sha="\$(create_semantic_commit "malformed" "malformed predecessor candidate" "\${BASE_SHA}" "0000000000000000000000000000000000000000000000000000000000000000")"
+          if validate_semantic_transition "\${malformed_transition_sha}"; then
+            echo "malformed semantic predecessor was accepted" >&2
+            exit 1
+          fi
+          echo "malformed semantic predecessor correctly rejected before publication"
+
 
           winner_response="$(mktemp)"
           winner_status="$(update_ref_status "${WINNER_SHA}" "${winner_response}" "${ref_path}")"
@@ -162,8 +227,8 @@ jobs:
 
           # True concurrent-winner race: both candidates are valid successors of
           # the same observed parent. Exactly one ref update may linearize.
-          RACE_LEFT_SHA="$(create_commit 'qual-cas-lab: concurrent left successor' "${BASE_SHA}")"
-          RACE_RIGHT_SHA="$(create_commit 'qual-cas-lab: concurrent right successor' "${BASE_SHA}")"
+          RACE_LEFT_SHA="$(create_semantic_commit "race-left" "concurrent left successor" "${BASE_SHA}" "${BASE_SHA}")"
+          RACE_RIGHT_SHA="$(create_semantic_commit "race-right" "concurrent right successor" "${BASE_SHA}" "${BASE_SHA}")"
 
           race_left_response="$(mktemp)"
           race_right_response="$(mktemp)"
@@ -207,7 +272,7 @@ jobs:
           esac
 
           # A newer invalidation is itself a successor of the current ledger head.
-          INVALIDATION_SHA="$(create_commit 'qual-cas-lab: trust-root invalidation successor' "${WINNER_SHA}")"
+          INVALIDATION_SHA="$(create_semantic_commit "invalidation" "trust-root invalidation successor" "${WINNER_SHA}" "${WINNER_SHA}")"
           invalidation_response="$(mktemp)"
           invalidation_status="$(update_ref_status "${INVALIDATION_SHA}" "${invalidation_response}" "${ref_path}")"
           test "${invalidation_status}" = "200"
@@ -264,7 +329,8 @@ jobs:
             echo "- invalidation_success_http: \`${invalidation_status}\`"
             echo "- late_stale_http: \`${stale_after_invalidation_status}\`"
             echo "- rollback_http: \`${rollback_status}\`"
-            echo "- winner_sha: \`${WINNER_SHA}\`"
+            echo "- malformed_transition_rejected: `true`"
+            echo "- winner_sha: `${WINNER_SHA}`"
             echo "- stale_candidate_sha: \`${STALE_SHA}\`"
             echo "- invalidation_sha: \`${INVALIDATION_SHA}\`"
             echo "- final_current_ref_sha: \`${CURRENT_AFTER_ROLLBACK}\`"
