@@ -27,6 +27,8 @@ jobs:
           race_ref_path="${RACE_REF#refs/}"
           FORCE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-force"
           force_ref_path="${FORCE_REF#refs/}"
+          RECREATE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-recreate"
+          recreate_ref_path="${RECREATE_REF#refs/}"
 
           is_lab_ref_path() {
             case "$1" in
@@ -100,6 +102,7 @@ jobs:
             delete_ref_if_owned "${ref_path}" "${BASE_SHA:-}" "${WINNER_SHA:-}" "${STALE_SHA:-}" "${INVALIDATION_SHA:-}" "${malformed_transition_sha:-}" || true
             delete_ref_if_owned "${race_ref_path}" "${BASE_SHA:-}" "${RACE_LEFT_SHA:-}" "${RACE_RIGHT_SHA:-}" || true
             delete_ref_if_owned "${force_ref_path}" "${BASE_SHA:-}" "${FORCE_INTERMEDIATE_SHA:-}" "${FORCE_RESURRECTION_SHA:-}" || true
+            delete_ref_if_owned "${recreate_ref_path}" "${BASE_SHA:-}" "${RECREATE_INTERMEDIATE_SHA:-}" "${RECREATE_STALE_SHA:-}" || true
           }
           trap cleanup_best_effort EXIT
 
@@ -122,12 +125,18 @@ jobs:
             -f ref="${FORCE_REF}" \
             -f sha="${BASE_SHA}" >/dev/null
 
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="${RECREATE_REF}" \
+            -f sha="${BASE_SHA}" >/dev/null
+
           LAB_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
           RACE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${race_ref_path}" --jq '.object.sha')"
           FORCE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
+          RECREATE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${recreate_ref_path}" --jq '.object.sha')"
           test "${LAB_HEAD}" = "${BASE_SHA}"
           test "${RACE_HEAD}" = "${BASE_SHA}"
           test "${FORCE_HEAD}" = "${BASE_SHA}"
+          test "${RECREATE_HEAD}" = "${BASE_SHA}"
 
           create_semantic_commit() {
             local transition_kind="$1"
@@ -260,6 +269,38 @@ jobs:
           FORCE_AFTER_RESURRECTION="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${force_ref_path}" --jq '.object.sha')"
           test "${FORCE_AFTER_RESURRECTION}" = "${FORCE_RESURRECTION_SHA}"
 
+          # Negative control: delete/recreate also creates an ABA window without force.
+          RECREATE_STALE_SHA="$(create_semantic_commit "delete-recreate-stale" "delete-recreate stale candidate" "${BASE_SHA}" "${BASE_SHA}")"
+          validate_semantic_transition "${RECREATE_STALE_SHA}"
+          RECREATE_INTERMEDIATE_SHA="$(create_semantic_commit "delete-recreate-intermediate" "delete-recreate intermediate successor" "${BASE_SHA}" "${BASE_SHA}")"
+          recreate_intermediate_response="$(mktemp)"
+          recreate_intermediate_status="$(update_ref_status "${RECREATE_INTERMEDIATE_SHA}" "${recreate_intermediate_response}" "${recreate_ref_path}")"
+          test "${recreate_intermediate_status}" = "200"
+          RECREATE_BEFORE_DELETE="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${recreate_ref_path}" --jq '.object.sha')"
+          test "${RECREATE_BEFORE_DELETE}" = "${RECREATE_INTERMEDIATE_SHA}"
+          recreate_delete_status="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "${api_root}/git/refs/${recreate_ref_path}")"
+          test "${recreate_delete_status}" = "204"
+          recreate_missing_status="$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "${api_root}/git/refs/${recreate_ref_path}")"
+          test "${recreate_missing_status}" = "404"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="${RECREATE_REF}" \
+            -f sha="${BASE_SHA}" >/dev/null
+          RECREATE_AFTER_CREATE="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${recreate_ref_path}" --jq '.object.sha')"
+          test "${RECREATE_AFTER_CREATE}" = "${BASE_SHA}"
+          recreate_resurrection_response="$(mktemp)"
+          recreate_resurrection_status="$(update_ref_status "${RECREATE_STALE_SHA}" "${recreate_resurrection_response}" "${recreate_ref_path}")"
+          test "${recreate_resurrection_status}" = "200"
+          RECREATE_AFTER_RESURRECTION="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${recreate_ref_path}" --jq '.object.sha')"
+          test "${RECREATE_AFTER_RESURRECTION}" = "${RECREATE_STALE_SHA}"
+
 
           winner_response="$(mktemp)"
           winner_status="$(update_ref_status "${WINNER_SHA}" "${winner_response}" "${ref_path}")"
@@ -390,6 +431,9 @@ jobs:
             echo "- force_reset_http: \`${force_reset_status}\`"
             echo "- post_force_resurrection_http: \`${force_resurrection_status}\`"
             echo "- force_writer_aba_escape_observed: \`true\`"
+            echo "- delete_recreate_delete_http: \`${recreate_delete_status}\`"
+            echo "- delete_recreate_resurrection_http: \`${recreate_resurrection_status}\`"
+            echo "- delete_recreate_aba_escape_observed: \`true\`"
             echo "- winner_sha: \`${WINNER_SHA}\`"
             echo "- stale_candidate_sha: \`${STALE_SHA}\`"
             echo "- invalidation_sha: \`${INVALIDATION_SHA}\`"
@@ -399,12 +443,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # A successful lab requires proven cleanup, not merely an attempted DELETE.
-          if ! delete_ref_if_owned "${ref_path}" "${BASE_SHA}" "${WINNER_SHA}" "${STALE_SHA}" "${INVALIDATION_SHA}" "${malformed_transition_sha}" || ! delete_ref_if_owned "${race_ref_path}" "${BASE_SHA}" "${RACE_LEFT_SHA}" "${RACE_RIGHT_SHA}" || ! delete_ref_if_owned "${force_ref_path}" "${BASE_SHA}" "${FORCE_INTERMEDIATE_SHA}" "${FORCE_RESURRECTION_SHA}"; then
+          if ! delete_ref_if_owned "${ref_path}" "${BASE_SHA}" "${WINNER_SHA}" "${STALE_SHA}" "${INVALIDATION_SHA}" "${malformed_transition_sha}" || ! delete_ref_if_owned "${race_ref_path}" "${BASE_SHA}" "${RACE_LEFT_SHA}" "${RACE_RIGHT_SHA}" || ! delete_ref_if_owned "${force_ref_path}" "${BASE_SHA}" "${FORCE_INTERMEDIATE_SHA}" "${FORCE_RESURRECTION_SHA}" || ! delete_ref_if_owned "${recreate_ref_path}" "${BASE_SHA}" "${RECREATE_INTERMEDIATE_SHA}" "${RECREATE_STALE_SHA}"; then
             echo "temporary promotion-ledger lab ref cleanup failed" >&2
             exit 1
           fi
 
-          for candidate_ref in "${ref_path}" "${race_ref_path}" "${force_ref_path}"; do
+          for candidate_ref in "${ref_path}" "${race_ref_path}" "${force_ref_path}" "${recreate_ref_path}"; do
             delete_status="$(curl -sS -o /dev/null -w '%{http_code}' \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
