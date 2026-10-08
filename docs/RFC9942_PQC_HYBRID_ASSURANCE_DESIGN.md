@@ -65,27 +65,34 @@ This is a **policy/profile identifier**, not a COSE alg value.
 
 ### Authenticated message
 
-The PQ component should authenticate the **exact ES256 COSE Sig_structure bytes** produced by the existing RFC 9052 signing path.
+Define one canonical **hybrid transcript** and have both components sign that exact byte string independently.
 
-Conceptually:
+Recommended transcript:
 
-PQ_SigStructure = COSE_Sign1_Sig_structure( alg=-49,
-payload = Domain || len(ES256_Sig_structure) || ES256_Sig_structure )
+hybrid_message = Domain || version || len(receipt_wire) || receipt_wire
 
-with a fixed, protocol-owned domain separator.
+where:
 
-The exact byte string, rather than reconstructed semantic fields, is important. It prevents later code from accidentally authenticating a semantically similar but byte-different message.
+- Domain is a fixed, protocol-owned domain separator;
+- version is the profile version;
+- receipt_wire is the exact byte sequence being bound by the hybrid attestation.
+
+The classical ES256 hybrid signature and the ML-DSA-65 signature must both authenticate hybrid_message. This avoids making the PQ signature depend on the internal representation of the ES256 COSE Sig_structure and keeps the two component signatures semantically parallel.
+
+The existing RFC 9942 ES256 signature remains independently verified; the hybrid attestation is a second assurance layer over the exact receipt wire.
 
 The hybrid verifier should retain:
 
-- SHA-256 of the exact ES256 Sig_structure bytes;
+- SHA-256 of the exact hybrid transcript bytes;
+- SHA-256 of the exact receipt wire bytes;
 - SHA-256 of the exact PQ COSE protected header bytes;
 - SHA-256 of the exact PQ signature bytes;
 - SHA-256 of the exact PQ public-key bytes;
-- PQ algorithm identifier;
+- SHA-256 of the hybrid ES256 signature bytes;
+- both algorithm identifiers;
 - hybrid policy/version.
 
-A future implementation may choose a direct full-message encoding instead of this nested construction, but it must define one canonical byte-level transcript and authenticate that transcript directly.
+The canonical transcript must be length-delimited and domain-separated. Do not reconstruct it from parsed semantic fields after verification.
 
 ## Key separation
 
