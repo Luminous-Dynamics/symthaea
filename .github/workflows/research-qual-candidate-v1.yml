@@ -1,0 +1,56 @@
+name: Research QUAL candidate temporal model
+
+on:
+  pull_request:
+    paths:
+      - "scripts/validate_promotion_reservation_v1.py"
+      - "scripts/verify_clock_relation_crypto_v1.py"
+      - "docs/qualification/**"
+      - ".github/workflows/research-qual-candidate-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-model-execution:
+    # This workflow is intentionally non-authoritative. It executes candidate
+    # branch code for reproducibility only and never establishes qualification.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Execute provider-free Python oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_promotion_reservation_v1.py
+
+      - name: Execute independent crypto replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_clock_relation_crypto_v1.py
+
+      - name: Record non-qualification boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Research QUAL candidate execution"
+            echo
+            echo "candidate_head=$GITHUB_SHA"
+            echo "qualification_claim=false"
+            echo "provider_dispatch=false"
+            echo "authority=false"
+            echo "independent_of_candidate_code=false"
+          } >> "$GITHUB_STEP_SUMMARY"

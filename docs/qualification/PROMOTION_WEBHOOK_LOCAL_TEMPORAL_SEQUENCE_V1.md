@@ -238,3 +238,65 @@ Distinct source identifiers alone are not enough: the operator and trust-anchor 
 RFC 10049 specifies that Roughtime clients use a list with at least three operational servers not run by the same parties, and its multi-server mode checks reported times for causal consistency. The present model borrows the anti-single-source principle and interval reasoning while remaining a local qualification model rather than a Roughtime implementation. citeturn348751search0turn348751search2
 
 The source-set agreement predicate still does not establish global clock correctness, network-path symmetry, provider honesty, or causal attribution. It only makes single-source temporal evidence insufficient for the stronger disposition.
+
+
+## Causally chained multi-source measurement
+
+The source quorum now has a second evidence layer: a sequential measurement chain.
+
+`ClockSourceMeasurementSequenceV1` requires two rounds over the same ordered source set. Each round contains at least three sources, and each step binds:
+
+    operation identity
+    round and sequence index
+    source identity
+    exact relation digest
+    request-nonce digest
+    previous-response digest
+    fresh chain-random digest
+    deterministic chain-link digest
+    local receive time
+
+The first step in each round starts from the fresh request nonce. Each subsequent step commits to the immediately preceding response digest plus fresh chain entropy. Replaying an earlier response across rounds is rejected.
+
+The model also checks causal ordering between sequentially received responses using the uncertainty intervals. A response that is already too late to be causally compatible with the next response produces:
+
+    clock-source-causal-order-contradiction
+
+Other chain failures are explicit:
+
+    clock-source-measurement-quorum-insufficient
+    clock-source-measurement-round-mismatch
+    clock-source-measurement-invalid
+    clock-source-measurement-replay
+    clock-source-measurement-chain-mismatch
+
+This is deliberately a qualification-model abstraction rather than an implementation of the Roughtime wire format. RFC 10049 requires at least three operational servers not run by the same parties, sequentially queries them, repeats the sequence twice in the same order, chains later query nonces to the prior response plus fresh randomness, and checks pairwise causal consistency using the reported midpoint and radius. citeturn312740search0turn312740search1
+
+The important boundary is preserved:
+
+    authenticated + independently verified source
+        +
+    independent multi-source agreement
+        +
+    causally linked repeated measurement
+        ->
+    stronger temporal evidence
+
+but not:
+
+    universal time correctness
+    network-path symmetry proof
+    provider honesty
+    proof of operation causality
+    production promotion success
+
+The chain digest is order-sensitive because measurement order is semantically meaningful, unlike the source-set digest which is intentionally order-invariant.
+
+
+The measurement chain also requires source/operator/trust-anchor independence within each round, and the same operator/trust-anchor lineage across the repeated rounds. A changed trust lineage is rejected as:
+
+    clock-source-measurement-trust-lineage-mismatch
+
+Causal ordering is checked pairwise across every earlier/later response, not merely adjacent responses. This avoids allowing a middle response with a wide uncertainty interval to mask a contradiction between two non-adjacent responses.
+
+The source-set admission itself is fail-closed even without a supplied local dispatch/observation window: every member must first be a structurally admissible `ClockRelationV1`. A missing time window therefore cannot turn malformed cryptographic/source evidence into a valid quorum.

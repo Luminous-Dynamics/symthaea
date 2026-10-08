@@ -82,9 +82,10 @@ jobs:
               "ClockRelationVerificationV1",
               "ClockRelationTrustSnapshotV1",
               "ClockRelationSourceSetV1",
+              "ClockSourceMeasurementStepV1",
+              "ClockSourceMeasurementSequenceV1",
               "LocalTemporalSequenceEvidenceV1",
               "ClockRelationV1",
-              "ClockRelationSourceSetV1",
               "LocalTemporalSequenceV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
@@ -162,6 +163,14 @@ jobs:
               "clock-source-domain-mismatch",
               "clock-source-time-disagreement",
               "clock-source-quorum-admissible",
+              "clock-source-measurement-quorum-insufficient",
+              "clock-source-measurement-round-mismatch",
+              "clock-source-measurement-invalid",
+              "clock-source-measurement-replay",
+              "clock-source-causal-order-contradiction",
+              "clock-source-measurement-chain-mismatch",
+              "clock-source-measurement-trust-lineage-mismatch",
+              "clock-source-measurement-admissible",
           }
           for state in temporal_states:
               assert f'"{state}"' in source, f"Missing temporal state: {state}"
@@ -240,6 +249,11 @@ jobs:
               "clock-source-quorum-admissible",
               "clock-source-time-disagreement",
               "clock-source-independence-invalid",
+              "ClockSourceMeasurementStepV1",
+              "ClockSourceMeasurementSequenceV1",
+              "clock-source-measurement-admissible",
+              "clock-source-causal-order-contradiction",
+              "clock-source-measurement-trust-lineage-mismatch",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"
