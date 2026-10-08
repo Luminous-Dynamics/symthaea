@@ -63,6 +63,7 @@ jobs:
           required_classes = {
               "ProviderMergeResultV1",
               "PromotionCausalResolutionV1",
+              "ProviderResultRetentionV1",
               "ProviderTopologyBindingV1",
               "PromotionStackEffectSetV1",
           }
@@ -79,6 +80,16 @@ jobs:
           source = path.read_text()
           for outcome in causal_outcomes:
               assert f'"{outcome}"' in source, f"Missing causal outcome: {outcome}"
+
+          retention_states = {
+              "provider-result-captured-locally",
+              "provider-result-provider-recoverable",
+              "provider-result-expired",
+              "provider-result-unavailable",
+              "invalid-retention-state",
+          }
+          for state in retention_states:
+              assert f'"{state}"' in source, f"Missing retention state: {state}"
 
           expected_call_args = {
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
