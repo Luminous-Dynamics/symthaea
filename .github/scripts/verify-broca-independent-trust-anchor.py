@@ -264,12 +264,49 @@ def resolve_branch_tip(branch: str) -> str:
     return sha
 
 
+def verify_trust_anchor_permissions(workflow: str) -> None:
+    if re.search(r"(?m)^[ ]{4,}permissions:\s*$", workflow):
+        raise VerificationError(
+            "trust-anchor workflow contains job-level permissions; only the exact workflow-level envelope is permitted"
+        )
+
+    if re.search(r"(?m)^\s*permissions:\s+(?:read-all|write-all|\{)", workflow):
+        raise VerificationError(
+            "trust-anchor workflow uses a non-explicit permissions shorthand"
+        )
+
+    match = re.search(
+        r"(?ms)^permissions:\n((?:^[ ]{2}[^\n]+\n?)*)"
+        r"(?=^[^ ]\S|\Z)",
+        workflow,
+    )
+    if not match:
+        raise VerificationError("trust-anchor workflow has no canonical workflow-level permissions block")
+
+    observed = tuple(
+        line.strip()
+        for line in match.group(1).splitlines()
+        if line.strip()
+    )
+    expected = (
+        "actions: read",
+        "contents: read",
+        "pull-requests: read",
+        "statuses: write",
+    )
+    if observed != expected:
+        raise VerificationError(
+            f"trust-anchor workflow permissions mismatch: expected {expected!r}, got {observed!r}"
+        )
+
+
 def verify_trust_anchor_workflow() -> str:
     workflow_bytes, workflow_blob = get_file(
         ".github/workflows/qual-broca-independent-trust-anchor.yml",
         TRUST_ANCHOR_SHA,
     )
     workflow = workflow_bytes.decode("utf-8")
+    verify_trust_anchor_permissions(workflow)
     uses = [
         match.group(1)
         for line in workflow.splitlines()
