@@ -1,9 +1,8 @@
 name: one-shot-rustfmt-repair
 
 on:
-  push:
-    branches:
-      - chore/cross-077-rustfmt-repair
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
