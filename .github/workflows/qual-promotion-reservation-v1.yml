@@ -69,6 +69,7 @@ jobs:
               "ProviderAttestationV1",
               "ProviderEvidenceEnvelopeV1",
               "ProviderWebhookReceiptV1",
+              "ProviderPullRequestMergeObservationV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
               "PromotionStackEffectSetV1",
@@ -115,6 +116,15 @@ jobs:
               "delivery_id",
               "payload_bytes_digest",
           }
+          semantic_webhook_fields = {
+              "pull_request",
+              "merged",
+              "merge_commit_sha",
+              "head",
+              "action",
+          }
+          for field in semantic_webhook_fields:
+              assert field in source, f"Missing webhook semantic field: {field}"
           for field in webhook_context_fields:
               assert field in source, f"Missing webhook context field: {field}"
 
