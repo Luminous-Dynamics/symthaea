@@ -812,6 +812,36 @@ fn main() {
         Ok(())
     );
 
+    // The production algorithm identifier is explicit, but no production
+    // algorithm is accepted by this fixture-only verifier.
+    registry
+        .register(KeyRecord {
+            key_id: "log-key-v3-experimental".to_owned(),
+            principal_id: "civ-log-v1".to_owned(),
+            authority_lineage: "lineage-log-operator".to_owned(),
+            role: KeyRole::LogSigner,
+            algorithm: SignatureAlgorithm::MlDsa65,
+            key_epoch: 3,
+            valid_from_epoch: 140,
+            valid_until_epoch: 300,
+        })
+        .expect("record ML-DSA backend candidate without accepting it");
+    let unsupported_mldsa_head = test_sign_tree_head(TreeHeadStatement {
+        signature_algorithm: SignatureAlgorithm::MlDsa65,
+        key_id: "log-key-v3-experimental".to_owned(),
+        key_epoch: 3,
+        timestamp_epoch: 150,
+        ..head_v2.statement.clone()
+    });
+    assert_eq!(
+        verify_signed_head_at_signing_time(
+            &unsupported_mldsa_head,
+            &registry,
+            &verifier
+        ),
+        Err(VerifyFailure::UnsupportedProductionAlgorithm)
+    );
+
     // Witnesses attest to the exact serialized signed tree head.
     let quorum_head = head_v2.clone();
     let witnesses = vec![
