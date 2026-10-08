@@ -828,7 +828,7 @@ class PromotionCausalResolutionV1:
 
 
 def provider_result_request_bytes() -> bytes:
-    return b'{"requested_pr":7087,"head":"H3","merge_method":"squash","merge_action":"direct_merge"}'
+    return b'{"repository":"Luminous-Dynamics/symthaea","requested_pr":7087,"head":"H3","merge_method":"squash","merge_action":"direct_merge"}'
 
 
 def provider_result_response_bytes() -> bytes:
@@ -877,18 +877,16 @@ def provider_evidence_fixture(
     provider_uuid: str | None = "uuid-1",
     observed_merge_commit: str | None = "M2",
 ) -> ProviderAsyncMergeEvidencePairV1:
+    request_payload = provider_result_request_bytes()
+    response_payload = provider_result_response_bytes()
     request_capture = ProviderCaptureIntegrityV1(
-        raw_bytes_digest=hashlib.sha256(
-            provider_result_request_bytes()
-        ).hexdigest(),
+        raw_bytes_digest=hashlib.sha256(request_payload).hexdigest(),
         storage_id="request-capture-1",
         capture_sequence=sequence,
         durable=durable,
     )
     response_capture = ProviderCaptureIntegrityV1(
-        raw_bytes_digest=hashlib.sha256(
-            provider_result_response_bytes()
-        ).hexdigest(),
+        raw_bytes_digest=hashlib.sha256(response_payload).hexdigest(),
         storage_id="response-capture-1",
         capture_sequence=sequence,
         durable=durable,
@@ -901,6 +899,7 @@ def provider_evidence_fixture(
     return ProviderAsyncMergeEvidencePairV1(
         request=ProviderAsyncMergeRequestEvidenceV1(
             capture=ProviderEvidenceEnvelopeV1(request_capture, source),
+            raw_payload=request_payload,
             repository="Luminous-Dynamics/symthaea",
             requested_pr_number=7087,
             expected_head_sha="H3",
@@ -909,6 +908,7 @@ def provider_evidence_fixture(
         ),
         response=ProviderAsyncMergeResponseEvidenceV1(
             capture=ProviderEvidenceEnvelopeV1(response_capture, source),
+            raw_payload=response_payload,
             status=status,
             provider_uuid=provider_uuid,
             observed_merge_commit=observed_merge_commit,
