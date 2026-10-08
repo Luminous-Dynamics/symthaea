@@ -627,6 +627,11 @@ mod tests {
         assert_ne!(before, projected.canonical_bytes().unwrap());
 
         let mut wrong_receipt = anchor();
+        wrong_receipt
+            .receipt_selection
+            .as_mut()
+            .unwrap()
+            .selected_receipt_sha256 = [16; 32];
         wrong_receipt.receipt_selection.as_mut().unwrap().hybrid_assurance =
             projected.receipt_selection.as_ref().unwrap().hybrid_assurance.clone();
         assert_eq!(
