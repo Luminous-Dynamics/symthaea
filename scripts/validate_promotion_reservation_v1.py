@@ -1044,12 +1044,77 @@ class ClockRelationV1:
 
 
 @dataclass(frozen=True)
+class LocalTemporalSequenceEvidenceV1:
+    operation_identity_digest: str
+    sequence_source_id: str
+    sequence_source_generation: int
+    capture_id: str
+    reservation_sequence: int
+    dispatch_sequence: int
+    observation_sequence: int
+    sequence_digest: str
+    source_kind: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "capture_id": self.capture_id,
+            "dispatch_sequence": self.dispatch_sequence,
+            "observation_sequence": self.observation_sequence,
+            "operation_identity_digest": self.operation_identity_digest,
+            "reservation_sequence": self.reservation_sequence,
+            "sequence_source_generation": self.sequence_source_generation,
+            "sequence_source_id": self.sequence_source_id,
+            "source_kind": self.source_kind,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def sequence_values_digest(self) -> str:
+        payload = [
+            self.reservation_sequence,
+            self.dispatch_sequence,
+            self.observation_sequence,
+        ]
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def internally_consistent(self) -> bool:
+        return (
+            bool(self.operation_identity_digest)
+            and bool(self.sequence_source_id)
+            and self.sequence_source_generation > 0
+            and bool(self.capture_id)
+            and bool(self.source_kind)
+            and self.reservation_sequence > 0
+            and self.dispatch_sequence > 0
+            and self.observation_sequence > 0
+            and self.reservation_sequence
+            <= self.dispatch_sequence
+            <= self.observation_sequence
+            and self.sequence_digest == self.sequence_values_digest()
+        )
+
+
+@dataclass(frozen=True)
 class LocalTemporalSequenceV1:
     reservation_sequence: int
     dispatch_sequence: int
     observation_sequence: int
+    source_evidence: LocalTemporalSequenceEvidenceV1 | None = None
 
-    def valid(self) -> bool:
+    def values_valid(self) -> bool:
         return (
             self.reservation_sequence > 0
             and self.dispatch_sequence > 0
@@ -1057,6 +1122,25 @@ class LocalTemporalSequenceV1:
             and self.reservation_sequence
             <= self.dispatch_sequence
             <= self.observation_sequence
+        )
+
+    def valid(self, operation_identity_digest: str | None = None) -> bool:
+        if not self.values_valid():
+            return False
+        if operation_identity_digest is None:
+            return True
+        if self.source_evidence is None:
+            return False
+        return (
+            self.source_evidence.internally_consistent()
+            and self.source_evidence.operation_identity_digest
+            == operation_identity_digest
+            and self.source_evidence.reservation_sequence
+            == self.reservation_sequence
+            and self.source_evidence.dispatch_sequence
+            == self.dispatch_sequence
+            and self.source_evidence.observation_sequence
+            == self.observation_sequence
         )
 
 
@@ -1127,8 +1211,19 @@ class ProviderWebhookEffectTimingV1:
             return "invalid-local-time-order"
         if self.local_sequence is None:
             return "local-monotonic-sequence-missing"
-        if not self.local_sequence.valid():
+        if not self.local_sequence.values_valid():
             return "invalid-local-monotonic-sequence"
+        if self.local_sequence.source_evidence is None:
+            return "local-sequence-provenance-missing"
+        if (
+            not self.local_sequence.valid(self.operation_identity_digest)
+        ):
+            if (
+                self.local_sequence.source_evidence.operation_identity_digest
+                != self.operation_identity_digest
+            ):
+                return "local-sequence-operation-identity-mismatch"
+            return "local-sequence-source-invalid"
         if self.provider_delivery_time_ms is not None:
             if self.provider_delivery_time_ms < self.provider_event_time_ms:
                 return "invalid-provider-time-order"
@@ -1807,6 +1902,41 @@ def clock_relation_fixture(
 DEFAULT_CLOCK_RELATION = clock_relation_fixture()
 
 
+def local_sequence_fixture(
+    operation_identity_digest: str | None = None,
+    *,
+    reservation_sequence: int = 1,
+    dispatch_sequence: int = 2,
+    observation_sequence: int = 3,
+    sequence_source_generation: int = 1,
+) -> LocalTemporalSequenceV1:
+    operation_identity_digest = (
+        operation_identity_digest
+        if operation_identity_digest is not None
+        else stack_identity_fixture().digest()
+    )
+    evidence = LocalTemporalSequenceEvidenceV1(
+        operation_identity_digest=operation_identity_digest,
+        sequence_source_id="local-monotonic-source-v1",
+        sequence_source_generation=sequence_source_generation,
+        capture_id="sequence-capture-1",
+        reservation_sequence=reservation_sequence,
+        dispatch_sequence=dispatch_sequence,
+        observation_sequence=observation_sequence,
+        sequence_digest="",
+        source_kind="local-monotonic-clock",
+    )
+    evidence = LocalTemporalSequenceEvidenceV1(
+        **{**evidence.__dict__, "sequence_digest": evidence.sequence_values_digest()},
+    )
+    return LocalTemporalSequenceV1(
+        reservation_sequence=reservation_sequence,
+        dispatch_sequence=dispatch_sequence,
+        observation_sequence=observation_sequence,
+        source_evidence=evidence,
+    )
+
+
 def effect_timing_fixture(
     *,
     event_time_ms: int | None = 1791475200000,
@@ -1815,7 +1945,7 @@ def effect_timing_fixture(
     dispatch_time_ms: int | None = 1791475195000,
     observation_time_ms: int | None = 1791475205000,
     clock_relation: ClockRelationV1 | None = DEFAULT_CLOCK_RELATION,
-    local_sequence: LocalTemporalSequenceV1 | None = LocalTemporalSequenceV1(1, 2, 3),
+    local_sequence: LocalTemporalSequenceV1 | None = local_sequence_fixture(),
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
         operation_identity_digest=stack_identity_fixture().digest(),
@@ -1843,7 +1973,12 @@ def webhook_effect_timing_from_observation(
         local_reservation_time_ms=1791475190000,
         local_dispatch_time_ms=1791475195000,
         clock_relation=clock_relation_fixture(),
-        local_sequence=LocalTemporalSequenceV1(10, 11, 12),
+        local_sequence=local_sequence_fixture(
+            identity.digest(),
+            reservation_sequence=10,
+            dispatch_sequence=11,
+            observation_sequence=12,
+        ),
     )
 
 
@@ -2092,6 +2227,56 @@ def test_clock_relation_digest_binds_all_three_evidence_layers():
         verification=relation.verification,
         trust_snapshot=changed_snapshot,
     ).digest() != original
+
+
+def test_local_temporal_sequence_evidence_rejects_invalid_generation():
+    evidence = local_sequence_fixture().source_evidence
+    assert evidence is not None
+    assert not LocalTemporalSequenceEvidenceV1(
+        **{**evidence.__dict__, "sequence_source_generation": 0},
+    ).internally_consistent()
+
+
+def test_local_temporal_sequence_evidence_binds_sequence_digest():
+    sequence = local_sequence_fixture()
+    evidence = sequence.source_evidence
+    assert evidence is not None
+    altered = LocalTemporalSequenceEvidenceV1(
+        **{**evidence.__dict__, "sequence_digest": "forged"},
+    )
+    assert not altered.internally_consistent()
+
+
+def test_temporal_effect_without_sequence_provenance_is_not_admissible():
+    timing = effect_timing_fixture(
+        local_sequence=LocalTemporalSequenceV1(1, 2, 3),
+    )
+    assert timing.classify() == "local-sequence-provenance-missing"
+
+
+def test_temporal_effect_with_foreign_sequence_operation_is_not_admissible():
+    timing = effect_timing_fixture(
+        local_sequence=local_sequence_fixture("foreign-operation"),
+    )
+    assert timing.classify() == "local-sequence-operation-identity-mismatch"
+
+
+def test_temporal_effect_with_invalid_sequence_evidence_is_not_admissible():
+    sequence = local_sequence_fixture()
+    evidence = sequence.source_evidence
+    assert evidence is not None
+    altered = LocalTemporalSequenceEvidenceV1(
+        **{**evidence.__dict__, "capture_id": ""},
+    )
+    timing = effect_timing_fixture(
+        local_sequence=LocalTemporalSequenceV1(
+            sequence.reservation_sequence,
+            sequence.dispatch_sequence,
+            sequence.observation_sequence,
+            altered,
+        ),
+    )
+    assert timing.classify() == "local-sequence-source-invalid"
 
 
 def test_local_temporal_sequence_validates_monotonic_order():
