@@ -1,4 +1,10 @@
 name: QUAL HDC bounded decoder trusted runner
+          echo "trusted_workflow_ref=$TRUSTED_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
+          echo "trusted_workflow_loaded_blob_sha=$LOADED_WORKFLOW_BLOB_SHA" >> "$GITHUB_OUTPUT"
+          test "$GITHUB_WORKFLOW_REF" = "$TRUSTED_WORKFLOW_REF"
+          test "$GITHUB_WORKFLOW_SHA" != ""
+          LOADED_WORKFLOW_BLOB_SHA="$(gh api --method GET -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/contents/${TRUSTED_WORKFLOW_PATH}?ref=${GITHUB_WORKFLOW_SHA}" --jq ".sha")"
+          test "$LOADED_WORKFLOW_BLOB_SHA" = "$EXPECTED_TRUSTED_WORKFLOW_BLOB_SHA"
 
 on:
   pull_request:
@@ -51,6 +57,8 @@ jobs:
           ACTUAL_SHA="$(git rev-parse HEAD)"
           PARENT_SHA="164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           TRUSTED_WORKFLOW_PATH=".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
+          TRUSTED_WORKFLOW_REF="Luminous-Dynamics/symthaea/.github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml@refs/heads/main"
+          EXPECTED_TRUSTED_WORKFLOW_BLOB_SHA="f42b9c2f565a157dc32fb21c024caf4ff0ee0c31"
           test "$GITHUB_EVENT_NAME" = "pull_request"
           test "$EVENT_HEAD_REF" = "research/hdc-linear-code-bounded-decoder-v2"
           test "$EVENT_HEAD_REPO" = "Luminous-Dynamics/symthaea"
@@ -620,6 +628,8 @@ jobs:
           trusted_execution_root=main
           trusted_workflow_path=${{ steps.head.outputs.trusted_workflow_path }}
           trusted_workflow_sha=${{ steps.head.outputs.workflow_sha }}
+          trusted_workflow_ref=${{ steps.head.outputs.trusted_workflow_ref }}
+          trusted_workflow_loaded_blob_sha=${{ steps.head.outputs.trusted_workflow_loaded_blob_sha }}
           artifact_revalidation_deferred=true
           qualification_status_pre_artifact=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.artifact_revalidate.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.brute_force_dual_space.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
