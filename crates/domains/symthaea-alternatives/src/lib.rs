@@ -1768,16 +1768,8 @@ impl EvidenceRecord {
                 ));
             }
             (Some(uncertainty), _) => {
-                uncertainty.validate()?;
-                if let Some(unit) = &self.unit {
-                    if uncertainty.statement.unit() != unit {
-                        return Err(AssessmentError::MeasurementUncertaintyUnitMismatch {
-                            evidence_id: self.id.clone(),
-                            evidence_unit: unit.clone(),
-                            uncertainty_unit: uncertainty.statement.unit().to_string(),
-                        });
-                    }
-                }
+                // Report cross-record identity mismatches before deep validation so the error
+                // identifies the boundary that was actually violated.
                 if let Some(observation) = &self.observation {
                     if uncertainty.observation_id != observation.observation_id {
                         return Err(AssessmentError::MeasurementUncertaintyObservationMismatch {
@@ -1816,6 +1808,18 @@ impl EvidenceRecord {
                             },
                         );
                     }
+                }
+                uncertainty.validate()?;
+                if let Some(unit) = &self.unit {
+                    if uncertainty.statement.unit() != unit {
+                        return Err(AssessmentError::MeasurementUncertaintyUnitMismatch {
+                            evidence_id: self.id.clone(),
+                            evidence_unit: unit.clone(),
+                            uncertainty_unit: uncertainty.statement.unit().to_string(),
+                        });
+                    }
+                }
+
                     if let Some(topology) = &observation.calibration_topology {
                         if topology.measurement_model_id != uncertainty.measurement_model_id
                             || topology.measurement_model_revision
@@ -5991,7 +5995,18 @@ mod tests {
                     measurand_id: format!("fixture-measurand:{id}"),
                     procedure_id: "fixture-measurement-procedure-v1".into(),
                     procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
-                    component_refs: vec![test_component("fixture-uncertainty-component-v1")],
+                    component_refs: vec![{
+                        let mut component = test_component("fixture-uncertainty-component-v1");
+                        component.uncertainty_budget_id = "fixture-uncertainty-budget-v1".into();
+                        component.uncertainty_budget_revision = "v1".into();
+                        component.uncertainty_budget_digest =
+                            "fixture-uncertainty-budget-digest-v1".into();
+                        component.measurement_model_id = "fixture-measurement-model-v1".into();
+                        component.measurement_model_revision = "v1".into();
+                        component.measurement_model_digest =
+                            "fixture-measurement-model-digest-v1".into();
+                        component
+                    }],
                     component_refs_digest: String::new(),
                     record_digest: format!("fixture-uncertainty-digest:{id}"),
                     binding_digest: String::new(),
