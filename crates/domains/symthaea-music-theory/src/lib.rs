@@ -60,7 +60,7 @@ pub mod modal_arc;
 pub mod motif;
 pub mod motif_family;
 pub mod motif_foundry;
-pub mod motif_return;
+pub mod motif_return;\npub mod state_space;
 pub mod obligation;
 pub mod opera;
 pub mod passacaglia;
@@ -138,5 +138,5 @@ pub use sonata::{
 };
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
-pub use style::Style;
+pub use state_space::{MusicalStateFrame, MusicalStateTrajectory, STATE_DIMS};\npub use style::Style;
 pub use voicing::{lead_bass, lead_upper};
