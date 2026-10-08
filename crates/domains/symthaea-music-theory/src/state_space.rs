@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 /// Layout: six bounded scalars, a part-identity availability bit, 12 pitch-
 /// class bins, 5 rhythm bins, 12 verified line-interval bins, 3 verified
 /// line-contour bins, and 8 register bins.
+pub const MUSICAL_STATE_SPACE_V1: &str = "musical-state-space-v1";
 pub const STATE_DIMS: usize = 47;
 
 const PITCH_CLASS_BINS: usize = 12;
@@ -41,6 +42,7 @@ const MAX_TRAJECTORY_FRAMES: usize = 4096;
 /// or to human music.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicalStateFrame {
+    pub schema_version: String,
     pub start_beat: f64,
     pub end_beat: f64,
     pub event_count: usize,
@@ -119,6 +121,7 @@ impl MusicalStateFrame {
 /// A time-ordered sequence of MusicalStateFrame values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicalStateTrajectory {
+    pub schema_version: String,
     pub window_beats: f64,
     pub hop_beats: f64,
     pub frames: Vec<MusicalStateFrame>,
@@ -145,6 +148,7 @@ impl MusicalStateTrajectory {
         let total = score.total_beats.beats();
         if total <= 0.0 {
             return Ok(Self {
+                schema_version: MUSICAL_STATE_SPACE_V1.into(),
                 window_beats,
                 hop_beats,
                 frames: Vec::new(),
@@ -183,6 +187,7 @@ impl MusicalStateTrajectory {
         }
 
         Ok(Self {
+            schema_version: MUSICAL_STATE_SPACE_V1.into(),
             window_beats,
             hop_beats,
             frames,
@@ -341,6 +346,7 @@ fn frame_from_notes(score: &Score, start: f64, end: f64, notes: &[ScoreNote]) ->
     };
 
     MusicalStateFrame {
+        schema_version: MUSICAL_STATE_SPACE_V1.into(),
         start_beat: start,
         end_beat: end,
         event_count: notes.len(),
@@ -455,6 +461,8 @@ mod tests {
 
         assert_eq!(ta.frames.len(), 1);
         assert_eq!(tb.frames.len(), 1);
+        assert_eq!(ta.schema_version, MUSICAL_STATE_SPACE_V1);
+        assert_eq!(ta.frames[0].schema_version, MUSICAL_STATE_SPACE_V1);
         assert_eq!(ta.frames[0].vector().len(), STATE_DIMS);
         assert!((ta.frames[0].similarity(&tb.frames[0]) - 1.0).abs() < 1e-9);
     }
