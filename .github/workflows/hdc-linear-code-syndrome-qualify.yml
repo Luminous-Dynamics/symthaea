@@ -84,14 +84,16 @@ jobs:
           test -n "$SYNTHETIC_MERGE_SHA"
           test "$LIVE_RUN_HEAD_SHA" = "$EVENT_HEAD_SHA"
           test -n "$GITHUB_WORKFLOW_SHA"
-          test "$GITHUB_WORKFLOW_SHA" = "$SYNTHETIC_MERGE_SHA"
+          test "$GITHUB_WORKFLOW_SHA" != "$EVENT_HEAD_SHA"
+          test "$GITHUB_WORKFLOW_SHA" != "$PARENT_SHA"
+          test -n "$SYNTHETIC_MERGE_SHA"
           test "$SYNTHETIC_MERGE_SHA" != "$EVENT_HEAD_SHA"
           test "$SYNTHETIC_MERGE_SHA" != "$PARENT_SHA"
           WORKFLOW_PATH=".github/workflows/hdc-linear-code-syndrome-qualify.yml"
           CHECKED_OUT_WORKFLOW_BLOB_SHA="$(git rev-parse "HEAD:$WORKFLOW_PATH")"
           EXECUTED_WORKFLOW_BLOB_SHA="$(gh api --method GET \\
             -H "Accept: application/vnd.github+json" \\
-            "/repos/${GITHUB_REPOSITORY}/contents/${WORKFLOW_PATH}?ref=${SYNTHETIC_MERGE_SHA}" \\
+            "/repos/${GITHUB_REPOSITORY}/contents/${WORKFLOW_PATH}?ref=${GITHUB_WORKFLOW_SHA}" \\
             --jq '.sha')"
           test "$EXECUTED_WORKFLOW_BLOB_SHA" = "$CHECKED_OUT_WORKFLOW_BLOB_SHA"
           if test "$GITHUB_EVENT_NAME" = "pull_request"; then
