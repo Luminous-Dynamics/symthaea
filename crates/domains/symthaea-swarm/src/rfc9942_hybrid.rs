@@ -9,6 +9,7 @@
 
 use sha2::{Digest, Sha256};
 
+use crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection;
 use crate::semantic_evidence_vds::{
     Rfc9942VerifiedReceipt, MAX_RFC9942_RECEIPT_ENCODED_BYTES,
 };
@@ -388,6 +389,98 @@ impl Rfc9942HybridVerifiedReceipt {
     }
 }
 
+/// Requirement applied after receipt verification but before durable
+/// publication. Classical validity is preserved as a distinct assurance level;
+/// it never silently satisfies a hybrid-required request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rfc9942HybridRequirement {
+    ClassicalAllowed,
+    HybridRequired,
+}
+
+/// Immutable, fail-closed admission of a verified selection under an explicit
+/// assurance requirement. The constructor binds the selected receipt digest,
+/// classical capability, and PQ capability together. Durable projection should
+/// accept this wrapper when the caller's policy requires hybrid assurance.
+#[must_use = "retain the admitted assurance when crossing a durable evidence boundary"]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9942SelectionAssuranceAdmission {
+    requirement: Rfc9942HybridRequirement,
+    selection: Rfc9942VerifiedReceiptSelection,
+    hybrid: Option<Rfc9942HybridVerifiedReceipt>,
+}
+
+impl Rfc9942SelectionAssuranceAdmission {
+    pub fn admit(
+        requirement: Rfc9942HybridRequirement,
+        selection: Rfc9942VerifiedReceiptSelection,
+        hybrid: Option<Rfc9942HybridVerifiedReceipt>,
+    ) -> Result<Self, Rfc9942HybridError> {
+        if requirement == Rfc9942HybridRequirement::HybridRequired && hybrid.is_none() {
+            return Err(Rfc9942HybridError::HybridRequiredButMissing);
+        }
+
+        let decision = selection.decision();
+        decision
+            .validated_digest()
+            .map_err(|_| Rfc9942HybridError::InvalidSelectionWitness)?;
+        let selected_receipt_sha256 = decision
+            .selected_receipt_sha256
+            .ok_or(Rfc9942HybridError::InvalidSelectionWitness)?;
+        let classical_capability_sha256 = selection.verified_capability_sha256();
+        if selected_receipt_sha256 == [0; 32] || classical_capability_sha256 == [0; 32] {
+            return Err(Rfc9942HybridError::InvalidSelectionWitness);
+        }
+
+        if let Some(hybrid) = hybrid {
+            let attestation = hybrid.pq_attestation();
+            let transcript = attestation.transcript();
+            if hybrid.classical_capability_sha256() != classical_capability_sha256
+                || transcript.classical_capability_sha256()
+                    != classical_capability_sha256
+                || transcript.receipt_sha256() != selected_receipt_sha256
+                || transcript.policy_digest_sha256()
+                    != hybrid.key_policy_digest_sha256()
+                || transcript.key_id() != attestation.key_id()
+                || transcript.verifying_key_sha256()
+                    != attestation.verifying_key_sha256()
+                || hybrid.hybrid_capability_sha256() == [0; 32]
+            {
+                return Err(Rfc9942HybridError::HybridSelectionBindingMismatch);
+            }
+        }
+
+        Ok(Self {
+            requirement,
+            selection,
+            hybrid,
+        })
+    }
+
+    pub const fn requirement(&self) -> Rfc9942HybridRequirement {
+        self.requirement
+    }
+
+    pub const fn selection(&self) -> &Rfc9942VerifiedReceiptSelection {
+        &self.selection
+    }
+
+    pub const fn hybrid(&self) -> Option<&Rfc9942HybridVerifiedReceipt> {
+        self.hybrid.as_ref()
+    }
+
+    pub const fn is_hybrid_verified(&self) -> bool {
+        self.hybrid.is_some()
+    }
+
+    pub const fn hybrid_capability_sha256(&self) -> Option<[u8; 32]> {
+        match self.hybrid {
+            Some(hybrid) => Some(hybrid.hybrid_capability_sha256()),
+            None => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942HybridError {
     ReceiptWireTooLarge,
@@ -410,6 +503,9 @@ pub enum Rfc9942HybridError {
     PqSignatureVerificationFailed,
     PqResourceLimitExceeded,
     PqProviderFailure,
+    HybridRequiredButMissing,
+    InvalidSelectionWitness,
+    HybridSelectionBindingMismatch,
 }
 
 impl Rfc9942HybridError {
