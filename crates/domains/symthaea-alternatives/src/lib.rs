@@ -6372,7 +6372,7 @@ mod tests {
         );
         let baseline = AlternativesEngine.assess(&fixture_requirement(), &[c.clone()], None).unwrap();
         let mut changed = c;
-        changed.evidence[0].observation.as_mut().unwrap().record_digest = "different-record".into();
+        changed.evidence[0].observation.as_mut().unwrap().subject_id = "replacement-subject".into();
         let updated = AlternativesEngine.assess(&fixture_requirement(), &[changed], None).unwrap();
         assert_ne!(
             baseline.candidates[0].evidence_digest,
@@ -7755,6 +7755,8 @@ mod tests {
         );
         c.evidence[0].valid_until_epoch_seconds = Some(100);
 
+        c.evidence[0].observed_at_epoch_seconds = Some(0);
+
         let current = AlternativesEngine
             .assess_at(&fixture_requirement(), &[c.clone()], None, Some(200))
             .unwrap();
@@ -7877,10 +7879,9 @@ mod tests {
             result.candidates[0].qualification,
             QualificationState::Hypothesis
         );
-        assert!(matches!(
-            result.frontier_blockers["unverified-performance"][0],
-            FrontierBlocker::ConstraintUnresolved(_)
-        ));
+        assert!(result.frontier_blockers["unverified-performance"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::ConstraintUnresolved(_))));
     }
 
     #[test]
@@ -7893,6 +7894,16 @@ mod tests {
             vec![evidence("p1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
         );
         c.performance.get_mut("throughput_per_hour").unwrap().unit = "other-unit".into();
+        c.evidence[0].unit = Some("other-unit".into());
+        let uncertainty = c.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.statement = MeasurementUncertaintyStatement::Standard {
+            value: 0.1,
+            unit: "other-unit".into(),
+        };
+        uncertainty.evaluation.coverage_probability = None;
+        uncertainty.evaluation.coverage_method = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
         let result = AlternativesEngine
             .assess(&fixture_requirement(), &[c], None)
@@ -8033,7 +8044,10 @@ mod tests {
         );
         assert!(!result.pareto_frontier.contains(&"unknown".into()));
         assert_eq!(
-            result.frontier_blockers["blocked"][0],
+            result.frontier_blockers["blocked"]
+                .iter()
+                .find(|blocker| matches!(blocker, FrontierBlocker::ConstraintUnresolved(_)))
+                .expect("constraint unresolved blocker is present"),
             FrontierBlocker::ConstraintUnresolved("throughput_per_hour".into())
         );
     }
@@ -8128,7 +8142,10 @@ mod tests {
             PathwayKind::ProcessSubstitution,
             2.0,
             8.0,
-            vec![evidence("c1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+            vec![
+                evidence("c1", "source-observed", EvidenceKind::Observed, EvidenceStance::Supports, 0.9),
+                evidence("c2", "source-reported", EvidenceKind::Reported, EvidenceStance::Supports, 0.9),
+            ],
         );
         let estimate = c.burdens.get(&Dimension::Water).unwrap().clone();
         c.burdens.insert(
@@ -8139,7 +8156,7 @@ mod tests {
                 unit: estimate.unit,
                 scope: estimate.scope,
                 basis: estimate.basis,
-                evidence_ids: estimate.evidence_ids,
+                evidence_ids: vec!["c2".into()],
             },
         );
 
@@ -10077,13 +10094,14 @@ mod tests {
             valid_from_epoch_seconds: Some(0),
             valid_until_epoch_seconds: Some(100),
         });
-        let c = candidate(
+        let mut c = candidate(
             "admission-expired",
             PathwayKind::ProcessSubstitution,
             2.0,
             2.0,
             vec![e],
         );
+        c.evidence[0].observed_at_epoch_seconds = Some(0);
 
         let expired = AlternativesEngine
             .assess_at(&fixture_requirement(), &[c.clone()], None, Some(200))
@@ -10982,10 +11000,9 @@ mod tests {
         );
         c.burdens.remove(&Dimension::Carbon);
         let result = AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap();
-        assert!(matches!(
-            &result.frontier_blockers["missing"][0],
-            FrontierBlocker::MissingDimension(Dimension::Carbon)
-        ));
+        assert!(result.frontier_blockers["missing"]
+            .iter()
+            .any(|blocker| matches!(blocker, FrontierBlocker::MissingDimension(Dimension::Carbon))));
     }
     #[test]
     fn experimental_discrimination_target_resolves_requirement_scale() {
@@ -11097,7 +11114,7 @@ mod tests {
                 uncertainty_target: Some(ExperimentalUncertaintyStoppingTarget {
                     target_id: "water-discrimination".into(),
                     max_interval_width: 0.5,
-                    unit: "unit".into(),
+                    unit: "burden-unit".into(),
                 }),
             },
             comparison_basis: basis,
@@ -11491,7 +11508,7 @@ mod tests {
             .observation
             .as_mut()
             .unwrap()
-            .experimental_target_id = None;
+            .experimental_target_id = Some("target:orphan".into());
         assert_eq!(
             AlternativesEngine
                 .assess(&case.requirement, &[candidate], None)
