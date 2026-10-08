@@ -324,6 +324,12 @@ impl SystemTransaction {
         commitment: ExecutionCommitment,
     ) -> Result<(), String> {
         validate_execution_commitment(&commitment)?;
+        if self.mutation != MutationKind::Install || commitment.role != "install-script" {
+            return Err(
+                "install-script execution commitments are only valid for install transactions"
+                    .into(),
+            );
+        }
         if self.execution_commitment.is_some() {
             return Err("execution commitment is already bound".into());
         }
@@ -882,6 +888,12 @@ impl TransactionLedger {
                         ));
                     }
 
+                    if event.mutation != MutationKind::Install {
+                        return Err(format!(
+                            "transaction ledger execution binding at line {} is attached to a non-install mutation",
+                            line_number + 1
+                        ));
+                    }
                     let execution_commitment = event.execution_commitment.as_ref().unwrap();
                     validate_execution_commitment(execution_commitment).map_err(|error| {
                         format!(
