@@ -3,9 +3,9 @@
 
 //! Deterministic, typed institutional-evolution state machine.
 //!
-//! The kernel models an institution as a versioned rule-set. Proposal, adoption,
-//! implementation, and historical lineage remain distinct. Rule changes require
-//! the higher-order rule currently governing the changed rule.
+//! An institution has a stable identity, a versioned profile hash, and a
+//! separate hash for each rule-level representation. Proposal, adoption,
+//! implementation, and lineage remain distinct transitions.
 
 use std::collections::BTreeMap;
 
@@ -39,7 +39,7 @@ pub struct SemanticDelta {
 pub struct InstitutionState {
     pub institution_id: String,
     pub semantic_version: String,
-    pub parent_institution_id: Option<String>,
+    pub parent_profile_hash: Option<String>,
     pub profile_hash: String,
     pub rules: BTreeMap<RuleLevel, String>,
 }
@@ -55,6 +55,7 @@ pub struct MutationCandidate {
     pub mutation_id: String,
     pub parent_institution_hash: String,
     pub candidate_institution_hash: String,
+    pub candidate_rule_hash: String,
     pub rule_level: RuleLevel,
     pub semantic_delta: SemanticDelta,
 }
@@ -95,6 +96,7 @@ pub enum FailureDisposition {
 pub struct InstitutionLineageEvent {
     pub parent_institution_hash: String,
     pub candidate_institution_hash: String,
+    pub candidate_rule_hash: String,
     pub mutation_id: String,
     pub rule_level: RuleLevel,
     pub transition: Transition,
@@ -189,6 +191,7 @@ impl InstitutionalEvolution {
         self.lineage.push(InstitutionLineageEvent {
             parent_institution_hash: candidate.parent_institution_hash,
             candidate_institution_hash: candidate.candidate_institution_hash,
+            candidate_rule_hash: candidate.candidate_rule_hash,
             mutation_id: candidate.mutation_id,
             rule_level: candidate.rule_level,
             transition: Transition::Proposed,
@@ -231,7 +234,7 @@ impl InstitutionalEvolution {
                 if self.current.rule_hash(required_level) != Some(authorizing_hash) {
                     return Err(FailureDisposition::AuthorityRuleNotCurrent);
                 }
-                if authorizing_hash == proposal.candidate.candidate_institution_hash {
+                if authorizing_hash == proposal.candidate.candidate_rule_hash {
                     return Err(FailureDisposition::SelfModificationUnauthorized);
                 }
             }
@@ -241,6 +244,7 @@ impl InstitutionalEvolution {
         self.lineage.push(InstitutionLineageEvent {
             parent_institution_hash: proposal.candidate.parent_institution_hash.clone(),
             candidate_institution_hash: proposal.candidate.candidate_institution_hash.clone(),
+            candidate_rule_hash: proposal.candidate.candidate_rule_hash.clone(),
             mutation_id: proposal.candidate.mutation_id.clone(),
             rule_level: proposal.candidate.rule_level,
             transition: if decision.adopted { Transition::Adopted } else { Transition::Rejected },
@@ -271,7 +275,7 @@ impl InstitutionalEvolution {
             return Err(FailureDisposition::AlreadyImplemented);
         }
         if self.current.rule_hash(proposal.candidate.rule_level)
-            == Some(proposal.candidate.candidate_institution_hash.as_str())
+            == Some(proposal.candidate.candidate_rule_hash.as_str())
         {
             return Err(FailureDisposition::AlreadyImplemented);
         }
@@ -279,22 +283,24 @@ impl InstitutionalEvolution {
         let mut next_rules = self.current.rules.clone();
         next_rules.insert(
             proposal.candidate.rule_level,
-            proposal.candidate.candidate_institution_hash.clone(),
+            proposal.candidate.candidate_rule_hash.clone(),
         );
         self.current = InstitutionState {
-            institution_id: proposal.candidate.candidate_institution_hash.clone(),
+            institution_id: self.current.institution_id.clone(),
             semantic_version: format!(
                 "{}+{}",
                 self.current.semantic_version,
                 proposal.candidate.mutation_id
             ),
-            parent_institution_id: Some(self.current.institution_id.clone()),
+            parent_profile_hash: Some(self.current.profile_hash.clone()),
             profile_hash: proposal.candidate.candidate_institution_hash.clone(),
             rules: next_rules,
         };
+
         self.lineage.push(InstitutionLineageEvent {
             parent_institution_hash: proposal.candidate.parent_institution_hash.clone(),
             candidate_institution_hash: proposal.candidate.candidate_institution_hash.clone(),
+            candidate_rule_hash: proposal.candidate.candidate_rule_hash.clone(),
             mutation_id: proposal.candidate.mutation_id.clone(),
             rule_level: proposal.candidate.rule_level,
             transition: Transition::Implemented,
@@ -313,9 +319,9 @@ mod tests {
 
     fn initial() -> InstitutionState {
         InstitutionState {
-            institution_id: "inst-v0".into(),
+            institution_id: "institution-a".into(),
             semantic_version: "0".into(),
-            parent_institution_id: None,
+            parent_profile_hash: None,
             profile_hash: "profile-v0".into(),
             rules: BTreeMap::from([
                 (RuleLevel::Operational, "op-rule-v0".into()),
@@ -326,11 +332,12 @@ mod tests {
         }
     }
 
-    fn candidate(level: RuleLevel, hash: &str, mutation: &str) -> MutationCandidate {
+    fn candidate(level: RuleLevel, profile_hash: &str, rule_hash: &str, mutation: &str) -> MutationCandidate {
         MutationCandidate {
             mutation_id: mutation.into(),
             parent_institution_hash: "profile-v0".into(),
-            candidate_institution_hash: hash.into(),
+            candidate_institution_hash: profile_hash.into(),
+            candidate_rule_hash: rule_hash.into(),
             rule_level: level,
             semantic_delta: SemanticDelta {
                 path: "allocation.rule".into(),
@@ -353,15 +360,16 @@ mod tests {
     #[test]
     fn proposal_does_not_change_current_state() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
         assert_eq!(evolution.current().profile_hash, "profile-v0");
+        assert_eq!(evolution.current().institution_id, "institution-a");
         assert_eq!(evolution.lineage()[0].transition, Transition::Proposed);
     }
 
     #[test]
     fn adopted_change_requires_current_higher_order_rule() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
         assert_eq!(
             evolution.decide(AdoptionDecision {
                 proposal_id: "p1".into(),
@@ -377,12 +385,14 @@ mod tests {
     #[test]
     fn adopted_and_implemented_are_distinct() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
         evolution.decide(adopted_operational_decision()).unwrap();
         assert_eq!(evolution.current().profile_hash, "profile-v0");
         evolution.implement("p1").unwrap();
         assert_eq!(evolution.current().profile_hash, "profile-v1");
-        assert_eq!(evolution.current().rule_hash(RuleLevel::Operational), Some("profile-v1"));
+        assert_eq!(evolution.current().institution_id, "institution-a");
+        assert_eq!(evolution.current().parent_profile_hash.as_deref(), Some("profile-v0"));
+        assert_eq!(evolution.current().rule_hash(RuleLevel::Operational), Some("op-rule-v1"));
         assert_eq!(evolution.current().rule_hash(RuleLevel::CollectiveChoice), Some("cc-rule-v0"));
         assert!(evolution.lineage().iter().any(|e| e.transition == Transition::Adopted));
         assert!(evolution.lineage().iter().any(|e| e.transition == Transition::Implemented));
@@ -391,24 +401,18 @@ mod tests {
     #[test]
     fn wrong_parent_cannot_be_proposed() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        let mut wrong = candidate(RuleLevel::Operational, "profile-v1", "m1");
+        let mut wrong = candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1");
         wrong.parent_institution_hash = "other-profile".into();
-        assert_eq!(
-            evolution.propose("p1", wrong, "a", "failure"),
-            Err(FailureDisposition::ParentMismatch)
-        );
+        assert_eq!(evolution.propose("p1", wrong, "a", "failure"), Err(FailureDisposition::ParentMismatch));
     }
 
     #[test]
     fn competing_proposal_becomes_stale_after_intervening_implementation() {
         let mut evolution = InstitutionalEvolution::new(initial());
-
-        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
-        evolution.propose("p2", candidate(RuleLevel::Operational, "profile-v2", "m2"), "b", "another-failure").unwrap();
-
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
+        evolution.propose("p2", candidate(RuleLevel::Operational, "profile-v2", "op-rule-v2", "m2"), "b", "another-failure").unwrap();
         evolution.decide(adopted_operational_decision()).unwrap();
         evolution.implement("p1").unwrap();
-
         let decision = AdoptionDecision {
             proposal_id: "p2".into(),
             adopted: true,
@@ -422,7 +426,7 @@ mod tests {
     #[test]
     fn rejected_proposal_never_becomes_current() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
         evolution.decide(AdoptionDecision {
             proposal_id: "p1".into(),
             adopted: false,
@@ -437,12 +441,9 @@ mod tests {
     #[test]
     fn duplicate_proposal_and_decision_fail_closed() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        let proposal = candidate(RuleLevel::Operational, "profile-v1", "m1");
+        let proposal = candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1");
         evolution.propose("p1", proposal.clone(), "a", "failure").unwrap();
-        assert_eq!(
-            evolution.propose("p1", proposal, "b", "other"),
-            Err(FailureDisposition::DuplicateProposal)
-        );
+        assert_eq!(evolution.propose("p1", proposal, "b", "other"), Err(FailureDisposition::DuplicateProposal));
         let decision = AdoptionDecision {
             proposal_id: "p1".into(),
             adopted: false,
@@ -455,9 +456,48 @@ mod tests {
     }
 
     #[test]
-    fn constitutional_mutation_requires_meta_constitutional_rule() {
+    fn wrong_authority_level_fails_closed() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        let mut candidate = candidate(RuleLevel::Constitutional, "profile-v1", "m-constitutional");
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
+        assert_eq!(
+            evolution.decide(AdoptionDecision {
+                proposal_id: "p1".into(),
+                adopted: true,
+                authority: Some("authority".into()),
+                authorizing_rule_hash: Some("constitution-v0".into()),
+                authorizing_rule_level: Some(RuleLevel::Constitutional),
+            }),
+            Err(FailureDisposition::WrongAuthorityLevel)
+        );
+    }
+
+    #[test]
+    fn unregistered_rule_hash_cannot_be_treated_as_current_authority() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
+        assert_eq!(
+            evolution.decide(AdoptionDecision {
+                proposal_id: "p1".into(),
+                adopted: true,
+                authority: Some("authority".into()),
+                authorizing_rule_hash: Some("unregistered".into()),
+                authorizing_rule_level: Some(RuleLevel::CollectiveChoice),
+            }),
+            Err(FailureDisposition::AuthorityRuleNotCurrent)
+        );
+    }
+
+    #[test]
+    fn self_authorizing_mutation_fails_closed() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "cc-rule-v0", "m1"), "a", "capture").unwrap();
+        assert_eq!(evolution.decide(adopted_operational_decision()), Err(FailureDisposition::SelfModificationUnauthorized));
+    }
+
+    #[test]
+    fn constitutional_mutation_is_blocked_until_separate_treatment() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        let mut candidate = candidate(RuleLevel::Constitutional, "profile-v1", "constitution-v1", "m-constitutional");
         candidate.semantic_delta.path = "amendment.threshold".into();
         evolution.propose("p1", candidate, "a", "capture").unwrap();
         assert_eq!(
@@ -473,15 +513,12 @@ mod tests {
     }
 
     #[test]
-    fn self_authorizing_mutation_fails_closed() {
+    fn same_profile_hash_cannot_be_reimplemented() {
         let mut evolution = InstitutionalEvolution::new(initial());
-        let mut candidate = candidate(RuleLevel::Operational, "cc-rule-v0", "m1");
-        candidate.semantic_delta.path = "collective_choice.rule".into();
-        evolution.propose("p1", candidate, "a", "capture").unwrap();
-        assert_eq!(
-            evolution.decide(adopted_operational_decision()),
-            Err(FailureDisposition::SelfModificationUnauthorized)
-        );
+        evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
+        evolution.decide(adopted_operational_decision()).unwrap();
+        evolution.implement("p1").unwrap();
+        assert_eq!(evolution.implement("p1"), Err(FailureDisposition::AlreadyImplemented));
     }
 
     #[test]
@@ -489,7 +526,7 @@ mod tests {
         let mut first = InstitutionalEvolution::new(initial());
         let mut second = InstitutionalEvolution::new(initial());
         for evolution in [&mut first, &mut second] {
-            evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "m1"), "a", "failure").unwrap();
+            evolution.propose("p1", candidate(RuleLevel::Operational, "profile-v1", "op-rule-v1", "m1"), "a", "failure").unwrap();
             evolution.decide(adopted_operational_decision()).unwrap();
             evolution.implement("p1").unwrap();
         }
