@@ -21,12 +21,13 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 5;
+const RECEIPT_VERSION: u16 = 6;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
 const VULKAN_SHADER_STAGE: &str = "compute";
 const DRIVER_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-driver.v1";
+const QUEUE_FAMILY_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-queue-family.v1";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -142,6 +143,10 @@ pub enum VulkanBarrierReceiptError {
     DriverUuidBinding,
     #[error("receipt driver ID does not match the execution runtime")]
     DriverIdBinding,
+    #[error("receipt queue-family identity digest is missing, malformed, or inconsistent")]
+    QueueFamilyIdentity,
+    #[error("receipt queue-family identity does not match the execution runtime")]
+    QueueFamilyIdentityBinding,
     #[error("receipt physical-device UUID does not match the execution runtime")]
     DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -172,6 +177,11 @@ pub struct VulkanBarrierExecutionReceipt {
     pub vulkan_api_version: u32,
     pub physical_device_api_version: u32,
     pub queue_family_index: u32,
+    pub queue_family_identity_digest: String,
+    pub queue_family_queue_flags: u32,
+    pub queue_family_queue_count: u32,
+    pub queue_family_timestamp_valid_bits: u32,
+    pub queue_family_min_image_transfer_granularity: [u32; 3],
     pub device_uuid: [u8; 16],
     pub implementation_identity_digest: String,
     pub physical_device_identity_digest: String,
@@ -197,6 +207,23 @@ impl VulkanBarrierExecutionReceipt {
         }
         if !is_sha256_hex(&self.driver_identity_digest) {
             return Err(VulkanBarrierReceiptError::DriverIdentity);
+        }
+        if !is_sha256_hex(&self.queue_family_identity_digest)
+            || self.queue_family_queue_count == 0
+            || (self.queue_family_queue_flags & vk::QueueFlags::COMPUTE.as_raw()) == 0
+        {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentity);
+        }
+        if self.queue_family_identity_digest
+            != queue_family_identity_digest_from_fields(
+                self.queue_family_index,
+                self.queue_family_queue_flags,
+                self.queue_family_queue_count,
+                self.queue_family_timestamp_valid_bits,
+                self.queue_family_min_image_transfer_granularity,
+            )
+        {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentity);
         }
         if schedule.nodes.is_empty() { return Err(VulkanBarrierReceiptError::EmptyWorkload); }
         if self.graph_digest != graph.digest_hex().map_err(|_| VulkanBarrierReceiptError::GraphDigest)? {
@@ -290,6 +317,11 @@ impl VulkanBarrierExecutionReceipt {
         driver_identity_digest: &str,
         driver_uuid: [u8; 16],
         driver_id: i32,
+        queue_family_identity_digest: &str,
+        queue_family_queue_flags: u32,
+        queue_family_queue_count: u32,
+        queue_family_timestamp_valid_bits: u32,
+        queue_family_min_image_transfer_granularity: [u32; 3],
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
@@ -315,6 +347,17 @@ impl VulkanBarrierExecutionReceipt {
         if self.driver_id != driver_id {
             return Err(VulkanBarrierReceiptError::DriverIdBinding);
         }
+        if self.queue_family_identity_digest != queue_family_identity_digest {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding);
+        }
+        if self.queue_family_queue_flags != queue_family_queue_flags
+            || self.queue_family_queue_count != queue_family_queue_count
+            || self.queue_family_timestamp_valid_bits != queue_family_timestamp_valid_bits
+            || self.queue_family_min_image_transfer_granularity
+                != queue_family_min_image_transfer_granularity
+        {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding);
+        }
         Ok(())
     }
 }
@@ -334,6 +377,11 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
     queue_family_index: u32,
+    queue_family_identity_digest: String,
+    queue_family_queue_flags: u32,
+    queue_family_queue_count: u32,
+    queue_family_timestamp_valid_bits: u32,
+    queue_family_min_image_transfer_granularity: [u32; 3],
     device_uuid: [u8; 16],
     implementation_identity_digest: String,
     shader_spirv_sha256: String,
@@ -396,11 +444,14 @@ impl VulkanBarrierWorkloadRuntime {
             let family = unsafe { instance.get_physical_device_queue_family_properties(physical) }
                 .iter().enumerate()
                 .find(|(_, q)| q.queue_flags.contains(vk::QueueFlags::COMPUTE))
-                .map(|(i, _)| i as u32);
-            if let Some(family) = family { selected = Some((physical, family)); break; }
+                .map(|(i, q)| (i as u32, *q));
+            if let Some((family, queue_properties)) = family {
+                selected = Some((physical, family, queue_properties));
+                break;
+            }
         }
 
-        let (physical, family) = match selected {
+        let (physical, family, queue_family_properties) = match selected {
             Some(value) => value,
             None => {
                 unsafe { instance.destroy_instance(None); }
@@ -408,6 +459,16 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         let props = unsafe { instance.get_physical_device_properties(physical) };
+        let queue_family_identity_digest =
+            queue_family_identity_digest(family, &queue_family_properties);
+        let queue_family_queue_flags = queue_family_properties.queue_flags.as_raw();
+        let queue_family_queue_count = queue_family_properties.queue_count;
+        let queue_family_timestamp_valid_bits = queue_family_properties.timestamp_valid_bits;
+        let queue_family_min_image_transfer_granularity = [
+            queue_family_properties.min_image_transfer_granularity.width,
+            queue_family_properties.min_image_transfer_granularity.height,
+            queue_family_properties.min_image_transfer_granularity.depth,
+        ];
         let physical_device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
         let physical_device_identity_digest = physical_device_identity_digest(&props);
         let mut id_properties = vk::PhysicalDeviceIDProperties::default();
@@ -601,6 +662,11 @@ impl VulkanBarrierWorkloadRuntime {
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
             queue_family_index: family,
+            queue_family_identity_digest,
+            queue_family_queue_flags,
+            queue_family_queue_count,
+            queue_family_timestamp_valid_bits,
+            queue_family_min_image_transfer_granularity,
             device_uuid,
             implementation_identity_digest,
             shader_spirv_sha256,
@@ -848,6 +914,11 @@ impl VulkanBarrierWorkloadRuntime {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
             queue_family_index: self.queue_family_index,
+            queue_family_identity_digest: self.queue_family_identity_digest.clone(),
+            queue_family_queue_flags: self.queue_family_queue_flags,
+            queue_family_queue_count: self.queue_family_queue_count,
+            queue_family_timestamp_valid_bits: self.queue_family_timestamp_valid_bits,
+            queue_family_min_image_transfer_granularity: self.queue_family_min_image_transfer_granularity,
             device_uuid: self.device_uuid,
             implementation_identity_digest: self.implementation_identity_digest.clone(),
             physical_device_identity_digest: self.physical_device_identity_digest.clone(),
@@ -867,6 +938,11 @@ impl VulkanBarrierWorkloadRuntime {
                 &self.driver_identity_digest,
                 self.driver_uuid,
                 self.driver_id,
+                &self.queue_family_identity_digest,
+                self.queue_family_queue_flags,
+                self.queue_family_queue_count,
+                self.queue_family_timestamp_valid_bits,
+                self.queue_family_min_image_transfer_granularity,
             )
             .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -1239,6 +1315,40 @@ fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> Stri
     hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+fn queue_family_identity_digest(index: u32, properties: &vk::QueueFamilyProperties) -> String {
+    queue_family_identity_digest_from_fields(
+        index,
+        properties.queue_flags.as_raw(),
+        properties.queue_count,
+        properties.timestamp_valid_bits,
+        [
+            properties.min_image_transfer_granularity.width,
+            properties.min_image_transfer_granularity.height,
+            properties.min_image_transfer_granularity.depth,
+        ],
+    )
+}
+
+fn queue_family_identity_digest_from_fields(
+    index: u32,
+    queue_flags: u32,
+    queue_count: u32,
+    timestamp_valid_bits: u32,
+    min_image_transfer_granularity: [u32; 3],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(QUEUE_FAMILY_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    hasher.update(&index.to_le_bytes());
+    hasher.update(&queue_flags.to_le_bytes());
+    hasher.update(&queue_count.to_le_bytes());
+    hasher.update(&timestamp_valid_bits.to_le_bytes());
+    for value in min_image_transfer_granularity {
+        hasher.update(&value.to_le_bytes());
+    }
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn driver_identity_digest(
     driver_uuid: [u8; 16],
     driver_id: i32,
@@ -1466,6 +1576,8 @@ mod tests {
         "0000000000000000000000000000000000000000000000000000000000000000";
     const TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST: &str =
         "1111111111111111111111111111111111111111111111111111111111111111";
+    const TEST_QUEUE_FAMILY_IDENTITY_DIGEST: &str =
+        "3333333333333333333333333333333333333333333333333333333333333333";
 
     fn fixture() -> (
         ExecutionGraph,
@@ -2358,6 +2470,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
@@ -2371,6 +2488,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
@@ -2387,6 +2509,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
@@ -2405,6 +2532,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             )
             .is_ok());
 
@@ -2418,6 +2550,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::ImplementationIdentityBinding)
         ));
@@ -2444,6 +2581,11 @@ mod tests {
                 TEST_DRIVER_IDENTITY_DIGEST,
                 [2; 16],
                 1,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
             ),
             Err(VulkanBarrierReceiptError::DeviceUuidBinding)
         ));
@@ -2514,6 +2656,11 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 7,
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
@@ -2545,6 +2692,11 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
@@ -2580,6 +2732,17 @@ mod tests {
         println!("vulkan_api_version={}", receipt.vulkan_api_version);
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
+        println!("queue_family_identity_version=1");
+        println!("queue_family_identity_sha256={}", receipt.queue_family_identity_digest);
+        println!("queue_family_queue_flags={}", receipt.queue_family_queue_flags);
+        println!("queue_family_queue_count={}", receipt.queue_family_queue_count);
+        println!("queue_family_timestamp_valid_bits={}", receipt.queue_family_timestamp_valid_bits);
+        println!(
+            "queue_family_min_image_transfer_granularity={},{},{}",
+            receipt.queue_family_min_image_transfer_granularity[0],
+            receipt.queue_family_min_image_transfer_granularity[1],
+            receipt.queue_family_min_image_transfer_granularity[2],
+        );
         println!("device_uuid={}", hex_bytes(&receipt.device_uuid));
         println!("implementation_identity_version=1");
         println!("implementation_identity_sha256={}", receipt.implementation_identity_digest);
@@ -2653,6 +2816,41 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::ImplementationIdentity)
         ));
+    }
+
+    #[test]
+    fn queue_family_identity_digest_binds_capability_tuple() {
+        let mut properties = vk::QueueFamilyProperties::default()
+            .queue_flags(vk::QueueFlags::COMPUTE)
+            .queue_count(1)
+            .timestamp_valid_bits(0)
+            .min_image_transfer_granularity(vk::Extent3D { width: 1, height: 1, depth: 1 });
+        let baseline = queue_family_identity_digest(3, &properties);
+
+        properties.queue_flags |= vk::QueueFlags::TRANSFER;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        properties.queue_flags = vk::QueueFlags::COMPUTE;
+
+        properties.queue_count += 1;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        properties.queue_count = 1;
+
+        properties.timestamp_valid_bits = 64;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        properties.timestamp_valid_bits = 0;
+
+        properties.min_image_transfer_granularity.width = 2;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        assert_ne!(
+            baseline,
+            queue_family_identity_digest_from_fields(
+                4,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+            )
+        );
     }
 
     #[test]
