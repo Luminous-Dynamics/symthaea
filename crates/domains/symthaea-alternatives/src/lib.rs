@@ -6471,6 +6471,8 @@ mod tests {
             unit: "different-unit".into(),
         };
         let uncertainty = e.uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.coverage_probability = None;
+        uncertainty.evaluation.coverage_method = None;
         uncertainty.binding_digest =
             canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
         assert!(matches!(
@@ -6612,6 +6614,10 @@ mod tests {
             .as_mut()
             .unwrap()
             .component_refs[0].component_id = "replacement-component".into();
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.uncertainty_budget_component_set_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
@@ -6666,15 +6672,20 @@ mod tests {
         let mut second = first.clone();
 
         let uncertainty = first.evidence[0].uncertainty.as_mut().unwrap();
-        uncertainty.component_refs = vec![
-            test_component("component-a"),
-            test_component("component-b"),
-            test_component("component-c"),
-        ];
+        let prototype = uncertainty.component_refs[0].clone();
+        uncertainty.component_refs = ["component-a", "component-b", "component-c"]
+            .into_iter()
+            .map(|id| {
+                let mut component = prototype.clone();
+                component.component_id = id.into();
+                component
+            })
+            .collect();
         uncertainty.component_refs_digest =
             canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
                 .unwrap();
         uncertainty.evaluation.component_set_digest = uncertainty.component_refs_digest.clone();
+        uncertainty.evaluation.component_count = uncertainty.component_refs.len();
         uncertainty.uncertainty_budget_component_set_digest =
             uncertainty.component_refs_digest.clone();
         uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
@@ -6682,15 +6693,20 @@ mod tests {
             canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
         let uncertainty = second.evidence[0].uncertainty.as_mut().unwrap();
-        uncertainty.component_refs = vec![
-            test_component("component-c"),
-            test_component("component-a"),
-            test_component("component-b"),
-        ];
+        let prototype = uncertainty.component_refs[0].clone();
+        uncertainty.component_refs = ["component-c", "component-a", "component-b"]
+            .into_iter()
+            .map(|id| {
+                let mut component = prototype.clone();
+                component.component_id = id.into();
+                component
+            })
+            .collect();
         uncertainty.component_refs_digest =
             canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
                 .unwrap();
         uncertainty.evaluation.component_set_digest = uncertainty.component_refs_digest.clone();
+        uncertainty.evaluation.component_count = uncertainty.component_refs.len();
         uncertainty.uncertainty_budget_component_set_digest =
             uncertainty.component_refs_digest.clone();
         uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
@@ -6737,6 +6753,10 @@ mod tests {
             .unwrap()
             .component_refs[0]
             .component_record_digest = "different-component-record".into();
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.uncertainty_budget_component_set_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
@@ -6879,6 +6899,9 @@ mod tests {
         let mut uncertainty = test_uncertainty(&["component"]);
         uncertainty.component_refs[0].evaluation_type =
             MeasurementUncertaintyComponentEvaluationType::TypeB;
+        uncertainty.uncertainty_budget_component_set_digest =
+            canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
+                .unwrap();
         let error = uncertainty.validate().unwrap_err();
         assert!(matches!(
             error,
@@ -7233,6 +7256,8 @@ mod tests {
             .unwrap()
             .component_refs
             .push(additional_component);
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.evaluation.component_count = uncertainty.component_refs.len();
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
