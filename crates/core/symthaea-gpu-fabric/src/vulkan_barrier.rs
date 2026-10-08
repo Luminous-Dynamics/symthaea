@@ -166,7 +166,7 @@ pub enum VulkanBarrierReceiptError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VulkanSynchronizationFeatureProfile {
     pub timeline_semaphore_supported: bool,
     pub synchronization2_supported: bool,
@@ -1010,7 +1010,7 @@ impl VulkanBarrierWorkloadRuntime {
             physical_device_api_version: self.physical_device_api_version,
             synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: self.queue_family_index,
-            synchronization_features: self.synchronization_features,
+            synchronization_features: self.synchronization_features.clone(),
             queue_family_identity_digest: self.queue_family_identity_digest.clone(),
             queue_family_queue_flags: self.queue_family_queue_flags,
             queue_family_queue_count: self.queue_family_queue_count,
