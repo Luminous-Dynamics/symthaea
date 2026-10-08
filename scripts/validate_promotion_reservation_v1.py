@@ -90,6 +90,41 @@ class PromotionStackEffectSetV1:
     operation_identity_digest: str
     effects: tuple[PromotionStackEffectV1, ...]
 
+    @classmethod
+    def from_webhook_observations(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        observations: tuple["ProviderPullRequestMergeObservationV1", ...],
+    ) -> "PromotionStackEffectSetV1 | None":
+        expected = identity.ordered_stack
+        expected_prs = {entry.pr_number for entry in expected}
+        by_pr: dict[int, "ProviderPullRequestMergeObservationV1"] = {}
+
+        for observation in observations:
+            if observation.repository != identity.repository:
+                return None
+            if observation.pr_number in by_pr:
+                return None
+            by_pr[observation.pr_number] = observation
+
+        if set(by_pr) != expected_prs:
+            return None
+
+        effects: list[PromotionStackEffectV1] = []
+        for entry in expected:
+            observation = by_pr.get(entry.pr_number)
+            if observation is None:
+                return None
+            effect = observation.to_effect_for_stack_entry(entry)
+            if effect is None:
+                return None
+            effects.append(effect)
+
+        return cls(
+            operation_identity_digest=identity.digest(),
+            effects=tuple(effects),
+        )
+
     def validates_complete(self, identity: PromotionOperationIdentityV1) -> bool:
         if self.operation_identity_digest != identity.digest():
             return False
@@ -384,6 +419,25 @@ class ProviderPullRequestMergeObservationV1:
             head_sha=head_sha,
             merge_commit_sha=str(merge_commit_sha),
             payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
+        )
+
+    def to_effect_for_stack_entry(
+        self,
+        entry: StackEntryV1,
+    ) -> PromotionStackEffectV1 | None:
+        if not (
+            self.event_type == "pull_request"
+            and self.action == "closed"
+            and self.merged
+            and self.pr_number == entry.pr_number
+            and self.head_sha == entry.head_sha
+            and bool(self.merge_commit_sha)
+        ):
+            return None
+        return PromotionStackEffectV1(
+            pr_number=self.pr_number,
+            expected_head_sha=self.head_sha,
+            observed_merge_commit=self.merge_commit_sha,
         )
 
     def validates_requested_effect(self, identity: PromotionOperationIdentityV1) -> bool:
@@ -715,6 +769,7 @@ def webhook_merge_payload(
     head_sha: str = "H3",
     merged: bool = True,
     action: str = "closed",
+    merge_commit: str | None = None,
 ) -> bytes:
     return json.dumps(
         {
@@ -724,23 +779,248 @@ def webhook_merge_payload(
                 "number": pr_number,
                 "merged": merged,
                 "head": {"sha": head_sha},
-                "merge_commit_sha": "M2" if merged else None,
+                "merge_commit_sha": (
+                    merge_commit
+                    if merge_commit is not None
+                    else ("M2" if merged else None)
+                ),
             },
             "repository": {"full_name": repository},
         },
         separators=(",", ":"),
     ).encode("utf-8")
 
-
-def webhook_merge_receipt(payload: bytes) -> ProviderWebhookReceiptV1:
+def webhook_merge_receipt(
+    payload: bytes,
+    *,
+    delivery_id: str = "delivery-merge",
+    repository: str = "Luminous-Dynamics/symthaea",
+    event_type: str = "pull_request",
+) -> ProviderWebhookReceiptV1:
     return ProviderWebhookReceiptV1.from_delivery(
-        "delivery-merge",
+        delivery_id,
         "hook-1",
-        "pull_request",
-        "Luminous-Dynamics/symthaea",
+        event_type,
+        repository,
         payload,
         b"secret",
     )
+
+
+
+def stack_webhook_observation(
+    identity: PromotionOperationIdentityV1 | None = None,
+    *,
+    pr_number: int = 7087,
+    head_sha: str = "H3",
+    merge_commit: str = "M2",
+    delivery_id: str = "delivery-merge",
+    repository: str = "Luminous-Dynamics/symthaea",
+) -> ProviderPullRequestMergeObservationV1:
+    identity = identity or stack_identity_fixture()
+    payload = webhook_merge_payload(
+        repository=repository,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        merged=True,
+        action="closed",
+        merge_commit=merge_commit,
+    )
+    receipt = webhook_merge_receipt(
+        payload,
+        delivery_id=delivery_id,
+        repository=repository,
+    )
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+    )
+    assert observation is not None
+    return observation
+
+
+def test_webhook_derived_stack_effect_set_is_complete():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-bottom",
+    )
+    requested = stack_webhook_observation(identity)
+    effects = PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert effects is not None
+    assert effects.validates_complete(identity)
+
+
+def test_webhook_derived_stack_effect_set_normalizes_input_order():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-bottom-order",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-requested-order",
+    )
+    effects = PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (requested, bottom),
+    )
+    assert effects is not None
+    assert [effect.pr_number for effect in effects.effects] == [7085, 7087]
+
+
+def test_webhook_derived_stack_effect_set_rejects_missing_member():
+    identity = stack_identity_fixture()
+    requested = stack_webhook_observation(identity)
+    assert PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (requested,),
+    ) is None
+
+
+def test_webhook_derived_stack_effect_set_rejects_extra_member():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-extra-bottom",
+    )
+    requested = stack_webhook_observation(identity)
+    extra = stack_webhook_observation(
+        identity,
+        pr_number=7090,
+        head_sha="H9",
+        merge_commit="M9",
+        delivery_id="delivery-extra",
+    )
+    assert PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, requested, extra),
+    ) is None
+
+
+def test_webhook_derived_stack_effect_set_rejects_duplicate_pr():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-dup-bottom",
+    )
+    requested1 = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-dup-requested-1",
+    )
+    requested2 = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-dup-requested-2",
+    )
+    assert PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, requested1, requested2),
+    ) is None
+
+
+def test_webhook_derived_stack_effect_set_rejects_mixed_repository():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-mixed-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        repository="other/repo",
+        delivery_id="delivery-mixed-requested",
+    )
+    assert PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, requested),
+    ) is None
+
+
+def test_webhook_derived_stack_effect_set_rejects_head_mismatch():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1-CHANGED",
+        merge_commit="M1",
+        delivery_id="delivery-head-mismatch",
+    )
+    requested = stack_webhook_observation(identity)
+    assert PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, requested),
+    ) is None
+
+
+def test_webhook_derived_stack_effect_set_rejects_semantically_invalid_observation():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-invalid-bottom",
+    )
+    invalid = ProviderPullRequestMergeObservationV1(
+        delivery_id="delivery-invalid-requested",
+        repository=identity.repository,
+        pr_number=7087,
+        event_type="pull_request",
+        action="closed",
+        merged=False,
+        head_sha="H3",
+        merge_commit_sha="M2",
+        payload_bytes_digest="digest",
+    )
+    assert PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, invalid),
+    ) is None
+
+
+def test_webhook_derived_effect_set_preserves_observation_only_semantics():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-effect-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-effect-requested",
+    )
+    effects = PromotionStackEffectSetV1.from_webhook_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert effects is not None
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=None,
+        effect_set=effects,
+        provider_evidence=None,
+    )
+    assert resolution.outcome == "effect-observed-only"
 
 
 def test_webhook_merge_effect_parses_authenticated_merged_pr():
@@ -2403,6 +2683,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_webhook_derived_stack_effect_set_is_complete,
+    test_webhook_derived_stack_effect_set_normalizes_input_order,
+    test_webhook_derived_stack_effect_set_rejects_missing_member,
+    test_webhook_derived_stack_effect_set_rejects_extra_member,
+    test_webhook_derived_stack_effect_set_rejects_duplicate_pr,
+    test_webhook_derived_stack_effect_set_rejects_mixed_repository,
+    test_webhook_derived_stack_effect_set_rejects_head_mismatch,
+    test_webhook_derived_stack_effect_set_rejects_semantically_invalid_observation,
+    test_webhook_derived_effect_set_preserves_observation_only_semantics,
     test_webhook_merge_effect_parses_authenticated_merged_pr,
     test_webhook_merge_effect_rejects_invalid_hmac,
     test_webhook_merge_effect_rejects_non_pull_request_event,
