@@ -1618,38 +1618,39 @@ fn generate_system_config(msg: &ClientMessage) -> String {
 
     config
 }fn single_luks_fallback_configuration(hostname: &str) -> String {
-    format!(
-        "{{ config, pkgs, ... }}:
-{{
+    let mut config = String::from(
+        r#"{ config, pkgs, ... }:
+{
   imports = [ ./hardware-configuration.nix ];
-  networking.hostName = "{hostname}";
+  networking.hostName = "__HOSTNAME__";
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
   # LUKS2 encryption; runtime UUID substitution occurs after luksFormat.
-  boot.initrd.luks.devices."cryptroot" = {{
+  boot.initrd.luks.devices."cryptroot" = {
     device = "/dev/disk/by-uuid/__CRYPT_UUID__";
     allowDiscards = true;
-  }};
+  };
 
   services.openssh.enable = true;
-  services.earlyoom = {{ enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; }};
+  services.earlyoom = { enable = true; freeMemThreshold = 5; freeSwapThreshold = 5; };
   services.fstrim.enable = true;
-  services.smartd = {{ enable = true; autodetect = true; }};
-  services.btrfs.autoScrub = {{ enable = true; interval = "monthly"; fileSystems = [ "/" ]; }};
-  zramSwap = {{ enable = true; algorithm = "zstd"; }};
+  services.smartd = { enable = true; autodetect = true; };
+  services.btrfs.autoScrub = { enable = true; interval = "monthly"; fileSystems = [ "/" ]; };
+  zramSwap = { enable = true; algorithm = "zstd"; };
   boot.kernel.sysctl."vm.swappiness" = 60;
 
-  users.users.{hostname} = {{
+  users.users.__HOSTNAME__ = {
     isNormalUser = true;
     extraGroups = [ "wheel" "video" "networkmanager" ];
-  }};
+  };
 
   environment.systemPackages = with pkgs; [ vim git curl wget htop btrfs-progs cryptsetup ];
   system.stateVersion = "26.05";
-}}",
-        hostname = hostname,
-    )
+}"#,
+    );
+    config = config.replace("__HOSTNAME__", hostname);
+    config
 }
 
 fn generate_system_config_module(msg: &ClientMessage) -> String {
@@ -12242,8 +12243,8 @@ mod tests {
         let fido = fido2_postinstall();
         assert!(tpm.contains("$CRYPT_PART"));
         assert!(fido.contains("$CRYPT_PART"));
-        assert!(!tpm.contains('blkid -t TYPE=crypto_LUKS'));
-        assert!(!fido.contains('blkid -t TYPE=crypto_LUKS'));
+        assert!(!tpm.contains("blkid -t TYPE=crypto_LUKS"));
+        assert!(!fido.contains("blkid -t TYPE=crypto_LUKS"));
         assert!(tpm.contains("ERROR: TPM 2.0 requested"));
         assert!(fido.contains("ERROR: FIDO2 requested"));
     }
