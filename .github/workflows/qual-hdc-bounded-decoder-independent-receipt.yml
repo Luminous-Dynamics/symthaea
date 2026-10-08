@@ -245,17 +245,10 @@ jobs:
                   evidence.pr.base.sha === expected.parent &&
                   Number(evidence.pr.base.repo?.id) === expected.repositoryId &&
                   evidence.pr.base.repo?.full_name === expected.repository,
-                run_pr_association:
+                run_pr_association_view_shape:
                   Array.isArray(evidence.run.pull_requests) &&
                   evidence.run.pull_requests.length === 1 &&
-                  evidence.run.pull_requests[0].number === expected.pr &&
-                  evidence.run.pull_requests[0].head.sha === expected.subject &&
-                  Number(evidence.run.pull_requests[0].head.repo?.id) === expected.repositoryId &&
-                  evidence.run.pull_requests[0].head.repo?.full_name === expected.repository &&
-                  evidence.run.pull_requests[0].base?.sha === expected.parent &&
-                  evidence.run.pull_requests[0].base?.ref === expected.baseBranch &&
-                  Number(evidence.run.pull_requests[0].base?.repo?.id) === expected.repositoryId &&
-                  evidence.run.pull_requests[0].base?.repo?.full_name === expected.repository,
+                  evidence.run.pull_requests[0].number === expected.pr,
                 ancestry:
                   evidence.parentCommit.sha === expected.subject &&
                   evidence.parentCommit.parents?.[0]?.sha === expected.parent,
@@ -417,6 +410,7 @@ jobs:
               ['run_attempt_zero', (e) => { e.run.run_attempt = 0; }],
               ['run_attempt_string', (e) => { e.run.run_attempt = '1'; }],
               ['run_pr_number', (e) => { e.run.pull_requests[0].number += 1; }],
+              ['run_pr_association_missing', (e) => { e.run.pull_requests = []; }],
               ['run_pr_head_repo', (e) => { e.run.pull_requests[0].head.repo.full_name = 'attacker/clone'; }],
               ['run_pr_base_sha', (e) => { e.run.pull_requests[0].base.sha = '0'.repeat(40); }],
               ['run_pr_base_ref', (e) => { e.run.pull_requests[0].base.ref = 'untrusted-base'; }],
@@ -495,6 +489,18 @@ jobs:
             const syntheticBaseline = evaluate(syntheticEvidence());
             const syntheticBaselinePassed =
               syntheticBaseline.qualificationResult === 'PASS';
+
+            const staleAssociationEvidence = syntheticEvidence();
+            staleAssociationEvidence.run.pull_requests[0].head.sha = '0'.repeat(40);
+            staleAssociationEvidence.run.pull_requests[0].head.repo.id = expected.repositoryId + 1;
+            staleAssociationEvidence.run.pull_requests[0].head.repo.full_name = 'attacker/clone';
+            staleAssociationEvidence.run.pull_requests[0].base.sha = '1'.repeat(40);
+            staleAssociationEvidence.run.pull_requests[0].base.ref = 'stale-base';
+            staleAssociationEvidence.run.pull_requests[0].base.repo.id = expected.repositoryId + 1;
+            staleAssociationEvidence.run.pull_requests[0].base.repo.full_name = 'attacker/clone';
+            const staleAssociationEvaluation = evaluate(staleAssociationEvidence);
+            const staleAssociationViewPassed =
+              staleAssociationEvaluation.qualificationResult === 'PASS';
 
             const adversarialResults = [];
             for (const [name, mutate] of attackCases) {
@@ -678,7 +684,7 @@ jobs:
             const liveEvaluation = evaluate(liveEvidence);
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v4',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v5',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -693,6 +699,10 @@ jobs:
                 verifier_root_current: liveEvaluation.checks.verifier_root_current,
                 verifier_root_stable: liveEvaluation.checks.verifier_root_stable,
                 workflow_run_id: run.id,
+              },
+              run_pr_association_view: {
+                expected_immutable_identity: false,
+                stale_association_view_accepted: staleAssociationViewPassed,
               },
               adversarial_verifier_corpus: {
                 test_count: adversarialResults.length,
