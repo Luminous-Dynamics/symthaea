@@ -1750,6 +1750,7 @@ fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
 
     let mut total_dual_vectors = 0usize;
     let mut total_row_membership_checks = 0usize;
+    let mut total_production_span_vectors = 0usize;
     let mut total_kernel_observations = 0usize;
 
     for &(dimension, rank, seed) in &cases {
@@ -1797,6 +1798,7 @@ fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
         }
         production_span.sort_unstable();
         production_span.dedup();
+        total_production_span_vectors += production_span.len();
         assert_eq!(
             production_span, dual_vectors,
             "production parity-check row span diverged from the complete brute-force dual space: regime={dimension}x{rank} seed=0x{seed:X}"
@@ -1820,7 +1822,7 @@ fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
     }
 
     println!(
-        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_span_exact=true;kernel_equals_code=true;algebraically_distinct=true",
+        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};total_production_span_vectors={total_production_span_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_span_exact=true;kernel_equals_code=true;algebraically_distinct=true",
         cases.len(),
     );
 }
