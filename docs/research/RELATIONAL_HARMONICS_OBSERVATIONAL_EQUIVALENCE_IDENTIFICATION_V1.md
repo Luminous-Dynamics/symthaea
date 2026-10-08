@@ -4,253 +4,282 @@
 
 **Research diagnostic only. Not approved for formal inference.**
 
-Current selection remains:
+Current selection: `stop-assumption-failure`.
 
-`stop-assumption-failure`
+The gate is intentionally before nuisance estimation, inference-method selection, and bootstrap execution.
 
-The purpose of this gate is to sit **before** nuisance estimation, inference-method selection, and bootstrap execution.
+## Core distinction
 
-## Scientific question
+RH-006 currently observes a `RelationalPredictionSample`: feature-time variables, outcome-time variables, relational features, common context, and an independently observed future outcome.
 
-RH-006 currently observes a `RelationalPredictionSample` containing feature-time variables, outcome-time variables, relational features, common context, and the independently observed future outcome. The current estimator-compatibility contract identifies how the declared forecasting estimator behaves, but it does not by itself establish point identification of a future latent nuisance quantity.
+That predictive observable is not automatically a measurement model for a latent state.
 
-Any future latent construction of the form
+Let `T(theta)` be the observable-data law induced by latent DGP parameters `theta`, and let `psi(theta)` be a proposed latent target. At observable law `P`, define:
 
-[
-F=q+v,qquad Y=bq+e,
-]
+```text
+I_psi(P) = { psi(theta) : T(theta) = P }
+```
 
-with (vperp(q,e)), jointly Gaussian variables, and observable covariance
-
-[
-Sigma_{F,Y} =
-egin{pmatrix}
-2 & 0.5\
-0.5 & 1.5
-end{pmatrix}
-]
-
-must pass an observational-equivalence attack before (K), (Xi), (C), or any downstream branch quantity is treated as point identified.
-
-## Executed result
-
-The deterministic harness is:
-
-`scripts/rh006_observational_equivalence.py`
-
-It checks:
-
-1. two explicit latent DGP witnesses with identical observable covariance;
-2. a continuum of admissible (C) values, including the contraction boundary;
-3. unbounded (K) with the observable law fixed;
-4. branch-regime changes under (D(C)=0.25-C^2);
-5. an explicit identification-rescue construction using a second calibrated indicator of (q) and a valid excluded instrument.
-
-The harness was executed independently with deterministic parameters and a 100,000-draw Gaussian sanity simulation. The finite-sample simulation is calibration only; the identification result is analytic.
-
-## Exact observational-equivalence witness
-
-Model A:
-
-- (operatorname{Var}(q)=1)
-- (operatorname{Cov}(e,q)=0.4)
-- (K=0.4)
-- (C=0.3368607684ldots)
-- (b=0.1)
-- (operatorname{Var}(e)=1.41)
-- (operatorname{Var}(v)=1)
-
-Model B:
-
-- (operatorname{Var}(q)=0.5)
-- (operatorname{Cov}(e,q)=-0.4)
-- (K=-0.8)
-- (C=-0.4923659639ldots)
-- (b=1.8)
-- (operatorname{Var}(e)=1.32)
-- (operatorname{Var}(v)=1.5)
-
-Both satisfy:
-
-[
-operatorname{Var}(F)=2,qquad
-operatorname{Cov}(F,Y)=0.5,qquad
-operatorname{Var}(Y)=1.5.
-]
-
-Because the construction is jointly Gaussian, equality of the observable mean/covariance parameters gives equality of the entire observable Gaussian law.
+Point identification means `I_psi(P)` is a singleton. A non-singleton set is partial identification. Two admissible observationally equivalent witnesses with different target values establish non-identification for the stated model class.
 
 Therefore:
 
-[
-oxed{
-	ext{same observable law}
+```text
+coordinate invariance != statistical identification
+```
 
-otRightarrow
-	ext{same }Xi
+An invariant target can remain nonidentified when multiple latent DGPs induce the same observable law.
 
-otRightarrow
-	ext{same }K
+## Adversarial latent model
 
-otRightarrow
-	ext{same }C
-}
-]
+Use the minimal construction:
 
-under the minimal model.
+```text
+F = q + v
+Y = b q + e
+v independent of (q, e)
+```
 
-## Identified-set result
+Assume joint Gaussian variables and observable covariance:
 
-For
+```text
+Sigma_(F,Y) = [[2, 0.5],
+               [0.5, 1.5]]
+```
 
-[
-t=operatorname{Cov}(F,Y),qquad
-V=operatorname{Var}(Y),qquad
-s=operatorname{Var}(q),
-]
+Gaussianity matters: equality of the observable mean and covariance parameters determines the full observable Gaussian law.
 
-take any admissible (s) with
+## Executed witness result
 
-[
-rac{t^2}{V}<s<operatorname{Var}(F).
-]
+The harness is `scripts/rh006_observational_equivalence.py`.
 
-Define
+The independent local run uses deterministic parameters and 100,000 Gaussian draws per witness. The simulation is a sanity check only; the identification result comes from the analytic construction.
 
-[
-	au^2=V-rac{t^2}{s}.
-]
+### Witness A
 
-For any (cin(-1,1)), set
+```text
+Var(q)     = 1.0
+Cov(e,q)   = +0.4
+K          = +0.4
+C          = 0.3368607684...
+b          = 0.1
+Var(e)     = 1.41
+Var(v)     = 1.0
+```
 
-[
-k =
-rac{c}{sqrt{1-c^2}}sqrt{s	au^2},
-qquad
-b=rac{t-k}{s},
-qquad
-operatorname{Var}(e)=rac{k^2}{s}+	au^2.
-]
+### Witness B
 
-Then (C=c) while the observable covariance remains unchanged.
+```text
+Var(q)     = 0.5
+Cov(e,q)   = -0.4
+K          = -0.8
+C          = -0.4923659639...
+b          = 1.8
+Var(e)     = 1.32
+Var(v)     = 1.5
+```
 
-The exact PSD-boundary construction also admits (C=pm1).
+Both produce:
 
-The resulting minimal-model identified sets are:
+```text
+Var(F)     = 2.0
+Cov(F,Y)   = 0.5
+Var(Y)     = 1.5
+```
 
-| Quantity | Classification | Identified set / value |
+So:
+
+```text
+same observable law
+    !=> same Xi
+    !=> same K
+    !=> same C
+```
+
+## Identified-set construction
+
+Let `t = Cov(F,Y)`, `V = Var(Y)`, and `s = Var(q)`.
+
+For admissible `s` with `t^2 / V < s < Var(F)`, define:
+
+```text
+tau^2 = V - t^2 / s
+```
+
+For any `c` in `(-1, 1)` choose:
+
+```text
+k      = c / sqrt(1-c^2) * sqrt(s * tau^2)
+b      = (t - k) / s
+Var(e) = k^2 / s + tau^2
+```
+
+Then `C = c` while the observable covariance remains unchanged. The PSD boundary also permits `C = -1` and `C = +1`.
+
+For the canonical observable covariance, the minimal-model sets are:
+
+| Quantity | Class | Identified set / value |
 |---|---|---|
-| (operatorname{Var}(F)) | O | ({2}) |
-| (operatorname{Cov}(F,Y)) | O | ({0.5}) |
-| (operatorname{Var}(Y)) | O | ({1.5}) |
-| (operatorname{Var}(q)) | PI | ([1/6,2]), subject to boundary convention |
-| (operatorname{Var}(v)) | PI | ([0,11/6]), subject to boundary convention |
-| (operatorname{Cov}(e,q)=Xi) | NI | (mathbb R) |
-| (K=Xi/operatorname{Var}(q)) | NI | (mathbb R) |
-| (C) | NI | ([-1,1]) |
-| (b) | NI | (mathbb R) |
-| (operatorname{Var}(e)) | NI | non-singleton |
-| (D(C)=0.25-C^2) | NI | ([-0.75,0.25]) |
-| branch existence | NI | can be two roots, a double root, or no real roots |
+| `Var(F)` | O | `{2}` |
+| `Cov(F,Y)` | O | `{0.5}` |
+| `Var(Y)` | O | `{1.5}` |
+| `Var(q)` | PI | `[1/6, 2]` if `Var(v)=0` is allowed |
+| `Var(v)` | PI | `[0, 11/6]` |
+| `Xi = Cov(e,q)` | NI | `R` |
+| `K = Xi / Var(q)` | NI | `R` |
+| `C` | NI | `[-1,1]` |
+| `b` | NI | `R` |
+| `Var(e)` | NI | non-singleton |
+| `D(C)=0.25-C^2` | NI | `[-0.75,0.25]` |
+| branch existence | NI | two roots / double root / no real root |
 
-The critical point is that **branch existence is itself not identified** when the branch discriminant depends on (C).
+If strictly positive `Var(v)` is required, the upper endpoint of `Var(q)` becomes open.
+
+## Branch-regime attack
+
+For `D(C)=0.25-C^2`:
+
+```text
+C = 0.00  -> D = +0.25    -> two real branches
+C = 0.50  -> D =  0.00    -> double root
+C = 0.99  -> D = -0.7301  -> no real branch
+```
+
+Thus a nonidentified nuisance can make the downstream qualitative regime itself nonidentified.
+
+This is stronger than poor numerical conditioning.
 
 ## Estimation trap
 
-Fitting
+If the same sample is used to fit `Y = b q + e` by OLS, the fitted residual is sample-orthogonal to the fitted regressor by construction.
 
-[
-Y=bq+e
-]
+Therefore:
 
-by OLS on the same sample forces the fitted residual to be sample-orthogonal to the fitted regressor. Consequently, residual-then-correlate cannot recover (operatorname{Cov}(e,q)) under endogeneity; it mechanically manufactures near-zero sample covariance.
+```text
+fit b
+-> compute residual
+-> correlate residual with q
+```
 
-This is a validity boundary for any future RH-006 nuisance estimator, not a property of the current forecasting estimator.
+cannot identify `Cov(e,q)` under endogeneity. It mechanically manufactures near-zero sample covariance.
 
-## Required machine gate
+This is a rejection rule for future latent-nuisance estimators. It is not a criticism of the current fixed-ridge forecasting estimator.
+
+## Required classification
 
 Every proposed nuisance quantity should carry one of:
 
-- **O — Observable:** directly a functional of the observed `RelationalPredictionSample`.
-- **MI — Model-identified:** uniquely determined under an explicit identification model and its checked assumptions.
-- **PI — Partially identified:** only an identified set is determined.
-- **NI — Not identified:** observationally equivalent admissible DGPs produce different target values.
+- **O — Observable:** direct functional of `RelationalPredictionSample`.
+- **MI — Model-identified:** unique only after an explicit identification model and its assumptions pass.
+- **PI — Partially identified:** the data determine a non-singleton identified set.
+- **NI — Not identified:** admissible observationally equivalent DGPs produce different target values.
 
-The minimum executable attack is:
+The executable qualification order is:
 
-[
-oxed{
-	ext{observable law}
-ightarrow
-	ext{latent witness family}
-ightarrow
-	ext{target variation}
-ightarrow
-	ext{identified set}
-ightarrow
-	ext{branch/surface image}
-}
-]
+```text
+observable law
+-> observational-equivalence witnesses
+-> target variation
+-> identified set
+-> downstream surface image
+-> only then estimation
+```
 
-A target that varies across observationally equivalent witnesses must not be promoted to a point-estimated nuisance parameter.
+A target that varies across admissible observationally equivalent witnesses must fail closed as `NI` rather than become a point-estimated nuisance.
 
-## What can rescue identification?
+## Exact-law requirement
 
-The harness demonstrates one explicit rescue, not an assertion that RH-006 already possesses it.
+Covariance equality is sufficient for the current adversarial witness because the model is Gaussian.
 
-A defensible point-identification structure is:
+For real RH-006 time series, covariance matching alone is insufficient unless Gaussianity is itself part of the maintained model. The eventual harness should therefore prove observational equivalence at the law level, using an analytically equivalent process family or a common-innovation construction.
 
-1. two calibrated independent indicators of (q) with known unit loading, so (operatorname{Var}(q)) is recovered from their cross-covariance;
-2. a valid excluded instrument (Z) with (operatorname{Cov}(Z,e)=0) and (operatorname{Cov}(Z,q)
-eq0), so (b) is identified;
-3. then
-   [
-   Xi=operatorname{Cov}(F,Y)-boperatorname{Var}(q)
-   ]
-   and (operatorname{Var}(e)) are identified, giving (C).
+Empirical distance can be used as a falsification sanity check, but it must not be used as the proof of identification.
 
-The executable rescue recovers the Model-A value:
+## Identification rescues
 
-[
-C=0.3368607684ldots
-]
+The harness demonstrates one explicit point-identification rescue:
 
-under those added assumptions.
+1. two calibrated independent indicators of `q` with known unit loading, recovering `Var(q)` from cross-covariance;
+2. a valid excluded instrument `Z` with `Cov(Z,e)=0` and `Cov(Z,q) != 0`, identifying `b`;
+3. recovery of `Xi` from `Cov(F,Y) - b * Var(q)` and then recovery of `C`.
 
-The repository must therefore not infer that a currently available signal is an instrument merely because it is predictive. Exogeneity and exclusion are structural assumptions requiring experimental or design justification.
+The rescue recovers:
+
+```text
+b  = 0.1
+Xi = 0.4
+C  = 0.3368607684...
+```
+
+The repository must not treat a predictive signal as a valid instrument without explicit exclusion and exogeneity justification.
+
+Other defensible rescue families are randomized intervention, a rank-identified latent measurement model, IV/control-function designs, proximal proxy designs with explicit completeness-style assumptions, and honest partial-identification bounds.
+
+The last option is important: **PI is a scientific result, not a failed experiment.** The identified set can be propagated through the downstream decision surface.
 
 ## Placement in RH-006
 
-The existing inference path is already conservative: the current estimator-applicability flag is false and the compiled selector resolves to `stop-assumption-failure` when compatibility is not approved.
+The current inference path already stops because the estimator-applicability artifact is not approved.
 
-The identification gate should become an earlier prerequisite:
+The identification gate should precede that layer:
 
-[
-	ext{observable schema}
-ightarrow
-	ext{identification audit}
-ightarrow
-	ext{identified-set status}
-ightarrow
-	ext{nuisance estimation}
-ightarrow
-	ext{finite-sample calibration}
-ightarrow
-	ext{inference selection}.
-]
+```text
+observable schema
+-> identification audit
+-> identified-set status
+-> nuisance estimation
+-> finite-sample calibration
+-> inferential procedure selection
+-> bootstrap / interval / p-value
+```
 
-No inference selector should be allowed to turn an NI or PI nuisance quantity into a point-null or point-alternative claim without an explicit model-identification receipt.
+A future inferential receipt should bind at least:
+
+```text
+observed_schema_id
+target_id
+classification
+identification_model_id
+identification_assumption_digest
+observational_equivalence_suite_digest
+identified_set_digest
+downstream_surface_digest
+```
+
+The receipt should fail closed unless the target is `O` or `MI` and every required assumption has an explicit qualification result.
+
+## Recommended adversarial order
+
+```text
+1. coordinate invariance
+2. observational equivalence
+3. identification classification
+4. identified-set construction
+5. downstream branch/surface image
+6. estimator identification and leakage audit
+7. finite-sample calibration
+8. dependence characterization
+9. inferential-method bridge
+10. bootstrap re-estimation
+```
+
+This prevents a correct estimator for a nonidentified target from being mistaken for a solution to the identification problem.
 
 ## Literature boundary
 
-The result is consistent with latent-variable and SEM identification work: multiple indicators can be essential for identification, and graphical/algebraic instrumental-variable criteria can identify latent parameters when the required measurement and exclusion assumptions hold. Proxy-variable approaches likewise require explicit rank/completeness-style conditions; proxies are not automatically identifying merely because they correlate with a latent confounder. Neyman-orthogonal / DML methods protect inference against nuisance-estimation error after the estimand is defined and identified; orthogonality is not an identification theorem.
+Latent-variable and SEM identification research treats identification as a structural problem involving scaling, rank, measurement, or graphical assumptions. Recent work combining graphical and algebraic approaches follows the same separation.
 
-Forecast-comparison literature also reinforces the existing RH-006 separation between identification and inference: nested-model bootstrap procedures are tied to the exact forecast-estimation design, while rolling/recursive dependence and model instability can invalidate naive conditional procedures.
+Proxy and proximal approaches provide important rescue families, but their point-identification results depend on explicit proxy-separation and completeness-style assumptions. Recent 2026 work also shows that structural violations can break proximal identification even when proxies are predictive.
+
+Nested forecast bootstrap methods are designed for the forecast-comparison problem and can accommodate recursive or rolling estimation, but they do not establish identification of a separate latent nuisance parameter.
 
 ## Nonclaims
 
 - No RH-006 latent nuisance has been shown to be point identified from the current experiment.
 - No valid instrument has been established.
-- The finite-sample simulation is not a proof of equal observable laws.
-- The harness does not validate the current RH-006 estimator.
-- Formal p-values, confidence intervals, and bootstrap-based inference remain disabled.
+- No current RH-006 feature is promoted to an instrument merely because it predicts the target.
+- The finite-sample simulation is not the identification proof.
+- The harness does not validate the full RH-006 estimator.
+- No formal p-value or confidence interval is enabled.
+- No bootstrap validity theorem is established.
+- No hosted CI/Test/Clippy PASS is claimed by this branch.
