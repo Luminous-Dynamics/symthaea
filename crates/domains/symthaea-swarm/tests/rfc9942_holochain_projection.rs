@@ -137,7 +137,7 @@ use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942ProofKind, Rfc9942ReceiptCollection, Rfc9942ReceiptEnvelope,
     Rfc9942ReceiptPayload, Rfc9942SignatureWithReceipts, Rfc9942Vdp,
-    Rfc9162InclusionProof, Rfc9162Sha256Vds, COSE_ES256_ALGORITHM_ID,
+    Rfc9162InclusionProof, Rfc9162Sha256Vds, Rfc9942PayloadMode, COSE_ES256_ALGORITHM_ID,
 };
 
 #[cfg(feature = "semantic-receipts")]
@@ -303,7 +303,7 @@ fn detached_outer_payload_is_exactly_bound_through_selection() {
             Some(b"candidate"),
         )
         .unwrap();
-    assert_eq!(verified.outer_payload_mode(), symthaea_swarm::Rfc9942PayloadMode::Detached);
+    assert_eq!(verified.outer_payload_mode(), Rfc9942PayloadMode::Detached);
     assert_eq!(
         verified.outer_payload_sha256(),
         sha2::Sha256::digest(b"candidate").into()
