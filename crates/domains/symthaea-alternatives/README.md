@@ -129,7 +129,7 @@ An admission reference can now contribute to higher-tier authority diversity onl
 
 ## Experimental-design provenance
 
-The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, uncertainty references, and interval-overlap discrimination targets without inventing a laboratory protocol.
+The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, exact uncertainty identities when the linked evidence actually carries them, and interval-overlap discrimination targets without inventing a laboratory protocol. It never synthesizes an uncertainty identifier when the evidence layer has not supplied one.
 
 When an actual measurement campaign is proposed, ExperimentalDesignProvenance can be attached to the assessment. It requires an exact hypothesis, exact requirement identity, targeted uncertainty identities, candidate identities, explicit discrimination targets, an exact documented protocol identity/digest and comparison basis, and explicit stopping criteria. The assessment receipt commits to that design.
 
@@ -154,7 +154,7 @@ ExperimentalDesignProvenance carries both the stable requirement ID and a canoni
 Design-bound observations also have to match the target surface's declared unit, scope, and comparison basis. A correct design/target identity is therefore insufficient on its own: the observed evidence must be comparable to the exact requirement surface it purports to resolve. The typed target resolver returns the complete requirement scale (unit, scope, and exact basis) for burden, constrained-performance, and operating-condition surfaces; an undeclared or unconstrained performance surface remains unresolved and fails closed.
 
 
-The heuristic next-measurement result also uses typed discrimination targets. Each target explicitly names the two frontier candidates and the burden dimension whose intervals overlap; the heuristic does not invent an experimental decision rule or protocol.
+The heuristic next-measurement result also uses typed discrimination targets. Each target explicitly names the two frontier candidates and the burden dimension whose intervals overlap; unresolved counts are scoped to that burden dimension's own evidence conflict, and uncertainty references are limited to exact identities already present on usable linked evidence. The heuristic does not invent an experimental decision rule, protocol, or uncertainty identity.
 
 
 Uncertainty-based stopping criteria are target-specific rather than bare numeric widths. Each stopping bound names the exact discrimination target and the unit in which its maximum interval width is expressed, preventing ambiguity when a campaign covers multiple measurands or units.
