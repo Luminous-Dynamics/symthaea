@@ -1293,8 +1293,29 @@ class ClockSourceMeasurementSequenceV1:
         if any(not step.internally_consistent() for step in steps):
             return "clock-source-measurement-invalid"
         source_ids = [step.source_id for step in steps]
-        if len(source_ids) != len(set(source_ids)):
+        operator_ids = [
+            step.relation.evidence.source_challenge.operator_id
+            for step in steps
+            if step.relation.evidence is not None
+        ]
+        trust_anchors = [
+            step.relation.evidence.source_challenge.trust_anchor_id
+            for step in steps
+            if step.relation.evidence is not None
+        ]
+        provider_domains = [
+            step.relation.evidence.source_response.provider_clock_domain
+            for step in steps
+            if step.relation.evidence is not None
+        ]
+        if (
+            len(source_ids) != len(set(source_ids))
+            or len(operator_ids) != len(set(operator_ids))
+            or len(trust_anchors) != len(set(trust_anchors))
+        ):
             return "clock-source-independence-invalid"
+        if len(set(provider_domains)) != 1:
+            return "clock-source-domain-mismatch"
         sequence_indices = [step.sequence_index for step in steps]
         if sequence_indices != list(range(1, len(steps) + 1)):
             return "clock-source-measurement-round-mismatch"
@@ -1343,8 +1364,33 @@ class ClockSourceMeasurementSequenceV1:
 
         first_ids = tuple(step.source_id for step in self.first_round)
         second_ids = tuple(step.source_id for step in self.second_round)
+        first_operator_ids = tuple(
+            step.relation.evidence.source_challenge.operator_id
+            for step in self.first_round
+            if step.relation.evidence is not None
+        )
+        second_operator_ids = tuple(
+            step.relation.evidence.source_challenge.operator_id
+            for step in self.second_round
+            if step.relation.evidence is not None
+        )
+        first_trust_anchors = tuple(
+            step.relation.evidence.source_challenge.trust_anchor_id
+            for step in self.first_round
+            if step.relation.evidence is not None
+        )
+        second_trust_anchors = tuple(
+            step.relation.evidence.source_challenge.trust_anchor_id
+            for step in self.second_round
+            if step.relation.evidence is not None
+        )
         if first_ids != second_ids:
             return "clock-source-measurement-round-mismatch"
+        if (
+            first_operator_ids != second_operator_ids
+            or first_trust_anchors != second_trust_anchors
+        ):
+            return "clock-source-measurement-trust-lineage-mismatch"
 
         first_responses = {
             step.relation.evidence.source_response.response_id
@@ -2521,6 +2567,46 @@ def test_clock_measurement_sequence_requires_same_source_order():
         second_round=(reordered_first, reordered_second, third),
     )
     assert reordered.classify() == "clock-source-measurement-round-mismatch"
+
+
+def test_clock_measurement_sequence_rejects_trust_lineage_change():
+    sequence = clock_source_measurement_sequence_fixture()
+    altered = sequence.second_round[1]
+    assert altered.relation.evidence is not None
+    altered_challenge = replace(
+        altered.relation.evidence.source_challenge,
+        operator_id="rotated-operator",
+    )
+    altered_evidence = replace(
+        altered.relation.evidence,
+        source_challenge=altered_challenge,
+        source_response=replace(
+            altered.relation.evidence.source_response,
+            challenge_digest=altered_challenge.digest(),
+        ),
+        source_attestation=replace(
+            altered.relation.evidence.source_attestation,
+            challenge_digest=altered_challenge.digest(),
+        ),
+    )
+    altered_verification = replace(
+        altered.relation.verification,
+        evidence_digest=altered_evidence.digest(),
+    )
+    altered_relation = replace(
+        altered.relation,
+        evidence=altered_evidence,
+        verification=altered_verification,
+    )
+    tampered = replace(
+        sequence,
+        second_round=(
+            sequence.second_round[0],
+            replace(altered, relation=altered_relation),
+            sequence.second_round[2],
+        ),
+    )
+    assert tampered.classify() == "clock-source-independence-invalid"
 
 
 def test_clock_measurement_sequence_rejects_chain_link_tamper():
@@ -5613,6 +5699,7 @@ TESTS = [
     test_clock_measurement_sequence_checks_nonadjacent_causal_pairs,
     test_clock_measurement_sequence_requires_two_rounds,
     test_clock_measurement_sequence_requires_same_source_order,
+    test_clock_measurement_sequence_rejects_trust_lineage_change,
     test_clock_measurement_sequence_rejects_chain_link_tamper,
     test_clock_measurement_sequence_rejects_previous_response_mismatch,
     test_clock_measurement_sequence_rejects_replayed_response,
