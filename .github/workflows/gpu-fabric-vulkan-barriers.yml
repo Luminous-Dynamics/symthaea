@@ -107,7 +107,7 @@ jobs:
           cargo test --locked --features vulkan --lib -- --ignored --nocapture 2>&1 | tee qualification-runtime.txt
 
       - name: Capture native crash backtrace
-        if: steps.execute_runtime.outcome == 'failure'
+        if: ${{ failure() && steps.execute_runtime.outcome == 'failure' }}
         working-directory: .ci/gpu-fabric-workspace
         continue-on-error: true
         run: |
