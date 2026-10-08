@@ -86,9 +86,11 @@ The transcript digest uses the private domain `symthaea-swarm/rfc9942-pq-bound-m
 
 The verifier must retain the exact Receipt digest, classical capability digest, key-policy snapshot digest, key ID, public-key digest, PQ signature digest, transcript digest, evaluation time, and private hybrid capability identity.
 
-**Not yet implemented:** a serialized PQ-attestation envelope, the RFC 9964 AKP COSE_Key/thumbprint adapter, an actual ML-DSA provider, hybrid-required selection admission, and a Holochain projection field that durably carries the hybrid assurance. The 16-byte key ID is an application registry identifier, not a claim to be an RFC 9964 key thumbprint. Those are explicit follow-on seams, not implied capabilities.
+**Implemented as semantic seams on the current branch:** the snapshot-bound key-authorization result, fail-closed ClassicalAllowed / HybridRequired admission, binding of the PQ capability to the exact selected Receipt and classical capability, and schema-v2 Holochain projection metadata. The projection records the required/not-required bit plus hybrid capability identity, key-policy digest, evaluation time, key ID, verification-key fingerprint, PQ signature fingerprint, receipt/capability identities, and transcript digest. Its hybrid fields are read-only externally and are populated from the admission constructor rather than caller-supplied metadata.
 
-Do not claim that the existing ES256 signature authenticates PQ-specific metadata or that this interim profile is interoperable as one composite COSE object.
+**Not yet implemented or qualified:** a serialized PQ-attestation envelope, RFC 9964 AKP COSE_Key/thumbprint adapter, concrete ML-DSA-65 provider, independent known-answer/interoperability corpus, cross-implementation oracle, and a concrete trusted key-lifecycle snapshot implementation. The policy is an explicit trait contract; no concrete trust registry is claimed. The 16-byte key ID is an application registry identifier, not an RFC 9964 key thumbprint. The targeted locked test workflow and all current code still require an actual exact-head successful run; skipped/queued jobs do not qualify this seam.
+
+Do not claim that the existing ES256 signature authenticates PQ-specific metadata or that this interim profile is interoperable as one composite COSE object. The Holochain projection is provenance/identity metadata, not a substitute for independently re-verifying retained cryptographic material at the integrity boundary.
 
 ## Key separation
 
