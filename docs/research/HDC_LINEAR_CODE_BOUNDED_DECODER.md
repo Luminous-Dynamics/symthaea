@@ -234,7 +234,7 @@ the checkout and PR association. The receipt records these validated values in s
 field is explicitly pre-artifact; final qualification remains contingent on successful artifact revalidation
 and the completed hosted run.
 
-The same execution boundary also revalidates the uploaded artifact against the live run after upload. The artifact name binds the exact PR-head SHA, while the artifact's `workflow_run.head_sha` is checked against the synthetic merge SHA used for the pull-request execution. The receipt records both identities separately, so a successful receipt cannot conflate the research subject with GitHub's merge-ref execution object.
+The same execution boundary also revalidates the uploaded artifact against the live run after upload. The artifact name binds the exact PR-head SHA, and the artifact's `workflow_run.head_sha` is checked against that same PR-head subject. The pull-request merge-ref SHA is recorded separately and is never substituted for the research subject, so the evidence cannot conflate GitHub's execution object with the code identity under qualification.
 
 ## Walsh/dual-fiber structure
 
