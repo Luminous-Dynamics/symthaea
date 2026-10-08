@@ -156,10 +156,11 @@ set membership are independently checked. Observations outside the bound must
 remain explicit NoMatchWithinBound results.
 
 The entire probe is repeated with identical seeds and observations and the
-complete multiplicity histogram (1 through 16) must be identical. The emitted
-ledger therefore exposes the full observed list-size distribution rather than
-only a selected prefix. This makes the empirical random-code result deterministic
-without pretending it is an asymptotic theorem.
+complete multiplicity histogram (1 through 16) must be identical. Codeword
+translation is also required to preserve the exact decoder work ledger, not only
+outcome, list cardinality, and nearest-codeword translation. The emitted ledger
+therefore exposes both deterministic list-size behavior and translation-equivariant
+search effort without pretending it is an asymptotic theorem.
 
 ## Spectrum is a geometry witness, not an additive-coordinate proof
 
