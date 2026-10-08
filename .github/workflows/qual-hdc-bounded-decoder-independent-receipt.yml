@@ -1146,10 +1146,6 @@ jobs:
               process.env.RUNNER_TEMP,
               'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V8.json'
             );
-            fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
-            core.info('Promotion lease: ' + promotionLease.lease_state + ' [' + promotionLease.lease_id_sha256 + ']');
-            core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
-            core.info('Independent qualification result: ' + receipt.qualification_result);
 
             const publicationMainRef = (await github.rest.git.getRef({
               owner: context.repo.owner,
@@ -1300,6 +1296,11 @@ jobs:
             promotionLease.lease_id_sha256 = sha256Canonical(leaseBodyForHash);
 
             receipt.promotion_eligibility_lease = promotionLease;
+
+            fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
+            core.info('Promotion lease: ' + promotionLease.lease_state + ' [' + promotionLease.lease_id_sha256 + ']');
+            core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
+            core.info('Independent qualification result: ' + receipt.qualification_result);
 
             const promotable =
               receipt.qualification_result === 'PASS' &&
