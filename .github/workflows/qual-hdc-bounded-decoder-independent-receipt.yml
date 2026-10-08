@@ -20,7 +20,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
-          EXPECTED_SUBJECT: "b5a8410f6c70d9d518c8a6282550a945349a78ab"
+          EXPECTED_SUBJECT: "ab3faf8fda640e27c4a2e7554d89b08612f31677"
           EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
@@ -29,7 +29,7 @@ jobs:
           EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
           EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
           EXPECTED_WORKFLOW_BLOB_SHA: "455662ba16f50197abc9cbbe35454ebdf3f8788f"
-          EXPECTED_MERGE_COMMIT: "2e877fd0a0fe0495193565f7d10eb5f7f9d2d806"
+          EXPECTED_MERGE_COMMIT: "42f525592291f7fb4e08854c915d7c9cd7360c1a"
         with:
           script: |
             const fs = require('fs');
@@ -67,7 +67,7 @@ jobs:
               'crates/core/symthaea-core/tests/linear_code_syndrome_decoder.rs':
                 '939ecdb716e5da5362e54575d0df9cfbf8522dd0',
               'docs/research/HDC_LINEAR_CODE_BOUNDED_DECODER.md':
-                '7ded1017db61fb544ac49d852bf54a34376ccca5',
+                '81ba3c88fa7b8a4de19d17cd073f63e9723767fe',
             };
 
             const requiredSteps = [
