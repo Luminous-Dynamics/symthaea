@@ -263,6 +263,9 @@ class ProviderEvidenceEnvelopeV1:
 @dataclass(frozen=True)
 class ProviderWebhookReceiptV1:
     delivery_id: str
+    hook_id: str
+    event_type: str
+    repository: str
     payload_bytes_digest: str
     signature: str
     signature_algorithm: str = "HMAC-SHA256"
@@ -271,6 +274,9 @@ class ProviderWebhookReceiptV1:
     def from_delivery(
         cls,
         delivery_id: str,
+        hook_id: str,
+        event_type: str,
+        repository: str,
         payload: bytes,
         secret: bytes,
     ) -> "ProviderWebhookReceiptV1":
@@ -278,11 +284,21 @@ class ProviderWebhookReceiptV1:
         mac = hmac.new(secret, payload, hashlib.sha256).hexdigest()
         return cls(
             delivery_id=delivery_id,
+            hook_id=hook_id,
+            event_type=event_type,
+            repository=repository,
             payload_bytes_digest=digest,
             signature=f"sha256={mac}",
         )
 
-    def verify(self, payload: bytes, secret: bytes) -> bool:
+    def verify(
+        self,
+        payload: bytes,
+        secret: bytes,
+        expected_hook_id: str | None = None,
+        expected_event_type: str | None = None,
+        expected_repository: str | None = None,
+    ) -> bool:
         expected = "sha256=" + hmac.new(
             secret,
             payload,
@@ -291,8 +307,14 @@ class ProviderWebhookReceiptV1:
         return (
             self.signature_algorithm == "HMAC-SHA256"
             and bool(self.delivery_id)
+            and bool(self.hook_id)
+            and bool(self.event_type)
+            and bool(self.repository)
             and hmac.compare_digest(self.signature, expected)
             and self.payload_bytes_digest == hashlib.sha256(payload).hexdigest()
+            and (expected_hook_id is None or self.hook_id == expected_hook_id)
+            and (expected_event_type is None or self.event_type == expected_event_type)
+            and (expected_repository is None or self.repository == expected_repository)
         )
 
 
@@ -553,16 +575,28 @@ def test_webhook_hmac_verification_accepts_exact_payload():
     payload = b'{"action":"closed","pull_request":{"number":7087}}'
     receipt = ProviderWebhookReceiptV1.from_delivery(
         "delivery-1",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         payload,
         b"secret",
     )
-    assert receipt.verify(payload, b"secret")
+    assert receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-1",
+        expected_event_type="pull_request",
+        expected_repository="Luminous-Dynamics/symthaea",
+    )
 
 
 def test_webhook_hmac_verification_rejects_tampered_payload():
     payload = b'{"action":"closed"}'
     receipt = ProviderWebhookReceiptV1.from_delivery(
         "delivery-2",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         payload,
         b"secret",
     )
@@ -573,6 +607,9 @@ def test_webhook_hmac_verification_rejects_wrong_secret():
     payload = b'{"action":"closed"}'
     receipt = ProviderWebhookReceiptV1.from_delivery(
         "delivery-3",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         payload,
         b"secret",
     )
@@ -583,6 +620,9 @@ def test_webhook_delivery_registry_accepts_new_delivery():
     payload = b"{}"
     receipt = ProviderWebhookReceiptV1.from_delivery(
         "delivery-4",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         payload,
         b"secret",
     )
@@ -592,14 +632,53 @@ def test_webhook_delivery_registry_accepts_new_delivery():
     assert registry.observe(receipt) == "duplicate-identical"
 
 
+def test_webhook_context_mismatch_rejects_even_with_valid_hmac():
+    payload = b'{"action":"closed"}'
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-2",
+        expected_event_type="pull_request",
+        expected_repository="Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-1",
+        expected_event_type="issues",
+        expected_repository="Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-1",
+        expected_event_type="pull_request",
+        expected_repository="other/repo",
+    )
+
+
 def test_webhook_delivery_registry_rejects_same_id_with_different_payload():
     first = ProviderWebhookReceiptV1.from_delivery(
         "delivery-5",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         b"{}",
         b"secret",
     )
     second = ProviderWebhookReceiptV1.from_delivery(
         "delivery-5",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         b'{"action":"different"}',
         b"secret",
     )
@@ -2006,6 +2085,7 @@ TESTS = [
     test_webhook_hmac_verification_accepts_exact_payload,
     test_webhook_hmac_verification_rejects_tampered_payload,
     test_webhook_hmac_verification_rejects_wrong_secret,
+    test_webhook_context_mismatch_rejects_even_with_valid_hmac,
     test_webhook_delivery_registry_accepts_new_delivery,
     test_webhook_delivery_registry_rejects_same_id_with_different_payload,
     test_webhook_authentication_does_not_prove_merge_result_causality,
