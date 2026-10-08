@@ -18,13 +18,13 @@ The reducer never transitions a valid EffectObserved state back to Unobserved.
 
 An authenticated merged pull-request observation may transition Unobserved to EffectObserved.
 
-The retained state records the compact effect and the source delivery IDs supporting that effect.
+The retained state records the compact effect and the canonical source delivery identities supporting that effect. A delivery identity binds the delivery ID to its payload digest, hook ID, event type, and repository. A repeated delivery ID with any changed bound field is source conflict, even when the projected merge effect is unchanged.
 
 ## Repetition
 
 An equivalent observation through another authenticated delivery is a compatible repeat. It does not create a second effect.
 
-An exact repeated delivery ID is classified as duplicate-delivery and is idempotent.
+An exact repeated delivery identity is classified as duplicate-delivery and is idempotent. Delivery IDs are never treated as sufficient by themselves; the source tuple must remain identical.
 
 ## Conflict
 
@@ -56,7 +56,7 @@ It does not establish that a particular async promotion operation caused the eff
 
 ## Claim ceiling
 
-This establishes deterministic monotonic effect-state semantics under arbitrary webhook delivery order in the provider-free reference model.
+This establishes deterministic monotonic effect-state semantics under arbitrary webhook delivery order and exact source-delivery identity replay/conflict handling in the provider-free reference model.
 
 It does not establish provider event ordering, provider truthfulness, causal attribution, provider-side topology CAS, governance legitimacy, production atomicity, or promotion success.
 
