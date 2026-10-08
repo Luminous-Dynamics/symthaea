@@ -21,6 +21,9 @@ jobs:
       VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
 
       - name: Install Vulkan runtime and validation
         run: |
@@ -65,7 +68,8 @@ jobs:
         working-directory: .ci/gpu-fabric-workspace
         run: |
           {
-            echo "commit=$GITHUB_SHA"
+            echo "workflow_sha=$GITHUB_SHA"
+            echo "qualification_commit=${{ github.event.pull_request.head.sha || github.sha }}"
             echo "runner_os=$RUNNER_OS"
             echo "runner_arch=$RUNNER_ARCH"
             echo "runner_name=$RUNNER_NAME"
@@ -89,7 +93,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: gpu-fabric-vulkan-barrier-qualification-${{ github.sha }}
+          name: gpu-fabric-vulkan-barrier-qualification-${{ github.event.pull_request.head.sha || github.sha }}
           if-no-files-found: error
           path: |
             .ci/gpu-fabric-workspace/Cargo.lock
