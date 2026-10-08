@@ -9139,6 +9139,30 @@ mod tests {
             } if frontier_id == "fixture-input-frontier-v1"
         ));
 
+        let mut wrong_input_unit_definition = topology.clone();
+        wrong_input_unit_definition.input_bindings[0]
+            .input_specification
+            .unit_definition = Some(MeasurementModelInputUnitDefinitionRef {
+                vocabulary_id: "http://qudt.org/3.5.2/vocab/unit".into(),
+                vocabulary_revision: "3.5.2".into(),
+                definition_id: "http://qudt.org/vocab/unit/K".into(),
+                definition_revision: "3.5.2".into(),
+                definition_digest: "different-unit-definition-digest".into(),
+            });
+        assert!(matches!(
+            wrong_input_unit_definition
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
         let mut wrong_input_specification = topology.clone();
         wrong_input_specification.input_bindings[0]
             .input_specification
