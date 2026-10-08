@@ -1,0 +1,603 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/monetary-attestation-binding-v1.schema.json",
+  "title": "Monetary Attestation Subject Attribute Generation Context Binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "factorial_size",
+    "batch_size",
+    "factors",
+    "binding_policies",
+    "binding_policy_digests",
+    "attestation_variants",
+    "attestation_variant_digests",
+    "attribute_identities",
+    "attribute_digests",
+    "fixed_dimensions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "monetary-attestation-binding-v1"
+    },
+    "experiment_id": {
+      "const": "monetary-interop-attestation-binding-v1"
+    },
+    "factorial_size": {
+      "const": 466560
+    },
+    "batch_size": {
+      "const": 3
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_pair",
+        "adapter",
+        "shock",
+        "seed",
+        "allocation_policy",
+        "focal_obligation",
+        "reporting_policy",
+        "binding_policy",
+        "attestation_variant"
+      ],
+      "properties": {
+        "monetary_pair": {
+          "const": [
+            "bank_mutual",
+            "bank_stablecoin",
+            "tokenized_deposit_stablecoin"
+          ]
+        },
+        "adapter": {
+          "const": [
+            "redeem_reissue",
+            "escrowed_atomic_swap",
+            "multilateral_net_settlement",
+            "absent"
+          ]
+        },
+        "shock": {
+          "const": [
+            "normal",
+            "liquidity_shock",
+            "network_partition",
+            "issuer_default",
+            "bridge_failure",
+            "stale_quote"
+          ]
+        },
+        "seed": {
+          "const": [
+            11,
+            23,
+            47,
+            89,
+            131
+          ]
+        },
+        "allocation_policy": {
+          "const": [
+            "fifo",
+            "criticality_priority",
+            "minimum_liquidity_demand"
+          ]
+        },
+        "focal_obligation": {
+          "const": [
+            0,
+            1,
+            2
+          ]
+        },
+        "reporting_policy": {
+          "const": [
+            "truthful",
+            "criticality_inflation",
+            "liquidity_demand_underreport",
+            "dual_misreport"
+          ]
+        },
+        "binding_policy": {
+          "const": [
+            "attribute_only",
+            "generation_only",
+            "context_only",
+            "subject_only",
+            "subject_attribute",
+            "exact_all"
+          ]
+        },
+        "attestation_variant": {
+          "const": [
+            "exact_current",
+            "subject_substitution",
+            "attribute_substitution",
+            "stale_generation",
+            "context_substitution",
+            "composite_replay"
+          ]
+        }
+      }
+    },
+    "binding_policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attribute_only",
+        "generation_only",
+        "context_only",
+        "subject_only",
+        "subject_attribute",
+        "exact_all"
+      ],
+      "properties": {
+        "attribute_only": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "fields"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "generation_only": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "fields"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "context_only": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "fields"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "subject_only": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "fields"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "subject_attribute": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "fields"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "exact_all": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "fields"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "binding_policy_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attribute_only",
+        "generation_only",
+        "context_only",
+        "subject_only",
+        "subject_attribute",
+        "exact_all"
+      ],
+      "properties": {
+        "attribute_only": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generation_only": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "context_only": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "subject_only": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "subject_attribute": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "exact_all": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "attestation_variants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_current",
+        "subject_substitution",
+        "attribute_substitution",
+        "stale_generation",
+        "context_substitution",
+        "composite_replay"
+      ],
+      "properties": {
+        "exact_current": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_id",
+            "mutation"
+          ],
+          "properties": {
+            "variant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "subject_substitution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_id",
+            "mutation"
+          ],
+          "properties": {
+            "variant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "attribute_substitution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_id",
+            "mutation"
+          ],
+          "properties": {
+            "variant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "stale_generation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_id",
+            "mutation"
+          ],
+          "properties": {
+            "variant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "context_substitution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_id",
+            "mutation"
+          ],
+          "properties": {
+            "variant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "composite_replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "variant_id",
+            "mutation"
+          ],
+          "properties": {
+            "variant_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "attestation_variant_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_current",
+        "subject_substitution",
+        "attribute_substitution",
+        "stale_generation",
+        "context_substitution",
+        "composite_replay"
+      ],
+      "properties": {
+        "exact_current": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "subject_substitution": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "attribute_substitution": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "stale_generation": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "context_substitution": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "composite_replay": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "attribute_identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fifo",
+        "criticality_priority",
+        "minimum_liquidity_demand"
+      ],
+      "properties": {
+        "fifo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criticality_priority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_liquidity_demand": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "attribute_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fifo",
+        "criticality_priority",
+        "minimum_liquidity_demand"
+      ],
+      "properties": {
+        "fifo": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "criticality_priority": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "minimum_liquidity_demand": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "fixed_dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topology",
+        "topology_digest",
+        "resource_regime",
+        "resource_digest",
+        "resource_capacity",
+        "obligations",
+        "liquidity_demand_multiplier_by_adapter",
+        "liquidity_shock_increment",
+        "current_generation_by_seed",
+        "stale_generation_delta",
+        "context_identity",
+        "attestation_envelope_fields",
+        "signature_semantics",
+        "attestation_authority",
+        "invalid_binding_fallback",
+        "comparison_boundary",
+        "crn_namespace"
+      ],
+      "properties": {
+        "topology": {
+          "const": "full_mesh"
+        },
+        "topology_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resource_regime": {
+          "const": "bounded_shared_settlement_liquidity"
+        },
+        "resource_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resource_capacity": {
+          "const": 15
+        },
+        "obligations": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "liquidity_demand_multiplier_by_adapter": {
+          "type": "object"
+        },
+        "liquidity_shock_increment": {
+          "const": 5
+        },
+        "current_generation_by_seed": {
+          "type": "object"
+        },
+        "stale_generation_delta": {
+          "const": 1
+        },
+        "context_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attestation_envelope_fields": {
+          "const": [
+            "subject_id",
+            "attribute_id",
+            "generation",
+            "context_id",
+            "attested_value",
+            "signer_profile",
+            "signature_valid"
+          ]
+        },
+        "signature_semantics": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attestation_authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invalid_binding_fallback": {
+          "const": "neutral_ordering"
+        },
+        "comparison_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "crn_namespace": {
+          "const": "world:{shock}:{seed}:obligation:{index}"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

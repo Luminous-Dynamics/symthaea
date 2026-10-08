@@ -1,0 +1,53 @@
+{
+  "schema_version": "monetary-attestation-binding-negative-v1",
+  "cases": [
+    {
+      "id": "BIND-X01",
+      "description": "valid signature + wrong subject is accepted without subject binding"
+    },
+    {
+      "id": "BIND-X02",
+      "description": "valid signature + wrong attribute is accepted without attribute binding"
+    },
+    {
+      "id": "BIND-X03",
+      "description": "valid signature + stale generation is accepted without generation binding"
+    },
+    {
+      "id": "BIND-X04",
+      "description": "valid signature + wrong context is accepted without context binding"
+    },
+    {
+      "id": "BIND-X05",
+      "description": "composite replay is accepted when any changed coordinate is outside the selected binding profile"
+    },
+    {
+      "id": "BIND-X06",
+      "description": "binding policy digest is omitted or mismatched"
+    },
+    {
+      "id": "BIND-X07",
+      "description": "exact-current attestation is treated as valid without checking all four binding coordinates"
+    },
+    {
+      "id": "BIND-X08",
+      "description": "participant reporting changes an allocation that is supposed to consume authoritative attestation"
+    },
+    {
+      "id": "BIND-X09",
+      "description": "generation rollback changes current authority state without detection"
+    },
+    {
+      "id": "BIND-X10",
+      "description": "context identity includes reporting treatment or other treatment-only factors and breaks CRN independence"
+    },
+    {
+      "id": "BIND-X11",
+      "description": "truthful counterpart differs in binding profile or attestation variant"
+    },
+    {
+      "id": "BIND-X12",
+      "description": "execution omits a binding × attack factorial cell"
+    }
+  ]
+}
