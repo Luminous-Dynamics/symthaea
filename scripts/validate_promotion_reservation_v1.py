@@ -1810,6 +1810,42 @@ def test_webhook_stack_metadata_rejects_base_sha_drift():
     assert not altered.validates_provider_stack_metadata(identity)
 
 
+def test_webhook_stack_metadata_rejects_position_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=41,
+                stack_size=3,
+                stack_position=1,
+                base_ref="main",
+                base_sha="T1",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_base_ref_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=41,
+                stack_size=3,
+                stack_position=2,
+                base_ref="release",
+                base_sha="T1",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
 def test_webhook_stack_metadata_missing_is_not_topology_proof():
     identity = stack_identity_fixture()
     observation = stack_webhook_observation(identity)
@@ -1820,6 +1856,42 @@ def test_webhook_stack_metadata_missing_is_not_topology_proof():
         }
     )
     assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_malformed_payload_is_rejected():
+    identity = stack_identity_fixture()
+    payload = json.dumps(
+        {
+            "action": "closed",
+            "number": 7087,
+            "pull_request": {
+                "number": 7087,
+                "merged": True,
+                "head": {"sha": "H3"},
+                "merge_commit_sha": "M2",
+                "merged_at": "2026-10-08T16:00:00Z",
+                "stack": {
+                    "number": 41,
+                    "size": 3,
+                    "position": 2,
+                    "base": {"ref": "main"},
+                },
+            },
+            "repository": {"full_name": identity.repository},
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    receipt = webhook_merge_receipt(payload)
+    observation = ProviderPullRequestMergeObservationV1.from_authenticated_delivery(
+        receipt,
+        payload,
+        b"secret",
+        webhook_received_context(receipt, 1791475205000, 9000000000000),
+        "hook-1",
+        "pull_request",
+        identity.repository,
+    )
+    assert observation is None
 
 
 def test_provider_timestamp_parser_accepts_utc_and_offset():
@@ -4695,7 +4767,10 @@ TESTS = [
     test_webhook_stack_metadata_matches_exact_operation,
     test_webhook_stack_metadata_rejects_stack_number_drift,
     test_webhook_stack_metadata_rejects_base_sha_drift,
+    test_webhook_stack_metadata_rejects_position_drift,
+    test_webhook_stack_metadata_rejects_base_ref_drift,
     test_webhook_stack_metadata_missing_is_not_topology_proof,
+    test_webhook_stack_metadata_malformed_payload_is_rejected,
     test_provider_timestamp_parser_accepts_utc_and_offset,
     test_provider_timestamp_interval_respects_reported_precision,
     test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics,
