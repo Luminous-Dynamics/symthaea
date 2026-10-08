@@ -21,7 +21,7 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 4;
+const RECEIPT_VERSION: u16 = 5;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
@@ -133,6 +133,10 @@ pub enum VulkanBarrierReceiptError {
     ImplementationIdentityBinding,
     #[error("receipt physical-device identity does not match the execution runtime")]
     PhysicalDeviceIdentityBinding,
+    #[error("receipt driver identity digest is missing or malformed")]
+    DriverIdentity,
+    #[error("receipt driver identity does not match the execution runtime")]
+    DriverIdentityBinding,
     #[error("receipt physical-device UUID does not match the execution runtime")]
     DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -166,6 +170,9 @@ pub struct VulkanBarrierExecutionReceipt {
     pub device_uuid: [u8; 16],
     pub implementation_identity_digest: String,
     pub physical_device_identity_digest: String,
+    pub driver_identity_digest: String,
+    pub driver_uuid: [u8; 16],
+    pub driver_id: i32,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -182,6 +189,9 @@ impl VulkanBarrierExecutionReceipt {
         }
         if !is_sha256_hex(&self.physical_device_identity_digest) {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentity);
+        }
+        if !is_sha256_hex(&self.driver_identity_digest) {
+            return Err(VulkanBarrierReceiptError::DriverIdentity);
         }
         if schedule.nodes.is_empty() { return Err(VulkanBarrierReceiptError::EmptyWorkload); }
         if self.graph_digest != graph.digest_hex().map_err(|_| VulkanBarrierReceiptError::GraphDigest)? {
@@ -272,6 +282,9 @@ impl VulkanBarrierExecutionReceipt {
         device_uuid: [u8; 16],
         implementation_identity_digest: &str,
         physical_device_identity_digest: &str,
+        driver_identity_digest: &str,
+        driver_uuid: [u8; 16],
+        driver_id: i32,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
@@ -287,6 +300,12 @@ impl VulkanBarrierExecutionReceipt {
         }
         if self.physical_device_identity_digest != physical_device_identity_digest {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding);
+        }
+        if self.driver_identity_digest != driver_identity_digest {
+            return Err(VulkanBarrierReceiptError::DriverIdentityBinding);
+        }
+        if self.driver_uuid != driver_uuid || self.driver_id != driver_id {
+            return Err(VulkanBarrierReceiptError::DriverIdentityBinding);
         }
         Ok(())
     }
@@ -319,6 +338,11 @@ pub struct VulkanBarrierWorkloadRuntime {
     physical_device_driver_version: u32,
     physical_device_name_hex: String,
     physical_device_identity_digest: String,
+    driver_identity_digest: String,
+    driver_uuid: [u8; 16],
+    driver_id: i32,
+    driver_name_hex: String,
+    driver_info_hex: String,
     // Must be dropped after Instance/Device because ash requires Entry to outlive them.
     _entry: Entry,
 }
@@ -379,9 +403,22 @@ impl VulkanBarrierWorkloadRuntime {
         let physical_device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
         let physical_device_identity_digest = physical_device_identity_digest(&props);
         let mut id_properties = vk::PhysicalDeviceIDProperties::default();
-        let mut properties2 = vk::PhysicalDeviceProperties2::default().push_next(&mut id_properties);
+        let mut driver_properties = vk::PhysicalDeviceDriverProperties::default();
+        let mut properties2 = vk::PhysicalDeviceProperties2::default()
+            .push_next(&mut id_properties)
+            .push_next(&mut driver_properties);
         unsafe { instance.get_physical_device_properties2(physical, &mut properties2); }
         let device_uuid = id_properties.device_uuid;
+        let driver_uuid = id_properties.driver_uuid;
+        let driver_id = driver_properties.driver_id.as_raw();
+        let driver_name = unsafe { CStr::from_ptr(driver_properties.driver_name.as_ptr()) }.to_bytes();
+        let driver_info = unsafe { CStr::from_ptr(driver_properties.driver_info.as_ptr()) }.to_bytes();
+        let driver_identity_digest = driver_identity_digest(
+            driver_uuid,
+            driver_id,
+            driver_name,
+            driver_info,
+        );
         if device_uuid.iter().all(|byte| *byte == 0) {
             unsafe { instance.destroy_instance(None); }
             return Err(VulkanBarrierError::NoQualifiedDevice);
@@ -391,6 +428,8 @@ impl VulkanBarrierWorkloadRuntime {
             vk::api_version_major(props.api_version),
             vk::api_version_minor(props.api_version),
             vk::api_version_patch(props.api_version)));
+        qualification_stage(&format!("driver_identity_sha256={driver_identity_digest}"));
+        qualification_stage(&format!("driver_id={driver_id}"));
 
         let priorities = [1.0_f32];
         let queue_info = vk::DeviceQueueCreateInfo::default().queue_family_index(family).queue_priorities(&priorities);
@@ -566,6 +605,11 @@ impl VulkanBarrierWorkloadRuntime {
             physical_device_driver_version: props.driver_version,
             physical_device_name_hex: hex_bytes(physical_device_name),
             physical_device_identity_digest,
+            driver_identity_digest,
+            driver_uuid,
+            driver_id,
+            driver_name_hex: hex_bytes(driver_name),
+            driver_info_hex: hex_bytes(driver_info),
             _entry: entry,
         })
     }
@@ -799,6 +843,9 @@ impl VulkanBarrierWorkloadRuntime {
             device_uuid: self.device_uuid,
             implementation_identity_digest: self.implementation_identity_digest.clone(),
             physical_device_identity_digest: self.physical_device_identity_digest.clone(),
+            driver_identity_digest: self.driver_identity_digest.clone(),
+            driver_uuid: self.driver_uuid,
+            driver_id: self.driver_id,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         qualification_stage("receipt_verified");
@@ -809,6 +856,9 @@ impl VulkanBarrierWorkloadRuntime {
                 self.device_uuid,
                 &self.implementation_identity_digest,
                 &self.physical_device_identity_digest,
+                &self.driver_identity_digest,
+                self.driver_uuid,
+                self.driver_id,
             )
             .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -1181,6 +1231,21 @@ fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> Stri
     hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+fn driver_identity_digest(
+    driver_uuid: [u8; 16],
+    driver_id: i32,
+    driver_name: &[u8],
+    driver_info: &[u8],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.gpu-fabric.vulkan-driver.v1\0");
+    sha256_len_prefixed_update(&mut hasher, &driver_uuid);
+    hasher.update(&driver_id.to_le_bytes());
+    sha256_len_prefixed_update(&mut hasher, driver_name);
+    sha256_len_prefixed_update(&mut hasher, driver_info);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64
         && value.bytes().all(|byte| (b'0'..=b'9').contains(&byte) || (b'a'..=b'f').contains(&byte))
@@ -1385,6 +1450,8 @@ impl Drop for VulkanBarrierWorkloadRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const TEST_DRIVER_IDENTITY_DIGEST: &str =
+        "2222222222222222222222222222222222222222222222222222222222222222";
 
     const TEST_IMPLEMENTATION_IDENTITY_DIGEST: &str =
         "0000000000000000000000000000000000000000000000000000000000000000";
@@ -2249,6 +2316,9 @@ mod tests {
                 [1; 16],
                 TEST_IMPLEMENTATION_IDENTITY_DIGEST,
                 TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
             ).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
@@ -2259,6 +2329,9 @@ mod tests {
                 [1; 16],
                 TEST_IMPLEMENTATION_IDENTITY_DIGEST,
                 TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
             ),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
@@ -2272,6 +2345,9 @@ mod tests {
                 [1; 16],
                 TEST_IMPLEMENTATION_IDENTITY_DIGEST,
                 TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
             ),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
@@ -2287,6 +2363,9 @@ mod tests {
                 [1; 16],
                 TEST_IMPLEMENTATION_IDENTITY_DIGEST,
                 TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
             )
             .is_ok());
 
@@ -2297,6 +2376,9 @@ mod tests {
                 [1; 16],
                 "2222222222222222222222222222222222222222222222222222222222222222",
                 TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
             ),
             Err(VulkanBarrierReceiptError::ImplementationIdentityBinding)
         ));
@@ -2320,6 +2402,9 @@ mod tests {
                 [1; 16],
                 TEST_IMPLEMENTATION_IDENTITY_DIGEST,
                 TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
             ),
             Err(VulkanBarrierReceiptError::DeviceUuidBinding)
         ));
@@ -2488,6 +2573,15 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::ImplementationIdentity)
         ));
+    }
+
+    #[test]
+    fn driver_identity_digest_binds_uuid_id_and_metadata() {
+        let baseline = driver_identity_digest([1; 16], 7, b"driver", b"info");
+        assert_ne!(baseline, driver_identity_digest([2; 16], 7, b"driver", b"info"));
+        assert_ne!(baseline, driver_identity_digest([1; 16], 8, b"driver", b"info"));
+        assert_ne!(baseline, driver_identity_digest([1; 16], 7, b"driver2", b"info"));
+        assert_ne!(baseline, driver_identity_digest([1; 16], 7, b"driver", b"info2"));
     }
 
     #[test]
