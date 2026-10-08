@@ -68,6 +68,7 @@ pub struct AdoptionDecision {
     pub adopted: bool,
     pub authority: Option<String>,
     pub authorizing_rule_hash: Option<String>,
+    pub authorizing_rule_level: Option<RuleLevel>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,6 +81,8 @@ pub enum FailureDisposition {
     AlreadyImplemented,
     NotAdopted,
     MetaConstitutionalMutationDisabled,
+    DuplicateProposal,
+    AlreadyDecided,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -167,6 +170,9 @@ impl InstitutionalEvolution {
         }
 
         let proposal_id = proposal_id.into();
+        if self.proposals.contains_key(&proposal_id) {
+            return Err(FailureDisposition::DuplicateProposal);
+        }
         let proposal = Proposal {
             proposal_id: proposal_id.clone(),
             candidate: candidate.clone(),
@@ -196,10 +202,26 @@ impl InstitutionalEvolution {
             .proposals
             .get(&decision.proposal_id)
             .ok_or(FailureDisposition::UnknownProposal)?;
+        if self.decisions.contains_key(&decision.proposal_id) {
+            return Err(FailureDisposition::AlreadyDecided);
+        }
         if decision.adopted {
             let required_level = proposal.candidate.rule_level.required_authorizer();
-            if required_level.is_some() && decision.authorizing_rule_hash.is_none() {
+            if required_level.is_some()
+                && (decision.authorizing_rule_hash.is_none()
+                    || decision.authorizing_rule_level.is_none())
+            {
                 return Err(FailureDisposition::MissingAuthority);
+            }
+            if let Some(required_level) = required_level {
+                if decision.authorizing_rule_level != Some(required_level) {
+                    return Err(FailureDisposition::WrongAuthorityLevel);
+                }
+            }
+            if decision.authorizing_rule_hash.as_deref()
+                == Some(proposal.candidate.candidate_institution_hash.as_str())
+            {
+                return Err(FailureDisposition::SelfModificationUnauthorized);
             }
             if proposal.candidate.rule_level == RuleLevel::MetaConstitutional
                 && !self.allow_meta_constitutional_mutation
@@ -312,6 +334,7 @@ mod tests {
                 adopted: true,
                 authority: Some("authority".into()),
                 authorizing_rule_hash: None,
+                authorizing_rule_level: None,
             }),
             Err(FailureDisposition::MissingAuthority)
         );
@@ -327,6 +350,7 @@ mod tests {
             adopted: true,
             authority: Some("authority".into()),
             authorizing_rule_hash: Some("cc-rule-v0".into()),
+            authorizing_rule_level: Some(RuleLevel::CollectiveChoice),
         }).unwrap();
         assert_eq!(evolution.current().rule_hash, "hash-v0");
         evolution.implement("p1").unwrap();
@@ -355,6 +379,7 @@ mod tests {
             adopted: false,
             authority: None,
             authorizing_rule_hash: None,
+            authorizing_rule_level: None,
         }).unwrap();
         assert_eq!(evolution.current().rule_hash, "hash-v0");
         assert_eq!(evolution.implement("p1"), Err(FailureDisposition::NotAdopted));
