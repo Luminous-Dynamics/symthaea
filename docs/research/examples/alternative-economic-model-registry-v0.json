@@ -181,6 +181,15 @@
       "parent_model_id": null,
       "evidence_tier": "C",
       "status": "specified_for_research"
+    },
+    {
+      "model_id": "neutral-multilateral-settlement-v0",
+      "name": "Neutral Multilateral Settlement / Interoperable Local Money",
+      "classification": "architecture",
+      "primary_divergence": "Multilateral net-settlement and explicit future commitments provide a neutral interoperability layer among local or non-convertible monetary expressions.",
+      "parent_model_id": "mutual-credit-v0",
+      "evidence_tier": "B",
+      "status": "specified_for_research"
     }
   ],
   "notes": [
