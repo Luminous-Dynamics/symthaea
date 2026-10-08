@@ -323,12 +323,12 @@ def test_single_use_reservation():
 def test_dispatch_intent_fences_crash():
     ledger = Ledger()
     assert ledger.reserve("L0", "LEASE-1", "L1", 1)
-    assert ledger.prepare_dispatch("L1", 1, 1)
+    assert ledger.prepare_dispatch("L1", 1, 1, 1)
     assert ledger.reservation.dispatch_intent
     assert ledger.reservation.state == "PromotionDispatchPrepared"
-    ledger.record_unknown()
+    ledger.record_unknown(ledger.reservation.operation_id)
     assert ledger.reservation.state == "PromotionReconciliationRequired"
-    assert not ledger.prepare_dispatch("L1", 1, 1, 1)
+    assert not ledger.prepare_dispatch("L1", 1, 1, 2)
 
 
 def test_timeout_after_acceptance_is_unknown():
@@ -431,7 +431,7 @@ def test_root_change_before_dispatch_blocks_effect():
     assert ledger.reserve("L0", "LEASE-1", "L1", 1)
     assert ledger.invalidate("L1", "I1", 2)
     assert ledger.reservation.state == "PromotionSuperseded"
-    assert not ledger.prepare_dispatch("L1", 1, 1)
+    assert not ledger.prepare_dispatch("L1", 1, 1, 1)
     assert provider.calls == 0
 
 
@@ -439,10 +439,10 @@ def test_root_change_after_dispatch_is_not_retroactive():
     ledger = Ledger()
     provider = GitHubAsyncModel()
     assert ledger.reserve("L0", "LEASE-1", "L1", 1)
-    assert ledger.prepare_dispatch("L1", 1, 1)
+    assert ledger.prepare_dispatch("L1", 1, 1, 1)
     outcome = provider.submit("H1")
     assert outcome.http == 202
-    ledger.record_unknown()
+    ledger.record_unknown(ledger.reservation.operation_id)
     assert ledger.reservation.state == "PromotionReconciliationRequired"
     assert provider.pending_uuid is not None
 
@@ -476,7 +476,7 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
     ledger.reserve("L0", "LEASE-1", "L1", 1)
     ledger.fencing_token += 1
     ledger.head = "L2"
-    assert not ledger.prepare_dispatch("L1", 1, 1)
+    assert not ledger.prepare_dispatch("L1", 1, 1, 1)
 
 
 TESTS = [
