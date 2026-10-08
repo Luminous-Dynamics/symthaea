@@ -986,6 +986,9 @@ class ClockRelationV1:
             or self.trust_snapshot is None
         ):
             return "clock-relation-provenance-missing"
+        source_state = self.evidence.classify_source()
+        if source_state != "clock-relation-source-admissible":
+            return source_state
         if (
             not self.evidence.internally_consistent()
             or not self.verification.internally_consistent(self.evidence)
@@ -4574,6 +4577,7 @@ TESTS = [
     test_clock_source_response_binds_exact_challenge,
     test_clock_source_attestation_binds_exact_response,
     test_clock_source_attestation_rejects_unverified_signature,
+    test_clock_relation_rejects_source_operation_identity_mismatch,
     test_clock_relation_requires_provenance,
     test_clock_relation_rejects_mismatched_evidence_digest,
     test_clock_relation_rejects_policy_drift,
