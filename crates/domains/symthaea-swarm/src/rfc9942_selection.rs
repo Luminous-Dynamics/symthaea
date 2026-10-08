@@ -506,6 +506,14 @@ impl Rfc9942SignatureWithReceipts {
 
 }
 
+/// Evaluate candidates in RFC 9942 priority order using a caller-supplied evaluator.
+///
+/// This function records evaluator outcomes and exact collection/Receipt
+/// identities, but the callback result is only evaluator evidence. The returned
+/// decision is not a cryptographic verification witness and must not be used as
+/// durable evidence or projected into the Holochain state by itself. Durable
+/// projection must cross the private verified-selection witness constructed by
+/// Rfc9942SignatureWithReceipts::verify_es256_inclusion_priority_first_valid_receipt_selection_state.
 pub fn evaluate_priority_first_valid<F>(
     collection: &Rfc9942ReceiptCollection,
     mut verify: F,
