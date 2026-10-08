@@ -324,7 +324,21 @@ def verify_runtime(path: Path) -> None:
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
         fail("runtime witness must contain fixture then hazard exactly once")
 
-    provenance: tuple[str, str, bytes, str, bytes, int, str, int, int, int, tuple[int, int, int]] | None = None
+    provenance: tuple[
+        str,
+        str,
+        bytes,
+        str,
+        bytes,
+        int,
+        str,
+        int,
+        int,
+        int,
+        tuple[int, int, int],
+        str,
+        tuple[int, int, int, int],
+    ] | None = None
     for name, lines in blocks:
         spec = FIXTURES[name]
         values = parse_kv(lines)
