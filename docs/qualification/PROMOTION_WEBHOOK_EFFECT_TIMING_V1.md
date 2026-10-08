@@ -126,3 +126,15 @@ A usable cross-domain clock relation now binds:
 The effective uncertainty grows monotonically from the verification time according to the declared drift bound. A relation used after its validity window, before its verification instant, or with invalid bounds is not usable for temporal admission.
 
 The model therefore does not treat a one-time skew measurement as an indefinitely valid synchronized-clock fact.
+
+## Timestamp policy identity
+
+The occurrence semantics are carried by `ProviderTimestampPolicyV1`, not selected as an unbound per-event string. The policy binds:
+
+- provider identity;
+- exact source field (`pull_request.merged_at`);
+- occurrence semantics;
+- maximum accepted reported resolution;
+- policy generation.
+
+The timing record retains the policy identity digest and rejects a tampered policy object or an interval that exceeds the policy's maximum accepted resolution. A different timestamp interpretation therefore creates a different policy identity rather than silently changing the meaning of the same payload.
