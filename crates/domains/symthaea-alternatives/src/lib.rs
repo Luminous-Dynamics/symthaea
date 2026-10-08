@@ -3594,6 +3594,22 @@ impl MeasurementDiscriminationTarget {
             .map_err(|_| AssessmentError::InvalidMeasurementDiscriminationTarget)?;
         Ok(())
     }
+
+    /// Validate the exact comparison scale against the authoritative requirement.
+    pub fn validate_against(
+        &self,
+        requirement: &FunctionalRequirement,
+    ) -> Result<(), AssessmentError> {
+        requirement.validate()?;
+        self.validate()?;
+        let Some(scale) = requirement.comparison_scales.get(&self.dimension) else {
+            return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
+        };
+        if self.unit != scale.unit || self.scope != scale.scope || self.basis != scale.basis {
+            return Err(AssessmentError::InvalidMeasurementDiscriminationTarget);
+        }
+        Ok(())
+    }
 }
 
 /// Conservative next-measurement target.
@@ -5860,7 +5876,7 @@ impl AlternativesEngine {
 
             if expected_discrimination
                 .iter()
-                .any(|target| target.validate().is_err())
+                .any(|target| target.validate_against(requirement).is_err())
             {
                 return None;
             }
@@ -8615,6 +8631,41 @@ mod tests {
         target.basis.basis_digest.clear();
         assert_eq!(
             target.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+    }
+
+    #[test]
+    fn heuristic_measurement_target_must_match_requirement_scale() {
+        let requirement = fixture_requirement();
+        let scale = requirement.comparison_scales[&Dimension::Water].clone();
+        let mut target = MeasurementDiscriminationTarget {
+            left_candidate_id: "left".into(),
+            right_candidate_id: "right".into(),
+            dimension: Dimension::Water,
+            unit: scale.unit.clone(),
+            scope: scale.scope.clone(),
+            basis: scale.basis.clone(),
+        };
+        target.validate_against(&requirement).unwrap();
+
+        target.unit = "wrong-unit".into();
+        assert_eq!(
+            target.validate_against(&requirement).unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.unit = scale.unit;
+        target.scope = "wrong-scope".into();
+        assert_eq!(
+            target.validate_against(&requirement).unwrap_err(),
+            AssessmentError::InvalidMeasurementDiscriminationTarget
+        );
+
+        target.scope = scale.scope;
+        target.basis.basis_revision = "wrong-revision".into();
+        assert_eq!(
+            target.validate_against(&requirement).unwrap_err(),
             AssessmentError::InvalidMeasurementDiscriminationTarget
         );
     }
