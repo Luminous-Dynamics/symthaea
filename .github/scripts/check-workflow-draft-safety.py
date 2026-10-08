@@ -73,25 +73,39 @@ def top_level_section(text: str, key: str) -> list[str]:
 
 def pull_request_block(text: str) -> list[str] | None:
     lines = text.splitlines()
-    top_level_on = next(
-        (line for line in lines if line.startswith("on:")),
-        None,
-    )
-    if top_level_on is not None and top_level_on != "on:":
-        inline = top_level_on.removeprefix("on:").strip()
+    top_level_on_index: int | None = None
+    top_level_on_value = ""
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"""(['"]?)on\1\s*:\s*(.*)""", line)
+        if match:
+            top_level_on_index = index
+            top_level_on_value = match.group(2).strip()
+            break
+        if line and not line.startswith(" ") and re.match(r"""(?:['"]?)on(?:['"]?)\s*:""", line):
+            raise SafetyError(
+                "unsupported top-level on: declaration; refusing to infer PR safety"
+            )
+
+    if top_level_on_index is None:
+        return None
+
+    if top_level_on_value:
         # Flow-style trigger declarations are supported only when their entire
         # trigger surface is visible on the same line. This prevents a PR
         # workflow from disappearing from the ratchet merely by switching the
         # top-level `on:` mapping to flow syntax.
-        if "pull_request" in inline:
-            return [top_level_on]
-        if any(event in inline for event in ("push", "workflow_dispatch", "schedule")):
+        if "pull_request" in top_level_on_value:
+            return [lines[top_level_on_index]]
+        if any(
+            event in top_level_on_value
+            for event in ("push", "workflow_dispatch", "schedule")
+        ):
             return None
         raise SafetyError(
             "unsupported inline top-level on: declaration; refusing to infer PR safety"
         )
 
-    on_lines = top_level_section(text, "on")
+    on_lines = lines[top_level_on_index + 1 :]
     for index, line in enumerate(on_lines):
         match = re.fullmatch(r"  pull_request:\s*(.*)", line)
         if not match:
@@ -354,6 +368,30 @@ jobs:
         pass
     else:
         raise AssertionError("inline pull_request workflow without ready_for_review was accepted")
+
+    quoted_inline = """'on': {pull_request: {types: [opened, synchronize, reopened, ready_for_review]}}
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(quoted_inline)
+    assert pr is not None
+    assert validate_generic(Path("quoted-inline-safe.yml"), quoted_inline, pr) == (1, 1)
+
+    spaced_on = """on : {pull_request: {types: [opened, synchronize, reopened, ready_for_review]}}
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(spaced_on)
+    assert pr is not None
+    assert validate_generic(Path("spaced-on-safe.yml"), spaced_on, pr) == (1, 1)
 
 
 def main() -> int:
