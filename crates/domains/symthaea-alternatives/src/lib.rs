@@ -9283,6 +9283,7 @@ mod tests {
         duplicate_input.input_bindings.push(CalibrationTraceabilityInputBinding {
             input_quantity_id: "fixture-input".into(),
             input_specification: duplicate_input.input_bindings[0].input_specification.clone(),
+            input_result_ref: None,
             role: duplicate_input.input_bindings[0].role,
             node_id: "calibration".into(),
         });
