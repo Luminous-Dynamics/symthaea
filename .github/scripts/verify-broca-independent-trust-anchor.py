@@ -273,6 +273,19 @@ def resolve_branch_tip(branch: str) -> str:
     return sha
 
 
+def verify_trust_root_current(
+    verifier_head: str,
+    live_default_branch_tip: str,
+    *,
+    phase: str,
+) -> None:
+    if verifier_head != live_default_branch_tip:
+        raise StaleError(
+            "trusted verifier root is not current at "
+            f"{phase}: checkout {verifier_head} != live default-branch tip {live_default_branch_tip}"
+        )
+
+
 def verify_trust_anchor_permissions(workflow: str) -> None:
     if re.search(r"(?m)^[ ]{4,}permissions:\s*$", workflow):
         raise VerificationError(
@@ -758,6 +771,11 @@ def main() -> int:
             "workflow_blob_sha": trust_workflow_blob,
             "workflow_name": "Broca Independent Trust Anchor",
             "status_context": STATUS_CONTEXT,
+            "default_branch": None,
+            "live_default_branch_tip_sha_initial": None,
+            "live_default_branch_tip_sha_final": None,
+            "root_current_initial": False,
+            "root_current_final": False,
         },
         "trigger": {
             "repository_id": TRIGGER_RUN_REPOSITORY_ID,
@@ -775,6 +793,20 @@ def main() -> int:
     }
 
     try:
+        default_branch_metadata = api_request("GET", "")
+        default_branch = str(default_branch_metadata.get("default_branch", "")).strip()
+        if not default_branch:
+            raise VerificationError("repository has no canonical default branch")
+        initial_default_branch_tip = resolve_branch_tip(default_branch)
+        receipt["trust_anchor"]["default_branch"] = default_branch
+        receipt["trust_anchor"]["live_default_branch_tip_sha_initial"] = initial_default_branch_tip
+        verify_trust_root_current(
+            verifier_head,
+            initial_default_branch_tip,
+            phase="verification start",
+        )
+        receipt["trust_anchor"]["root_current_initial"] = True
+
         if TRUST_ANCHOR_MODE == "workflow_dispatch":
             manual_run_id = int(env_required("MANUAL_WORKFLOW_RUN_ID"))
             manual_run = api_request("GET", f"/actions/runs/{manual_run_id}")
@@ -1304,6 +1336,22 @@ def main() -> int:
             raise VerificationError(
                 f"triggering workflow path mismatch: expected {expected_path!r}, got {trigger_run.get('path')!r}"
             )
+
+        final_default_branch_metadata = api_request("GET", "")
+        final_default_branch = str(final_default_branch_metadata.get("default_branch", "")).strip()
+        if final_default_branch != receipt["trust_anchor"]["default_branch"]:
+            raise StaleError(
+                "repository default branch changed during verification: "
+                f"initial {receipt['trust_anchor']['default_branch']!r} != final {final_default_branch!r}"
+            )
+        final_default_branch_tip = resolve_branch_tip(final_default_branch)
+        receipt["trust_anchor"]["live_default_branch_tip_sha_final"] = final_default_branch_tip
+        verify_trust_root_current(
+            verifier_head,
+            final_default_branch_tip,
+            phase="final publication reconciliation",
+        )
+        receipt["trust_anchor"]["root_current_final"] = True
 
         receipt["qualification_result"] = "PASS"
         post_status(
