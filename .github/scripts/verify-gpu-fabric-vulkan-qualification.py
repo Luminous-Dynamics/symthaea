@@ -117,7 +117,7 @@ def expected_state(spec: dict) -> dict[str, bytes]:
 def sha256_len_prefixed(parts: list[bytes], domain: bytes) -> str:
     digest = hashlib.sha256()
     digest.update(domain)
-    digest.update(b"\\x00")
+    digest.update(b"\x00")
     for part in parts:
         digest.update(struct.pack("<Q", len(part)))
         digest.update(part)
@@ -184,7 +184,7 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
         fail("physical-device identity numeric field outside u32 range")
     device_hash = hashlib.sha256()
     device_hash.update(b"symthaea.gpu-fabric.vulkan-device.v1")
-    device_hash.update(b"\\x00")
+    device_hash.update(b"\x00")
     for value in numeric:
         device_hash.update(struct.pack("<I", value))
     device_hash.update(struct.pack("<Q", len(name)))
