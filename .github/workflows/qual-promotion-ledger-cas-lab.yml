@@ -81,15 +81,17 @@ jobs:
           }
 
           update_ref_status() {
-            local target="$1"
+            local target_sha="$1"
             local response_file="$2"
+            local target_ref_path="$3"
+            test -n "${target_ref_path}"
             curl -sS -o "${response_file}" -w '%{http_code}' \
               -X PATCH \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
-              "${api_root}/git/refs/${ref_path}" \
-              -d "$(jq -n --arg sha "${target}" '{sha:$sha, force:false}')"
+              "${api_root}/git/refs/${target_ref_path}" \
+              -d "$(jq -n --arg sha "${target_sha}" '{sha:$sha, force:false}')"
           }
 
           # Two valid successor candidates share the same observed predecessor.
@@ -97,14 +99,14 @@ jobs:
           STALE_SHA="$(create_commit 'qual-cas-lab: stale successor' "${BASE_SHA}")"
 
           winner_response="$(mktemp)"
-          winner_status="$(update_ref_status "${WINNER_SHA}" "${winner_response}")"
+          winner_status="$(update_ref_status "${WINNER_SHA}" "${winner_response}" "${ref_path}")"
           test "${winner_status}" = "200"
 
           CURRENT_AFTER_WINNER="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
           test "${CURRENT_AFTER_WINNER}" = "${WINNER_SHA}"
 
           stale_response="$(mktemp)"
-          stale_status="$(update_ref_status "${STALE_SHA}" "${stale_response}")"
+          stale_status="$(update_ref_status "${STALE_SHA}" "${stale_response}" "${ref_path}")"
           case "${stale_status}" in
             409|422) ;;
             *)
@@ -124,9 +126,9 @@ jobs:
 
           race_left_response="$(mktemp)"
           race_right_response="$(mktemp)"
-          ( update_ref_status "${RACE_LEFT_SHA}" "${race_left_response}" ) > race_left_status.txt &
+          ( update_ref_status "${RACE_LEFT_SHA}" "${race_left_response}" "${race_ref_path}" ) > race_left_status.txt &
           left_pid=$!
-          ( update_ref_status "${RACE_RIGHT_SHA}" "${race_right_response}" ) > race_right_status.txt &
+          ( update_ref_status "${RACE_RIGHT_SHA}" "${race_right_response}" "${race_ref_path}" ) > race_right_status.txt &
           right_pid=$!
           wait "${left_pid}"
           wait "${right_pid}"
@@ -166,7 +168,7 @@ jobs:
           # A newer invalidation is itself a successor of the current ledger head.
           INVALIDATION_SHA="$(create_commit 'qual-cas-lab: trust-root invalidation successor' "${WINNER_SHA}")"
           invalidation_response="$(mktemp)"
-          invalidation_status="$(update_ref_status "${INVALIDATION_SHA}" "${invalidation_response}")"
+          invalidation_status="$(update_ref_status "${INVALIDATION_SHA}" "${invalidation_response}" "${ref_path}")"
           test "${invalidation_status}" = "200"
 
           CURRENT_AFTER_INVALIDATION="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
@@ -174,7 +176,7 @@ jobs:
 
           # The original stale candidate is still a valid Git object, but cannot become current.
           stale_after_invalidation_response="$(mktemp)"
-          stale_after_invalidation_status="$(update_ref_status "${STALE_SHA}" "${stale_after_invalidation_response}")"
+          stale_after_invalidation_status="$(update_ref_status "${STALE_SHA}" "${stale_after_invalidation_response}" "${ref_path}")"
           case "${stale_after_invalidation_status}" in
             409|422) ;;
             *)
@@ -189,7 +191,7 @@ jobs:
 
           # Rollback to the historical predecessor is also non-fast-forward and must fail.
           rollback_response="$(mktemp)"
-          rollback_status="$(update_ref_status "${BASE_SHA}" "${rollback_response}")"
+          rollback_status="$(update_ref_status "${BASE_SHA}" "${rollback_response}" "${ref_path}")"
           case "${rollback_status}" in
             409|422) ;;
             *)
