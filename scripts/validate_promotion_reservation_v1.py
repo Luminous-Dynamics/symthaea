@@ -519,6 +519,31 @@ class ProviderPullRequestMergeObservationV1:
 
 
 @dataclass(frozen=True)
+class ProviderDeliveryIdentityV1:
+    delivery_id: str
+    payload_bytes_digest: str
+    hook_id: str
+    event_type: str
+    repository: str
+
+    @classmethod
+    def from_observation(
+        cls,
+        observation: ProviderPullRequestMergeObservationV1,
+    ) -> "ProviderDeliveryIdentityV1":
+        return cls(
+            delivery_id=observation.delivery_id,
+            payload_bytes_digest=observation.payload_bytes_digest,
+            hook_id=observation.hook_id,
+            event_type=observation.event_type,
+            repository=observation.repository,
+        )
+
+    def matches(self, other: "ProviderDeliveryIdentityV1") -> bool:
+        return self == other
+
+
+@dataclass(frozen=True)
 class PromotionPrEffectStateV1:
     repository: str
     expected_entry: StackEntryV1
@@ -526,6 +551,7 @@ class PromotionPrEffectStateV1:
     state: str = "Unobserved"
     effect: PromotionStackEffectV1 | None = None
     source_delivery_ids: tuple[str, ...] = ()
+    source_delivery_identities: tuple[ProviderDeliveryIdentityV1, ...] = ()
 
     def validates_operation_identity(
         self,
@@ -557,6 +583,8 @@ class PromotionPrEffectStateV1:
         if candidate is None:
             return self, "rejected-non-effect"
 
+        delivery_identity = ProviderDeliveryIdentityV1.from_observation(observation)
+
         if self.state == "Unobserved":
             return (
                 PromotionPrEffectStateV1(
@@ -566,12 +594,31 @@ class PromotionPrEffectStateV1:
                     state="EffectObserved",
                     effect=candidate,
                     source_delivery_ids=(observation.delivery_id,),
+                    source_delivery_identities=(delivery_identity,),
                 ),
                 "admitted",
             )
 
         if self.state != "EffectObserved" or self.effect is None:
             return self, "rejected-invalid-state"
+
+        for prior_identity in self.source_delivery_identities:
+            if prior_identity.delivery_id != delivery_identity.delivery_id:
+                continue
+            if prior_identity.matches(delivery_identity):
+                return self, "duplicate-delivery"
+            return (
+                PromotionPrEffectStateV1(
+                    repository=self.repository,
+                    expected_entry=self.expected_entry,
+                    operation_identity_digest=self.operation_identity_digest,
+                    state="Conflict",
+                    effect=None,
+                    source_delivery_ids=self.source_delivery_ids,
+                    source_delivery_identities=self.source_delivery_identities,
+                ),
+                "delivery-identity-conflict",
+            )
 
         if candidate != self.effect:
             return (
@@ -582,12 +629,10 @@ class PromotionPrEffectStateV1:
                     state="Conflict",
                     effect=None,
                     source_delivery_ids=self.source_delivery_ids,
+                    source_delivery_identities=self.source_delivery_identities,
                 ),
                 "conflict",
             )
-
-        if observation.delivery_id in self.source_delivery_ids:
-            return self, "duplicate-delivery"
 
         return (
             PromotionPrEffectStateV1(
@@ -597,6 +642,7 @@ class PromotionPrEffectStateV1:
                 state=self.state,
                 effect=self.effect,
                 source_delivery_ids=self.source_delivery_ids + (observation.delivery_id,),
+                source_delivery_identities=self.source_delivery_identities + (delivery_identity,),
             ),
             "compatible-repeat",
         )
@@ -710,13 +756,23 @@ class PromotionStackEffectEvidenceSetV1:
 
 @dataclass(frozen=True)
 class ProviderDeliveryRegistryV1:
-    deliveries: tuple[tuple[str, str], ...] = ()
+    deliveries: tuple[ProviderDeliveryIdentityV1, ...] = ()
+
+    def _identity(self, receipt: ProviderWebhookReceiptV1) -> ProviderDeliveryIdentityV1:
+        return ProviderDeliveryIdentityV1(
+            delivery_id=receipt.delivery_id,
+            payload_bytes_digest=receipt.payload_bytes_digest,
+            hook_id=receipt.hook_id,
+            event_type=receipt.event_type,
+            repository=receipt.repository,
+        )
 
     def observe(self, receipt: ProviderWebhookReceiptV1) -> str:
-        for delivery_id, payload_digest in self.deliveries:
-            if delivery_id != receipt.delivery_id:
+        identity = self._identity(receipt)
+        for prior in self.deliveries:
+            if prior.delivery_id != identity.delivery_id:
                 continue
-            if payload_digest == receipt.payload_bytes_digest:
+            if prior.matches(identity):
                 return "duplicate-identical"
             return "delivery-id-conflict"
         return "new-delivery"
@@ -725,7 +781,7 @@ class ProviderDeliveryRegistryV1:
         classification = self.observe(receipt)
         if classification == "new-delivery":
             return ProviderDeliveryRegistryV1(
-                self.deliveries + ((receipt.delivery_id, receipt.payload_bytes_digest),)
+                self.deliveries + (self._identity(receipt),)
             )
         return self
 
@@ -1058,12 +1114,12 @@ def webhook_merge_payload(
     merged: bool = True,
     action: str = "closed",
     merge_commit: str | None = None,
+    extra_field: str | None = None,
 ) -> bytes:
-    return json.dumps(
-        {
-            "action": action,
-            "number": pr_number,
-            "pull_request": {
+    document = {
+        "action": action,
+        "number": pr_number,
+        "pull_request": {
                 "number": pr_number,
                 "merged": merged,
                 "head": {"sha": head_sha},
@@ -1073,8 +1129,12 @@ def webhook_merge_payload(
                     else ("M2" if merged else None)
                 ),
             },
-            "repository": {"full_name": repository},
-        },
+        "repository": {"full_name": repository},
+    }
+    if extra_field is not None:
+        document["qualification_extra"] = extra_field
+    return json.dumps(
+        document,
         separators=(",", ":"),
     ).encode("utf-8")
 
@@ -1104,6 +1164,7 @@ def stack_webhook_observation(
     merge_commit: str = "M2",
     delivery_id: str = "delivery-merge",
     repository: str = "Luminous-Dynamics/symthaea",
+    payload_extra: str | None = None,
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
     payload = webhook_merge_payload(
@@ -1113,6 +1174,7 @@ def stack_webhook_observation(
         merged=True,
         action="closed",
         merge_commit=merge_commit,
+        extra_field=payload_extra,
     )
     receipt = webhook_merge_receipt(
         payload,
@@ -1217,6 +1279,33 @@ def test_effect_state_repeated_same_delivery_is_idempotent():
     state_after, decision = state.ingest(observation)
     assert decision == "duplicate-delivery"
     assert state_after == state
+    assert state_after.source_delivery_identities == (
+        ProviderDeliveryIdentityV1.from_observation(observation),
+    )
+
+
+def test_effect_state_same_delivery_id_with_changed_payload_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="first-payload",
+    )
+    conflicting_payload = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same-id",
+        payload_extra="second-payload",
+    )
+    assert first.payload_bytes_digest != conflicting_payload.payload_bytes_digest
+    assert first.to_stack_effect(identity) == conflicting_payload.to_stack_effect(identity)
+
+    state, decision = state.ingest(first)
+    assert decision == "admitted"
+    state_after, decision = state.ingest(conflicting_payload)
+    assert decision == "delivery-identity-conflict"
+    assert state_after.state == "Conflict"
+    assert state_after.effect is None
 
 
 def test_effect_state_conflicting_merge_commit_fails_closed():
@@ -2072,6 +2161,28 @@ def test_webhook_delivery_registry_rejects_same_id_with_different_payload():
         "pull_request",
         "Luminous-Dynamics/symthaea",
         b'{"action":"different"}',
+        b"secret",
+    )
+    registry = ProviderDeliveryRegistryV1().record(first)
+    assert registry.observe(second) == "delivery-id-conflict"
+
+
+def test_webhook_delivery_registry_rejects_same_id_with_changed_context():
+    payload = b"{}"
+    first = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    second = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context-reuse",
+        "hook-2",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
         b"secret",
     )
     registry = ProviderDeliveryRegistryV1().record(first)
@@ -3502,6 +3613,7 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 TESTS = [
     test_effect_state_binds_to_exact_operation_identity,
+    test_effect_state_same_delivery_id_with_changed_payload_fails_closed,
     test_effect_state_conflict_is_absorbing,
     test_effect_state_conflict_never_reclassifies_as_terminal_observed,
     test_effect_state_admits_first_authenticated_merge,
