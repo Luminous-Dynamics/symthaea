@@ -445,3 +445,84 @@ jobs:
             rm -f "${log_file}"
             trap - EXIT
           done
+
+  cargo-resolution-diagnostic:
+    name: Diagnostic Cargo feature resolution
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
+        with:
+          toolchain: 1.96.0
+
+      - name: Diagnose feature-aware lock resolution
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          echo "=== cargo version ==="
+          cargo --version
+
+          echo "=== locked metadata before regeneration ==="
+          cargo metadata --locked --features semantic-receipts --format-version 1 > /tmp/metadata-before.json 2> /tmp/metadata-before.err
+          before_status=$?
+          echo "metadata_locked_status=${before_status}"
+          sed -n '1,120p' /tmp/metadata-before.err
+
+          cp Cargo.lock /tmp/Cargo.lock.before
+
+          echo "=== feature-aware metadata without --locked ==="
+          cargo metadata --features semantic-receipts --format-version 1 > /tmp/metadata-after.json 2> /tmp/metadata-after.err
+          after_status=$?
+          echo "metadata_unlocked_status=${after_status}"
+          sed -n '1,120p' /tmp/metadata-after.err
+          test "${after_status}" -eq 0
+
+          echo "=== exact Cargo.lock delta ==="
+          git diff --unified=0 -- Cargo.lock | sed -n '1,320p'
+
+          echo "=== lockfile package edge for symthaea-swarm ==="
+          awk '
+            /^name = "symthaea-swarm"$/ { show=1 }
+            show { print }
+            show && /^\[\[package\]\]$/ && NR > 1 { exit }
+          ' Cargo.lock
+
+          echo "=== locked metadata after regeneration ==="
+          cargo metadata --locked --features semantic-receipts --format-version 1 > /tmp/metadata-locked-after.json 2> /tmp/metadata-locked-after.err
+          locked_after_status=$?
+          echo "metadata_locked_after_status=${locked_after_status}"
+          sed -n '1,120p' /tmp/metadata-locked-after.err
+          test "${locked_after_status}" -eq 0
+
+          echo "=== feature-resolved crypto dependencies ==="
+          python3 - <<'PY'
+          import json
+          m=json.load(open("/tmp/metadata-locked-after.json"))
+          for p in m["packages"]:
+              if p["name"] == "symthaea-swarm":
+                  for d in p["dependencies"]:
+                      if d["name"] in {"ed25519-dalek", "sha2", "ring", "blake3"}:
+                          print(d["name"], d["req"], d["source"])
+          PY
+
+          echo "=== result ==="
+          echo "The diagnostic is successful only if feature-aware metadata can regenerate and then be consumed with --locked."
