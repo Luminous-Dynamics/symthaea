@@ -14,6 +14,7 @@
       "id": "MC-001",
       "events": [
         {
+          "id": "mc-001-trade-1",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
@@ -26,25 +27,29 @@
           "bob": 40,
           "carol": 0
         },
-        "total": 0
+        "total": 0,
+        "external_settled_total": 0
       }
     },
     {
       "id": "MC-002",
       "events": [
         {
+          "id": "mc-002-trade-1",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 40
         },
         {
+          "id": "mc-002-trade-2",
           "op": "trade",
           "buyer": "bob",
           "seller": "carol",
           "amount": 40
         },
         {
+          "id": "mc-002-trade-3",
           "op": "trade",
           "buyer": "carol",
           "seller": "alice",
@@ -57,19 +62,22 @@
           "bob": 0,
           "carol": 0
         },
-        "total": 0
+        "total": 0,
+        "external_settled_total": 0
       }
     },
     {
       "id": "MC-003",
       "events": [
         {
+          "id": "mc-003-trade-1",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 40
         },
         {
+          "id": "mc-003-settlement-1",
           "op": "settle_external",
           "member": "bob",
           "amount": 15
@@ -81,25 +89,29 @@
           "bob": 25,
           "carol": 0
         },
-        "total": -15
+        "total": -15,
+        "external_settled_total": 15
       }
     },
     {
       "id": "MC-004",
       "events": [
         {
+          "id": "mc-004-trade-1",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 40
         },
         {
+          "id": "mc-004-trade-2",
           "op": "trade",
           "buyer": "bob",
           "seller": "carol",
           "amount": 40
         },
         {
+          "id": "mc-004-trade-3",
           "op": "trade",
           "buyer": "carol",
           "seller": "alice",
@@ -112,19 +124,22 @@
           "bob": 0,
           "carol": 20
         },
-        "total": 0
+        "total": 0,
+        "external_settled_total": 0
       }
     },
     {
       "id": "MC-005",
       "events": [
         {
+          "id": "mc-005-trade-1",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 100
         },
         {
+          "id": "mc-005-trade-2",
           "op": "trade",
           "buyer": "bob",
           "seller": "alice",
@@ -137,61 +152,137 @@
           "bob": 0,
           "carol": 0
         },
-        "total": 0
+        "total": 0,
+        "external_settled_total": 0
+      }
+    },
+    {
+      "id": "MC-006",
+      "events": [
+        {
+          "id": "mc-006-trade-1",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 20
+        },
+        {
+          "id": "mc-006-trade-2",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 20
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": -40,
+          "bob": 40,
+          "carol": 0
+        },
+        "total": 0,
+        "external_settled_total": 0
+      }
+    },
+    {
+      "id": "MC-007",
+      "events": [
+        {
+          "id": "mc-007-trade-1",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 10
+        },
+        {
+          "id": "mc-007-default-1",
+          "op": "mark_defaulted",
+          "member": "carol"
+        },
+        {
+          "id": "mc-007-trade-2",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 10
+        }
+      ],
+      "expect": {
+        "balances": {
+          "alice": -20,
+          "bob": 20,
+          "carol": 0
+        },
+        "total": 0,
+        "external_settled_total": 0
       }
     }
   ],
   "rejected": [
     {
       "id": "MC-X01",
-      "event": {
-        "op": "trade",
-        "buyer": "unknown",
-        "seller": "bob",
-        "amount": 1
-      },
+      "events": [
+        {
+          "id": "mc-x01",
+          "op": "trade",
+          "buyer": "unknown",
+          "seller": "bob",
+          "amount": 1
+        }
+      ],
       "error": "UnknownMember"
     },
     {
       "id": "MC-X02",
-      "event": {
-        "op": "trade",
-        "buyer": "alice",
-        "seller": "alice",
-        "amount": 1
-      },
+      "events": [
+        {
+          "id": "mc-x02",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "alice",
+          "amount": 1
+        }
+      ],
       "error": "SelfTrade"
     },
     {
       "id": "MC-X03",
-      "event": {
-        "op": "trade",
-        "buyer": "alice",
-        "seller": "bob",
-        "amount": 0
-      },
+      "events": [
+        {
+          "id": "mc-x03",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 0
+        }
+      ],
       "error": "NonPositiveAmount"
     },
     {
       "id": "MC-X04",
-      "event": {
-        "op": "trade",
-        "buyer": "alice",
-        "seller": "bob",
-        "amount": 101
-      },
+      "events": [
+        {
+          "id": "mc-x04",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 101
+        }
+      ],
       "error": "CreditLimitExceeded"
     },
     {
       "id": "MC-X05",
       "events": [
         {
+          "id": "mc-x05-trade",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 40
         },
         {
+          "id": "mc-x05-settle",
           "op": "settle_external",
           "member": "alice",
           "amount": 15
@@ -203,12 +294,14 @@
       "id": "MC-X06",
       "events": [
         {
+          "id": "mc-x06-trade",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 40
         },
         {
+          "id": "mc-x06-settle",
           "op": "settle_external",
           "member": "bob",
           "amount": 50
@@ -220,12 +313,14 @@
       "id": "MC-X07",
       "events": [
         {
+          "id": "mc-x07-trade-1",
           "op": "trade",
           "buyer": "alice",
           "seller": "bob",
           "amount": 100
         },
         {
+          "id": "mc-x07-trade-2",
           "op": "trade",
           "buyer": "bob",
           "seller": "carol",
@@ -233,6 +328,67 @@
         }
       ],
       "error": "CreditLimitExceeded"
+    },
+    {
+      "id": "MC-X08",
+      "events": [
+        {
+          "id": "mc-x08-replay",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 20
+        },
+        {
+          "id": "mc-x08-replay",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 20
+        }
+      ],
+      "error": "DuplicateEventId"
+    },
+    {
+      "id": "MC-X09",
+      "events": [
+        {
+          "id": "",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 1
+        }
+      ],
+      "error": "InvalidEventId"
+    },
+    {
+      "id": "MC-X10",
+      "events": [
+        {
+          "id": "mc-x10-default",
+          "op": "mark_defaulted",
+          "member": "alice"
+        },
+        {
+          "id": "mc-x10-trade",
+          "op": "trade",
+          "buyer": "alice",
+          "seller": "bob",
+          "amount": 1
+        }
+      ],
+      "error": "DefaultedMember"
+    },
+    {
+      "id": "MC-X11",
+      "events": [
+        {
+          "id": "mc-x11-unknown-op",
+          "op": "unknown"
+        }
+      ],
+      "error": "UnknownOperation"
     }
   ]
 }
