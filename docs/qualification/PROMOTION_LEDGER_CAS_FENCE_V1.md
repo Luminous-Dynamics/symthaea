@@ -20,6 +20,9 @@ A lease reference and a trust-root reference cannot safely form an atomic pair w
 
 The forbidden construction is:
 
+GitHub-specific refinement: GitHub's GraphQL `updateRefs` mutation can atomically update multiple refs using per-ref `beforeOid` preconditions. Therefore, a single ledger ref is not the only possible atomic substrate on GitHub. It remains the preferred v1 substrate here because it collapses the currentness theorem into one authoritative object, avoids cross-object composition rules, and gives the lab a REST-compatible primitive that does not depend on a multi-ref transaction surface.
+
+
 ~~~text
 read trust_root_ref = A
 read lease_ref = A
@@ -55,7 +58,7 @@ Every trusted ledger writer follows:
 5. treat any ref-update conflict/non-fast-forward rejection as STALE / RECHECK_REQUIRED;
 6. re-read the ref and require that the observed head equals the exact successor SHA before reporting publication success.
 
-The ref update is the linearization point.
+The ref update is the linearization point. On GitHub, an implementation using GraphQL `updateRefs` may instead use its documented multi-ref transaction semantics when there is a concrete reason to retain separate refs; the proof must then bind every participating ref with `beforeOid` and treat the whole mutation as the linearization point.
 
 For two candidates B and S both based on A:
 
@@ -204,7 +207,7 @@ The provider-level lab is intentionally stronger than a sequential demonstration
 
 Successful completion also requires deletion of the temporary refs followed by an explicit 404 observation. Cleanup is therefore part of the positive lab predicate rather than an unverified best-effort side effect.
 
-GitHub's reference API defines non-forced reference updates as fast-forward updates and documents conflict responses; reference deletion also has an explicit provider response contract. The lab establishes those provider mechanics, not an application-level authorization theorem.
+GitHub's REST reference API defines non-forced reference updates as fast-forward updates and documents conflict responses. GitHub's GraphQL `updateRefs` additionally provides an atomic multi-ref mutation with `beforeOid` preconditions. This lab deliberately exercises the single-ref REST-compatible primitive; it does not establish an application-level authorization theorem.
 
 ## Claim ceiling
 
