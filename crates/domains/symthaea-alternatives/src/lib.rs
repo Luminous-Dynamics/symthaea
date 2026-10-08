@@ -598,7 +598,7 @@ impl MeasurementModelInputResultRef {
             || self.result_revision.is_empty()
             || self.result_record_digest.is_empty()
         {
-            return Err(AssessmentError::InvalidCalibrationTraceabilityInputBinding);
+            return Err(AssessmentError::InvalidMeasurementModelInputResultReference);
         }
         Ok(())
     }
@@ -4107,6 +4107,8 @@ pub enum AssessmentError {
     InvalidMeasurementModelInputQuantityDefinition,
     /// An external machine-readable unit-definition reference is structurally incomplete.
     InvalidMeasurementModelInputUnitDefinition,
+    /// An external measurement-model input-result reference is structurally incomplete.
+    InvalidMeasurementModelInputResultReference,
     /// The topology binding count differs from the authoritative input frontier.
     MeasurementModelInputFrontierCountMismatch {
         /// Frontier identity.
@@ -4680,6 +4682,9 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::InvalidMeasurementModelInputUnitDefinition => {
                 write!(f, "measurement-model input unit definition reference is incomplete")
+            }
+            Self::InvalidMeasurementModelInputResultReference => {
+                write!(f, "measurement-model input result reference is incomplete")
             }
             Self::MeasurementModelInputFrontierCountMismatch {
                 frontier_id,
@@ -8921,7 +8926,7 @@ mod tests {
             .result_record_digest = String::new();
         assert_eq!(
             malformed.input_bindings[0].validate().unwrap_err(),
-            AssessmentError::InvalidCalibrationTraceabilityInputBinding
+            AssessmentError::InvalidMeasurementModelInputResultReference
         );
     }
 
