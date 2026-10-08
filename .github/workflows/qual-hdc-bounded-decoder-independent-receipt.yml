@@ -309,6 +309,7 @@ jobs:
                   Object.values(checks).every(Boolean) ? 'PASS' : 'NOT_PASS',
                 checks,
                 artifact,
+                finalArtifact,
                 stepConclusions,
                 changedFiles,
               };
