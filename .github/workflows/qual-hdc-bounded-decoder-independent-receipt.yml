@@ -962,6 +962,34 @@ jobs:
             });
             const rulesets = Array.isArray(rulesetsResponse.data) ? rulesetsResponse.data : [];
 
+            let effectiveRulesObservation;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/rules/branches/{branch}',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              effectiveRulesObservation = {
+                accessible: true,
+                http_status: response.status,
+                rules: Array.isArray(response.data)
+                  ? response.data.map((rule) => ({
+                      type: rule.type ?? null,
+                      parameters: rule.parameters ?? null,
+                    }))
+                  : [],
+              };
+            } catch (error) {
+              effectiveRulesObservation = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                rules: [],
+              };
+            }
+
             const branchSummaryResponse = await github.request(
               'GET /repos/{owner}/{repo}/branches/{branch}',
               {
@@ -1002,6 +1030,7 @@ jobs:
               schema_version: 'governance-authority-observation-v1',
               default_branch: repositoryMetadata.default_branch,
               branch_summary: branchSummary,
+              effective_rules: effectiveRulesObservation,
               rulesets: rulesets.map((rule) => ({
                 id: rule.id ?? null,
                 name: rule.name ?? null,
@@ -1014,18 +1043,48 @@ jobs:
             const requiredStatusCheckObserved =
               Array.isArray(branchSummary.protection?.required_status_checks?.contexts) &&
               branchSummary.protection.required_status_checks.contexts.includes(STATUS_CONTEXT);
+            const effectiveRequiredStatusRule =
+              effectiveRulesObservation.accessible
+                ? effectiveRulesObservation.rules.find((rule) => rule.type === 'required_status_checks')
+                : null;
+            const effectiveRequiredStatusCheck =
+              effectiveRequiredStatusRule?.parameters?.required_status_checks?.find(
+                (check) => check?.context === STATUS_CONTEXT
+              ) ?? null;
+            const effectiveStatusAuthorityObserved =
+              effectiveRequiredStatusCheck !== null &&
+              effectiveRequiredStatusCheck.integration_id !== undefined &&
+              effectiveRequiredStatusCheck.integration_id !== -1;
+            const effectiveStrictPolicy =
+              effectiveRequiredStatusRule?.parameters?.strict_required_status_checks_policy === true;
             const governanceObservation = {
               observation_identity_sha256: governanceIdentitySha256,
               default_branch: repositoryMetadata.default_branch,
-              verified: branchSummary.protected && requiredStatusCheckObserved,
+              verified:
+                branchSummary.protected &&
+                effectiveRulesObservation.accessible &&
+                effectiveRequiredStatusCheck !== null &&
+                effectiveStatusAuthorityObserved &&
+                effectiveStrictPolicy,
               verification_basis:
-                branchSummary.protected && requiredStatusCheckObserved
-                  ? 'protected_branch_required_status_context'
-                  : branchSummary.protected
-                    ? 'required_status_context_not_observed'
-                    : 'default_branch_unprotected',
+                !branchSummary.protected
+                  ? 'default_branch_unprotected'
+                  : !effectiveRulesObservation.accessible
+                    ? 'effective_branch_rules_unavailable'
+                    : !effectiveRequiredStatusCheck
+                      ? 'required_status_context_not_observed'
+                      : !effectiveStatusAuthorityObserved
+                        ? 'status_source_not_pinned'
+                        : !effectiveStrictPolicy
+                          ? 'strict_status_policy_not_observed'
+                          : 'effective_required_status_authority_verified',
               protected: branchSummary.protected,
               ruleset_count: rulesets.length,
+              effective_rules_accessible: effectiveRulesObservation.accessible,
+              effective_required_status_context: effectiveRequiredStatusCheck?.context ?? null,
+              effective_status_integration_id:
+                effectiveRequiredStatusCheck?.integration_id ?? null,
+              effective_strict_policy: effectiveStrictPolicy,
               branch_protection_accessible: branchProtection.accessible,
               required_status_context: STATUS_CONTEXT,
             };
@@ -1232,6 +1291,33 @@ jobs:
             const publicationRulesets = Array.isArray(publicationGovernanceResponse.data)
               ? publicationGovernanceResponse.data
               : [];
+            let publicationEffectiveRules;
+            try {
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/rules/branches/{branch}',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: repositoryMetadata.default_branch,
+                }
+              );
+              publicationEffectiveRules = {
+                accessible: true,
+                http_status: response.status,
+                rules: Array.isArray(response.data)
+                  ? response.data.map((rule) => ({
+                      type: rule.type ?? null,
+                      parameters: rule.parameters ?? null,
+                    }))
+                  : [],
+              };
+            } catch (error) {
+              publicationEffectiveRules = {
+                accessible: false,
+                http_status: Number(error.status ?? 0) || null,
+                rules: [],
+              };
+            }
             const publicationBranchSummaryResponse = await github.request(
               'GET /repos/{owner}/{repo}/branches/{branch}',
               {
@@ -1270,6 +1356,7 @@ jobs:
               schema_version: 'governance-authority-observation-v1',
               default_branch: repositoryMetadata.default_branch,
               branch_summary: publicationBranchSummary,
+              effective_rules: publicationEffectiveRules,
               rulesets: publicationRulesets.map((rule) => ({
                 id: rule.id ?? null,
                 name: rule.name ?? null,
