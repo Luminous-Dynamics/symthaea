@@ -128,6 +128,7 @@ pub enum Rfc9942PayloadMode {
     Detached,
 }
 
+#[must_use = "retain the verified Receipt capability when crossing a trust boundary"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942VerifiedReceipt {
     algorithm_id: i64,
@@ -250,6 +251,7 @@ pub enum Rfc9942ReceiptPlacement {
 /// - the exact outer payload bytes were the candidate entry supplied to the
 ///   inclusion proof;
 /// - the inner Receipt was bound to VDS 1 and its signed Merkle root.
+#[must_use = "retain the verified Signature_With_Receipt capability when crossing a trust boundary"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942VerifiedSignatureWithReceipt {
     /// SHA-256 fingerprint of the exact outer Signature_With_Receipt wire that
