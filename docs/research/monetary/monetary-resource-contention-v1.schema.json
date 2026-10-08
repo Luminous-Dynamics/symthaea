@@ -24,16 +24,23 @@
       "bounded_operator_capacity":{"$ref":"#/$defs/resource"}
     }},
     "resource_regimes":{"type":"object","additionalProperties":false,"required":["unrestricted","bounded_shared_settlement_liquidity","bounded_operator_capacity","both_bounded"],"properties":{
-      "unrestricted":{"type":"array","items":{"type":"string"},"const":["unrestricted_settlement_liquidity"]},
-      "bounded_shared_settlement_liquidity":{"type":"array","items":{"type":"string"},"const":["bounded_shared_settlement_liquidity"]},
-      "bounded_operator_capacity":{"type":"array","items":{"type":"string"},"const":["unrestricted_settlement_liquidity","bounded_operator_capacity"]},
-      "both_bounded":{"type":"array","items":{"type":"string"},"const":["bounded_shared_settlement_liquidity","bounded_operator_capacity"]}
+      "unrestricted":{"type":"array","const":["unrestricted_settlement_liquidity"]},
+      "bounded_shared_settlement_liquidity":{"type":"array","const":["bounded_shared_settlement_liquidity"]},
+      "bounded_operator_capacity":{"type":"array","const":["unrestricted_settlement_liquidity","bounded_operator_capacity"]},
+      "both_bounded":{"type":"array","const":["bounded_shared_settlement_liquidity","bounded_operator_capacity"]}
     }},
     "fixed_dimensions":{"type":"object","additionalProperties":false,"required":["topology_digest_set","routing_policy_digest","profile_digests","edge_digests","common_random_number_identity","liquidity_demand_units","liquidity_shock_increment","manual_breakpoint_probability_ppm","allocation_policy","resource_identity_rule","no_capacity_inference"],"properties":{
-      "topology_digest_set":{"type":"object","minProperties":3,"additionalProperties":false},
+      "topology_digest_set":{"type":"object","additionalProperties":false,"required":["full_mesh","routing_only_hub","redundant_two_hub"],"properties":{
+        "full_mesh":{"type":"string","pattern":"^[a-f0-9]{64}$"},"routing_only_hub":{"type":"string","pattern":"^[a-f0-9]{64}$"},"redundant_two_hub":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+      }},
       "routing_policy_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
-      "profile_digests":{"type":"object","minProperties":5,"additionalProperties":false},
-      "edge_digests":{"type":"object","minProperties":3,"additionalProperties":false},
+      "profile_digests":{"type":"object","additionalProperties":false,"required":["conventional-bank-money-v1","sovereign-money-v1","mutual-credit-v1","tokenized-deposit-v1","reserve-backed-stablecoin-v1"],"properties":{
+        "conventional-bank-money-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"sovereign-money-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+        "mutual-credit-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"tokenized-deposit-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"reserve-backed-stablecoin-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+      }},
+      "edge_digests":{"type":"object","additionalProperties":false,"required":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],"properties":{
+        "bank_mutual":{"type":"string","pattern":"^[a-f0-9]{64}$"},"bank_stablecoin":{"type":"string","pattern":"^[a-f0-9]{64}$"},"tokenized_deposit_stablecoin":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+      }},
       "common_random_number_identity":{"type":"string","minLength":1},
       "liquidity_demand_units":{"type":"object","additionalProperties":false,"required":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],"properties":{
         "redeem_reissue":{"const":10,"type":"integer"},"escrowed_atomic_swap":{"const":15,"type":"integer"},
