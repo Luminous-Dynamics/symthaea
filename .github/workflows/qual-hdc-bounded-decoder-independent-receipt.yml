@@ -240,7 +240,11 @@ jobs:
                   evidence.run.pull_requests[0].number === expected.pr &&
                   evidence.run.pull_requests[0].head.sha === expected.subject &&
                   Number(evidence.run.pull_requests[0].head.repo?.id) === expected.repositoryId &&
-                  evidence.run.pull_requests[0].head.repo?.full_name === expected.repository,
+                  evidence.run.pull_requests[0].head.repo?.full_name === expected.repository &&
+                  evidence.run.pull_requests[0].base?.sha === expected.parent &&
+                  evidence.run.pull_requests[0].base?.ref === expected.baseBranch &&
+                  Number(evidence.run.pull_requests[0].base?.repo?.id) === expected.repositoryId &&
+                  evidence.run.pull_requests[0].base?.repo?.full_name === expected.repository,
                 ancestry:
                   evidence.parentCommit.sha === expected.subject &&
                   evidence.parentCommit.parents?.[0]?.sha === expected.parent,
@@ -391,14 +395,25 @@ jobs:
               ['verifier_root_drift_between_reads', (e) => { e.finalMainSha = '0'.repeat(40); }],
               ['repository_id', (e) => { e.run.repository.id += 1; }],
               ['run_workflow_path', (e) => { e.run.path = 'untrusted/workflow.yml'; }],
+              ['run_workflow_name', (e) => { e.run.name = 'untrusted workflow'; }],
+              ['run_head_branch', (e) => { e.run.head_branch = 'untrusted-branch'; }],
+              ['run_head_repository', (e) => { e.run.head_repository.full_name = 'attacker/clone'; }],
               ['run_event', (e) => { e.run.event = 'push'; }],
               ['run_conclusion', (e) => { e.run.conclusion = 'failure'; }],
               ['run_head_sha', (e) => { e.run.head_sha = '0'.repeat(40); }],
               ['run_pr_number', (e) => { e.run.pull_requests[0].number += 1; }],
               ['run_pr_head_repo', (e) => { e.run.pull_requests[0].head.repo.full_name = 'attacker/clone'; }],
+              ['run_pr_base_sha', (e) => { e.run.pull_requests[0].base.sha = '0'.repeat(40); }],
+              ['run_pr_base_ref', (e) => { e.run.pull_requests[0].base.ref = 'untrusted-base'; }],
+              ['run_pr_base_repo_id', (e) => { e.run.pull_requests[0].base.repo.id += 1; }],
+              ['run_pr_base_repo_name', (e) => { e.run.pull_requests[0].base.repo.full_name = 'attacker/clone'; }],
+              ['pr_head_ref', (e) => { e.pr.head.ref = 'untrusted-branch'; }],
               ['pr_head_sha', (e) => { e.pr.head.sha = '0'.repeat(40); }],
               ['pr_head_repo_id', (e) => { e.pr.head.repo.id += 1; }],
+              ['pr_base_ref', (e) => { e.pr.base.ref = 'untrusted-base'; }],
               ['pr_base_sha', (e) => { e.pr.base.sha = '0'.repeat(40); }],
+              ['pr_base_repo_id', (e) => { e.pr.base.repo.id += 1; }],
+              ['pr_base_repo_name', (e) => { e.pr.base.repo.full_name = 'attacker/clone'; }],
               ['parent_sha', (e) => { e.parentCommit.parents[0].sha = '0'.repeat(40); }],
               ['merge_base_sha', (e) => { e.compare.merge_base_commit.sha = '0'.repeat(40); }],
               ['changed_file_surface', (e) => { e.compare.files.push({ filename: 'untrusted.txt' }); }],
