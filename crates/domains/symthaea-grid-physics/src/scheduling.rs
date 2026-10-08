@@ -35,7 +35,14 @@ pub struct TariffSchedule {
 impl TariffSchedule {
     pub fn import_price(&self, time_of_day_hours: f64) -> f64 {
         let hour = time_of_day_hours.rem_euclid(24.0);
-        if hour >= self.peak_start_hour && hour < self.peak_end_hour {
+        // Support both same-day windows (for example 17:00-21:00) and
+        // windows that cross midnight (for example 22:00-06:00).
+        let in_peak = if self.peak_start_hour <= self.peak_end_hour {
+            hour >= self.peak_start_hour && hour < self.peak_end_hour
+        } else {
+            hour >= self.peak_start_hour || hour < self.peak_end_hour
+        };
+        if in_peak {
             self.peak_price_per_kwh
         } else {
             self.off_peak_price_per_kwh
@@ -77,6 +84,25 @@ pub struct ScenarioResult {
 /// `unserved_energy_kwh` instead and surplus is simply curtailed (no cost
 /// either way -- there's no grid to sell it to).
 #[allow(clippy::too_many_arguments)]
+/// Failures returned by the validated energy-scheduling scenario runner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScenarioError {
+    InvalidTimeStep,
+    InvalidHorizon,
+    InvalidStartHour,
+    InvalidTariff,
+    InvalidBatteryConfiguration,
+    InvalidProfile,
+    InvalidSetpoint,
+    SimultaneousChargeAndDischarge,
+    NonFiniteResult,
+}
+
+/// Compatibility wrapper for callers that already supply trusted, valid
+/// scenarios. Untrusted or generated scenario inputs should use
+/// try_run_scenario so invalid data is reported instead of panicking or
+/// hanging the simulator.
+#[allow(clippy::too_many_arguments)]
 pub fn run_scenario(
     battery: &mut Battery,
     tariff: &TariffSchedule,
@@ -86,43 +112,183 @@ pub fn run_scenario(
     total_hours: f64,
     start_hour: f64,
     grid_available: bool,
-    mut policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
+    policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
 ) -> ScenarioResult {
+    try_run_scenario(
+        battery,
+        tariff,
+        load_profile,
+        generation_profile,
+        dt_hours,
+        total_hours,
+        start_hour,
+        grid_available,
+        policy,
+    )
+    .unwrap_or_else(|error| panic!("invalid energy scheduling scenario: {error:?}"))
+}
+
+/// Run a validated scenario atomically with respect to battery state.
+///
+/// The runner rejects invalid time steps, invalid profiles and non-finite
+/// control outputs; it prevents a zero timestep from creating an infinite
+/// loop; it uses a shorter final step when the horizon is not divisible by
+/// dt; and it reports only the equivalent-full-cycle increment caused by
+/// this scenario. Battery state is committed back to the caller only when
+/// the complete scenario succeeds.
+#[allow(clippy::too_many_arguments)]
+pub fn try_run_scenario(
+    battery: &mut Battery,
+    tariff: &TariffSchedule,
+    load_profile: impl Fn(f64) -> f64,
+    generation_profile: impl Fn(f64) -> f64,
+    dt_hours: f64,
+    total_hours: f64,
+    start_hour: f64,
+    grid_available: bool,
+    mut policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
+) -> Result<ScenarioResult, ScenarioError> {
+    if !dt_hours.is_finite() || dt_hours <= 0.0 {
+        return Err(ScenarioError::InvalidTimeStep);
+    }
+    if !total_hours.is_finite() || total_hours < 0.0 {
+        return Err(ScenarioError::InvalidHorizon);
+    }
+    if !start_hour.is_finite() {
+        return Err(ScenarioError::InvalidStartHour);
+    }
+
+    let tariff_values = [
+        tariff.off_peak_price_per_kwh,
+        tariff.peak_price_per_kwh,
+        tariff.peak_start_hour,
+        tariff.peak_end_hour,
+        tariff.export_price_per_kwh,
+    ];
+    if !tariff_values.iter().all(|value| value.is_finite())
+        || !(0.0..24.0).contains(&tariff.peak_start_hour)
+        || !(0.0..24.0).contains(&tariff.peak_end_hour)
+    {
+        return Err(ScenarioError::InvalidTariff);
+    }
+
+    let battery_values = [
+        battery.capacity_kwh,
+        battery.power_rating_kw,
+        battery.round_trip_efficiency,
+        battery.soc(),
+        battery.state_of_health(),
+        battery.effective_capacity_kwh(),
+        battery.equivalent_full_cycles(),
+    ];
+    if !battery_values.iter().all(|value| value.is_finite())
+        || battery.capacity_kwh < 0.0
+        || battery.power_rating_kw < 0.0
+        || !(0.0..=1.0).contains(&battery.round_trip_efficiency)
+        || !(0.0..=1.0).contains(&battery.soc())
+        || !(0.0..=1.0).contains(&battery.state_of_health())
+        || battery.effective_capacity_kwh() < 0.0
+        || battery.equivalent_full_cycles() < 0.0
+    {
+        return Err(ScenarioError::InvalidBatteryConfiguration);
+    }
+
+    // Work on a clone so a later bad profile or policy output cannot leave
+    // the caller's battery partially mutated by an unsuccessful scenario.
+    let mut working_battery = battery.clone();
+    let initial_cycles = working_battery.equivalent_full_cycles();
     let mut elapsed = 0.0;
     let mut total_cost = 0.0;
     let mut unserved_energy_kwh = 0.0;
+
     while elapsed < total_hours {
+        let remaining_hours = total_hours - elapsed;
+        let step_hours = dt_hours.min(remaining_hours);
+        let final_step = dt_hours >= remaining_hours;
+        if !final_step && elapsed + step_hours <= elapsed {
+            // Extremely small dt relative to a very large horizon can stop
+            // floating-point time from advancing, which would otherwise loop
+            // forever. The clone keeps the caller's state unchanged on error.
+            return Err(ScenarioError::InvalidTimeStep);
+        }
+
         let t = start_hour + elapsed;
+        if !t.is_finite() {
+            return Err(ScenarioError::InvalidStartHour);
+        }
         let load_kw = load_profile(t);
         let generation_kw = generation_profile(t);
-        let (charge_cmd_kw, discharge_cmd_kw) = policy(t, load_kw, generation_kw, battery);
-        let charge_kw = charge_cmd_kw.clamp(0.0, battery.power_rating_kw);
-        let discharge_kw = discharge_cmd_kw.clamp(0.0, battery.power_rating_kw);
-        let _ = battery.charge(charge_kw, dt_hours);
-        let discharge_delivered_ac_kwh = battery.discharge(discharge_kw, dt_hours).unwrap_or(0.0);
-        let served_kw_from_battery = discharge_delivered_ac_kwh / dt_hours;
-        // Power balance: local demand is load PLUS whatever the battery is
-        // drawing to charge; local supply is generation PLUS battery
-        // discharge. Omitting charge_kw here previously double-counted
-        // surplus generation as export credit even while that same surplus
-        // was simultaneously being routed into the battery.
-        let net_kw = (load_kw + charge_kw) - (generation_kw + served_kw_from_battery);
+        if !load_kw.is_finite()
+            || load_kw < 0.0
+            || !generation_kw.is_finite()
+            || generation_kw < 0.0
+        {
+            return Err(ScenarioError::InvalidProfile);
+        }
+
+        let (charge_cmd_kw, discharge_cmd_kw) =
+            policy(t, load_kw, generation_kw, &working_battery);
+        if !charge_cmd_kw.is_finite()
+            || charge_cmd_kw < 0.0
+            || !discharge_cmd_kw.is_finite()
+            || discharge_cmd_kw < 0.0
+        {
+            return Err(ScenarioError::InvalidSetpoint);
+        }
+        let charge_kw = charge_cmd_kw.clamp(0.0, working_battery.power_rating_kw);
+        let discharge_kw = discharge_cmd_kw.clamp(0.0, working_battery.power_rating_kw);
+        if charge_kw > 0.0 && discharge_kw > 0.0 {
+            return Err(ScenarioError::SimultaneousChargeAndDischarge);
+        }
+
+        let charge_accepted_dc_kwh = working_battery
+            .charge(charge_kw, step_hours)
+            .map_err(|_| ScenarioError::InvalidBatteryConfiguration)?;
+        let one_way_efficiency = working_battery.round_trip_efficiency.sqrt();
+        let actual_charge_kw = if step_hours > 0.0 && one_way_efficiency > 0.0 {
+            charge_accepted_dc_kwh / one_way_efficiency / step_hours
+        } else {
+            0.0
+        };
+        let discharge_delivered_ac_kwh = working_battery
+            .discharge(discharge_kw, step_hours)
+            .map_err(|_| ScenarioError::InvalidBatteryConfiguration)?;
+        let served_kw_from_battery = discharge_delivered_ac_kwh / step_hours;
+
+        // Use accepted charge energy, not the requested setpoint, in the
+        // balance. A full battery must not appear to consume its requested
+        // charging power when it accepted no energy.
+        let net_kw = (load_kw + actual_charge_kw) - (generation_kw + served_kw_from_battery);
+        if !net_kw.is_finite() {
+            return Err(ScenarioError::NonFiniteResult);
+        }
         if net_kw > 0.0 {
             if grid_available {
-                total_cost += net_kw * dt_hours * tariff.import_price(t);
+                total_cost += net_kw * step_hours * tariff.import_price(t);
             } else {
-                unserved_energy_kwh += net_kw * dt_hours;
+                unserved_energy_kwh += net_kw * step_hours;
             }
         } else if grid_available {
-            total_cost -= (-net_kw) * dt_hours * tariff.export_price_per_kwh;
+            total_cost -= (-net_kw) * step_hours * tariff.export_price_per_kwh;
         }
-        elapsed += dt_hours;
+        if !total_cost.is_finite() || !unserved_energy_kwh.is_finite() {
+            return Err(ScenarioError::NonFiniteResult);
+        }
+
+        elapsed = if final_step {
+            total_hours
+        } else {
+            elapsed + step_hours
+        };
     }
-    ScenarioResult {
+
+    let result = ScenarioResult {
         total_cost,
         unserved_energy_kwh,
-        battery_cycles: battery.equivalent_full_cycles(),
-    }
+        battery_cycles: working_battery.equivalent_full_cycles() - initial_cycles,
+    };
+    *battery = working_battery;
+    Ok(result)
 }
 
 /// Baseline: greedy self-consumption with no look-ahead and no reserve
@@ -379,4 +545,169 @@ mod tests {
         assert_eq!(charge, 0.0);
         assert_eq!(discharge, 15.0, "no reserve cap outside daytime hours");
     }
+    #[test]
+    fn test_tariff_supports_peak_windows_crossing_midnight() {
+        let tariff = TariffSchedule {
+            peak_start_hour: 22.0,
+            peak_end_hour: 6.0,
+            ..default_tariff()
+        };
+        assert_eq!(tariff.import_price(23.0), tariff.peak_price_per_kwh);
+        assert_eq!(tariff.import_price(2.0), tariff.peak_price_per_kwh);
+        assert_eq!(tariff.import_price(12.0), tariff.off_peak_price_per_kwh);
+    }
+
+    #[test]
+    fn test_try_runner_rejects_invalid_time_steps_without_mutating_battery() {
+        let tariff = default_tariff();
+        for dt_hours in [0.0, -0.25, f64::NAN, f64::INFINITY] {
+            let mut battery = Battery::new(10.0, 5.0, 0.9).with_soc(0.6);
+            let before_soc = battery.soc();
+            let result = try_run_scenario(
+                &mut battery,
+                &tariff,
+                |_t| 1.0,
+                |_t| 0.0,
+                dt_hours,
+                1.0,
+                0.0,
+                true,
+                |_t, _load, _generation, _battery| (0.0, 0.0),
+            );
+            assert_eq!(result, Err(ScenarioError::InvalidTimeStep));
+            assert_eq!(battery.soc(), before_soc);
+        }
+    }
+
+    #[test]
+    fn test_try_runner_rejects_invalid_horizon() {
+        let tariff = default_tariff();
+        for total_hours in [-1.0, f64::NAN, f64::INFINITY] {
+            let mut battery = Battery::new(10.0, 5.0, 0.9);
+            let result = try_run_scenario(
+                &mut battery,
+                &tariff,
+                |_t| 1.0,
+                |_t| 0.0,
+                0.25,
+                total_hours,
+                0.0,
+                true,
+                |_t, _load, _generation, _battery| (0.0, 0.0),
+            );
+            assert_eq!(result, Err(ScenarioError::InvalidHorizon));
+        }
+    }
+
+    #[test]
+    fn test_non_divisible_horizon_uses_a_short_final_step() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(0.0, 0.0, 1.0);
+        let result = run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 1.0,
+            |_t| 0.0,
+            0.6,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (0.0, 0.0),
+        );
+        assert!(
+            (result.total_cost - 0.1).abs() < 1e-9,
+            "1 kW for exactly 1 hour should cost 0.10, got {}",
+            result.total_cost
+        );
+    }
+
+    #[test]
+    fn test_full_battery_does_not_draw_unaccepted_charge_power() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 1.0).with_soc(1.0);
+        let result = run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 0.0,
+            |_t| 5.0,
+            1.0,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (5.0, 0.0),
+        );
+        assert!(
+            (result.total_cost + 0.25).abs() < 1e-9,
+            "surplus from a full battery should be exportable, got {}",
+            result.total_cost
+        );
+    }
+
+    #[test]
+    fn test_result_reports_only_cycles_accumulated_in_this_scenario() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 1.0).with_soc(0.5);
+        battery.charge(5.0, 1.0).unwrap();
+        battery.discharge(5.0, 1.0).unwrap();
+        assert!(battery.equivalent_full_cycles() > 0.0);
+
+        let result = run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 0.0,
+            |_t| 0.0,
+            1.0,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (0.0, 0.0),
+        );
+        assert_eq!(result.battery_cycles, 0.0);
+    }
+
+    #[test]
+    fn test_invalid_profile_is_rejected_without_committing_partial_battery_state() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 0.9).with_soc(0.5);
+        let before_soc = battery.soc();
+        let before_cycles = battery.equivalent_full_cycles();
+        let result = try_run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| f64::NAN,
+            |_t| 0.0,
+            0.25,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (0.0, 1.0),
+        );
+        assert_eq!(result, Err(ScenarioError::InvalidProfile));
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
+    }
+
+    #[test]
+    fn test_simultaneous_charge_and_discharge_is_rejected_atomically() {
+        let tariff = default_tariff();
+        let mut battery = Battery::new(10.0, 5.0, 0.9).with_soc(0.5);
+        let before_soc = battery.soc();
+        let result = try_run_scenario(
+            &mut battery,
+            &tariff,
+            |_t| 1.0,
+            |_t| 1.0,
+            0.25,
+            1.0,
+            0.0,
+            true,
+            |_t, _load, _generation, _battery| (1.0, 1.0),
+        );
+        assert_eq!(
+            result,
+            Err(ScenarioError::SimultaneousChargeAndDischarge)
+        );
+        assert_eq!(battery.soc(), before_soc);
+    }
+
 }
