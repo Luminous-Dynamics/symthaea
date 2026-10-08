@@ -513,6 +513,9 @@ fn noncanonical_outer_wire_changes_only_wire_capability_identity() {
     let noncanonical_outer =
         Rfc9942SignatureWithReceipts::from_cbor(&noncanonical_wire).unwrap();
     assert_eq!(noncanonical_outer.to_cbor(), noncanonical_wire);
+    // Top-level CBOR framing is not part of the semantic fields compared by
+    // this structural type; exact wire identity is carried separately.
+    assert_eq!(canonical_outer, noncanonical_outer);
 
     let (canonical_verified, canonical_selection) = canonical_outer
         .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
