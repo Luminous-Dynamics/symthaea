@@ -586,8 +586,6 @@ pub struct MeasurementModelInputSpecificationRef {
     pub specification_revision: String,
     /// Digest of the exact authoritative input specification record.
     pub specification_digest: String,
-                    quantity_definition: None,
-                    unit_definition: None,
     /// Optional exact machine-readable quantity definition bound by the authoritative specification.
     ///
     /// Symthaea treats this as an opaque external reference. It does not parse,
