@@ -728,6 +728,16 @@ impl NixPostStateReceiptV1 {
             .clone()
             .ok_or(NixPostStateErrorV1::MissingManagerOwner)?;
 
+        if let Some(context) = intent.service_effect_context() {
+            let observed_bus_id = observation
+                .systemd_bus_id
+                .as_deref()
+                .ok_or(NixPostStateErrorV1::BusIncarnationMismatch)?;
+            if observed_bus_id != context.authorized_bus_id {
+                return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+            }
+        }
+
         if let Some(stability) = stability {
             let stability = stability.as_ref();
             stability.validate_shape()?;
