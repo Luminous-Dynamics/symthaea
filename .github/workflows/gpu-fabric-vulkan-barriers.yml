@@ -84,11 +84,12 @@ jobs:
             echo "runner_name=$RUNNER_NAME"
             rustc -Vv
             cargo -V
+            gdb --version | head -n 1
             echo "--- vulkaninfo --summary ---"
             vulkaninfo --summary
           } > qualification-environment.txt
           dpkg-query -W -f='${Package}\t${Version}\n' \
-            libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers \
+            libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers gdb \
             > vulkan-package-versions.txt
           find src -type f -print0 | sort -z | xargs -0 sha256sum > source-sha256.txt
           sha256sum Cargo.toml Cargo.lock metadata.json vulkan-package-versions.txt > qualification-input-sha256.txt
