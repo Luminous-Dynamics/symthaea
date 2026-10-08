@@ -1035,7 +1035,7 @@ fn completion_lowering_digest(
     queue_family_index: u32,
 ) -> String {
     let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v2\0");
+    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v3\0");
     h.update(b"semaphore-type:timeline\0");
     h.update(b"initial-value:0\0");
     h.update(b"recording-policy:single-primary-command-buffer\0");
@@ -1054,6 +1054,12 @@ fn completion_lowering_digest(
     h.update(&1_u32.to_le_bytes()); // command-buffer device mask
     h.update(&completion_expected.to_le_bytes());
     h.update(&(plan.submissions.len() as u32).to_le_bytes());
+    for submission in &plan.submissions {
+        h.update(&submission.node_id.to_le_bytes());
+        h.update(&submission.ordinal.to_le_bytes());
+        h.update(&submission.queue.get().to_le_bytes());
+        h.update(&submission.signal.value.to_le_bytes());
+    }
     h.update(&1_u32.to_le_bytes()); // command-buffer count
     h.update(&1_u32.to_le_bytes()); // queue-submit batch count
     h.update(&1_u32.to_le_bytes()); // final signal count
@@ -1812,6 +1818,15 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             )
+        );
+
+        let (_, _, mut tampered_plan, _) = fixture();
+        let expected = expected_final_timeline_value(&tampered_plan);
+        let baseline = completion_lowering_digest(&tampered_plan, expected, 0);
+        tampered_plan.submissions[0].signal.value += 9;
+        assert_ne!(
+            baseline,
+            completion_lowering_digest(&tampered_plan, expected, 0)
         );
     }
 
