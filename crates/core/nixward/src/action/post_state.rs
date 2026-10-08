@@ -99,6 +99,9 @@ pub struct NixSystemdJobEvidenceV1 {
     /// this value prevents a durable receipt from collapsing two systemd
     /// manager incarnations that happen to reuse other job identifiers.
     pub manager_owner: String,
+    /// D-Bus daemon incarnation for this Job evidence.
+    #[serde(default)]
+    pub bus_id: Option<String>,
     /// Job object path returned by systemd.
     pub object_path: String,
     /// systemd JobRemoved result. Only the exact `done` value is accepted as
@@ -118,6 +121,9 @@ impl NixSystemdJobEvidenceV1 {
             return Err(NixPostStateErrorV1::InvalidJobUnit);
         }
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         require_nonempty(&self.object_path, "systemd job object path")?;
         if !self
             .object_path
@@ -258,6 +264,9 @@ pub struct NixServicePostStateObservationV1 {
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
     pub systemd_manager_owner: Option<String>,
+    /// D-Bus daemon incarnation observed with this service state.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -282,10 +291,18 @@ impl NixServicePostStateObservationV1 {
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
         }
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
                 return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
+            }
+            if let Some(job_bus_id) = job.bus_id.as_deref() {
+                if self.systemd_bus_id.as_deref() != Some(job_bus_id) {
+                    return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+                }
             }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
@@ -325,6 +342,9 @@ pub struct NixPostStateStabilitySampleV1 {
     pub definition_content_digest: String,
     pub state_digest: String,
     pub manager_owner: String,
+    /// D-Bus daemon incarnation for this stability sample.
+    #[serde(default)]
+    pub bus_id: Option<String>,
     pub invocation_id: Option<String>,
     pub state_change_at_monotonic_us: u64,
     pub captured_at_monotonic_us: u64,
@@ -345,6 +365,9 @@ impl NixPostStateStabilitySampleV1 {
         )?;
         validate_digest(&self.state_digest, "stability state digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
         if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
@@ -364,6 +387,7 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
+        put_opt_str(&mut h, self.bus_id.as_deref());
         put_opt_str(&mut h, self.invocation_id.as_deref());
         put_u64(&mut h, self.state_change_at_monotonic_us);
         put_u64(&mut h, self.captured_at_monotonic_us);
@@ -430,6 +454,7 @@ impl NixPostStateStabilityEvidenceV1 {
                 || sample.definition_digest != first.definition_digest
                 || sample.state_digest != first.state_digest
                 || sample.manager_owner != first.manager_owner
+                || sample.bus_id != first.bus_id
                 || sample.invocation_id != first.invocation_id
                 || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
             {
