@@ -1909,57 +1909,6 @@ def test_clock_source_response_binds_exact_challenge():
     forged = ClockRelationEvidenceV1(
         **{**relation.evidence.__dict__, "source_response": altered},
     )
-    assert not forged.internally_consistent()
-
-
-def test_clock_source_attestation_binds_exact_response():
-    relation = clock_relation_fixture()
-    altered = ClockRelationSourceAttestationV1(
-        **{**relation.evidence.source_attestation.__dict__, "response_digest": "forged"},
-    )
-    assert not altered.internally_consistent(
-        relation.evidence.source_challenge,
-        relation.evidence.source_response,
-    )
-
-
-def test_clock_source_attestation_rejects_unverified_signature():
-    relation = clock_relation_fixture(verified=False)
-    assert not relation.usable(1791475195000, 1791475205000)
-
-
-def test_clock_source_challenge_rejects_wrong_nonce_length():
-    challenge = ClockRelationSourceChallengeV1(
-        challenge_id="c",
-        operation_identity_digest="op",
-        nonce_hex="11",
-        issued_local_time_ms=1,
-        expires_local_time_ms=2,
-        trust_anchor_id="anchor",
-    )
-    assert not challenge.internally_consistent()
-
-
-def test_clock_source_challenge_rejects_zero_nonce():
-    challenge = ClockRelationSourceChallengeV1(
-        challenge_id="c",
-        operation_identity_digest="op",
-        nonce_hex="00" * 32,
-        issued_local_time_ms=1,
-        expires_local_time_ms=2,
-        trust_anchor_id="anchor",
-    )
-    assert not challenge.internally_consistent()
-
-
-def test_clock_source_response_binds_exact_challenge():
-    relation = clock_relation_fixture()
-    altered = ClockRelationSourceResponseV1(
-        **{**relation.evidence.source_response.__dict__, "challenge_digest": "forged"},
-    )
-    forged = ClockRelationEvidenceV1(
-        **{**relation.evidence.__dict__, "source_response": altered},
-    )
     assert forged.classify_source() == "clock-relation-source-response-mismatch"
 
 
