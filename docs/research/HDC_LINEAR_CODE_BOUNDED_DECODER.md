@@ -129,10 +129,11 @@ small random regime: `[12,4]`, `[16,8]`, and `[20,3]`. For each code, the comple
 enumerated directly by checking
 orthogonality against the generator basis. Every production parity-check row must occur in that brute-force dual space, and the
 complete XOR-span of the production check rows must equal the independently enumerated dual space
-element-for-element. The production zero-syndrome kernel is also exhaustively checked against the
-code. This does not reconstruct (H) by the same nullspace-elimination procedure; it instead
-establishes exact equality between the production check-row span and the independently enumerated
-dual code.
+element-for-element. The production zero-syndrome kernel is also exhaustively compared element-for-element with
+the independently reconstructed codeword set. This does not reconstruct (H) by the same
+nullspace-elimination procedure; it instead establishes exact equality between the production
+check-row span and the independently enumerated dual code while separately binding the kernel to an
+independent codeword reconstruction.
 
 
 The randomized qualification surface now probes deterministic observations from the
