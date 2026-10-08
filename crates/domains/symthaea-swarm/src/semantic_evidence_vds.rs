@@ -1278,12 +1278,6 @@ impl Rfc9942SignatureWithReceipts {
         &self.payload
     }
 
-    /// Exact serialized outer COSE_Sign1 wire; parsed objects retain source
-    /// bytes while newly constructed objects use deterministic encoding.
-    pub fn serialized_bytes(&self) -> Vec<u8> {
-        self.to_cbor()
-    }
-
     pub fn protected_header_bytes(&self) -> Vec<u8> {
         self.protected_bytes.as_deref().map_or_else(
             || {
