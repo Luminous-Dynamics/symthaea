@@ -120,6 +120,19 @@ properties.
 
 ## Random-code list qualification and independent parity-check oracle
 
+The randomized qualification surface uses a test-side parity-check construction based on u64
+nullspace elimination, which is intentionally separate from the production constructor. The
+resulting syndrome is compared directly with the production parity-check syndrome for every probe.
+
+A stronger algebraic-independence witness now covers one deterministic code in each small random
+regime: for `[12,4]` and `[20,3]`, the complete dual space is enumerated directly by checking
+orthogonality against the generator basis. Every production parity-check row must occur in that
+brute-force dual space, the production rows must have rank (n-k), and the production
+zero-syndrome kernel is exhaustively checked against the code. This does not reconstruct (H) by
+the same nullspace-elimination procedure; it instead establishes that the production checks are a
+full-rank subset of the independently enumerated dual code.
+
+
 The randomized qualification surface now probes deterministic observations from the
 existing moderate-rate and low-rate regimes, using an independent test-side
 parity-check construction based on u64 nullspace elimination. It does not call the
