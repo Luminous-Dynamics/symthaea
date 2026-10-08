@@ -120,6 +120,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd invocation ID changed during definition capture")]
     InvocationIdChanged,
 
+    #[error("post InvocationID resolved to a different Unit object")]
+    InvocationIdUnitObjectMismatch,
+
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
 
@@ -878,6 +881,44 @@ impl NixSystemdReadOnlyObserverV1 {
             return Err(NixSystemdObserverErrorV1::InvalidInvocationId);
         }
         Ok(path)
+    }
+
+    /// Resolve a post InvocationID and bind it to the exact observed Unit object
+    /// while requiring the same systemd manager owner and D-Bus daemon incarnation.
+    pub async fn resolve_invocation_id_for_observed_unit(
+        &self,
+        invocation_id: &[u8],
+        expected_unit: &str,
+        expected_unit_object_path: &OwnedObjectPath,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<(), NixSystemdObserverErrorV1> {
+        let before_owner = self.systemd_manager_owner().await?;
+        let before_bus_id = self.dbus_bus_id().await?;
+        if before_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if before_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let resolved = self
+            .resolve_invocation_id(invocation_id, expected_unit)
+            .await?;
+        if resolved.as_str() != expected_unit_object_path.as_str() {
+            return Err(NixSystemdObserverErrorV1::InvocationIdUnitObjectMismatch);
+        }
+
+        let after_owner = self.systemd_manager_owner().await?;
+        let after_bus_id = self.dbus_bus_id().await?;
+        if after_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if after_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        Ok(())
     }
 
     async fn observe_service_post_state_internal(
