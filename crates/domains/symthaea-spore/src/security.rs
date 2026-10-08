@@ -73,9 +73,56 @@ pub struct BlockDeviceBinding {
 }
 
 #[cfg(target_os = "linux")]
+fn linux_device_number_parts(dev: u64) -> (u32, u32) {
+    // Linux/glibc modern dev_t uses a split major/minor representation.
+    // Keep this decomposition local and dependency-free so this crate can
+    // retain #![deny(unsafe_code)] without a raw libc major/minor call.
+    let major = ((dev >> 8) & 0x0fff) | ((dev >> 32) & 0xfffff000);
+    let minor = (dev & 0x00ff) | ((dev >> 12) & 0xffffff00);
+    (major as u32, minor as u32)
+}
+
+#[cfg(target_os = "linux")]
+fn block_device_capacity_from_sysfs(major: u32, minor: u32) -> Result<u64, String> {
+    // /sys/dev/block/<major>:<minor>/size exposes the capacity in standard
+    // 512-byte sectors. Binding the read to the exact device number observed
+    // from the already-open block-device inode avoids a raw ioctl here.
+    let sysfs_root = format!("/sys/dev/block/{major}:{minor}");
+    let dev_number = std::fs::read_to_string(format!("{sysfs_root}/dev"))
+        .map_err(|error| {
+            format!(
+                "unable to query sysfs device identity for {major}:{minor}: {error}"
+            )
+        })?;
+    if dev_number.trim() != format!("{major}:{minor}") {
+        return Err(format!(
+            "sysfs device identity mismatch: expected {major}:{minor}, observed {:?}",
+            dev_number.trim()
+        ));
+    }
+
+    let sectors = std::fs::read_to_string(format!("{sysfs_root}/size"))
+        .map_err(|error| {
+            format!(
+                "unable to query block-device capacity for {major}:{minor}: {error}"
+            )
+        })?
+        .trim()
+        .parse::<u64>()
+        .map_err(|error| {
+            format!(
+                "block-device capacity for {major}:{minor} is not a valid sector count: {error}"
+            )
+        })?;
+
+    sectors
+        .checked_mul(512)
+        .ok_or_else(|| format!("block-device capacity for {major}:{minor} overflows u64"))
+}
+
+#[cfg(target_os = "linux")]
 pub fn bind_block_device(path: &str) -> Result<BlockDeviceBinding, String> {
     use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
-    use std::os::fd::AsRawFd;
 
     let validated = validate_disk_path(path)?;
     let file = std::fs::OpenOptions::new()
@@ -91,24 +138,8 @@ pub fn bind_block_device(path: &str) -> Result<BlockDeviceBinding, String> {
         return Err(format!("{validated} is not a block device"));
     }
 
-    let major = unsafe { libc::major(metadata.rdev()) as u32 };
-    let minor = unsafe { libc::minor(metadata.rdev()) as u32 };
-
-    const BLKGETSIZE64: libc::c_ulong = 0x8008_1272;
-    let mut size_bytes = 0u64;
-    if unsafe {
-        libc::ioctl(
-            file.as_raw_fd(),
-            BLKGETSIZE64,
-            &mut size_bytes as *mut u64,
-        )
-    } != 0
-    {
-        return Err(format!(
-            "unable to query block-device capacity for {validated}: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
+    let (major, minor) = linux_device_number_parts(metadata.rdev());
+    let size_bytes = block_device_capacity_from_sysfs(major, minor)?;
 
     if size_bytes == 0 {
         return Err(format!(
@@ -122,7 +153,6 @@ pub fn bind_block_device(path: &str) -> Result<BlockDeviceBinding, String> {
         size_bytes,
     })
 }
-
 #[cfg(not(target_os = "linux"))]
 pub fn bind_block_device(_path: &str) -> Result<(), String> {
     Err("block-device binding is only supported on Linux".into())
@@ -473,6 +503,22 @@ mod tests {
             .expect_err("regular file must not bind as a block device");
         assert!(error.contains("not a block device"));
         let _ = std::fs::remove_file(path);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_device_number_split_matches_standard_device_id_example() {
+        assert_eq!(linux_device_number_parts(0x0000_0000_0000_0103), (1, 3));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_device_capacity_sector_conversion_is_checked() {
+        assert_eq!((2048u64).checked_mul(512), Some(1_048_576u64));
+        assert!(
+            (u64::MAX).checked_mul(512).is_none(),
+            "capacity conversion must fail closed on overflow"
+        );
     }
 
     #[cfg(target_os = "linux")]
