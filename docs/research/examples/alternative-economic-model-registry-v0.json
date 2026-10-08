@@ -106,6 +106,41 @@
       "classification": "architecture",
       "primary_divergence": "Separate community land stewardship from use/occupancy rights to preserve long-term affordability and collective land control.",
       "parent_model_id": null
+    },
+    {
+      "model_id": "mutual-credit-v0",
+      "name": "Mutual Credit / Credit-Clearing Networks",
+      "classification": "architecture",
+      "primary_divergence": "Credit is created and extinguished through reciprocal multilateral obligations within a bounded network rather than primarily through bank-issued national money.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "demurrage-money-v0",
+      "name": "Demurrage / Gesellian Money",
+      "classification": "architecture",
+      "primary_divergence": "The monetary instrument carries an explicit holding cost intended to reduce hoarding and alter liquidity, spending, and rent dynamics.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "private-currency-competition-v0",
+      "name": "Competitive Private Money / Denationalized Currency",
+      "classification": "architecture",
+      "primary_divergence": "Multiple privately issued monies compete for adoption and settlement rather than relying on a single sovereign currency.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "retail-cbdc-v0",
+      "name": "Retail CBDC / Direct Central-Bank Money",
+      "classification": "architecture",
+      "primary_divergence": "The public can hold digital central-bank money directly, changing the relationship among payments, deposits, bank funding, and monetary policy.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "sovereign-grassroots-currencies-v0",
+      "name": "Sovereign Grassroots Currencies",
+      "classification": "architecture",
+      "primary_divergence": "A CBDC architecture composes sovereign money, non-sovereign grassroots credit instruments, and interest-bearing bonds in a shared monetary framework.",
+      "parent_model_id": null
     }
   ],
   "notes": [
