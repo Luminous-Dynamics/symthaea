@@ -59,8 +59,16 @@ fn privileged_process(program: &str) -> tokio::process::Command {
 }
 
 fn privileged_nix_process(program: &str) -> Result<tokio::process::Command, std::io::Error> {
-    let mut command = trusted_typed_process(program)
+    let command = trusted_typed_process(program)
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::PermissionDenied, error))?;
+    Ok(command)
+}
+
+/// nixos-rebuild intentionally needs the installed NixOS configuration and
+/// root channel. Keep that dependency scoped to this exact effect instead of
+/// making it part of generic Nix execution.
+fn privileged_nixos_rebuild_process() -> Result<tokio::process::Command, std::io::Error> {
+    let mut command = privileged_nix_process("nixos-rebuild")?;
     command.env(
         "NIX_PATH",
         "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
@@ -68,11 +76,10 @@ fn privileged_nix_process(program: &str) -> Result<tokio::process::Command, std:
     Ok(command)
 }
 
-async fn run_privileged_nix_args(
-    program: &str,
+async fn run_privileged_nixos_rebuild_args(
     args: &[&str],
 ) -> Result<CmdResult, std::io::Error> {
-    let mut command = privileged_nix_process(program)?;
+    let mut command = privileged_nixos_rebuild_process()?;
     command.args(args);
     let output = command.output().await?;
     Ok(CmdResult {
@@ -8617,7 +8624,7 @@ echo '}'
                     transaction.log_line(),
                     previous_generation
                 );
-                match run_privileged_nix_args("nixos-rebuild", &["switch", "--rollback"]).await {
+                match run_privileged_nixos_rebuild_args(&["switch", "--rollback"]).await {
                     Ok(r) => {
                         let observed_outcome = if r.exit_status == 0 {
                             match current_system_generation().await {
@@ -9547,7 +9554,7 @@ echo '}'
                     ))
                     .await;
 
-                let rebuild_result = run_privileged_nix_args("nixos-rebuild", &["switch"]).await;
+                let rebuild_result = run_privileged_nixos_rebuild_args(&["switch"]).await;
 
                 let (exit_code, observed_outcome, retain_swap) = match rebuild_result {
                     Ok(result) if result.exit_status == 0 => {
