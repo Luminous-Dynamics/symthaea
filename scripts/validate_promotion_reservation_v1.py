@@ -663,6 +663,7 @@ class ClockRelationSourceResponseV1:
     uncertainty_radius_ms: int
     response_id: str
     response_payload_digest: str
+    signed_payload_digest: str
     trust_anchor_id: str
 
     def canonical_bytes(self) -> bytes:
@@ -672,6 +673,7 @@ class ClockRelationSourceResponseV1:
             "provider_time_ms": self.provider_time_ms,
             "response_id": self.response_id,
             "response_payload_digest": self.response_payload_digest,
+            "signed_payload_digest": self.signed_payload_digest,
             "trust_anchor_id": self.trust_anchor_id,
             "uncertainty_radius_ms": self.uncertainty_radius_ms,
         }
@@ -693,6 +695,8 @@ class ClockRelationSourceResponseV1:
             and self.uncertainty_radius_ms >= 0
             and bool(self.response_id)
             and bool(self.response_payload_digest)
+            and bool(self.signed_payload_digest)
+            and len(self.signed_payload_digest) == 64
             and bool(self.trust_anchor_id)
         )
 
@@ -701,26 +705,36 @@ class ClockRelationSourceResponseV1:
 class ClockRelationSourceAttestationV1:
     challenge_digest: str
     response_digest: str
+    signed_payload_digest: str
+    signature_digest: str
+    public_key_digest: str
+    signature_algorithm: str
+    signature_context: str
+    key_role: str
     trust_anchor_id: str
     verifier_identity: str
+    verifier_implementation_digest: str
     verifier_policy_digest: str
     verified_at_local_time_ms: int
     verification_valid_until_local_time_ms: int
-    crypto_scheme: str
-    signature_verified: bool
-    decision: str = "accepted"
+    verification_result: str = "signature-valid"
 
     def canonical_bytes(self) -> bytes:
         payload = {
             "challenge_digest": self.challenge_digest,
-            "crypto_scheme": self.crypto_scheme,
-            "decision": self.decision,
+            "key_role": self.key_role,
+            "public_key_digest": self.public_key_digest,
+            "signature_algorithm": self.signature_algorithm,
+            "signature_context": self.signature_context,
+            "signature_digest": self.signature_digest,
+            "signed_payload_digest": self.signed_payload_digest,
             "response_digest": self.response_digest,
-            "signature_verified": self.signature_verified,
             "trust_anchor_id": self.trust_anchor_id,
             "verified_at_local_time_ms": self.verified_at_local_time_ms,
+            "verification_result": self.verification_result,
             "verification_valid_until_local_time_ms": self.verification_valid_until_local_time_ms,
             "verifier_identity": self.verifier_identity,
+            "verifier_implementation_digest": self.verifier_implementation_digest,
             "verifier_policy_digest": self.verifier_policy_digest,
         }
         return json.dumps(
@@ -741,13 +755,19 @@ class ClockRelationSourceAttestationV1:
         return (
             self.challenge_digest == challenge.digest()
             and self.response_digest == response.digest()
+            and self.signed_payload_digest == response.signed_payload_digest
+            and len(self.signed_payload_digest) == 64
+            and len(self.signature_digest) == 64
+            and len(self.public_key_digest) == 64
             and self.trust_anchor_id == challenge.trust_anchor_id
             and self.trust_anchor_id == response.trust_anchor_id
             and bool(self.verifier_identity)
+            and len(self.verifier_implementation_digest) == 64
             and bool(self.verifier_policy_digest)
-            and bool(self.crypto_scheme)
-            and self.signature_verified
-            and self.decision == "accepted"
+            and bool(self.signature_algorithm)
+            and bool(self.signature_context)
+            and bool(self.key_role)
+            and self.verification_result == "signature-valid"
             and self.verified_at_local_time_ms >= challenge.issued_local_time_ms
             and self.verified_at_local_time_ms <= self.verification_valid_until_local_time_ms
             and self.verification_valid_until_local_time_ms <= challenge.expires_local_time_ms
@@ -1852,19 +1872,25 @@ def clock_relation_fixture(
         uncertainty_radius_ms=max_skew_ms,
         response_id="clock-response-1",
         response_payload_digest="response-digest-1",
+        signed_payload_digest="55" * 32,
         trust_anchor_id="time-anchor-1",
     )
     attestation = ClockRelationSourceAttestationV1(
         challenge_digest=challenge.digest(),
         response_digest=response.digest(),
+        signed_payload_digest=response.signed_payload_digest,
+        signature_digest="22" * 32,
+        public_key_digest="33" * 32,
+        signature_algorithm="Ed25519",
+        signature_context="Roughtime v1 response signature",
+        key_role="online-response-key",
         trust_anchor_id="time-anchor-1",
         verifier_identity="clock-source-verifier-v1",
+        verifier_implementation_digest="44" * 32,
         verifier_policy_digest=verifier_policy_digest,
         verified_at_local_time_ms=verification_time_ms,
         verification_valid_until_local_time_ms=valid_until_local_time_ms,
-        crypto_scheme="external-signature-verified",
-        signature_verified=verified,
-        decision="accepted" if verified else "rejected",
+        verification_result="signature-valid" if verified else "signature-invalid",
     )
     evidence = ClockRelationEvidenceV1(
         source_origin="trusted-time-source",
@@ -2053,7 +2079,7 @@ def test_clock_source_response_binds_exact_challenge():
 def test_clock_source_attestation_binds_exact_response():
     relation = clock_relation_fixture()
     altered = ClockRelationSourceAttestationV1(
-        **{**relation.evidence.source_attestation.__dict__, "response_digest": "forged"},
+        **{**relation.evidence.source_attestation.__dict__, "signed_payload_digest": "forged"},
     )
     assert not altered.internally_consistent(
         relation.evidence.source_challenge,
@@ -2064,6 +2090,37 @@ def test_clock_source_attestation_binds_exact_response():
 def test_clock_source_attestation_rejects_unverified_signature():
     relation = clock_relation_fixture(verified=False)
     assert not relation.usable(1791475195000, 1791475205000)
+
+
+def test_clock_source_attestation_binds_exact_crypto_material():
+    relation = clock_relation_fixture()
+    original = relation.evidence.source_attestation
+    for field, value in (
+        ("signature_digest", "66" * 32),
+        ("public_key_digest", "77" * 32),
+        ("signature_algorithm", "ML-DSA-65"),
+        ("signature_context", "other-context"),
+        ("key_role", "long-term-key"),
+        ("verifier_identity", "verifier-v2"),
+        ("verifier_implementation_digest", "88" * 32),
+        ("verifier_policy_digest", "policy-v2"),
+    ):
+        altered = ClockRelationSourceAttestationV1(
+            **{**original.__dict__, field: value},
+        )
+        assert altered.digest() != original.digest()
+
+
+def test_clock_source_attestation_rejects_missing_crypto_material():
+    relation = clock_relation_fixture()
+    for field in ("signed_payload_digest", "signature_digest", "public_key_digest"):
+        altered = ClockRelationSourceAttestationV1(
+            **{**relation.evidence.source_attestation.__dict__, field: ""},
+        )
+        assert not altered.internally_consistent(
+            relation.evidence.source_challenge,
+            relation.evidence.source_response,
+        )
 
 
 def test_clock_relation_rejects_source_operation_identity_mismatch():
@@ -4749,6 +4806,8 @@ TESTS = [
     test_clock_source_response_binds_exact_challenge,
     test_clock_source_attestation_binds_exact_response,
     test_clock_source_attestation_rejects_unverified_signature,
+    test_clock_source_attestation_binds_exact_crypto_material,
+    test_clock_source_attestation_rejects_missing_crypto_material,
     test_clock_relation_rejects_source_operation_identity_mismatch,
     test_clock_relation_requires_provenance,
     test_clock_relation_rejects_mismatched_evidence_digest,
