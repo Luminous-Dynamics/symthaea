@@ -79,5 +79,27 @@
     "claims_are_conditional_simulations": true,
     "political_recommendation_authority": false,
     "universal_optimality_claim": false
+  },
+  "semantic_frontier": {
+    "id": "creditism-research-v0",
+    "retrieved_on": "2026-10-08",
+    "primary_current_sources": [
+      "https://common-planet.org/creditism",
+      "https://common-planet.org/creditism/architecture",
+      "https://common-planet.org/creditism/transition"
+    ],
+    "historical_sources": [
+      "https://common-planet.org/wp-content/uploads/2025/12/Creditism_-an-economic-evolution.pdf"
+    ],
+    "rule": "historical_profiles_are_not_silently_merged_into_current_profile",
+    "known_divergence": {
+      "community_credit": "Older 2025 working material permits personal CC direction to a person or group; current architecture says equal personal shares are directed toward groups/projects and only group accounts spend CC."
+    },
+    "unresolved_semantics": [
+      "contribution criteria",
+      "contribution verification",
+      "appeal process",
+      "exact Balance controller definition"
+    ]
   }
 }
