@@ -722,3 +722,109 @@ For example:
 This allows the laboratory to ask whether an observed effect belongs to the system family or to an orthogonal mechanism.
 
 That is a stronger causal question than simply comparing named ideologies.
+
+
+## Evidence / seriousness tiers
+
+The registry separates structural completeness from evidentiary maturity.
+
+### Tier A — specified + literature-grounded
+
+Enough institutional detail exists to build a model, and there is a meaningful research literature or empirical analogue.
+
+Examples:
+- Sovereign Money / 100%-Money;
+- Mutual Credit;
+- Market Socialism / cooperatives;
+- Islamic risk-sharing finance;
+- Polycentric Commons.
+
+### Tier B — specified architecture with active but incomplete empirical grounding
+
+The mechanism is sufficiently explicit to simulate, but evidence is narrower, implementation-specific, geographically bounded, or still developing.
+
+Examples:
+- Community Wealth Building;
+- Community Land Trusts / housing commons;
+- Demurrage Money;
+- Retail CBDC.
+
+### Tier C — frontier / preprint / emerging architecture
+
+The mechanism is newly specified or substantially novel, but independent replication and empirical validation are limited.
+
+Example:
+- Sovereign Grassroots Currencies.
+
+Tier C is testable but must not be presented as empirically established.
+
+### Tier D — insufficiently specified or primarily aspirational
+
+Examples include proposals where the allocation, ownership, governance, accounting, transition, or failure mechanism is left materially undefined.
+
+These can be tracked as research references, but they do not become executable first-class model profiles.
+
+## Explicit exclusions from first-class status
+
+Do not automatically add:
+
+- a single tax or subsidy;
+- a metric framework;
+- a generic "wellbeing economy" objective without institutional mechanics;
+- a technology (blockchain, AI, automation) without a distinct institutional architecture;
+- a specific company/network implementation when the mechanism is already represented by its parent architecture;
+- a slogan-level "resource-based economy" unless resource allocation, ownership, governance, accounting, transition, and failure semantics are explicitly specified;
+- cryptocurrency as one monolithic model.
+
+Cryptocurrencies can instead instantiate the **competitive private money** architecture with explicit issuer, consensus, supply, custody, settlement, and governance treatments.
+
+Stablecoins similarly belong as explicit private-money or settlement variants, not as a universal alternative-system category.
+
+## Registry anti-bias rule
+
+A model's representation budget must not determine its apparent performance.
+
+For paired experiments:
+
+- hold the real-sector state fixed;
+- hold shock timing fixed;
+- hold information availability fixed;
+- hold computational budget fixed where relevant;
+- vary only the declared mechanism;
+- record omissions as `underdetermined`, never silently substitute a mechanism from another model;
+- run the same adversarial battery;
+- preserve profile and scenario hashes.
+
+This prevents Creditism, planning, markets, or any other architecture from receiving hidden "default assumptions" simply because its implementation happens to be more mature.
+
+## New research frontier: composability
+
+The registry should evolve from a list of systems into a **typed mechanism algebra**.
+
+A model profile can be composed from orthogonal components:
+
+`money × ownership × allocation × governance × ecological`
+
+Examples:
+
+- Mutual Credit × Market Socialism × Polycentric Commons;
+- Sovereign Money × Cooperative Ownership;
+- Demurrage × Market Allocation;
+- Retail CBDC × conventional corporate ownership;
+- Creditism × Community Land Trusts;
+- Democratic Planning × Social Dividend;
+- any monetary architecture × Post-Growth constraints.
+
+Composition is valid only when the interfaces between mechanisms are explicitly specified.
+
+The laboratory should therefore distinguish:
+
+`standalone_model`
+vs
+`composed_regime`
+vs
+`policy_treatment`
+vs
+`empirical_observation`.
+
+This is likely to become more scientifically useful than increasing the number of named system families indefinitely.
