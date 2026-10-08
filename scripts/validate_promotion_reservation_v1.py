@@ -4154,6 +4154,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_clock_relation_requires_provenance,
+    test_clock_relation_rejects_mismatched_evidence_digest,
+    test_clock_relation_rejects_policy_drift,
+    test_clock_relation_rejects_revocation_epoch_drift,
+    test_clock_relation_rejects_verification_after_dispatch,
+    test_clock_relation_rejects_stale_relation,
+    test_clock_relation_rejects_expired_validity_before_observation,
+    test_clock_relation_accepts_exact_validity_and_freshness_boundaries,
+    test_clock_relation_digest_binds_all_three_evidence_layers,
     test_local_temporal_sequence_validates_monotonic_order,
     test_local_temporal_sequence_rejects_nonpositive_values,
     test_local_temporal_sequence_rejects_backward_dispatch,
