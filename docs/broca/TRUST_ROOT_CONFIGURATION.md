@@ -42,6 +42,8 @@ The integration used to maintain this repository does not currently expose branc
 
 Once configured, a successful `Broca / Independent Trust Anchor` status becomes a real merge prerequisite instead of merely an informative status.
 
+Treat that status as a decision-time observation, not a perpetual certificate. The verifier records the exact trusted checkout SHA and the live default-branch tip at both the start and final publication boundary; a root movement makes the result stale. Any promotion or release controller consuming the status should independently revalidate this currentness tuple rather than assuming an older success remains valid after the trust root or target base moves.
+
 ## Actions execution protection
 
 The trust workflow has write authority over commit statuses. GitHub's Actions workflow execution protections can independently restrict both who may trigger a workflow and which events are permitted; these controls sit outside the workflow file and therefore remain an external governance root.
