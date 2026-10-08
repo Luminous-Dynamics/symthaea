@@ -1,0 +1,14 @@
+{
+  "schema_version":"monetary-strategic-response-v1-execution",
+  "run_count":1080,
+  "obligation_count":3240,
+  "common_random_number_cells":30,
+  "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest":"4bc57a43b987026bb77fae1abd34aa5f9b4a29c1152f29e6b3124341b2ef57a6",
+  "completion_rate_by_policy":{"fixed_submission":0.4166666666666667,"liquidity_aware_stagger":0.4166666666666667,"critical_payment_acceleration":0.4166666666666667},
+  "system_completion_time_by_policy":{"fixed_submission":10.545454545454545,"liquidity_aware_stagger":12.763636363636364,"critical_payment_acceleration":12.618181818181819},
+  "critical_submission_delay_by_policy":{"fixed_submission":0.0,"liquidity_aware_stagger":0.5416666666666666,"critical_payment_acceleration":0.0},
+  "critical_obligation_latency_by_policy":{"fixed_submission":10.472727272727273,"liquidity_aware_stagger":10.654545454545454,"critical_payment_acceleration":5.145454545454545},
+  "mean_obligation_latency_by_policy":{"fixed_submission":7.9363636363636365,"liquidity_aware_stagger":8.042424242424243,"critical_payment_acceleration":8.460606060606061},
+  "claim_ceiling":"Local deterministic strategic-response reference execution only; no empirical behavioral/equilibrium claim."
+}
