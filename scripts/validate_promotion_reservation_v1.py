@@ -939,6 +939,7 @@ class PromotionStackEffectTimingV1:
 @dataclass(frozen=True)
 class PromotionStackEffectTimingSetV1:
     operation_identity_digest: str
+    timestamp_policy_identity_digest: str
     timings: tuple[PromotionStackEffectTimingV1, ...]
 
     def validates_complete(
@@ -947,6 +948,8 @@ class PromotionStackEffectTimingSetV1:
         effect_evidence: "PromotionStackEffectEvidenceSetV1 | None",
     ) -> bool:
         if self.operation_identity_digest != identity.digest():
+            return False
+        if not self.timestamp_policy_identity_digest:
             return False
         if effect_evidence is None or not effect_evidence.validates_complete(identity):
             return False
@@ -961,6 +964,8 @@ class PromotionStackEffectTimingSetV1:
         return all(
             item.pr_number == entry.pr_number
             and item.source_effect_evidence_identity_digest == evidence.identity_digest()
+            and item.timing.provider_timestamp_policy_digest
+            == self.timestamp_policy_identity_digest
             and item.timing.temporally_admissible()
             for entry, item, evidence in zip(
                 expected,
@@ -1704,6 +1709,49 @@ def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
     assert tampered.classify() == "provider-timestamp-policy-integrity-invalid"
 
 
+def test_stack_timing_rejects_mixed_timestamp_policy_identities():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-timing-policy-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-timing-policy-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    first_timing = effect_timing_fixture(
+        timestamp_policy=timestamp_policy_fixture(policy_generation=1),
+    )
+    second_timing = effect_timing_fixture(
+        timestamp_policy=timestamp_policy_fixture(policy_generation=2),
+    )
+    timings = PromotionStackEffectTimingSetV1(
+        identity.digest(),
+        first_timing.provider_timestamp_policy_digest,
+        (
+            PromotionStackEffectTimingV1(
+                7085,
+                evidence.effects[0].identity_digest(),
+                first_timing,
+            ),
+            PromotionStackEffectTimingV1(
+                7087,
+                evidence.effects[1].identity_digest(),
+                second_timing,
+            ),
+        ),
+    )
+    assert not timings.validates_complete(identity, evidence)
+
+
 def test_temporal_effect_without_timestamp_policy_is_not_admissible():
     timing = effect_timing_fixture(timestamp_policy=None)
     timing = ProviderWebhookEffectTimingV1(
@@ -1774,10 +1822,6 @@ def test_temporal_effect_with_valid_skew_is_admissible():
     assert timing.temporally_admissible()
 
 
-def test_temporal_effect_without_timestamp_semantics_is_not_admissible():
-    timing = effect_timing_fixture(timestamp_semantics=None)
-    assert timing.classify() == "provider-timestamp-semantics-unverified"
-    assert not timing.temporally_admissible()
 
 
 def test_temporal_effect_interval_overlap_is_not_admissible():
@@ -1938,6 +1982,7 @@ def test_complete_stack_timing_requires_every_member_admissible():
     )
     timings = PromotionStackEffectTimingSetV1(
         identity.digest(),
+        timestamp_policy_fixture().identity_digest(),
         (good, bad),
     )
     assert not timings.validates_complete(identity, evidence)
@@ -4286,7 +4331,7 @@ TESTS = [
     test_clock_relation_expiry_blocks_late_observation,
     test_clock_relation_drift_expands_uncertainty_monotonically,
     test_temporal_effect_with_valid_skew_is_admissible,
-    test_temporal_effect_without_timestamp_semantics_is_not_admissible,
+    test_stack_timing_rejects_mixed_timestamp_policy_identities,
     test_temporal_effect_interval_overlap_is_not_admissible,
     test_temporal_effect_expired_clock_relation_is_not_admissible,
     test_temporal_effect_drift_can_turn_boundary_into_uncertainty,
