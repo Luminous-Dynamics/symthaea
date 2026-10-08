@@ -9,7 +9,8 @@ permissions:
 jobs:
   cas-lab:
     if: github.repository == 'Luminous-Dynamics/symthaea' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Exercise provider-level promotion ledger serialization
         env:
@@ -22,14 +23,31 @@ jobs:
           api_root="https://api.github.com/repos/${GITHUB_REPOSITORY}"
           ref_path="${LAB_REF#refs/}"
 
-          cleanup() {
-            curl -sS -o /dev/null -X DELETE \
+          RACE_REF="refs/heads/_qual-promotion-cas-lab-${GITHUB_RUN_ID}-race"
+          race_ref_path="${RACE_REF#refs/}"
+
+          delete_ref() {
+            local target_ref_path="$1"
+            local status
+            status="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
-              "${api_root}/git/refs/${ref_path}" || true
+              "${api_root}/git/refs/${target_ref_path}")"
+            case "${status}" in
+              204|404) return 0 ;;
+              *)
+                echo "unexpected ref-delete HTTP status for ${target_ref_path}: ${status}" >&2
+                return 1
+                ;;
+            esac
           }
-          trap cleanup EXIT
+
+          cleanup_best_effort() {
+            delete_ref "${ref_path}" || true
+            delete_ref "${race_ref_path}" || true
+          }
+          trap cleanup_best_effort EXIT
 
           BASE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
           TREE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${BASE_SHA}" --jq '.tree.sha')"
@@ -42,8 +60,14 @@ jobs:
             -f ref="${LAB_REF}" \
             -f sha="${BASE_SHA}" >/dev/null
 
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="${RACE_REF}" \
+            -f sha="${BASE_SHA}" >/dev/null
+
           LAB_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
+          RACE_HEAD="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${race_ref_path}" --jq '.object.sha')"
           test "${LAB_HEAD}" = "${BASE_SHA}"
+          test "${RACE_HEAD}" = "${BASE_SHA}"
 
           create_commit() {
             local message="$1"
@@ -92,6 +116,52 @@ jobs:
 
           CURRENT_AFTER_STALE="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref_path}" --jq '.object.sha')"
           test "${CURRENT_AFTER_STALE}" = "${WINNER_SHA}"
+
+          # True concurrent-winner race: both candidates are valid successors of
+          # the same observed parent. Exactly one ref update may linearize.
+          RACE_LEFT_SHA="$(create_commit 'qual-cas-lab: concurrent left successor' "${BASE_SHA}")"
+          RACE_RIGHT_SHA="$(create_commit 'qual-cas-lab: concurrent right successor' "${BASE_SHA}")"
+
+          race_left_response="$(mktemp)"
+          race_right_response="$(mktemp)"
+          ( update_ref_status "${RACE_LEFT_SHA}" "${race_left_response}" ) > race_left_status.txt &
+          left_pid=$!
+          ( update_ref_status "${RACE_RIGHT_SHA}" "${race_right_response}" ) > race_right_status.txt &
+          right_pid=$!
+          wait "${left_pid}"
+          wait "${right_pid}"
+
+          race_left_status="$(cat race_left_status.txt)"
+          race_right_status="$(cat race_right_status.txt)"
+          left_wins=0
+          right_wins=0
+          case "${race_left_status}" in
+            200) left_wins=1 ;;
+            409|422) ;;
+            *)
+              echo "unexpected concurrent-left HTTP status: ${race_left_status}" >&2
+              cat "${race_left_response}" >&2
+              exit 1
+              ;;
+          esac
+          case "${race_right_status}" in
+            200) right_wins=1 ;;
+            409|422) ;;
+            *)
+              echo "unexpected concurrent-right HTTP status: ${race_right_status}" >&2
+              cat "${race_right_response}" >&2
+              exit 1
+              ;;
+          esac
+          test $((left_wins + right_wins)) = 1
+          RACE_CURRENT="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${race_ref_path}" --jq '.object.sha')"
+          case "${RACE_CURRENT}" in
+            "${RACE_LEFT_SHA}"|"${RACE_RIGHT_SHA}") ;;
+            *)
+              echo "concurrent race ref did not settle on a winner: ${RACE_CURRENT}" >&2
+              exit 1
+              ;;
+          esac
 
           # A newer invalidation is itself a successor of the current ledger head.
           INVALIDATION_SHA="$(create_commit 'qual-cas-lab: trust-root invalidation successor' "${WINNER_SHA}")"
@@ -143,6 +213,9 @@ jobs:
             echo "- lab_ref: \`${LAB_REF}\`"
             echo "- winner_success_http: \`${winner_status}\`"
             echo "- stale_from_same_parent_http: \`${stale_status}\`"
+            echo "- concurrent_left_http: \`${race_left_status}\`"
+            echo "- concurrent_right_http: \`${race_right_status}\`"
+            echo "- concurrent_exactly_one_winner: \`$((left_wins + right_wins))\`"
             echo "- invalidation_success_http: \`${invalidation_status}\`"
             echo "- late_stale_http: \`${stale_after_invalidation_status}\`"
             echo "- rollback_http: \`${rollback_status}\`"
@@ -152,5 +225,24 @@ jobs:
             echo "- final_current_ref_sha: \`${CURRENT_AFTER_ROLLBACK}\`"
             echo "- stale_candidate_remained_reachable_as_object: true"
             echo "- stale_candidate_became_active: false"
+          # A successful lab requires proven cleanup, not merely an attempted DELETE.
+          if ! delete_ref "${ref_path}" || ! delete_ref "${race_ref_path}"; then
+            echo "temporary promotion-ledger lab ref cleanup failed" >&2
+            exit 1
+          fi
+
+          for candidate_ref in "${ref_path}" "${race_ref_path}"; do
+            delete_status="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "${api_root}/git/refs/${candidate_ref}")"
+            test "${delete_status}" = "404"
+          done
+
+          {
             echo "- claim: same-parent successors serialize at the Git-ref publication point when non-fast-forward updates are rejected"
+            echo "- cleanup_verified: true"
           } >> "$GITHUB_STEP_SUMMARY"
+
+          trap - EXIT
