@@ -97,44 +97,110 @@ class Ledger:
 
 
 class ProviderOutcome:
-    def __init__(self, http: int, kind: str, uuid: str | None = None):
+    def __init__(
+        self,
+        http: int,
+        kind: str,
+        uuid: str | None = None,
+        merge_method: str | None = None,
+        merge_action: str | None = None,
+    ):
         self.http = http
         self.kind = kind
         self.uuid = uuid
+        self.merge_method = merge_method
+        self.merge_action = merge_action
 
 
 class GitHubAsyncModel:
     def __init__(self):
         self.pr_head = "H1"
         self.pending_uuid: str | None = None
+        self.pending_merge_method: str | None = None
+        self.pending_merge_action: str | None = None
         self.async_status: str | None = None
         self.merge_sha: str | None = None
         self.expired: set[str] = set()
         self.calls = 0
 
-    def submit(self, expected_head: str, timeout_after_accept: bool = False) -> ProviderOutcome:
+    def submit(
+        self,
+        expected_head: str,
+        merge_method: str = "squash",
+        merge_action: str = "direct_merge",
+        timeout_after_accept: bool = False,
+    ) -> ProviderOutcome:
         self.calls += 1
         if expected_head != self.pr_head:
             return ProviderOutcome(409, "rejected")
         if self.merge_sha is not None:
             return ProviderOutcome(200, "merged")
         if self.pending_uuid is not None:
-            return ProviderOutcome(409, "duplicate", self.pending_uuid)
+            if (
+                merge_method == self.pending_merge_method
+                and merge_action == self.pending_merge_action
+            ):
+                return ProviderOutcome(
+                    409,
+                    "duplicate",
+                    self.pending_uuid,
+                    self.pending_merge_method,
+                    self.pending_merge_action,
+                )
+            return ProviderOutcome(
+                409,
+                "duplicate-parameter-mismatch",
+                self.pending_uuid,
+                self.pending_merge_method,
+                self.pending_merge_action,
+            )
         self.pending_uuid = f"uuid-{self.calls}"
+        self.pending_merge_method = merge_method
+        self.pending_merge_action = merge_action
         self.async_status = "pending"
         if timeout_after_accept:
-            return ProviderOutcome(599, "timeout-after-accept")
-        return ProviderOutcome(202, "accepted", self.pending_uuid)
+            return ProviderOutcome(
+                599,
+                "timeout-after-accept",
+                self.pending_uuid,
+                merge_method,
+                merge_action,
+            )
+        return ProviderOutcome(
+            202,
+            "accepted",
+            self.pending_uuid,
+            merge_method,
+            merge_action,
+        )
 
     def get_async_result(self, uuid: str) -> ProviderOutcome:
         if uuid in self.expired:
             return ProviderOutcome(404, "not-found")
         if self.async_status == "enqueued" and self.pending_uuid == uuid:
-            return ProviderOutcome(200, "enqueued")
+            return ProviderOutcome(
+                200,
+                "enqueued",
+                uuid,
+                self.pending_merge_method,
+                self.pending_merge_action,
+            )
         if self.async_status == "merged" and self.pending_uuid == uuid:
-            return ProviderOutcome(200, "merged")
+            return ProviderOutcome(
+                200,
+                "merged",
+                uuid,
+                self.pending_merge_method,
+                self.pending_merge_action,
+            )
         if self.pending_uuid == uuid:
-            return ProviderOutcome(200, "pending")
+            return ProviderOutcome(
+                200,
+                "pending",
+                uuid,
+                self.pending_merge_method,
+                self.pending_merge_action,
+            )
         return ProviderOutcome(404, "not-found")
 
     def complete(self) -> None:
@@ -235,11 +301,25 @@ def test_timeout_after_acceptance_is_unknown():
 
 def test_duplicate_async_request_reuses_provider_handle():
     provider = GitHubAsyncModel()
-    first = provider.submit("H1")
-    second = provider.submit("H1")
+    first = provider.submit("H1", "squash", "direct_merge")
+    second = provider.submit("H1", "squash", "direct_merge")
     assert first.http == 202 and first.uuid
     assert second.http == 409 and second.kind == "duplicate"
     assert second.uuid == first.uuid
+    assert second.merge_method == "squash"
+    assert second.merge_action == "direct_merge"
+
+
+def test_duplicate_async_request_option_mismatch_is_not_idempotent():
+    provider = GitHubAsyncModel()
+    first = provider.submit("H1", "squash", "direct_merge")
+    second = provider.submit("H1", "merge", "default")
+    assert first.uuid is not None
+    assert second.http == 409
+    assert second.kind == "duplicate-parameter-mismatch"
+    assert second.uuid == first.uuid
+    assert second.merge_method == "squash"
+    assert second.merge_action == "direct_merge"
 
 
 def test_enqueued_is_not_completion():
@@ -361,6 +441,7 @@ TESTS = [
     test_dispatch_intent_fences_crash,
     test_timeout_after_acceptance_is_unknown,
     test_duplicate_async_request_reuses_provider_handle,
+    test_duplicate_async_request_option_mismatch_is_not_idempotent,
     test_enqueued_is_not_completion,
     test_already_merged_is_durable_completion,
     test_expired_uuid_with_merged_pr_uses_pr_state,

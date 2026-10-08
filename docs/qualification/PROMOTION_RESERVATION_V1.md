@@ -54,8 +54,9 @@ This is the stronger claim: the model executes each schedule against a state mac
       -> no blind second operation
 
     duplicate async request
-      -> recover existing provider UUID
-      -> do not create another operation
+      -> compare returned provider UUID and stored merge options
+      -> exact parameter match: recover existing provider UUID
+      -> parameter mismatch: explicit reconciliation/parameter-mismatch state; do not silently reuse
 
     enqueued
       -> not PromotionCompleted
