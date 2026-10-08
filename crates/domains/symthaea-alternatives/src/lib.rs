@@ -8905,9 +8905,13 @@ mod tests {
         assert_topology_change("input-result digest", |result| {
             result.result_record_digest = "temperature-result-v2".into();
         });
-        assert_topology_change("input-result omission", |result| {
-            result.result_id.clear();
-        });
+        let mut omitted = topology.clone();
+        omitted.input_bindings[0].input_result_ref = None;
+        assert_eq!(
+            frontier_digest,
+            canonical_measurement_model_input_frontier_digest(&omitted.input_bindings).unwrap()
+        );
+        assert_ne!(topology_digest, omitted.canonical_digest().unwrap());
 
         let mut malformed = topology.clone();
         malformed.input_bindings[0]
