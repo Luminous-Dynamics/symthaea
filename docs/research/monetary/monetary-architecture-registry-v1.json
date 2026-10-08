@@ -10,56 +10,45 @@
       "evidence_maturity": "A",
       "evidence_refs": ["https://www.bis.org/publ/arpdf/ar2026e.pdf"],
       "claim_ceiling": "Exact mechanism representation under this profile; no macroeconomic superiority or normative conclusion.",
-      "provenance": {
-        "source_type": "literature",
-        "source_id": "https://www.bis.org/publ/arpdf/ar2026e.pdf",
-        "profile_digest": "ef2b057447c228458592ade645fea34e152f9d90a3feeff94e7271f6ba2cbd54"
-      },
-      "inheritance_policy": {
-        "implicit_inheritance": false,
-        "missing_mechanism_disposition": "underdetermined"
-      },
+      "provenance": {"source_type":"literature","source_id":"https://www.bis.org/publ/arpdf/ar2026e.pdf","profile_digest":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e"},
+      "inheritance_policy": {"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
       "monetary_primitives": {
-        "unit_of_account": {"status":"specified","definition":"Sovereign/national currency unit."},
-        "medium_of_exchange": {"status":"specified","definition":"Commercial-bank deposits."},
-        "payment_instrument": {"status":"specified","definition":"Account-based bank payments."},
-        "store_of_value_claim": {"status":"specified","definition":"Claim on the commercial bank."},
-        "issuer_liability": {"status":"specified","definition":"Commercial-bank liability."},
-        "credit_creation": {"status":"specified","definition":"Bank lending can create deposit liabilities under the applicable constraints."},
-        "reserve_or_backing": {"status":"specified","definition":"Liquid assets and central-bank reserves; deposits are not individually fully reserved."},
-        "settlement_asset": {"status":"specified","definition":"Central-bank money."},
-        "redemption_convertibility": {"status":"specified","definition":"Deposit claims transferable/redeemable at par subject to bank solvency and resolution."},
-        "transaction_finality": {"status":"specified","definition":"Payment-system finality anchored by settlement rules."},
-        "liquidity_backstop": {"status":"specified","definition":"Central-bank liquidity facilities where provided."},
-        "clearing_topology": {"status":"specified","definition":"Shared payment/clearing and settlement networks."},
-        "interoperability": {"status":"specified","definition":"Shared standards/payment infrastructure."},
-        "default_loss_allocation": {"status":"specified","definition":"Capital, creditors/depositors, insurance and resolution regime."},
-        "governance_legal_finality": {"status":"specified","definition":"Banking, payment and settlement law."}
+        "unit_of_account":{"status":"specified","definition":"Sovereign/national currency unit."},
+        "medium_of_exchange":{"status":"specified","definition":"Commercial-bank deposits."},
+        "payment_instrument":{"status":"specified","definition":"Account-based bank payments."},
+        "store_of_value_claim":{"status":"specified","definition":"Claim on the commercial bank."},
+        "issuer_liability":{"status":"specified","definition":"Commercial-bank liability."},
+        "credit_creation":{"status":"specified","definition":"Bank lending can create deposit liabilities under the applicable constraints."},
+        "reserve_or_backing":{"status":"specified","definition":"Liquid assets and central-bank reserves; deposits are not individually fully reserved."},
+        "settlement_asset":{"status":"specified","definition":"Central-bank money."},
+        "redemption_convertibility":{"status":"specified","definition":"Deposit claims transferable/redeemable at par subject to bank solvency and resolution."},
+        "transaction_finality":{"status":"specified","definition":"Payment-system finality anchored by settlement rules."},
+        "liquidity_backstop":{"status":"specified","definition":"Central-bank liquidity facilities where provided."},
+        "clearing_topology":{"status":"specified","definition":"Shared payment/clearing and settlement networks."},
+        "interoperability":{"status":"specified","definition":"Shared standards/payment infrastructure."},
+        "default_loss_allocation":{"status":"specified","definition":"Capital, creditors/depositors, insurance and resolution regime."},
+        "governance_legal_finality":{"status":"specified","definition":"Banking, payment and settlement law."}
       },
-      "institutional_composition": {
-        "ownership":{"status":"underdetermined"},
-        "allocation":{"status":"underdetermined"},
-        "governance":{"status":"underdetermined"},
-        "ecological_constraints":{"status":"underdetermined"}
+      "moneyness_properties":{
+        "par_singleness":{"status":"specified","definition":"Within the conventional two-tier system, similarly denominated bank-money claims settle at par through central-bank money."},
+        "liquidity_elasticity":{"status":"specified","definition":"System liquidity can expand through bank credit and central-bank facilities subject to the applicable framework."},
+        "integrity_constraints":{"status":"specified","definition":"Banking/payment supervision, identity controls, and settlement/legal rules constrain monetary transfers."}
       },
+      "institutional_composition":{"ownership":{"status":"underdetermined"},"allocation":{"status":"underdetermined"},"governance":{"status":"underdetermined"},"ecological_constraints":{"status":"underdetermined"}},
       "transplant_contract":{"mutable_layer":"monetary_primitives","protected_layers":["ownership","allocation","governance","ecological_constraints"],"comparison_rule":"candidate may differ only in mutable_layer"}
     },
     {
-      "schema_version": "monetary-architecture-profile-v1",
-      "profile_id": "sovereign-money-v1",
-      "semantic_version": "1.0.0",
-      "title": "Sovereign Money / 100%-Money",
-      "classification": "architecture",
-      "evidence_maturity": "A",
-      "evidence_refs": ["https://doi.org/10.1080/00213624.2025.2455643"],
-      "claim_ceiling": "Exact mechanism representation under this profile; no macroeconomic superiority or normative conclusion.",
-      "provenance": {
-        "source_type":"literature",
-        "source_id":"https://doi.org/10.1080/00213624.2025.2455643",
-        "profile_digest":"171a8f9bb55256129488933c225947be774c2335b652739f01a5e0cd25a9724e"
-      },
+      "schema_version":"monetary-architecture-profile-v1",
+      "profile_id":"sovereign-money-v1",
+      "semantic_version":"1.0.0",
+      "title":"Sovereign Money / 100%-Money",
+      "classification":"architecture",
+      "evidence_maturity":"A",
+      "evidence_refs":["https://doi.org/10.1080/00213624.2025.2455643"],
+      "claim_ceiling":"Exact mechanism representation under this profile; no macroeconomic superiority or normative conclusion.",
+      "provenance":{"source_type":"literature","source_id":"https://doi.org/10.1080/00213624.2025.2455643","profile_digest":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32"},
       "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
-      "monetary_primitives": {
+      "monetary_primitives":{
         "unit_of_account":{"status":"specified","definition":"Sovereign monetary unit."},
         "medium_of_exchange":{"status":"specified","definition":"Publicly issued transaction money."},
         "payment_instrument":{"status":"specified","definition":"Public transaction account or equivalent."},
@@ -76,6 +65,11 @@
         "default_loss_allocation":{"status":"specified","definition":"Credit losses remain in the lending/intermediation layer rather than transaction-money issuance."},
         "governance_legal_finality":{"status":"specified","definition":"Public monetary authority and legal framework."}
       },
+      "moneyness_properties":{
+        "par_singleness":{"status":"specified","definition":"Public transaction-money units are intended to be uniform claims within the sovereign payment system."},
+        "liquidity_elasticity":{"status":"specified","definition":"Elasticity depends on the public issuance and payment design; private credit liquidity is a separate layer."},
+        "integrity_constraints":{"status":"specified","definition":"Public issuance, payment, legal finality and access rules define the integrity boundary."}
+      },
       "institutional_composition":{"ownership":{"status":"underdetermined"},"allocation":{"status":"underdetermined"},"governance":{"status":"underdetermined"},"ecological_constraints":{"status":"underdetermined"}},
       "transplant_contract":{"mutable_layer":"monetary_primitives","protected_layers":["ownership","allocation","governance","ecological_constraints"],"comparison_rule":"candidate may differ only in mutable_layer"}
     },
@@ -88,7 +82,7 @@
       "evidence_maturity":"A",
       "evidence_refs":["https://www.sciencedirect.com/science/article/abs/pii/S016726812400475X"],
       "claim_ceiling":"Exact mechanism representation under this profile; no macroeconomic superiority or normative conclusion.",
-      "provenance":{"source_type":"literature","source_id":"https://www.sciencedirect.com/science/article/abs/pii/S016726812400475X","profile_digest":"f6b18651c5dc42b190512c05561663985c132b65eec518f598159c937b05ee82"},
+      "provenance":{"source_type":"literature","source_id":"https://www.sciencedirect.com/science/article/abs/pii/S016726812400475X","profile_digest":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e"},
       "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
       "monetary_primitives":{
         "unit_of_account":{"status":"specified","definition":"Network accounting unit."},
@@ -107,6 +101,11 @@
         "default_loss_allocation":{"status":"specified","definition":"Not specified in the base profile."},
         "governance_legal_finality":{"status":"specified","definition":"Network membership/limits/ledger rules; broader legal finality remains separate."}
       },
+      "moneyness_properties":{
+        "par_singleness":{"status":"specified","definition":"Member balances are unitary at the network layer; external-money par is not assumed."},
+        "liquidity_elasticity":{"status":"specified","definition":"No system-wide elastic backstop is assumed in the bounded base profile."},
+        "integrity_constraints":{"status":"specified","definition":"Membership, credit limits, identified events and fail-closed ledger rules constrain internal issuance."}
+      },
       "institutional_composition":{"ownership":{"status":"underdetermined"},"allocation":{"status":"underdetermined"},"governance":{"status":"underdetermined"},"ecological_constraints":{"status":"underdetermined"}},
       "transplant_contract":{"mutable_layer":"monetary_primitives","protected_layers":["ownership","allocation","governance","ecological_constraints"],"comparison_rule":"candidate may differ only in mutable_layer"}
     },
@@ -119,7 +118,7 @@
       "evidence_maturity":"A",
       "evidence_refs":["https://www.imf.org/en/Blogs/Articles/2026/07/02/tokenization-can-change-the-worlds-financial-architecture"],
       "claim_ceiling":"Exact mechanism representation under this profile; no macroeconomic superiority or normative conclusion.",
-      "provenance":{"source_type":"literature","source_id":"https://www.imf.org/en/Blogs/Articles/2026/07/02/tokenization-can-change-the-worlds-financial-architecture","profile_digest":"4980a9c233b6fb87e3ee7e2d16b24dc0eaec977b4786fbf9cf8753c6f84806ab"},
+      "provenance":{"source_type":"literature","source_id":"https://www.imf.org/en/Blogs/Articles/2026/07/02/tokenization-can-change-the-worlds-financial-architecture","profile_digest":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e"},
       "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
       "monetary_primitives":{
         "unit_of_account":{"status":"specified","definition":"Underlying sovereign/national currency."},
@@ -138,6 +137,11 @@
         "default_loss_allocation":{"status":"specified","definition":"Underlying bank insolvency and protection regime."},
         "governance_legal_finality":{"status":"specified","definition":"Ledger governance, legal ownership and settlement finality must be explicit."}
       },
+      "moneyness_properties":{
+        "par_singleness":{"status":"specified","definition":"Tokenized deposits can preserve par settlement when transfers ultimately settle in central-bank money within the connected framework."},
+        "liquidity_elasticity":{"status":"specified","definition":"Continuous programmable settlement increases the importance of explicitly defined liquidity facilities and intraday liquidity."},
+        "integrity_constraints":{"status":"specified","definition":"Banking/payment controls plus ledger governance constrain issuance, transfer and finality."}
+      },
       "institutional_composition":{"ownership":{"status":"underdetermined"},"allocation":{"status":"underdetermined"},"governance":{"status":"underdetermined"},"ecological_constraints":{"status":"underdetermined"}},
       "transplant_contract":{"mutable_layer":"monetary_primitives","protected_layers":["ownership","allocation","governance","ecological_constraints"],"comparison_rule":"candidate may differ only in mutable_layer"}
     },
@@ -150,7 +154,7 @@
       "evidence_maturity":"A",
       "evidence_refs":["https://www.imf.org/en/publications/wp/issues/2026/04/10/making-stablecoins-stable-575348"],
       "claim_ceiling":"Exact mechanism representation under this profile; no macroeconomic superiority or normative conclusion.",
-      "provenance":{"source_type":"literature","source_id":"https://www.imf.org/en/publications/wp/issues/2026/04/10/making-stablecoins-stable-575348","profile_digest":"6ae1a4a40a55b56f0c79b856d8b7a279a59f466f2e7fc2701c176568e20bce0f"},
+      "provenance":{"source_type":"literature","source_id":"https://www.imf.org/en/publications/wp/issues/2026/04/10/making-stablecoins-stable-575348","profile_digest":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"},
       "inheritance_policy":{"implicit_inheritance":false,"missing_mechanism_disposition":"underdetermined"},
       "monetary_primitives":{
         "unit_of_account":{"status":"specified","definition":"Reference fiat currency or unit."},
@@ -168,6 +172,11 @@
         "interoperability":{"status":"specified","definition":"Cross-network interoperability is explicit and may introduce fragmentation risk."},
         "default_loss_allocation":{"status":"specified","definition":"Reserve priority, issuer resolution, redemption and regulation determine losses."},
         "governance_legal_finality":{"status":"specified","definition":"Issuer governance, reserve governance, ledger rules and law."}
+      },
+      "moneyness_properties":{
+        "par_singleness":{"status":"specified","definition":"Par is a contractual target, but uniform interchangeability depends on reserves, redemption, liquidity and interoperability."},
+        "liquidity_elasticity":{"status":"specified","definition":"Elasticity depends on reserve liquidity, redemption design and any public/private backstop; none is inherited."},
+        "integrity_constraints":{"status":"specified","definition":"Issuer, reserve, ledger and legal controls define the integrity boundary; public permissionless rails may add distinct risks."}
       },
       "institutional_composition":{"ownership":{"status":"underdetermined"},"allocation":{"status":"underdetermined"},"governance":{"status":"underdetermined"},"ecological_constraints":{"status":"underdetermined"}},
       "transplant_contract":{"mutable_layer":"monetary_primitives","protected_layers":["ownership","allocation","governance","ecological_constraints"],"comparison_rule":"candidate may differ only in mutable_layer"}
