@@ -111,12 +111,31 @@ fn privileged_nixos_rebuild_process() -> Result<tokio::process::Command, std::io
     Ok(command)
 }
 
+#[derive(Debug)]
+enum RebuildExecutionError {
+    BeforeStart(std::io::Error),
+    AfterStart(std::io::Error),
+}
+
 async fn run_privileged_nixos_rebuild_args(
     args: &[&str],
-) -> Result<CmdResult, std::io::Error> {
-    let mut command = privileged_nixos_rebuild_process()?;
+) -> Result<CmdResult, RebuildExecutionError> {
+    let mut command =
+        privileged_nixos_rebuild_process().map_err(RebuildExecutionError::BeforeStart)?;
     command.args(args);
-    let output = command.output().await?;
+    command.stdin(std::process::Stdio::null());
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
+
+    let child = command
+        .spawn()
+        .await
+        .map_err(RebuildExecutionError::BeforeStart)?;
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(RebuildExecutionError::AfterStart)?;
+
     Ok(CmdResult {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -8954,7 +8973,26 @@ echo '}'
                         );
                         let _ = ws_tx.send(Message::Text(serde_json::json!({"type":"exit","code":protocol_exit_code(r.exit_status, outcome),"data":r.stdout.chars().take(2000).collect::<String>(),"transaction":transaction.receipt(outcome)}).to_string())).await;
                     }
-                    Err(e) => {
+                    Err(RebuildExecutionError::BeforeStart(error)) => {
+                        let outcome = finalize_transaction(
+                            &transaction_ledger,
+                            &transaction,
+                            TransactionOutcome::Failed,
+                            &peer_addr,
+                        );
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                serde_json::json!({
+                                    "type":"exit",
+                                    "code": protocol_exit_code(1, outcome),
+                                    "data": format!("Rollback could not be started: {}", error),
+                                    "transaction": transaction.receipt(outcome)
+                                })
+                                .to_string(),
+                            ))
+                            .await;
+                    }
+                    Err(RebuildExecutionError::AfterStart(error)) => {
                         let outcome = finalize_transaction(
                             &transaction_ledger,
                             &transaction,
@@ -8966,7 +9004,7 @@ echo '}'
                                 serde_json::json!({
                                     "type":"exit",
                                     "code": protocol_exit_code(1, outcome),
-                                    "data": format!("Rollback execution could not be observed: {}", e),
+                                    "data": format!("Rollback started but its terminal outcome could not be observed: {}", error),
                                     "transaction": transaction.receipt(outcome)
                                 })
                                 .to_string(),
@@ -9870,7 +9908,7 @@ echo '}'
                             },
                             Ok(false) => {
                                 eprintln!(
-                                    "[{}] {} rebuild returned 0 but requested configuration was not observed; preserving the exact swap for manual recovery because activation may have partially applied",
+                                    "[{}] {} rebuild returned 0 but requested configuration was not observed; preserving the exact swap because activation may have partially applied",
                                     peer_addr,
                                     transaction.log_line()
                                 );
@@ -9878,7 +9916,7 @@ echo '}'
                             }
                             Err(error) => {
                                 eprintln!(
-                                    "[{}] {} configuration postcondition could not be observed; preserving the exact swap for manual recovery: {}",
+                                    "[{}] {} configuration postcondition could not be observed; preserving the exact swap for recovery: {}",
                                     peer_addr,
                                     transaction.log_line(),
                                     error
@@ -9896,9 +9934,29 @@ echo '}'
                         );
                         (result.exit_status.max(1), TransactionOutcome::Indeterminate, true)
                     }
-                    Err(error) => {
+                    Err(RebuildExecutionError::BeforeStart(error)) => {
                         eprintln!(
-                            "[{}] {} nixos-rebuild execution outcome could not be observed; preserving the exact swap rather than assuming activation did not begin: {}",
+                            "[{}] {} nixos-rebuild could not be started; activation cannot have begun, so the exact pre-activation source swap may be safely reverted: {}",
+                            peer_addr,
+                            transaction.log_line(),
+                            error
+                        );
+                        match finalize_configuration_swap(swap, false).await {
+                            Ok(()) => (1, TransactionOutcome::Failed, false),
+                            Err(rollback_error) => {
+                                eprintln!(
+                                    "[{}] {} pre-activation configuration rollback failed: {}",
+                                    peer_addr,
+                                    transaction.log_line(),
+                                    rollback_error
+                                );
+                                (1, TransactionOutcome::Indeterminate, true)
+                            }
+                        }
+                    }
+                    Err(RebuildExecutionError::AfterStart(error)) => {
+                        eprintln!(
+                            "[{}] {} nixos-rebuild started but its terminal outcome could not be observed; preserving the exact swap rather than assuming activation did not begin: {}",
                             peer_addr,
                             transaction.log_line(),
                             error

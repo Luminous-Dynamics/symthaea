@@ -165,14 +165,31 @@ def main() -> None:
     if activation_index < 0:
         fail("write_config lost its explicit nixos-rebuild activation boundary")
     post_activation = write_body[activation_index:]
-    if "finalize_configuration_swap(swap, false)" in post_activation:
+    before_start = "Err(RebuildExecutionError::BeforeStart("
+    after_start = "Err(RebuildExecutionError::AfterStart("
+    before_start_index = post_activation.find(before_start)
+    after_start_index = post_activation.find(after_start)
+    if before_start_index < 0:
+        fail("write_config lost the typed pre-activation rebuild failure class")
+    if after_start_index < 0:
+        fail("write_config lost the typed post-start rebuild failure class")
+    if before_start_index > after_start_index:
+        fail("write_config rebuild failure classes are ordered incorrectly")
+    pre_start_branch = post_activation[before_start_index:after_start_index]
+    post_start_branch = post_activation[after_start_index:]
+    if "finalize_configuration_swap(swap, false)" not in pre_start_branch:
+        fail(
+            "write_config no longer permits exact source rollback when nixos-rebuild "
+            "provably never started"
+        )
+    if "finalize_configuration_swap(swap, false)" in post_start_branch:
         fail(
             "write_config regressed to source rollback after nixos-rebuild activation began; "
             "preserve the exact swap and classify the running state as indeterminate"
         )
-    if "TransactionOutcome::Indeterminate" not in post_activation:
+    if "TransactionOutcome::Indeterminate" not in post_start_branch:
         fail("write_config activation uncertainty no longer maps to indeterminate")
-    if "preserving the exact swap" not in post_activation:
+    if "preserving the exact swap" not in post_start_branch:
         fail("write_config activation uncertainty no longer preserves its exact swap")
 
 
