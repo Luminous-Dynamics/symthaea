@@ -220,6 +220,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                         job_type: expected.job_type,
                         unit: removed.unit,
                         object_path: removed.object_path.as_str().to_string(),
+                        removed_at_monotonic_us: Some(monotonic_now_us()?),
                         result: removed.result,
                         manager_owner: self.manager_owner.clone(),
                     });
