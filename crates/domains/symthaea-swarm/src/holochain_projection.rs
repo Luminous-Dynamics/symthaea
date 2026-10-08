@@ -90,11 +90,12 @@ pub struct ReceiptSelectionContext {
 }
 
 impl ReceiptSelectionContext {
-    /// Internal structural conversion used only after a decision has passed
-    /// the collection-bound validation performed by from_bound_decision.
+    /// Internal structural conversion used only after both source-collection
+    /// and verified-capability binding have succeeded.
     #[cfg(feature = "semantic-receipts")]
     fn from_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
+        verified_capability_sha256: [u8; 32],
     ) -> Result<Self, HolochainProjectionError> {
         let selection_decision_sha256 = decision
             .validated_digest()
@@ -112,29 +113,15 @@ impl ReceiptSelectionContext {
             collection_len: decision.collection_len,
             selected_index,
             selected_receipt_sha256,
-            verified_capability_sha256: [0; 32],
+            verified_capability_sha256,
             selection_decision_sha256,
             selection_policy: decision.policy_id.to_owned(),
             selection_policy_version: decision.policy_version,
         })
     }
 
-    /// Build the structural selection context only after binding the decision
-    /// to the exact receipt collection it claims to describe. This does not
-    /// establish that a cryptographic Receipt capability was verified.
-    #[cfg(feature = "semantic-receipts")]
-    pub fn from_bound_decision(
-        decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
-        collection: &crate::semantic_evidence_vds::Rfc9942ReceiptCollection,
-    ) -> Result<Self, HolochainProjectionError> {
-        decision
-            .validate_against_collection(collection)
-            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
-        Self::from_decision(decision)
-    }
-
-    /// Build the durable selection context only after binding the decision and
-    /// its selected candidate to a cryptographically verified Receipt capability.
+    /// Build the durable selection context only after binding the decision,
+    /// exact source collection, and cryptographically verified Receipt capability.
     #[cfg(feature = "semantic-receipts")]
     pub fn from_verified_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
@@ -147,10 +134,7 @@ impl ReceiptSelectionContext {
         let capability_sha256 = decision
             .verified_capability_sha256(verified)
             .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
-
-        let mut context = Self::from_decision(decision)?;
-        context.verified_capability_sha256 = capability_sha256;
-        Ok(context)
+        Self::from_decision(decision, capability_sha256)
     }
 
     fn validate(&self) -> Result<(), HolochainProjectionError> {
