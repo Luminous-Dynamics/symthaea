@@ -113,6 +113,7 @@ pub struct InstitutionalEvolution {
     allow_meta_constitutional_mutation: bool,
     proposals: BTreeMap<String, Proposal>,
     decisions: BTreeMap<String, AdoptionDecision>,
+    authorizing_rules: BTreeMap<String, RuleLevel>,
     lineage: Vec<InstitutionLineageEvent>,
 }
 
@@ -124,6 +125,7 @@ impl InstitutionalEvolution {
             allow_meta_constitutional_mutation: false,
             proposals: BTreeMap::new(),
             decisions: BTreeMap::new(),
+            authorizing_rules: BTreeMap::new(),
             lineage: Vec::new(),
         }
     }
@@ -151,6 +153,14 @@ impl InstitutionalEvolution {
 
     pub fn lineage(&self) -> &[InstitutionLineageEvent] {
         &self.lineage
+    }
+
+    pub fn register_authorizing_rule(
+        &mut self,
+        rule_hash: impl Into<String>,
+        rule_level: RuleLevel,
+    ) {
+        self.authorizing_rules.insert(rule_hash.into(), rule_level);
     }
 
     pub fn propose(
@@ -216,6 +226,17 @@ impl InstitutionalEvolution {
             if let Some(required_level) = required_level {
                 if decision.authorizing_rule_level != Some(required_level) {
                     return Err(FailureDisposition::WrongAuthorityLevel);
+                }
+                let authorizing_rule_hash = decision
+                    .authorizing_rule_hash
+                    .as_deref()
+                    .expect("required above");
+                match self.authorizing_rules.get(authorizing_rule_hash) {
+                    None => return Err(FailureDisposition::MissingAuthority),
+                    Some(actual_level) if *actual_level != required_level => {
+                        return Err(FailureDisposition::WrongAuthorityLevel);
+                    }
+                    Some(_) => {}
                 }
             }
             if decision.authorizing_rule_hash.as_deref()
@@ -345,6 +366,7 @@ mod tests {
     fn adopted_and_implemented_are_distinct() {
         let mut evolution = InstitutionalEvolution::new(initial());
         evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "failure").unwrap();
+        evolution.register_authorizing_rule("cc-rule-v0", RuleLevel::CollectiveChoice);
         evolution.decide(AdoptionDecision {
             proposal_id: "p1".into(),
             adopted: true,
@@ -398,6 +420,7 @@ mod tests {
     #[test]
     fn wrong_authority_level_fails_closed() {
         let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.register_authorizing_rule("constitutional-rule-v0", RuleLevel::Constitutional);
         evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "failure").unwrap();
         assert_eq!(
             evolution.decide(AdoptionDecision {
@@ -435,9 +458,27 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn unregistered_authorizing_rule_fails_closed() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "failure").unwrap();
+        assert_eq!(
+            evolution.decide(AdoptionDecision {
+                proposal_id: "p1".into(),
+                adopted: true,
+                authority: Some("authority".into()),
+                authorizing_rule_hash: Some("unregistered".into()),
+                authorizing_rule_level: Some(RuleLevel::CollectiveChoice),
+            }),
+            Err(FailureDisposition::MissingAuthority)
+        );
+    }
+
     #[test]
     fn self_authorizing_mutation_fails_closed() {
         let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.register_authorizing_rule("hash-v1", RuleLevel::CollectiveChoice);
         evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "capture").unwrap();
         assert_eq!(
             evolution.decide(AdoptionDecision {
@@ -456,6 +497,7 @@ mod tests {
         let mut first = InstitutionalEvolution::new(initial());
         let mut second = InstitutionalEvolution::new(initial());
         for evolution in [&mut first, &mut second] {
+            evolution.register_authorizing_rule("cc-rule-v0", RuleLevel::CollectiveChoice);
             evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "failure").unwrap();
             evolution.decide(AdoptionDecision {
                 proposal_id: "p1".into(),
