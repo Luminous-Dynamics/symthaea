@@ -11,11 +11,13 @@ use crate::cognitive_analysis::{ScoreCognitiveProfile, profile_score_region};
 use crate::form::SectionRole;
 use crate::grammar::PerformanceDialect;
 use crate::harmony::{HarmonicFunction, Key, Tonality};
-use crate::motif_return::{MotifReturnEvidence, compare_melodic_regions};
+use crate::motif_return::{
+    MotifReturnEvidence, compare_melodic_regions, melodic_notes_in_region,
+};
 use crate::obligation::ObligationPressure;
 use crate::pitch::PitchClass;
 use crate::rhythm::Duration;
-use crate::score::{Score, VoiceRole};
+use crate::score::{PartId, Score, VoiceRole};
 use crate::state_space::MusicalStateFrame;
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +52,8 @@ pub struct MusicalWorldStateContext {
 /// that a listener recognizes the return.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MotifRelationObservationV1 {
+    pub source_part: PartId,
+    pub target_part: PartId,
     pub source_start: Duration,
     pub source_end: Duration,
     pub target_start: Duration,
@@ -78,6 +82,19 @@ impl MotifRelationObservationV1 {
         if !valid_region(source_start, source_end) || !valid_region(target_start, target_end) {
             return None;
         }
+        let source_notes = melodic_notes_in_region(score, source_start, source_end);
+        let target_notes = melodic_notes_in_region(score, target_start, target_end);
+        let source_part = source_notes.first()?.part;
+        let target_part = target_notes.first()?.part;
+        // VoiceRole is a function, not persistent line identity. Never merge
+        // multiple/unassigned parts into one inferred motif sequence.
+        if !source_part.is_assigned()
+            || !target_part.is_assigned()
+            || source_notes.iter().any(|note| note.part != source_part)
+            || target_notes.iter().any(|note| note.part != target_part)
+        {
+            return None;
+        }
         let evidence = compare_melodic_regions(
             score,
             source_start,
@@ -90,6 +107,8 @@ impl MotifRelationObservationV1 {
             return None;
         }
         Some(Self {
+            source_part,
+            target_part,
             source_start,
             source_end,
             target_start,
@@ -275,6 +294,8 @@ mod tests {
         )
         .expect("both score regions contain melody");
 
+        assert_eq!(relation.source_part, PartId(1));
+        assert_eq!(relation.target_part, PartId(1));
         assert_eq!(relation.source_start, Duration::zero());
         assert_eq!(relation.source_end, Duration::new(3, 1));
         assert_eq!(relation.target_start, Duration::new(3, 1));
@@ -301,6 +322,48 @@ mod tests {
             Duration::new(2, 1),
             Duration::new(2, 1),
             Duration::new(3, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        ).is_none());
+    }
+
+    #[test]
+    fn motif_relation_rejects_unassigned_or_multi_part_melody_regions() {
+        let mut unassigned = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (pc, onset) in [(0, 0), (2, 1), (0, 2), (2, 3)] {
+            unassigned.push(note(
+                PitchClass::new(pc),
+                4,
+                onset,
+                VoiceRole::Melody,
+                PartId::UNASSIGNED,
+            ));
+        }
+        assert!(MotifRelationObservationV1::from_score(
+            &unassigned,
+            Duration::new(0, 1),
+            Duration::new(2, 1),
+            Duration::new(2, 1),
+            Duration::new(4, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        ).is_none());
+
+        let mut ambiguous = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (pc, onset, part) in [
+            (0, 0, PartId(1)),
+            (2, 1, PartId(1)),
+            (4, 0, PartId(2)),
+            (5, 1, PartId(2)),
+            (0, 2, PartId(1)),
+            (2, 3, PartId(1)),
+        ] {
+            ambiguous.push(note(PitchClass::new(pc), 4, onset, VoiceRole::Melody, part));
+        }
+        assert!(MotifRelationObservationV1::from_score(
+            &ambiguous,
+            Duration::new(0, 2),
+            Duration::new(2, 1),
+            Duration::new(2, 1),
+            Duration::new(4, 1),
             crate::obligation::ReturnTransformation::Literal,
         ).is_none());
     }
