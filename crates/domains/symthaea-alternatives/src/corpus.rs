@@ -62,7 +62,6 @@ fn evidence(
         )
         .then(|| ObservationProvenanceRef {
             observation_id: format!("benchmark-observation:{id}"),
-            observation_record_digest: format!("benchmark-record-digest:{id}"),
             subject_id: format!("benchmark-subject:{id}"),
             activity_id: format!("benchmark-activity:{id}"),
             measurand_id: format!("benchmark-measurand:{id}"),
@@ -132,6 +131,7 @@ fn evidence(
                     procedure_digest: "benchmark-measurement-procedure-v1-digest".into(),
                     evaluation_revision: "v1".into(),
                     evaluation_digest: "benchmark-uncertainty-evaluation-digest-v1".into(),
+                    calibration_topology_digest: None,
                     method_id: "benchmark-uncertainty-method-v1".into(),
                     method_revision: "v1".into(),
                     method_digest: "benchmark-uncertainty-method-digest-v1".into(),
@@ -203,13 +203,16 @@ fn evidence(
     }
 }
 
-fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
+pub(crate) fn admitted(mut evidence: EvidenceRecord) -> EvidenceRecord {
     evidence.source.admission = Some(SourceAdmissionRef {
         authority_id: evidence.source.authority_id.clone(),
         policy_id: "benchmark-policy".into(),
         policy_revision: "v1".into(),
         policy_digest: "benchmark-policy-digest-v1".into(),
         admission_id: format!("benchmark-admission:{}", evidence.id),
+        subject_binding_digest: Some(
+            evidence.source.canonical_subject_binding_digest().unwrap(),
+        ),
         authority_epoch: "benchmark-epoch-v1".into(),
         fault_domain_id: Some(format!("benchmark-domain:{}", evidence.source.authority_id)),
         valid_from_epoch_seconds: None,
