@@ -31,7 +31,7 @@ use system_transaction::{
 
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
-    sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
+    nix_string_literal, sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
     validate_hostname as validate_hostname_relay, validate_username,
 };
 
@@ -1645,23 +1645,25 @@ fn generate_system_config(msg: &ClientMessage) -> String {
 
     // Timezone
     let tz = if msg.timezone.is_empty() {
-        "UTC"
+        "UTC".to_string()
     } else {
-        &msg.timezone
+        msg.timezone.clone()
     };
-    config.push_str(&format!("  time.timeZone = \"{}\";\n", tz));
+    let tz_literal = nix_string_literal(&tz);
+    config.push_str(&format!("  time.timeZone = {};\n", tz_literal));
 
     // Locale
     config.push_str("  i18n.defaultLocale = \"en_US.UTF-8\";\n");
 
     // Keyboard
     let kb = if msg.keyboard.is_empty() {
-        "us"
+        "us".to_string()
     } else {
-        &msg.keyboard
+        msg.keyboard.clone()
     };
-    config.push_str(&format!("  console.keyMap = \"{}\";\n", kb));
-    config.push_str(&format!("  services.xserver.xkb.layout = \"{}\";\n", kb));
+    let kb_literal = nix_string_literal(&kb);
+    config.push_str(&format!("  console.keyMap = {};\n", kb_literal));
+    config.push_str(&format!("  services.xserver.xkb.layout = {};\n", kb_literal));
 
     // Desktop environment
     match msg.desktop.as_str() {
@@ -1719,11 +1721,12 @@ fn generate_system_config(msg: &ClientMessage) -> String {
 
     config
 }fn single_luks_fallback_configuration(hostname: &str) -> String {
+    let hostname_literal = nix_string_literal(hostname);
     let mut config = String::from(
         r#"{ config, pkgs, ... }:
 {
   imports = [ ./hardware-configuration.nix ];
-  networking.hostName = "__HOSTNAME__";
+  networking.hostName = __HOSTNAME_LITERAL__;
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
@@ -1741,7 +1744,7 @@ fn generate_system_config(msg: &ClientMessage) -> String {
   zramSwap = { enable = true; algorithm = "zstd"; };
   boot.kernel.sysctl."vm.swappiness" = 60;
 
-  users.users.__HOSTNAME__ = {
+  users.users.__HOSTNAME_ATTR__ = {
     isNormalUser = true;
     extraGroups = [ "wheel" "video" "networkmanager" ];
   };
@@ -1750,7 +1753,8 @@ fn generate_system_config(msg: &ClientMessage) -> String {
   system.stateVersion = "26.05";
 }"#,
     );
-    config = config.replace("__HOSTNAME__", hostname);
+    config = config.replace("__HOSTNAME_LITERAL__", &hostname_literal);
+    config = config.replace("__HOSTNAME_ATTR__", &hostname_literal[1..hostname_literal.len() - 1]);
     config
 }
 
