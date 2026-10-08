@@ -6,9 +6,12 @@ promotion_authority=false
 """
 
 import hashlib
+import hmac
 import json
 from dataclasses import dataclass
 from itertools import permutations
+
+_UNSET = object()
 
 
 @dataclass
@@ -185,6 +188,159 @@ class ProviderTopologyBindingV1:
 
 
 @dataclass(frozen=True)
+class ProviderCaptureIntegrityV1:
+    raw_bytes_digest: str
+    storage_id: str
+    capture_sequence: int
+    durable: bool = True
+
+    @classmethod
+    def capture(
+        cls,
+        raw_bytes: bytes,
+        storage_id: str,
+        capture_sequence: int,
+        durable: bool = True,
+    ) -> "ProviderCaptureIntegrityV1":
+        return cls(
+            raw_bytes_digest=hashlib.sha256(raw_bytes).hexdigest(),
+            storage_id=storage_id,
+            capture_sequence=capture_sequence,
+            durable=durable,
+        )
+
+    def is_valid(self) -> bool:
+        return (
+            bool(self.raw_bytes_digest)
+            and bool(self.storage_id)
+            and self.capture_sequence > 0
+            and self.durable
+        )
+
+
+@dataclass(frozen=True)
+class ProviderSourceAuthenticationV1:
+    method: str
+    verified: bool
+    provider_identity: str | None = None
+
+    def is_accepted_transport_auth(self) -> bool:
+        return (
+            self.verified
+            and bool(self.provider_identity)
+            and self.method in {
+                "authenticated-api-channel",
+                "webhook-hmac-verified",
+            }
+        )
+
+
+@dataclass(frozen=True)
+class ProviderAttestationV1:
+    scheme: str | None = None
+    verified: bool = False
+
+    def is_verified(self) -> bool:
+        return self.verified and bool(self.scheme)
+
+
+@dataclass(frozen=True)
+class ProviderEvidenceEnvelopeV1:
+    capture: ProviderCaptureIntegrityV1
+    source_authentication: ProviderSourceAuthenticationV1
+    provider_attestation: ProviderAttestationV1 = ProviderAttestationV1()
+
+    def is_preserved_provider_evidence(self) -> bool:
+        return (
+            self.capture.is_valid()
+            and self.source_authentication.is_accepted_transport_auth()
+        )
+
+    def has_provider_attestation(self) -> bool:
+        return self.provider_attestation.is_verified()
+
+
+@dataclass(frozen=True)
+class ProviderWebhookReceiptV1:
+    delivery_id: str
+    hook_id: str
+    event_type: str
+    repository: str
+    payload_bytes_digest: str
+    signature: str
+    signature_algorithm: str = "HMAC-SHA256"
+
+    @classmethod
+    def from_delivery(
+        cls,
+        delivery_id: str,
+        hook_id: str,
+        event_type: str,
+        repository: str,
+        payload: bytes,
+        secret: bytes,
+    ) -> "ProviderWebhookReceiptV1":
+        digest = hashlib.sha256(payload).hexdigest()
+        mac = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+        return cls(
+            delivery_id=delivery_id,
+            hook_id=hook_id,
+            event_type=event_type,
+            repository=repository,
+            payload_bytes_digest=digest,
+            signature=f"sha256={mac}",
+        )
+
+    def verify(
+        self,
+        payload: bytes,
+        secret: bytes,
+        expected_hook_id: str | None = None,
+        expected_event_type: str | None = None,
+        expected_repository: str | None = None,
+    ) -> bool:
+        expected = "sha256=" + hmac.new(
+            secret,
+            payload,
+            hashlib.sha256,
+        ).hexdigest()
+        return (
+            self.signature_algorithm == "HMAC-SHA256"
+            and bool(self.delivery_id)
+            and bool(self.hook_id)
+            and bool(self.event_type)
+            and bool(self.repository)
+            and hmac.compare_digest(self.signature, expected)
+            and self.payload_bytes_digest == hashlib.sha256(payload).hexdigest()
+            and (expected_hook_id is None or self.hook_id == expected_hook_id)
+            and (expected_event_type is None or self.event_type == expected_event_type)
+            and (expected_repository is None or self.repository == expected_repository)
+        )
+
+
+@dataclass(frozen=True)
+class ProviderDeliveryRegistryV1:
+    deliveries: tuple[tuple[str, str], ...] = ()
+
+    def observe(self, receipt: ProviderWebhookReceiptV1) -> str:
+        for delivery_id, payload_digest in self.deliveries:
+            if delivery_id != receipt.delivery_id:
+                continue
+            if payload_digest == receipt.payload_bytes_digest:
+                return "duplicate-identical"
+            return "delivery-id-conflict"
+        return "new-delivery"
+
+    def record(self, receipt: ProviderWebhookReceiptV1) -> "ProviderDeliveryRegistryV1":
+        classification = self.observe(receipt)
+        if classification == "new-delivery":
+            return ProviderDeliveryRegistryV1(
+                self.deliveries + ((receipt.delivery_id, receipt.payload_bytes_digest),)
+            )
+        return self
+
+
+@dataclass(frozen=True)
 class ProviderMergeResultV1:
     result_source: str
     status: str
@@ -198,9 +354,12 @@ class ProviderMergeResultV1:
     def directly_binds_requested_effect(
         self,
         identity: PromotionOperationIdentityV1,
+        evidence: ProviderEvidenceEnvelopeV1 | None = None,
     ) -> bool:
         return (
-            self.result_source == "provider-async-result"
+            evidence is not None
+            and evidence.is_preserved_provider_evidence()
+            and self.result_source == "provider-async-result"
             and self.status == "merged"
             and bool(self.provider_uuid)
             and self.requested_pr_number == identity.requested_pr_number
@@ -263,13 +422,17 @@ class PromotionCausalResolutionV1:
         provider_result: ProviderMergeResultV1 | None,
         effect_set: PromotionStackEffectSetV1 | None,
         topology_binding: ProviderTopologyBindingV1 | None,
+        provider_evidence: ProviderEvidenceEnvelopeV1 | None = None,
     ) -> "PromotionCausalResolutionV1":
         effect_observed = (
             effect_set is not None and effect_set.validates_complete(identity)
         )
         requested_causal = (
             provider_result is not None
-            and provider_result.directly_binds_requested_effect(identity)
+            and provider_result.directly_binds_requested_effect(
+                identity,
+                provider_evidence,
+            )
         )
 
         if requested_causal and effect_observed:
@@ -316,20 +479,313 @@ def provider_merge_result_fixture(
     )
 
 
+def provider_evidence_fixture(
+    *,
+    method: str = "authenticated-api-channel",
+    verified: bool = True,
+    durable: bool = True,
+    sequence: int = 1,
+) -> ProviderEvidenceEnvelopeV1:
+    capture = ProviderCaptureIntegrityV1(
+        raw_bytes_digest="raw-digest",
+        storage_id="capture-1",
+        capture_sequence=sequence,
+        durable=durable,
+    )
+    source = ProviderSourceAuthenticationV1(
+        method=method,
+        verified=verified,
+        provider_identity="github",
+    )
+    return ProviderEvidenceEnvelopeV1(capture, source)
+
+
 def causal_resolution_fixture(
     identity: PromotionOperationIdentityV1 | None = None,
     *,
-    provider_result: ProviderMergeResultV1 | None = None,
-    effect_set: PromotionStackEffectSetV1 | None = None,
-    topology_binding: ProviderTopologyBindingV1 | None = None,
+    provider_result: ProviderMergeResultV1 | None | object = _UNSET,
+    effect_set: PromotionStackEffectSetV1 | None | object = _UNSET,
+    topology_binding: ProviderTopologyBindingV1 | None | object = _UNSET,
+    provider_evidence: ProviderEvidenceEnvelopeV1 | None | object = _UNSET,
 ) -> PromotionCausalResolutionV1:
     identity = identity or stack_identity_fixture()
+    if provider_result is _UNSET:
+        provider_result = provider_merge_result_fixture(identity)
+    if effect_set is _UNSET:
+        effect_set = stack_effect_fixture(identity)
+    if topology_binding is _UNSET:
+        topology_binding = topology_binding_fixture(identity)
+    if provider_evidence is _UNSET:
+        provider_evidence = provider_evidence_fixture()
     return PromotionCausalResolutionV1.resolve(
         identity,
-        provider_result if provider_result is not None else provider_merge_result_fixture(identity),
-        effect_set if effect_set is not None else stack_effect_fixture(identity),
-        topology_binding if topology_binding is not None else topology_binding_fixture(identity),
+        provider_result,
+        effect_set,
+        topology_binding,
+        provider_evidence,
     )
+
+
+def test_capture_integrity_hashes_exact_raw_bytes():
+    capture = ProviderCaptureIntegrityV1.capture(
+        b"provider-result",
+        "store-1",
+        1,
+    )
+    assert capture.raw_bytes_digest == hashlib.sha256(
+        b"provider-result"
+    ).hexdigest()
+    assert capture.is_valid()
+
+
+def test_capture_integrity_rejects_empty_storage_identity():
+    capture = ProviderCaptureIntegrityV1("digest", "", 1, durable=True)
+    assert not capture.is_valid()
+
+
+def test_capture_integrity_rejects_nonpositive_sequence():
+    capture = ProviderCaptureIntegrityV1("D", "store-1", 0, durable=True)
+    assert not capture.is_valid()
+
+
+def test_source_authentication_api_channel_is_distinct_from_attestation():
+    evidence = provider_evidence_fixture()
+    assert evidence.is_preserved_provider_evidence()
+    assert not evidence.has_provider_attestation()
+
+
+def test_source_authentication_rejects_missing_provider_identity():
+    evidence = ProviderEvidenceEnvelopeV1(
+        ProviderCaptureIntegrityV1("D", "store-1", 1),
+        ProviderSourceAuthenticationV1(
+            "authenticated-api-channel",
+            True,
+            None,
+        ),
+    )
+    assert not evidence.is_preserved_provider_evidence()
+
+
+def test_source_authentication_rejects_unverified_api_channel():
+    evidence = provider_evidence_fixture(verified=False)
+    assert not evidence.is_preserved_provider_evidence()
+
+
+def test_webhook_hmac_verification_accepts_exact_payload():
+    payload = b'{"action":"closed","pull_request":{"number":7087}}'
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-1",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-1",
+        expected_event_type="pull_request",
+        expected_repository="Luminous-Dynamics/symthaea",
+    )
+
+
+def test_webhook_hmac_verification_rejects_tampered_payload():
+    payload = b'{"action":"closed"}'
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-2",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert not receipt.verify(b'{"action":"opened"}', b"secret")
+
+
+def test_webhook_hmac_verification_rejects_wrong_secret():
+    payload = b'{"action":"closed"}'
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-3",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert not receipt.verify(payload, b"wrong")
+
+
+def test_webhook_delivery_registry_accepts_new_delivery():
+    payload = b"{}"
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-4",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    registry = ProviderDeliveryRegistryV1()
+    assert registry.observe(receipt) == "new-delivery"
+    registry = registry.record(receipt)
+    assert registry.observe(receipt) == "duplicate-identical"
+
+
+def test_webhook_context_mismatch_rejects_even_with_valid_hmac():
+    payload = b'{"action":"closed"}'
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-context",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        payload,
+        b"secret",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-2",
+        expected_event_type="pull_request",
+        expected_repository="Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-1",
+        expected_event_type="issues",
+        expected_repository="Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        expected_hook_id="hook-1",
+        expected_event_type="pull_request",
+        expected_repository="other/repo",
+    )
+
+
+def test_webhook_delivery_registry_rejects_same_id_with_different_payload():
+    first = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-5",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        b"{}",
+        b"secret",
+    )
+    second = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-5",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+        b'{"action":"different"}',
+        b"secret",
+    )
+    registry = ProviderDeliveryRegistryV1().record(first)
+    assert registry.observe(second) == "delivery-id-conflict"
+
+
+def test_webhook_authentication_does_not_prove_merge_result_causality():
+    identity = stack_identity_fixture()
+    payload = b'{"action":"closed"}'
+    receipt = ProviderWebhookReceiptV1.from_delivery(
+        "delivery-6",
+        payload,
+        b"secret",
+    )
+    assert receipt.verify(payload, b"secret")
+    webhook_evidence = ProviderEvidenceEnvelopeV1(
+        ProviderCaptureIntegrityV1(
+            hashlib.sha256(payload).hexdigest(),
+            "webhook-1",
+            1,
+        ),
+        ProviderSourceAuthenticationV1(
+            "webhook-hmac-verified",
+            True,
+            "github",
+        ),
+    )
+    result = provider_merge_result_fixture(identity)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=webhook_evidence,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_attestation_material_does_not_rescue_untrusted_capture():
+    evidence = ProviderEvidenceEnvelopeV1(
+        ProviderCaptureIntegrityV1("D", "store-1", 1),
+        ProviderSourceAuthenticationV1(
+            "local-untrusted",
+            True,
+            "github",
+        ),
+        ProviderAttestationV1(
+            scheme="future-provider-attestation",
+            verified=True,
+        ),
+    )
+    assert evidence.has_provider_attestation()
+    assert not evidence.is_preserved_provider_evidence()
+
+
+def test_fabricated_local_capture_cannot_establish_requested_causality():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    local = provider_evidence_fixture(
+        method="local-untrusted",
+        verified=True,
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=local,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_direct_provider_result_without_evidence_cannot_be_causal():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=None,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_authenticated_api_capture_can_support_requested_causality():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    evidence = provider_evidence_fixture()
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=evidence,
+    )
+    assert resolution.outcome == "requested-effect-causal"
+
+
+def test_invalid_capture_cannot_support_requested_causality():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    evidence = provider_evidence_fixture(durable=False)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=evidence,
+    )
+    assert resolution.outcome == "causality-unestablished"
 
 
 def test_provider_result_retention_captured_locally_survives_expiry():
@@ -1637,6 +2093,24 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_capture_integrity_hashes_exact_raw_bytes,
+    test_capture_integrity_rejects_empty_storage_identity,
+    test_capture_integrity_rejects_nonpositive_sequence,
+    test_source_authentication_api_channel_is_distinct_from_attestation,
+    test_source_authentication_rejects_missing_provider_identity,
+    test_source_authentication_rejects_unverified_api_channel,
+    test_webhook_hmac_verification_accepts_exact_payload,
+    test_webhook_hmac_verification_rejects_tampered_payload,
+    test_webhook_hmac_verification_rejects_wrong_secret,
+    test_webhook_context_mismatch_rejects_even_with_valid_hmac,
+    test_webhook_delivery_registry_accepts_new_delivery,
+    test_webhook_delivery_registry_rejects_same_id_with_different_payload,
+    test_webhook_authentication_does_not_prove_merge_result_causality,
+    test_attestation_material_does_not_rescue_untrusted_capture,
+    test_fabricated_local_capture_cannot_establish_requested_causality,
+    test_direct_provider_result_without_evidence_cannot_be_causal,
+    test_authenticated_api_capture_can_support_requested_causality,
+    test_invalid_capture_cannot_support_requested_causality,
     test_provider_result_retention_captured_locally_survives_expiry,
     test_provider_result_retention_is_recoverable_before_expiry,
     test_provider_result_retention_expires_at_window_boundary,

@@ -64,6 +64,12 @@ jobs:
               "ProviderMergeResultV1",
               "PromotionCausalResolutionV1",
               "ProviderResultRetentionV1",
+              "ProviderCaptureIntegrityV1",
+              "ProviderSourceAuthenticationV1",
+              "ProviderAttestationV1",
+              "ProviderEvidenceEnvelopeV1",
+              "ProviderWebhookReceiptV1",
+              "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
               "PromotionStackEffectSetV1",
           }
@@ -90,6 +96,27 @@ jobs:
           }
           for state in retention_states:
               assert f'"{state}"' in source, f"Missing retention state: {state}"
+
+          authenticity_markers = {
+              "HMAC-SHA256",
+              "authenticated-api-channel",
+              "webhook-hmac-verified",
+              "local-untrusted",
+              "delivery-id-conflict",
+              "duplicate-identical",
+          }
+          for marker in authenticity_markers:
+              assert f'"{marker}"' in source, f"Missing authenticity marker: {marker}"
+
+          webhook_context_fields = {
+              "hook_id",
+              "event_type",
+              "repository",
+              "delivery_id",
+              "payload_bytes_digest",
+          }
+          for field in webhook_context_fields:
+              assert field in source, f"Missing webhook context field: {field}"
 
           expected_call_args = {
               "prepare_dispatch": 4,    # self omitted; four explicit inputs
