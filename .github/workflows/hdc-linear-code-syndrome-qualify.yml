@@ -682,12 +682,7 @@ jobs:
           echo "artifact_refetch_name=$REFETCH_NAME" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_repo_id=$REFETCH_REPO_ID" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_run_id=$REFETCH_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "artifact_refetch_head_sha=$REFETCH_HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "artifact_refetch_synthetic_merge_sha=$SYNTHETIC_MERGE_SHA" >> "$GITHUB_OUTPUT"
-          echo "artifact_refetch_pr_head_sha=$EXACT_HEAD" >> "$GITHUB_OUTPUT"
           echo "artifact_refetch_head_repo_id=$REFETCH_HEAD_REPO_ID" >> "$GITHUB_OUTPUT"
-          echo "artifact_refetch_digest=$REFETCH_DIGEST" >> "$GITHUB_OUTPUT"
-          echo "artifact_refetch_match=true" >> "$GITHUB_OUTPUT"
       - name: Publish artifact provenance summary
         if: always() && steps.upload_receipt.outcome == 'success'
         env:
