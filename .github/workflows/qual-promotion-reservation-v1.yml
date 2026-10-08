@@ -39,6 +39,7 @@ jobs:
 
           required_classes = {
               "ProviderTopologyCasPredicateV1",
+              "ProviderTopologyCasRequestV1",
               "ProviderTopologyCasProviderResultV1",
               "ProviderTopologyCasEvidenceV1",
               "ProviderTopologyBindingV1",
