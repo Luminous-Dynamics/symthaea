@@ -2447,6 +2447,35 @@ mod tests {
             ),
             Err(VulkanBarrierReceiptError::DeviceUuidBinding)
         ));
+
+        receipt.device_uuid = [1; 16];
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [9; 16],
+                1,
+            ),
+            Err(VulkanBarrierReceiptError::DriverUuidBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                9,
+            ),
+            Err(VulkanBarrierReceiptError::DriverIdBinding)
+        ));
     }
 
     #[test]
