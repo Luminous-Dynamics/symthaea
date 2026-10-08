@@ -126,11 +126,12 @@ resulting syndrome is compared directly with the production parity-check syndrom
 
 A stronger algebraic-independence witness now covers one deterministic code in each small random
 regime: for `[12,4]` and `[20,3]`, the complete dual space is enumerated directly by checking
-orthogonality against the generator basis. Every production parity-check row must occur in that
-brute-force dual space, the production rows must have rank (n-k), and the production
-zero-syndrome kernel is exhaustively checked against the code. This does not reconstruct (H) by
-the same nullspace-elimination procedure; it instead establishes that the production checks are a
-full-rank subset of the independently enumerated dual code.
+orthogonality against the generator basis. Every production parity-check row must occur in that brute-force dual space, and the
+complete XOR-span of the production check rows must equal the independently enumerated dual space
+element-for-element. The production zero-syndrome kernel is also exhaustively checked against the
+code. This does not reconstruct (H) by the same nullspace-elimination procedure; it instead
+establishes exact equality between the production check-row span and the independently enumerated
+dual code.
 
 
 The randomized qualification surface now probes deterministic observations from the
