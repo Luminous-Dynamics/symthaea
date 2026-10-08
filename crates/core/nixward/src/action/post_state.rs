@@ -2257,6 +2257,20 @@ mod tests {
     }
 
     #[test]
+    fn malformed_bus_incarnation_is_rejected() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_bus_id = Some("not-a-valid-bus-id".to_string());
+        assert_eq!(
+            NixVerifiedPostStateObservationV1::from_observer(obs).unwrap_err(),
+            NixPostStateErrorV1::InvalidBusId
+        );
+    }
+
+    #[test]
     fn receipt_rejects_bus_incarnation_rollover() {
         let exp = expectation(NixServiceOperationKindV1::Start);
         let obs = observation(
