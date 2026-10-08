@@ -1,56 +1,308 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://luminousdynamics.org/schemas/monetary-strategic-reporting-v1.schema.json",
-  "title":"Monetary Strategic Reporting Manipulability v1",
-  "type":"object","additionalProperties":false,
-  "required":["schema_version","experiment_id","factorial_size","batch_size","factors","reporting_policies","fixed_dimensions","profile_digests","edge_digests","claim_ceiling"],
-  "properties":{
-    "schema_version":{"const":"monetary-strategic-reporting-v1"},
-    "experiment_id":{"const":"monetary-interop-strategic-reporting-v1"},
-    "factorial_size":{"const":12960,"type":"integer"},
-    "batch_size":{"const":3,"type":"integer"},
-    "factors":{"type":"object","additionalProperties":false,"required":["monetary_pair","adapter","shock","seed","allocation_policy","focal_obligation","reporting_policy"],"properties":{
-      "monetary_pair":{"const":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"]},
-      "adapter":{"const":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"]},
-      "shock":{"const":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"]},
-      "seed":{"const":[11,23,47,89,131]},
-      "allocation_policy":{"const":["fifo","criticality_priority","minimum_liquidity_demand"]},
-      "focal_obligation":{"const":[0,1,2]},
-      "reporting_policy":{"const":["truthful","criticality_inflation","liquidity_demand_underreport","dual_misreport"]}
-    }},
-    "reporting_policies":{"type":"object","additionalProperties":false,"required":["truthful","criticality_inflation","liquidity_demand_underreport","dual_misreport"],"properties":{
-      "truthful":{"$ref":"#/$defs/reporting_policy"},
-      "criticality_inflation":{"$ref":"#/$defs/reporting_policy"},
-      "liquidity_demand_underreport":{"$ref":"#/$defs/reporting_policy"},
-      "dual_misreport":{"$ref":"#/$defs/reporting_policy"}
-    }},
-    "fixed_dimensions":{"type":"object","additionalProperties":false,"required":["topology","topology_digest","resource_regime","resource_digest","resource_capacity","allocation_policy_changes","obligations","liquidity_demand_multiplier_by_adapter","liquidity_shock_increment","common_random_number_identity","exogenous_random_namespace","reporting_boundary","reservation_boundary","comparison_boundary"],"properties":{
-      "topology":{"const":"full_mesh"},
-      "topology_digest":{"const":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983"},
-      "resource_regime":{"const":"bounded_shared_settlement_liquidity"},
-      "resource_digest":{"const":"8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7"},
-      "resource_capacity":{"const":15},
-      "allocation_policy_changes":{"const":"admission order only"},
-      "obligations":{"const":[{"obligation_index":0,"amount":15,"criticality":2},{"obligation_index":1,"amount":5,"criticality":1},{"obligation_index":2,"amount":10,"criticality":3}]},
-      "liquidity_demand_multiplier_by_adapter":{"const":{"redeem_reissue":1,"escrowed_atomic_swap":1,"multilateral_net_settlement":0.7,"absent":0}},
-      "liquidity_shock_increment":{"const":5},
-      "common_random_number_identity":{"const":"world-{shock}-{seed}; identical exogenous draw namespace across all reporting policies and allocation mechanisms"},
-      "exogenous_random_namespace":{"const":"world:{shock}:{seed}:obligation:{index}"},
-      "reporting_boundary":{"const":"reporting policy may change focal declared criticality and/or declared liquidity demand only; immutable true values, amount, adapter, topology, resource capacity, allocation mechanism and exogenous randomness remain fixed"},
-      "reservation_boundary":{"const":"resource reservation always consumes immutable true liquidity demand; declared demand is never a resource quantity"},
-      "comparison_boundary":{"const":"each non-truthful focal cell is paired with the exact truthful counterpart sharing pair, adapter, shock, seed, allocation policy and focal obligation"}
-    }},
-    "profile_digests":{"type":"object","additionalProperties":false,"required":["conventional-bank-money-v1","sovereign-money-v1","mutual-credit-v1","tokenized-deposit-v1","reserve-backed-stablecoin-v1"],"properties":{
-      "conventional-bank-money-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"sovereign-money-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"mutual-credit-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"tokenized-deposit-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"},"reserve-backed-stablecoin-v1":{"type":"string","pattern":"^[a-f0-9]{64}$"}
-    }},
-    "edge_digests":{"type":"object","additionalProperties":false,"required":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],"properties":{
-      "bank_mutual":{"type":"string","pattern":"^[a-f0-9]{64}$"},"bank_stablecoin":{"type":"string","pattern":"^[a-f0-9]{64}$"},"tokenized_deposit_stablecoin":{"type":"string","pattern":"^[a-f0-9]{64}$"}
-    }},
-    "claim_ceiling":{"type":"string","minLength":1}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/monetary-strategic-reporting-v1.schema.json",
+  "title": "Monetary Strategic Reporting Manipulability v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "factorial_size",
+    "batch_size",
+    "factors",
+    "reporting_policies",
+    "fixed_dimensions",
+    "profile_digests",
+    "edge_digests",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "monetary-strategic-reporting-v1"
+    },
+    "experiment_id": {
+      "const": "monetary-interop-strategic-reporting-v1"
+    },
+    "factorial_size": {
+      "const": 12960,
+      "type": "integer"
+    },
+    "batch_size": {
+      "const": 3,
+      "type": "integer"
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monetary_pair",
+        "adapter",
+        "shock",
+        "seed",
+        "allocation_policy",
+        "focal_obligation",
+        "reporting_policy"
+      ],
+      "properties": {
+        "monetary_pair": {
+          "const": [
+            "bank_mutual",
+            "bank_stablecoin",
+            "tokenized_deposit_stablecoin"
+          ]
+        },
+        "adapter": {
+          "const": [
+            "redeem_reissue",
+            "escrowed_atomic_swap",
+            "multilateral_net_settlement",
+            "absent"
+          ]
+        },
+        "shock": {
+          "const": [
+            "normal",
+            "liquidity_shock",
+            "network_partition",
+            "issuer_default",
+            "bridge_failure",
+            "stale_quote"
+          ]
+        },
+        "seed": {
+          "const": [
+            11,
+            23,
+            47,
+            89,
+            131
+          ]
+        },
+        "allocation_policy": {
+          "const": [
+            "fifo",
+            "criticality_priority",
+            "minimum_liquidity_demand"
+          ]
+        },
+        "focal_obligation": {
+          "const": [
+            0,
+            1,
+            2
+          ]
+        },
+        "reporting_policy": {
+          "const": [
+            "truthful",
+            "criticality_inflation",
+            "liquidity_demand_underreport",
+            "dual_misreport"
+          ]
+        }
+      }
+    },
+    "reporting_policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "truthful",
+        "criticality_inflation",
+        "liquidity_demand_underreport",
+        "dual_misreport"
+      ],
+      "properties": {
+        "truthful": {
+          "$ref": "#/$defs/reporting_policy"
+        },
+        "criticality_inflation": {
+          "$ref": "#/$defs/reporting_policy"
+        },
+        "liquidity_demand_underreport": {
+          "$ref": "#/$defs/reporting_policy"
+        },
+        "dual_misreport": {
+          "$ref": "#/$defs/reporting_policy"
+        }
+      }
+    },
+    "fixed_dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topology",
+        "topology_digest",
+        "resource_regime",
+        "resource_digest",
+        "resource_capacity",
+        "allocation_policy_changes",
+        "obligations",
+        "liquidity_demand_multiplier_by_adapter",
+        "liquidity_shock_increment",
+        "common_random_number_identity",
+        "exogenous_random_namespace",
+        "reporting_boundary",
+        "reservation_boundary",
+        "comparison_boundary",
+        "allocation_policy_digests"
+      ],
+      "properties": {
+        "topology": {
+          "const": "full_mesh"
+        },
+        "topology_digest": {
+          "const": "6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983"
+        },
+        "resource_regime": {
+          "const": "bounded_shared_settlement_liquidity"
+        },
+        "resource_digest": {
+          "const": "8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7"
+        },
+        "resource_capacity": {
+          "const": 15
+        },
+        "allocation_policy_changes": {
+          "const": "admission order only"
+        },
+        "obligations": {
+          "const": [
+            {
+              "obligation_index": 0,
+              "amount": 15,
+              "criticality": 2
+            },
+            {
+              "obligation_index": 1,
+              "amount": 5,
+              "criticality": 1
+            },
+            {
+              "obligation_index": 2,
+              "amount": 10,
+              "criticality": 3
+            }
+          ]
+        },
+        "liquidity_demand_multiplier_by_adapter": {
+          "const": {
+            "redeem_reissue": 1,
+            "escrowed_atomic_swap": 1,
+            "multilateral_net_settlement": 0.7,
+            "absent": 0
+          }
+        },
+        "liquidity_shock_increment": {
+          "const": 5
+        },
+        "common_random_number_identity": {
+          "const": "world-{shock}-{seed}; identical exogenous draw namespace across all reporting policies and allocation mechanisms"
+        },
+        "exogenous_random_namespace": {
+          "const": "world:{shock}:{seed}:obligation:{index}"
+        },
+        "reporting_boundary": {
+          "const": "reporting policy may change focal declared criticality and/or declared liquidity demand only; immutable true values, amount, adapter, topology, resource capacity, allocation mechanism and exogenous randomness remain fixed"
+        },
+        "reservation_boundary": {
+          "const": "resource reservation always consumes immutable true liquidity demand; declared demand is never a resource quantity"
+        },
+        "comparison_boundary": {
+          "const": "each non-truthful focal cell is paired with the exact truthful counterpart sharing pair, adapter, shock, seed, allocation policy and focal obligation"
+        },
+        "allocation_policy_digests": {
+          "const": {
+            "fifo": "7bfe21a9815c819972baf46f8dc77199a6f602d31fcabc8e0708b14436777fb8",
+            "criticality_priority": "89fb3406736d4d36c7a29c8094e3be198b3135090e7c8f78a13bfec0d2f2d234",
+            "minimum_liquidity_demand": "fe1ae1b40106ac7c5343f5aa254ce3e0bd454df49fbdca99b4ae40519e47c900"
+          }
+        }
+      }
+    },
+    "profile_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conventional-bank-money-v1",
+        "sovereign-money-v1",
+        "mutual-credit-v1",
+        "tokenized-deposit-v1",
+        "reserve-backed-stablecoin-v1"
+      ],
+      "properties": {
+        "conventional-bank-money-v1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sovereign-money-v1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mutual-credit-v1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "tokenized-deposit-v1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reserve-backed-stablecoin-v1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "edge_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bank_mutual",
+        "bank_stablecoin",
+        "tokenized_deposit_stablecoin"
+      ],
+      "properties": {
+        "bank_mutual": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bank_stablecoin": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "tokenized_deposit_stablecoin": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
   },
-  "$defs":{
-    "reporting_policy":{"type":"object","additionalProperties":false,"required":["policy_id","digest","rule"],"properties":{
-      "policy_id":{"type":"string","minLength":1},"digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"rule":{"type":"string","minLength":1}
-    }}
+  "$defs": {
+    "reporting_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "digest",
+        "rule"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
   }
 }
