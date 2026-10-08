@@ -1,57 +1,93 @@
-# Promotion Webhook Local Temporal Sequence v1
+# Promotion Webhook Temporal Evidence v2
 
-This tranche adds a separate local monotonic ordering primitive to the bounded temporal effect model.
+This tranche hardens the cross-domain clock boundary that was intentionally left abstract in the first bounded-time model.
 
-## Why wall-clock time is insufficient
+## Clock relation is evidence, not a boolean
 
-Local wall-clock timestamps can move backward or jump forward.
+A usable relation is now a frozen composition of three distinct records:
 
-A monotonic sequence can establish ordering without pretending to provide absolute elapsed time.
+    ClockRelationEvidenceV1
+        ↓
+    ClockRelationVerificationV1
+        ↓
+    ClockRelationTrustSnapshotV1
+        ↓
+    ClockRelationV1
 
-## Sequence contract
+The evidence records where the relation came from, its provider/local clock domains, its worst-case skew bound, when that bound was measured, its local validity interval, an evidence identity, and the source-authentication class.
 
-LocalTemporalSequenceV1 records:
+The verification record binds to the exact evidence digest and records the verifier identity, verifier-policy digest, verification time, validity interval, freshness ceiling, and revocation epoch.
 
-    reservation sequence
-    dispatch sequence
-    observation sequence
+The trust snapshot binds the verifier policy and revocation epoch used for the admission decision. This is a local trust snapshot, not a claim that the external time source is inherently truthful.
 
-Required order:
+A generic verified=true flag is no longer sufficient.
 
-    reservation_seq <= dispatch_seq <= observation_seq
+## Freshness and validity
 
-Values must be positive.
+The skew bound is interpreted as a conservative bound over the entire declared validity interval, not as an indefinitely reusable instantaneous measurement.
 
-## Interaction with wall-clock timing
+The relation is admitted only when:
 
-Temporal admissibility requires both:
+    relation evidence covers dispatch and observation
+    verification covers dispatch and observation
+    verification time <= dispatch
+    observation - verification_time <= freshness_max_age
+    the trust snapshot existed by dispatch
 
-    usable provider/local clock relation with explicit skew bound
-    +
-    valid local monotonic sequence
+Therefore a relation that was valid yesterday cannot be silently reused for today's promotion merely because its max_skew_ms still looks plausible.
 
-The sequence establishes local ordering.
+A relation that becomes stale before local observation fails closed as:
 
-The clock relation bounds cross-domain wall-clock comparison.
+    clock-relation-stale
 
-Neither establishes provider truthfulness or operation causality.
+A validity-window miss fails closed as:
 
-## Fail-closed cases
+    clock-relation-outside-validity
 
-Without local sequence evidence:
+Verification that occurs after dispatch fails closed as:
 
-    local-monotonic-sequence-missing
+    clock-relation-established-after-dispatch
 
-For invalid ordering or non-positive sequence values:
+The trust snapshot must also predate the verifier decision. Otherwise the verifier could appear to have made an accepted decision using a trust state that did not yet exist.
 
-    invalid-local-monotonic-sequence
+That fails closed as:
 
-In both cases the timing result is not temporally admissible.
+    clock-relation-trust-snapshot-after-verification
 
-## Claim ceiling
+Evidence measurement must not occur after verification. Such a record would amount to future evidence being used to justify an earlier decision and is structurally invalid.
 
-This establishes only explicit local monotonic ordering as a prerequisite to the bounded temporal effect claim.
+## Policy drift and revocation
 
-It does not establish monotonic wall-clock time, synchronized clocks, provider truthfulness, causal attribution, provider-side topology CAS, governance legitimacy, production atomicity, or promotion success.
+The operation compares the verification's policy digest and revocation epoch against an explicit local trust snapshot.
 
-Related: #7169, #7171, #7176, #7177.
+Policy mismatch is:
+
+    clock-relation-policy-drift
+
+Revocation-epoch mismatch is:
+
+    clock-relation-revoked
+
+This does not retroactively rewrite historical evidence. The intended model is a decision-time snapshot: a relation is qualified under the exact trust state that existed for that operation. A later trust-state change can prevent new admission or force reconciliation to treat a fresh decision as unavailable without changing the old bytes.
+
+## Why this shape
+
+Secure time protocols treat freshness as a first-class property. Current Roughtime protocol work binds a server response to a fresh client nonce, includes an explicit uncertainty radius, and uses time-limited online keys; NTS similarly has explicit concerns around certificate validity and replay. RFC 8633 also recommends multiple independent time sources and monitoring because authenticated packets alone do not make the reported time infallible. These mechanisms motivate the data-model separation here, but they do not make this deterministic promotion oracle a real time-synchronization implementation.
+
+## Remaining boundary
+
+Even a provenance-complete and fresh clock relation still does not establish:
+
+    provider truthfulness
+    immunity to network delay/asymmetry attacks
+    cryptographic synchronization of the GitHub clock to the local clock
+    provider-side topology CAS
+    operation causality
+    production atomicity
+    promotion success
+
+The bounded temporal gate therefore remains a qualification predicate, not an oracle of universal time.
+
+The local monotonic sequence remains a separate ordering primitive. Its fixture semantics were also corrected so an explicit missing sequence stays missing instead of being silently replaced by a default sequence.
+
+Related: #7176, #7180.

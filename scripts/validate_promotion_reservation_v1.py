@@ -611,18 +611,248 @@ def parse_provider_timestamp_ms(value: str) -> int | None:
 
 
 @dataclass(frozen=True)
-class ClockRelationV1:
+class ClockRelationEvidenceV1:
+    source_origin: str
+    evidence_id: str
     provider_clock_domain: str
     local_clock_domain: str
     max_skew_ms: int
-    verified: bool = False
+    measured_at_local_time_ms: int
+    valid_from_local_time_ms: int
+    valid_until_local_time_ms: int
+    source_authentication: str
 
-    def usable(self) -> bool:
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "evidence_id": self.evidence_id,
+            "local_clock_domain": self.local_clock_domain,
+            "max_skew_ms": self.max_skew_ms,
+            "measured_at_local_time_ms": self.measured_at_local_time_ms,
+            "provider_clock_domain": self.provider_clock_domain,
+            "source_authentication": self.source_authentication,
+            "source_origin": self.source_origin,
+            "valid_from_local_time_ms": self.valid_from_local_time_ms,
+            "valid_until_local_time_ms": self.valid_until_local_time_ms,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def internally_consistent(self) -> bool:
         return (
-            bool(self.provider_clock_domain)
+            bool(self.source_origin)
+            and bool(self.evidence_id)
+            and bool(self.provider_clock_domain)
             and bool(self.local_clock_domain)
+            and bool(self.source_authentication)
             and self.max_skew_ms >= 0
-            and self.verified
+            and self.measured_at_local_time_ms >= 0
+            and self.valid_from_local_time_ms >= 0
+            and self.valid_until_local_time_ms >= 0
+            and self.valid_from_local_time_ms
+            <= self.measured_at_local_time_ms
+            <= self.valid_until_local_time_ms
+        )
+
+
+@dataclass(frozen=True)
+class ClockRelationVerificationV1:
+    evidence_digest: str
+    verifier_identity: str
+    verifier_policy_digest: str
+    verified_at_local_time_ms: int
+    valid_from_local_time_ms: int
+    valid_until_local_time_ms: int
+    freshness_max_age_ms: int
+    revocation_epoch: int
+    decision: str = "accepted"
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "decision": self.decision,
+            "evidence_digest": self.evidence_digest,
+            "freshness_max_age_ms": self.freshness_max_age_ms,
+            "revocation_epoch": self.revocation_epoch,
+            "valid_from_local_time_ms": self.valid_from_local_time_ms,
+            "valid_until_local_time_ms": self.valid_until_local_time_ms,
+            "verified_at_local_time_ms": self.verified_at_local_time_ms,
+            "verifier_identity": self.verifier_identity,
+            "verifier_policy_digest": self.verifier_policy_digest,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def internally_consistent(
+        self,
+        evidence: ClockRelationEvidenceV1,
+    ) -> bool:
+        return (
+            self.evidence_digest == evidence.digest()
+            and bool(self.verifier_identity)
+            and bool(self.verifier_policy_digest)
+            and self.decision == "accepted"
+            and self.verified_at_local_time_ms >= 0
+            and self.valid_from_local_time_ms >= 0
+            and self.valid_until_local_time_ms >= 0
+            and self.freshness_max_age_ms >= 0
+            and self.revocation_epoch >= 0
+            and self.valid_from_local_time_ms
+            <= self.verified_at_local_time_ms
+            <= self.valid_until_local_time_ms
+            and evidence.measured_at_local_time_ms
+            <= self.verified_at_local_time_ms
+            and self.valid_from_local_time_ms
+            >= evidence.valid_from_local_time_ms
+            and self.valid_until_local_time_ms
+            <= evidence.valid_until_local_time_ms
+        )
+
+
+@dataclass(frozen=True)
+class ClockRelationTrustSnapshotV1:
+    verifier_policy_digest: str
+    revocation_epoch: int
+    snapshot_local_time_ms: int
+
+    def internally_consistent(self) -> bool:
+        return (
+            bool(self.verifier_policy_digest)
+            and self.revocation_epoch >= 0
+            and self.snapshot_local_time_ms >= 0
+        )
+
+    def digest(self) -> str:
+        payload = {
+            "revocation_epoch": self.revocation_epoch,
+            "snapshot_local_time_ms": self.snapshot_local_time_ms,
+            "verifier_policy_digest": self.verifier_policy_digest,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+
+@dataclass(frozen=True)
+class ClockRelationV1:
+    evidence: ClockRelationEvidenceV1 | None
+    verification: ClockRelationVerificationV1 | None
+    trust_snapshot: ClockRelationTrustSnapshotV1 | None
+
+    @property
+    def provider_clock_domain(self) -> str:
+        return self.evidence.provider_clock_domain if self.evidence is not None else ""
+
+    @property
+    def local_clock_domain(self) -> str:
+        return self.evidence.local_clock_domain if self.evidence is not None else ""
+
+    @property
+    def max_skew_ms(self) -> int:
+        return self.evidence.max_skew_ms if self.evidence is not None else -1
+
+    def digest(self) -> str:
+        payload = {
+            "evidence_digest": (
+                self.evidence.digest() if self.evidence is not None else None
+            ),
+            "trust_snapshot_digest": (
+                self.trust_snapshot.digest()
+                if self.trust_snapshot is not None
+                else None
+            ),
+            "verification_digest": (
+                self.verification.digest()
+                if self.verification is not None
+                else None
+            ),
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def classify(
+        self,
+        dispatch_time_ms: int | None = None,
+        observation_time_ms: int | None = None,
+    ) -> str:
+        if (
+            self.evidence is None
+            or self.verification is None
+            or self.trust_snapshot is None
+        ):
+            return "clock-relation-provenance-missing"
+        if (
+            not self.evidence.internally_consistent()
+            or not self.verification.internally_consistent(self.evidence)
+            or not self.trust_snapshot.internally_consistent()
+        ):
+            return "clock-relation-invalid"
+        if (
+            self.verification.verifier_policy_digest
+            != self.trust_snapshot.verifier_policy_digest
+        ):
+            return "clock-relation-policy-drift"
+        if (
+            self.verification.revocation_epoch
+            != self.trust_snapshot.revocation_epoch
+        ):
+            return "clock-relation-revoked"
+        if dispatch_time_ms is None or observation_time_ms is None:
+            return "clock-relation-admissible"
+        if dispatch_time_ms < 0 or observation_time_ms < 0:
+            return "clock-relation-invalid"
+        if self.trust_snapshot.snapshot_local_time_ms
+            > self.verification.verified_at_local_time_ms:
+            return "clock-relation-trust-snapshot-after-verification"
+        if self.trust_snapshot.snapshot_local_time_ms > dispatch_time_ms:
+            return "clock-relation-trust-snapshot-after-dispatch"
+        if self.verification.verified_at_local_time_ms > dispatch_time_ms:
+            return "clock-relation-established-after-dispatch"
+        if (
+            dispatch_time_ms < self.evidence.valid_from_local_time_ms
+            or observation_time_ms > self.evidence.valid_until_local_time_ms
+            or dispatch_time_ms < self.verification.valid_from_local_time_ms
+            or observation_time_ms > self.verification.valid_until_local_time_ms
+        ):
+            return "clock-relation-outside-validity"
+        if (
+            observation_time_ms - self.verification.verified_at_local_time_ms
+            > self.verification.freshness_max_age_ms
+        ):
+            return "clock-relation-stale"
+        return "clock-relation-admissible"
+
+    def usable(
+        self,
+        dispatch_time_ms: int | None = None,
+        observation_time_ms: int | None = None,
+    ) -> bool:
+        return (
+            self.classify(dispatch_time_ms, observation_time_ms)
+            == "clock-relation-admissible"
         )
 
 
@@ -700,8 +930,15 @@ class ProviderWebhookEffectTimingV1:
         if self.provider_delivery_time_ms is not None:
             if self.provider_delivery_time_ms < self.provider_event_time_ms:
                 return "invalid-provider-time-order"
-        if self.clock_relation is None or not self.clock_relation.usable():
+        if self.clock_relation is None:
             return "cross-domain-time-unbounded"
+
+        clock_state = self.clock_relation.classify(
+            self.local_dispatch_time_ms,
+            self.local_observation_time_ms,
+        )
+        if clock_state != "clock-relation-admissible":
+            return clock_state
 
         skew = self.clock_relation.max_skew_ms
         event = self.provider_event_time_ms
@@ -1287,13 +1524,49 @@ def clock_relation_fixture(
     *,
     max_skew_ms: int = 1000,
     verified: bool = True,
+    valid_from_local_time_ms: int = 1791475189000,
+    valid_until_local_time_ms: int = 1791475210000,
+    freshness_max_age_ms: int = 20000,
+    verification_time_ms: int = 1791475190000,
+    revocation_epoch: int = 1,
+    verifier_policy_digest: str = "clock-policy-v1",
+    snapshot_local_time_ms: int = 1791475190000,
 ) -> ClockRelationV1:
-    return ClockRelationV1(
+    evidence = ClockRelationEvidenceV1(
+        source_origin="trusted-time-source",
+        evidence_id="clock-evidence-1",
         provider_clock_domain="github",
         local_clock_domain="local",
         max_skew_ms=max_skew_ms,
-        verified=verified,
+        measured_at_local_time_ms=1791475189000,
+        valid_from_local_time_ms=valid_from_local_time_ms,
+        valid_until_local_time_ms=valid_until_local_time_ms,
+        source_authentication="authenticated-time-source",
     )
+    verification = ClockRelationVerificationV1(
+        evidence_digest=evidence.digest(),
+        verifier_identity="clock-verifier-v1",
+        verifier_policy_digest=verifier_policy_digest,
+        verified_at_local_time_ms=verification_time_ms,
+        valid_from_local_time_ms=valid_from_local_time_ms,
+        valid_until_local_time_ms=valid_until_local_time_ms,
+        freshness_max_age_ms=freshness_max_age_ms,
+        revocation_epoch=revocation_epoch,
+        decision="accepted" if verified else "rejected",
+    )
+    trust_snapshot = ClockRelationTrustSnapshotV1(
+        verifier_policy_digest=verifier_policy_digest,
+        revocation_epoch=revocation_epoch,
+        snapshot_local_time_ms=snapshot_local_time_ms,
+    )
+    return ClockRelationV1(
+        evidence=evidence,
+        verification=verification,
+        trust_snapshot=trust_snapshot,
+    )
+
+
+DEFAULT_CLOCK_RELATION = clock_relation_fixture()
 
 
 def effect_timing_fixture(
@@ -1303,8 +1576,8 @@ def effect_timing_fixture(
     reservation_time_ms: int | None = 1791475190000,
     dispatch_time_ms: int | None = 1791475195000,
     observation_time_ms: int | None = 1791475205000,
-    clock_relation: ClockRelationV1 | None = None,
-    local_sequence: LocalTemporalSequenceV1 | None = None,
+    clock_relation: ClockRelationV1 | None = DEFAULT_CLOCK_RELATION,
+    local_sequence: LocalTemporalSequenceV1 | None = LocalTemporalSequenceV1(1, 2, 3),
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
         provider_event_time_ms=event_time_ms,
@@ -1312,14 +1585,8 @@ def effect_timing_fixture(
         local_reservation_time_ms=reservation_time_ms,
         local_dispatch_time_ms=dispatch_time_ms,
         local_observation_time_ms=observation_time_ms,
-        clock_relation=(
-            clock_relation if clock_relation is not None else clock_relation_fixture()
-        ),
-        local_sequence=(
-            local_sequence
-            if local_sequence is not None
-            else LocalTemporalSequenceV1(1, 2, 3)
-        ),
+        clock_relation=clock_relation,
+        local_sequence=local_sequence,
     )
 
 
@@ -1368,6 +1635,149 @@ def test_clock_relation_unverified_is_unusable():
 
 def test_clock_relation_negative_skew_is_unusable():
     assert not clock_relation_fixture(max_skew_ms=-1, verified=True).usable()
+
+
+def test_clock_relation_requires_provenance():
+    relation = ClockRelationV1(
+        evidence=None,
+        verification=None,
+        trust_snapshot=None,
+    )
+    assert not relation.usable()
+
+
+def test_clock_relation_rejects_mismatched_evidence_digest():
+    relation = clock_relation_fixture()
+    assert relation.verification is not None
+    verification = ClockRelationVerificationV1(
+        **{**relation.verification.__dict__, "evidence_digest": "forged"},
+    )
+    forged = ClockRelationV1(
+        evidence=relation.evidence,
+        verification=verification,
+        trust_snapshot=relation.trust_snapshot,
+    )
+    assert not forged.usable(1791475195000, 1791475205000)
+
+
+def test_clock_relation_rejects_policy_drift():
+    relation = clock_relation_fixture()
+    snapshot = ClockRelationTrustSnapshotV1(
+        verifier_policy_digest="clock-policy-v2",
+        revocation_epoch=1,
+        snapshot_local_time_ms=1791475190000,
+    )
+    forged = ClockRelationV1(
+        evidence=relation.evidence,
+        verification=relation.verification,
+        trust_snapshot=snapshot,
+    )
+    assert forged.classify(1791475195000, 1791475205000) == "clock-relation-policy-drift"
+
+
+def test_clock_relation_rejects_revocation_epoch_drift():
+    relation = clock_relation_fixture()
+    snapshot = ClockRelationTrustSnapshotV1(
+        verifier_policy_digest="clock-policy-v1",
+        revocation_epoch=2,
+        snapshot_local_time_ms=1791475190000,
+    )
+    forged = ClockRelationV1(
+        evidence=relation.evidence,
+        verification=relation.verification,
+        trust_snapshot=snapshot,
+    )
+    assert forged.classify(1791475195000, 1791475205000) == "clock-relation-revoked"
+
+
+def test_clock_relation_rejects_verification_after_dispatch():
+    relation = clock_relation_fixture(verification_time_ms=1791475196000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-established-after-dispatch"
+
+
+def test_clock_relation_rejects_trust_snapshot_after_verification():
+    relation = clock_relation_fixture(snapshot_local_time_ms=1791475191000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-trust-snapshot-after-verification"
+
+
+def test_clock_relation_rejects_trust_snapshot_after_dispatch():
+    relation = clock_relation_fixture(snapshot_local_time_ms=1791475196000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-trust-snapshot-after-dispatch"
+
+
+def test_clock_relation_rejects_evidence_measured_after_verification():
+    relation = clock_relation_fixture()
+    assert relation.evidence is not None
+    evidence = ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "measured_at_local_time_ms": 1791475191001},
+    )
+    assert evidence.measured_at_local_time_ms > relation.verification.verified_at_local_time_ms
+    forged = ClockRelationV1(
+        evidence=evidence,
+        verification=relation.verification,
+        trust_snapshot=relation.trust_snapshot,
+    )
+    assert forged.classify(1791475195000, 1791475205000) == "clock-relation-invalid"
+
+
+def test_clock_relation_rejects_invalid_relation_state():
+    relation = clock_relation_fixture(max_skew_ms=-1)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-invalid"
+
+
+def test_clock_relation_rejects_stale_relation():
+    relation = clock_relation_fixture(freshness_max_age_ms=4000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-stale"
+
+
+def test_clock_relation_rejects_expired_validity_before_observation():
+    relation = clock_relation_fixture(valid_until_local_time_ms=1791475204000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-outside-validity"
+
+
+def test_clock_relation_accepts_exact_validity_and_freshness_boundaries():
+    relation = clock_relation_fixture(
+        valid_from_local_time_ms=1791475190000,
+        valid_until_local_time_ms=1791475205000,
+        freshness_max_age_ms=15000,
+        verification_time_ms=1791475190000,
+    )
+    assert relation.classify(1791475190000, 1791475205000) == "clock-relation-admissible"
+
+
+def test_clock_relation_digest_binds_all_three_evidence_layers():
+    relation = clock_relation_fixture()
+    assert relation.evidence is not None
+    assert relation.verification is not None
+    assert relation.trust_snapshot is not None
+    original = relation.digest()
+
+    changed_evidence = ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_origin": "other-source"},
+    )
+    assert ClockRelationV1(
+        evidence=changed_evidence,
+        verification=relation.verification,
+        trust_snapshot=relation.trust_snapshot,
+    ).digest() != original
+
+    changed_verification = ClockRelationVerificationV1(
+        **{**relation.verification.__dict__, "verifier_identity": "clock-verifier-v2"},
+    )
+    assert ClockRelationV1(
+        evidence=relation.evidence,
+        verification=changed_verification,
+        trust_snapshot=relation.trust_snapshot,
+    ).digest() != original
+
+    changed_snapshot = ClockRelationTrustSnapshotV1(
+        **{**relation.trust_snapshot.__dict__, "snapshot_local_time_ms": 1791475191000},
+    )
+    assert ClockRelationV1(
+        evidence=relation.evidence,
+        verification=relation.verification,
+        trust_snapshot=changed_snapshot,
+    ).digest() != original
 
 
 def test_local_temporal_sequence_validates_monotonic_order():
@@ -3797,6 +4207,19 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_clock_relation_requires_provenance,
+    test_clock_relation_rejects_mismatched_evidence_digest,
+    test_clock_relation_rejects_policy_drift,
+    test_clock_relation_rejects_revocation_epoch_drift,
+    test_clock_relation_rejects_verification_after_dispatch,
+    test_clock_relation_rejects_trust_snapshot_after_verification,
+    test_clock_relation_rejects_trust_snapshot_after_dispatch,
+    test_clock_relation_rejects_evidence_measured_after_verification,
+    test_clock_relation_rejects_invalid_relation_state,
+    test_clock_relation_rejects_stale_relation,
+    test_clock_relation_rejects_expired_validity_before_observation,
+    test_clock_relation_accepts_exact_validity_and_freshness_boundaries,
+    test_clock_relation_digest_binds_all_three_evidence_layers,
     test_local_temporal_sequence_validates_monotonic_order,
     test_local_temporal_sequence_rejects_nonpositive_values,
     test_local_temporal_sequence_rejects_backward_dispatch,
