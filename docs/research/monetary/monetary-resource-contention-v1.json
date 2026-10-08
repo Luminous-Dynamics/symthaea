@@ -47,7 +47,8 @@
       "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
       "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
     },
-    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous jitter across resource regimes",
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous jitter across all treatment factors",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
     "liquidity_demand_units":{"redeem_reissue":10,"escrowed_atomic_swap":15,"multilateral_net_settlement":7,"absent":0},
     "liquidity_shock_increment":5,
     "manual_breakpoint_probability_ppm":300000,
