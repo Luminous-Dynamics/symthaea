@@ -223,6 +223,9 @@ jobs:
       # the shell-string executor or another "-c" parsing boundary.
       - name: No shell-backed executor in mutation handlers
         run: python3 .github/scripts/check-privileged-shell-boundary.py
+      # Durable execution evidence must remain monotonic: Started -> Bound -> Completed.
+      - name: Enforce durable execution evidence boundary
+        run: python3 .github/scripts/check-transaction-evidence-boundary.py
 
       - name: Verify transaction ledger durability invariants
         run: python3 .github/scripts/check-transaction-ledger-boundary.py
