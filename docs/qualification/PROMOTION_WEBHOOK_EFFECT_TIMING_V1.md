@@ -225,3 +225,11 @@ Monotonic readings are meaningful for ordering only when they originate from the
 A missing runtime clock identity is not admissible. A timing record reconstructed with a different monotonic clock identity is a different timing identity rather than an equivalent replay.
 
 This does not establish continuity across process restarts or prove the runtime clock's correctness; those require separate attestation/continuity evidence. It only prevents unrelated monotonic counters from being composed into one ordering witness.
+
+## Provider delivery recovery is not evidence retention
+
+GitHub exposes webhook delivery history and redelivery controls separately from the webhook payload itself. Current GitHub documentation states that webhook deliveries can be redelivered only within a bounded recent window (3 days for the documented interface).
+
+That recovery window must not be used as the system's evidence-retention guarantee. A delivery may remain semantically important after provider-side redelivery is unavailable, so durable local capture/reconciliation remains a separate boundary.
+
+A later provider redelivery can help recover evidence, but it cannot retroactively turn an expired or unavailable local/provider result into continuous causal provenance.
