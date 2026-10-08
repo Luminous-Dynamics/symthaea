@@ -15,7 +15,7 @@ The model retains:
 
 These timestamps are not collapsed into one generic event time.
 
-GitHub documents that webhook deliveries may arrive out of order and recommends timestamps when event ordering matters. The timing model therefore uses event occurrence time rather than webhook arrival order as its semantic input. citeturn940906search5
+GitHub documents that webhook deliveries may arrive out of order and recommends timestamps when event ordering matters. The timing model therefore uses event occurrence time rather than webhook arrival order as its semantic input.
 
 ## Clock relation
 
