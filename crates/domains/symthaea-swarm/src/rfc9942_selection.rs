@@ -374,7 +374,7 @@ impl Rfc9942VerifiedReceiptSelection {
     /// receives one immutable object whose private fields prove compatibility
     /// among the collection, selected Receipt, inner verification capability,
     /// and authenticated outer composition.
-    pub fn bind(
+    pub(crate) fn bind(
         decision: &ReceiptSelectionDecision,
         collection: &Rfc9942ReceiptCollection,
         verified: &crate::semantic_evidence_vds::Rfc9942VerifiedSignatureWithReceipt,
