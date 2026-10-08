@@ -673,7 +673,7 @@ jobs:
               subject: {
                 pr_number: expected.pr,
                 head_sha: expected.subject,
-                merge_sha: run.head_sha,
+                merge_sha: pr.merge_commit_sha ?? null,
                 head_branch: run.head_branch,
                 base_branch: pr.base.ref,
                 base_sha: pr.base.sha,
@@ -708,7 +708,7 @@ jobs:
               merge_snapshot: {
                 pr_merge_commit_sha: pr.merge_commit_sha ?? null,
                 observed_merge_commit_sha: liveEvidence.mergeCommit?.sha ?? null,
-                 merge_commit_sha_is_current: true,
+                merge_commit_sha_is_current: true,
                 observed_source_blob_shas: liveEvidence.mergeSourceBlobShas,
                 expected_source_blob_shas: expectedSourceBlobShas,
               },
