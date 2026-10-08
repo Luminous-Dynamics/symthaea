@@ -1690,6 +1690,16 @@ def test_clock_relation_rejects_verification_after_dispatch():
     assert relation.classify(1791475195000, 1791475205000) == "clock-relation-established-after-dispatch"
 
 
+def test_clock_relation_rejects_trust_snapshot_after_dispatch():
+    relation = clock_relation_fixture(snapshot_local_time_ms=1791475196000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-trust-snapshot-after-dispatch"
+
+
+def test_clock_relation_rejects_invalid_relation_state():
+    relation = clock_relation_fixture(max_skew_ms=-1)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-invalid"
+
+
 def test_clock_relation_rejects_stale_relation():
     relation = clock_relation_fixture(freshness_max_age_ms=4000)
     assert relation.classify(1791475195000, 1791475205000) == "clock-relation-stale"
@@ -1716,15 +1726,33 @@ def test_clock_relation_digest_binds_all_three_evidence_layers():
     assert relation.verification is not None
     assert relation.trust_snapshot is not None
     original = relation.digest()
+
+    changed_evidence = ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_origin": "other-source"},
+    )
+    assert ClockRelationV1(
+        evidence=changed_evidence,
+        verification=relation.verification,
+        trust_snapshot=relation.trust_snapshot,
+    ).digest() != original
+
     changed_verification = ClockRelationVerificationV1(
         **{**relation.verification.__dict__, "verifier_identity": "clock-verifier-v2"},
     )
-    changed = ClockRelationV1(
+    assert ClockRelationV1(
         evidence=relation.evidence,
         verification=changed_verification,
         trust_snapshot=relation.trust_snapshot,
+    ).digest() != original
+
+    changed_snapshot = ClockRelationTrustSnapshotV1(
+        **{**relation.trust_snapshot.__dict__, "snapshot_local_time_ms": 1791475191000},
     )
-    assert changed.digest() != original
+    assert ClockRelationV1(
+        evidence=relation.evidence,
+        verification=relation.verification,
+        trust_snapshot=changed_snapshot,
+    ).digest() != original
 
 
 def test_local_temporal_sequence_validates_monotonic_order():
@@ -4159,6 +4187,8 @@ TESTS = [
     test_clock_relation_rejects_policy_drift,
     test_clock_relation_rejects_revocation_epoch_drift,
     test_clock_relation_rejects_verification_after_dispatch,
+    test_clock_relation_rejects_trust_snapshot_after_dispatch,
+    test_clock_relation_rejects_invalid_relation_state,
     test_clock_relation_rejects_stale_relation,
     test_clock_relation_rejects_expired_validity_before_observation,
     test_clock_relation_accepts_exact_validity_and_freshness_boundaries,
