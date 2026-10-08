@@ -1747,6 +1747,9 @@ def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
         local_reservation_time_ms=timing.local_reservation_time_ms,
         local_dispatch_time_ms=timing.local_dispatch_time_ms,
         local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
         clock_relation=timing.clock_relation,
     )
     assert tampered.classify() == "provider-timestamp-policy-integrity-invalid"
@@ -1806,6 +1809,9 @@ def test_temporal_effect_without_timestamp_policy_is_not_admissible():
         local_reservation_time_ms=timing.local_reservation_time_ms,
         local_dispatch_time_ms=timing.local_dispatch_time_ms,
         local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
         clock_relation=timing.clock_relation,
     )
     assert timing.classify() == "provider-timestamp-policy-unusable"
