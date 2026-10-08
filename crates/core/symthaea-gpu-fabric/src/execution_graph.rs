@@ -5,6 +5,7 @@
 //! order to their own synchronization primitives.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fmt;
 
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,12 @@ pub const MAX_RESOURCE_ID_BYTES: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ResourceId(String);
+
+impl fmt::Display for ResourceId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
 
 impl ResourceId {
     pub fn new(value: impl Into<String>) -> Result<Self, GraphError> {
@@ -86,14 +93,14 @@ impl ExecutionNode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum DependencyKind {
     ReadAfterWrite,
     WriteAfterRead,
     WriteAfterWrite,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DependencyEdge {
     pub from: u32,
     pub to: u32,
