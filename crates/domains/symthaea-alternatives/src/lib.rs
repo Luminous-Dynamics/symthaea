@@ -9015,6 +9015,30 @@ mod tests {
             } if frontier_id == "fixture-input-frontier-v1"
         ));
 
+        let mut wrong_quantity_definition = topology.clone();
+        wrong_quantity_definition.input_bindings[0]
+            .input_specification
+            .quantity_definition = Some(MeasurementModelInputQuantityDefinitionRef {
+                vocabulary_id: "http://qudt.org/3.5.2/vocab/quantitykind".into(),
+                vocabulary_revision: "3.5.2".into(),
+                definition_id: "http://qudt.org/vocab/quantitykind/Temperature".into(),
+                definition_revision: "3.5.2".into(),
+                definition_digest: "new-definition-digest".into(),
+            });
+        assert!(matches!(
+            wrong_quantity_definition
+                .validate_against_observation(
+                    &observation.observation_id,
+                    &observation.record_digest,
+                    &observation.calibration_chain_refs,
+                )
+                .unwrap_err(),
+            AssessmentError::MeasurementModelInputFrontierInputSetDigestMismatch {
+                frontier_id,
+                ..
+            } if frontier_id == "fixture-input-frontier-v1"
+        ));
+
         let mut wrong_input_specification = topology.clone();
         wrong_input_specification.input_bindings[0]
             .input_specification
