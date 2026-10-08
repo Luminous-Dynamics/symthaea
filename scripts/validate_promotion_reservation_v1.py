@@ -3704,6 +3704,7 @@ TESTS = [
     test_webhook_context_mismatch_rejects_even_with_valid_hmac,
     test_webhook_delivery_registry_accepts_new_delivery,
     test_webhook_delivery_registry_rejects_same_id_with_different_payload,
+    test_webhook_delivery_registry_rejects_same_id_with_changed_context,
     test_webhook_authentication_does_not_prove_merge_result_causality,
     test_attestation_material_does_not_rescue_untrusted_capture,
     test_fabricated_local_capture_cannot_establish_requested_causality,
