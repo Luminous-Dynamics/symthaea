@@ -85,7 +85,6 @@ jobs:
               "LocalTemporalSequenceEvidenceV1",
               "ClockRelationV1",
               "ClockRelationSourceSetV1",
-              "clock_relation_source_set_fixture",
               "LocalTemporalSequenceV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
