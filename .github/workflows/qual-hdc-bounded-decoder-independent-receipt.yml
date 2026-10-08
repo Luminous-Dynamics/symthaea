@@ -209,6 +209,9 @@ jobs:
               const checks = {
                 verifier_on_main: evidence.contextRef === 'refs/heads/main',
                 verifier_root_current: evidence.contextSha === evidence.currentMainSha,
+                verifier_root_stable:
+                  evidence.contextSha === evidence.currentMainSha &&
+                  evidence.contextSha === evidence.finalMainSha,
                 repository_identity:
                   evidence.contextRepository === expected.repository &&
                   Number(evidence.run.repository?.id) === expected.repositoryId &&
@@ -272,6 +275,7 @@ jobs:
                 contextRef: 'refs/heads/main',
                 contextSha: 'synthetic-main',
                 currentMainSha: 'synthetic-main',
+                finalMainSha: 'synthetic-main',
                 contextRepository: expected.repository,
                 run: {
                   id: runId,
@@ -384,6 +388,7 @@ jobs:
             const attackCases = [
               ['verifier_ref', (e) => { e.contextRef = 'refs/heads/research/evil'; }],
               ['verifier_root_stale', (e) => { e.currentMainSha = '0'.repeat(40); }],
+              ['verifier_root_drift_between_reads', (e) => { e.finalMainSha = '0'.repeat(40); }],
               ['repository_id', (e) => { e.run.repository.id += 1; }],
               ['run_workflow_path', (e) => { e.run.path = 'untrusted/workflow.yml'; }],
               ['run_event', (e) => { e.run.event = 'push'; }],
@@ -568,17 +573,40 @@ jobs:
               repo: context.repo.repo,
               ref: 'heads/main',
             })).data;
-            const currentMainSha = String(liveMainRef.object?.sha ?? '');
-            if (!/^[0-9a-f]{40}$/.test(currentMainSha)) {
+            const initialMainSha = String(liveMainRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(initialMainSha)) {
               throw new Error(
-                'live default-branch ref did not resolve to a canonical commit SHA'
+                'initial live default-branch ref did not resolve to a canonical commit SHA'
+              );
+            }
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+
+            const finalMainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            })).data;
+            const finalMainSha = String(finalMainRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(finalMainSha)) {
+              throw new Error(
+                'final live default-branch ref did not resolve to a canonical commit SHA'
               );
             }
 
             const liveEvidence = {
               contextRef: context.ref,
               contextSha: context.sha,
-              currentMainSha,
+              currentMainSha: initialMainSha,
+              finalMainSha,
               contextRepository: context.repo.owner + '/' + context.repo.repo,
               run,
               jobs,
@@ -595,15 +623,7 @@ jobs:
               },
               workflowFileSha: workflowFile.data.sha,
               sourceBlobShas,
-              artifacts: await github.paginate(
-                github.rest.actions.listWorkflowRunArtifacts,
-                {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  run_id: run.id,
-                  per_page: 100,
-                }
-              ),
+              artifacts,
             };
 
             const liveEvaluation = evaluate(liveEvidence);
@@ -619,8 +639,10 @@ jobs:
                 default_branch: repositoryMetadata.default_branch,
                 verifier_ref: context.ref,
                 verifier_sha: context.sha,
-                live_default_branch_tip_sha: liveEvidence.currentMainSha,
+                live_default_branch_initial_tip_sha: liveEvidence.currentMainSha,
+                live_default_branch_final_tip_sha: liveEvidence.finalMainSha,
                 verifier_root_current: liveEvaluation.checks.verifier_root_current,
+                verifier_root_stable: liveEvaluation.checks.verifier_root_stable,
                 workflow_run_id: run.id,
               },
               adversarial_verifier_corpus: {
