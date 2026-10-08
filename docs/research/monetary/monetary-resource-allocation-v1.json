@@ -1,0 +1,58 @@
+{
+  "schema_version":"monetary-resource-allocation-v1",
+  "experiment_id":"monetary-interop-resource-allocation-v1",
+  "factorial_size":12960,
+  "batch_size":3,
+  "factors":{
+    "topology":["full_mesh","routing_only_hub","redundant_two_hub"],
+    "monetary_pair":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],
+    "adapter":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"],
+    "shock":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"],
+    "seed":[11,23,47,89,131],
+    "resource_regime":["unrestricted","bounded_shared_settlement_liquidity","bounded_operator_capacity","both_bounded"],
+    "allocation_policy":["fifo","criticality_priority","minimum_liquidity_demand"]
+  },
+  "allocation_policies":{
+    "fifo":{"policy_id":"fifo-v1","digest":"7bfe21a9815c819972baf46f8dc77199a6f602d31fcabc8e0708b14436777fb8","ordering_rule":"ascending obligation_index"},
+    "criticality_priority":{"policy_id":"criticality-priority-v1","digest":"89fb3406736d4d36c7a29c8094e3be198b3135090e7c8f78a13bfec0d2f2d234","ordering_rule":"descending criticality, then ascending obligation_index"},
+    "minimum_liquidity_demand":{"policy_id":"minimum-liquidity-demand-v1","digest":"fe1ae1b40106ac7c5343f5aa254ce3e0bd454df49fbdca99b4ae40519e47c900","ordering_rule":"ascending declared liquidity demand, then ascending obligation_index"}
+  },
+  "fixed_dimensions":{
+    "obligations":[
+      {"obligation_index":0,"amount":15,"criticality":2},
+      {"obligation_index":1,"amount":5,"criticality":1},
+      {"obligation_index":2,"amount":10,"criticality":3}
+    ],
+    "resource_capacity_by_regime":{"unrestricted":30,"bounded_shared_settlement_liquidity":15,"bounded_operator_capacity":30,"both_bounded":15},
+    "liquidity_demand_multiplier_by_adapter":{"redeem_reissue":1,"escrowed_atomic_swap":1,"multilateral_net_settlement":0.7,"absent":0},
+    "liquidity_shock_increment":5,
+    "common_random_number_identity":"world-{shock}-{seed}; identical exogenous draw namespace across all treatment factors",
+    "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+    "resource_digest_set":[
+      "4ee5629e5bba88e39a76f4d0bf09d6f9f8cf2175cf9c705a134a85ae08b4e612",
+      "8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7",
+      "dc31ad937f954b025b99c084f566bb747cdfe27f3b2ffa4827290e0fc1f254e1"
+    ],
+    "topology_digest_set":{
+      "full_mesh":"6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
+      "routing_only_hub":"90d10f6025f7200a3c4ff2863e755e29b7d40bbc437729410ef4ff06ba80d0e3",
+      "redundant_two_hub":"400c93eabda6ceb9d224fa4944f458ab410233c1c13404297c64ab53ad077a47"
+    },
+    "routing_policy_digest":"a5435036c4791a6dc0275771d73f78c2c54f02d64fbe2de88adbdb2b7c5901c3",
+    "profile_digests":{
+      "conventional-bank-money-v1":"fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e",
+      "sovereign-money-v1":"a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32",
+      "mutual-credit-v1":"e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e",
+      "tokenized-deposit-v1":"d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e",
+      "reserve-backed-stablecoin-v1":"2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+    },
+    "edge_digests":{
+      "bank_mutual":"0c77d6cf338fccf07254f96620c4fdc4e9e2dd06d71369370eee5c98e66d191b",
+      "bank_stablecoin":"2162c182b1a314975c5e6e8b0c38a5cfa4830bbab1862440cbdedb846c0445db",
+      "tokenized_deposit_stablecoin":"a3b15fbb527ff127da92dc243d36680742ebd02eb2d5a640df11bfd728bc41cc"
+    },
+    "policy_invariant":"allocation policy changes admission order only; it does not alter amount, criticality, resource capacity, monetary mechanism, topology, settlement finality, or exogenous random draws",
+    "no_policy_mutation_of_capacity":true
+  },
+  "claim_ceiling":"Synthetic allocation-policy factorial only; identifies order-conditioned behavior inside the declared model. It does not establish empirical causal effects, policy superiority, systemic safety, market liquidity, legal finality, or live payment-system behavior."
+}
