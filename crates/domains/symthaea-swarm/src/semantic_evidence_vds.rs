@@ -4413,21 +4413,40 @@ fn verify_consistency_path(
 #[cfg(feature = "semantic-receipts")]
 fn verified_capability_identity_is_anchored_to_exact_receipt() {
     let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
-    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
     let receipt = Rfc9942ReceiptEnvelope::new(
         COSE_ES256_ALGORITHM_ID,
-        vdp,
+        Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof.clone()]).unwrap(),
         Rfc9942ReceiptPayload::Attached([0x22; 32]),
         vec![0xAA; 64],
     )
     .unwrap();
 
-    // The capability identity is only available from the cryptographic
-    // verification path; this test exercises the binding field directly through
-    // the existing semantic-state constructor path in the integration suite.
-    let capability_wire = receipt.to_cbor();
-    assert_ne!(sha256(&capability_wire), [0; 32]);
+    let state = receipt.verified_state(
+        Rfc9942VerifiedProof::Inclusion {
+            proof_index: 0,
+            head: VdsTreeHead::new(2, [0x33; 32]),
+            leaf_index: 0,
+            candidate_leaf: [0x44; 32],
+        },
+        &[0x22; 32],
+        Rfc9942PayloadMode::Attached,
+        sha256(&proof),
+        &[0x04; 65],
+        b"qualification-aad",
+    );
+
+    assert_eq!(state.receipt_sha256(), sha256(&receipt.to_cbor()));
+    let baseline = state.capability_sha256();
+
+    let mut changed_signature = state;
+    changed_signature.signature_sha256[0] ^= 1;
+    assert_ne!(changed_signature.capability_sha256(), baseline);
+
+    let mut changed_wire = state;
+    changed_wire.receipt_sha256[0] ^= 1;
+    assert_ne!(changed_wire.capability_sha256(), baseline);
 }
+
 
 #[cfg(test)]
 mod tests {
