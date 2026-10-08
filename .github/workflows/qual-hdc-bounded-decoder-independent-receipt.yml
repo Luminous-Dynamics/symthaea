@@ -1602,6 +1602,7 @@ jobs:
               currentPr.merge_commit_sha === process.env.EXPECTED_PR_MERGE_SHA &&
               currentRun.id === Number(process.env.EXPECTED_RUN_ID) &&
               currentRun.run_attempt === Number(process.env.EXPECTED_RUN_ATTEMPT) &&
+              currentRun.conclusion === 'success' &&
               currentRun.head_sha === process.env.EXPECTED_PR_HEAD_SHA &&
               currentProducerArtifact?.id === Number(process.env.EXPECTED_ARTIFACT_ID) &&
               currentProducerArtifact?.digest === process.env.EXPECTED_ARTIFACT_DIGEST &&
