@@ -1745,6 +1745,7 @@ fn composed_basis_and_coordinate_metamorphisms_preserve_decoder_semantics() {
 fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
     let cases = [
         (12usize, 4usize, 0xE100_0000u64),
+        (16usize, 8usize, 0xE300_0000u64),
         (20usize, 3usize, 0xE200_0000u64),
     ];
 
