@@ -131,6 +131,9 @@ impl ExpectationBook {
         if self.updates.contains_key(&update.update_id) {
             return Err(ExpectationError::DuplicateUpdate);
         }
+        if self.records.contains_key(&update.expectation_id) {
+            return Err(ExpectationError::DuplicateExpectation);
+        }
         let existing = self
             .records
             .get(&update.superseded_expectation_id)
@@ -250,6 +253,27 @@ mod tests {
         assert_eq!(book.records()["e1"].belief_value, "persist");
         assert_eq!(book.records()["e1"].superseded_by.as_deref(), Some("e2"));
         assert!(book.records()["e2"].current);
+    }
+
+
+    #[test]
+    fn update_cannot_overwrite_an_existing_expectation() {
+        let mut book = ExpectationBook::new();
+        book.record(record("e1", 10, "persist")).unwrap();
+        book.record(record("e2", 20, "already-present")).unwrap();
+        assert_eq!(
+            book.update(ExpectationUpdate {
+                expectation_id: "e2".into(),
+                update_id: "u1".into(),
+                update_time: 20,
+                superseded_expectation_id: "e1".into(),
+                new_belief_value: "fail".into(),
+                information_set: InformationSetIdentity { hash: "info-v1".into(), as_of: 20 },
+            }),
+            Err(ExpectationError::DuplicateExpectation)
+        );
+        assert_eq!(book.records()["e1"].belief_value, "persist");
+        assert_eq!(book.records()["e2"].belief_value, "already-present");
     }
 
     #[test]
