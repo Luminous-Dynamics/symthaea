@@ -283,6 +283,7 @@ pub struct VulkanBarrierWorkloadRuntime {
 
 impl VulkanBarrierWorkloadRuntime {
     pub fn new() -> Result<Self, VulkanBarrierError> {
+        qualification_stage("before_entry_load");
         let entry = unsafe { Entry::load() }.map_err(|e| VulkanBarrierError::Loader(e.to_string()))?;
         qualification_stage("entry_loaded");
         let loader_version = unsafe { entry.try_enumerate_instance_version() }
@@ -2174,6 +2175,7 @@ mod tests {
     #[ignore = "requires a Vulkan 1.3 validation runner"]
     fn real_vulkan_runtime_constructs_and_drops() {
         qualification_stage("preflight_test_begin");
+        qualification_stage("preflight_before_runtime_new");
         let runtime = VulkanBarrierWorkloadRuntime::new()
             .expect("qualified Vulkan 1.3 synchronization2 timeline device");
         qualification_stage("preflight_runtime_constructed");
