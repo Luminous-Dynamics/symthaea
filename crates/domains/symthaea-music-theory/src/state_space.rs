@@ -20,15 +20,16 @@ use serde::{Deserialize, Serialize};
 
 /// Number of dimensions in a frame's canonical structural vector.
 ///
-/// Layout: onset density, pitch entropy, rhythm entropy, mean interval,
-/// contour asymmetry, structural intensity, 12 pitch-class bins, 5 rhythm
-/// bins, 12 interval bins, and 3 contour bins.
-pub const STATE_DIMS: usize = 38;
+/// Layout: six bounded scalars, a part-identity availability bit, 12 pitch-
+/// class bins, 5 rhythm bins, 12 verified line-interval bins, 3 verified
+/// line-contour bins, and 8 register bins.
+pub const STATE_DIMS: usize = 47;
 
 const PITCH_CLASS_BINS: usize = 12;
 const RHYTHM_BINS: usize = 5;
 const INTERVAL_BINS: usize = 12;
 const CONTOUR_BINS: usize = 3;
+const REGISTER_BINS: usize = 8;
 const RHYTHM_THRESHOLDS: [f64; RHYTHM_BINS - 1] = [0.25, 0.5, 1.0, 2.0];
 
 /// One temporal slice of a symbolic score.
