@@ -7587,27 +7587,31 @@ echo ']}}'
                 let preflight_path =
                     format!("/tmp/nixforhumanity-preflight-{preflight_id}.sh");
 
-                if let Err(error) = write_private_file(
+                let staged_preflight = match stage_trusted_script(
                     &preflight_path,
                     check_script.as_bytes(),
-                    0o700,
                 ) {
-                    let _ = ws_tx
-                        .send(Message::Text(
-                            RelayMessage::error(&format!(
-                                "Unable to stage pre-install check safely: {error}"
+                    Ok(staged) => staged,
+                    Err(error) => {
+                        let _ = ws_tx
+                            .send(Message::Text(
+                                RelayMessage::error(&format!(
+                                    "Unable to stage pre-install check safely: {error}"
+                                ))
+                                .to_json(),
                             ))
-                            .to_json(),
-                        ))
-                        .await;
-                    continue;
-                }
+                            .await;
+                        continue;
+                    }
+                };
+                eprintln!(
+                    "[{}] preflight script commitment {}",
+                    peer_addr,
+                    staged_preflight.digest_hex
+                );
 
-                let check_result = run_privileged_script_with_args(
-                    &preflight_path,
-                    &[&disk],
-                )
-                .await;
+                let check_result =
+                    run_privileged_script_file(staged_preflight.file, &[&disk]).await;
                 let _ = tokio::fs::remove_file(&preflight_path).await;
 
                 match check_result {
