@@ -26,7 +26,8 @@ use tokio_tungstenite::tungstenite::Message;
 
 mod system_transaction;
 use system_transaction::{
-    ArtifactCommitment, MutationKind, MutationLease, SystemTransaction, TransactionOutcome,
+    ArtifactCommitment, ExecutionCommitment, MutationKind, MutationLease, SystemTransaction,
+    TransactionOutcome,
 };
 
 // Security validators from the library (shared with fuzz targets)
@@ -6888,7 +6889,7 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         continue;
                     }
                 };
-                let Some(transaction) = admit_mutation_transaction(
+                let Some(mut transaction) = admit_mutation_transaction(
                     &mut ws_tx,
                     &transaction_ledger,
                     MutationKind::Install,
@@ -7283,6 +7284,38 @@ echo "  User password set."
                     "[{}] install script commitment {}",
                     peer_addr,
                     staged_script.digest_hex
+                );
+
+                let execution_commitment = ExecutionCommitment {
+                    role: "install-script".to_string(),
+                    size: script.len() as u64,
+                    digest: staged_script.digest_hex.clone(),
+                };
+                if let Err(error) = transaction.bind_execution_commitment(execution_commitment.clone())
+                    .and_then(|_| {
+                        transaction_ledger
+                            .bind_execution_commitment(&transaction, execution_commitment)
+                    })
+                {
+                    for secret_path in &staged_secret_paths {
+                        let _ = cleanup_sensitive_file(secret_path);
+                    }
+                    let _ = tokio::fs::remove_file(&script_path).await;
+                    let _ = ws_tx
+                        .send(Message::Text(
+                            RelayMessage::error(&format!(
+                                "Install script commitment could not be durably bound: {error}"
+                            ))
+                            .to_json(),
+                        ))
+                        .await;
+                    remove_transaction_artifact_dir(&transaction_dir);
+                    continue;
+                }
+                eprintln!(
+                    "[{}] install script commitment durably bound to transaction {}",
+                    peer_addr,
+                    transaction.transaction_id
                 );
 
                 if let Err(error) = spawn_privileged_background_script_file(
