@@ -92,6 +92,20 @@
       "classification": "macro_regime",
       "primary_divergence": "Sovereign fiscal-monetary coordination is coupled to a standing employment stabilizer.",
       "parent_model_id": null
+    },
+    {
+      "model_id": "georgist-land-value-socialization-v0",
+      "name": "Georgist / Land-Value Socialization",
+      "classification": "architecture",
+      "primary_divergence": "Capture socially created land rent through land-value taxation or analogous land-rent socialization while reducing taxes on productive improvements.",
+      "parent_model_id": null
+    },
+    {
+      "model_id": "community-land-trust-housing-commons-v0",
+      "name": "Community Land Trusts / Housing Commons",
+      "classification": "architecture",
+      "primary_divergence": "Separate community land stewardship from use/occupancy rights to preserve long-term affordability and collective land control.",
+      "parent_model_id": null
     }
   ],
   "notes": [
