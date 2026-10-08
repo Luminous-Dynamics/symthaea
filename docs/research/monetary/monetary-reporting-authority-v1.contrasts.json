@@ -7,7 +7,7 @@
     "Mismatch-rejected authority also eliminates positive gain, but by refusing mismatched focal declarations: 100% of criticality-inflation and dual-misreport cells are rejected; liquidity-demand underreporting is rejected in 54.1667% of cells.",
     "Mismatch rejection therefore trades manipulation resistance for lower focal/system completion in the synthetic model; it is not interchangeable with verified truth."
   ],
-  "authority_boundary_result:": "The model distinguishes assertion, verification, and rejection as separate authority semantics rather than treating a declaration as truth.",
+  "authority_boundary_result": "The model distinguishes assertion, verification, and rejection as separate authority semantics rather than treating a declaration as truth.",
   "design_implication": "A durable allocation design should bind each allocation input to an explicit authority/provenance mode. 'Declared by participant' and 'verified fact' must not be semantically interchangeable.",
   "claim_ceiling": "Synthetic deterministic authority/manipulability observation only; no empirical truthfulness, equilibrium, incentive-compatibility, welfare, or real-system safety claim."
 }
