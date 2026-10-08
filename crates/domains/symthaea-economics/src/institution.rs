@@ -88,6 +88,7 @@ pub enum FailureDisposition {
     AlreadyImplemented,
     NotAdopted,
     MetaConstitutionalMutationDisabled,
+    ConstitutionalMutationDisabled,
     DuplicateProposal,
     AlreadyDecided,
 }
@@ -118,6 +119,7 @@ pub enum Transition {
 pub struct InstitutionalEvolution {
     initial: InstitutionState,
     current: InstitutionState,
+    allow_constitutional_mutation: bool,
     allow_meta_constitutional_mutation: bool,
     proposals: BTreeMap<String, Proposal>,
     decisions: BTreeMap<String, AdoptionDecision>,
@@ -129,11 +131,17 @@ impl InstitutionalEvolution {
         Self {
             initial: initial.clone(),
             current: initial,
+            allow_constitutional_mutation: false,
             allow_meta_constitutional_mutation: false,
             proposals: BTreeMap::new(),
             decisions: BTreeMap::new(),
             lineage: Vec::new(),
         }
+    }
+
+    pub fn with_constitutional_mutation(mut self, enabled: bool) -> Self {
+        self.allow_constitutional_mutation = enabled;
+        self
     }
 
     pub fn with_meta_constitutional_mutation(mut self, enabled: bool) -> Self {
@@ -175,6 +183,11 @@ impl InstitutionalEvolution {
         if self.proposals.contains_key(&proposal_id) {
             return Err(FailureDisposition::DuplicateProposal);
         }
+        if candidate.rule_level == RuleLevel::Constitutional
+            && !self.allow_constitutional_mutation
+        {
+            return Err(FailureDisposition::ConstitutionalMutationDisabled);
+        }
         if candidate.rule_level == RuleLevel::MetaConstitutional
             && !self.allow_meta_constitutional_mutation
         {
@@ -215,6 +228,11 @@ impl InstitutionalEvolution {
             return Err(FailureDisposition::ParentMismatch);
         }
         if decision.adopted {
+            if proposal.candidate.rule_level == RuleLevel::Constitutional
+                && !self.allow_constitutional_mutation
+            {
+                return Err(FailureDisposition::ConstitutionalMutationDisabled);
+            }
             if proposal.candidate.rule_level == RuleLevel::MetaConstitutional
                 && !self.allow_meta_constitutional_mutation
             {
