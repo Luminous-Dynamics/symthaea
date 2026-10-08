@@ -1,0 +1,64 @@
+name: QUAL promotion effect attribution v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  effect-attribution:
+    if: github.repository == 'Luminous-Dynamics/symthaea' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove trusted checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          grep -Fq "claim_ceiling=deterministic semantic classification only" scripts/validate_promotion_effect_attribution_v1.py
+          grep -Fq "promotion_authority=false" scripts/validate_promotion_effect_attribution_v1.py
+
+      - name: Compile and run Rust semantic reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 --test validation/promotion_effect_attribution_v1.rs -o /tmp/promotion-effect-attribution-v1-tests
+          /tmp/promotion-effect-attribution-v1-tests --nocapture | tee /tmp/promotion-effect-attribution-v1-rust.out
+
+      - name: Run independent Python oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_promotion_effect_attribution_v1.py | tee /tmp/promotion-effect-attribution-v1-python.out
+
+      - name: Record evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Promotion Effect Attribution v1"
+            echo
+            echo "trusted_head=$GITHUB_SHA"
+            echo "rust_reference=validation/promotion_effect_attribution_v1.rs"
+            echo "python_oracle=scripts/validate_promotion_effect_attribution_v1.py"
+            echo "promotion_authority=false"
+            echo
+            echo "### Rust reference"
+            cat /tmp/promotion-effect-attribution-v1-rust.out
+            echo
+            echo "### Python oracle"
+            cat /tmp/promotion-effect-attribution-v1-python.out
+            echo
+            echo "### Semantic boundary"
+            echo "DirectProviderResult => narrow causal attribution may be established"
+            echo "DurableSubjectObservation => effect observed; causal attribution remains unestablished"
+          } >> "$GITHUB_STEP_SUMMARY"
