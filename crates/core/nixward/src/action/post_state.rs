@@ -270,6 +270,10 @@ pub struct NixServicePostStateObservationV1 {
     #[serde(default)]
     pub systemd_bus_id: Option<String>,
     pub invocation_id: Option<String>,
+    /// Observer-derived commitment proving the post InvocationID was resolved to
+    /// this exact Unit object under the same manager owner and D-Bus incarnation.
+    #[serde(default)]
+    pub post_invocation_binding_digest: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
     pub observed_at_monotonic_us: u64,
