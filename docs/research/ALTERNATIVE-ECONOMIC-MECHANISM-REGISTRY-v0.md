@@ -521,3 +521,204 @@ A deterministic PASS should establish only the exact semantics covered by the fr
   https://link.springer.com/article/10.1007/s11213-025-09712-7
 - Participatory socialism:
   https://plato.stanford.edu/archives/fall2025/entries/socialism/
+
+## Monetary architecture frontier — v0.1
+
+The first registry wave exposed a deeper axis: different systems alter not merely who allocates resources, but **what counts as money, who can issue it, how credit is created, and how obligations clear**.
+
+### Mutual Credit / Credit-Clearing Networks
+
+Classification: architecture.
+
+Mechanism:
+- participating firms can obtain purchasing capacity by entering reciprocal obligations;
+- balances are cleared multilaterally rather than requiring every transaction to settle through scarce national currency;
+- credit limits, membership, trust, and network topology become first-class variables.
+
+Key tests:
+- liquidity creation inside the network;
+- concentration of negative/positive balances;
+- default contagion;
+- network fragmentation;
+- credit-limit calibration;
+- crisis liquidity;
+- leakage into external money;
+- resilience vs productivity trade-off.
+
+This is no longer merely hypothetical: a 2025 firm-level study of mutual-credit membership found nuanced effects, with costs in stable periods but stronger resilience during turbulence, especially for small firms. citeturn445931search0turn445931search3
+
+### Demurrage / Gesellian Money
+
+Classification: architecture.
+
+Mechanism:
+- holding the monetary instrument carries an explicit decay/holding cost;
+- the treatment changes the relative attractiveness of holding liquidity versus spending, lending, or alternative stores of value.
+
+Key tests:
+- velocity response;
+- hoarding substitution;
+- inflation interaction;
+- asset substitution;
+- liquidity preference;
+- distributional incidence;
+- emergence of alternative stores of value;
+- avoidance/evasion channels.
+
+The model remains a live research topic: 2026 work explicitly revisits demurrage money and its relationship to hoarding, rent, and digital monetary systems. citeturn152199search10turn152199search11
+
+### Competitive Private Money / Currency Competition
+
+Classification: architecture.
+
+Mechanism:
+- multiple issuers create distinct monetary instruments;
+- users choose among monies;
+- exchange and network effects determine coexistence, dominance, or fragmentation.
+
+Key tests:
+- currency selection;
+- network-effect lock-in;
+- issuer discipline;
+- run dynamics;
+- unit-of-account fragmentation;
+- monetary-policy effectiveness;
+- interoperability;
+- backing/convertibility.
+
+The research program is especially valuable because the central questions are themselves testable: whether private monies coexist, whether one drives others out, and whether government money can coexist with private monies. Empirical work has also examined cryptocurrency competition as a contemporary analogue of Hayek's private-money vision. citeturn445931search4turn445931search6
+
+### Retail CBDC / Direct Central-Bank Money
+
+Classification: architecture.
+
+Mechanism:
+- households and firms can directly hold digital central-bank liabilities;
+- the monetary system gains another public settlement instrument alongside bank deposits.
+
+Key tests:
+- deposit substitution;
+- bank funding effects;
+- bank-run acceleration or mitigation;
+- liquidity facilities;
+- privacy/compliance trade-offs;
+- monetary transmission;
+- offline/operational resilience.
+
+This is a serious live architecture rather than a speculative token model. 2025 empirical work links CBDC development news to systemic-risk dynamics, while 2026 research highlights the design trade-offs among banking stability, disintermediation, and emergency liquidity. citeturn152199search0turn152199search5turn152199search8
+
+### Sovereign Grassroots Currencies
+
+Classification: frontier architecture.
+
+Mechanism:
+- a direct sovereign digital money layer;
+- non-sovereign grassroots credit instruments that are redeemable at par;
+- sovereign and non-sovereign bonds for maturity and interest;
+- central-bank operations can interact with these layers without treating commercial banks as the only counterparties.
+
+This is unusually important for the laboratory because it combines public money, distributed credit issuance, and conventional maturity-bearing instruments in one explicit architecture. A September 2026 preprint presents the architecture as a response to limitations in conventional CBDC designs. It should remain tagged as **frontier / preprint-specified**, not empirically validated. citeturn445931academia65
+
+### Narrow Banking
+
+Classification: architecture / variant.
+
+Treat narrow banking as a distinct variant inside the sovereign-money family rather than a duplicate system.
+
+Core divergence:
+- payment/deposit institutions hold safe liquid assets;
+- lending is structurally separated from demand-deposit creation.
+
+Key tests:
+- credit availability;
+- maturity transformation;
+- bank-run propagation;
+- migration to shadow banking;
+- growth;
+- crisis resolution.
+
+Recent research continues to study narrow banking as a live financial-stability proposal, including deposit insurance and the trade-offs of separating payment from lending functions. citeturn735270search11turn735270academia65
+
+## New highest-value comparative battery
+
+The monetary lab should now compare at least:
+
+**Conventional fractional/reserve banking**
+vs
+**Creditism**
+vs
+**Sovereign Money / 100%-Money**
+vs
+**Mutual Credit**
+vs
+**Demurrage Money**
+vs
+**Competitive Private Money**
+vs
+**Retail CBDC**
+vs
+**Sovereign Grassroots Currencies**
+vs
+**Narrow Banking**
+
+The same real-sector scenario should then be replayed while changing only the monetary architecture where possible.
+
+### Monetary adversarial battery
+
+1. normal growth;
+2. sudden demand collapse;
+3. supply shortage;
+4. bank run;
+5. network credit freeze;
+6. issuer default;
+7. collateral crash;
+8. inflation shock;
+9. deflationary shock;
+10. hoarding surge;
+11. currency flight;
+12. shadow-credit migration;
+13. external-foreign-currency shortage;
+14. payment-network outage;
+15. fraudulent issuance;
+16. strategic reserve manipulation;
+17. interoperability failure;
+18. monetary fragmentation;
+19. legacy conversion;
+20. emergency liquidity intervention.
+
+### Critical measurements
+
+Do not use one monetary-system score.
+
+Measure independently:
+- settlement liquidity;
+- credit availability;
+- payment resilience;
+- default concentration;
+- maturity mismatch;
+- balance-sheet leverage;
+- monetary concentration;
+- issuer concentration;
+- network concentration;
+- velocity;
+- unit-of-account stability;
+- external leakage;
+- transition burden;
+- privacy;
+- governance burden;
+- shadow-finance migration.
+
+## New research principle
+
+The strongest next-stage experiment is **mechanism transplantation**.
+
+For example:
+- put Mutual Credit inside a market-socialist ownership regime;
+- put Sovereign Money inside conventional corporate ownership;
+- put a demurrage treatment inside Creditism;
+- put Polycentric Commons governance on top of a conventional banking regime;
+- combine Community Land Trusts with each monetary architecture.
+
+This allows the laboratory to ask whether an observed effect belongs to the system family or to an orthogonal mechanism.
+
+That is a stronger causal question than simply comparing named ideologies.
