@@ -20,7 +20,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_PR: "6803"
-          EXPECTED_SUBJECT: "8524f0ba2334430a993780931d4386798eed8310"
+          EXPECTED_SUBJECT: "a5c4d284a3e47d5e3ac534e1f2e7e8af06fb35c1"
           EXPECTED_PARENT: "164d6b94d12bb72a902bdc2164d25cd540d3ba7f"
           EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
@@ -57,7 +57,7 @@ jobs:
 
             const expectedSourceBlobShas = {
               '.github/workflows/hdc-linear-code-syndrome-qualify.yml':
-                'bb1ac024c93eb83a85ad62ac7730d3f3bd9faab4',
+                '024b5ab4bd052963aa6f3292ddf84c6dcef942d5',
               'crates/core/symthaea-core/src/hdc/mod.rs':
                 '17b297a167b57f22070a50115f4967b820f911c1',
               'crates/core/symthaea-core/src/hdc/syndrome_decoder.rs':
