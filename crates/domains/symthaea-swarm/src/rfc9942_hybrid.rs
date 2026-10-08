@@ -167,17 +167,30 @@ impl Rfc9942HybridTranscript {
         verifying_key_sha256: [u8; 32],
         policy_digest_sha256: [u8; 32],
     ) -> Result<Self, Rfc9942HybridError> {
-        if exact_receipt_wire.is_empty()
-            || exact_receipt_wire.len() > MAX_HYBRID_RECEIPT_WIRE_BYTES
-        {
-            return Err(Rfc9942HybridError::ReceiptWireTooLarge);
-        }
+        let receipt_sha256 =
+            validate_exact_receipt_wire(verified_classical, exact_receipt_wire)?;
+        Self::from_receipt_digest(
+            verified_classical,
+            key_id,
+            verifying_key_sha256,
+            policy_digest_sha256,
+            receipt_sha256,
+        )
+    }
+
+    fn from_receipt_digest(
+        verified_classical: &Rfc9942VerifiedReceipt,
+        key_id: Rfc9942PqKeyId,
+        verifying_key_sha256: [u8; 32],
+        policy_digest_sha256: [u8; 32],
+        receipt_sha256: [u8; 32],
+    ) -> Result<Self, Rfc9942HybridError> {
         if policy_digest_sha256 == [0; 32] {
             return Err(Rfc9942HybridError::PqKeyPolicyInvalid);
         }
-
-        let receipt_sha256 = sha256(exact_receipt_wire);
-        if receipt_sha256 != verified_classical.receipt_sha256() {
+        if receipt_sha256 == [0; 32]
+            || receipt_sha256 != verified_classical.receipt_sha256()
+        {
             return Err(Rfc9942HybridError::ReceiptWireIdentityMismatch);
         }
 
@@ -311,6 +324,12 @@ impl Rfc9942HybridVerifiedReceipt {
             return Err(Rfc9942HybridError::PqSignatureAllZero);
         }
 
+        // Reject malformed or mismatched Receipt bytes before consulting a
+        // trust registry, HSM-backed policy, or remote authorization service.
+        // The validated digest is reused when constructing the signed transcript.
+        let receipt_sha256 =
+            validate_exact_receipt_wire(verified_classical, exact_receipt_wire)?;
+
         let verifying_key_sha256 = sha256(verifying_key);
         let authorization = key_policy
             .authorize(
@@ -329,12 +348,12 @@ impl Rfc9942HybridVerifiedReceipt {
         }
         let policy_digest_sha256 = authorization.policy_digest_sha256();
 
-        let transcript = Rfc9942HybridTranscript::new(
+        let transcript = Rfc9942HybridTranscript::from_receipt_digest(
             verified_classical,
-            exact_receipt_wire,
             key_id,
             verifying_key_sha256,
             policy_digest_sha256,
+            receipt_sha256,
         )?;
 
         verifier
@@ -540,6 +559,22 @@ impl Rfc9942HybridError {
             MlDsa65VerifyError::ProviderFailure => Self::PqProviderFailure,
         }
     }
+}
+
+fn validate_exact_receipt_wire(
+    verified_classical: &Rfc9942VerifiedReceipt,
+    exact_receipt_wire: &[u8],
+) -> Result<[u8; 32], Rfc9942HybridError> {
+    if exact_receipt_wire.is_empty()
+        || exact_receipt_wire.len() > MAX_HYBRID_RECEIPT_WIRE_BYTES
+    {
+        return Err(Rfc9942HybridError::ReceiptWireTooLarge);
+    }
+    let receipt_sha256 = sha256(exact_receipt_wire);
+    if receipt_sha256 != verified_classical.receipt_sha256() {
+        return Err(Rfc9942HybridError::ReceiptWireIdentityMismatch);
+    }
+    Ok(receipt_sha256)
 }
 
 fn sha256(bytes: &[u8]) -> [u8; 32] {
