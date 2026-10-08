@@ -44,6 +44,10 @@ The resulting control-plane chain is:
 
 The verifier also self-audits the base-owned trust workflow definition at its trusted checkout SHA, including its exact Action pins, permissions, trigger topology, early-invalidation triggers, default-branch replay restriction, and manual-run input plumbing. The admissible trigger topology is exactly the three required `workflow_run` sources plus the single `workflow_dispatch.workflow_run_id` input; additional workflow-run sources or dispatch inputs are rejected rather than ignored. This is an accidental-drift guard; repository branch/ruleset governance remains the ultimate external trust root.
 
+## Verifier-root currentness
+
+A trusted checkout is not considered current merely because `git rev-parse HEAD` matches the workflow's `github.sha`. The verifier independently resolves the repository's live default-branch tip and records that observation in the receipt. The checkout SHA must equal the live default-branch tip both at verification start and again immediately before PASS publication. Any root movement, default-branch rename, or inconsistent live-root observation is classified as `STALE`, not as qualification failure. This preserves the distinction between a valid historical receipt and a decision-time current trust root.
+
 The trust anchor complements, rather than replaces, the Broca Feature Matrix's local compiler replay and artifact provenance checks.
 
 ## Claim ceiling
