@@ -1,0 +1,16 @@
+{
+  "schema_version": "monetary-attestation-binding-v1-contrasts",
+  "trace_set_digest": "c9dcc9b230a68c5e3a0d3cd2e38863a56bdc7252cbf3eaee6c7082b7ef3f978e",
+  "key_findings": [
+    "Every synthetic variant carries a valid synthetic signature; the experiment therefore isolates semantic binding from cryptographic validity.",
+    "Exact-all binding rejects every invalid variant: invalid-binding acceptance 0, positive attack gain 0, maximum attack gain 0.",
+    "Across the 30 partial-binding × invalid-variant combinations, 17/30 (56.6667%) accept an invalid attestation.",
+    "The missing coordinate predicts the acceptance surface: subject substitution bypasses profiles without subject binding; attribute substitution bypasses profiles without attribute binding; stale generation bypasses profiles without generation binding; context substitution bypasses profiles without context binding.",
+    "Accepted invalid evidence is not automatically profitable. Subject substitution reaches 21.1111% positive gain among admitted/common-completion cells, with mean 0.1755556 ticks and max 14; attribute substitution 12.2222%, mean 0.1444444 and max 9; context substitution 1.1111%, mean -0.2311111 and max 6. Stale-generation and composite replay produced no positive gain in this reference execution despite semantic acceptance by incomplete profiles.",
+    "Authoritative attestation is independent of participant reporting across all 466,560 cells: truthful, criticality inflation, liquidity underreport and dual misreport produce the same authoritative result.",
+    "Resource reservation remains tied to immutable true liquidity demand; resource-integrity failures are 0. The CRN namespace remains world:{shock}:{seed}:obligation:{index}.",
+    "The architectural decomposition is now explicit: signature validity authenticates the evidence object; subject × attribute × generation × context binding decides applicability to this exact decision."
+  ],
+  "design_implication": "Do not extract authority from a cryptographically valid attestation until the exact subject, semantic attribute, lifecycle generation and decision context are bound. Binding mismatch should fail closed before authority extraction; fallback remains a separate qualified semantic.",
+  "claim_ceiling": "Deterministic synthetic attestation-binding mechanism experiment only; no empirical cryptographic implementation security, attacker behavior, calibrated uncertainty, equilibrium, welfare, legal finality, interoperability conformance, or production-readiness claim."
+}

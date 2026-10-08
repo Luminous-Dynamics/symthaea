@@ -1,0 +1,215 @@
+{
+  "schema_version": "monetary-attestation-binding-v1",
+  "experiment_id": "monetary-interop-attestation-binding-v1",
+  "factorial_size": 466560,
+  "batch_size": 3,
+  "factors": {
+    "monetary_pair": [
+      "bank_mutual",
+      "bank_stablecoin",
+      "tokenized_deposit_stablecoin"
+    ],
+    "adapter": [
+      "redeem_reissue",
+      "escrowed_atomic_swap",
+      "multilateral_net_settlement",
+      "absent"
+    ],
+    "shock": [
+      "normal",
+      "liquidity_shock",
+      "network_partition",
+      "issuer_default",
+      "bridge_failure",
+      "stale_quote"
+    ],
+    "seed": [
+      11,
+      23,
+      47,
+      89,
+      131
+    ],
+    "allocation_policy": [
+      "fifo",
+      "criticality_priority",
+      "minimum_liquidity_demand"
+    ],
+    "focal_obligation": [
+      0,
+      1,
+      2
+    ],
+    "reporting_policy": [
+      "truthful",
+      "criticality_inflation",
+      "liquidity_demand_underreport",
+      "dual_misreport"
+    ],
+    "binding_policy": [
+      "attribute_only",
+      "generation_only",
+      "context_only",
+      "subject_only",
+      "subject_attribute",
+      "exact_all"
+    ],
+    "attestation_variant": [
+      "exact_current",
+      "subject_substitution",
+      "attribute_substitution",
+      "stale_generation",
+      "context_substitution",
+      "composite_replay"
+    ]
+  },
+  "binding_policies": {
+    "attribute_only": {
+      "policy_id": "attestation-binding-attribute-only-v1",
+      "fields": [
+        "attribute_id"
+      ]
+    },
+    "generation_only": {
+      "policy_id": "attestation-binding-generation-only-v1",
+      "fields": [
+        "generation"
+      ]
+    },
+    "context_only": {
+      "policy_id": "attestation-binding-context-only-v1",
+      "fields": [
+        "context_id"
+      ]
+    },
+    "subject_only": {
+      "policy_id": "attestation-binding-subject-only-v1",
+      "fields": [
+        "subject_id"
+      ]
+    },
+    "subject_attribute": {
+      "policy_id": "attestation-binding-subject-attribute-v1",
+      "fields": [
+        "subject_id",
+        "attribute_id"
+      ]
+    },
+    "exact_all": {
+      "policy_id": "attestation-binding-exact-all-v1",
+      "fields": [
+        "subject_id",
+        "attribute_id",
+        "generation",
+        "context_id"
+      ]
+    }
+  },
+  "binding_policy_digests": {
+    "attribute_only": "4fa206363a8b1ed95397f302edc3621cb550f8abda268e571538567fe8c25b09",
+    "generation_only": "41be299b62b3f2fcc675811546b1757ea79c15d89ddae3044e5e2f238580faf2",
+    "context_only": "96738f21404297a6f6d54c837e25cd2ad1cb0b3694bafe06c85100de57026aa6",
+    "subject_only": "c9299ac9684844bfe1b15edcdfa4bb1ce51b35ba7e0d9d4a15938354847ab8f7",
+    "subject_attribute": "23c98711f76892ea26555769817af1a9ee684e6792124869f146746b6e4b35a4",
+    "exact_all": "c3118e686243325e63c6f33765ccec8107864da7628bb8c8dbd8c5a9f61c69b2"
+  },
+  "attestation_variants": {
+    "exact_current": {
+      "variant_id": "attestation-current-v1",
+      "mutation": "none; exact current subject, attribute, generation and context"
+    },
+    "subject_substitution": {
+      "variant_id": "attestation-subject-substitution-v1",
+      "mutation": "replace only subject with a sibling obligation while preserving expected attribute, current generation and context"
+    },
+    "attribute_substitution": {
+      "variant_id": "attestation-attribute-substitution-v1",
+      "mutation": "replace only attribute namespace/value while preserving expected subject, current generation and context"
+    },
+    "stale_generation": {
+      "variant_id": "attestation-stale-generation-v1",
+      "mutation": "replace only generation/value with a prior lifecycle snapshot while preserving expected subject, attribute and context"
+    },
+    "context_substitution": {
+      "variant_id": "attestation-context-substitution-v1",
+      "mutation": "replace only context/value with a valid sibling-world context while preserving expected subject, attribute and current generation"
+    },
+    "composite_replay": {
+      "variant_id": "attestation-composite-replay-v1",
+      "mutation": "replay a value across both an older generation and a different context while preserving subject and attribute"
+    }
+  },
+  "attestation_variant_digests": {
+    "exact_current": "38bcc3d24c324add11141b707125c8a6df0fd0c12b6362bd86f89a70f5fcf7de",
+    "subject_substitution": "7106fb598388f5edda2a7462b7d13a2d154dc68dd5d58fa4b2ad7f2c64e651ad",
+    "attribute_substitution": "cc13f1ed9b0239172d2aca96c96f9ddce8192f578cfe4cce60f351b9b2cfac3c",
+    "stale_generation": "bb209a8de2498e34b8539f21dc2f3fd8b62437141873f3127da3c605ea9eb4d7",
+    "context_substitution": "562a317cf7858e95ad6e650736c49877212d928578597b82348f4607fb37b82e",
+    "composite_replay": "027a8e455e932512bfc21c43b9122c8c99e3a31feb21e5f7f4ba1a1232ceacad"
+  },
+  "attribute_identities": {
+    "fifo": "fifo_order_v1",
+    "criticality_priority": "criticality_v1",
+    "minimum_liquidity_demand": "liquidity_demand_v1"
+  },
+  "attribute_digests": {
+    "fifo": "d38f0d1334448d335e1b6020533ff0eb02750e312eb4c905334d93633f78e553",
+    "criticality_priority": "8691e88f2fe22ba754cb72cd2477e9b22373f3a5de07e131387e2a386f3199d4",
+    "minimum_liquidity_demand": "c3de67faa18e0ff0c25afe9e496f6a2c4c43ad06f5421136598d00db6368c166"
+  },
+  "fixed_dimensions": {
+    "topology": "full_mesh",
+    "topology_digest": "6ebb7f4c4da37e834675759a5348d1bbd7bf1ccc4e132334fe8c090a94f7f983",
+    "resource_regime": "bounded_shared_settlement_liquidity",
+    "resource_digest": "8ff36e45d517568a7b153af2dab070b0adf4c7cfe97778d7575c84dd7b2e33b7",
+    "resource_capacity": 15,
+    "obligations": [
+      {
+        "obligation_index": 0,
+        "amount": 15,
+        "criticality": 2
+      },
+      {
+        "obligation_index": 1,
+        "amount": 5,
+        "criticality": 1
+      },
+      {
+        "obligation_index": 2,
+        "amount": 10,
+        "criticality": 3
+      }
+    ],
+    "liquidity_demand_multiplier_by_adapter": {
+      "redeem_reissue": 1,
+      "escrowed_atomic_swap": 1,
+      "multilateral_net_settlement": 0.7,
+      "absent": 0
+    },
+    "liquidity_shock_increment": 5,
+    "current_generation_by_seed": {
+      "11": 1001,
+      "23": 1002,
+      "47": 1003,
+      "89": 1004,
+      "131": 1005
+    },
+    "stale_generation_delta": 1,
+    "context_identity": "sha256(canonical subject-independent world context {pair,adapter,shock,seed,allocation_policy,topology_digest,resource_digest}); excludes reporting_policy, binding_policy and attestation_variant",
+    "attestation_envelope_fields": [
+      "subject_id",
+      "attribute_id",
+      "generation",
+      "context_id",
+      "attested_value",
+      "signer_profile",
+      "signature_valid"
+    ],
+    "signature_semantics": "synthetic-valid-signature-v1; signature_valid remains true for every exact and mutated attestation so semantic binding is isolated from cryptographic validity",
+    "attestation_authority": "authoritative attestation replaces participant declarations for the allocation ordering key; resource reservation remains bound to immutable true demand",
+    "invalid_binding_fallback": "neutral_ordering",
+    "comparison_boundary": "every invalid attestation variant is compared to exact_current under identical pair, adapter, shock, seed, allocation policy, focal obligation, reporting policy and binding policy",
+    "crn_namespace": "world:{shock}:{seed}:obligation:{index}"
+  },
+  "claim_ceiling": "Deterministic synthetic attestation-binding mechanism experiment only; no empirical cryptographic implementation security, attacker behavior, calibrated uncertainty, equilibrium, welfare, legal finality, interoperability conformance, or production-readiness claim."
+}

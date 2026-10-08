@@ -1,0 +1,110 @@
+{
+  "schema_version": "monetary-attestation-binding-v1-execution",
+  "run_count": 466560,
+  "obligation_count": 1399680,
+  "common_random_number_cells": 90,
+  "exogenous_random_namespace": "world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest": "c9dcc9b230a68c5e3a0d3cd2e38863a56bdc7252cbf3eaee6c7082b7ef3f978e",
+  "headline": {
+    "exact_all_invalid_binding_acceptance_rate": 0,
+    "exact_all_attack_positive_gain_rate": 0,
+    "exact_all_max_attack_gain_ticks": 0,
+    "accepted_invalid_rate_across_all_partial_binding_profiles": 0.5666666666666667
+  },
+  "binding_acceptance_matrix": {
+    "exact_current": {
+      "attribute_only": 1,
+      "generation_only": 1,
+      "context_only": 1,
+      "subject_only": 1,
+      "subject_attribute": 1,
+      "exact_all": 1
+    },
+    "subject_substitution": {
+      "attribute_only": 1,
+      "generation_only": 1,
+      "context_only": 1,
+      "subject_only": 0,
+      "subject_attribute": 0,
+      "exact_all": 0
+    },
+    "attribute_substitution": {
+      "attribute_only": 0,
+      "generation_only": 1,
+      "context_only": 1,
+      "subject_only": 1,
+      "subject_attribute": 0,
+      "exact_all": 0
+    },
+    "stale_generation": {
+      "attribute_only": 1,
+      "generation_only": 0,
+      "context_only": 1,
+      "subject_only": 1,
+      "subject_attribute": 1,
+      "exact_all": 0
+    },
+    "context_substitution": {
+      "attribute_only": 1,
+      "generation_only": 1,
+      "context_only": 0,
+      "subject_only": 1,
+      "subject_attribute": 1,
+      "exact_all": 0
+    },
+    "composite_replay": {
+      "attribute_only": 1,
+      "generation_only": 0,
+      "context_only": 0,
+      "subject_only": 1,
+      "subject_attribute": 1,
+      "exact_all": 0
+    }
+  },
+  "partial_profile_invalid_acceptance_rate": {
+    "attribute_only": 0.8,
+    "generation_only": 0.6,
+    "context_only": 0.6,
+    "subject_only": 0.8,
+    "subject_attribute": 0.6,
+    "exact_all": 0
+  },
+  "attack_effects_if_admitted": {
+    "subject_substitution": {
+      "positive_gain_rate": 0.2111111111111111,
+      "mean_gain_ticks": 0.17555555555555555,
+      "max_gain_ticks": 14
+    },
+    "attribute_substitution": {
+      "positive_gain_rate": 0.12222222222222222,
+      "mean_gain_ticks": 0.14444444444444443,
+      "max_gain_ticks": 9
+    },
+    "stale_generation": {
+      "positive_gain_rate": 0,
+      "mean_gain_ticks": -1.2533333333333334,
+      "max_gain_ticks": 0
+    },
+    "context_substitution": {
+      "positive_gain_rate": 0.011111111111111112,
+      "mean_gain_ticks": -0.2311111111111111,
+      "max_gain_ticks": 6
+    },
+    "composite_replay": {
+      "positive_gain_rate": 0,
+      "mean_gain_ticks": -1.4755555555555555,
+      "max_gain_ticks": 0
+    }
+  },
+  "invariants": {
+    "factorial_cardinality_exact": true,
+    "obligation_cardinality_exact": true,
+    "signature_valid_for_all_synthetic_variants": true,
+    "mutation_coordinate_isolation": true,
+    "reporting_independent_authoritative_result": true,
+    "resource_integrity_failures": 0,
+    "exact_current_all_binding_profiles_accept": true,
+    "exact_all_rejects_every_invalid_variant": true
+  },
+  "claim_ceiling": "Deterministic synthetic attestation-binding mechanism experiment only; no empirical cryptographic implementation security, attacker behavior, calibrated uncertainty, equilibrium, welfare, legal finality, interoperability conformance, or production-readiness claim."
+}
