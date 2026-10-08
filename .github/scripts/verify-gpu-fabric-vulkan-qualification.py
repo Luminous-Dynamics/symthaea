@@ -16,6 +16,7 @@ WGSL_ABI_MARKER = "symthaea.hdc.bind_xor.storage-u32.v1"
 KERNEL_ID = "symthaea.hdc.bind_xor.v1"
 VULKAN_ENTRY_POINT = "main"
 VULKAN_SHADER_STAGE = "compute"
+DRIVER_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-driver.v1"
 
 FIXTURES = {
     "fixture": {
@@ -208,6 +209,36 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
     return implementation_digest, physical_digest, uuid
 
 
+def verify_driver_provenance(values: dict[str, str]) -> tuple[str, bytes, int]:
+    if values.get("driver_identity_version") != "1":
+        fail("driver identity version mismatch")
+    try:
+        driver_uuid = bytes.fromhex(values["driver_uuid"])
+        driver_id = int(values["driver_id"])
+        driver_name = bytes.fromhex(values["driver_name_hex"])
+        driver_info = bytes.fromhex(values["driver_info_hex"])
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed driver provenance field: {exc}")
+    if len(driver_uuid) != 16:
+        fail("driver UUID must be exactly 16 bytes")
+    if driver_id < -0x80000000 or driver_id > 0x7FFFFFFF:
+        fail("driver ID outside signed 32-bit range")
+    digest = hashlib.sha256()
+    digest.update(DRIVER_IDENTITY_VERSION.encode("utf-8"))
+    digest.update(b"\x00")
+    digest.update(struct.pack("<Q", len(driver_uuid)))
+    digest.update(driver_uuid)
+    digest.update(struct.pack("<i", driver_id))
+    digest.update(struct.pack("<Q", len(driver_name)))
+    digest.update(driver_name)
+    digest.update(struct.pack("<Q", len(driver_info)))
+    digest.update(driver_info)
+    expected = digest.hexdigest()
+    if values.get("driver_identity_sha256") != expected:
+        fail("driver identity digest mismatch")
+    return expected, driver_uuid, driver_id
+
+
 def verify_runtime(path: Path) -> None:
     blocks = parse_runtime(path)
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
@@ -221,7 +252,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "4":
+        if values.get("receipt_version") != "5":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -239,12 +270,13 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: queue family mismatch")
 
         implementation_digest, physical_digest, uuid = verify_provenance(values, path.parent)
+        driver_digest, driver_uuid, driver_id = verify_driver_provenance(values)
         if values.get("implementation_identity_sha256") != implementation_digest:
             fail(f"{name}: implementation identity receipt binding mismatch")
         if values.get("physical_device_identity_sha256") != physical_digest:
             fail(f"{name}: physical-device identity receipt binding mismatch")
 
-        current_provenance = (implementation_digest, physical_digest, uuid)
+        current_provenance = (implementation_digest, physical_digest, uuid, driver_digest, driver_uuid, driver_id)
         if provenance is None:
             provenance = current_provenance
         elif current_provenance != provenance:
