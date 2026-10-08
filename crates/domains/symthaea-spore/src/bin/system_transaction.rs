@@ -870,6 +870,61 @@ impl TransactionLedger {
                         records.insert(event.request_id, record);
                     }
                 }
+                JournalEventKind::Bound => {
+                    if event.outcome.is_some()
+                        || event.execution_commitment.is_none()
+                        || event.artifact_commitment.is_some()
+                        || event.configuration_commitment.is_some()
+                    {
+                        return Err(format!(
+                            "transaction ledger bound event at line {} has invalid commitment state",
+                            line_number + 1
+                        ));
+                    }
+
+                    let execution_commitment = event.execution_commitment.as_ref().unwrap();
+                    validate_execution_commitment(execution_commitment).map_err(|error| {
+                        format!(
+                            "transaction ledger invalid execution commitment at line {}: {}",
+                            line_number + 1,
+                            error
+                        )
+                    })?;
+
+                    let Some(record) = records.get_mut(&event.request_id) else {
+                        return Err(format!(
+                            "transaction ledger bound event at line {} has no prior start",
+                            line_number + 1
+                        ));
+                    };
+                    if record.transaction_id != event.transaction_id
+                        || record.mutation != event.mutation
+                        || record.target_machine_digest != event.target_machine_digest
+                        || record.request_digest != event.request_digest
+                    {
+                        return Err(format!(
+                            "transaction ledger bound event at line {} does not match its start",
+                            line_number + 1
+                        ));
+                    }
+                    if record.outcome.is_some() {
+                        return Err(format!(
+                            "transaction ledger bound event at line {} occurs after completion",
+                            line_number + 1
+                        ));
+                    }
+
+                    if let Some(existing) = record.execution_commitment.as_ref() {
+                        if existing != execution_commitment {
+                            return Err(format!(
+                                "transaction ledger has conflicting execution commitments for request_id {}",
+                                event.request_id
+                            ));
+                        }
+                    } else {
+                        record.execution_commitment = Some(execution_commitment.clone());
+                    }
+                }
                 JournalEventKind::Completed => {
                     let outcome = event.outcome.ok_or_else(|| {
                         format!(
@@ -898,6 +953,12 @@ impl TransactionLedger {
                     {
                         return Err(format!(
                             "transaction ledger completion at line {} does not match its start",
+                            line_number + 1
+                        ));
+                    }
+                    if record.execution_commitment != event.execution_commitment {
+                        return Err(format!(
+                            "transaction ledger completion at line {} changes the execution commitment",
                             line_number + 1
                         ));
                     }
