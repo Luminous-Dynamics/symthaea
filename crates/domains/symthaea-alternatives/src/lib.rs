@@ -9930,6 +9930,16 @@ mod tests {
             ],
         );
 
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["same".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["same".into()];
+        }
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["same".into()];
+        }
+
         let error = AlternativesEngine.assess(&fixture_requirement(), &[c.clone()], None).unwrap_err();
         assert_eq!(error, AssessmentError::DuplicateEvidenceId("same".into()));
 
@@ -10003,14 +10013,34 @@ mod tests {
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
         });
+        lifecycle_a.source.admission.as_mut().unwrap().subject_binding_digest =
+            Some(lifecycle_a.source.canonical_subject_binding_digest().unwrap());
+        lifecycle_b.source.admission.as_mut().unwrap().subject_binding_digest =
+            Some(lifecycle_b.source.canonical_subject_binding_digest().unwrap());
 
-        let c = candidate(
+        let functional = evidence(
+            "functional",
+            "functional-source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.95,
+        );
+        let mut c = candidate(
             "single-authority-lifecycle",
             PathwayKind::MaterialSubstitution,
             2.0,
             2.0,
-            vec![lifecycle_a, lifecycle_b],
+            vec![lifecycle_a, lifecycle_b, functional],
         );
+        for estimate in c.burdens.values_mut() {
+            estimate.evidence_ids = vec!["lca-a".into(), "lca-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
 
         let result = AlternativesEngine
             .assess(&fixture_requirement(), &[c], None)
@@ -10063,6 +10093,8 @@ mod tests {
             valid_from_epoch_seconds: None,
             valid_until_epoch_seconds: None,
         });
+        admitted_a.source.admission.as_mut().unwrap().subject_binding_digest =
+            Some(admitted_a.source.canonical_subject_binding_digest().unwrap());
         assert_eq!(
             admitted_a.admitted_authority_group_id(),
             Some(a.authority_group_id())
@@ -10426,7 +10458,9 @@ mod tests {
                 policy_digest: "policy-digest".into(),
                 admission_id: admission_id.into(),
                 authority_epoch: "epoch-1".into(),
-                subject_binding_digest: None,
+                subject_binding_digest: Some(
+                    evidence.source.canonical_subject_binding_digest().unwrap(),
+                ),
                 fault_domain_id: Some(domain.into()),
                 valid_from_epoch_seconds: None,
                 valid_until_epoch_seconds: None,
@@ -10493,7 +10527,9 @@ mod tests {
                 policy_digest: "policy-digest".into(),
                 admission_id: admission_id.into(),
                 authority_epoch: "epoch-1".into(),
-                subject_binding_digest: None,
+                subject_binding_digest: Some(
+                    evidence.source.canonical_subject_binding_digest().unwrap(),
+                ),
                 fault_domain_id: Some(domain.into()),
                 valid_from_epoch_seconds: None,
                 valid_until_epoch_seconds: None,
