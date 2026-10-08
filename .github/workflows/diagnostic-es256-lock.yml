@@ -9,6 +9,13 @@ on:
       - "Cargo.lock"
       - "crates/domains/symthaea-swarm/Cargo.toml"
       - ".github/workflows/diagnostic-es256-lock.yml"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-swarm/Cargo.toml"
+      - ".github/workflows/diagnostic-es256-lock.yml"
 
 jobs:
   diagnose:
