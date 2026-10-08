@@ -594,7 +594,7 @@ impl Rfc9942SignaturePayload {
 /// This is intentionally a COSE_Sign1 parser/encoder boundary, not a cryptographic
 /// verifier. Signature bytes are preserved but are never treated as evidence of
 /// authenticity by this type.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Rfc9942ReceiptEnvelope {
     algorithm_id: i64,
     vds_id: u64,
@@ -616,6 +616,22 @@ pub struct Rfc9942ReceiptEnvelope {
     /// container representation.
     serialized_bytes: Option<Vec<u8>>,
 }
+
+impl PartialEq for Rfc9942ReceiptEnvelope {
+    fn eq(&self, other: &Self) -> bool {
+        self.algorithm_id == other.algorithm_id
+            && self.vds_id == other.vds_id
+            && self.vdp == other.vdp
+            && self.payload == other.payload
+            && self.signature == other.signature
+            && self.protected_bytes == other.protected_bytes
+            && self.unprotected_bytes == other.unprotected_bytes
+            && self.protected_extensions == other.protected_extensions
+            && self.unprotected_extensions == other.unprotected_extensions
+    }
+}
+
+impl Eq for Rfc9942ReceiptEnvelope {}
 
 impl Rfc9942ReceiptEnvelope {
     pub fn new(algorithm_id:i64,vdp:Rfc9942Vdp,payload:Rfc9942ReceiptPayload,signature:Vec<u8>)->Result<Self,Rfc9942VdpError>{
