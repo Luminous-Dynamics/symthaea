@@ -1,0 +1,54 @@
+{
+  "schema_version": "monetary-resource-contention-v1-execution",
+  "run_count": 4320,
+  "obligation_count": 12960,
+  "common_random_number_cells": 30,
+  "trace_set_digest": "a8f79ed8c5a3fd372cbbe482e5ae69c07fc681f1151509432f01631fc78d9cce",
+  "completion_rate_by_resource": {
+    "unrestricted": 0.3333333333333333,
+    "bounded_shared_settlement_liquidity": 0.2916666666666667,
+    "bounded_operator_capacity": 0.3333333333333333,
+    "both_bounded": 0.2916666666666667
+  },
+  "operational_waiting_by_resource": {
+    "unrestricted": 10.793518518518518,
+    "bounded_shared_settlement_liquidity": 13.025396825396825,
+    "bounded_operator_capacity": 11.391666666666667,
+    "both_bounded": 13.582010582010582
+  },
+  "liquidity_queue_mean_by_resource": {
+    "unrestricted": 0.2361111111111111,
+    "bounded_shared_settlement_liquidity": 0.5138888888888888,
+    "bounded_operator_capacity": 0.2361111111111111,
+    "both_bounded": 0.5138888888888888
+  },
+  "operator_queue_mean_by_resource": {
+    "unrestricted": 0,
+    "bounded_shared_settlement_liquidity": 0,
+    "bounded_operator_capacity": 0.10092592592592593,
+    "both_bounded": 0.08055555555555556
+  },
+  "resource_blocked_obligations_by_resource": {
+    "unrestricted": 0,
+    "bounded_shared_settlement_liquidity": 135,
+    "bounded_operator_capacity": 0,
+    "both_bounded": 135
+  },
+  "resource_exhaustion_rate_by_resource": {
+    "unrestricted": 0,
+    "bounded_shared_settlement_liquidity": 0.041666666666666664,
+    "bounded_operator_capacity": 0,
+    "both_bounded": 0.041666666666666664
+  },
+  "effects": {
+    "bounded_shared_settlement_liquidity_vs_unrestricted_completion_delta": -0.04166666666666663,
+    "bounded_shared_settlement_liquidity_vs_unrestricted_operational_wait_delta": 2.2318783068783077,
+    "bounded_operator_capacity_vs_unrestricted_completion_delta": 0,
+    "bounded_operator_capacity_vs_unrestricted_operational_wait_delta": 0.5981481481481499,
+    "both_bounded_vs_unrestricted_completion_delta": -0.04166666666666663,
+    "both_bounded_vs_unrestricted_operational_wait_delta": 2.788492063492063,
+    "bounded_liquidity_atomic_completion_delta": -0.16666666666666663,
+    "bounded_liquidity_liquidity_shock_completion_delta": -0.25
+  },
+  "claim_ceiling": "Local deterministic shared-resource contention execution only; no empirical causal or live-system claim."
+}
