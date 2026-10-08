@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-causal-factorial-negative-v1",
+  "cases":[
+    {"id":"FAC-X01","kind":"unbalanced_cell_count","expected":"reject"},
+    {"id":"FAC-X02","kind":"seed_mismatch_between_treatments","expected":"reject_common_random_number_breach"},
+    {"id":"FAC-X03","kind":"missing_no_adapter_control","expected":"reject"},
+    {"id":"FAC-X04","kind":"topology_changed_with_adapter","expected":"reject_factor_leakage"},
+    {"id":"FAC-X05","kind":"pair_edge_digest_mutation","expected":"reject"},
+    {"id":"FAC-X06","kind":"adapter_effect_reported_without_shock_stratification","expected":"reject_collapsed_interaction"},
+    {"id":"FAC-X07","kind":"completion_time_used_as_technical_settlement_time","expected":"reject_latency_collapse"},
+    {"id":"FAC-X08","kind":"cross_asset_scalar_conservation","expected":"reject_typed_conservation_violation"},
+    {"id":"FAC-X09","kind":"pair_identity_inferred_from_unit_labels","expected":"reject_identity_inference"},
+    {"id":"FAC-X10","kind":"three_way_interaction_averaged_out","expected":"reject_uncontrolled_composition_effect"},
+    {"id":"FAC-X11","kind":"seed_reused_as_treatment_specific_rng","expected":"reject_common_random_number_breach"},
+    {"id":"FAC-X12","kind":"missing_trace_digest","expected":"reject_unbound_observation"}
+  ]
+}
