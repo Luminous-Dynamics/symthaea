@@ -223,11 +223,17 @@ def explicitly_excludes_pull_request(expression: str | None) -> bool:
     # infer exclusion through disjunctions because one branch could admit PRs.
     if "||" in expression:
         return False
-    return any(pattern.search(expression) for pattern in EVENT_EQ.values())
+    return any(
+        active_pattern_search(pattern, expression) is not None
+        for pattern in EVENT_EQ.values()
+    )
 
 
 def has_draft_guard(expression: str | None) -> bool:
-    return expression is not None and DRAFT_FALSE.search(expression) is not None
+    return (
+        expression is not None
+        and active_pattern_search(DRAFT_FALSE, expression) is not None
+    )
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
