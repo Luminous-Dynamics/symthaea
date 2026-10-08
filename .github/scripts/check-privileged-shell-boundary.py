@@ -135,6 +135,20 @@ def main() -> None:
                 if needle in body:
                     fail(f'mutation arm {name!r} contains forbidden shell boundary {needle!r}')
 
+    # Generation switching mutates the Nix system profile. Keep its
+    # nix-env invocation in the isolated Nix capability so ambient nix.conf,
+    # user configuration, and NIX_PATH cannot alter the mutation semantics.
+    switch_start = arm_indexes.get("switch_generation")
+    if switch_start is None:
+        fail("switch_generation arm census missing")
+    next_switch = next(
+        (index for index, name in ordered if index > switch_start),
+        len(lines),
+    )
+    switch_body = "\n".join(lines[switch_start:next_switch])
+    if 'run_privileged_isolated_nix_args("nix-env"' not in switch_body:
+        fail("switch_generation lost isolated Nix execution for nix-env mutation")
+
     # The pre-install check is non-destructive, but it accepts a browser-selected
     # disk. Keep that value out of generated shell source: the script must receive
     # it only through argv.
