@@ -58,6 +58,10 @@ pub const COSE_P256_CRV: i64 = 1;
 pub const COSE_KEY_OP_VERIFY: i64 = 2;
 /// COSE algorithm identifier -8 is EdDSA. This adapter narrows it to Ed25519
 /// by requiring a 32-byte public key and is therefore not a generic EdDSA verifier.
+///
+/// Ed25519 is retained for classical interoperability. It is not a
+/// post-quantum signature and therefore must not be treated as sufficient for
+/// any future `HYBRID_REQUIRED` durable-evidence policy.
 pub const COSE_ES256_ALGORITHM_ID: i64 = -7;
 pub const COSE_EDDSA_ALGORITHM_ID: i64 = -8;
 pub const ES256_PUBLIC_KEY_BYTES: usize = 65;
