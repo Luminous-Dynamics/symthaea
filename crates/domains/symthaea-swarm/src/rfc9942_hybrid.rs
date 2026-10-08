@@ -101,12 +101,10 @@ pub enum MlDsa65VerifyError {
 /// Parsed Rust structures are not serialized into this transcript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942HybridTranscript {
-    key_id: Rfc9942PqKeyId,
-    verifying_key_sha256: [u8; 32],
-    receipt_sha256: [u8; 32],
     policy_digest_sha256: [u8; 32],
     key_id: Rfc9942PqKeyId,
     verifying_key_sha256: [u8; 32],
+    receipt_sha256: [u8; 32],
     classical_capability_sha256: [u8; 32],
     transcript_sha256: [u8; 32],
 }
