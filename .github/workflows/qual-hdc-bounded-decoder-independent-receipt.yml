@@ -1074,7 +1074,7 @@ jobs:
             });
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v9',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v10',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -1204,7 +1204,7 @@ jobs:
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V9.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V10.json'
             );
 
             const publicationMainRef = (await github.rest.git.getRef({
@@ -1390,10 +1390,90 @@ jobs:
               core.setFailed('Independent verifier refused to qualify the triggering run');
             }
       - name: Upload independent qualification receipt
+        id: upload_receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V9.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V10.json
           if-no-files-found: error
           retention-days: 90
+
+      - name: Publish decision-time qualification status
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
+        env:
+          EXPECTED_SUBJECT: "433ca9c92b16bfac824225950e32692e8e151238"
+          STATUS_CONTEXT: "HDC / Independent Qualification"
+          VERIFIER_OUTCOME: ${{ steps.verify.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload_receipt.outcome }}
+          PROMOTABLE: ${{ steps.verify.outputs.promotable }}
+          LEASE_ID: ${{ steps.verify.outputs.lease_id }}
+        with:
+          script: |
+            const uploadSucceeded = process.env.UPLOAD_OUTCOME === 'success';
+            const verifierSucceeded = process.env.VERIFIER_OUTCOME === 'success';
+            let receiptArtifactAvailable = false;
+            let receiptArtifact = null;
+
+            if (uploadSucceeded) {
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: context.runId,
+                  per_page: 100,
+                }
+              );
+              const matches = artifacts.filter(
+                (artifact) =>
+                  artifact.name === 'hdc-linear-code-bounded-decoder-independent-run-receipt'
+              );
+              receiptArtifact = matches[0] ?? null;
+              receiptArtifactAvailable =
+                matches.length === 1 &&
+                receiptArtifact !== null &&
+                receiptArtifact.expired === false &&
+                Number.isSafeInteger(receiptArtifact.id) &&
+                receiptArtifact.id > 0 &&
+                Number.isSafeInteger(receiptArtifact.size_in_bytes) &&
+                receiptArtifact.size_in_bytes > 0;
+            }
+
+            const success =
+              verifierSucceeded &&
+              uploadSucceeded &&
+              receiptArtifactAvailable &&
+              process.env.PROMOTABLE === 'true';
+            const state = success ? 'success' : 'pending';
+            const description = success
+              ? 'Qualification and decision-time promotion lease verified.'
+              : 'Qualification evidence is not currently promotion-eligible; evidence publication or currentness fence is not satisfied.';
+            const targetUrl =
+              context.serverUrl +
+              '/' +
+              context.repo.owner +
+              '/' +
+              context.repo.repo +
+              '/actions/runs/' +
+              context.runId;
+
+            await github.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.EXPECTED_SUBJECT,
+              state,
+              target_url: targetUrl,
+              description,
+              context: process.env.STATUS_CONTEXT,
+            });
+
+            core.info(
+              'Published decision-time status: ' +
+                state +
+                ' lease=' +
+                (process.env.LEASE_ID || 'unavailable') +
+                ' receipt_artifact=' +
+                (receiptArtifact?.id ?? 'unavailable')
+            );
