@@ -10,6 +10,7 @@
     {"id":"TOP-X07","kind":"topology_changes_adapter_finality_without_declaration","expected":"reject_semantic_leak"},
     {"id":"TOP-X08","kind":"same_topology_digest_for_distinct_graph","expected":"reject_digest_collision"},
     {"id":"TOP-X09","kind":"partition_recovery_without_explicit_route","expected":"reject_invented_failover"},
-    {"id":"TOP-X10","kind":"topology_effect_averaged_across_shocks","expected":"reject_collapsed_interaction"}
+    {"id":"TOP-X10","kind":"topology_effect_averaged_across_shocks","expected":"reject_collapsed_interaction"},
+    {"id":"TOP-X11","kind":"treatment_dependent_exogenous_rng_namespace","expected":"reject_common_random_number_breach"}
   ]
 }
