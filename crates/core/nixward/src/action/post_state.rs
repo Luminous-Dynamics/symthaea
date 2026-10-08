@@ -2511,14 +2511,6 @@ mod tests {
         obs.observed_at_monotonic_us = 2_000;
 
         let stability = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
-        let authorization = contextual_authorization(&contextual_intent(
-            NixServiceOperationKindV1::Start,
-            &exp.unit,
-            exp.authorized_generation,
-            exp.authorized_definition_content_digest.clone(),
-            exp.pre_invocation_id.clone(),
-            exp.required_stability_us,
-        ));
 
         let mut receipt = build_proven_receipt(&exp, &obs, Some(stability)).unwrap();
         receipt.systemd_job_removed_at_monotonic_us = Some(3_000);
@@ -2527,7 +2519,6 @@ mod tests {
             Err(NixPostStateErrorV1::PostconditionMismatch)
         ));
 
-        let _ = authorization;
     }
 
     #[test]
