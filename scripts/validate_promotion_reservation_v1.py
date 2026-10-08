@@ -832,6 +832,19 @@ def test_provider_topology_cas_predicate_digest_binds_bypass_rules():
     assert normal.digest() != bypass.digest()
 
 
+def test_provider_topology_binding_rejects_bypass_mode_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    bypass_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "bypass_rules": True},
+    )
+    binding = topology_binding_fixture(
+        bypass_identity,
+        provider_topology_cas_evidence=evidence,
+    )
+    assert binding.classify(bypass_identity) == "observed-not-cas"
+
+
 def test_provider_topology_binding_rejects_non_provider_cas_evidence_source():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(
@@ -1305,6 +1318,22 @@ def test_async_provider_result_preserves_bypass_rules_for_reconciliation():
     assert reconciliation.causal_attribution == "established"
 
 
+def test_async_provider_result_bypass_rules_mismatch_is_not_causal():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1", "squash", "direct_merge", True)
+    assert accepted.uuid is not None
+    provider.merge_directly()
+    reconciliation = provider.reconcile(
+        accepted.uuid,
+        "H1",
+        "squash",
+        "direct_merge",
+        False,
+    )
+    assert not reconciliation.effect_observed
+    assert reconciliation.causal_attribution == "unestablished"
+
+
 def test_direct_provider_merge_establishes_causal_attribution():
     provider = GitHubAsyncModel()
     accepted = provider.submit("H1", "squash", "direct_merge")
@@ -1511,6 +1540,7 @@ TESTS = [
     test_provider_topology_cas_predicate_digest_binds_observation,
     test_provider_topology_cas_predicate_digest_binds_sequence,
     test_provider_topology_cas_predicate_digest_binds_bypass_rules,
+    test_provider_topology_binding_rejects_bypass_mode_splice,
     test_provider_topology_binding_rejects_non_provider_cas_evidence_source,
     test_provider_topology_binding_rejects_empty_provider_operation_id,
     test_provider_topology_binding_rejects_unaccepted_cas_predicate_result,
@@ -1555,6 +1585,7 @@ TESTS = [
     test_duplicate_async_request_option_mismatch_is_not_idempotent,
     test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent,
     test_async_provider_result_preserves_bypass_rules_for_reconciliation,
+    test_async_provider_result_bypass_rules_mismatch_is_not_causal,
     test_direct_provider_merge_establishes_causal_attribution,
     test_enqueued_then_durable_merge_observes_effect_without_causality,
     test_expired_uuid_then_durable_merge_observes_effect_without_causality,
