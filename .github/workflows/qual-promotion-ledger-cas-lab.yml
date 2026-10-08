@@ -205,7 +205,10 @@ jobs:
             local target_sha="$1"
             local response_file="$2"
             local target_ref_path="$3"
-            test -n "${target_ref_path}"
+            test "${target_ref_path}" = "${force_ref_path}" || {
+              echo "force-update helper may target only the run-owned force-test ref" >&2
+              return 1
+            }
             curl -sS -o "${response_file}" -w '%{http_code}' \
               -X PATCH \
               -H "Accept: application/vnd.github+json" \
