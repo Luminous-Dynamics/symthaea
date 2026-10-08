@@ -19,7 +19,7 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 3;
+const RECEIPT_VERSION: u16 = 4;
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -131,6 +131,10 @@ pub enum VulkanBarrierReceiptError {
     PhysicalDeviceApiVersionBinding,
     #[error("receipt queue family does not match the execution runtime")]
     QueueFamilyBinding,
+    #[error("receipt physical-device UUID is all zeroes")]
+    DeviceUuidMissing,
+    #[error("receipt physical-device UUID does not match the execution runtime")]
+    DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
     TimelineExpected,
     #[error("receipt uses an unsupported multi-queue synchronization plan")]
@@ -159,6 +163,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub vulkan_api_version: u32,
     pub physical_device_api_version: u32,
     pub queue_family_index: u32,
+    pub device_uuid: [u8; 16],
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -228,6 +233,9 @@ impl VulkanBarrierExecutionReceipt {
         if self.physical_device_api_version < VULKAN_API_VERSION {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersion);
         }
+        if self.device_uuid.iter().all(|byte| *byte == 0) {
+            return Err(VulkanBarrierReceiptError::DeviceUuidMissing);
+        }
         if plan.queue_count > 1 || plan.assignments.iter().any(|assignment| assignment.queue.get() != 0) {
             return Err(VulkanBarrierReceiptError::MultipleLogicalQueues);
         }
@@ -253,12 +261,16 @@ impl VulkanBarrierExecutionReceipt {
         &self,
         physical_device_api_version: u32,
         queue_family_index: u32,
+        device_uuid: [u8; 16],
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
         }
         if self.queue_family_index != queue_family_index {
             return Err(VulkanBarrierReceiptError::QueueFamilyBinding);
+        }
+        if self.device_uuid != device_uuid {
+            return Err(VulkanBarrierReceiptError::DeviceUuidBinding);
         }
         Ok(())
     }
@@ -279,6 +291,7 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
     queue_family_index: u32,
+    device_uuid: [u8; 16],
     // Must be dropped after Instance/Device because ash requires Entry to outlive them.
     _entry: Entry,
 }
@@ -336,6 +349,14 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         let props = unsafe { instance.get_physical_device_properties(physical) };
+        let mut id_properties = vk::PhysicalDeviceIDProperties::default();
+        let mut properties2 = vk::PhysicalDeviceProperties2::default().push_next(&mut id_properties);
+        unsafe { instance.get_physical_device_properties2(physical, &mut properties2); }
+        let device_uuid = id_properties.device_uuid;
+        if device_uuid.iter().all(|byte| *byte == 0) {
+            unsafe { instance.destroy_instance(None); }
+            return Err(VulkanBarrierError::NoQualifiedDevice);
+        }
         let memory_properties = unsafe { instance.get_physical_device_memory_properties(physical) };
         qualification_stage(&format!("device_selected_api={}.{}.{} queue_family={family}",
             vk::api_version_major(props.api_version),
@@ -496,6 +517,7 @@ impl VulkanBarrierWorkloadRuntime {
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
             queue_family_index: family,
+            device_uuid,
             _entry: entry,
         })
     }
@@ -726,6 +748,7 @@ impl VulkanBarrierWorkloadRuntime {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
             queue_family_index: self.queue_family_index,
+            device_uuid: self.device_uuid,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         qualification_stage("receipt_verified");
@@ -1620,6 +1643,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         assert_eq!(
             receipt.verify_against(&graph, &schedule, &plan, &BTreeMap::new()),
@@ -1663,6 +1687,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         let expected = expected_final_timeline_value(&plan);
         assert!(matches!(
@@ -1710,6 +1735,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
@@ -1754,6 +1780,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: vk::API_VERSION_1_2,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1800,6 +1827,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -1848,6 +1876,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -1899,6 +1928,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         receipt.barrier_digest = String::from("tampered");
 
@@ -1969,6 +1999,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2024,6 +2055,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2067,6 +2099,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+        device_uuid: [1; 16],
         };
         receipt.completion_lowering_digest = String::from("tampered");
         assert!(matches!(
@@ -2078,18 +2111,18 @@ mod tests {
     #[test]
     fn receipt_rejects_runtime_device_and_queue_binding_mismatch() {
         let mut receipt = minimal_receipt_for_binding_tests();
-        assert!(receipt.verify_runtime_binding(VULKAN_API_VERSION, 0).is_ok());
+        assert!(receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0),
+            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
 
         receipt.physical_device_api_version = VULKAN_API_VERSION;
         receipt.queue_family_index = 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0),
+            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
     }
@@ -2130,6 +2163,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 7,
+            device_uuid: [1; 16],
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2155,6 +2189,7 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            device_uuid: [1; 16],
         }
     }
 
@@ -2183,6 +2218,7 @@ mod tests {
         println!("vulkan_api_version={}", receipt.vulkan_api_version);
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
+        println!("device_uuid={}", hex_bytes(&receipt.device_uuid));
         for (resource, value) in initial {
             println!("resource_initial_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
