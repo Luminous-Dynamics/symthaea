@@ -654,6 +654,7 @@ class ProviderMergeResultV1:
     merge_method: str
     merge_action: str
     observed_merge_commit: str | None = None
+    result_payload_digest: str = ""
 
     def directly_binds_requested_effect(
         self,
@@ -663,6 +664,7 @@ class ProviderMergeResultV1:
         return (
             evidence is not None
             and evidence.is_preserved_provider_evidence()
+            and evidence.source_authentication.method == "authenticated-api-channel"
             and self.result_source == "provider-async-result"
             and self.status == "merged"
             and bool(self.provider_uuid)
@@ -671,6 +673,8 @@ class ProviderMergeResultV1:
             and self.merge_method == identity.merge_method
             and self.merge_action == identity.merge_action
             and bool(self.observed_merge_commit)
+            and bool(self.result_payload_digest)
+            and self.result_payload_digest == evidence.capture.raw_bytes_digest
         )
 
 
@@ -763,12 +767,17 @@ class PromotionCausalResolutionV1:
         return cls("causality-unestablished", False, False)
 
 
+def provider_result_response_bytes() -> bytes:
+    return b'{"status":"merged","uuid":"uuid-1","requested_pr":7087,"head":"H3","merge_commit":"M2"}'
+
+
 def provider_merge_result_fixture(
     identity: PromotionOperationIdentityV1 | None = None,
     *,
     status: str = "merged",
     provider_uuid: str | None = "uuid-1",
     observed_merge_commit: str | None = "M2",
+    result_payload_digest: str | None = None,
 ) -> ProviderMergeResultV1:
     identity = identity or stack_identity_fixture()
     return ProviderMergeResultV1(
@@ -780,6 +789,11 @@ def provider_merge_result_fixture(
         merge_method=identity.merge_method,
         merge_action=identity.merge_action,
         observed_merge_commit=observed_merge_commit,
+        result_payload_digest=(
+            hashlib.sha256(provider_result_response_bytes()).hexdigest()
+            if result_payload_digest is None
+            else result_payload_digest
+        ),
     )
 
 
@@ -791,7 +805,9 @@ def provider_evidence_fixture(
     sequence: int = 1,
 ) -> ProviderEvidenceEnvelopeV1:
     capture = ProviderCaptureIntegrityV1(
-        raw_bytes_digest="raw-digest",
+        raw_bytes_digest=hashlib.sha256(
+            provider_result_response_bytes()
+        ).hexdigest(),
         storage_id="capture-1",
         capture_sequence=sequence,
         durable=durable,
@@ -1848,6 +1864,80 @@ def test_fabricated_local_capture_cannot_establish_requested_causality():
         provider_result=result,
         effect_set=None,
         provider_evidence=local,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_missing_content_digest_cannot_be_causal():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(
+        identity,
+        result_payload_digest="",
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=provider_evidence_fixture(),
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_content_digest_mismatch_cannot_be_causal():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(
+        identity,
+        result_payload_digest="different-digest",
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=provider_evidence_fixture(),
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
+def test_provider_result_matching_content_digest_can_be_causal():
+    identity = stack_identity_fixture()
+    digest = hashlib.sha256(provider_result_response_bytes()).hexdigest()
+    result = provider_merge_result_fixture(
+        identity,
+        result_payload_digest=digest,
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=provider_evidence_fixture(),
+    )
+    assert resolution.outcome == "requested-effect-causal"
+
+
+def test_webhook_evidence_cannot_be_async_operation_causality_even_with_matching_bytes():
+    identity = stack_identity_fixture()
+    digest = hashlib.sha256(provider_result_response_bytes()).hexdigest()
+    result = provider_merge_result_fixture(
+        identity,
+        result_payload_digest=digest,
+    )
+    webhook_evidence = ProviderEvidenceEnvelopeV1(
+        ProviderCaptureIntegrityV1(
+            raw_bytes_digest=digest,
+            storage_id="webhook-causal-boundary",
+            capture_sequence=1,
+        ),
+        ProviderSourceAuthenticationV1(
+            "webhook-hmac-verified",
+            True,
+            "github",
+        ),
+    )
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=webhook_evidence,
     )
     assert resolution.outcome == "causality-unestablished"
 
@@ -3195,6 +3285,10 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_result_missing_content_digest_cannot_be_causal,
+    test_provider_result_content_digest_mismatch_cannot_be_causal,
+    test_provider_result_matching_content_digest_can_be_causal,
+    test_webhook_evidence_cannot_be_async_operation_causality_even_with_matching_bytes,
     test_webhook_effect_provenance_set_is_complete,
     test_webhook_effect_provenance_normalizes_input_order,
     test_webhook_effect_provenance_rejects_missing_source_provenance,
