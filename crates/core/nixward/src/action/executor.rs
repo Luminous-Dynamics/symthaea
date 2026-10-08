@@ -1490,8 +1490,8 @@ impl NixOSExecutor {
                         NixServiceOperationKindV1::Stop => "stop",
                         NixServiceOperationKindV1::Restart => "restart",
                         NixServiceOperationKindV1::Reload => "reload",
-                        NixServiceOperationKindV1::Enable
-                        | NixServiceOperationKindV1::Disable => "unsupported",
+                        NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable =>
+                            "unsupported",
                     },
                     unit,
                     job_result.unwrap_or("unknown"),
