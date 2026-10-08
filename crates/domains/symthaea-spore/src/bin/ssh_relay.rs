@@ -11384,6 +11384,15 @@ mod tests {
     }
 
     #[test]
+    fn single_luks_fallback_configuration_contains_only_runtime_uuid_placeholder() {
+        let config = single_luks_fallback_configuration("guardian");
+        assert!(config.contains("boot.initrd.luks.devices.\"cryptroot\""));
+        assert!(config.contains("__CRYPT_UUID__"));
+        assert!(!config.contains("/dev/sda2"));
+        assert!(!config.contains("$CRYPT_UUID"));
+    }
+
+    #[test]
     fn fd_relative_cleanup_never_follows_child_symlink() {
         use std::os::unix::fs::PermissionsExt;
         use std::os::fd::AsRawFd;
