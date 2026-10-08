@@ -2120,6 +2120,7 @@ mod tests {
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
                     manager_owner: ":1.123".to_string(),
+                    removed_at_monotonic_us: Some(1_500),
                 }
             }),
             systemd_manager_owner: Some(":1.123".to_string()),
@@ -2680,6 +2681,104 @@ mod tests {
 
         obs.systemd_job.as_mut().unwrap().manager_owner = ":1.2.3".to_string();
         obs.validate_shape().unwrap();
+    }
+
+    #[test]
+    fn job_removed_observation_time_before_post_state_is_accepted() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().removed_at_monotonic_us = Some(1_000);
+        obs.observed_at_monotonic_us = 1_000;
+
+        let receipt = build_receipt(
+            &expectation(NixServiceOperationKindV1::Start),
+            &obs,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            receipt.systemd_job_removed_observed_at_monotonic_us,
+            Some(1_000)
+        );
+    }
+
+    #[test]
+    fn job_removed_observation_time_after_post_state_is_rejected() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().removed_at_monotonic_us = Some(2_001);
+
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::JobRemovedAfterObservation
+        );
+    }
+
+    #[test]
+    fn zero_job_removed_observation_time_fails_closed() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().removed_at_monotonic_us = Some(0);
+
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::InvalidJobRemovedObservationTime
+        );
+    }
+
+    #[test]
+    fn proven_receipt_requires_job_removed_observation_time() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_proven_receipt(
+            &exp,
+            &obs,
+            Some(stability(
+                &obs,
+                1_000,
+                1_000,
+                2_000,
+                &[1_000, 2_000],
+            )),
+        )
+        .unwrap();
+
+        receipt.systemd_job_removed_observed_at_monotonic_us = None;
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::MissingJobRemovedObservationTime
+        );
+    }
+
+    #[test]
+    fn job_removed_observation_time_is_bound_into_receipt_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let baseline = receipt.digest().unwrap();
+
+        let mut changed = receipt.clone();
+        changed.systemd_job_removed_observed_at_monotonic_us = Some(1_600);
+
+        assert_ne!(baseline, changed.digest().unwrap());
     }
 
     #[test]
