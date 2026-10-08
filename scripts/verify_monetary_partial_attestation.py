@@ -45,6 +45,7 @@ def main():
         m=json.loads(Path(sys.argv[1]).read_text())
         n=json.loads(Path(sys.argv[2]).read_text())
         f=m["factors"]; fixed=m["fixed_dimensions"]
+        if len(f) != 9: fail("factor axis count")
         expected=(
             len(f["monetary_pair"])*len(f["adapter"])*len(f["shock"])*len(f["seed"])*
             len(f["allocation_policy"])*len(f["focal_obligation"])*len(f["reporting_policy"])*
