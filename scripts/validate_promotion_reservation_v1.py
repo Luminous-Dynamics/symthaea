@@ -712,6 +712,8 @@ class ClockRelationVerificationV1:
             and self.valid_from_local_time_ms
             <= self.verified_at_local_time_ms
             <= self.valid_until_local_time_ms
+            and evidence.measured_at_local_time_ms
+            <= self.verified_at_local_time_ms
             and self.valid_from_local_time_ms
             >= evidence.valid_from_local_time_ms
             and self.valid_until_local_time_ms
@@ -822,6 +824,9 @@ class ClockRelationV1:
             return "clock-relation-admissible"
         if dispatch_time_ms < 0 or observation_time_ms < 0:
             return "clock-relation-invalid"
+        if self.trust_snapshot.snapshot_local_time_ms
+            > self.verification.verified_at_local_time_ms:
+            return "clock-relation-trust-snapshot-after-verification"
         if self.trust_snapshot.snapshot_local_time_ms > dispatch_time_ms:
             return "clock-relation-trust-snapshot-after-dispatch"
         if self.verification.verified_at_local_time_ms > dispatch_time_ms:
@@ -1690,9 +1695,29 @@ def test_clock_relation_rejects_verification_after_dispatch():
     assert relation.classify(1791475195000, 1791475205000) == "clock-relation-established-after-dispatch"
 
 
+def test_clock_relation_rejects_trust_snapshot_after_verification():
+    relation = clock_relation_fixture(snapshot_local_time_ms=1791475191000)
+    assert relation.classify(1791475195000, 1791475205000) == "clock-relation-trust-snapshot-after-verification"
+
+
 def test_clock_relation_rejects_trust_snapshot_after_dispatch():
     relation = clock_relation_fixture(snapshot_local_time_ms=1791475196000)
     assert relation.classify(1791475195000, 1791475205000) == "clock-relation-trust-snapshot-after-dispatch"
+
+
+def test_clock_relation_rejects_evidence_measured_after_verification():
+    relation = clock_relation_fixture()
+    assert relation.evidence is not None
+    evidence = ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "measured_at_local_time_ms": 1791475191001},
+    )
+    assert evidence.measured_at_local_time_ms > relation.verification.verified_at_local_time_ms
+    forged = ClockRelationV1(
+        evidence=evidence,
+        verification=relation.verification,
+        trust_snapshot=relation.trust_snapshot,
+    )
+    assert forged.classify(1791475195000, 1791475205000) == "clock-relation-invalid"
 
 
 def test_clock_relation_rejects_invalid_relation_state():
@@ -4187,7 +4212,9 @@ TESTS = [
     test_clock_relation_rejects_policy_drift,
     test_clock_relation_rejects_revocation_epoch_drift,
     test_clock_relation_rejects_verification_after_dispatch,
+    test_clock_relation_rejects_trust_snapshot_after_verification,
     test_clock_relation_rejects_trust_snapshot_after_dispatch,
+    test_clock_relation_rejects_evidence_measured_after_verification,
     test_clock_relation_rejects_invalid_relation_state,
     test_clock_relation_rejects_stale_relation,
     test_clock_relation_rejects_expired_validity_before_observation,
