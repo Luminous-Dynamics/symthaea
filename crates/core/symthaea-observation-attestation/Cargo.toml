@@ -9,6 +9,7 @@ repository = "https://github.com/luminous-dynamics/symthaea"
 
 [dependencies]
 blake3 = { workspace = true }
+hex = { workspace = true }
 ed25519-dalek = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
