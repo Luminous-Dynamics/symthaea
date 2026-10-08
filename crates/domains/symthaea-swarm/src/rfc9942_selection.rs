@@ -374,6 +374,12 @@ impl Rfc9942VerifiedReceiptSelection {
     /// receives one immutable object whose private fields prove compatibility
     /// among the collection, selected Receipt, inner verification capability,
     /// and authenticated outer composition.
+    ///
+    /// This witness is currently a classical-cryptographic boundary: the
+    /// atomic durable path uses ES256. It is therefore not, by itself, a
+    /// post-quantum or hybrid witness. A future `HYBRID_REQUIRED` policy
+    /// must cross a stronger witness binding both classical and
+    /// post-quantum verification.
     fn bind(
         decision: &ReceiptSelectionDecision,
         collection: &Rfc9942ReceiptCollection,
