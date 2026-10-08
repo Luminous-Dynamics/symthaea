@@ -404,14 +404,11 @@ fn main() {
         Err("authorization is expired")
     );
 
-    // Revocation is a new attributable governance event and is terminal.
-    let revoked_authorization = PromotionAuthorization {
-        id: Digest("authorization-revoked-v1"),
-        ..authorization
-    };
+    // Revocation is a new attributable governance event on the exact
+    // authorization identity that produced the deployment. It is terminal.
     let revocation = ledger
         .append_authority_action(
-            revoked_authorization,
+            authorization,
             Digest("authority-v1"),
             AuthorityAction::Revoke,
             170,
@@ -420,8 +417,27 @@ fn main() {
         .expect("named authority can revoke");
     assert_eq!(revocation.action, AuthorityAction::Revoke);
     assert_eq!(
-        ledger.current_state(revoked_authorization, 171),
+        ledger.current_state(authorization, 171),
         AuthorizationState::Revoked
+    );
+    assert_eq!(
+        issue_deployment(
+            authorization,
+            Digest("bounded-deployment-scope"),
+            171,
+            &ledger,
+        ),
+        Err("authorization is revoked")
+    );
+    assert_eq!(
+        continue_execution(
+            deployment,
+            authorization,
+            Digest("bounded-deployment-scope"),
+            171,
+            &ledger,
+        ),
+        Err("execution halted by revocation")
     );
 
     // An adverse post-deployment outcome is distinct evidence and may support
@@ -507,7 +523,18 @@ fn main() {
         .expect("requalification must be a fresh chain");
     assert_ne!(fresh_authorization.scope, authorization.scope);
 
-    // Reusing the stale pre-revocation authorization is explicitly rejected.
+    // Reusing the same pre-revocation authorization is rejected even though
+    // its historical evaluation was PASS; lifecycle state, not stale evidence,
+    // controls admission.
+    assert_eq!(
+        issue_deployment(
+            authorization,
+            Digest("bounded-deployment-scope"),
+            171,
+            &ledger,
+        ),
+        Err("authorization is revoked")
+    );
     assert_eq!(
         issue_deployment(
             authorization,
