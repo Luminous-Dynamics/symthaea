@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 53;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-heuristic-scale-v75";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-target-measurand-canonical-procedure-requirement-digest-observation-scale-typed-priority-uncertainty-stop-calibration-traceability-time-evaluation-binding-quantity-definition-unit-input-result-node-binding-reference-root-kind-heuristic-scale-target-link-v76";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -4043,6 +4043,15 @@ pub enum AssessmentError {
         /// Target identity referenced by the observation.
         target_id: String,
     },
+    /// A design-bound observation is not linked to the estimate named by its experimental target.
+    ExperimentalDesignObservationNotLinkedToTargetSurface {
+        /// Evidence identifier carrying the observation.
+        evidence_id: String,
+        /// Candidate carrying the observation.
+        candidate_id: String,
+        /// Experimental target identity.
+        target_id: String,
+    },
     /// A design-bound observation uses a different unit from the requirement surface.
     ExperimentalDesignObservationUnitMismatch {
         /// Evidence identifier carrying the observation.
@@ -4660,6 +4669,14 @@ impl std::fmt::Display for AssessmentError {
                 f,
                 "evidence {evidence_id} procedure digest {actual_procedure_digest} does not match protocol procedure digest {expected_procedure_digest}"
             ),
+            Self::ExperimentalDesignObservationNotLinkedToTargetSurface {
+                evidence_id,
+                candidate_id,
+                target_id,
+            } => write!(
+                f,
+                "evidence {evidence_id} on candidate {candidate_id} is not linked to experimental target {target_id}'s assessed surface"
+            ),
             Self::ExperimentalDesignObservationUnitMismatch {
                 evidence_id,
                 expected_unit,
@@ -5174,6 +5191,29 @@ impl AlternativesEngine {
                         target.target_id.clone(),
                     ));
                 };
+                let linked_to_target_surface = match &target.surface {
+                    ExperimentalDiscriminationSurface::Burden(dimension) => candidate
+                        .burdens
+                        .get(dimension)
+                        .is_some_and(|estimate| estimate.evidence_ids.contains(&evidence.id)),
+                    ExperimentalDiscriminationSurface::PerformanceMetric(metric) => candidate
+                        .performance
+                        .get(metric)
+                        .is_some_and(|estimate| estimate.evidence_ids.contains(&evidence.id)),
+                    ExperimentalDiscriminationSurface::OperatingCondition(condition) => candidate
+                        .operating_capabilities
+                        .get(condition)
+                        .is_some_and(|estimate| estimate.evidence_ids.contains(&evidence.id)),
+                };
+                if !linked_to_target_surface {
+                    return Err(
+                        AssessmentError::ExperimentalDesignObservationNotLinkedToTargetSurface {
+                            evidence_id: evidence.id.clone(),
+                            candidate_id: candidate.id.clone(),
+                            target_id: target.target_id.clone(),
+                        },
+                    );
+                }
                 if evidence.scope != expected_scope {
                     return Err(AssessmentError::ExperimentalDesignObservationScopeMismatch {
                         evidence_id: evidence.id.clone(),
@@ -11544,6 +11584,9 @@ mod tests {
             left_candidate_id: "left".into(),
             right_candidate_id: "right".into(),
             surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
             decision_rule: ExperimentalDecisionRuleRef {
                 rule_id: "rule".into(),
                 rule_revision: "v1".into(),
@@ -11558,6 +11601,9 @@ mod tests {
             surface: ExperimentalDiscriminationSurface::PerformanceMetric(
                 "throughput_per_hour".into(),
             ),
+            unit: "unit".into(),
+            scope: "synthetic functional unit".into(),
+            basis: fixture_basis(),
             decision_rule: burden.decision_rule.clone(),
         };
         let operating = ExperimentalDiscriminationTarget {
@@ -11568,6 +11614,9 @@ mod tests {
             surface: ExperimentalDiscriminationSurface::OperatingCondition(
                 "temperature".into(),
             ),
+            unit: "unit".into(),
+            scope: "synthetic functional unit".into(),
+            basis: fixture_basis(),
             decision_rule: burden.decision_rule.clone(),
         };
 
@@ -11624,6 +11673,9 @@ mod tests {
                 left_candidate_id: "direct-substitute".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "interval-separation-v1".into(),
                     rule_revision: "v1".into(),
@@ -11686,6 +11738,9 @@ mod tests {
                 left_candidate_id: "does-not-exist".into(),
                 right_candidate_id: "does-not-exist-2".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -11733,6 +11788,9 @@ mod tests {
             left_candidate_id: "product-redesign".into(),
             right_candidate_id: "process-substitute".into(),
             surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
             decision_rule: ExperimentalDecisionRuleRef {
                 rule_id: "rule-a".into(),
                 rule_revision: "v1".into(),
@@ -11745,6 +11803,9 @@ mod tests {
             left_candidate_id: "product-redesign".into(),
             right_candidate_id: "process-substitute".into(),
             surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
             decision_rule: ExperimentalDecisionRuleRef {
                 rule_id: "rule-b".into(),
                 rule_revision: "v1".into(),
@@ -11830,6 +11891,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -11887,6 +11951,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -11938,6 +12005,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -11990,6 +12060,9 @@ mod tests {
                 left_candidate_id: "direct-substitute".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -12089,6 +12162,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -12199,6 +12275,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -12283,6 +12362,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -12323,6 +12405,97 @@ mod tests {
     }
 
     #[test]
+    fn experimental_design_requires_observation_link_to_target_surface() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidates = case.candidates.clone();
+        let candidate_index = candidates
+            .iter()
+            .position(|candidate| candidate.id == "product-redesign")
+            .unwrap();
+        let observed = candidates[candidate_index]
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed.observation.as_mut().unwrap().experimental_design_id =
+            Some("design:surface-link".into());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+
+        candidates[candidate_index]
+            .burdens
+            .get_mut(&Dimension::Water)
+            .unwrap()
+            .evidence_ids
+            .clear();
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:surface-link".into(),
+            requirement_id: case.requirement.id.clone(),
+            requirement_digest: canonical_requirement_hash(&case.requirement).unwrap(),
+            hypothesis_id: "hypothesis:surface-link".into(),
+            hypothesis_statement: "The declared water measurement resolves the selected alternatives.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            candidate_digests: fixture_candidate_digests(
+                &candidates,
+                &["product-redesign", "process-substitute"],
+            ),
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: "fixture-measurand:Water".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                procedure_id: "fixture-measurement-procedure-v1".into(),
+                procedure_digest: "fixture-measurement-procedure-v1-digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                uncertainty_target: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignObservationNotLinkedToTargetSurface {
+                evidence_id,
+                candidate_id: "product-redesign".into(),
+                target_id: "t1".into(),
+            }
+        );
+    }
+
+    #[test]
     fn experimental_design_rejects_observation_scale_drift() {
         let case = crate::corpus::five_pathway_adversarial_case();
         let mut candidates = case.candidates.clone();
@@ -12353,6 +12526,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
@@ -12440,6 +12616,9 @@ mod tests {
                 left_candidate_id: "product-redesign".into(),
                 right_candidate_id: "process-substitute".into(),
                 surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 decision_rule: ExperimentalDecisionRuleRef {
                     rule_id: "rule".into(),
                     rule_revision: "v1".into(),
