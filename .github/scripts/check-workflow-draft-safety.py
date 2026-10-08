@@ -295,7 +295,6 @@ jobs:
         raise AssertionError("runner workflow without ready_for_review was accepted")
 
     manual = """on:
-  pull_request:
   workflow_dispatch:
 jobs:
   manual:
