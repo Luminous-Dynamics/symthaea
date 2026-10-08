@@ -1,0 +1,13 @@
+{
+  "schema_version": "monetary-reporting-authority-v1-contrasts",
+  "trace_set_digest": "35609124f8be23b83d4b392144e49c9192d83c992e8e2d1c48a46aa99ac7222f",
+  "key_findings": [
+    "Claim-driven allocation preserves the manipulability found in #7146: across all three non-truth reporting policies, 22.2222% of comparable focal outcomes improve relative to the paired truthful counterpart, with mean gain 1.3274074 ticks and maximum gain 14.",
+    "Verified-truth authority eliminates the measured focal reporting advantage: 4,050 comparable non-truth paired completions have zero positive gain.",
+    "Mismatch-rejected authority also eliminates positive gain, but by refusing mismatched focal declarations: 100% of criticality-inflation and dual-misreport cells are rejected; liquidity-demand underreporting is rejected in 54.1667% of cells.",
+    "Mismatch rejection therefore trades manipulation resistance for lower focal/system completion in the synthetic model; it is not interchangeable with verified truth."
+  ],
+  "authority_boundary_result:": "The model distinguishes assertion, verification, and rejection as separate authority semantics rather than treating a declaration as truth.",
+  "design_implication": "A durable allocation design should bind each allocation input to an explicit authority/provenance mode. 'Declared by participant' and 'verified fact' must not be semantically interchangeable.",
+  "claim_ceiling": "Synthetic deterministic authority/manipulability observation only; no empirical truthfulness, equilibrium, incentive-compatibility, welfare, or real-system safety claim."
+}
