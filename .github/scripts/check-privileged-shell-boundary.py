@@ -52,6 +52,10 @@ def main() -> None:
         "Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics",
         "async fn handle_connection(",
         "fn main(",
+        "fn trusted_typed_executable(",
+        "fn remove_transaction_artifact_dir_blocking(",
+        "fn replace_configuration_atomically_blocking(",
+        "async fn create_btrfs_image_archive(",
         "#[cfg(test)]\nmod tests {",
     ):
         if marker not in text:
@@ -154,7 +158,7 @@ def main() -> None:
     script_start = text.find("fn open_trusted_script(")
     if script_start < 0:
         fail("open_trusted_script helper disappeared")
-    script_end = text.find("\nasync fn run_privileged_script_with_args(", script_start)
+    script_end = text.find("\nfn create_private_runtime_file(", script_start)
     if script_end < 0:
         fail("trusted script helper boundary could not be located")
     script_body = text[script_start:script_end]
