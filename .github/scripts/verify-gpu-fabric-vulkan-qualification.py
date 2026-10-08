@@ -17,6 +17,7 @@ KERNEL_ID = "symthaea.hdc.bind_xor.v1"
 VULKAN_ENTRY_POINT = "main"
 VULKAN_SHADER_STAGE = "compute"
 DRIVER_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-driver.v1"
+DRIVER_IDENTITY_VERSION_NUMBER = "1"
 
 FIXTURES = {
     "fixture": {
@@ -210,7 +211,7 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
 
 
 def verify_driver_provenance(values: dict[str, str]) -> tuple[str, bytes, int]:
-    if values.get("driver_identity_version") != "1":
+    if values.get("driver_identity_version") != DRIVER_IDENTITY_VERSION_NUMBER:
         fail("driver identity version mismatch")
     try:
         driver_uuid = bytes.fromhex(values["driver_uuid"])
@@ -244,7 +245,7 @@ def verify_runtime(path: Path) -> None:
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
         fail("runtime witness must contain fixture then hazard exactly once")
 
-    provenance: tuple[str, str, bytes] | None = None
+    provenance: tuple[str, str, bytes, str, bytes, int] | None = None
     for name, lines in blocks:
         spec = FIXTURES[name]
         values = parse_kv(lines)
