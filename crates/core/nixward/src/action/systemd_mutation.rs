@@ -53,9 +53,7 @@ pub struct NixSystemdLifecycleMutationTransportV1 {
 }
 
 impl NixSystemdLifecycleMutationTransportV1 {
-    pub async fn connect_system()
-        -> Result<Self, NixSystemdMutationTransportErrorV1>
-    {
+    pub async fn connect_system() -> Result<Self, NixSystemdMutationTransportErrorV1> {
         Ok(Self {
             connection: Connection::system().await?,
         })
@@ -77,11 +75,9 @@ impl NixSystemdLifecycleMutationTransportV1 {
         operation: &NixServiceOperationV1,
         manager_owner: &str,
     ) -> Result<OwnedObjectPath, NixSystemdMutationTransportErrorV1> {
-        operation
-            .validate_shape()
-            .map_err(|error| {
-                NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
-            })?;
+        operation.validate_shape().map_err(|error| {
+            NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
+        })?;
         validate_manager_owner(manager_owner)?;
         let bus = Proxy::new(
             &self.connection,
@@ -90,9 +86,7 @@ impl NixSystemdLifecycleMutationTransportV1 {
             DBUS_INTERFACE,
         )
         .await?;
-        let current_owner: String = bus
-            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
-            .await?;
+        let current_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
         if current_owner != manager_owner {
             return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
         }
@@ -122,11 +116,9 @@ impl NixSystemdLifecycleMutationTransportV1 {
         manager_owner: &str,
         expected_bus_id: &str,
     ) -> Result<OwnedObjectPath, NixSystemdMutationTransportErrorV1> {
-        operation
-            .validate_shape()
-            .map_err(|error| {
-                NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
-            })?;
+        operation.validate_shape().map_err(|error| {
+            NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
+        })?;
         validate_manager_owner(manager_owner)?;
         validate_bus_id(expected_bus_id)?;
 
@@ -138,9 +130,7 @@ impl NixSystemdLifecycleMutationTransportV1 {
         )
         .await?;
 
-        let current_owner: String = bus
-            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
-            .await?;
+        let current_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
         if current_owner != manager_owner {
             return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
         }
@@ -168,9 +158,7 @@ impl NixSystemdLifecycleMutationTransportV1 {
 
         // A manager or bus rollover during the D-Bus RPC invalidates the dispatch
         // as qualifying evidence even if a Job path was returned.
-        let final_owner: String = bus
-            .call("GetNameOwner", &(SYSTEMD_DESTINATION,))
-            .await?;
+        let final_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
         if final_owner != manager_owner {
             return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
         }
@@ -206,26 +194,26 @@ fn method_and_job_type(
         NixServiceOperationKindV1::Restart => ("RestartUnit", "restart"),
         NixServiceOperationKindV1::Reload => ("ReloadUnit", "reload"),
         NixServiceOperationKindV1::Enable => {
-            return Err(NixSystemdMutationTransportErrorV1::UnsupportedOperation("enable"))
+            return Err(NixSystemdMutationTransportErrorV1::UnsupportedOperation(
+                "enable",
+            ));
         }
         NixServiceOperationKindV1::Disable => {
-            return Err(NixSystemdMutationTransportErrorV1::UnsupportedOperation("disable"))
+            return Err(NixSystemdMutationTransportErrorV1::UnsupportedOperation(
+                "disable",
+            ));
         }
     };
     Ok(value)
 }
 
-fn validate_manager_owner(
-    owner: &str,
-) -> Result<(), NixSystemdMutationTransportErrorV1> {
-    zbus::names::UniqueName::try_from(owner).map(|_| ()).map_err(|_| {
-        NixSystemdMutationTransportErrorV1::InvalidManagerOwner
-    })
+fn validate_manager_owner(owner: &str) -> Result<(), NixSystemdMutationTransportErrorV1> {
+    zbus::names::UniqueName::try_from(owner)
+        .map(|_| ())
+        .map_err(|_| NixSystemdMutationTransportErrorV1::InvalidManagerOwner)
 }
 
-fn validate_bus_id(
-    bus_id: &str,
-) -> Result<(), NixSystemdMutationTransportErrorV1> {
+fn validate_bus_id(bus_id: &str) -> Result<(), NixSystemdMutationTransportErrorV1> {
     if bus_id.len() != 32 || !bus_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
     }
@@ -258,18 +246,52 @@ mod tests {
 
     #[test]
     fn lifecycle_methods_are_exact() {
-        assert_eq!(NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Start).unwrap(), "StartUnit");
-        assert_eq!(NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Stop).unwrap(), "StopUnit");
-        assert_eq!(NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Restart).unwrap(), "RestartUnit");
-        assert_eq!(NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Reload).unwrap(), "ReloadUnit");
-        assert!(NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Enable).is_err());
-        assert!(NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Disable).is_err());
+        assert_eq!(
+            NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Start)
+                .unwrap(),
+            "StartUnit"
+        );
+        assert_eq!(
+            NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Stop)
+                .unwrap(),
+            "StopUnit"
+        );
+        assert_eq!(
+            NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Restart)
+                .unwrap(),
+            "RestartUnit"
+        );
+        assert_eq!(
+            NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Reload)
+                .unwrap(),
+            "ReloadUnit"
+        );
+        assert!(
+            NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Enable)
+                .is_err()
+        );
+        assert!(
+            NixSystemdLifecycleMutationTransportV1::method_name(NixServiceOperationKindV1::Disable)
+                .is_err()
+        );
     }
 
     #[test]
     fn lifecycle_job_types_are_exact() {
-        assert_eq!(NixSystemdLifecycleMutationTransportV1::job_type_name(NixServiceOperationKindV1::Restart).unwrap(), "restart");
-        assert_eq!(NixSystemdLifecycleMutationTransportV1::job_type_name(NixServiceOperationKindV1::Reload).unwrap(), "reload");
+        assert_eq!(
+            NixSystemdLifecycleMutationTransportV1::job_type_name(
+                NixServiceOperationKindV1::Restart
+            )
+            .unwrap(),
+            "restart"
+        );
+        assert_eq!(
+            NixSystemdLifecycleMutationTransportV1::job_type_name(
+                NixServiceOperationKindV1::Reload
+            )
+            .unwrap(),
+            "reload"
+        );
     }
 
     #[test]
@@ -297,8 +319,7 @@ mod tests {
     }
 
     fn lifecycle_dispatch_api_is_owner_bound_not_well_known_name_bound() {
-        let _method =
-            NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner;
+        let _method = NixSystemdLifecycleMutationTransportV1::dispatch_lifecycle_for_manager_owner;
         assert!(validate_manager_owner(":1.42").is_ok());
     }
 
@@ -307,12 +328,10 @@ mod tests {
         let good = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42").unwrap();
         let bad_namespace =
             OwnedObjectPath::try_from("/org/freedesktop/systemd1/unit/nginx_2eservice").unwrap();
-        let bad_id = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/not-a-number").unwrap();
+        let bad_id =
+            OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/not-a-number").unwrap();
         let zero = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/0").unwrap();
-        let nested = OwnedObjectPath::try_from(
-            "/org/freedesktop/systemd1/job/42/extra",
-        )
-        .unwrap();
+        let nested = OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/42/extra").unwrap();
         validate_job_object_path(&good).unwrap();
         assert!(validate_job_object_path(&bad_namespace).is_err());
         assert!(validate_job_object_path(&bad_id).is_err());
