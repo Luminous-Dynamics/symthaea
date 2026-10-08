@@ -29,7 +29,6 @@ jobs:
           EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
           EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
           EXPECTED_WORKFLOW_BLOB_SHA: "63baafe8786e4f2ed5deda97850d35979c6b4228"
-          EXPECTED_MERGE_COMMIT: "4fa84567af424959b9ba225b1d67eb766bcf05e3"
         with:
           script: |
             const fs = require('fs');
@@ -46,7 +45,6 @@ jobs:
               workflowPath: process.env.EXPECTED_WORKFLOW_PATH,
               workflowName: process.env.EXPECTED_WORKFLOW_NAME,
               workflowBlobSha: process.env.EXPECTED_WORKFLOW_BLOB_SHA,
-              mergeCommit: process.env.EXPECTED_MERGE_COMMIT,
             };
 
             const expectedFiles = [
@@ -181,7 +179,7 @@ jobs:
                 artifact.workflow_run?.id === evidence.run.id &&
                 artifact.workflow_run?.repository_id === expected.repositoryId &&
                 artifact.workflow_run?.head_repository_id === expected.repositoryId &&
-                artifact.workflow_run?.head_sha === expected.mergeCommit &&
+                artifact.workflow_run?.head_sha === expected.subject &&
                 typeof artifact.digest === 'string' &&
                 /^sha256:[0-9a-f]{64}$/.test(artifact.digest);
 
@@ -195,8 +193,8 @@ jobs:
               const expectedMergeParentSet = [expected.parent, expected.subject].sort();
 
               const mergeIdentityVerified =
-                evidence.pr.merge_commit_sha === expected.mergeCommit &&
-                evidence.mergeCommit?.sha === expected.mergeCommit &&
+                typeof evidence.pr.merge_commit_sha === 'string' &&
+                evidence.mergeCommit?.sha === evidence.pr.merge_commit_sha &&
                 evidence.mergeCommit?.parents?.length === 2 &&
                 JSON.stringify(mergeParentSet) === JSON.stringify(expectedMergeParentSet);
 
@@ -226,7 +224,7 @@ jobs:
                   evidence.run.event === 'pull_request' &&
                   evidence.run.conclusion === 'success' &&
                   evidence.run.head_branch === expected.branch &&
-                  evidence.run.head_sha === expected.mergeCommit,
+                  evidence.run.head_sha === expected.subject,
                 pr_identity:
                   evidence.pr.number === expected.pr &&
                   evidence.pr.head.ref === expected.branch &&
@@ -385,7 +383,7 @@ jobs:
                       id: runId,
                       repository_id: expected.repositoryId,
                       head_repository_id: expected.repositoryId,
-                      head_sha: expected.mergeCommit,
+                      head_sha: expected.subject,
                     },
                   },
                 ],
@@ -514,11 +512,11 @@ jobs:
               pull_number: expected.pr,
             })).data;
 
-            const mergeCommit = run.head_sha
+            const mergeCommit = pr.merge_commit_sha
               ? (await github.rest.repos.getCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  ref: run.head_sha,
+                  ref: pr.merge_commit_sha,
                 })).data
               : null;
 
