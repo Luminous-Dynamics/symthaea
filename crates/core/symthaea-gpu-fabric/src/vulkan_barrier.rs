@@ -562,14 +562,8 @@ impl VulkanBarrierWorkloadRuntime {
             )?;
             set_guard.push(set);
 
-            let groups = ((range / 4) as u32)
-                .saturating_add(WORKGROUP_SIZE - 1)
-                / WORKGROUP_SIZE;
-            if groups.max(1) > self.max_compute_workgroup_count_x {
-                return Err(VulkanBarrierError::DispatchTooLarge(
-                    writes[0].resource.clone(),
-                ));
-            }
+            let groups = dispatch_group_count(range, self.max_compute_workgroup_count_x)
+                .ok_or_else(|| VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone()))?;
             unsafe {
                 self.device.cmd_bind_pipeline(
                     command_guard.command(),
@@ -1021,6 +1015,17 @@ fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFl
     }
 }
 
+fn dispatch_group_count(range: u64, max_groups_x: u32) -> Option<u32> {
+    let elements = range / 4;
+    let groups = elements.saturating_add(u64::from(WORKGROUP_SIZE - 1)) / u64::from(WORKGROUP_SIZE);
+    let groups = groups.max(1);
+    if groups <= u64::from(max_groups_x) {
+        Some(groups as u32)
+    } else {
+        None
+    }
+}
+
 fn expected_final_timeline_value(plan: &VulkanSyncPlan) -> u64 {
     plan.submissions
         .iter()
@@ -1337,6 +1342,14 @@ mod tests {
         );
         initial.insert(mid, BinaryHypervector::zeros(32));
         (graph, schedule, plan, initial)
+    }
+
+    #[test]
+    fn dispatch_group_count_rejects_u64_to_u32_truncation() {
+        let range = (u64::from(u32::MAX) + 1)
+            .saturating_mul(u64::from(WORKGROUP_SIZE))
+            .saturating_mul(4);
+        assert_eq!(dispatch_group_count(range, u32::MAX), None);
     }
 
     #[test]
