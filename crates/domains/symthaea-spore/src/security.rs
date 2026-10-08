@@ -83,6 +83,33 @@ pub fn sanitize_input(s: &str, field_name: &str, allow_slashes: bool) -> Result<
     }
     Ok(s.to_string())
 }
+/// Render an arbitrary value as a complete, safe Nix double-quoted string literal.
+///
+/// Nix treats `"`, `\\`, and `${...}` specially inside double-quoted strings.
+/// Keep this at the code-generation boundary so generated Nix remains safe even
+/// when a future caller bypasses the current input sanitizer.
+pub fn nix_string_literal(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '$' if chars.peek() == Some(&'{') => out.push_str("\\$"),
+            c if c.is_control() => out.push('\u{FFFD}'),
+            c => out.push(c),
+        }
+    }
+
+    out.push('"');
+    out
+}
+
 
 /// Validate hostname — RFC 1123. Returns lowercase, defaults to "guardian" if empty.
 pub fn validate_hostname(h: &str) -> Result<String, String> {
