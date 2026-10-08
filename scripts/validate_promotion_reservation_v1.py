@@ -364,6 +364,7 @@ class ProviderWebhookRequestContextV1:
     event_type: str
     repository: str
     received_at_ms: int | None = None
+    received_monotonic_ns: int | None = None
 
     def matches_receipt(self, receipt: ProviderWebhookReceiptV1) -> bool:
         return (
@@ -387,6 +388,7 @@ class ProviderPullRequestMergeObservationV1:
     payload_bytes_digest: str
     merged_at: str = ""
     local_received_at_ms: int | None = None
+    local_received_monotonic_ns: int | None = None
     hook_id: str = ""
     source_authentication: str = ""
 
@@ -452,6 +454,7 @@ class ProviderPullRequestMergeObservationV1:
             payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
             merged_at=str(merged_at),
             local_received_at_ms=received_context.received_at_ms,
+            local_received_monotonic_ns=received_context.received_monotonic_ns,
             hook_id=receipt.hook_id,
             source_authentication="webhook-hmac-verified",
         )
@@ -820,6 +823,9 @@ class ProviderWebhookEffectTimingV1:
     local_reservation_time_ms: int | None
     local_dispatch_time_ms: int | None
     local_observation_time_ms: int | None
+    local_reservation_monotonic_ns: int | None
+    local_dispatch_monotonic_ns: int | None
+    local_observation_monotonic_ns: int | None
     clock_relation: ClockRelationV1 | None
 
     @classmethod
@@ -831,6 +837,8 @@ class ProviderWebhookEffectTimingV1:
         clock_relation: ClockRelationV1 | None,
         provider_delivery_time_ms: int | None = None,
         timestamp_policy: ProviderTimestampPolicyV1 | None = None,
+        local_reservation_monotonic_ns: int | None = None,
+        local_dispatch_monotonic_ns: int | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
         interval = (
             parse_provider_timestamp_interval_ms(
@@ -860,6 +868,9 @@ class ProviderWebhookEffectTimingV1:
             local_reservation_time_ms=local_reservation_time_ms,
             local_dispatch_time_ms=local_dispatch_time_ms,
             local_observation_time_ms=observation.local_received_at_ms,
+            local_reservation_monotonic_ns=local_reservation_monotonic_ns,
+            local_dispatch_monotonic_ns=local_dispatch_monotonic_ns,
+            local_observation_monotonic_ns=observation.local_received_monotonic_ns,
             clock_relation=clock_relation,
         )
 
@@ -871,6 +882,9 @@ class ProviderWebhookEffectTimingV1:
             self.local_reservation_time_ms,
             self.local_dispatch_time_ms,
             self.local_observation_time_ms,
+            self.local_reservation_monotonic_ns,
+            self.local_dispatch_monotonic_ns,
+            self.local_observation_monotonic_ns,
         )
         if any(value is not None and value < 0 for value in values):
             return "invalid-negative-time"
@@ -896,10 +910,20 @@ class ProviderWebhookEffectTimingV1:
             return "local-dispatch-time-missing"
         if self.local_observation_time_ms is None:
             return "local-observation-time-missing"
+        if self.local_reservation_monotonic_ns is None:
+            return "local-reservation-monotonic-time-missing"
+        if self.local_dispatch_monotonic_ns is None:
+            return "local-dispatch-monotonic-time-missing"
+        if self.local_observation_monotonic_ns is None:
+            return "local-observation-monotonic-time-missing"
         if self.local_dispatch_time_ms < self.local_reservation_time_ms:
             return "invalid-local-time-order"
         if self.local_observation_time_ms < self.local_dispatch_time_ms:
             return "invalid-local-time-order"
+        if self.local_dispatch_monotonic_ns < self.local_reservation_monotonic_ns:
+            return "invalid-local-monotonic-order"
+        if self.local_observation_monotonic_ns < self.local_dispatch_monotonic_ns:
+            return "invalid-local-monotonic-order"
         if self.provider_delivery_time_ms is not None:
             if self.provider_delivery_time_ms < self.provider_event_time_ms:
                 return "invalid-provider-time-order"
@@ -1446,6 +1470,7 @@ def test_webhook_hmac_verification_rejects_wrong_secret():
 def webhook_received_context(
     receipt: ProviderWebhookReceiptV1,
     received_at_ms: int | None = None,
+    received_monotonic_ns: int | None = None,
 ) -> ProviderWebhookRequestContextV1:
     return ProviderWebhookRequestContextV1(
         delivery_id=receipt.delivery_id,
@@ -1453,6 +1478,7 @@ def webhook_received_context(
         event_type=receipt.event_type,
         repository=receipt.repository,
         received_at_ms=received_at_ms,
+        received_monotonic_ns=received_monotonic_ns,
     )
 
 
@@ -1523,6 +1549,7 @@ def stack_webhook_observation(
     repository: str = "Luminous-Dynamics/symthaea",
     payload_extra: str | None = None,
     received_at_ms: int = 1791475205000,
+    received_monotonic_ns: int = 9000000000000,
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
     payload = webhook_merge_payload(
@@ -1543,7 +1570,7 @@ def stack_webhook_observation(
         receipt,
         payload,
         b"secret",
-        webhook_received_context(receipt, received_at_ms),
+        webhook_received_context(receipt, received_at_ms, received_monotonic_ns),
         "hook-1",
         "pull_request",
         "Luminous-Dynamics/symthaea",
@@ -1597,6 +1624,9 @@ def effect_timing_fixture(
     reservation_time_ms: int | None = 1791475190000,
     dispatch_time_ms: int | None = 1791475195000,
     observation_time_ms: int | None = 1791475205000,
+    reservation_monotonic_ns: int | None = 8999999000000,
+    dispatch_monotonic_ns: int | None = 8999999500000,
+    observation_monotonic_ns: int | None = 9000000000000,
     clock_relation: ClockRelationV1 | None = None,
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
@@ -1618,6 +1648,9 @@ def effect_timing_fixture(
         local_reservation_time_ms=reservation_time_ms,
         local_dispatch_time_ms=dispatch_time_ms,
         local_observation_time_ms=observation_time_ms,
+        local_reservation_monotonic_ns=reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=dispatch_monotonic_ns,
+        local_observation_monotonic_ns=observation_monotonic_ns,
         clock_relation=(
             clock_relation if clock_relation is not None else clock_relation_fixture()
         ),
@@ -1636,6 +1669,8 @@ def webhook_effect_timing_from_observation(
         observation,
         local_reservation_time_ms=1791475190000,
         local_dispatch_time_ms=1791475195000,
+        local_reservation_monotonic_ns=8999999000000,
+        local_dispatch_monotonic_ns=8999999500000,
         clock_relation=clock_relation_fixture(),
         timestamp_policy=timestamp_policy_fixture(),
     )
@@ -1867,6 +1902,33 @@ def test_temporal_effect_drift_can_turn_boundary_into_uncertainty():
         ),
     )
     assert timing.classify() == "cross-domain-time-uncertain"
+
+
+def test_temporal_timing_rejects_missing_local_monotonic_time():
+    timing = effect_timing_fixture(
+        observation_monotonic_ns=None,
+    )
+    assert timing.classify() == "local-observation-monotonic-time-missing"
+
+
+def test_temporal_timing_rejects_local_monotonic_rollback():
+    timing = effect_timing_fixture(
+        observation_monotonic_ns=8999999400000,
+        dispatch_monotonic_ns=8999999500000,
+    )
+    assert timing.classify() == "invalid-local-monotonic-order"
+
+
+def test_temporal_timing_rejects_wall_clock_valid_but_monotonic_invalid_order():
+    timing = effect_timing_fixture(
+        reservation_time_ms=1791475190000,
+        dispatch_time_ms=1791475195000,
+        observation_time_ms=1791475205000,
+        reservation_monotonic_ns=8999999000000,
+        dispatch_monotonic_ns=9000000500000,
+        observation_monotonic_ns=9000000000000,
+    )
+    assert timing.classify() == "invalid-local-monotonic-order"
 
 
 def test_temporal_effect_without_clock_relation_is_unbounded():
@@ -4463,6 +4525,9 @@ TESTS = [
     test_temporal_effect_interval_overlap_is_not_admissible,
     test_temporal_effect_expired_clock_relation_is_not_admissible,
     test_temporal_effect_drift_can_turn_boundary_into_uncertainty,
+    test_temporal_timing_rejects_missing_local_monotonic_time,
+    test_temporal_timing_rejects_local_monotonic_rollback,
+    test_temporal_timing_rejects_wall_clock_valid_but_monotonic_invalid_order,
     test_temporal_effect_without_clock_relation_is_unbounded,
     test_temporal_effect_with_event_before_dispatch_is_rejected,
     test_temporal_effect_with_event_after_observation_is_rejected,
