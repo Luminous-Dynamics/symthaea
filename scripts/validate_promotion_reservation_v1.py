@@ -1160,6 +1160,221 @@ class ClockRelationSourceSetV1:
 
 
 @dataclass(frozen=True)
+class ClockSourceMeasurementStepV1:
+    operation_identity_digest: str
+    round_index: int
+    sequence_index: int
+    source_id: str
+    relation: ClockRelationV1
+    request_nonce_digest: str
+    previous_response_digest: str | None
+    chain_random_digest: str
+    chain_link_digest: str
+    received_local_time_ms: int
+
+    def expected_chain_link_digest(self) -> str:
+        if self.previous_response_digest is None:
+            material = (
+                "initial|"
+                + self.request_nonce_digest
+                + "|"
+                + str(self.round_index)
+                + "|"
+                + str(self.sequence_index)
+            )
+        else:
+            material = (
+                "continuation|"
+                + self.previous_response_digest
+                + "|"
+                + self.chain_random_digest
+                + "|"
+                + str(self.round_index)
+                + "|"
+                + str(self.sequence_index)
+            )
+        return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+    def internally_consistent(self) -> bool:
+        if self.round_index not in (1, 2) or self.sequence_index <= 0:
+            return False
+        if not self.operation_identity_digest or not self.source_id:
+            return False
+        if self.relation.evidence is None:
+            return False
+        challenge = self.relation.evidence.source_challenge
+        response = self.relation.evidence.source_response
+        if challenge is None or response is None:
+            return False
+        if challenge.operation_identity_digest != self.operation_identity_digest:
+            return False
+        if challenge.source_id != self.source_id:
+            return False
+        try:
+            nonce = bytes.fromhex(challenge.nonce_hex)
+        except ValueError:
+            return False
+        expected_nonce_digest = hashlib.sha256(nonce).hexdigest()
+        return (
+            self.request_nonce_digest == expected_nonce_digest
+            and self.relation.classify() == "clock-relation-admissible"
+            and self.received_local_time_ms >= 0
+            and bool(self.chain_random_digest)
+            and len(self.chain_random_digest) == 64
+            and (
+                self.previous_response_digest is None
+                or len(self.previous_response_digest) == 64
+            )
+            and self.chain_link_digest == self.expected_chain_link_digest()
+        )
+
+
+@dataclass(frozen=True)
+class ClockSourceMeasurementSequenceV1:
+    operation_identity_digest: str
+    first_round: tuple[ClockSourceMeasurementStepV1, ...]
+    second_round: tuple[ClockSourceMeasurementStepV1, ...]
+    required_sources: int = 3
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "first_round": [step_digest for step_digest in self.round_digest(1)],
+            "operation_identity_digest": self.operation_identity_digest,
+            "required_sources": self.required_sources,
+            "second_round": [step_digest for step_digest in self.round_digest(2)],
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def round_digest(self, round_index: int) -> tuple[str, ...]:
+        source = self.first_round if round_index == 1 else self.second_round
+        return tuple(
+            hashlib.sha256(
+                json.dumps(
+                    {
+                        "chain_link_digest": step.chain_link_digest,
+                        "operation_identity_digest": step.operation_identity_digest,
+                        "previous_response_digest": step.previous_response_digest,
+                        "received_local_time_ms": step.received_local_time_ms,
+                        "relation_digest": step.relation.digest(),
+                        "round_index": step.round_index,
+                        "sequence_index": step.sequence_index,
+                        "source_id": step.source_id,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=True,
+                ).encode("utf-8")
+            ).hexdigest()
+            for step in source
+        )
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def _validate_round(
+        self,
+        steps: tuple[ClockSourceMeasurementStepV1, ...],
+        expected_round: int,
+    ) -> str | None:
+        if len(steps) < self.required_sources:
+            return "clock-source-measurement-quorum-insufficient"
+        if any(step.round_index != expected_round for step in steps):
+            return "clock-source-measurement-round-mismatch"
+        if any(
+            step.operation_identity_digest != self.operation_identity_digest
+            for step in steps
+        ):
+            return "clock-source-operation-identity-mismatch"
+        if any(not step.internally_consistent() for step in steps):
+            return "clock-source-measurement-invalid"
+        source_ids = [step.source_id for step in steps]
+        if len(source_ids) != len(set(source_ids)):
+            return "clock-source-independence-invalid"
+        sequence_indices = [step.sequence_index for step in steps]
+        if sequence_indices != list(range(1, len(steps) + 1)):
+            return "clock-source-measurement-round-mismatch"
+        receive_times = [step.received_local_time_ms for step in steps]
+        if any(
+            later <= earlier
+            for earlier, later in zip(receive_times, receive_times[1:])
+        ):
+            return "clock-source-measurement-round-mismatch"
+        response_ids = [
+            step.relation.evidence.source_response.response_id
+            for step in steps
+            if step.relation.evidence is not None
+        ]
+        if len(response_ids) != len(set(response_ids)):
+            return "clock-source-measurement-replay"
+        for earlier, later in zip(steps, steps[1:]):
+            if earlier.relation.evidence is None or later.relation.evidence is None:
+                return "clock-source-measurement-invalid"
+            earlier_response = earlier.relation.evidence.source_response
+            later_response = later.relation.evidence.source_response
+            earlier_upper = (
+                earlier_response.provider_time_ms
+                + earlier_response.uncertainty_radius_ms
+            )
+            later_lower = (
+                later_response.provider_time_ms
+                - later_response.uncertainty_radius_ms
+            )
+            if earlier_upper < later_lower:
+                continue
+            if (
+                earlier_response.provider_time_ms
+                - earlier_response.uncertainty_radius_ms
+                > later_response.provider_time_ms
+                + later_response.uncertainty_radius_ms
+            ):
+                return "clock-source-causal-order-contradiction"
+        return None
+
+    def classify(self) -> str:
+        if self.required_sources < 3:
+            return "clock-source-policy-too-weak"
+        first_error = self._validate_round(self.first_round, 1)
+        if first_error is not None:
+            return first_error
+        second_error = self._validate_round(self.second_round, 2)
+        if second_error is not None:
+            return second_error
+
+        first_ids = tuple(step.source_id for step in self.first_round)
+        second_ids = tuple(step.source_id for step in self.second_round)
+        if first_ids != second_ids:
+            return "clock-source-measurement-round-mismatch"
+
+        first_responses = {
+            step.relation.evidence.source_response.response_id
+            for step in self.first_round
+            if step.relation.evidence is not None
+        }
+        second_responses = {
+            step.relation.evidence.source_response.response_id
+            for step in self.second_round
+            if step.relation.evidence is not None
+        }
+        if first_responses & second_responses:
+            return "clock-source-measurement-replay"
+
+        for steps in (self.first_round, self.second_round):
+            for previous, current in zip(steps, steps[1:]):
+                if current.previous_response_digest != previous.relation.evidence.source_response.digest():
+                    return "clock-source-measurement-chain-mismatch"
+
+        return "clock-source-measurement-admissible"
+
+    def usable(self) -> bool:
+        return self.classify() == "clock-source-measurement-admissible"
+
+
+@dataclass(frozen=True)
 class LocalTemporalSequenceEvidenceV1:
     operation_identity_digest: str
     sequence_source_id: str
@@ -2085,6 +2300,91 @@ def clock_relation_source_set_fixture(
     )
 
 
+def clock_source_measurement_sequence_fixture(
+    *,
+    provider_offsets_round_1: tuple[int, ...] = (-250, 0, 250),
+    provider_offsets_round_2: tuple[int, ...] = (-200, 25, 225),
+    required_sources: int = 3,
+) -> ClockSourceMeasurementSequenceV1:
+    source_set = clock_relation_source_set_fixture(
+        provider_time_offsets_ms=provider_offsets_round_1,
+        required_independent_sources=required_sources,
+    )
+    assert source_set.usable()
+    rounds: list[tuple[ClockSourceMeasurementStepV1, ...]] = []
+
+    for round_index, offsets in ((1, provider_offsets_round_1), (2, provider_offsets_round_2)):
+        steps: list[ClockSourceMeasurementStepV1] = []
+        previous_response_digest: str | None = None
+        for sequence_index, (relation, offset) in enumerate(
+            zip(source_set.relations, offsets),
+            start=1,
+        ):
+            assert relation.evidence is not None
+            challenge = replace(
+                relation.evidence.source_challenge,
+                challenge_id=f"clock-chain-challenge-{round_index}-{sequence_index}",
+                nonce_hex=f"{60 + round_index + sequence_index:02x}" * 32,
+            )
+            response = replace(
+                relation.evidence.source_response,
+                challenge_digest=challenge.digest(),
+                provider_time_ms=1791475200000 + offset,
+                response_id=f"clock-chain-response-{round_index}-{sequence_index}",
+                response_payload_digest=f"{70 + round_index + sequence_index:02x}" * 32,
+            )
+            attestation = replace(
+                relation.evidence.source_attestation,
+                challenge_digest=challenge.digest(),
+                response_digest=response.digest(),
+                signed_payload_digest=response.signed_payload_digest,
+            )
+            evidence = replace(
+                relation.evidence,
+                evidence_id=f"clock-chain-evidence-{round_index}-{sequence_index}",
+                source_challenge=challenge,
+                source_response=response,
+                source_attestation=attestation,
+            )
+            verification = replace(
+                relation.verification,
+                evidence_digest=evidence.digest(),
+            )
+            chained_relation = ClockRelationV1(
+                evidence=evidence,
+                verification=verification,
+                trust_snapshot=relation.trust_snapshot,
+            )
+            step = ClockSourceMeasurementStepV1(
+                operation_identity_digest=stack_identity_fixture().digest(),
+                round_index=round_index,
+                sequence_index=sequence_index,
+                source_id=challenge.source_id,
+                relation=chained_relation,
+                request_nonce_digest=hashlib.sha256(
+                    bytes.fromhex(challenge.nonce_hex)
+                ).hexdigest(),
+                previous_response_digest=previous_response_digest,
+                chain_random_digest=f"{90 + round_index + sequence_index:02x}" * 32,
+                chain_link_digest="",
+                received_local_time_ms=1791475205000 + (round_index - 1) * 10000 + sequence_index * 1000,
+            )
+            step = replace(
+                step,
+                chain_link_digest=step.expected_chain_link_digest(),
+            )
+            steps.append(step)
+            previous_response_digest = response.digest()
+        rounds.append(tuple(steps))
+
+    return ClockSourceMeasurementSequenceV1(
+        operation_identity_digest=stack_identity_fixture().digest(),
+        first_round=rounds[0],
+        second_round=rounds[1],
+        required_sources=required_sources,
+    )
+
+
 def local_sequence_fixture(
     operation_identity_digest: str | None = None,
     *,
@@ -2185,6 +2485,115 @@ def test_provider_timestamp_parser_accepts_utc_and_offset():
 def test_provider_timestamp_parser_rejects_malformed_timestamp():
     assert parse_provider_timestamp_ms("not-a-timestamp") is None
     assert parse_provider_timestamp_ms("2026-10-08T16:00:00") is None
+
+
+def test_clock_measurement_sequence_accepts_two_causal_rounds():
+    sequence = clock_source_measurement_sequence_fixture()
+    assert sequence.classify() == "clock-source-measurement-admissible"
+    assert sequence.usable()
+
+
+def test_clock_measurement_sequence_requires_two_rounds():
+    sequence = clock_source_measurement_sequence_fixture()
+    single_round = replace(sequence, second_round=())
+    assert single_round.classify() == "clock-source-measurement-quorum-insufficient"
+
+
+def test_clock_measurement_sequence_requires_same_source_order():
+    sequence = clock_source_measurement_sequence_fixture()
+    reordered = replace(
+        sequence,
+        second_round=(
+            sequence.second_round[1],
+            sequence.second_round[0],
+            sequence.second_round[2],
+        ),
+    )
+    assert reordered.classify() == "clock-source-independence-invalid"
+
+
+def test_clock_measurement_sequence_rejects_chain_link_tamper():
+    sequence = clock_source_measurement_sequence_fixture()
+    altered = replace(
+        sequence.second_round[1],
+        chain_random_digest="ff" * 32,
+    )
+    tampered = replace(
+        sequence,
+        second_round=(
+            sequence.second_round[0],
+            altered,
+            sequence.second_round[2],
+        ),
+    )
+    assert tampered.classify() == "clock-source-measurement-invalid"
+
+
+def test_clock_measurement_sequence_rejects_previous_response_mismatch():
+    sequence = clock_source_measurement_sequence_fixture()
+    altered = replace(
+        sequence.second_round[1],
+        previous_response_digest="aa" * 32,
+    )
+    tampered = replace(
+        sequence,
+        second_round=(
+            sequence.second_round[0],
+            altered,
+            sequence.second_round[2],
+        ),
+    )
+    assert tampered.classify() == "clock-source-measurement-chain-mismatch"
+
+
+def test_clock_measurement_sequence_rejects_replayed_response():
+    sequence = clock_source_measurement_sequence_fixture()
+    replayed = replace(
+        sequence.second_round[1],
+        relation=sequence.first_round[1].relation,
+    )
+    tampered = replace(
+        sequence,
+        second_round=(
+            sequence.second_round[0],
+            replayed,
+            sequence.second_round[2],
+        ),
+    )
+    assert tampered.classify() == "clock-source-measurement-replay"
+
+
+def test_clock_measurement_sequence_rejects_causal_order_contradiction():
+    sequence = clock_source_measurement_sequence_fixture(
+        provider_offsets_round_2=(-2500, 0, 2500),
+    )
+    assert sequence.classify() == "clock-source-causal-order-contradiction"
+
+
+def test_clock_measurement_sequence_requires_three_sources():
+    sequence = clock_source_measurement_sequence_fixture(
+        provider_offsets_round_1=(0, 250),
+        provider_offsets_round_2=(0, 250),
+        required_sources=2,
+    )
+    assert sequence.classify() == "clock-source-policy-too-weak"
+
+
+def test_clock_measurement_sequence_digest_binds_rounds():
+    sequence = clock_source_measurement_sequence_fixture()
+    altered = replace(
+        sequence.second_round[2],
+        chain_random_digest="ab" * 32,
+    )
+    tampered = replace(
+        sequence,
+        second_round=(
+            sequence.second_round[0],
+            sequence.second_round[1],
+            replace(altered, chain_link_digest=altered.expected_chain_link_digest()),
+        ),
+    )
+    assert tampered.digest() != sequence.digest()
 
 
 def test_clock_source_set_accepts_three_independent_sources():
@@ -5107,6 +5516,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_clock_measurement_sequence_accepts_two_causal_rounds,
+    test_clock_measurement_sequence_requires_two_rounds,
+    test_clock_measurement_sequence_requires_same_source_order,
+    test_clock_measurement_sequence_rejects_chain_link_tamper,
+    test_clock_measurement_sequence_rejects_previous_response_mismatch,
+    test_clock_measurement_sequence_rejects_replayed_response,
+    test_clock_measurement_sequence_rejects_causal_order_contradiction,
+    test_clock_measurement_sequence_requires_three_sources,
+    test_clock_measurement_sequence_digest_binds_rounds,
     test_clock_source_set_accepts_three_independent_sources,
     test_clock_source_set_rejects_duplicate_source_or_anchor,
     test_clock_source_set_rejects_mixed_provider_clock_domain,
