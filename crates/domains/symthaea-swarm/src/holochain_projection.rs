@@ -77,6 +77,9 @@ pub struct ReceiptSelectionContext {
     pub collection_len: u32,
     pub selected_index: u32,
     pub selected_receipt_sha256: [u8; 32],
+    /// Identity of the cryptographically verified Receipt capability selected
+    /// by the decision. This is not itself an authorization or truth claim.
+    pub verified_capability_sha256: [u8; 32],
     /// Digest of the complete selection decision, including rejected and
     /// not-evaluated candidates. This is an application digest, not a
     /// Holochain EntryHash; a conductor adapter must map the decision to a
@@ -109,14 +112,16 @@ impl ReceiptSelectionContext {
             collection_len: decision.collection_len,
             selected_index,
             selected_receipt_sha256,
+            verified_capability_sha256: [0; 32],
             selection_decision_sha256,
             selection_policy: decision.policy_id.to_owned(),
             selection_policy_version: decision.policy_version,
         })
     }
 
-    /// Build the durable selection context only after binding the decision to
-    /// the exact receipt collection it claims to describe.
+    /// Build the structural selection context only after binding the decision
+    /// to the exact receipt collection it claims to describe. This does not
+    /// establish that a cryptographic Receipt capability was verified.
     #[cfg(feature = "semantic-receipts")]
     pub fn from_bound_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
@@ -126,6 +131,26 @@ impl ReceiptSelectionContext {
             .validate_against_collection(collection)
             .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
         Self::from_decision(decision)
+    }
+
+    /// Build the durable selection context only after binding the decision and
+    /// its selected candidate to a cryptographically verified Receipt capability.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn from_verified_decision(
+        decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
+        collection: &crate::semantic_evidence_vds::Rfc9942ReceiptCollection,
+        verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
+    ) -> Result<Self, HolochainProjectionError> {
+        decision
+            .validate_against_collection(collection)
+            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
+        let capability_sha256 = decision
+            .verified_capability_sha256(verified)
+            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
+
+        let mut context = Self::from_decision(decision)?;
+        context.verified_capability_sha256 = capability_sha256;
+        Ok(context)
     }
 
     fn validate(&self) -> Result<(), HolochainProjectionError> {
@@ -144,6 +169,7 @@ impl ReceiptSelectionContext {
         }
         if self.collection_sha256 == [0; 32]
             || self.selected_receipt_sha256 == [0; 32]
+            || self.verified_capability_sha256 == [0; 32]
             || self.selection_decision_sha256 == [0; 32]
         {
             return Err(HolochainProjectionError::ZeroDigest);
@@ -258,6 +284,7 @@ impl HolochainEvidenceAnchor {
                 put_u32(&mut out, selection.collection_len);
                 put_u32(&mut out, selection.selected_index);
                 out.extend_from_slice(&selection.selected_receipt_sha256);
+                out.extend_from_slice(&selection.verified_capability_sha256);
                 out.extend_from_slice(&selection.selection_decision_sha256);
                 put_string(&mut out, &selection.selection_policy);
                 put_u16(&mut out, selection.selection_policy_version);
@@ -323,7 +350,8 @@ mod tests {
                 collection_len: 2,
                 selected_index: 1,
                 selected_receipt_sha256: [5; 32],
-                selection_decision_sha256: [6; 32],
+                verified_capability_sha256: [6; 32],
+                selection_decision_sha256: [7; 32],
                 selection_policy: "rfc9942/priority-first-valid-v1".into(),
                 selection_policy_version: 1,
             }),
@@ -404,6 +432,18 @@ mod tests {
             invalid_selection.validate(),
             Err(HolochainProjectionError::UnaddressableDependency("selection_decision"))
         );
+    }
+
+    #[test]
+    fn verified_capability_identity_is_bound() {
+        let mut first = anchor();
+        let before = first.canonical_bytes().unwrap();
+        first
+            .receipt_selection
+            .as_mut()
+            .unwrap()
+            .verified_capability_sha256[0] ^= 1;
+        assert_ne!(before, first.canonical_bytes().unwrap());
     }
 
     #[test]
