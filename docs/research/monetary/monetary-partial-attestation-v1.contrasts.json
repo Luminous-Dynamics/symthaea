@@ -1,0 +1,15 @@
+{
+  "schema_version":"monetary-partial-attestation-v1-contrasts",
+  "trace_set_digest":"75f410c441a584ae9a4ddca3ec11e1e9e0222fa012bcd2673cc223b88295937b",
+  "paired_reference":"Every non-truthful cell is paired with the exact truthful counterpart sharing pair, adapter, shock, seed, allocation policy, focal obligation, coverage profile and fallback policy.",
+  "findings":[
+    "Claim fallback reproduces the earlier manipulability boundary: across all allocation policies, 22.2222% of comparable focal completions improve under synthetic non-truth reporting, with mean gain 1.3274074 ticks and maximum 14 ticks.",
+    "Coverage metadata alone does not reduce this manipulation: none, focal_only, nonfocal_only and full produce identical claim-fallback manipulation results because the fallback still treats declarations as authoritative.",
+    "Neutral fallback eliminates measured focal reporting gain across all coverage profiles and allocation mechanisms by preventing unattested declarations from supplying positive ordering authority.",
+    "Reject-unattested also eliminates measured focal gain, but imposes an availability cost proportional to missing attestation: completion falls to 0 with no attestations, 0.1388889 with focal-only coverage, and 0.2777778 with nonfocal-only coverage, versus 0.4166667 with full coverage.",
+    "The same mechanism therefore has materially different semantics depending on what an unattested claim is allowed to do; 'partial attestation' is not a single policy."
+  ],
+  "design_implication":"An evidence-aware allocation layer should explicitly separate attestation coverage from fallback semantics. An unattested assertion must not silently become authoritative merely because an attestation pathway exists elsewhere.",
+  "research_alignment":"BIS Project Inuksuit describes structured evidence packs with provenance, corroboration and calibrated uncertainty as an early-indication layer rather than a substitute for verified supervisory findings. This supports keeping evidence status and authority semantics explicit rather than collapsing them into a single claim field.",
+  "claim_ceiling":"Synthetic deterministic partial-attestation observation only; no empirical uncertainty calibration, strategic equilibrium, truthfulness theorem, welfare result, systemic-safety evidence, or policy recommendation."
+}
