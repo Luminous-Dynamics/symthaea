@@ -756,7 +756,10 @@ class ProviderTopologyCasEvidenceV1:
         identity: PromotionOperationIdentityV1,
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
+        trust_root: ProviderTopologyCasTrustRootV1 | None,
     ) -> bool:
+        if trust_root is None:
+            return False
         if self.evidence_source != "provider-result-capture":
             return False
         if self.submission_digest != self.submission.digest():
@@ -773,7 +776,15 @@ class ProviderTopologyCasEvidenceV1:
         request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
         return (
             self.submission.validates(request)
-            and self.provider_result.validates(request, self.submission, predicate)
+            and self.provider_result.validates(
+                request,
+                self.submission,
+                predicate,
+                identity,
+                observation,
+                pre_submit_sequence,
+                trust_root,
+            )
         )
 
 
@@ -784,6 +795,7 @@ class ProviderTopologyBindingV1:
     initial_sequence: int
     pre_submit_sequence: int | None
     provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None
+    attestation_trust_root: ProviderTopologyCasTrustRootV1 | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
         if not identity.provider_constraints_valid():
@@ -803,7 +815,10 @@ class ProviderTopologyBindingV1:
         if self.provider_topology_cas_evidence is None:
             return "observed-not-cas"
         if not self.provider_topology_cas_evidence.validates(
-            identity, self.pre_submit_observation, self.pre_submit_sequence
+            identity,
+            self.pre_submit_observation,
+            self.pre_submit_sequence,
+            self.attestation_trust_root,
         ):
             return "observed-not-cas"
         return "provider-topology-cas"
@@ -1230,6 +1245,11 @@ def topology_binding_fixture(
         initial_sequence=1,
         pre_submit_sequence=pre_submit_sequence,
         provider_topology_cas_evidence=provider_topology_cas_evidence,
+        attestation_trust_root=(
+            _test_trust_root(identity)
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
     )
 
 
@@ -1267,11 +1287,27 @@ def provider_topology_cas_evidence_fixture(
         predicate_digest=predicate.digest(),
         enforcement_result=enforcement_result,
     )
-    attestation = ProviderTopologyCasAttestationV1.from_execution(
+    attestation = _test_sign_topology_statement(
+        identity,
+        observation,
+        pre_submit_sequence,
+        request,
+        submission,
         execution,
-        attestation_id="attestation-1",
     )
-    verification = ProviderTopologyCasVerificationV1.from_attestation(attestation)
+    trust_root = _test_trust_root(identity)
+    verification = verify_provider_topology_cas_attestation(
+        attestation,
+        trust_root,
+        identity,
+        observation,
+        pre_submit_sequence,
+        request,
+        submission,
+        execution,
+    )
+    if verification is None:
+        raise RuntimeError("test DSSE attestation did not verify")
     provider_result = ProviderTopologyCasProviderResultV1(
         result_source=result_source,
         provider_operation_id=provider_operation_id,
@@ -1291,6 +1327,115 @@ def provider_topology_cas_evidence_fixture(
         provider_result=provider_result,
         provider_result_digest=provider_result.digest(),
         evidence_source=evidence_source,
+    )
+
+
+@lru_cache(maxsize=1)
+def _test_signer_material() -> tuple[str, str, str]:
+    """Create one ephemeral Ed25519 key for executable verifier tests only."""
+    with tempfile.TemporaryDirectory(prefix="topology-cas-test-key-") as temp:
+        private_path = Path(temp) / "private.pem"
+        public_path = Path(temp) / "public.pem"
+        generated = subprocess.run(
+            ["openssl", "genpkey", "-algorithm", "Ed25519", "-out", str(private_path)],
+            check=False,
+            capture_output=True,
+            timeout=10,
+        )
+        if generated.returncode != 0:
+            raise RuntimeError("OpenSSL Ed25519 test-key generation failed")
+        published = subprocess.run(
+            ["openssl", "pkey", "-in", str(private_path), "-pubout", "-out", str(public_path)],
+            check=False,
+            capture_output=True,
+            timeout=10,
+        )
+        if published.returncode != 0:
+            raise RuntimeError("OpenSSL public-key extraction failed")
+        private_pem = private_path.read_text(encoding="utf-8")
+        public_pem = public_path.read_text(encoding="utf-8")
+        fingerprint = _public_key_fingerprint(public_pem)
+        if fingerprint is None:
+            raise RuntimeError("OpenSSL public-key fingerprint failed")
+        return private_pem, public_pem, fingerprint
+
+
+def _test_trust_root(identity: PromotionOperationIdentityV1) -> ProviderTopologyCasTrustRootV1:
+    _, public_pem, key_id = _test_signer_material()
+    return ProviderTopologyCasTrustRootV1(
+        trust_root_id="test-only-ephemeral-ed25519-root-v1",
+        generation=identity.trust_root_generation,
+        repository=identity.repository,
+        signer_identity=(
+            "https://github.com/Luminous-Dynamics/symthaea/"
+            ".github/workflows/qual-promotion-reservation-v1.yml@refs/heads/main"
+        ),
+        key_id=key_id,
+        public_key_pem=public_pem,
+    )
+
+
+def _test_sign_topology_statement(
+    identity: PromotionOperationIdentityV1,
+    observation: ProviderStackObservationV1,
+    pre_submit_sequence: int,
+    request: ProviderTopologyCasRequestV1,
+    submission: ProviderTopologyCasSubmissionV1,
+    execution: ProviderTopologyCasExecutionV1,
+) -> ProviderTopologyCasAttestationV1:
+    private_pem, _, key_id = _test_signer_material()
+    trust_root = _test_trust_root(identity)
+    payload = _canonical_json_bytes(
+        _provider_topology_statement(
+            identity,
+            observation,
+            pre_submit_sequence,
+            request,
+            submission,
+            execution,
+            trust_root,
+        )
+    )
+    payload_base64 = base64.b64encode(payload).decode("ascii")
+    unsigned = ProviderTopologyCasDsseEnvelopeV1(
+        payload_type="application/vnd.in-toto+json",
+        payload_base64=payload_base64,
+        key_id=key_id,
+        signature_base64="",
+    )
+    with tempfile.TemporaryDirectory(prefix="topology-cas-test-sign-") as temp:
+        private_path = Path(temp) / "private.pem"
+        pae_path = Path(temp) / "pae.bin"
+        signature_path = Path(temp) / "signature.bin"
+        private_path.write_text(private_pem, encoding="utf-8")
+        pae_path.write_bytes(unsigned.pae())
+        result = subprocess.run(
+            [
+                "openssl",
+                "pkeyutl",
+                "-sign",
+                "-inkey",
+                str(private_path),
+                "-rawin",
+                "-in",
+                str(pae_path),
+                "-out",
+                str(signature_path),
+            ],
+            check=False,
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("OpenSSL DSSE test signing failed")
+        signature_base64 = base64.b64encode(signature_path.read_bytes()).decode("ascii")
+    return ProviderTopologyCasAttestationV1(
+        envelope=ProviderTopologyCasDsseEnvelopeV1(
+            payload_type=unsigned.payload_type,
+            payload_base64=payload_base64,
+            key_id=key_id,
+            signature_base64=signature_base64,
+        )
     )
 
 
