@@ -20068,6 +20068,7 @@ dependencies = [
  "iroh",
  "iroh-gossip",
  "ring",
+ "sha2",
  "serde",
  "symthaea-core",
  "symthaea-runtime",
