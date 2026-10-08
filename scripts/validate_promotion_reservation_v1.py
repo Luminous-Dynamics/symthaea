@@ -222,11 +222,45 @@ class ProviderTopologyCasPredicateV1:
 
 
 @dataclass(frozen=True)
-class ProviderTopologyCasEvidenceV1:
-    predicate_digest: str
+class ProviderTopologyCasProviderResultV1:
+    """Canonical provider result carrying one topology-CAS predicate decision."""
+    result_source: str
     provider_operation_id: str
-    evidence_source: str
+    predicate_digest: str
     predicate_result: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "predicate_digest": self.predicate_digest,
+            "predicate_result": self.predicate_result,
+            "provider_operation_id": self.provider_operation_id,
+            "result_source": self.result_source,
+            "result": "provider-topology-cas-v1",
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def validates(self, predicate: ProviderTopologyCasPredicateV1) -> bool:
+        return (
+            self.result_source == "provider-operation-result"
+            and bool(self.provider_operation_id)
+            and self.predicate_result == "accepted"
+            and self.predicate_digest == predicate.digest()
+        )
+
+
+@dataclass(frozen=True)
+class ProviderTopologyCasEvidenceV1:
+    provider_result: ProviderTopologyCasProviderResultV1
+    provider_result_digest: str
+    evidence_source: str
 
     def validates(
         self,
@@ -234,11 +268,9 @@ class ProviderTopologyCasEvidenceV1:
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
     ) -> bool:
-        if not self.provider_operation_id:
+        if self.evidence_source != "provider-result-capture":
             return False
-        if self.evidence_source != "provider-operation-result":
-            return False
-        if self.predicate_result != "accepted":
+        if self.provider_result_digest != self.provider_result.digest():
             return False
         if pre_submit_sequence <= 0:
             return False
@@ -247,7 +279,7 @@ class ProviderTopologyCasEvidenceV1:
             observation,
             pre_submit_sequence,
         )
-        return self.predicate_digest == predicate.digest()
+        return self.provider_result.validates(predicate)
 
 
 @dataclass(frozen=True)
@@ -705,8 +737,9 @@ def provider_topology_cas_evidence_fixture(
     pre_submit_sequence: int = 2,
     *,
     provider_operation_id: str = "provider-op-1",
-    evidence_source: str = "provider-operation-result",
+    result_source: str = "provider-operation-result",
     predicate_result: str = "accepted",
+    evidence_source: str = "provider-result-capture",
 ) -> ProviderTopologyCasEvidenceV1:
     identity = identity or stack_identity_fixture()
     observation = observation or provider_stack_observation_fixture(identity)
@@ -715,11 +748,16 @@ def provider_topology_cas_evidence_fixture(
         observation,
         pre_submit_sequence,
     )
-    return ProviderTopologyCasEvidenceV1(
-        predicate_digest=predicate.digest(),
+    provider_result = ProviderTopologyCasProviderResultV1(
+        result_source=result_source,
         provider_operation_id=provider_operation_id,
-        evidence_source=evidence_source,
+        predicate_digest=predicate.digest(),
         predicate_result=predicate_result,
+    )
+    return ProviderTopologyCasEvidenceV1(
+        provider_result=provider_result,
+        provider_result_digest=provider_result.digest(),
+        evidence_source=evidence_source,
     )
 
 
@@ -832,6 +870,43 @@ def test_provider_topology_cas_predicate_digest_binds_bypass_rules():
     assert normal.digest() != bypass.digest()
 
 
+def test_provider_topology_cas_provider_result_digest_binds_operation_id():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    changed = ProviderTopologyCasProviderResultV1(
+        **{**evidence.provider_result.__dict__, "provider_operation_id": "provider-op-2"},
+    )
+    assert evidence.provider_result.digest() != changed.digest()
+
+
+def test_provider_topology_cas_evidence_rejects_provider_result_digest_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    other = provider_topology_cas_evidence_fixture(identity, provider_operation_id="provider-op-2")
+    spliced = ProviderTopologyCasEvidenceV1(
+        provider_result=evidence.provider_result,
+        provider_result_digest=other.provider_result_digest,
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_evidence_rejects_result_field_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    changed = ProviderTopologyCasProviderResultV1(
+        **{**evidence.provider_result.__dict__, "predicate_result": "observed-only"},
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        provider_result=changed,
+        provider_result_digest=evidence.provider_result_digest,
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
 def test_provider_topology_binding_rejects_bypass_mode_splice():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
@@ -849,7 +924,7 @@ def test_provider_topology_binding_rejects_non_provider_cas_evidence_source():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(
         identity,
-        evidence_source="local-receipt",
+        result_source="local-receipt",
     )
     binding = topology_binding_fixture(
         identity,
@@ -1540,6 +1615,9 @@ TESTS = [
     test_provider_topology_cas_predicate_digest_binds_observation,
     test_provider_topology_cas_predicate_digest_binds_sequence,
     test_provider_topology_cas_predicate_digest_binds_bypass_rules,
+    test_provider_topology_cas_provider_result_digest_binds_operation_id,
+    test_provider_topology_cas_evidence_rejects_provider_result_digest_splice,
+    test_provider_topology_cas_evidence_rejects_result_field_splice,
     test_provider_topology_binding_rejects_bypass_mode_splice,
     test_provider_topology_binding_rejects_non_provider_cas_evidence_source,
     test_provider_topology_binding_rejects_empty_provider_operation_id,
