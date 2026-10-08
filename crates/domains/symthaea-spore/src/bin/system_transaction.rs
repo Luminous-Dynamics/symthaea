@@ -893,31 +893,12 @@ impl TransactionLedger {
     }
 
     fn append_locked_file(&self, file: &File, event: &JournalEvent) -> Result<(), String> {
-              "transaction ledger event exceeds {} bytes",
+        let serialized = serde_json::to_string(event)
+            .map_err(|error| format!("unable to serialize transaction ledger event: {error}"))?;
+        if serialized.len() > MAX_JOURNAL_EVENT_BYTES {
+            return Err(format!(
+                "transaction ledger event exceeds {} bytes",
                 MAX_JOURNAL_EVENT_BYTES
-            ));
-        }
-
-        let Some(file) = self.open_ledger_file(
-            libc::O_RDWR | libc::O_CREAT | libc::O_APPEND,
-            0o600,
-        )? else {
-            return Err(format!(
-                "transaction ledger {} could not be opened for append",
-                self.path.display()
-            ));
-        };
-
-        // Serialize the journal's size-check + append + fsync critical section
-        // independently of the outer mutation fence. This keeps the ledger
-        // internally safe if a future append caller is introduced outside the
-        // relay mutation handlers.
-        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
-        if lock_result != 0 {
-            return Err(format!(
-                "unable to lock transaction ledger {} for append: {}",
-                self.path.display(),
-                std::io::Error::last_os_error()
             ));
         }
 
@@ -970,7 +951,19 @@ impl TransactionLedger {
             .map_err(|error| {
                 format!(
                     "unable to commit transaction ledger {}: {error}",
-         pub(crate) fn admit(
+                    self.path.display()
+                )
+            })?;
+
+        self.directory.sync_all().map_err(|error| {
+            format!(
+                "unable to synchronize transaction ledger directory {}: {error}",
+                self.path.parent().unwrap_or(Path::new("/")).display()
+            )
+        })
+    }
+
+    pub(crate) fn admit(
         &self,
         transaction: SystemTransaction,
     ) -> Result<TransactionAdmission, String> {
