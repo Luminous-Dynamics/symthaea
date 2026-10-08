@@ -138,6 +138,7 @@ pub struct ReceiptSelectionDecision {
 /// provenance witness that the three identities were checked together:
 /// source collection, selected Receipt wire, and verified Receipt capability.
 #[cfg(feature = "semantic-receipts")]
+#[must_use = "retain the verified selection witness when crossing a durable evidence boundary"]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rfc9942VerifiedReceiptSelection {
     decision: ReceiptSelectionDecision,
@@ -340,7 +341,7 @@ impl ReceiptSelectionDecision {
     /// verification, and its exact Receipt-wire fingerprint must equal the
     /// selected candidate before its capability identity is accepted.
     #[cfg(feature = "semantic-receipts")]
-    pub fn verified_capability_sha256(
+    fn verified_capability_sha256(
         &self,
         verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
     ) -> Result<[u8; 32], ReceiptSelectionDecisionError> {
