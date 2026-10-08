@@ -407,6 +407,73 @@ fn atomic_priority_selection_api_returns_bound_witness() {
 
 #[cfg(feature = "semantic-receipts")]
 #[test]
+fn noncanonical_outer_wire_changes_only_wire_capability_identity() {
+    let rng = SystemRandom::new();
+    let receipt_signer = signing_key(&rng);
+    let outer_signer = signing_key(&rng);
+    let receipt_key = receipt_signer.public_key().as_ref().to_vec();
+    let outer_key = outer_signer.public_key().as_ref().to_vec();
+
+    let collection = Rfc9942ReceiptCollection::new(vec![
+        signed_inclusion_receipt(
+            &[b"candidate".to_vec(), b"other".to_vec()],
+            &receipt_signer,
+            &rng,
+        ),
+    ])
+    .unwrap();
+    let canonical_outer =
+        signed_outer_with_receipts(&collection, b"candidate", &outer_signer, &rng);
+    let canonical_wire = canonical_outer.to_cbor();
+    assert_eq!(canonical_wire.get(1), Some(&0x84));
+
+    // COSE verification authenticates Sig_structure inputs, not the enclosing
+    // COSE_Sign1 array framing. Therefore an indefinite-length top-level array
+    // can retain equivalent verified semantics while still being a distinct
+    // wire artifact for provenance.
+    let mut noncanonical_wire = canonical_wire.clone();
+    noncanonical_wire[1] = 0x9f;
+    noncanonical_wire.push(0xff);
+
+    let noncanonical_outer =
+        Rfc9942SignatureWithReceipts::from_cbor(&noncanonical_wire).unwrap();
+    assert_eq!(noncanonical_outer.to_cbor(), noncanonical_wire);
+
+    let (canonical_verified, canonical_selection) = canonical_outer
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        )
+        .unwrap();
+    let (noncanonical_verified, noncanonical_selection) = noncanonical_outer
+        .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+            &receipt_key,
+            &outer_key,
+            &[],
+            &[],
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(canonical_selection.decision(), noncanonical_selection.decision());
+    assert_eq!(
+        canonical_verified.receipt().proof(),
+        noncanonical_verified.receipt().proof()
+    );
+    assert_ne!(
+        canonical_verified.outer_signature_with_receipt_sha256(),
+        noncanonical_verified.outer_signature_with_receipt_sha256()
+    );
+    assert_ne!(
+        canonical_verified.capability_sha256(),
+        noncanonical_verified.capability_sha256()
+    );
+}
+#[cfg(feature = "semantic-receipts")]
+#[test]
 fn noncanonical_receipt_wire_identity_survives_verified_projection() {
     let rng = SystemRandom::new();
     let signer = signing_key(&rng);
