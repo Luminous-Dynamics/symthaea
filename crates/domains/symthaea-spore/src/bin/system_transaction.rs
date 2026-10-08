@@ -1251,6 +1251,85 @@ impl TransactionLedger {
         hasher.finalize().to_hex().to_string()
     }
 
+    pub(crate) fn bind_execution_commitment(
+        &self,
+        transaction: &SystemTransaction,
+        commitment: ExecutionCommitment,
+    ) -> Result<(), String> {
+        validate_execution_commitment(&commitment)?;
+        if transaction.execution_commitment.as_ref() != Some(&commitment) {
+            return Err(
+                "transaction execution commitment does not match ledger binding request".into()
+            );
+        }
+
+        let Some(mut file) = self.open_ledger_file(
+            libc::O_RDWR | libc::O_APPEND,
+            0o600,
+        )? else {
+            return Err(format!(
+                "transaction ledger {} could not be opened for execution binding",
+                self.path.display()
+            ));
+        };
+
+        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+        if lock_result != 0 {
+            return Err(format!(
+                "unable to lock transaction ledger {} for execution binding: {}",
+                self.path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+
+        let records = self.load_locked_file(&mut file)?;
+        let Some(existing) = records.get(&transaction.request_id) else {
+            return Err(format!(
+                "cannot bind execution for unknown transaction request_id {}",
+                transaction.request_id
+            ));
+        };
+        if existing.transaction_id != transaction.transaction_id
+            || existing.mutation != transaction.mutation
+            || existing.target_machine_digest != transaction.target_machine_digest
+            || existing.request_digest != transaction.request_digest
+        {
+            return Err(format!(
+                "execution binding identity mismatch for request_id {}",
+                transaction.request_id
+            ));
+        }
+        if existing.outcome.is_some() {
+            return Err(format!(
+                "cannot bind execution after transaction {} already completed",
+                transaction.request_id
+            ));
+        }
+        if let Some(bound) = existing.execution_commitment.as_ref() {
+            if bound == &commitment {
+                return Ok(());
+            }
+            return Err(format!(
+                "transaction request_id {} already has a different execution commitment",
+                transaction.request_id
+            ));
+        }
+
+        self.append_locked_file(&file, &JournalEvent {
+            schema_version: SCHEMA_VERSION,
+            event: JournalEventKind::Bound,
+            request_id: transaction.request_id.clone(),
+            transaction_id: transaction.transaction_id.clone(),
+            mutation: transaction.mutation,
+            target_machine_digest: transaction.target_machine_digest.clone(),
+            request_digest: transaction.request_digest.clone(),
+            outcome: None,
+            execution_commitment: Some(commitment),
+            artifact_commitment: None,
+            configuration_commitment: None,
+        })
+    }
+
     pub(crate) fn mark_completed(
         &self,
         transaction: &SystemTransaction,
