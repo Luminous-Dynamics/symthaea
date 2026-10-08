@@ -114,40 +114,40 @@ jobs:
             local message="$2"
             local parent="$3"
             local embedded_parent="$4"
-            local transition_id="\${GITHUB_RUN_ID}/\${GITHUB_RUN_ATTEMPT}/\${transition_kind}"
+            local transition_id="${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${transition_kind}"
             local unsigned_json transition_digest transition_json blob_sha transition_tree_sha
 
             unsigned_json="\$(jq -ncS \
               --arg schema "symthaea.qualification.promotion-ledger-transition.v1" \
-              --arg transition_id "\${transition_id}" \
-              --arg repository "\${GITHUB_REPOSITORY}" \
-              --arg previous_ledger_head "\${embedded_parent}" \
-              --arg resulting_state "\${message}" \
+              --arg transition_id "${transition_id}" \
+              --arg repository "${GITHUB_REPOSITORY}" \
+              --arg previous_ledger_head "${embedded_parent}" \
+              --arg resulting_state "${message}" \
               '{schema_version:$schema,transition_id:$transition_id,repository:$repository,previous_ledger_head:$previous_ledger_head,resulting_state:$resulting_state}')"
-            transition_digest="\$(printf '%s' "\${unsigned_json}" | sha256sum | cut -d' ' -f1)"
+            transition_digest="\$(printf '%s' "${unsigned_json}" | sha256sum | cut -d' ' -f1)"
             transition_json="\$(jq -ncS \
               --arg schema "symthaea.qualification.promotion-ledger-transition.v1" \
-              --arg transition_id "\${transition_id}" \
-              --arg repository "\${GITHUB_REPOSITORY}" \
-              --arg previous_ledger_head "\${embedded_parent}" \
-              --arg resulting_state "\${message}" \
-              --arg transition_digest "\${transition_digest}" \
+              --arg transition_id "${transition_id}" \
+              --arg repository "${GITHUB_REPOSITORY}" \
+              --arg previous_ledger_head "${embedded_parent}" \
+              --arg resulting_state "${message}" \
+              --arg transition_digest "${transition_digest}" \
               '{schema_version:$schema,transition_id:$transition_id,repository:$repository,previous_ledger_head:$previous_ledger_head,resulting_state:$resulting_state,transition_digest:$transition_digest}')"
 
-            blob_sha="\$(jq -n --arg content "\${transition_json}" \
+            blob_sha="\$(jq -n --arg content "${transition_json}" \
               '{content:$content,encoding:"utf-8"}' \
-              | gh api --method POST "repos/\${GITHUB_REPOSITORY}/git/blobs" --input - --jq '.sha')"
+              | gh api --method POST "repos/${GITHUB_REPOSITORY}/git/blobs" --input - --jq '.sha')"
             transition_tree_sha="\$(jq -n \
-              --arg base_tree "\${TREE_SHA}" \
-              --arg blob_sha "\${blob_sha}" \
+              --arg base_tree "${TREE_SHA}" \
+              --arg blob_sha "${blob_sha}" \
               '{base_tree:$base_tree,tree:[{path:"_qual-cas-lab/transition.json",mode:"100644",type:"blob",sha:$blob_sha}]}' \
-              | gh api --method POST "repos/\${GITHUB_REPOSITORY}/git/trees" --input - --jq '.sha')"
+              | gh api --method POST "repos/${GITHUB_REPOSITORY}/git/trees" --input - --jq '.sha')"
             jq -n \
-              --arg message "qual-cas-lab:\${GITHUB_RUN_ID}/\${GITHUB_RUN_ATTEMPT}: \${message}" \
-              --arg tree "\${transition_tree_sha}" \
-              --arg parent "\${parent}" \
+              --arg message "qual-cas-lab:${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}: ${message}" \
+              --arg tree "${transition_tree_sha}" \
+              --arg parent "${parent}" \
               '{message:$message,tree:$tree,parents:[$parent]}' \
-              | gh api --method POST "repos/\${GITHUB_REPOSITORY}/git/commits" --input - --jq '.sha'
+              | gh api --method POST "repos/${GITHUB_REPOSITORY}/git/commits" --input - --jq '.sha'
           }
 
           validate_semantic_transition() {
@@ -155,24 +155,24 @@ jobs:
             local commit_payload parent_sha tree_sha blob_sha transition_json
             local schema embedded_parent expected_digest actual_digest unsigned_json
 
-            commit_payload="\$(gh api "repos/\${GITHUB_REPOSITORY}/git/commits/\${commit_sha}")"
-            parent_sha="\$(jq -er '.parents | if length == 1 then .[0].sha else error("expected exactly one parent") end' <<<"\${commit_payload}")"
-            tree_sha="\$(jq -er '.tree.sha' <<<"\${commit_payload}")"
-            blob_sha="\$(gh api "repos/\${GITHUB_REPOSITORY}/git/trees/\${tree_sha}?recursive=1" \
+            commit_payload="\$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${commit_sha}")"
+            parent_sha="\$(jq -er '.parents | if length == 1 then .[0].sha else error("expected exactly one parent") end' <<<"${commit_payload}")"
+            tree_sha="\$(jq -er '.tree.sha' <<<"${commit_payload}")"
+            blob_sha="\$(gh api "repos/${GITHUB_REPOSITORY}/git/trees/${tree_sha}?recursive=1" \
               | jq -er '.tree[] | select(.path == "_qual-cas-lab/transition.json") | .sha')"
-            transition_json="\$(gh api "repos/\${GITHUB_REPOSITORY}/git/blobs/\${blob_sha}" --jq '.content' \
+            transition_json="\$(gh api "repos/${GITHUB_REPOSITORY}/git/blobs/${blob_sha}" --jq '.content' \
               | tr -d '\n' | base64 --decode)"
-            schema="\$(jq -er '.schema_version' <<<"\${transition_json}")"
-            test "\${schema}" = "symthaea.qualification.promotion-ledger-transition.v1"
-            embedded_parent="\$(jq -er '.previous_ledger_head' <<<"\${transition_json}")"
-            test "\${parent_sha}" = "\${embedded_parent}" || {
-              echo "semantic predecessor mismatch: git_parent=\${parent_sha} encoded_parent=\${embedded_parent}" >&2
+            schema="\$(jq -er '.schema_version' <<<"${transition_json}")"
+            test "${schema}" = "symthaea.qualification.promotion-ledger-transition.v1"
+            embedded_parent="\$(jq -er '.previous_ledger_head' <<<"${transition_json}")"
+            test "${parent_sha}" = "${embedded_parent}" || {
+              echo "semantic predecessor mismatch: git_parent=${parent_sha} encoded_parent=${embedded_parent}" >&2
               return 1
             }
-            expected_digest="\$(jq -er '.transition_digest' <<<"\${transition_json}")"
-            unsigned_json="\$(jq -ncS 'del(.transition_digest)' <<<"\${transition_json}")"
-            actual_digest="\$(printf '%s' "\${unsigned_json}" | sha256sum | cut -d' ' -f1)"
-            test "\${actual_digest}" = "\${expected_digest}" || {
+            expected_digest="\$(jq -er '.transition_digest' <<<"${transition_json}")"
+            unsigned_json="\$(jq -ncS 'del(.transition_digest)' <<<"${transition_json}")"
+            actual_digest="\$(printf '%s' "${unsigned_json}" | sha256sum | cut -d' ' -f1)"
+            test "${actual_digest}" = "${expected_digest}" || {
               echo "semantic transition digest mismatch" >&2
               return 1
             }
@@ -195,9 +195,9 @@ jobs:
           # Two valid successor candidates share the same observed predecessor.
           WINNER_SHA="$(create_semantic_commit "winner" "winner successor" "${BASE_SHA}" "${BASE_SHA}")"
           STALE_SHA="$(create_semantic_commit "stale" "stale successor" "${BASE_SHA}" "${BASE_SHA}")"
-          validate_semantic_transition "\${WINNER_SHA}"
-          malformed_transition_sha="\$(create_semantic_commit "malformed" "malformed predecessor candidate" "\${BASE_SHA}" "0000000000000000000000000000000000000000000000000000000000000000")"
-          if validate_semantic_transition "\${malformed_transition_sha}"; then
+          validate_semantic_transition "${WINNER_SHA}"
+          malformed_transition_sha="\$(create_semantic_commit "malformed" "malformed predecessor candidate" "${BASE_SHA}" "0000000000000000000000000000000000000000000000000000000000000000")"
+          if validate_semantic_transition "${malformed_transition_sha}"; then
             echo "malformed semantic predecessor was accepted" >&2
             exit 1
           fi
