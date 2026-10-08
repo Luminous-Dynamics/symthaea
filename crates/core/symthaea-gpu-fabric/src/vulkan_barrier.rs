@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 use ash::{vk, Device, Entry, Instance};
@@ -8,6 +8,7 @@ use naga::back::spv;
 use naga::front::wgsl;
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
@@ -20,6 +21,8 @@ const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
 const RECEIPT_VERSION: u16 = 3;
+const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
+const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -129,6 +132,14 @@ pub enum VulkanBarrierReceiptError {
     PhysicalDeviceApiVersion,
     #[error("receipt physical-device API version does not match the execution runtime")]
     PhysicalDeviceApiVersionBinding,
+    #[error("receipt implementation identity digest is missing or malformed")]
+    ImplementationIdentity,
+    #[error("receipt physical-device identity digest is missing or malformed")]
+    PhysicalDeviceIdentity,
+    #[error("receipt implementation identity does not match the execution runtime")]
+    ImplementationIdentityBinding,
+    #[error("receipt physical-device identity does not match the execution runtime")]
+    PhysicalDeviceIdentityBinding,
     #[error("receipt queue family does not match the execution runtime")]
     QueueFamilyBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -156,6 +167,8 @@ pub struct VulkanBarrierExecutionReceipt {
     pub resource_storage_sizes: BTreeMap<ResourceId, u64>,
     pub completion_expected: u64,
     pub completion_observed: u64,
+    pub implementation_identity_digest: String,
+    pub physical_device_identity_digest: String,
     pub vulkan_api_version: u32,
     pub physical_device_api_version: u32,
     pub queue_family_index: u32,
@@ -170,6 +183,12 @@ impl VulkanBarrierExecutionReceipt {
         final_resources: &BTreeMap<ResourceId, BinaryHypervector>,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.version != RECEIPT_VERSION { return Err(VulkanBarrierReceiptError::Version(self.version)); }
+        if !is_sha256_hex(&self.implementation_identity_digest) {
+            return Err(VulkanBarrierReceiptError::ImplementationIdentity);
+        }
+        if !is_sha256_hex(&self.physical_device_identity_digest) {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentity);
+        }
         if schedule.nodes.is_empty() { return Err(VulkanBarrierReceiptError::EmptyWorkload); }
         if self.graph_digest != graph.digest_hex().map_err(|_| VulkanBarrierReceiptError::GraphDigest)? {
             return Err(VulkanBarrierReceiptError::GraphDigest);
@@ -253,12 +272,20 @@ impl VulkanBarrierExecutionReceipt {
         &self,
         physical_device_api_version: u32,
         queue_family_index: u32,
+        implementation_identity_digest: &str,
+        physical_device_identity_digest: &str,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
         }
         if self.queue_family_index != queue_family_index {
             return Err(VulkanBarrierReceiptError::QueueFamilyBinding);
+        }
+        if self.implementation_identity_digest != implementation_identity_digest {
+            return Err(VulkanBarrierReceiptError::ImplementationIdentityBinding);
+        }
+        if self.physical_device_identity_digest != physical_device_identity_digest {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding);
         }
         Ok(())
     }
@@ -279,6 +306,17 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
     queue_family_index: u32,
+    implementation_identity_digest: String,
+    shader_spirv_sha256: String,
+    implementation_wgsl_sha256: String,
+    implementation_wgsl_hex: String,
+    shader_spirv_hex: String,
+    physical_device_vendor_id: u32,
+    physical_device_device_id: u32,
+    physical_device_type: u32,
+    physical_device_driver_version: u32,
+    physical_device_name_hex: String,
+    physical_device_identity_digest: String,
     // Must be dropped after Instance/Device because ash requires Entry to outlive them.
     _entry: Entry,
 }
@@ -336,11 +374,14 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         let props = unsafe { instance.get_physical_device_properties(physical) };
+        let physical_device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
+        let physical_device_identity_digest = physical_device_identity_digest(&props);
         let memory_properties = unsafe { instance.get_physical_device_memory_properties(physical) };
         qualification_stage(&format!("device_selected_api={}.{}.{} queue_family={family}",
             vk::api_version_major(props.api_version),
             vk::api_version_minor(props.api_version),
             vk::api_version_patch(props.api_version)));
+        qualification_stage(&format!("physical_device_identity_sha256={physical_device_identity_digest}"));
 
         let priorities = [1.0_f32];
         let queue_info = vk::DeviceQueueCreateInfo::default().queue_family_index(family).queue_priorities(&priorities);
@@ -366,7 +407,15 @@ impl VulkanBarrierWorkloadRuntime {
             }
             error
         })?;
+        let shader_spirv_bytes = spirv_to_bytes(&spirv);
+        let shader_spirv_hex = hex_bytes(&shader_spirv_bytes);
+        let shader_spirv_sha256 = sha256_hex(&shader_spirv_bytes);
+        let implementation_wgsl_hex = hex_bytes(WGSL.as_bytes());
+        let implementation_wgsl_sha256 = sha256_hex(WGSL.as_bytes());
+        let implementation_identity_digest = vulkan_implementation_identity_digest(&spirv);
         qualification_stage("shader_spirv_compiled");
+        qualification_stage(&format!("shader_spirv_sha256={shader_spirv_sha256}"));
+        qualification_stage(&format!("implementation_identity_sha256={implementation_identity_digest}"));
         let shader = match create_shader_module(&device, &spirv) {
             Ok(shader) => shader,
             Err(error) => {
@@ -496,6 +545,17 @@ impl VulkanBarrierWorkloadRuntime {
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
             queue_family_index: family,
+            implementation_identity_digest,
+            shader_spirv_sha256,
+            implementation_wgsl_sha256,
+            implementation_wgsl_hex,
+            shader_spirv_hex,
+            physical_device_vendor_id: props.vendor_id,
+            physical_device_device_id: props.device_id,
+            physical_device_type: props.device_type.as_raw() as u32,
+            physical_device_driver_version: props.driver_version,
+            physical_device_name_hex: hex_bytes(physical_device_name),
+            physical_device_identity_digest,
             _entry: entry,
         })
     }
@@ -723,6 +783,8 @@ impl VulkanBarrierWorkloadRuntime {
             resource_storage_sizes: storage_sizes,
             completion_expected,
             completion_observed,
+            implementation_identity_digest: self.implementation_identity_digest.clone(),
+            physical_device_identity_digest: self.physical_device_identity_digest.clone(),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
             queue_family_index: self.queue_family_index,
@@ -730,7 +792,12 @@ impl VulkanBarrierWorkloadRuntime {
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         qualification_stage("receipt_verified");
         receipt
-            .verify_runtime_binding(self.physical_device_api_version, self.queue_family_index)
+            .verify_runtime_binding(
+                self.physical_device_api_version,
+                self.queue_family_index,
+                &self.implementation_identity_digest,
+                &self.physical_device_identity_digest,
+            )
             .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
     }
@@ -1056,6 +1123,69 @@ fn resource_digest(value: &BinaryHypervector) -> String {
     h.finalize().to_hex().to_string()
 }
 
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn sha256_len_prefixed_update(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
+fn spirv_to_bytes(spirv: &[u32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(spirv.len() * std::mem::size_of::<u32>());
+    for word in spirv {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    bytes
+}
+
+fn vulkan_implementation_identity_digest(spirv: &[u32]) -> String {
+    let spirv_bytes = spirv_to_bytes(spirv);
+    let mut hasher = Sha256::new();
+    hasher.update(VULKAN_IMPLEMENTATION_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    sha256_len_prefixed_update(&mut hasher, WGSL_ABI_MARKER.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, HDC_BIND_XOR_KERNEL_ID.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, WGSL.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, &spirv_bytes);
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> String {
+    let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.gpu-fabric.vulkan-device.v1 ");
+    hasher.update(&props.vendor_id.to_le_bytes());
+    hasher.update(&props.device_id.to_le_bytes());
+    hasher.update(&(props.device_type.as_raw() as u32).to_le_bytes());
+    hasher.update(&props.api_version.to_le_bytes());
+    hasher.update(&props.driver_version.to_le_bytes());
+    sha256_len_prefixed_update(&mut hasher, device_name);
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| (b'0'..=b'9').contains(&byte) || (b'a'..=b'f').contains(&byte))
+}
+
 fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFlags2) {
     match kind {
         DependencyKind::ReadAfterWrite => (
@@ -1254,6 +1384,9 @@ impl Drop for VulkanBarrierWorkloadRuntime {
 
 #[cfg(test)]
 mod tests {
+    const TEST_IMPLEMENTATION_IDENTITY_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+    const TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+
     use super::*;
 
     fn fixture() -> (
@@ -1620,6 +1753,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert_eq!(
             receipt.verify_against(&graph, &schedule, &plan, &BTreeMap::new()),
@@ -1663,6 +1798,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         let expected = expected_final_timeline_value(&plan);
         assert!(matches!(
@@ -1710,6 +1847,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
@@ -1754,6 +1893,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: vk::API_VERSION_1_2,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1800,6 +1941,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -1848,6 +1991,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -1899,6 +2044,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.barrier_digest = String::from("tampered");
 
@@ -1969,6 +2116,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2024,6 +2173,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2067,6 +2218,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.completion_lowering_digest = String::from("tampered");
         assert!(matches!(
@@ -2078,18 +2231,35 @@ mod tests {
     #[test]
     fn receipt_rejects_runtime_device_and_queue_binding_mismatch() {
         let mut receipt = minimal_receipt_for_binding_tests();
-        assert!(receipt.verify_runtime_binding(VULKAN_API_VERSION, 0).is_ok());
+        assert!(receipt
+            .verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            )
+            .is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0),
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
 
         receipt.physical_device_api_version = VULKAN_API_VERSION;
         receipt.queue_family_index = 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0),
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+            ),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
     }
@@ -2130,6 +2300,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 7,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2155,6 +2327,8 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         }
     }
 
@@ -2163,6 +2337,7 @@ mod tests {
         initial: &BTreeMap<ResourceId, BinaryHypervector>,
         observed: &BTreeMap<ResourceId, BinaryHypervector>,
         receipt: &VulkanBarrierExecutionReceipt,
+        runtime: &VulkanBarrierWorkloadRuntime,
     ) {
         println!("qualification_witness_version=1");
         println!("qualification_claim=workload_execution+synchronization_only");
@@ -2180,6 +2355,22 @@ mod tests {
         println!("resource_digests={:?}", receipt.resource_digests);
         println!("completion_expected={}", receipt.completion_expected);
         println!("completion_observed={}", receipt.completion_observed);
+        println!("implementation_identity_version=1");
+        println!("implementation_identity_sha256={}", receipt.implementation_identity_digest);
+        println!("implementation_abi_marker={}", WGSL_ABI_MARKER);
+        println!("implementation_kernel_id={}", HDC_BIND_XOR_KERNEL_ID);
+        println!("implementation_wgsl_sha256={}", runtime.implementation_wgsl_sha256);
+        println!("implementation_wgsl_hex={}", runtime.implementation_wgsl_hex);
+        println!("shader_spirv_sha256={}", runtime.shader_spirv_sha256);
+        println!("shader_spirv_hex={}", runtime.shader_spirv_hex);
+        println!("physical_device_identity_version=1");
+        println!("physical_device_identity_sha256={}", receipt.physical_device_identity_digest);
+        println!("physical_device_vendor_id={}", runtime.physical_device_vendor_id);
+        println!("physical_device_device_id={}", runtime.physical_device_device_id);
+        println!("physical_device_type={}", runtime.physical_device_type);
+        println!("physical_device_api_version={}", receipt.physical_device_api_version);
+        println!("physical_device_driver_version={}", runtime.physical_device_driver_version);
+        println!("physical_device_name_hex={}", runtime.physical_device_name_hex);
         println!("vulkan_api_version={}", receipt.vulkan_api_version);
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
@@ -2189,6 +2380,49 @@ mod tests {
         for (resource, value) in observed {
             println!("resource_observed_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
+    }
+
+    #[test]
+    fn implementation_identity_digest_is_deterministic_and_spirv_bound() {
+        let baseline = vulkan_implementation_identity_digest(&[0x07230203, 0x00010000]);
+        assert_eq!(
+            baseline,
+            vulkan_implementation_identity_digest(&[0x07230203, 0x00010000])
+        );
+        assert_ne!(
+            baseline,
+            vulkan_implementation_identity_digest(&[0x07230203, 0x00010001])
+        );
+    }
+
+    #[test]
+    fn physical_device_identity_digest_binds_device_and_driver_fields() {
+        let mut props = vk::PhysicalDeviceProperties::default();
+        props.vendor_id = 1;
+        props.device_id = 2;
+        props.device_type = vk::PhysicalDeviceType::CPU;
+        props.api_version = VULKAN_API_VERSION;
+        props.driver_version = 3;
+        let baseline = physical_device_identity_digest(&props);
+
+        props.driver_version += 1;
+        assert_ne!(baseline, physical_device_identity_digest(&props));
+
+        props.driver_version = 3;
+        props.vendor_id += 1;
+        assert_ne!(baseline, physical_device_identity_digest(&props));
+    }
+
+    #[test]
+    fn receipt_rejects_malformed_provenance_identity() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let mut receipt = minimal_receipt_for_binding_tests();
+        receipt.implementation_identity_digest = "tampered".to_owned();
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ImplementationIdentity)
+        ));
     }
 
     #[test]
@@ -2225,6 +2459,7 @@ mod tests {
                 &initial,
                 &observed,
                 &receipt,
+                &runtime,
             );
         }
 
