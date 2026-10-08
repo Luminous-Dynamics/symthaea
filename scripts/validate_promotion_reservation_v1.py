@@ -382,14 +382,22 @@ class ProviderTopologyCasAttestationV1:
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
-    def validates(self, execution: ProviderTopologyCasExecutionV1) -> bool:
-        return (
-            self.attestation_source == "provider-attestation"
-            and bool(self.attestation_id)
-            and self.provider_operation_id == execution.provider_operation_id
-            and self.execution_digest == execution.digest()
-            and self.statement == "predicate-enforced"
+    @classmethod
+    def from_execution(
+        cls,
+        execution: ProviderTopologyCasExecutionV1,
+        attestation_id: str = "attestation-1",
+    ) -> "ProviderTopologyCasAttestationV1":
+        return cls(
+            attestation_source="provider-attestation",
+            attestation_id=attestation_id,
+            provider_operation_id=execution.provider_operation_id,
+            execution_digest=execution.digest(),
+            statement="predicate-enforced",
         )
+
+    def validates(self, execution: ProviderTopologyCasExecutionV1) -> bool:
+        return self == type(self).from_execution(execution, self.attestation_id)
 
 
 @dataclass(frozen=True)
@@ -418,13 +426,20 @@ class ProviderTopologyCasVerificationV1:
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
-    def validates(self, attestation: ProviderTopologyCasAttestationV1) -> bool:
-        return (
-            self.verifier_source == "independent-verifier"
-            and self.verification_method == "canonical-binding-v1"
-            and self.verification_result == "verified"
-            and self.attestation_digest == attestation.digest()
+    @classmethod
+    def from_attestation(
+        cls,
+        attestation: ProviderTopologyCasAttestationV1,
+    ) -> "ProviderTopologyCasVerificationV1":
+        return cls(
+            verifier_source="independent-verifier",
+            verification_method="canonical-binding-v1",
+            attestation_digest=attestation.digest(),
+            verification_result="verified",
         )
+
+    def validates(self, attestation: ProviderTopologyCasAttestationV1) -> bool:
+        return self == type(self).from_attestation(attestation)
 
 
 @dataclass(frozen=True)
@@ -1020,19 +1035,11 @@ def provider_topology_cas_evidence_fixture(
         predicate_digest=predicate.digest(),
         enforcement_result=enforcement_result,
     )
-    attestation = ProviderTopologyCasAttestationV1(
-        attestation_source="provider-attestation",
+    attestation = ProviderTopologyCasAttestationV1.from_execution(
+        execution,
         attestation_id="attestation-1",
-        provider_operation_id=provider_operation_id,
-        execution_digest=execution.digest(),
-        statement="predicate-enforced",
     )
-    verification = ProviderTopologyCasVerificationV1(
-        verifier_source="independent-verifier",
-        verification_method="canonical-binding-v1",
-        attestation_digest=attestation.digest(),
-        verification_result="verified",
-    )
+    verification = ProviderTopologyCasVerificationV1.from_attestation(attestation)
     provider_result = ProviderTopologyCasProviderResultV1(
         result_source=result_source,
         provider_operation_id=provider_operation_id,
@@ -1221,6 +1228,29 @@ def test_provider_topology_cas_submission_digest_binds_operation_id():
     assert first.digest() != second.digest()
 
 
+def test_provider_topology_cas_attestation_factory_is_deterministic():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.execution is not None
+    assert evidence.provider_result.attestation is not None
+    rebuilt = ProviderTopologyCasAttestationV1.from_execution(
+        evidence.provider_result.execution,
+        attestation_id=evidence.provider_result.attestation.attestation_id,
+    )
+    assert rebuilt == evidence.provider_result.attestation
+
+
+def test_provider_topology_cas_verification_factory_is_deterministic():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.attestation is not None
+    assert evidence.provider_result.verification is not None
+    rebuilt = ProviderTopologyCasVerificationV1.from_attestation(
+        evidence.provider_result.attestation,
+    )
+    assert rebuilt == evidence.provider_result.verification
+
+
 def test_provider_topology_cas_attestation_digest_binds_execution():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
@@ -1245,6 +1275,50 @@ def test_provider_topology_cas_verification_binds_attestation():
         }
     )
     assert evidence.provider_result.verification.digest() != changed.digest()
+
+
+def test_provider_topology_cas_provider_result_rejects_attestation_digest_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    bad = ProviderTopologyCasProviderResultV1(
+        **{
+            **evidence.provider_result.__dict__,
+            "attestation_digest": "wrong-attestation-digest",
+        }
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        submission=evidence.submission,
+        submission_digest=evidence.submission_digest,
+        provider_result=bad,
+        provider_result_digest=bad.digest(),
+        evidence_source="provider-result-capture",
+    )
+    assert topology_binding_fixture(
+        identity,
+        provider_topology_cas_evidence=spliced,
+    ).classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_provider_result_rejects_verification_digest_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    bad = ProviderTopologyCasProviderResultV1(
+        **{
+            **evidence.provider_result.__dict__,
+            "verification_digest": "wrong-verification-digest",
+        }
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        submission=evidence.submission,
+        submission_digest=evidence.submission_digest,
+        provider_result=bad,
+        provider_result_digest=bad.digest(),
+        evidence_source="provider-result-capture",
+    )
+    assert topology_binding_fixture(
+        identity,
+        provider_topology_cas_evidence=spliced,
+    ).classify(identity) == "observed-not-cas"
 
 
 def test_provider_topology_cas_provider_result_requires_attestation_verification():
@@ -1298,9 +1372,6 @@ def test_provider_topology_cas_verification_rejects_wrong_source():
     )
     assert not changed.validates(evidence.provider_result.attestation)
 
-
-def provider_topology_cas_execution_digest_binds_predicate_placeholder():
-    return None
 
 
 def test_provider_topology_cas_execution_digest_binds_predicate():
@@ -2218,8 +2289,12 @@ TESTS = [
     test_provider_topology_cas_request_binds_requested_operation_parameters,
     test_provider_topology_cas_provider_result_binds_request_digest,
     test_provider_topology_cas_submission_digest_binds_operation_id,
+    test_provider_topology_cas_attestation_factory_is_deterministic,
+    test_provider_topology_cas_verification_factory_is_deterministic,
     test_provider_topology_cas_attestation_digest_binds_execution,
     test_provider_topology_cas_verification_binds_attestation,
+    test_provider_topology_cas_provider_result_rejects_attestation_digest_splice,
+    test_provider_topology_cas_provider_result_rejects_verification_digest_splice,
     test_provider_topology_cas_provider_result_requires_attestation_verification,
     test_provider_topology_cas_attestation_rejects_wrong_source,
     test_provider_topology_cas_verification_rejects_wrong_source,
