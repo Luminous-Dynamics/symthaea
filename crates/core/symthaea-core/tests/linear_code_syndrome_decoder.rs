@@ -1780,9 +1780,26 @@ fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
             .map(|row| row.words()[0])
             .collect::<Vec<_>>();
         assert_eq!(
-            independent_binary_rank(&production_rows, dimension),
+            production_rows.len(),
             dimension - rank,
-            "production parity-check rows did not have the full dual rank: regime={dimension}x{rank} seed=0x{seed:X}"
+            "production parity-check row count did not match the expected dual dimension: regime={dimension}x{rank} seed=0x{seed:X}"
+        );
+
+        let mut production_span = Vec::with_capacity(dual_vectors.len());
+        for mask in 0..(1usize << production_rows.len()) {
+            let mut combination = 0u64;
+            for (index, &row) in production_rows.iter().enumerate() {
+                if (mask >> index) & 1 == 1 {
+                    combination ^= row;
+                }
+            }
+            production_span.push(combination);
+        }
+        production_span.sort_unstable();
+        production_span.dedup();
+        assert_eq!(
+            production_span, dual_vectors,
+            "production parity-check row span diverged from the complete brute-force dual space: regime={dimension}x{rank} seed=0x{seed:X}"
         );
 
         let expected_kernel_size = 1usize << rank;
@@ -1803,7 +1820,7 @@ fn random_code_production_parity_check_rows_match_bruteforce_dual_space() {
     }
 
     println!(
-        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_rank_full=true;kernel_equals_code=true;algebraically_distinct=true",
+        "BRUTE_FORCE_DUAL_SPACE_ORACLE=regimes={};total_dual_vectors={total_dual_vectors};row_membership_checks={total_row_membership_checks};kernel_observations={total_kernel_observations};production_rows_subset_of_dual=true;production_row_span_exact=true;kernel_equals_code=true;algebraically_distinct=true",
         cases.len(),
     );
 }
