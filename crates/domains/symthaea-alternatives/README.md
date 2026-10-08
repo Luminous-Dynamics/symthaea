@@ -129,7 +129,7 @@ An admission reference can now contribute to higher-tier authority diversity onl
 
 ## Experimental-design provenance
 
-The assessment schema remains **53** and the assessment algorithm is now **v76**. v76 adds the fail-closed requirement that a design-bound observation must actually be linked into the candidate estimate named by its experimental target surface. The v75 heuristic target carries the exact requirement-declared comparison scale (unit, scope, and basis digest) alongside candidate-pair and dimension identity, so a serialized measurement priority cannot silently lose the comparability context that justified the overlap.
+The assessment schema remains **53** and the assessment algorithm is now **v76**. v76 adds the fail-closed requirement that a design-bound observation must actually be linked into the candidate estimate named by its experimental target surface. The v76 heuristic target carries the exact requirement-declared comparison scale (unit, scope, and basis digest) alongside candidate-pair and dimension identity, so a serialized measurement priority cannot silently lose the comparability context that justified the overlap.
 
 The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, exact uncertainty identities when the linked evidence actually carries them, and interval-overlap discrimination targets without inventing a laboratory protocol. It never synthesizes an uncertainty identifier when the evidence layer has not supplied one.
 
