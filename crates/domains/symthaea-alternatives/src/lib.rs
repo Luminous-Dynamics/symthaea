@@ -502,7 +502,7 @@ impl CalibrationTraceabilityEdge {
     }
 }
 
-/// How the authoritative measurement model classifies an input quantity.
+/// How the measurement-model input frontier classifies an input quantity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MeasurementModelInputRole {
     /// Quantity value obtained by direct or indirect measurement.
@@ -549,7 +549,7 @@ pub struct CalibrationTraceabilityInputBinding {
     pub input_quantity_id: String,
     /// Exact external specification governing this input quantity.
     pub input_specification: MeasurementModelInputSpecificationRef,
-    /// Authoritative role of this input quantity in the measurement model.
+    /// Frontier-attested role of this input quantity in the measurement model.
     pub role: MeasurementModelInputRole,
     /// Topology node at which the input quantity's traceability branch begins.
     pub node_id: String,
