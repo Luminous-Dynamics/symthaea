@@ -21,12 +21,17 @@ GitHub documents that webhook deliveries may arrive out of order and recommends 
 
 ClockRelationV1 records:
 
-    provider clock domain
-    local clock domain
-    maximum permitted skew
-    explicit verification state
+    provider clock identity
+    local clock identity
+    lower bound for (local - provider)
+    upper bound for (local - provider)
+    verification state
+    verification method/evidence
+    measurement time
+    validity window
+    drift bound
 
-A clock relation is unusable unless it is explicitly verified and its skew bound is non-negative.
+A clock relation is unusable unless its offset interval is ordered, it is explicitly verified, and its required verification evidence is present.
 
 Therefore:
 
@@ -38,10 +43,15 @@ Without a usable clock relation, the temporal state is cross-domain-time-unbound
 
 ## Conservative admissibility
 
-With maximum skew K, the reference model admits an event only when both bounds are provable:
+With offset interval [L, U], where offset = local_clock - provider_clock, the provider occurrence interval is first translated into local time:
 
-    provider_event - K >= local_dispatch
-    provider_event + K <= local_observation
+    local_event_lower = provider_event_lower + L
+    local_event_upper = provider_event_upper + U
+
+The reference model admits an event only when both local-time bounds are provable:
+
+    local_event_lower >= local_dispatch
+    local_event_upper <= local_observation
 
 An event definitely before dispatch is rejected.
 
@@ -79,7 +89,7 @@ It still does not establish that the local async operation caused the effect.
 
 ## Claim ceiling
 
-This establishes deterministic temporal-admissibility semantics with explicit clock-domain uncertainty in the provider-free reference model.
+This establishes deterministic temporal-admissibility semantics with an explicit directional clock-domain relation, timestamp occurrence interval, bounded drift, and local monotonic ordering in the provider-free reference model.
 
 It does not establish synchronized clocks, provider truthfulness, causal attribution, provider-side topology CAS, governance legitimacy, production atomicity, or promotion success.
 
