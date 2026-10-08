@@ -137,7 +137,7 @@ When an actual measurement campaign is proposed, ExperimentalDesignProvenance ca
 
 An observation may then carry the resulting experimental_design_id, closing the lineage from proposal to observed result. This is provenance, not scientific authorization: Symthaea does not certify protocol adequacy, sample size, statistical power, causal validity, metrological traceability, or experimental safety.
 
-Every `unresolved_uncertainty_refs` entry in a proposed design must now resolve to the exact uncertainty identity on pre-existing evidence linked to one endpoint candidate's declared target surface. An observation already marked as produced by an experimental design/target cannot retroactively serve as the unresolved uncertainty that justified that same design. This is an identity-and-linkage guard only: it does not recompute uncertainty, establish that uncertainty is adequate, or prove that a campaign's decision rule is scientifically sufficient.
+Every `unresolved_uncertainty_refs` entry in a proposed design must now resolve to the exact uncertainty identity on non-design-bound evidence linked to one endpoint candidate's declared target surface. Evidence carrying an experimental-design or experimental-target marker cannot justify the unresolved-uncertainty reference for that same proposed design. This is an identity-and-linkage guard only: it does not recompute uncertainty, establish that uncertainty is adequate, or prove that a campaign's decision rule is scientifically sufficient. The absence of design/target markers does not prove wall-clock chronology or source authenticity; records that omit or falsify provenance markers remain outside this verifier's proof boundary.
 
 
 ### Typed experimental discrimination
