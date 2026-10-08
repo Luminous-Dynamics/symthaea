@@ -77,10 +77,6 @@ jobs:
               "PromotionPrEffectStateV1",
               "ClockRelationV1",
               "ProviderTimestampPolicyV1",
-              "local_minus_provider_lower_bound_ms",
-              "local_minus_provider_upper_bound_ms",
-              "verification_evidence_digest",
-              "verification_method",
               "ProviderWebhookStackMetadataV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
@@ -127,6 +123,8 @@ jobs:
               "local-reservation-monotonic-time-missing",
               "local-dispatch-monotonic-time-missing",
               "local-observation-monotonic-time-missing",
+              "local-monotonic-clock-identity-missing",
+              "clock-relation-does-not-cover-event",
               "invalid-local-time-order",
               "invalid-local-monotonic-order",
               "invalid-provider-time-order",
@@ -162,9 +160,27 @@ jobs:
               "merge_commit_sha",
               "head",
               "action",
+              "merged_at",
+              "stack",
+          }
+          webhook_temporal_identity_fields = {
+              "local_monotonic_clock_id",
+              "local_received_monotonic_ns",
+              "local_reservation_monotonic_ns",
+              "local_dispatch_monotonic_ns",
+              "local_observation_monotonic_ns",
+              "local_minus_provider_lower_bound_ms",
+              "local_minus_provider_upper_bound_ms",
+              "provider_clock_id",
+              "provider_timestamp_policy",
+              "provider_timestamp_policy_digest",
+              "verification_evidence_digest",
+              "verification_method",
           }
           for field in semantic_webhook_fields:
               assert field in source, f"Missing webhook semantic field: {field}"
+          for field in webhook_temporal_identity_fields:
+              assert field in source, f"Missing webhook temporal identity field: {field}"
 
           stack_effect_derivation_markers = {
               "from_webhook_observations",
