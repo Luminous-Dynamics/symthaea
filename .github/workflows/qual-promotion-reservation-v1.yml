@@ -75,6 +75,12 @@ jobs:
               "PromotionStackEffectEvidenceV1",
               "PromotionStackEffectEvidenceSetV1",
               "PromotionPrEffectStateV1",
+              "ClockRelationEvidenceV1",
+              "ClockRelationVerificationV1",
+              "ClockRelationTrustSnapshotV1",
+              "ClockRelationEvidenceV1",
+              "ClockRelationVerificationV1",
+              "ClockRelationTrustSnapshotV1",
               "ClockRelationV1",
               "LocalTemporalSequenceV1",
               "ProviderWebhookEffectTimingV1",
@@ -118,6 +124,14 @@ jobs:
               "invalid-local-time-order",
               "invalid-provider-time-order",
               "invalid-negative-time",
+              "clock-relation-provenance-missing",
+              "clock-relation-invalid",
+              "clock-relation-policy-drift",
+              "clock-relation-revoked",
+              "clock-relation-trust-snapshot-after-dispatch",
+              "clock-relation-established-after-dispatch",
+              "clock-relation-outside-validity",
+              "clock-relation-stale",
           }
           for state in temporal_states:
               assert f'"{state}"' in source, f"Missing temporal state: {state}"
