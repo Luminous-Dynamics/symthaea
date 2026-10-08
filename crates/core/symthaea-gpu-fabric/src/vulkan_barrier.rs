@@ -1552,12 +1552,13 @@ mod tests {
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
         };
+        let expected = expected_final_timeline_value(&plan);
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::TimelineCompletion {
-                expected: expected_final_timeline_value(&plan),
+                expected: observed_expected,
                 observed: 0,
-            })
+            }) if observed_expected == expected
         ));
     }
 
@@ -1851,9 +1852,9 @@ mod tests {
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::TimelineCompletion {
-                expected,
-                observed: expected + 1,
-            })
+                expected: observed_expected,
+                observed,
+            }) if observed_expected == expected && observed == expected + 1
         ));
     }
 
