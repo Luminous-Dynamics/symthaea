@@ -1,0 +1,28 @@
+{
+  "schema_version":"monetary-architecture-negative-v1",
+  "cases":[
+    {
+      "id":"MAP-X01",
+      "kind":"implicit_inheritance",
+      "source_profile":"conventional-bank-money-v1",
+      "target_profile":"mutual-credit-v1",
+      "missing_primitive":"settlement_asset",
+      "proposed_behavior":"inherit from source_profile"
+    },
+    {
+      "id":"MAP-X02",
+      "kind":"profile_mutation",
+      "profile":"mutual-credit-v1",
+      "mutation":{"path":"monetary_primitives.credit_creation","operation":"replace","value":"commercial-bank deposit creation"},
+      "expected":"requires new profile generation and digest"
+    },
+    {
+      "id":"MAP-X03",
+      "kind":"cross_layer_mutation",
+      "baseline_profile":"conventional-bank-money-v1",
+      "candidate_profile":"conventional-bank-money-v1",
+      "mutated_layer":"institutional_composition.allocation",
+      "expected":"reject"
+    }
+  ]
+}

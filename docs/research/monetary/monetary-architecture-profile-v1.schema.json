@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/monetary-architecture-profile-v1.schema.json",
+  "title": "Monetary Architecture Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "semantic_version",
+    "title",
+    "classification",
+    "evidence_maturity",
+    "evidence_refs",
+    "claim_ceiling",
+    "provenance",
+    "inheritance_policy",
+    "monetary_primitives",
+    "moneyness_properties",
+    "institutional_composition",
+    "transplant_contract"
+  ],
+  "properties": {
+    "schema_version": { "const": "monetary-architecture-profile-v1" },
+    "profile_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "semantic_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "classification": {
+      "enum": [
+        "whole_system",
+        "architecture",
+        "variant",
+        "overlay",
+        "macro_regime",
+        "monetary_rule",
+        "analytical_framework"
+      ]
+    },
+    "evidence_maturity": { "enum": ["A", "B", "C", "D"] },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "claim_ceiling": { "type": "string", "minLength": 1 },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_id", "profile_digest"],
+      "properties": {
+        "source_type": {
+          "enum": ["literature", "frontier_specification", "synthetic_fixture", "implementation"]
+        },
+        "source_id": { "type": "string", "minLength": 1 },
+        "profile_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "inheritance_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implicit_inheritance", "missing_mechanism_disposition"],
+      "properties": {
+        "implicit_inheritance": { "const": false },
+        "missing_mechanism_disposition": { "const": "underdetermined" }
+      }
+    },
+    "monetary_primitives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_of_account",
+        "medium_of_exchange",
+        "payment_instrument",
+        "store_of_value_claim",
+        "issuer_liability",
+        "credit_creation",
+        "reserve_or_backing",
+        "settlement_asset",
+        "redemption_convertibility",
+        "transaction_finality",
+        "liquidity_backstop",
+        "clearing_topology",
+        "interoperability",
+        "default_loss_allocation",
+        "governance_legal_finality"
+      ],
+      "properties": {
+        "unit_of_account": { "$ref": "#/$defs/mechanism" },
+        "medium_of_exchange": { "$ref": "#/$defs/mechanism" },
+        "payment_instrument": { "$ref": "#/$defs/mechanism" },
+        "store_of_value_claim": { "$ref": "#/$defs/mechanism" },
+        "issuer_liability": { "$ref": "#/$defs/mechanism" },
+        "credit_creation": { "$ref": "#/$defs/mechanism" },
+        "reserve_or_backing": { "$ref": "#/$defs/mechanism" },
+        "settlement_asset": { "$ref": "#/$defs/mechanism" },
+        "redemption_convertibility": { "$ref": "#/$defs/mechanism" },
+        "transaction_finality": { "$ref": "#/$defs/mechanism" },
+        "liquidity_backstop": { "$ref": "#/$defs/mechanism" },
+        "clearing_topology": { "$ref": "#/$defs/mechanism" },
+        "interoperability": { "$ref": "#/$defs/mechanism" },
+        "default_loss_allocation": { "$ref": "#/$defs/mechanism" },
+        "governance_legal_finality": { "$ref": "#/$defs/mechanism" }
+      }
+    },
+    "moneyness_properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["par_singleness", "liquidity_elasticity", "integrity_constraints"],
+      "properties": {
+        "par_singleness": { "$ref": "#/$defs/mechanism" },
+        "liquidity_elasticity": { "$ref": "#/$defs/mechanism" },
+        "integrity_constraints": { "$ref": "#/$defs/mechanism" }
+      }
+    },
+    "institutional_composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownership",
+        "allocation",
+        "governance",
+        "ecological_constraints"
+      ],
+      "properties": {
+        "ownership": { "$ref": "#/$defs/composition_dimension" },
+        "allocation": { "$ref": "#/$defs/composition_dimension" },
+        "governance": { "$ref": "#/$defs/composition_dimension" },
+        "ecological_constraints": { "$ref": "#/$defs/composition_dimension" }
+      }
+    },
+    "transplant_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutable_layer", "protected_layers", "comparison_rule"],
+      "properties": {
+        "mutable_layer": { "const": "monetary_primitives" },
+        "protected_layers": {
+          "type": "array",
+          "const": [
+            "ownership",
+            "allocation",
+            "governance",
+            "ecological_constraints"
+          ]
+        },
+        "comparison_rule": {
+          "const": "candidate may differ only in mutable_layer"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "mechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["specified", "underdetermined", "not_applicable"]
+        },
+        "definition": { "type": "string", "minLength": 1 },
+        "parameters": { "type": "object" },
+        "implementation_ref": { "type": "string", "minLength": 1 },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "specified" } }
+          },
+          "then": { "required": ["definition"] }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "underdetermined" } }
+          },
+          "then": {
+            "not": {
+              "required": ["definition"]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "not_applicable" } }
+          },
+          "then": {
+            "not": {
+              "required": ["definition"]
+            }
+          }
+        }
+      ]
+    },
+    "composition_dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["fixed", "parameterized", "underdetermined"]
+        },
+        "definition": { "type": "string", "minLength": 1 },
+        "profile_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
