@@ -271,6 +271,12 @@ jobs:
                   evidence.finalPr?.base?.ref === evidence.pr.base?.ref &&
                   Number(evidence.finalPr?.base?.repo?.id) === Number(evidence.pr.base?.repo?.id) &&
                   evidence.finalPr?.merge_commit_sha === evidence.pr.merge_commit_sha,
+                base_branch_tip_stable:
+                  evidence.initialBaseBranchTipSha === expected.parent &&
+                  evidence.finalBaseBranchTipSha === expected.parent &&
+                  evidence.initialBaseBranchTipSha === evidence.finalBaseBranchTipSha &&
+                  evidence.pr.base.sha === evidence.initialBaseBranchTipSha &&
+                  evidence.finalPr?.base?.sha === evidence.finalBaseBranchTipSha,
                 pr_identity:
                   evidence.pr.number === expected.pr &&
                   evidence.pr.head.ref === expected.branch &&
@@ -380,6 +386,8 @@ jobs:
                   },
                    merge_commit_sha: 'c'.repeat(40),
                 },
+                initialBaseBranchTipSha: expected.parent,
+                finalBaseBranchTipSha: expected.parent,
                 finalPr: {
                   number: expected.pr,
                   head: {
@@ -504,6 +512,8 @@ jobs:
               ['pr_snapshot_drift_head', (e) => { e.finalPr.head.sha = '0'.repeat(40); }],
               ['pr_snapshot_drift_base', (e) => { e.finalPr.base.sha = '0'.repeat(40); }],
               ['pr_snapshot_drift_merge', (e) => { e.finalPr.merge_commit_sha = '0'.repeat(40); }],
+              ['base_branch_tip_initial_drift', (e) => { e.initialBaseBranchTipSha = '0'.repeat(40); }],
+              ['base_branch_tip_final_drift', (e) => { e.finalBaseBranchTipSha = '0'.repeat(40); }],
               ['pr_base_ref', (e) => { e.pr.base.ref = 'untrusted-base'; }],
               ['pr_base_sha', (e) => { e.pr.base.sha = '0'.repeat(40); }],
               ['pr_base_repo_id', (e) => { e.pr.base.repo.id += 1; }],
@@ -749,11 +759,31 @@ jobs:
               );
             }
 
+            const baseBranchRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + expected.baseBranch,
+            })).data;
+            const initialBaseBranchTipSha = String(baseBranchRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(initialBaseBranchTipSha)) {
+              throw new Error('initial base-branch ref did not resolve to a canonical commit SHA');
+            }
+
             const finalPr = (await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: expected.pr,
             })).data;
+
+            const finalBaseBranchRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/' + expected.baseBranch,
+            })).data;
+            const finalBaseBranchTipSha = String(finalBaseBranchRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(finalBaseBranchTipSha)) {
+              throw new Error('final base-branch ref did not resolve to a canonical commit SHA');
+            }
 
             const finalArtifacts = await github.paginate(
               github.rest.actions.listWorkflowRunArtifacts,
@@ -772,6 +802,8 @@ jobs:
               finalMainSha,
               contextRepository: context.repo.owner + '/' + context.repo.repo,
               triggerRunAttempt,
+              initialBaseBranchTipSha,
+              finalBaseBranchTipSha,
               run,
               jobs,
               pr,
@@ -795,7 +827,7 @@ jobs:
             const liveEvaluation = evaluate(liveEvidence);
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v6',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v7',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -828,6 +860,9 @@ jobs:
                 initial_merge_commit_sha: liveEvidence.pr.merge_commit_sha ?? null,
                 final_merge_commit_sha: liveEvidence.finalPr.merge_commit_sha ?? null,
                 stable: liveEvaluation.checks.pr_snapshot_stable,
+                initial_base_branch_tip_sha: liveEvidence.initialBaseBranchTipSha,
+                final_base_branch_tip_sha: liveEvidence.finalBaseBranchTipSha,
+                base_branch_tip_stable: liveEvaluation.checks.base_branch_tip_stable,
               },
               adversarial_verifier_corpus: {
                 test_count: adversarialResults.length,
