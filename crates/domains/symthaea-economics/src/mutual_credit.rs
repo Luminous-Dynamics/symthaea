@@ -166,11 +166,13 @@ impl MutualCreditNetwork {
 
         validate_balance(
             buyer,
+            buyer_balance,
             buyer_new_balance,
             buyer_limit,
         )?;
         validate_balance(
             seller,
+            seller_balance,
             seller_new_balance,
             seller_limit,
         )?;
@@ -279,13 +281,14 @@ fn validate_amount(amount: f64) -> Result<(), MutualCreditError> {
 
 fn validate_balance(
     member: &str,
+    balance: f64,
     requested_balance: f64,
     limit: MemberLimit,
 ) -> Result<(), MutualCreditError> {
     if requested_balance < limit.lower() || requested_balance > limit.upper() {
         return Err(MutualCreditError::CreditLimitExceeded {
             member: member.to_owned(),
-            balance: requested_balance,
+            balance,
             requested_balance,
             lower_limit: limit.lower(),
             upper_limit: limit.upper(),
@@ -374,6 +377,14 @@ mod tests {
                 member: "alice".into(),
                 balance: -40.0,
                 requested: 15.0,
+            })
+        );
+        assert_eq!(
+            network.settle_external("bob", 50.0),
+            Err(MutualCreditError::InsufficientPositiveBalance {
+                member: "bob".into(),
+                balance: 40.0,
+                requested: 50.0,
             })
         );
 
