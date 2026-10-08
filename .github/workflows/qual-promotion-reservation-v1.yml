@@ -80,9 +80,7 @@ jobs:
               "ProviderWebhookStackMetadataV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
-              "ProviderWebhookStackMetadataV1",
               "PromotionStackEffectTimingSetV1",
-              "ProviderWebhookStackMetadataV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
           }
