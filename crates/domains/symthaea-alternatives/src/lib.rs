@@ -2468,7 +2468,7 @@ impl CandidatePathway {
         })
     }
 
-    fn target_surface_has_preexisting_uncertainty(
+    fn target_surface_has_non_design_bound_uncertainty(
         &self,
         target: &ExperimentalDiscriminationTarget,
         uncertainty_id: &str,
@@ -4163,7 +4163,7 @@ pub enum AssessmentError {
         /// Unit declared by the stopping criterion.
         actual_unit: String,
     },
-    /// A declared uncertainty identity is not linked to pre-existing evidence on any target surface.
+    /// A declared uncertainty identity is not linked to non-design-bound evidence on any target surface.
     ExperimentalDesignUncertaintyNotLinkedToTargetSurface(String),
     /// An experimental design carries a different semantic digest for a candidate.
     ExperimentalDesignCandidateDigestMismatch {
@@ -4785,7 +4785,7 @@ impl std::fmt::Display for AssessmentError {
             ),
             Self::ExperimentalDesignUncertaintyNotLinkedToTargetSurface(uncertainty_id) => write!(
                 f,
-                "experimental design uncertainty {uncertainty_id} is not linked to pre-existing evidence on any declared target surface"
+                "experimental design uncertainty {uncertainty_id} is not linked to non-design-bound evidence on any declared target surface"
             ),
             Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
@@ -5315,7 +5315,7 @@ impl AlternativesEngine {
                                 .iter()
                                 .find(|candidate| &candidate.id == *candidate_id)
                                 .is_some_and(|candidate| {
-                                    candidate.target_surface_has_preexisting_uncertainty(
+                                    candidate.target_surface_has_non_design_bound_uncertainty(
                                         target,
                                         uncertainty_id,
                                     )
