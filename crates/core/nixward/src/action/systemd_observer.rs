@@ -119,6 +119,8 @@ pub enum NixSystemdObserverErrorV1 {
 
     #[error("systemd invocation ID changed during definition capture")]
     InvocationIdChanged,
+    #[error("D-Bus daemon incarnation changed during observation")]
+    BusIncarnationChanged,
 
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
@@ -208,6 +210,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                         object_path: removed.object_path.as_str().to_string(),
                         result: removed.result,
                         manager_owner: self.manager_owner.clone(),
+                        bus_id: Some(self.bus_id.clone()),
                     });
                 }
             }
@@ -786,6 +789,7 @@ impl NixSystemdReadOnlyObserverV1 {
 
         let expected_unit = canonical_unit(unit)?;
         let manager_owner = self.systemd_manager_owner().await?;
+        let bus_id = self.dbus_bus_id().await?;
         let object_path = self.resolve_service_unit(&expected_unit).await?;
         let unit_properties = self
             .get_all_properties(&object_path, SYSTEMD_UNIT_INTERFACE)
@@ -794,8 +798,12 @@ impl NixSystemdReadOnlyObserverV1 {
             .get_all_properties(&object_path, SYSTEMD_SERVICE_INTERFACE)
             .await?;
         let post_manager_owner = self.systemd_manager_owner().await?;
+        let post_bus_id = self.dbus_bus_id().await?;
         if post_manager_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if post_bus_id != bus_id {
+            return Err(NixSystemdObserverErrorV1::BusIncarnationChanged);
         }
 
         let service_result =
@@ -813,6 +821,7 @@ impl NixSystemdReadOnlyObserverV1 {
             generation,
             &object_path,
             &manager_owner,
+            &bus_id,
             &service_result,
             &unit_properties,
             job,
@@ -1370,6 +1379,7 @@ fn build_observation_from_properties(
     generation: u64,
     unit_object_path: &OwnedObjectPath,
     manager_owner: &str,
+    bus_id: &str,
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
     job: Option<NixSystemdJobEvidenceV1>,
@@ -1460,6 +1470,7 @@ fn build_observation_from_properties(
         service_result,
         systemd_job: job,
         systemd_manager_owner: Some(manager_owner.to_string()),
+        systemd_bus_id: Some(bus_id.to_string()),
         invocation_id,
         state_change_at_monotonic_us,
         observed_at_monotonic_us,
