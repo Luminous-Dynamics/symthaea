@@ -1192,7 +1192,29 @@ impl TransactionLedger {
             return Err("qualified image completion must commit both archive and configuration".into());
         }
 
-        let records = self.load()?;
+        let Some(mut file) = self.open_ledger_file(
+            libc::O_RDWR | libc::O_CREAT | libc::O_APPEND,
+            0o600,
+        )? else {
+            return Err(format!(
+                "transaction ledger {} could not be opened for completion",
+                self.path.display()
+            ));
+        };
+
+        // Terminal recording is itself an idempotency boundary. Hold the same
+        // exclusive journal descriptor lock across replay lookup and completion
+        // append so conflicting concurrent outcomes cannot both be committed.
+        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+        if lock_result != 0 {
+            return Err(format!(
+                "unable to lock transaction ledger {} for completion: {}",
+                self.path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+
+        let records = self.load_locked_file(&mut file)?;
         let Some(existing) = records.get(&transaction.request_id) else {
             return Err(format!(
                 "cannot complete unknown transaction request_id {}",
@@ -1222,7 +1244,7 @@ impl TransactionLedger {
             return Ok(());
         }
 
-        self.append(&JournalEvent {
+        self.append_locked_file(&file, &JournalEvent {
             schema_version: SCHEMA_VERSION,
             event: JournalEventKind::Completed,
             request_id: transaction.request_id.clone(),
@@ -1681,6 +1703,77 @@ mod tests {
         let contents = std::fs::read_to_string(&path).unwrap();
         assert!(contents.lines().count() >= workers);
         assert!(contents.lines().all(|line| serde_json::from_str::<serde_json::Value>(line).is_ok()));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn concurrent_conflicting_completions_commit_exactly_one_terminal_outcome() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Barrier,
+        };
+        use std::thread;
+
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-transaction-ledger-conflicting-completion-{name}.jsonl"
+        ));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let transaction = SystemTransaction::begin(
+            MutationKind::GcCollect,
+            "conflicting-completion-request-0001",
+            None,
+            b"gc-conflicting-completion",
+        )
+        .unwrap();
+        assert!(matches!(
+            ledger.admit(transaction.clone()).unwrap(),
+            TransactionAdmission::New(_)
+        ));
+
+        let barrier = Arc::new(Barrier::new(2));
+        let successes = Arc::new(AtomicUsize::new(0));
+        let failures = Arc::new(AtomicUsize::new(0));
+
+        thread::scope(|scope| {
+            for outcome in [
+                TransactionOutcome::ObservedSuccess,
+                TransactionOutcome::Failed,
+            ] {
+                let barrier = Arc::clone(&barrier);
+                let successes = Arc::clone(&successes);
+                let failures = Arc::clone(&failures);
+                let path = path.clone();
+                let transaction = transaction.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    let ledger = TransactionLedger::open_at(&path).unwrap();
+                    match ledger.mark_completed(&transaction, outcome) {
+                        Ok(()) => {
+                            successes.fetch_add(1, Ordering::SeqCst);
+                        }
+                        Err(_) => {
+                            failures.fetch_add(1, Ordering::SeqCst);
+                        }
+                    }
+                });
+            }
+        });
+
+        assert_eq!(successes.load(Ordering::SeqCst), 1);
+        assert_eq!(failures.load(Ordering::SeqCst), 1);
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let receipt = ledger
+            .lookup(&transaction.request_id)
+            .unwrap()
+            .expect("completion must remain replayable");
+        assert!(matches!(
+            receipt.outcome,
+            TransactionOutcome::ObservedSuccess | TransactionOutcome::Failed
+        ));
+        ledger.load().expect("conflicting completion must not poison journal");
 
         let _ = std::fs::remove_file(path);
     }
