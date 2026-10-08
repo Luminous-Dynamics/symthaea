@@ -31,6 +31,33 @@ rustfmt --edition 2024 --check \
 echo "-- source boundary --"
 bash scripts/check-nixward-observation-boundary.sh
 
+echo "-- final Service revalidation ordering --"
+python3 - <<'PY'
+from pathlib import Path
+
+source = Path("crates/core/nixward/src/action/executor.rs").read_text()
+start = source.index("async fn execute_authorized_service_with_witness(")
+end = source.index("\n    /// Revalidate the state identity", start)
+body = source[start:end]
+
+needle = "validate_authorized_service_definition_content"
+captures = [i for i in range(len(body)) if body.startswith(needle, i)]
+watcher = body.find("arm_job_removed_watcher")
+watcher_epoch = body.find("if watcher.bus_id() != expected_bus_id")
+witness = body.find("NixLiveExecutionWitnessV1::from_live_authority")
+
+if len(captures) < 2 or watcher < 0 or watcher_epoch < 0 or witness < 0:
+    raise SystemExit("CROSS-081: required Service execution ordering markers are missing")
+
+post_watcher = [i for i in captures if i > watcher_epoch and i < witness]
+if not post_watcher or post_watcher[0] <= watcher:
+    raise SystemExit(
+        "CROSS-081: final Service definition revalidation is not after watcher epoch validation and before witness mint"
+    )
+
+print("CROSS-081: final Service definition revalidation ordering is structurally intact.")
+PY
+
 echo "-- legacy custom mutation fence --"
 if rg -n "fn approved_intent_digest|let approved_digest|approved_intent_digest\\(" crates/core/nixward/src/bin/nixward_daemon.rs; then
   echo "legacy verdict-file approval parser still present in daemon" >&2
