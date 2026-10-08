@@ -286,7 +286,17 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
 
 
 def require_contains(expression: str | None, needle: str, label: str) -> None:
-    if expression is None or needle not in expression:
+    if expression is None:
+        raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
+    event_names = {
+        "github.event_name == 'push'": "push",
+        "github.event_name == 'workflow_dispatch'": "workflow_dispatch",
+    }
+    if needle in event_names:
+        if active_pattern_search(EVENT_EQ[event_names[needle]], expression) is None:
+            raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
+        return
+    if needle not in expression:
         raise SafetyError(f"benchmarks.yml {label} lost required expression {needle!r}")
 
 
