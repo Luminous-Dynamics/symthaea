@@ -43,9 +43,49 @@ jobs:
             esac
           }
 
+          delete_ref_if_owned() {
+            local target_ref_path="$1"
+            shift
+            local get_response_file current_status current_sha expected
+            get_response_file="$(mktemp)"
+            current_status="$(curl -sS -o "${get_response_file}" -w '%{http_code}' \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "${api_root}/git/refs/${target_ref_path}")"
+            case "${current_status}" in
+              404)
+                rm -f "${get_response_file}"
+                return 0
+                ;;
+              200)
+                ;;
+              *)
+                echo "unexpected ref-read HTTP status for ${target_ref_path}: ${current_status}" >&2
+                cat "${get_response_file}" >&2
+                rm -f "${get_response_file}"
+                return 1
+                ;;
+            esac
+            current_sha="$(jq -er '.object.sha' "${get_response_file}")" || {
+              echo "unable to determine current ref owner for ${target_ref_path}" >&2
+              rm -f "${get_response_file}"
+              return 1
+            }
+            rm -f "${get_response_file}"
+            for expected in "$@"; do
+              if [[ -n "${expected}" && "${current_sha}" = "${expected}" ]]; then
+                delete_ref "${target_ref_path}"
+                return $?
+              fi
+            done
+            echo "ref cleanup skipped because ${target_ref_path} is not owned by this lab (current=${current_sha})" >&2
+            return 0
+          }
+
           cleanup_best_effort() {
-            delete_ref "${ref_path}" || true
-            delete_ref "${race_ref_path}" || true
+            delete_ref_if_owned "${ref_path}" "${BASE_SHA:-}" "${WINNER_SHA:-}" "${STALE_SHA:-}" "${INVALIDATION_SHA:-}" || true
+            delete_ref_if_owned "${race_ref_path}" "${BASE_SHA:-}" "${RACE_LEFT_SHA:-}" "${RACE_RIGHT_SHA:-}" || true
           }
           trap cleanup_best_effort EXIT
 
@@ -230,7 +270,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # A successful lab requires proven cleanup, not merely an attempted DELETE.
-          if ! delete_ref "${ref_path}" || ! delete_ref "${race_ref_path}"; then
+          if ! delete_ref_if_owned "${ref_path}" "${BASE_SHA}" "${WINNER_SHA}" "${STALE_SHA}" "${INVALIDATION_SHA}" || ! delete_ref_if_owned "${race_ref_path}" "${BASE_SHA}" "${RACE_LEFT_SHA}" "${RACE_RIGHT_SHA}"; then
             echo "temporary promotion-ledger lab ref cleanup failed" >&2
             exit 1
           fi
