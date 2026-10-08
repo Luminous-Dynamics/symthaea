@@ -840,6 +840,13 @@ class ProviderWebhookEffectTimingV1:
             if timestamp_policy is not None and timestamp_policy.usable()
             else None
         )
+        if (
+            interval is not None
+            and timestamp_policy is not None
+            and interval[1] - interval[0] + 1
+            > timestamp_policy.max_reported_resolution_ms
+        ):
+            interval = None
         return cls(
             provider_event_time_ms=interval[0] if interval is not None else None,
             provider_event_time_upper_ms=interval[1] if interval is not None else None,
@@ -1670,6 +1677,14 @@ def test_timestamp_policy_binds_provider_source_and_interpretation():
     assert policy.identity_digest()
     assert not timestamp_policy_fixture(source_field="pull_request.closed_at").usable()
     assert not timestamp_policy_fixture(occurrence_semantics="unknown").usable()
+
+
+def test_timestamp_policy_resolution_limit_is_enforced():
+    timing = effect_timing_fixture(
+        timestamp_policy=timestamp_policy_fixture(max_reported_resolution_ms=500),
+    )
+    assert timing.provider_event_time_ms is not None
+    assert timing.classify() == "provider-event-time-missing"
 
 
 def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
@@ -4260,6 +4275,7 @@ TESTS = [
     test_provider_timestamp_interval_respects_reported_precision,
     test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics,
     test_timestamp_policy_binds_provider_source_and_interpretation,
+    test_timestamp_policy_resolution_limit_is_enforced,
     test_temporal_effect_rejects_tampered_timestamp_policy_identity,
     test_temporal_effect_without_timestamp_policy_is_not_admissible,
     test_provider_timestamp_parser_rejects_malformed_timestamp,
