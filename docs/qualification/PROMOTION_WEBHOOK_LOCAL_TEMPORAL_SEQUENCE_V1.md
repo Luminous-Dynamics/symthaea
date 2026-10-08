@@ -117,3 +117,26 @@ The timing artifact carries the same promotion operation identity digest and rej
 This is a stronger provenance shape than a free-form source-authentication string. It still does not implement the external signature verification primitive inside this provider-free oracle: signature_verified represents an external verifier decision and is not itself claimed to be cryptographic proof.
 
 Roughtime provides the relevant protocol precedent: responses are bound to a fresh client nonce, include a timestamp and uncertainty radius, and are verified against configured long-term trust roots. RFC 10049 also explicitly distinguishes a valid response from proof that the timestamp itself is globally correct. citeturn577066search2turn577066search1
+
+
+## Local sequence provenance
+
+The local monotonic sequence is no longer sufficient merely because its three integers are ordered.
+
+Temporal admission now requires sequence provenance:
+
+    LocalTemporalSequenceEvidenceV1
+        ↓
+    LocalTemporalSequenceV1
+        ↓
+    ProviderWebhookEffectTimingV1
+
+The evidence binds the exact promotion operation identity, local sequence source identity, source generation, capture identity, sequence triple, sequence-triple digest, and source kind.
+
+A timing artifact carrying a correctly ordered sequence from another operation is rejected as local-sequence-operation-identity-mismatch.
+
+A correctly ordered sequence with missing provenance is rejected as local-sequence-provenance-missing. A malformed or internally inconsistent provenance record is rejected as local-sequence-source-invalid.
+
+The reference model deliberately does not claim a kernel or hardware attestation of the sequence source. It establishes provenance and binding semantics so a bare caller-authored sequence cannot satisfy the full cross-domain timing predicate.
+
+Rust's current Instant documentation describes Instant as monotonically nondecreasing but not necessarily steady, and notes that platform or virtualization bugs can still violate practical monotonicity guarantees. That supports keeping monotonic ordering separate from wall-clock accuracy and source trust. citeturn670450search1turn670450search0
