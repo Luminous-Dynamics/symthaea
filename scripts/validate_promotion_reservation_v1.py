@@ -76,6 +76,11 @@ class PromotionOperationIdentityV1:
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
+    def provider_constraints_valid(self) -> bool:
+        # GitHub stacked merges do not support bypass_rules for a whole
+        # multi-PR stack; bypass is only available for the bottom PR.
+        return not (len(self.ordered_stack) > 1 and self.bypass_rules)
+
 
 @dataclass(frozen=True)
 class PromotionStackEffectV1:
@@ -291,6 +296,8 @@ class ProviderTopologyBindingV1:
     provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
+        if not identity.provider_constraints_valid():
+            return "invalid-provider-operation-options"
         if self.initial_sequence <= 0:
             return "invalid-observation-sequence"
         if self.initial_observation is None:
@@ -479,8 +486,13 @@ class GitHubAsyncModel:
         merge_action: str = "direct_merge",
         bypass_rules: bool = False,
         timeout_after_accept: bool = False,
+        stack_size: int = 1,
     ) -> ProviderOutcome:
         self.calls += 1
+        if stack_size <= 0:
+            return ProviderOutcome(400, "invalid-stack-size")
+        if bypass_rules and stack_size > 1:
+            return ProviderOutcome(400, "bypass-not-supported-for-stack")
         if expected_head != self.pr_head:
             return ProviderOutcome(409, "rejected")
         if self.merge_sha is not None:
@@ -917,7 +929,7 @@ def test_provider_topology_binding_rejects_bypass_mode_splice():
         bypass_identity,
         provider_topology_cas_evidence=evidence,
     )
-    assert binding.classify(bypass_identity) == "observed-not-cas"
+    assert binding.classify(bypass_identity) == "invalid-provider-operation-options"
 
 
 def test_provider_topology_binding_rejects_non_provider_cas_evidence_source():
@@ -1275,6 +1287,13 @@ def test_stack_identity_binds_bypass_rules():
     assert original.digest() != changed.digest()
 
 
+def test_stack_identity_rejects_bypass_for_multi_pr_stack():
+    identity = PromotionOperationIdentityV1(
+        **{**stack_identity_fixture().__dict__, "bypass_rules": True},
+    )
+    assert not identity.provider_constraints_valid()
+
+
 def test_stack_identity_binds_requested_subject_identity():
     original = stack_identity_fixture()
     changed_pr = PromotionOperationIdentityV1(
@@ -1370,6 +1389,20 @@ def test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent():
     assert second.kind == "duplicate-parameter-mismatch"
     assert second.uuid == first.uuid
     assert second.bypass_rules is False
+
+
+def test_provider_model_rejects_bypass_for_multi_pr_stack():
+    provider = GitHubAsyncModel()
+    result = provider.submit(
+        "H1",
+        "squash",
+        "direct_merge",
+        True,
+        stack_size=2,
+    )
+    assert result.http == 400
+    assert result.kind == "bypass-not-supported-for-stack"
+    assert provider.pending_uuid is None
 
 
 def test_async_provider_result_preserves_bypass_rules_for_reconciliation():
@@ -1654,6 +1687,7 @@ TESTS = [
     test_stack_identity_binds_authority_generations,
     test_stack_identity_binds_provider_stack_number,
     test_stack_identity_binds_bypass_rules,
+    test_stack_identity_rejects_bypass_for_multi_pr_stack,
     test_stack_identity_binds_requested_subject_identity,
     test_exact_20_schedules_are_executed,
     test_single_use_reservation,
@@ -1662,6 +1696,7 @@ TESTS = [
     test_duplicate_async_request_reuses_provider_handle,
     test_duplicate_async_request_option_mismatch_is_not_idempotent,
     test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent,
+    test_provider_model_rejects_bypass_for_multi_pr_stack,
     test_async_provider_result_preserves_bypass_rules_for_reconciliation,
     test_async_provider_result_bypass_rules_mismatch_is_not_causal,
     test_direct_provider_merge_establishes_causal_attribution,
