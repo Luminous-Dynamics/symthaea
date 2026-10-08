@@ -1,6 +1,7 @@
 {
   "schema_version":"monetary-operational-workflow-v1-execution",
   "base_ref":"eedc6a0722561487730728f3fa5da01297571ad8",
+  "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
   "cases":[
     {"id":"baseline","final_state":"externally_finalized","end_to_end_completion_time":10,"technical_settlement_time":2,"operational_waiting_time":8,"reconciliation_backlog":0,"unresolved":false},
     {"id":"compliance_block","final_state":"rejected","technical_settlement_time":null,"unresolved":false},
@@ -9,5 +10,5 @@
     {"id":"stale_quote","final_state":"unresolved","technical_settlement_time":null,"reconciliation_backlog":1,"unresolved":true},
     {"id":"settlement_reject","final_state":"unresolved","technical_settlement_time":null,"reconciliation_backlog":1,"unresolved":true}
   ],
-  "claim_ceiling":"Local deterministic reference execution only; not hosted qualification or live-system evidence."
+  "claim_ceiling":"Local deterministic reference execution only; treatment-independent CRN namespace; not hosted qualification or live-system evidence."
 }

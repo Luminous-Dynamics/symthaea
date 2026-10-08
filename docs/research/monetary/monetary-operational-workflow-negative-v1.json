@@ -11,6 +11,7 @@
     {"id":"OP-X08","kind":"operating_window_ignored","expected":"reject_time_constraint_bypass"},
     {"id":"OP-X09","kind":"fallback_flag_mutated_without_new_policy_generation","expected":"reject_generation_mutation"},
     {"id":"OP-X10","kind":"issuer_failure_hidden_by_atomicity_label","expected":"reject_atomicity_inheritance"},
-    {"id":"OP-X11","kind":"workflow_result_missing_trace_identity","expected":"reject_unbound_observation"}
+    {"id":"OP-X11","kind":"workflow_result_missing_trace_identity","expected":"reject_unbound_observation"},
+    {"id":"OP-X12","kind":"treatment_dependent_exogenous_rng_namespace","expected":"reject_common_random_number_breach"}
   ]
 }

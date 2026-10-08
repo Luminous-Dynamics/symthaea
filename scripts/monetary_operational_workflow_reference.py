@@ -32,9 +32,7 @@ class OperationalPolicy:
     fallback_enabled:bool=True; operator_capacity:int=1; operating_window_end:int=100
     asynchronous_delivery_delay:int=0; approval_timeout:int=20; fallback_timeout:int=20
     def validate(self):
-        ints=("compliance_latency","approval_latency","reservation_latency","quote_confirmation_latency",
-              "issuance_redemption_latency","external_finalization_latency","asynchronous_delivery_delay",
-              "approval_timeout","fallback_timeout","operating_window_end")
+        ints=("compliance_latency","approval_latency","reservation_latency","quote_confirmation_latency","issuance_redemption_latency","external_finalization_latency","asynchronous_delivery_delay","approval_timeout","fallback_timeout","operating_window_end")
         if any(getattr(self,k)<0 for k in ints): raise ValueError("negative policy duration")
         if not 0<=self.manual_breakpoint_probability_ppm<=1_000_000: raise ValueError("probability out of range")
         if self.operator_capacity<0: raise ValueError("negative operator capacity")
@@ -60,8 +58,7 @@ class WorkflowResult:
     reconciliation_backlog:int; unresolved:bool; operator_capacity_consumed:int; dependency_count:int
     failure_reason:FailureReason; trace_digest:str
     @property
-    def end_to_end_completion_time(self):
-        return self.finished_at-self.started_at if self.final_state is WorkflowState.EXTERNALLY_FINALIZED else None
+    def end_to_end_completion_time(self): return self.finished_at-self.started_at if self.final_state is WorkflowState.EXTERNALLY_FINALIZED else None
     @property
     def technical_settlement_time(self): return self.technical_settlement_duration
     @property
@@ -73,53 +70,38 @@ class WorkflowResult:
     @property
     def fallback_activation_rate(self): return float(self.fallback_activations>0)
     def as_dict(self):
-        return {"request_id":self.request_id,"policy_digest":self.policy_digest,"settlement_receipt_digest":self.settlement_receipt_digest,
-                "seed":self.seed,"final_state":self.final_state.value,"started_at":self.started_at,"finished_at":self.finished_at,
-                "end_to_end_completion_time":self.end_to_end_completion_time,"technical_settlement_time":self.technical_settlement_time,
-                "operational_waiting_time":self.operational_waiting_time,"manual_interventions":self.manual_interventions,
-                "manual_intervention_rate":self.manual_intervention_rate,"fallback_activations":self.fallback_activations,
-                "fallback_activation_rate":self.fallback_activation_rate,"reconciliation_backlog":self.reconciliation_backlog,
-                "unresolved":self.unresolved,"operator_capacity_consumed":self.operator_capacity_consumed,
-                "dependency_count":self.dependency_count,"failure_reason":self.failure_reason.value,
-                "transitions":[{"tick":x.tick,"state":x.state.value,"cause":x.cause} for x in self.transitions],"trace_digest":self.trace_digest}
+        return {"request_id":self.request_id,"policy_digest":self.policy_digest,"settlement_receipt_digest":self.settlement_receipt_digest,"seed":self.seed,"final_state":self.final_state.value,"started_at":self.started_at,"finished_at":self.finished_at,"end_to_end_completion_time":self.end_to_end_completion_time,"technical_settlement_time":self.technical_settlement_time,"operational_waiting_time":self.operational_waiting_time,"manual_interventions":self.manual_interventions,"manual_intervention_rate":self.manual_intervention_rate,"fallback_activations":self.fallback_activations,"fallback_activation_rate":self.fallback_activation_rate,"reconciliation_backlog":self.reconciliation_backlog,"unresolved":self.unresolved,"operator_capacity_consumed":self.operator_capacity_consumed,"dependency_count":self.dependency_count,"failure_reason":self.failure_reason.value,"transitions":[{"tick":x.tick,"state":x.state.value,"cause":x.cause} for x in self.transitions],"trace_digest":self.trace_digest}
 
-def _breakpoint_hit(request_id,seed,ppm):
+def _breakpoint_hit(random_namespace,seed,ppm):
     if ppm<=0:return False
-    return int.from_bytes(sha256(f"{request_id}:{seed}".encode()).digest()[:8],"big")%1_000_000 < ppm
+    return int.from_bytes(sha256(f"{random_namespace}:{seed}".encode()).digest()[:8],"big")%1_000_000 < ppm
 
 class OperationalWorkflow:
     def __init__(self,policy):
         policy.validate(); self.policy=policy
         self.policy_digest=sha256(json.dumps(policy.__dict__,sort_keys=True,separators=(",",":")).encode()).hexdigest()
-    def run(self,request,settlement,*,seed,compliance_ok=True,duplicate_manual_approval=False):
+    def run(self,request,settlement,*,seed,exogenous_random_namespace=None,compliance_ok=True,duplicate_manual_approval=False):
         if settlement.status not in {"settled","queued","stranded","rejected"}: raise ValueError("unknown settlement status")
         if settlement.technical_settlement_duration is not None and settlement.technical_settlement_duration<0: raise ValueError("negative settlement duration")
         p=self.policy; t=request.submitted_at; tr=[]; manual=fallback=backlog=capacity=0; unresolved=False; reason=FailureReason.NONE
         tech=settlement.technical_settlement_duration; receipt=settlement.settlement_receipt_digest
         def emit(state,cause): tr.append(Transition(t,state,cause))
         def finish(final,when,tech_value):
-            payload={"request":request.__dict__,"transitions":[x.__dict__|{"state":x.state.value} for x in tr],"finished_at":when,
-                     "technical_settlement_duration":tech_value,"receipt":receipt,"policy_digest":self.policy_digest,"seed":seed,
-                     "manual":manual,"fallback":fallback,"backlog":backlog,"unresolved":unresolved,"capacity":capacity,"reason":reason.value}
+            payload={"request":request.__dict__,"transitions":[x.__dict__|{"state":x.state.value} for x in tr],"finished_at":when,"technical_settlement_duration":tech_value,"receipt":receipt,"policy_digest":self.policy_digest,"seed":seed,"manual":manual,"fallback":fallback,"backlog":backlog,"unresolved":unresolved,"capacity":capacity,"reason":reason.value}
             digest=sha256(json.dumps(payload,sort_keys=True,separators=(",",":")).encode()).hexdigest()
             return WorkflowResult(request.request_id,self.policy_digest,receipt,seed,tr[-1].state,request.submitted_at,when,tech_value,tr,manual,fallback,backlog,unresolved,capacity,3,reason,digest)
-        emit(WorkflowState.REQUESTED,"request_submitted")
-        t+=p.compliance_latency+p.asynchronous_delivery_delay; emit(WorkflowState.COMPLIANCE_PENDING,"compliance_check_started")
-        if not compliance_ok:
-            reason=FailureReason.COMPLIANCE_BLOCK; emit(WorkflowState.REJECTED,reason.value); return finish(WorkflowState.REJECTED,t,None)
+        emit(WorkflowState.REQUESTED,"request_submitted"); t+=p.compliance_latency+p.asynchronous_delivery_delay; emit(WorkflowState.COMPLIANCE_PENDING,"compliance_check_started")
+        if not compliance_ok: reason=FailureReason.COMPLIANCE_BLOCK; emit(WorkflowState.REJECTED,reason.value); return finish(WorkflowState.REJECTED,t,None)
         t+=p.approval_latency; emit(WorkflowState.AUTHORIZED,"approval_completed")
-        if p.approval_latency>p.approval_timeout or t>p.operating_window_end:
-            reason=FailureReason.APPROVAL_TIMEOUT; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
-        if duplicate_manual_approval:
-            reason=FailureReason.DUPLICATE_APPROVAL; emit(WorkflowState.REJECTED,reason.value); return finish(WorkflowState.REJECTED,t,None)
-        if _breakpoint_hit(request.request_id,seed,p.manual_breakpoint_probability_ppm):
+        if p.approval_latency>p.approval_timeout or t>p.operating_window_end: reason=FailureReason.APPROVAL_TIMEOUT; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
+        if duplicate_manual_approval: reason=FailureReason.DUPLICATE_APPROVAL; emit(WorkflowState.REJECTED,reason.value); return finish(WorkflowState.REJECTED,t,None)
+        if _breakpoint_hit(exogenous_random_namespace or request.request_id,seed,p.manual_breakpoint_probability_ppm):
             if p.operator_capacity<1:
                 if p.fallback_enabled: fallback+=1; backlog+=1; unresolved=True; reason=FailureReason.OPERATOR_CAPACITY; emit(WorkflowState.RECONCILING,"manual_breakpoint_without_capacity"); emit(WorkflowState.UNRESOLVED,reason.value); return finish(WorkflowState.UNRESOLVED,t,None)
                 reason=FailureReason.OPERATOR_CAPACITY; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
             manual+=1; capacity+=1; emit(WorkflowState.MANUAL_INTERVENTION,"manual_breakpoint"); t+=1
         t+=p.reservation_latency; emit(WorkflowState.SOURCE_RESERVED,"source_reservation")
-        if t>p.operating_window_end:
-            reason=FailureReason.OPERATING_WINDOW_CLOSED; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
+        if t>p.operating_window_end: reason=FailureReason.OPERATING_WINDOW_CLOSED; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
         t+=p.quote_confirmation_latency; emit(WorkflowState.SETTLEMENT_READY,"quote_and_route_confirmed")
         if not p.quote_current:
             reason=FailureReason.QUOTE_STALE
@@ -142,8 +124,7 @@ class OperationalWorkflow:
                 reason=FailureReason.OPERATING_WINDOW_CLOSED
                 if p.fallback_enabled: fallback+=1; backlog+=1; unresolved=True; emit(WorkflowState.RECONCILING,reason.value); emit(WorkflowState.UNRESOLVED,reason.value); return finish(WorkflowState.UNRESOLVED,t,None)
                 emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
-        else:
-            t+=tech or 0; emit(WorkflowState.ATOMICALLY_SETTLED,"settlement_completed")
+        else: t+=tech or 0; emit(WorkflowState.ATOMICALLY_SETTLED,"settlement_completed")
         if settlement.requires_redemption:
             emit(WorkflowState.REDEMPTION_PENDING,"redemption_workflow"); t+=p.issuance_redemption_latency
             if not p.target_issuer_available:
