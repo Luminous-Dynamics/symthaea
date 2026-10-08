@@ -24,6 +24,8 @@ const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
 const RECEIPT_VERSION: u16 = 4;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
+const VULKAN_ENTRY_POINT: &str = "main";
+const VULKAN_SHADER_STAGE: &str = "compute";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -470,7 +472,7 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         qualification_stage("pipeline_layout_created");
-        let entry_point = CString::new("main").unwrap();
+        let entry_point = CString::new(VULKAN_ENTRY_POINT).expect("static Vulkan entry point has no NUL bytes");
         let stage = vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::COMPUTE).module(shader).name(&entry_point);
         let pipeline_info = vk::ComputePipelineCreateInfo::default().stage(stage).layout(pipeline_layout);
         let pipeline = unsafe {
@@ -1159,6 +1161,8 @@ fn vulkan_implementation_identity_digest(spirv: &[u32]) -> String {
     hasher.update([0]);
     sha256_len_prefixed_update(&mut hasher, WGSL_ABI_MARKER.as_bytes());
     sha256_len_prefixed_update(&mut hasher, HDC_BIND_XOR_KERNEL_ID.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, VULKAN_ENTRY_POINT.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, VULKAN_SHADER_STAGE.as_bytes());
     sha256_len_prefixed_update(&mut hasher, WGSL.as_bytes());
     sha256_len_prefixed_update(&mut hasher, &spirv_bytes);
     hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
@@ -2422,6 +2426,8 @@ mod tests {
         println!("implementation_identity_sha256={}", receipt.implementation_identity_digest);
         println!("implementation_abi_marker={}", WGSL_ABI_MARKER);
         println!("implementation_kernel_id={}", HDC_BIND_XOR_KERNEL_ID);
+        println!("implementation_entry_point={}", VULKAN_ENTRY_POINT);
+        println!("implementation_shader_stage={}", VULKAN_SHADER_STAGE);
         println!("implementation_wgsl_sha256={}", runtime.implementation_wgsl_sha256);
         println!("implementation_wgsl_hex={}", runtime.implementation_wgsl_hex);
         println!("shader_spirv_sha256={}", runtime.shader_spirv_sha256);
