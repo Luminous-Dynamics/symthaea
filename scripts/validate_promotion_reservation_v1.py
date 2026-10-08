@@ -1398,6 +1398,36 @@ def test_webhook_derived_effect_set_preserves_observation_only_semantics():
     assert resolution.outcome == "effect-observed-only"
 
 
+def test_webhook_verify_rejects_empty_expected_context():
+    payload = webhook_merge_payload()
+    receipt = webhook_merge_receipt(payload)
+    context = webhook_received_context(receipt)
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        context,
+        "",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        context,
+        "hook-1",
+        "",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert not receipt.verify(
+        payload,
+        b"secret",
+        context,
+        "hook-1",
+        "pull_request",
+        "",
+    )
+
+
 def test_webhook_parser_rejects_substituted_received_context():
     payload = webhook_merge_payload()
     receipt = webhook_merge_receipt(payload)
@@ -1747,10 +1777,26 @@ def test_webhook_authentication_does_not_prove_merge_result_causality():
     payload = b'{"action":"closed"}'
     receipt = ProviderWebhookReceiptV1.from_delivery(
         "delivery-6",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
         payload,
         b"secret",
     )
-    assert receipt.verify(payload, b"secret")
+    context = ProviderWebhookRequestContextV1(
+        "delivery-6",
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
+    assert receipt.verify(
+        payload,
+        b"secret",
+        context,
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
+    )
     webhook_evidence = ProviderEvidenceEnvelopeV1(
         ProviderCaptureIntegrityV1(
             hashlib.sha256(payload).hexdigest(),
@@ -3165,6 +3211,7 @@ TESTS = [
     test_webhook_derived_stack_effect_set_rejects_head_mismatch,
     test_webhook_derived_stack_effect_set_rejects_semantically_invalid_observation,
     test_webhook_derived_effect_set_preserves_observation_only_semantics,
+    test_webhook_verify_rejects_empty_expected_context,
     test_webhook_parser_rejects_substituted_received_context,
     test_webhook_merge_effect_parses_authenticated_merged_pr,
     test_webhook_merge_effect_rejects_invalid_hmac,
