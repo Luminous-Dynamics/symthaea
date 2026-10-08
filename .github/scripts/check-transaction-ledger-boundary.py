@@ -114,6 +114,36 @@ def main() -> None:
         "duplicate request-id concurrency regression test",
     )
 
+    # Terminal recording has the same TOCTOU shape: the completion replay
+    # check and terminal append must be one atomic decision, otherwise
+    # conflicting concurrent outcomes could permanently poison the journal.
+    completion_start = text.find("pub(crate) fn mark_completed_with_image_artifacts(")
+    completion_end = text.find("\n}", completion_start)
+    if completion_start < 0:
+        fail("transaction completion boundary disappeared")
+    # Locate the next major impl boundary rather than relying on a single brace,
+    # which keeps this ratchet tolerant of formatting changes.
+    completion_end = text.find("\n}\n\nfn read_fingerprint_key", completion_start)
+    if completion_end < 0:
+        fail("transaction completion implementation boundary disappeared")
+    completion = text[completion_start:completion_end]
+    for required in (
+        'open_ledger_file(',
+        "libc::LOCK_EX",
+        "load_locked_file(&mut file)",
+        "append_locked_file(&file",
+    ):
+        require(completion, required, "atomic transaction completion invariant")
+    if 'libc::O_CREAT' in completion:
+        fail("terminal completion must never recreate a missing transaction journal")
+    if "self.load()?" in completion or "self.append(" in completion:
+        fail("transaction completion regained an unlocked load/append TOCTOU")
+    require(
+        text,
+        "concurrent_conflicting_completions_commit_exactly_one_terminal_outcome",
+        "conflicting completion concurrency regression test",
+    )
+
     # The mutation lease remains descriptor-bound and non-blocking.
     lease_start = text.find("fn acquire_at(path: &Path)")
     lease_end = text.find("\n    }\n}\n\nimpl Drop for MutationLease", lease_start)
