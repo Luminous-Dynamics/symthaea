@@ -126,6 +126,24 @@ pub struct ReceiptSelectionDecision {
     pub candidates: Vec<ReceiptSelectionCandidate>,
 }
 
+/// A proof-carrying selection witness suitable for the durable projection
+/// boundary.
+///
+/// The witness can only be constructed by binding one validated selection
+/// decision to the exact source collection and one cryptographically verified
+/// Receipt capability. Its fields are private so a caller cannot manufacture
+/// the witness by copying digests into a public struct.
+///
+/// This type does not itself prove truth or authorization. It is a typed
+/// provenance witness that the three identities were checked together:
+/// source collection, selected Receipt wire, and verified Receipt capability.
+#[cfg(feature = "semantic-receipts")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9942VerifiedReceiptSelection {
+    decision: ReceiptSelectionDecision,
+    verified_capability_sha256: [u8; 32],
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReceiptSelectionDecisionError {
     EmptyCollection,
@@ -337,6 +355,42 @@ impl ReceiptSelectionDecision {
     }
 }
 
+#[cfg(feature = "semantic-receipts")]
+impl Rfc9942VerifiedReceiptSelection {
+    /// Bind a validated decision to the exact source collection and the exact
+    /// verified Receipt capability that produced the selected result.
+    ///
+    /// This is the narrowest durable-publication witness: after construction,
+    /// downstream code receives one immutable object rather than three
+    /// independently supplied values whose relationship could be forgotten.
+    pub fn bind(
+        decision: &ReceiptSelectionDecision,
+        collection: &Rfc9942ReceiptCollection,
+        verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
+    ) -> Result<Self, ReceiptSelectionDecisionError> {
+        decision.validate_against_collection(collection)?;
+        let verified_capability_sha256 = decision.verified_capability_sha256(verified)?;
+        Ok(Self {
+            decision: decision.clone(),
+            verified_capability_sha256,
+        })
+    }
+
+    pub fn decision(&self) -> &ReceiptSelectionDecision {
+        &self.decision
+    }
+
+    pub const fn verified_capability_sha256(&self) -> [u8; 32] {
+        self.verified_capability_sha256
+    }
+
+    pub fn selection_decision_sha256(
+        &self,
+    ) -> Result<[u8; 32], ReceiptSelectionDecisionError> {
+        self.decision.validated_digest()
+    }
+}
+
 /// Evaluate receipts strictly in RFC 9942 priority order.
 ///
 /// The callback performs cryptographic/semantic verification for exactly one
@@ -345,14 +399,13 @@ impl ReceiptSelectionDecision {
 
 #[cfg(feature = "semantic-receipts")]
 impl Rfc9942SignatureWithReceipts {
-    /// Verify the outer signature and choose the first inclusion Receipt that
-    /// passes the supplied cryptographic verification context.
+    /// Verify the outer signature, select the first valid inclusion Receipt in
+    /// RFC 9942 priority order, and return a proof-carrying selection witness.
     ///
-    /// The returned decision records every higher-priority rejection and marks
-    /// lower-priority candidates as not evaluated once a valid receipt wins.
-    /// The final verified capability is rechecked through the existing
-    /// composition verifier, keeping its construction boundary intact.
-    pub fn verify_es256_inclusion_priority_first_valid_receipt_state(
+    /// The witness binds the exact collection, selected Receipt wire identity,
+    /// and the cryptographically verified Receipt capability before durable
+    /// callers receive the result.
+    pub fn verify_es256_inclusion_priority_first_valid_receipt_selection_state(
         &self,
         receipt_public_key: &[u8],
         outer_public_key: &[u8],
@@ -360,26 +413,21 @@ impl Rfc9942SignatureWithReceipts {
         outer_external_aad: &[u8],
         detached_outer_payload: Option<&[u8]>,
     ) -> Result<
-        (Rfc9942VerifiedSignatureWithReceipt, ReceiptSelectionDecision),
+        (
+            Rfc9942VerifiedSignatureWithReceipt,
+            Rfc9942VerifiedReceiptSelection,
+        ),
         Rfc9942VdpError,
     > {
         let payload = match (self.payload(), detached_outer_payload) {
-            (
-                Rfc9942SignaturePayload::Attached(bytes),
-                None,
-            ) => bytes.as_slice(),
-            (
-                Rfc9942SignaturePayload::Attached(_),
-                Some(_),
-            ) => return Err(Rfc9942VdpError::InvalidStructure),
-            (
-                Rfc9942SignaturePayload::Detached,
-                Some(bytes),
-            ) => bytes,
-            (
-                Rfc9942SignaturePayload::Detached,
-                None,
-            ) => return Err(Rfc9942VdpError::DetachedPayloadRequired),
+            (Rfc9942SignaturePayload::Attached(bytes), None) => bytes.as_slice(),
+            (Rfc9942SignaturePayload::Attached(_), Some(_)) => {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
+            (Rfc9942SignaturePayload::Detached, Some(bytes)) => bytes,
+            (Rfc9942SignaturePayload::Detached, None) => {
+                return Err(Rfc9942VdpError::DetachedPayloadRequired);
+            }
         };
 
         self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
@@ -412,7 +460,43 @@ impl Rfc9942SignatureWithReceipts {
             detached_outer_payload,
         )?;
 
-        Ok((verified, decision))
+        let witness = Rfc9942VerifiedReceiptSelection::bind(
+            &decision,
+            collection,
+            &verified.receipt(),
+        )
+        .map_err(|_| Rfc9942VdpError::InvalidStructure)?;
+
+        Ok((verified, witness))
+    }
+
+    /// Compatibility wrapper returning the raw selection decision.
+    ///
+    /// Prefer verify_es256_inclusion_priority_first_valid_receipt_selection_state
+    /// for callers crossing a durable evidence boundary.
+    #[deprecated(
+        note = "use verify_es256_inclusion_priority_first_valid_receipt_selection_state for a bound provenance witness"
+    )]
+    pub fn verify_es256_inclusion_priority_first_valid_receipt_state(
+        &self,
+        receipt_public_key: &[u8],
+        outer_public_key: &[u8],
+        receipt_external_aad: &[u8],
+        outer_external_aad: &[u8],
+        detached_outer_payload: Option<&[u8]>,
+    ) -> Result<
+        (Rfc9942VerifiedSignatureWithReceipt, ReceiptSelectionDecision),
+        Rfc9942VdpError,
+    > {
+        let (verified, witness) =
+            self.verify_es256_inclusion_priority_first_valid_receipt_selection_state(
+                receipt_public_key,
+                outer_public_key,
+                receipt_external_aad,
+                outer_external_aad,
+                detached_outer_payload,
+            )?;
+        Ok((verified, witness.decision().clone()))
     }
 }
 
