@@ -44,6 +44,27 @@ CREATE TABLE IF NOT EXISTS ledger_state (
     revision INTEGER NOT NULL CHECK (revision >= 0)
 );
 
+CREATE TRIGGER IF NOT EXISTS ledger_state_fence_monotonicity_guard
+BEFORE UPDATE ON ledger_state
+WHEN NEW.singleton <> OLD.singleton
+  OR NEW.revision <> OLD.revision + 1
+  OR NEW.fencing_token < OLD.fencing_token
+  OR NEW.fencing_token > OLD.fencing_token + 1
+  OR NEW.trust_root_generation < OLD.trust_root_generation
+  OR NEW.governance_generation < OLD.governance_generation
+  OR (
+    NEW.fencing_token = OLD.fencing_token
+    AND (
+      NEW.head <> OLD.head
+      OR NEW.active_lease <> OLD.active_lease
+      OR NEW.trust_root_generation <> OLD.trust_root_generation
+      OR NEW.governance_generation <> OLD.governance_generation
+    )
+  )
+BEGIN
+    SELECT RAISE(ABORT, 'ledger authority state monotonicity violated');
+END;
+
 CREATE TABLE IF NOT EXISTS reservations (
     reservation_id TEXT PRIMARY KEY,
     operation_id TEXT NOT NULL UNIQUE,
@@ -217,6 +238,7 @@ class DurablePromotionJournalV1:
     REQUIRED_TRIGGERS = {
         "journal_events_no_update",
         "journal_events_no_delete",
+        "ledger_state_fence_monotonicity_guard",
         "reservation_insert_authority_guard",
         "reservation_identity_immutable",
         "reservation_state_transition_guard",
@@ -1175,11 +1197,40 @@ class DurablePromotionJournalTests(unittest.TestCase):
         self.assertFalse(journal.verify_journal())
         self.assertIsNone(journal.derive_attempt_identity("RES-1"))
 
+    def test_storage_guard_rejects_fence_regression_and_head_rewrite(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        before = journal.current_state()
+        connection = sqlite3.connect(journal.path, isolation_level=None)
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    """UPDATE ledger_state
+                       SET fencing_token = 0, revision = revision + 1
+                       WHERE singleton = 1"""
+                )
+            connection.rollback()
+
+            connection.execute("BEGIN IMMEDIATE")
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    """UPDATE ledger_state
+                       SET head = 'L0', revision = revision + 1
+                       WHERE singleton = 1"""
+                )
+            connection.rollback()
+        finally:
+            connection.close()
+        self.assertEqual(journal.current_state(), before)
+        self.assertTrue(journal.verify_journal())
+
     def test_materialized_authority_cannot_drift_from_replayed_journal(self) -> None:
         journal = self.make_journal()
         self.reserve_one(journal)
         connection = sqlite3.connect(journal.path)
         try:
+            connection.execute("DROP TRIGGER ledger_state_fence_monotonicity_guard")
             connection.execute(
                 "UPDATE ledger_state SET trust_root_generation = 22 WHERE singleton = 1"
             )
