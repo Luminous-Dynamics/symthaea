@@ -1,0 +1,29 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/mutual-credit-fixtures-v0.schema.json",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","member_limit","initial_members","valid","rejected"],
+  "properties":{
+    "schema_version":{"const":"mutual-credit-fixtures-v0"},
+    "member_limit":{"type":"object","additionalProperties":false,"required":["debit_limit","credit_limit"],"properties":{"debit_limit":{"type":"number","minimum":0},"credit_limit":{"type":"number","minimum":0}}},
+    "initial_members":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+    "valid":{"type":"array","items":{"$ref":"#/$defs/fixture"}},
+    "rejected":{"type":"array","items":{"$ref":"#/$defs/rejected"}}
+  },
+  "$defs":{
+    "event":{"type":"object","additionalProperties":false,"required":["op"],"properties":{
+      "op":{"type":"string","enum":["trade","settle_external"]},
+      "buyer":{"type":"string"},"seller":{"type":"string"},"member":{"type":"string"},
+      "amount":{"type":"number"}
+    }},
+    "fixture":{"type":"object","additionalProperties":false,"required":["id","events","expect"],"properties":{
+      "id":{"type":"string"},"events":{"type":"array","items":{"$ref":"#/$defs/event"}},
+      "expect":{"type":"object","additionalProperties":false,"required":["balances","total"],"properties":{"balances":{"type":"object"},"total":{"type":"number"}}}
+    }},
+    "rejected":{"type":"object","additionalProperties":false,"required":["id","error"],"properties":{
+      "id":{"type":"string"},"events":{"type":"array","items":{"$ref":"#/$defs/event"}},
+      "event":{"$ref":"#/$defs/event"},"error":{"type":"string"}
+    }}
+  }
+}
