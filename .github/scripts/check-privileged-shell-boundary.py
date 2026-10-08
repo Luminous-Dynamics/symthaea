@@ -251,6 +251,30 @@ def main() -> None:
         if not any(fragment in line for fragment in allowed_constructor_fragments):
             fail(f"unapproved privileged_process construction: {line.strip()!r}")
 
+    env_start = text.find("fn privileged_process(")
+    env_end = text.find("\n#[cfg(test)]\nfn privileged_shell_command(", env_start)
+    if env_start < 0 or env_end < 0:
+        fail("privileged_process helper boundary disappeared")
+    env_body = text[env_start:env_end]
+    if '"NIX_PATH"' in env_body:
+        fail("generic privileged_process regained ambient NIX_PATH configuration input")
+
+    nix_env_start = text.find("fn privileged_nix_process(")
+    nix_env_end = text.find("\n#[cfg(test)]\nfn privileged_shell_command(", nix_env_start)
+    if nix_env_start < 0 or nix_env_end < 0:
+        fail("privileged_nix_process helper boundary disappeared")
+    nix_env_body = text[nix_env_start:nix_env_end]
+    if '"NIX_PATH"' not in nix_env_body:
+        fail("explicit NixOS capability lost its required legacy NIX_PATH input")
+
+    nix_script_start = text.find("fn trusted_nix_script_process(")
+    nix_script_end = text.find("\nfn trusted_script_process(", nix_script_start)
+    if nix_script_start < 0 or nix_script_end < 0:
+        fail("trusted_nix_script_process helper boundary disappeared")
+    nix_script_body = text[nix_script_start:nix_script_end]
+    if '"NIX_PATH"' not in nix_script_body:
+        fail("installer script capability lost its explicit NIX_PATH environment")
+
     # Transaction cleanup is itself a privileged authority boundary. It must stay
     # descriptor-relative and never fall back to pathname-based recursive deletion.
     cleanup_start = text.find("fn remove_transaction_artifact_dir(path: &str)")
