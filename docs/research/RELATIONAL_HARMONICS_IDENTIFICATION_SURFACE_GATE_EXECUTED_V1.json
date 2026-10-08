@@ -1,0 +1,37 @@
+{
+  "schema": "rh006-identification-surface-gate/v1",
+  "status": "research-diagnostic-only",
+  "input": {
+    "target": "C",
+    "classification": "NI",
+    "identified_set": [-1.0, 1.0]
+  },
+  "surfaces": [
+    {
+      "surface_id": "quadratic-branch-discriminant-v1",
+      "formula": "D(C)=0.25-C^2",
+      "image": [-0.75, 0.25],
+      "admissible_regimes": [
+        "two-real-branches",
+        "double-root",
+        "no-real-branch"
+      ],
+      "decision_status": "decision-unstable-under-identification-set"
+    },
+    {
+      "surface_id": "contraction-radius-v1",
+      "formula": "r(C)=sqrt(1-C^2)",
+      "image": [0.0, 1.0],
+      "derivative_formula": "|dr/dC|=|C|/sqrt(1-C^2)",
+      "derivative_at_0.999": 22.343905770087243,
+      "derivative_at_0.9999": 70.70537470731932,
+      "conditioning_status": "nonregular-boundary"
+    }
+  ],
+  "gate": {
+    "point_estimation_permitted": false,
+    "formal_inference_permitted": false,
+    "downstream_decision_permitted": false
+  },
+  "execution_note": "Surface ranges and regime enumeration were independently reproduced numerically; analytic formulas determine the exact image and regime boundaries."
+}

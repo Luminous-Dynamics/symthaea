@@ -1,0 +1,45 @@
+{
+  "schema": "rh006-identification-receipt/v1",
+  "status": "research-diagnostic-only",
+  "classification_enum": ["O", "MI", "PI", "NI"],
+  "gate_semantics": {
+    "O": "direct observable functional",
+    "MI": "point identified under an explicit, qualified structural/measurement model",
+    "PI": "non-singleton identified set remains",
+    "NI": "observationally equivalent admissible DGPs produce different target values"
+  },
+  "required_bindings": [
+    "observed_schema_id",
+    "target_id",
+    "classification",
+    "identification_model_id",
+    "identification_assumption_digest",
+    "observational_equivalence_suite_digest",
+    "identified_set_digest",
+    "downstream_surface_digest"
+  ],
+  "proceed_rule": {
+    "point_estimation": "permitted only for O or MI",
+    "formal_inference": "permitted only when classification is O or MI and all required assumptions are qualified",
+    "downstream_decision": "permitted only when the image of the identified set is decision-invariant"
+  },
+  "fail_closed_conditions": [
+    "missing structural identification model for a latent target",
+    "observationally equivalent witnesses with different target values",
+    "identified-set image crosses a downstream branch boundary",
+    "surface computation leaves its declared domain",
+    "receipt digest does not match its serialized components"
+  ],
+  "surface_policy": {
+    "principle": "propagate identified sets through every downstream mathematical surface before selecting a branch",
+    "stable": "all admissible target values map to the same qualitative regime",
+    "unstable": "admissible target values map to multiple qualitative regimes",
+    "boundary": "identified set touches a nonregular or singular surface boundary"
+  },
+  "nonclaims": [
+    "This schema does not establish any RH-006 latent identification assumption.",
+    "A predictive variable is not thereby an instrument.",
+    "A numerical grid is not an analytic proof of an identified set.",
+    "Partial identification does not authorize point inference."
+  ]
+}
