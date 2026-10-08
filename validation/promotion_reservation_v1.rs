@@ -21,6 +21,8 @@ pub struct PromotionReservationV1 {
     pub promotion_operation_id: String,
     pub lease_id: String,
     pub predecessor_head: String,
+    pub reservation_head: String,
+    pub fencing_token: u64,
     pub subject_repository: String,
     pub subject_pr: u64,
     pub expected_pr_head_sha: String,
@@ -35,14 +37,18 @@ pub struct PromotionDispatchIntentV1 {
     pub reservation_id: String,
     pub promotion_operation_id: String,
     pub predecessor_head: String,
+    pub reservation_head: String,
+    pub fencing_token: u64,
     pub expected_pr_head_sha: String,
     pub provider_profile: String,
+    pub trust_root_generation: u64,
     pub attempt_sequence: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReservationError {
     StaleLedgerHead,
+    StaleDispatchFence,
     LeaseUnavailable,
     LeaseAlreadyConsumed,
     ReservationNotDispatchable,
@@ -53,6 +59,8 @@ pub enum ReservationError {
 #[derive(Debug, Default)]
 pub struct PromotionReservationLedgerV1 {
     current_head: String,
+    current_trust_root_generation: u64,
+    current_fencing_token: u64,
     active_lease: Option<String>,
     reservation: Option<PromotionReservationV1>,
     dispatch_intent: Option<PromotionDispatchIntentV1>,
@@ -64,6 +72,8 @@ impl PromotionReservationLedgerV1 {
     pub fn new(initial_head: impl Into<String>, lease_id: impl Into<String>) -> Self {
         Self {
             current_head: initial_head.into(),
+            current_trust_root_generation: 1,
+            current_fencing_token: 0,
             active_lease: Some(lease_id.into()),
             ..Self::default()
         }
@@ -103,12 +113,16 @@ impl PromotionReservationLedgerV1 {
             return Err(ReservationError::LeaseUnavailable);
         }
 
+        let reservation_head = next_head.into();
         self.next_reservation += 1;
+        self.current_fencing_token += 1;
         let reservation = PromotionReservationV1 {
             reservation_id: format!("promotion-reservation-{}", self.next_reservation),
             promotion_operation_id: format!("promotion-operation-{}", self.next_reservation),
             lease_id: lease_id.to_owned(),
             predecessor_head: observed_head.to_owned(),
+            reservation_head: reservation_head.clone(),
+            fencing_token: self.current_fencing_token,
             subject_repository: subject_repository.into(),
             subject_pr,
             expected_pr_head_sha: expected_pr_head_sha.into(),
@@ -120,7 +134,7 @@ impl PromotionReservationLedgerV1 {
 
         self.active_lease = None;
         self.consumed_leases.insert(lease_id.to_owned());
-        self.current_head = next_head.into();
+        self.current_head = reservation_head;
         self.reservation = Some(reservation);
 
         Ok(self.reservation.as_ref().expect("reservation installed"))
@@ -130,10 +144,13 @@ impl PromotionReservationLedgerV1 {
         &mut self,
         observed_head: &str,
         next_head: impl Into<String>,
+        trust_root_generation: u64,
     ) -> Result<(), ReservationError> {
         if observed_head != self.current_head {
             return Err(ReservationError::StaleLedgerHead);
         }
+        self.current_fencing_token += 1;
+        self.current_trust_root_generation = trust_root_generation;
         self.current_head = next_head.into();
         if let Some(reservation) = self.reservation.as_mut() {
             if reservation.state == PromotionState::Reserved {
@@ -146,8 +163,14 @@ impl PromotionReservationLedgerV1 {
     pub fn prepare_dispatch(
         &mut self,
         observed_operation_id: &str,
+        observed_head: &str,
+        observed_trust_root_generation: u64,
+        observed_fencing_token: u64,
         attempt_sequence: u64,
     ) -> Result<&PromotionDispatchIntentV1, ReservationError> {
+        let current_head = self.current_head.clone();
+        let current_root = self.current_trust_root_generation;
+        let current_fence = self.current_fencing_token;
         let reservation = self
             .reservation
             .as_mut()
@@ -155,6 +178,16 @@ impl PromotionReservationLedgerV1 {
 
         if reservation.promotion_operation_id != observed_operation_id {
             return Err(ReservationError::OperationIdentityMismatch);
+        }
+        if observed_head != current_head {
+            return Err(ReservationError::StaleLedgerHead);
+        }
+        if observed_trust_root_generation != current_root
+            || observed_fencing_token != current_fence
+            || reservation.fencing_token != current_fence
+            || reservation.reservation_head != current_head
+        {
+            return Err(ReservationError::StaleDispatchFence);
         }
         if reservation.state != PromotionState::Reserved {
             if reservation.state == PromotionState::DispatchPrepared {
@@ -167,8 +200,11 @@ impl PromotionReservationLedgerV1 {
             reservation_id: reservation.reservation_id.clone(),
             promotion_operation_id: reservation.promotion_operation_id.clone(),
             predecessor_head: reservation.predecessor_head.clone(),
+            reservation_head: reservation.reservation_head.clone(),
+            fencing_token: reservation.fencing_token,
             expected_pr_head_sha: reservation.expected_pr_head_sha.clone(),
             provider_profile: reservation.provider_profile.clone(),
+            trust_root_generation: reservation.trust_root_generation,
             attempt_sequence,
         };
 
@@ -260,14 +296,14 @@ mod tests {
         let mut ledger = reserve_one();
         let op = ledger.reservation().unwrap().promotion_operation_id.clone();
 
-        let intent = ledger.prepare_dispatch(&op, 1).unwrap().clone();
+        let intent = ledger.prepare_dispatch(&op, "L1", 7, 1, 1).unwrap().clone();
         assert_eq!(intent.promotion_operation_id, op);
         assert_eq!(ledger.reservation().unwrap().state, PromotionState::DispatchPrepared);
 
         ledger.record_unknown(&op).unwrap();
         assert_eq!(ledger.reservation().unwrap().state, PromotionState::ReconciliationRequired);
         assert_eq!(
-            ledger.prepare_dispatch(&op, 2),
+            ledger.prepare_dispatch(&op, "L1", 7, 1, 2),
             Err(ReservationError::ReservationNotDispatchable)
         );
     }
@@ -276,7 +312,7 @@ mod tests {
     fn unknown_outcome_requires_same_operation_identity() {
         let mut ledger = reserve_one();
         let op = ledger.reservation().unwrap().promotion_operation_id.clone();
-        ledger.prepare_dispatch(&op, 1).unwrap();
+        ledger.prepare_dispatch(&op, "L1", 7, 1, 1).unwrap();
 
         assert_eq!(
             ledger.record_unknown("different-operation"),
@@ -293,12 +329,29 @@ mod tests {
         let mut ledger = reserve_one();
         let op = ledger.reservation().unwrap().promotion_operation_id.clone();
 
-        ledger.invalidate("L1", "I1").unwrap();
+        ledger.invalidate("L1", "I1", 8).unwrap();
         assert_eq!(ledger.current_head(), "I1");
         assert_eq!(ledger.reservation().unwrap().state, PromotionState::Superseded);
         assert_eq!(
             ledger.prepare_dispatch(&op, 1),
             Err(ReservationError::ReservationNotDispatchable)
+        );
+    }
+
+
+    #[test]
+    fn unrelated_ledger_transition_rejects_stale_dispatch_fence() {
+        let mut ledger = reserve_one();
+        let op = ledger.reservation().unwrap().promotion_operation_id.clone();
+
+        // A different domain transition advances the shared ledger without
+        // explicitly touching this reservation record.
+        ledger.current_fencing_token += 1;
+        ledger.current_head = "L2".to_owned();
+
+        assert_eq!(
+            ledger.prepare_dispatch(&op, "L1", 7, 1, 1),
+            Err(ReservationError::StaleDispatchFence)
         );
     }
 
@@ -310,7 +363,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            ledger.invalidate("L0", "I-stale"),
+            ledger.invalidate("L0", "I-stale", 2),
             Err(ReservationError::StaleLedgerHead)
         );
         assert_eq!(ledger.current_head(), "L1");

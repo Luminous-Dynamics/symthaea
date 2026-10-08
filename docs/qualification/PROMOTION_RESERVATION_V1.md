@@ -10,6 +10,19 @@ A reservation binds the exact ledger predecessor/head, lease identity, qualifica
 
 The successful reservation is itself a ledger successor and consumes the active lease. A competing coordinator cannot reserve the same lease from the old predecessor.
 
+## Dispatch-time re-fencing
+
+A reservation is not perpetual authority. Before dispatch, the coordinator must re-read the shared ledger fence and require:
+
+    current ledger head == reservation_head
+    current fencing token == reservation.fencing_token
+    current trust-root generation == reservation.trust_root_generation
+    reservation state == Reserved
+
+A monotonic fencing token moves the stale-holder check to the protected resource boundary: a suspended coordinator with an older token must be rejected rather than trusting its historical lease. The token is a local ledger fence; GitHub does not enforce it.
+
+This closes a second-order race where an unrelated ledger transition advances the shared current head without explicitly mutating the old reservation record.
+
 ## Dispatch-intent recovery fence
 
 A provider call has an unavoidable crash window:
@@ -22,7 +35,7 @@ After dispatch intent exists, uncertainty is never resolved by blindly creating 
 
 ## Two-writer publication model
 
-The independent oracle executes all 20 legal interleavings of evaluator and invalidator read/construct/commit steps.
+The independent oracle executes all 20 legal interleavings of evaluator and invalidator read/construct/commit steps, then separately checks that an unrelated later ledger transition invalidates the old dispatch fence.
 
 18 schedules have concurrent commits from the same predecessor: exactly one successor wins.
 
