@@ -31,6 +31,8 @@ const INTERVAL_BINS: usize = 12;
 const CONTOUR_BINS: usize = 3;
 const REGISTER_BINS: usize = 8;
 const RHYTHM_THRESHOLDS: [f64; RHYTHM_BINS - 1] = [0.25, 0.5, 1.0, 2.0];
+/// Bounds quadratic recurrence analysis and prevents tiny-hop resource exhaustion.
+const MAX_TRAJECTORY_FRAMES: usize = 4096;
 
 /// One temporal slice of a symbolic score.
 ///
@@ -149,6 +151,13 @@ impl MusicalStateTrajectory {
             });
         }
 
+        let estimated_frames = (total / hop_beats).ceil();
+        if !estimated_frames.is_finite() || estimated_frames > MAX_TRAJECTORY_FRAMES as f64 {
+            return Err(format!(
+                "hop_beats would produce more than {MAX_TRAJECTORY_FRAMES} trajectory frames"
+            ));
+        }
+
         let mut frames = Vec::new();
         let mut start = 0.0;
         while start < total {
@@ -231,7 +240,7 @@ fn notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
         .copied()
         .filter(|note| {
             let onset = note.onset.beats();
-            onset >= start - 1e-9 && onset < end - 1e-9
+            onset >= start && onset < end
         })
         .collect();
     notes.sort_by(|a, b| {
@@ -399,7 +408,7 @@ mod tests {
     use crate::rhythm::Duration;
     use crate::score::{Emphasis, PartId, VoiceRole};
 
-    fn note(pc: u8, octave: i32, onset: i64) -> ScoreNote {
+    fn note(pc: i32, octave: i32, onset: i64) -> ScoreNote {
         ScoreNote {
             part: PartId::UNASSIGNED,
             pitch: Pitch::new(PitchClass::new(pc), octave),
@@ -412,7 +421,7 @@ mod tests {
         }
     }
 
-    fn score(notes: &[ScoreNote], tonic: u8) -> Score {
+    fn score(notes: &[ScoreNote], tonic: i32) -> Score {
         let mut score = Score::new(Key::major(PitchClass::new(tonic)), 120.0, 4);
         for n in notes.iter().copied() {
             score.push(n);
@@ -533,6 +542,12 @@ mod tests {
             .remove(0);
         assert_ne!(low_frame.register_hist, high_frame.register_hist);
         assert!(low_frame.similarity(&high_frame) < 0.999);
+    }
+
+    #[test]
+    fn tiny_hops_fail_closed_before_quadratic_analysis() {
+        let s = score(&[note(0, 4, 0), note(2, 4, 1), note(4, 4, 2)], 0);
+        assert!(MusicalStateTrajectory::from_score(&s, 3.0, 1e-9).is_err());
     }
 
     #[test]
