@@ -1,0 +1,163 @@
+{
+  "schema_version": "monetary-composition-v1",
+  "composition_id": "five-node-interoperability-lab-v1",
+  "semantic_version": "1.0.0",
+  "nodes": [
+    {
+      "profile_id": "conventional-bank-money-v1",
+      "profile_digest": "fb3c6d7da7ca899014d2ad2f537692bc735da7e25704bc40d714fcaf953d3c1e"
+    },
+    {
+      "profile_id": "sovereign-money-v1",
+      "profile_digest": "a33a9062618ac59d6f123ccd34f78516cd0bab62ed5db44f78c48489ba461a32"
+    },
+    {
+      "profile_id": "mutual-credit-v1",
+      "profile_digest": "e31e27b1afde9405920c14cd6ec840287b5d19f947f1ab4a0820a7105b4d890e"
+    },
+    {
+      "profile_id": "tokenized-deposit-v1",
+      "profile_digest": "d4c0897f41f04ed343b9f82c94ea02165871f7288be84a7f3cca957723edb48e"
+    },
+    {
+      "profile_id": "reserve-backed-stablecoin-v1",
+      "profile_digest": "2ad75345c6760089a1fcdacc1c767252b5779e17438d583ba42d149fc9a462b7"
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "io-conventional-bank-money-to-sovereign-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "conventional-bank-money-v1",
+      "target": "sovereign-money-v1"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-mutual-credit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "conventional-bank-money-v1",
+      "target": "mutual-credit-v1"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-tokenized-deposit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "conventional-bank-money-v1",
+      "target": "tokenized-deposit-v1"
+    },
+    {
+      "edge_id": "io-conventional-bank-money-to-reserve-backed-stablecoin",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "conventional-bank-money-v1",
+      "target": "reserve-backed-stablecoin-v1"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-conventional-bank-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "sovereign-money-v1",
+      "target": "conventional-bank-money-v1"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-mutual-credit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "sovereign-money-v1",
+      "target": "mutual-credit-v1"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-tokenized-deposit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "sovereign-money-v1",
+      "target": "tokenized-deposit-v1"
+    },
+    {
+      "edge_id": "io-sovereign-money-to-reserve-backed-stablecoin",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "sovereign-money-v1",
+      "target": "reserve-backed-stablecoin-v1"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-conventional-bank-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "mutual-credit-v1",
+      "target": "conventional-bank-money-v1"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-sovereign-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "mutual-credit-v1",
+      "target": "sovereign-money-v1"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-tokenized-deposit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "mutual-credit-v1",
+      "target": "tokenized-deposit-v1"
+    },
+    {
+      "edge_id": "io-mutual-credit-to-reserve-backed-stablecoin",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "mutual-credit-v1",
+      "target": "reserve-backed-stablecoin-v1"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-conventional-bank-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "tokenized-deposit-v1",
+      "target": "conventional-bank-money-v1"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-sovereign-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "tokenized-deposit-v1",
+      "target": "sovereign-money-v1"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-mutual-credit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "tokenized-deposit-v1",
+      "target": "mutual-credit-v1"
+    },
+    {
+      "edge_id": "io-tokenized-deposit-to-reserve-backed-stablecoin",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "tokenized-deposit-v1",
+      "target": "reserve-backed-stablecoin-v1"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-conventional-bank-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "conventional-bank-money-v1"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-sovereign-money",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "sovereign-money-v1"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-mutual-credit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "mutual-credit-v1"
+    },
+    {
+      "edge_id": "io-reserve-backed-stablecoin-to-tokenized-deposit",
+      "edge_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source": "reserve-backed-stablecoin-v1",
+      "target": "tokenized-deposit-v1"
+    }
+  ],
+  "topology": {
+    "topology_id": "fully-connected-planned-v1",
+    "topology_digest": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "routing": {
+    "policy_id": "explicit-shortest-feasible-route-v1",
+    "policy_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "shared_dependencies": [],
+  "generation": {
+    "generation_id": "g1",
+    "composition_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "claim_ceiling": "Composition graph definition only; edge existence does not imply qualified convertibility or systemic safety."
+}
