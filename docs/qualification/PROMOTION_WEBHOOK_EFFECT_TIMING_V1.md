@@ -204,3 +204,24 @@ The provider event occurrence interval is translated into a local-time interval 
 The relation also binds provider/local clock identities, verification method, verification evidence digest, measurement time, and expiry. A relation is unusable when the lower bound exceeds the upper bound, required verification evidence is absent, or the evaluation time is outside the validity window.
 
 Negative offsets are valid and do not mean an invalid relation; only inverted bounds are invalid.
+
+## Clock-relation event coverage
+
+The clock relation must cover the entire translated provider event interval, not merely the local observation instant.
+
+After applying the directional offset bounds:
+
+    local_event_lower
+    local_event_upper
+
+the interval must remain inside the clock relation validity domain. If any possible event instant falls before relation measurement or after relation expiry, the timing is `clock-relation-does-not-cover-event` and is not admissible.
+
+This prevents a relation verified only for a later observation window from being used to justify an earlier provider event.
+
+## Monotonic runtime identity
+
+Monotonic readings are meaningful for ordering only when they originate from the same identified runtime clock source. The timing record therefore carries `local_monotonic_clock_id`, inherited from the webhook observation context and included in the timing identity digest.
+
+A missing runtime clock identity is not admissible. A timing record reconstructed with a different monotonic clock identity is a different timing identity rather than an equivalent replay.
+
+This does not establish continuity across process restarts or prove the runtime clock's correctness; those require separate attestation/continuity evidence. It only prevents unrelated monotonic counters from being composed into one ordering witness.
