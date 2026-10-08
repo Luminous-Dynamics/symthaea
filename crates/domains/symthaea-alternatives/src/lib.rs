@@ -8055,6 +8055,51 @@ mod tests {
     }
 
     #[test]
+    fn functional_evidence_conflict_caps_qualification_and_blocks_frontier() {
+        let c = candidate(
+            "functional-conflict",
+            PathwayKind::ProcessSubstitution,
+            3.0,
+            3.0,
+            vec![
+                evidence(
+                    "functional-support",
+                    "source-a",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.95,
+                ),
+                evidence(
+                    "functional-contradiction",
+                    "source-b",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Contradicts,
+                    0.95,
+                ),
+            ],
+        );
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        let assessment = &result.candidates[0];
+
+        assert!(assessment.evidence_conflict);
+        assert_eq!(
+            assessment.qualification,
+            QualificationState::ComputationallyPlausible
+        );
+        assert!(assessment.frontier_blocked);
+        assert!(result.frontier_blockers["functional-conflict"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::ConstraintUnresolved(metric)
+                    if metric == "throughput_per_hour"
+            )));
+    }
+
+    #[test]
     fn conflicting_sources_remain_visible_and_cap_qualification() {
         let candidate = candidate(
             "conflict",
