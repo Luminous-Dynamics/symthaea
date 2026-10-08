@@ -1,0 +1,16 @@
+{
+  "schema_version":"monetary-operational-workflow-negative-v1",
+  "cases":[
+    {"id":"OP-X01","kind":"settlement_success_implies_workflow_completion","expected":"reject_inference"},
+    {"id":"OP-X02","kind":"technical_settlement_time_equals_end_to_end_time","expected":"reject_merged_latency"},
+    {"id":"OP-X03","kind":"compliance_latency_buried_in_settlement","expected":"reject_cross_layer_metric"},
+    {"id":"OP-X04","kind":"manual_breakpoint_without_operator_capacity","expected":"reject_unbounded_operator"},
+    {"id":"OP-X05","kind":"external_outage_without_reconciliation_state","expected":"reject_hidden_failure"},
+    {"id":"OP-X06","kind":"stale_quote_reused_after_expiry","expected":"reject_stale_input"},
+    {"id":"OP-X07","kind":"duplicate_manual_approval","expected":"reject_replay"},
+    {"id":"OP-X08","kind":"operating_window_ignored","expected":"reject_time_constraint_bypass"},
+    {"id":"OP-X09","kind":"fallback_flag_mutated_without_new_policy_generation","expected":"reject_generation_mutation"},
+    {"id":"OP-X10","kind":"issuer_failure_hidden_by_atomicity_label","expected":"reject_atomicity_inheritance"},
+    {"id":"OP-X11","kind":"workflow_result_missing_trace_identity","expected":"reject_unbound_observation"}
+  ]
+}
