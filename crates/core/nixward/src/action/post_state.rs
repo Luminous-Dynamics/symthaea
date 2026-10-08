@@ -1372,6 +1372,12 @@ fn evaluate_postcondition(
             if !job.succeeded() {
                 return Ok(NixPostconditionAssessmentV1::Violated);
             }
+            let Some(removed_at) = job.removed_at_monotonic_us else {
+                return Ok(NixPostconditionAssessmentV1::Unproven);
+            };
+            if removed_at > observation.observed_at_monotonic_us {
+                return Ok(NixPostconditionAssessmentV1::Unproven);
+            }
         }
         NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => {}
     }
