@@ -90,7 +90,7 @@ def main() -> None:
 
     print(
         "transaction-evidence-boundary: PASS: "
-        "durable Started→Bound→Completed execution evidence is present and "
+        "durable Started -> Bound -> Completed execution evidence is present and "
         "install binds before privileged execution"
     )
 
