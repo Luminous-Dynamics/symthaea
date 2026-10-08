@@ -1,0 +1,11 @@
+{
+  "schema_version":"monetary-causal-factorial-v1-execution",
+  "manifest_schema_version":"monetary-causal-factorial-v1",
+  "run_count":360,
+  "common_random_number_cells":30,
+  "trace_set_digest":"3b29048fd3bd6ed222caded873d54f8c5c1cdfd555fc2cbcb858980e3ea57a64",
+  "contrast_counts":{"adapter_shock_difference_in_difference":270,"adapter_vs_absent":324,"pair_vs_pair":480,"shock_vs_normal":381},
+  "completion_rate_by_adapter":{"absent":0.0,"escrowed_atomic_swap":0.16666666666666666,"multilateral_net_settlement":0.3333333333333333,"redeem_reissue":0.3333333333333333},
+  "completion_rate_by_shock":{"bridge_failure":0.0,"issuer_default":0.0,"liquidity_shock":0.5,"network_partition":0.0,"normal":0.75,"stale_quote":0.0},
+  "claim_ceiling":"Local deterministic reference execution only; not hosted qualification or live-system evidence."
+}
