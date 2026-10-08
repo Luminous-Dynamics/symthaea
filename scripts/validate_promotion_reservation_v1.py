@@ -599,6 +599,44 @@ class PromotionPrEffectStateV1:
         return self.state == "EffectObserved" and self.effect is not None
 
 def parse_provider_timestamp_ms(value: str) -> int | None:
+    interval = parse_provider_timestamp_interval_ms(
+        value,
+        occurrence_semantics="truncated",
+    )
+    return interval[0] if interval is not None else None
+
+
+def _timestamp_reported_resolution_ms(value: str) -> int | None:
+    if not value:
+        return None
+    raw = value
+    if raw.endswith("Z"):
+        raw = raw[:-1]
+    try:
+        date_part, time_part = raw.split("T", 1)
+        if "+" in time_part[1:] or time_part.count("-") > 0:
+            for separator in ("+", "-"):
+                idx = time_part.find(separator, 1)
+                if idx >= 0:
+                    time_part = time_part[:idx]
+                    break
+        fraction = time_part.split(".", 1)[1] if "." in time_part else ""
+    except ValueError:
+        return None
+    if not fraction:
+        return 1000
+    if not fraction.isdigit() or len(fraction) > 3:
+        return None
+    return 10 ** (3 - len(fraction))
+
+
+def parse_provider_timestamp_interval_ms(
+    value: str,
+    *,
+    occurrence_semantics: str,
+) -> tuple[int, int] | None:
+    if occurrence_semantics not in {"truncated", "exact"}:
+        return None
     if not value:
         return None
     try:
@@ -607,7 +645,15 @@ def parse_provider_timestamp_ms(value: str) -> int | None:
         return None
     if parsed.tzinfo is None:
         return None
-    return int(parsed.timestamp() * 1000)
+    resolution_ms = _timestamp_reported_resolution_ms(value)
+    if resolution_ms is None:
+        return None
+    lower = int(parsed.timestamp() * 1000)
+    if occurrence_semantics == "exact":
+        if resolution_ms != 1:
+            return None
+        return lower, lower
+    return lower, lower + resolution_ms - 1
 
 
 @dataclass(frozen=True)
@@ -616,19 +662,43 @@ class ClockRelationV1:
     local_clock_domain: str
     max_skew_ms: int
     verified: bool = False
+    verified_at_local_time_ms: int | None = None
+    valid_until_local_time_ms: int | None = None
+    max_drift_ppm: int = 0
 
     def usable(self) -> bool:
         return (
             bool(self.provider_clock_domain)
             and bool(self.local_clock_domain)
+            and self.provider_clock_domain != self.local_clock_domain
             and self.max_skew_ms >= 0
+            and self.max_drift_ppm >= 0
             and self.verified
+            and self.verified_at_local_time_ms is not None
+            and self.valid_until_local_time_ms is not None
+            and self.verified_at_local_time_ms >= 0
+            and self.valid_until_local_time_ms >= self.verified_at_local_time_ms
         )
+
+    def effective_skew_ms(self, at_local_time_ms: int) -> int | None:
+        if not self.usable():
+            return None
+        if at_local_time_ms < self.verified_at_local_time_ms:
+            return None
+        if at_local_time_ms > self.valid_until_local_time_ms:
+            return None
+        elapsed_ms = at_local_time_ms - self.verified_at_local_time_ms
+        drift_ms = (
+            self.max_drift_ppm * elapsed_ms + 999_999
+        ) // 1_000_000
+        return self.max_skew_ms + drift_ms
 
 
 @dataclass(frozen=True)
 class ProviderWebhookEffectTimingV1:
     provider_event_time_ms: int | None
+    provider_event_time_upper_ms: int | None
+    provider_timestamp_semantics: str | None
     provider_delivery_time_ms: int | None
     local_reservation_time_ms: int | None
     local_dispatch_time_ms: int | None
@@ -643,9 +713,20 @@ class ProviderWebhookEffectTimingV1:
         local_dispatch_time_ms: int | None,
         clock_relation: ClockRelationV1 | None,
         provider_delivery_time_ms: int | None = None,
+        provider_timestamp_semantics: str | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
+        interval = (
+            parse_provider_timestamp_interval_ms(
+                observation.merged_at,
+                occurrence_semantics=provider_timestamp_semantics,
+            )
+            if provider_timestamp_semantics is not None
+            else None
+        )
         return cls(
-            provider_event_time_ms=parse_provider_timestamp_ms(observation.merged_at),
+            provider_event_time_ms=interval[0] if interval is not None else None,
+            provider_event_time_upper_ms=interval[1] if interval is not None else None,
+            provider_timestamp_semantics=provider_timestamp_semantics,
             provider_delivery_time_ms=provider_delivery_time_ms,
             local_reservation_time_ms=local_reservation_time_ms,
             local_dispatch_time_ms=local_dispatch_time_ms,
@@ -656,6 +737,7 @@ class ProviderWebhookEffectTimingV1:
     def classify(self) -> str:
         values = (
             self.provider_event_time_ms,
+            self.provider_event_time_upper_ms,
             self.provider_delivery_time_ms,
             self.local_reservation_time_ms,
             self.local_dispatch_time_ms,
@@ -665,6 +747,12 @@ class ProviderWebhookEffectTimingV1:
             return "invalid-negative-time"
         if self.provider_event_time_ms is None:
             return "provider-event-time-missing"
+        if self.provider_event_time_upper_ms is None:
+            return "provider-event-time-upper-missing"
+        if self.provider_event_time_upper_ms < self.provider_event_time_ms:
+            return "invalid-provider-event-interval"
+        if self.provider_timestamp_semantics not in {"truncated", "exact"}:
+            return "provider-timestamp-semantics-unverified"
         if self.local_reservation_time_ms is None:
             return "local-reservation-time-missing"
         if self.local_dispatch_time_ms is None:
@@ -681,16 +769,22 @@ class ProviderWebhookEffectTimingV1:
         if self.clock_relation is None or not self.clock_relation.usable():
             return "cross-domain-time-unbounded"
 
-        skew = self.clock_relation.max_skew_ms
-        event = self.provider_event_time_ms
+        skew = self.clock_relation.effective_skew_ms(
+            self.local_observation_time_ms
+        )
+        if skew is None:
+            return "clock-relation-invalid-at-observation"
+
+        event_lower = self.provider_event_time_ms
+        event_upper = self.provider_event_time_upper_ms
         dispatch = self.local_dispatch_time_ms
         observed = self.local_observation_time_ms
 
-        if event + skew < dispatch:
+        if event_upper + skew < dispatch:
             return "provider-event-before-dispatch"
-        if event - skew > observed:
+        if event_lower - skew > observed:
             return "provider-event-after-observation"
-        if event - skew < dispatch or event + skew > observed:
+        if event_lower - skew < dispatch or event_upper + skew > observed:
             return "cross-domain-time-uncertain"
         return "temporally-admissible"
 
@@ -1302,18 +1396,26 @@ def clock_relation_fixture(
     *,
     max_skew_ms: int = 1000,
     verified: bool = True,
+    verified_at_local_time_ms: int = 1791475190000,
+    valid_until_local_time_ms: int = 1791478800000,
+    max_drift_ppm: int = 0,
 ) -> ClockRelationV1:
     return ClockRelationV1(
         provider_clock_domain="github",
         local_clock_domain="local",
         max_skew_ms=max_skew_ms,
         verified=verified,
+        verified_at_local_time_ms=verified_at_local_time_ms,
+        valid_until_local_time_ms=valid_until_local_time_ms,
+        max_drift_ppm=max_drift_ppm,
     )
 
 
 def effect_timing_fixture(
     *,
     event_time_ms: int | None = 1791475200000,
+    event_upper_time_ms: int | None = 1791475200999,
+    timestamp_semantics: str | None = "truncated",
     delivery_time_ms: int | None = None,
     reservation_time_ms: int | None = 1791475190000,
     dispatch_time_ms: int | None = 1791475195000,
@@ -1322,6 +1424,8 @@ def effect_timing_fixture(
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
         provider_event_time_ms=event_time_ms,
+        provider_event_time_upper_ms=event_upper_time_ms,
+        provider_timestamp_semantics=timestamp_semantics,
         provider_delivery_time_ms=delivery_time_ms,
         local_reservation_time_ms=reservation_time_ms,
         local_dispatch_time_ms=dispatch_time_ms,
@@ -1345,6 +1449,7 @@ def webhook_effect_timing_from_observation(
         local_reservation_time_ms=1791475190000,
         local_dispatch_time_ms=1791475195000,
         clock_relation=clock_relation_fixture(),
+        provider_timestamp_semantics="truncated",
     )
 
 
@@ -1365,6 +1470,31 @@ def test_provider_timestamp_parser_accepts_utc_and_offset():
     )
 
 
+def test_provider_timestamp_interval_respects_reported_precision():
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00Z",
+        occurrence_semantics="truncated",
+    ) == (
+        parse_provider_timestamp_ms("2026-10-08T16:00:00Z"),
+        parse_provider_timestamp_ms("2026-10-08T16:00:00Z") + 999,
+    )
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00.12Z",
+        occurrence_semantics="truncated",
+    )[1] == parse_provider_timestamp_ms("2026-10-08T16:00:00.12Z") + 9
+
+
+def test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics():
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00.1234Z",
+        occurrence_semantics="truncated",
+    ) is None
+    assert parse_provider_timestamp_interval_ms(
+        "2026-10-08T16:00:00Z",
+        occurrence_semantics="unknown",
+    ) is None
+
+
 def test_provider_timestamp_parser_rejects_malformed_timestamp():
     assert parse_provider_timestamp_ms("not-a-timestamp") is None
     assert parse_provider_timestamp_ms("2026-10-08T16:00:00") is None
@@ -1378,10 +1508,88 @@ def test_clock_relation_negative_skew_is_unusable():
     assert not clock_relation_fixture(max_skew_ms=-1, verified=True).usable()
 
 
+def test_clock_relation_requires_explicit_validity_window():
+    relation = clock_relation_fixture(
+        verified_at_local_time_ms=None,
+        valid_until_local_time_ms=None,
+    )
+    assert not relation.usable()
+
+
+def test_clock_relation_rejects_expiry_before_verification():
+    relation = clock_relation_fixture(
+        verified_at_local_time_ms=10,
+        valid_until_local_time_ms=9,
+    )
+    assert not relation.usable()
+
+
+def test_clock_relation_expiry_blocks_late_observation():
+    relation = clock_relation_fixture(
+        verified_at_local_time_ms=1791475190000,
+        valid_until_local_time_ms=1791475200000,
+    )
+    assert relation.effective_skew_ms(1791475200000) == 1000
+    assert relation.effective_skew_ms(1791475200001) is None
+
+
+def test_clock_relation_drift_expands_uncertainty_monotonically():
+    relation = clock_relation_fixture(
+        max_skew_ms=100,
+        max_drift_ppm=1000,
+        valid_until_local_time_ms=1791475290000,
+    )
+    assert relation.effective_skew_ms(1791475200000) == 1100
+    assert relation.effective_skew_ms(1791475210000) == 1110
+
+
 def test_temporal_effect_with_valid_skew_is_admissible():
     timing = effect_timing_fixture()
     assert timing.classify() == "temporally-admissible"
     assert timing.temporally_admissible()
+
+
+def test_temporal_effect_without_timestamp_semantics_is_not_admissible():
+    timing = effect_timing_fixture(timestamp_semantics=None)
+    assert timing.classify() == "provider-timestamp-semantics-unverified"
+    assert not timing.temporally_admissible()
+
+
+def test_temporal_effect_interval_overlap_is_not_admissible():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        event_upper_time_ms=1791475200999,
+        dispatch_time_ms=1791475200500,
+        observation_time_ms=1791475202000,
+        clock_relation=clock_relation_fixture(max_skew_ms=600),
+    )
+    assert timing.classify() == "cross-domain-time-uncertain"
+    assert not timing.temporally_admissible()
+
+
+def test_temporal_effect_expired_clock_relation_is_not_admissible():
+    timing = effect_timing_fixture(
+        observation_time_ms=1791476000000,
+        clock_relation=clock_relation_fixture(
+            valid_until_local_time_ms=1791475999999,
+        ),
+    )
+    assert timing.classify() == "clock-relation-invalid-at-observation"
+
+
+def test_temporal_effect_drift_can_turn_boundary_into_uncertainty():
+    timing = effect_timing_fixture(
+        event_time_ms=1791475200000,
+        event_upper_time_ms=1791475200999,
+        dispatch_time_ms=1791475199000,
+        observation_time_ms=1791475203000,
+        clock_relation=clock_relation_fixture(
+            max_skew_ms=1,
+            max_drift_ppm=1000,
+            valid_until_local_time_ms=1791475203000,
+        ),
+    )
+    assert timing.classify() == "cross-domain-time-uncertain"
 
 
 def test_temporal_effect_without_clock_relation_is_unbounded():
@@ -3839,10 +4047,20 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 TESTS = [
     test_provider_timestamp_parser_accepts_utc_and_offset,
+    test_provider_timestamp_interval_respects_reported_precision,
+    test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics,
     test_provider_timestamp_parser_rejects_malformed_timestamp,
     test_clock_relation_unverified_is_unusable,
     test_clock_relation_negative_skew_is_unusable,
+    test_clock_relation_requires_explicit_validity_window,
+    test_clock_relation_rejects_expiry_before_verification,
+    test_clock_relation_expiry_blocks_late_observation,
+    test_clock_relation_drift_expands_uncertainty_monotonically,
     test_temporal_effect_with_valid_skew_is_admissible,
+    test_temporal_effect_without_timestamp_semantics_is_not_admissible,
+    test_temporal_effect_interval_overlap_is_not_admissible,
+    test_temporal_effect_expired_clock_relation_is_not_admissible,
+    test_temporal_effect_drift_can_turn_boundary_into_uncertainty,
     test_temporal_effect_without_clock_relation_is_unbounded,
     test_temporal_effect_with_event_before_dispatch_is_rejected,
     test_temporal_effect_with_event_after_observation_is_rejected,
