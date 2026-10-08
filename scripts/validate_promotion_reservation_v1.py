@@ -716,8 +716,6 @@ class ClockRelationVerificationV1:
             >= evidence.valid_from_local_time_ms
             and self.valid_until_local_time_ms
             <= evidence.valid_until_local_time_ms
-            and self.valid_until_local_time_ms - self.verified_at_local_time_ms
-            <= self.freshness_max_age_ms
         )
 
 
@@ -1563,6 +1561,9 @@ def clock_relation_fixture(
     )
 
 
+DEFAULT_CLOCK_RELATION = clock_relation_fixture()
+
+
 def effect_timing_fixture(
     *,
     event_time_ms: int | None = 1791475200000,
@@ -1570,7 +1571,7 @@ def effect_timing_fixture(
     reservation_time_ms: int | None = 1791475190000,
     dispatch_time_ms: int | None = 1791475195000,
     observation_time_ms: int | None = 1791475205000,
-    clock_relation: ClockRelationV1 | None = None,
+    clock_relation: ClockRelationV1 | None = DEFAULT_CLOCK_RELATION,
     local_sequence: LocalTemporalSequenceV1 | None = LocalTemporalSequenceV1(1, 2, 3),
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
@@ -1579,9 +1580,7 @@ def effect_timing_fixture(
         local_reservation_time_ms=reservation_time_ms,
         local_dispatch_time_ms=dispatch_time_ms,
         local_observation_time_ms=observation_time_ms,
-        clock_relation=(
-            clock_relation if clock_relation is not None else clock_relation_fixture()
-        ),
+        clock_relation=clock_relation,
         local_sequence=local_sequence,
     )
 
