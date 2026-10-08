@@ -6463,6 +6463,9 @@ mod tests {
             value: 0.1,
             unit: "different-unit".into(),
         };
+        let uncertainty = e.uncertainty.as_mut().unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
         assert!(matches!(
             e.validate().unwrap_err(),
             AssessmentError::MeasurementUncertaintyUnitMismatch { .. }
@@ -6664,6 +6667,10 @@ mod tests {
         uncertainty.component_refs_digest =
             canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
                 .unwrap();
+        uncertainty.evaluation.component_set_digest = uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
         uncertainty.binding_digest =
             canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
@@ -6676,6 +6683,10 @@ mod tests {
         uncertainty.component_refs_digest =
             canonical_measurement_uncertainty_component_refs_hash(&uncertainty.component_refs)
                 .unwrap();
+        uncertainty.evaluation.component_set_digest = uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_set_digest =
+            uncertainty.component_refs_digest.clone();
+        uncertainty.uncertainty_budget_component_count = uncertainty.component_refs.len();
         uncertainty.binding_digest =
             canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
 
@@ -7075,6 +7086,8 @@ mod tests {
     fn measurement_uncertainty_expanded_allows_unspecified_coverage_probability() {
         let mut uncertainty = test_uncertainty(&["component"]);
         uncertainty.evaluation.coverage_probability = None;
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
         assert!(uncertainty.validate().is_ok());
     }
 
@@ -7117,6 +7130,7 @@ mod tests {
             unit: "unit".into(),
         };
         uncertainty.evaluation.coverage_method = None;
+        uncertainty.evaluation.coverage_probability = None;
         uncertainty.binding_digest =
             canonical_measurement_uncertainty_binding_hash(&uncertainty).unwrap();
         assert!(uncertainty.validate().is_ok());
@@ -7200,13 +7214,18 @@ mod tests {
             )],
         );
         let mut changed = c;
+        let uncertainty = changed.evidence[0].uncertainty.as_ref().unwrap();
+        let additional_component = MeasurementUncertaintyComponentRef {
+            component_id: "additional-component".into(),
+            ..uncertainty.component_refs[0].clone()
+        };
         changed
             .evidence[0]
             .uncertainty
             .as_mut()
             .unwrap()
             .component_refs
-            .push(test_component("additional-component"));
+            .push(additional_component);
         let error = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap_err();
@@ -7304,6 +7323,8 @@ mod tests {
         {
             let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
             uncertainty.uncertainty_budget_digest = "different-budget-digest".into();
+            uncertainty.evaluation.uncertainty_budget_digest =
+                "different-budget-digest".into();
             uncertainty.component_refs[0].uncertainty_budget_digest =
                 "different-budget-digest".into();
             uncertainty.component_refs_digest =
@@ -7347,6 +7368,9 @@ mod tests {
             .as_mut()
             .unwrap()
             .record_digest = "different-uncertainty-record".into();
+        let uncertainty = changed.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
         let updated = AlternativesEngine
             .assess(&fixture_requirement(), &[changed], None)
             .unwrap();
