@@ -11,6 +11,8 @@ from itertools import permutations
 
 @dataclass
 class PromotionEffectReceipt:
+    # Local reconciliation record only. Provider provenance/causal attribution
+    # is intentionally not represented here; see #7101.
     promotion_operation_id: str
     expected_pr_head_sha: str
     observed_merge_commit: str
@@ -83,17 +85,59 @@ class Ledger:
             self.reservation.state = "PromotionSuperseded"
         return True
 
-    def prepare_dispatch(self) -> bool:
+    def prepare_dispatch(
+        self,
+        observed_head: str,
+        observed_trust_root_generation: int,
+        observed_fencing_token: int,
+        attempt_sequence: int,
+    ) -> bool:
+        del attempt_sequence  # Reserved for durable dispatch-intent sequencing.
         r = self.reservation
         if r is None or r.dispatch_intent or r.state != "PromotionReserved":
+            return False
+        if observed_head != self.head:
+            return False
+        if observed_trust_root_generation != self.trust_root_generation:
+            return False
+        if observed_fencing_token != self.fencing_token:
+            return False
+        if r.reservation_head != self.head or r.fencing_token != self.fencing_token:
+            return False
+        if r.trust_root_generation != self.trust_root_generation:
             return False
         r.dispatch_intent = True
         r.state = "PromotionDispatchPrepared"
         return True
 
-    def record_unknown(self) -> None:
-        assert self.reservation is not None
-        self.reservation.state = "PromotionReconciliationRequired"
+    def record_unknown(self, operation_id: str) -> bool:
+        r = self.reservation
+        if r is None or r.operation_id != operation_id:
+            return False
+        if not r.dispatch_intent or r.state != "PromotionDispatchPrepared":
+            return False
+        r.state = "PromotionReconciliationRequired"
+        return True
+
+    def reconcile_complete(
+        self,
+        operation_id: str,
+        receipt: PromotionEffectReceipt,
+    ) -> bool:
+        r = self.reservation
+        if r is None or r.operation_id != operation_id:
+            return False
+        if r.state != "PromotionReconciliationRequired":
+            return False
+        if (
+            receipt.promotion_operation_id != r.operation_id
+            or receipt.expected_pr_head_sha != r.expected_pr_head_sha
+            or not receipt.observed_merge_commit
+        ):
+            return False
+        self.reservation.effect_receipt = receipt
+        self.reservation.state = "PromotionCompleted"
+        return True
 
 
 class ProviderOutcome:
@@ -284,17 +328,17 @@ def test_dispatch_intent_fences_crash():
     assert ledger.reservation.state == "PromotionDispatchPrepared"
     ledger.record_unknown()
     assert ledger.reservation.state == "PromotionReconciliationRequired"
-    assert not ledger.prepare_dispatch("L1", 1, 1)
+    assert not ledger.prepare_dispatch("L1", 1, 1, 1)
 
 
 def test_timeout_after_acceptance_is_unknown():
     ledger = Ledger()
     provider = GitHubAsyncModel()
     ledger.reserve("L0", "LEASE-1", "L1", 1)
-    ledger.prepare_dispatch("L1", 1, 1)
+    assert ledger.prepare_dispatch("L1", 1, 1, 1)
     outcome = provider.submit("H1", timeout_after_accept=True)
     assert outcome.kind == "timeout-after-accept"
-    ledger.record_unknown()
+    assert ledger.record_unknown(ledger.reservation.operation_id)
     assert provider.pending_uuid is not None
     assert ledger.reservation.state == "PromotionReconciliationRequired"
 
@@ -363,11 +407,11 @@ def test_expired_uuid_without_effect_stays_unknown():
     ledger = Ledger()
     provider = GitHubAsyncModel()
     ledger.reserve("L0", "LEASE-1", "L1", 1)
-    ledger.prepare_dispatch("L1", 1, 1)
+    assert ledger.prepare_dispatch("L1", 1, 1, 1)
     first = provider.submit("H1")
     assert first.uuid is not None
     provider.expired.add(first.uuid)
-    ledger.record_unknown()
+    assert ledger.record_unknown(ledger.reservation.operation_id)
     lookup = provider.get_async_result(first.uuid)
     assert lookup.http == 404
     assert provider.merge_sha is None
@@ -419,8 +463,8 @@ def test_stale_trust_root_rejects_reservation():
 def test_completion_requires_effect_receipt():
     ledger = Ledger()
     assert ledger.reserve("L0", "LEASE-1", "L1", 1)
-    assert ledger.prepare_dispatch("L1", 1, 1)
-    ledger.record_unknown()
+    assert ledger.prepare_dispatch("L1", 1, 1, 1)
+    assert ledger.record_unknown(ledger.reservation.operation_id)
     op = ledger.reservation.operation_id
     assert not ledger.reconcile_complete(PromotionEffectReceipt("wrong", "H1", "M1"))
     assert ledger.reconcile_complete(PromotionEffectReceipt(op, "H1", "M1"))
@@ -450,6 +494,9 @@ TESTS = [
     test_root_change_before_dispatch_blocks_effect,
     test_root_change_after_dispatch_is_not_retroactive,
     test_stale_coordinator_cannot_reserve_after_new_head,
+    test_stale_trust_root_rejects_reservation,
+    test_completion_requires_effect_receipt,
+    test_unrelated_ledger_transition_rejects_stale_dispatch_fence,
 ]
 
 if __name__ == "__main__":
