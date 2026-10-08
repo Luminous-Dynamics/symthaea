@@ -1,0 +1,29 @@
+{
+  "schema": "rh006-k-identifiability-observable-crosscov/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "execution": {
+    "trials": 40,
+    "seed": 20261011,
+    "latent_dim": 6,
+    "outcome_dim": 5,
+    "feature_dim": 4,
+    "strength": 0.7
+  },
+  "source_identity": {
+    "local_source_sha256": "6c9c63b8ae18c572aa17dfe448b148666e1c56712260bef06e600910d13de870",
+    "local_result_sha256": "ad379f2c8d3d464523bfb89e6af17d5a6a7d6b14cf831f65104f322805302fdd",
+    "payload_sha256": "321594ec1c150c0810e22d19ec213f0cf872e369e55e32e8567cd19af1f27e17"
+  },
+  "results": {
+    "max_conditional_covariance_error": 9.947598300641403e-14,
+    "max_conditional_mean_error": 1.1379786002407855e-15,
+    "max_canonical_spectrum_error": 2.3203661214665772e-14,
+    "max_latent_factor_observed_covariance_error": 3.552713678800501e-13,
+    "median_raw_K_norm_change": 0.39674122681511254,
+    "max_raw_K_norm_change": 4.174549743906374,
+    "median_canonical_strength": 0.7000000000000002
+  },
+  "conclusion": "K is not an invariant observable nuisance coordinate under latent reparameterization. When q is observed, Xi=K Sigma_q and the canonical cross-covariance spectrum are invariant bindings; when q is latent, a measurement/factor normalization is required before K itself is identified."
+}
