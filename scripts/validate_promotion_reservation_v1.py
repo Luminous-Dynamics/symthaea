@@ -364,6 +364,8 @@ class ProviderPullRequestMergeObservationV1:
     head_sha: str
     merge_commit_sha: str
     payload_bytes_digest: str
+    hook_id: str = ""
+    source_authentication: str = ""
 
     @classmethod
     def from_authenticated_delivery(
@@ -419,6 +421,8 @@ class ProviderPullRequestMergeObservationV1:
             head_sha=head_sha,
             merge_commit_sha=str(merge_commit_sha),
             payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
+            hook_id=receipt.hook_id,
+            source_authentication="webhook-hmac-verified",
         )
 
     def to_effect_for_stack_entry(
@@ -438,6 +442,33 @@ class ProviderPullRequestMergeObservationV1:
             pr_number=self.pr_number,
             expected_head_sha=self.head_sha,
             observed_merge_commit=self.merge_commit_sha,
+        )
+
+    def has_authenticated_source_provenance(self) -> bool:
+        return (
+            bool(self.delivery_id)
+            and bool(self.hook_id)
+            and self.event_type == "pull_request"
+            and bool(self.repository)
+            and self.source_authentication == "webhook-hmac-verified"
+            and bool(self.payload_bytes_digest)
+        )
+
+    def to_provenance_effect(
+        self,
+        entry: StackEntryV1,
+    ) -> "PromotionStackEffectEvidenceV1 | None":
+        effect = self.to_effect_for_stack_entry(entry)
+        if effect is None or not self.has_authenticated_source_provenance():
+            return None
+        return PromotionStackEffectEvidenceV1(
+            effect=effect,
+            source_delivery_id=self.delivery_id,
+            source_payload_digest=self.payload_bytes_digest,
+            source_hook_id=self.hook_id,
+            source_event_type=self.event_type,
+            source_repository=self.repository,
+            source_authentication=self.source_authentication,
         )
 
     def validates_requested_effect(self, identity: PromotionOperationIdentityV1) -> bool:
@@ -461,6 +492,110 @@ class ProviderPullRequestMergeObservationV1:
             pr_number=self.pr_number,
             expected_head_sha=self.head_sha,
             observed_merge_commit=self.merge_commit_sha,
+        )
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectEvidenceV1:
+    effect: PromotionStackEffectV1
+    source_delivery_id: str
+    source_payload_digest: str
+    source_hook_id: str
+    source_event_type: str
+    source_repository: str
+    source_authentication: str
+
+    def validates(self, identity: PromotionOperationIdentityV1) -> bool:
+        expected_prs = {entry.pr_number for entry in identity.ordered_stack}
+        return (
+            self.effect.pr_number in expected_prs
+            and bool(self.effect.expected_head_sha)
+            and bool(self.effect.observed_merge_commit)
+            and bool(self.source_delivery_id)
+            and bool(self.source_payload_digest)
+            and bool(self.source_hook_id)
+            and self.source_event_type == "pull_request"
+            and self.source_repository == identity.repository
+            and self.source_authentication == "webhook-hmac-verified"
+        )
+
+
+@dataclass(frozen=True)
+class PromotionStackEffectEvidenceSetV1:
+    operation_identity_digest: str
+    effects: tuple[PromotionStackEffectEvidenceV1, ...]
+
+    @classmethod
+    def from_observations(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        observations: tuple[ProviderPullRequestMergeObservationV1, ...],
+    ) -> "PromotionStackEffectEvidenceSetV1 | None":
+        expected = identity.ordered_stack
+        expected_prs = {entry.pr_number for entry in expected}
+        by_pr: dict[int, ProviderPullRequestMergeObservationV1] = {}
+        by_delivery: dict[str, ProviderPullRequestMergeObservationV1] = {}
+
+        for observation in observations:
+            if observation.repository != identity.repository:
+                return None
+            if observation.pr_number in by_pr:
+                return None
+            if not observation.delivery_id or observation.delivery_id in by_delivery:
+                return None
+            if not observation.has_authenticated_source_provenance():
+                return None
+            by_pr[observation.pr_number] = observation
+            by_delivery[observation.delivery_id] = observation
+
+        if set(by_pr) != expected_prs:
+            return None
+
+        evidence: list[PromotionStackEffectEvidenceV1] = []
+        for entry in expected:
+            observation = by_pr.get(entry.pr_number)
+            if observation is None:
+                return None
+            item = observation.to_provenance_effect(entry)
+            if item is None or not item.validates(identity):
+                return None
+            evidence.append(item)
+
+        return cls(
+            operation_identity_digest=identity.digest(),
+            effects=tuple(evidence),
+        )
+
+    def validates_complete(self, identity: PromotionOperationIdentityV1) -> bool:
+        if self.operation_identity_digest != identity.digest():
+            return False
+        expected = identity.ordered_stack
+        if len(self.effects) != len(expected):
+            return False
+
+        prs = [item.effect.pr_number for item in self.effects]
+        deliveries = [item.source_delivery_id for item in self.effects]
+        if len(prs) != len(set(prs)):
+            return False
+        if len(deliveries) != len(set(deliveries)):
+            return False
+
+        return all(
+            item.validates(identity)
+            and item.effect.pr_number == entry.pr_number
+            and item.effect.expected_head_sha == entry.head_sha
+            for entry, item in zip(expected, self.effects)
+        )
+
+    def to_compact_effect_set(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> PromotionStackEffectSetV1 | None:
+        if not self.validates_complete(identity):
+            return None
+        return PromotionStackEffectSetV1(
+            operation_identity_digest=self.operation_identity_digest,
+            effects=tuple(item.effect for item in self.effects),
         )
 
 
@@ -838,6 +973,175 @@ def stack_webhook_observation(
     )
     assert observation is not None
     return observation
+
+
+def test_webhook_effect_provenance_set_is_complete():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-prov-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-prov-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    assert evidence.validates_complete(identity)
+
+
+def test_webhook_effect_provenance_normalizes_input_order():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-prov-order-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-prov-order-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (requested, bottom),
+    )
+    assert evidence is not None
+    assert [item.effect.pr_number for item in evidence.effects] == [7085, 7087]
+
+
+def test_webhook_effect_provenance_rejects_missing_source_provenance():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    stripped = ProviderPullRequestMergeObservationV1(
+        delivery_id=observation.delivery_id,
+        repository=observation.repository,
+        pr_number=observation.pr_number,
+        event_type=observation.event_type,
+        action=observation.action,
+        merged=observation.merged,
+        head_sha=observation.head_sha,
+        merge_commit_sha=observation.merge_commit_sha,
+        payload_bytes_digest=observation.payload_bytes_digest,
+    )
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-prov-missing-bottom",
+    )
+    assert PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, stripped),
+    ) is None
+
+
+def test_webhook_effect_provenance_rejects_duplicate_delivery_id():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-same",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-same",
+    )
+    assert PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    ) is None
+
+
+def test_webhook_effect_provenance_rejects_mixed_repository():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-prov-mixed-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        repository="other/repo",
+        delivery_id="delivery-prov-mixed-requested",
+    )
+    assert PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    ) is None
+
+
+def test_webhook_effect_provenance_rejects_effect_disagreement():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-prov-effect-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-prov-effect-requested",
+    )
+    altered = PromotionStackEffectEvidenceV1(
+        effect=PromotionStackEffectV1(7085, "H0", "M1"),
+        source_delivery_id=bottom.delivery_id,
+        source_payload_digest=bottom.payload_bytes_digest,
+        source_hook_id=bottom.hook_id,
+        source_event_type=bottom.event_type,
+        source_repository=bottom.repository,
+        source_authentication=bottom.source_authentication,
+    )
+    evidence = PromotionStackEffectEvidenceSetV1(
+        operation_identity_digest=identity.digest(),
+        effects=(altered, PromotionStackEffectEvidenceV1(
+            effect=PromotionStackEffectV1(7087, "H3", "M2"),
+            source_delivery_id=requested.delivery_id,
+            source_payload_digest=requested.payload_bytes_digest,
+            source_hook_id=requested.hook_id,
+            source_event_type=requested.event_type,
+            source_repository=requested.repository,
+            source_authentication=requested.source_authentication,
+        )),
+    )
+    assert not evidence.validates_complete(identity)
+
+
+def test_webhook_effect_provenance_projects_to_compact_effect_set():
+    identity = stack_identity_fixture()
+    bottom = stack_webhook_observation(
+        identity,
+        pr_number=7085,
+        head_sha="H1",
+        merge_commit="M1",
+        delivery_id="delivery-prov-project-bottom",
+    )
+    requested = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-prov-project-requested",
+    )
+    evidence = PromotionStackEffectEvidenceSetV1.from_observations(
+        identity,
+        (bottom, requested),
+    )
+    assert evidence is not None
+    compact = evidence.to_compact_effect_set(identity)
+    assert compact is not None
+    assert compact.validates_complete(identity)
+    assert [item.pr_number for item in compact.effects] == [7085, 7087]
 
 
 def test_webhook_derived_stack_effect_set_is_complete():
@@ -2683,6 +2987,13 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_webhook_effect_provenance_set_is_complete,
+    test_webhook_effect_provenance_normalizes_input_order,
+    test_webhook_effect_provenance_rejects_missing_source_provenance,
+    test_webhook_effect_provenance_rejects_duplicate_delivery_id,
+    test_webhook_effect_provenance_rejects_mixed_repository,
+    test_webhook_effect_provenance_rejects_effect_disagreement,
+    test_webhook_effect_provenance_projects_to_compact_effect_set,
     test_webhook_derived_stack_effect_set_is_complete,
     test_webhook_derived_stack_effect_set_normalizes_input_order,
     test_webhook_derived_stack_effect_set_rejects_missing_member,
