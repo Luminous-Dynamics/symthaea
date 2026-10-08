@@ -396,6 +396,62 @@ mod tests {
     }
 
     #[test]
+    fn wrong_authority_level_fails_closed() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "failure").unwrap();
+        assert_eq!(
+            evolution.decide(AdoptionDecision {
+                proposal_id: "p1".into(),
+                adopted: true,
+                authority: Some("authority".into()),
+                authorizing_rule_hash: Some("constitutional-rule-v0".into()),
+                authorizing_rule_level: Some(RuleLevel::Constitutional),
+            }),
+            Err(FailureDisposition::WrongAuthorityLevel)
+        );
+    }
+
+    #[test]
+    fn duplicate_proposal_and_decision_fail_closed() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        let proposal = candidate(RuleLevel::Operational, "hash-v1", "m1");
+        evolution.propose("p1", proposal.clone(), "a", "failure").unwrap();
+        assert_eq!(
+            evolution.propose("p1", proposal, "b", "other"),
+            Err(FailureDisposition::DuplicateProposal)
+        );
+
+        let decision = AdoptionDecision {
+            proposal_id: "p1".into(),
+            adopted: false,
+            authority: None,
+            authorizing_rule_hash: None,
+            authorizing_rule_level: None,
+        };
+        evolution.decide(decision.clone()).unwrap();
+        assert_eq!(
+            evolution.decide(decision),
+            Err(FailureDisposition::AlreadyDecided)
+        );
+    }
+
+    #[test]
+    fn self_authorizing_mutation_fails_closed() {
+        let mut evolution = InstitutionalEvolution::new(initial());
+        evolution.propose("p1", candidate(RuleLevel::Operational, "hash-v1", "m1"), "a", "capture").unwrap();
+        assert_eq!(
+            evolution.decide(AdoptionDecision {
+                proposal_id: "p1".into(),
+                adopted: true,
+                authority: Some("authority".into()),
+                authorizing_rule_hash: Some("hash-v1".into()),
+                authorizing_rule_level: Some(RuleLevel::CollectiveChoice),
+            }),
+            Err(FailureDisposition::SelfModificationUnauthorized)
+        );
+    }
+
+    #[test]
     fn lineage_replay_is_deterministic_for_the_same_operation_sequence() {
         let mut first = InstitutionalEvolution::new(initial());
         let mut second = InstitutionalEvolution::new(initial());
@@ -406,6 +462,7 @@ mod tests {
                 adopted: true,
                 authority: Some("authority".into()),
                 authorizing_rule_hash: Some("cc-rule-v0".into()),
+                authorizing_rule_level: Some(RuleLevel::CollectiveChoice),
             }).unwrap();
             evolution.implement("p1").unwrap();
         }
