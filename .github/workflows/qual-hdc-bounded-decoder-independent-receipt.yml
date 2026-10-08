@@ -210,8 +210,15 @@ jobs:
                 .map((file) => file.filename)
                 .sort();
 
+              const runIdentityShapeVerified =
+                Number.isSafeInteger(evidence.run.id) &&
+                evidence.run.id > 0 &&
+                Number.isSafeInteger(evidence.run.run_attempt) &&
+                evidence.run.run_attempt > 0;
+
               const checks = {
                 verifier_on_main: evidence.contextRef === 'refs/heads/main',
+                run_identity_shape: runIdentityShapeVerified,
                 verifier_root_current: evidence.contextSha === evidence.currentMainSha,
                 verifier_root_stable:
                   evidence.contextSha === evidence.currentMainSha &&
@@ -405,6 +412,10 @@ jobs:
               ['run_event', (e) => { e.run.event = 'push'; }],
               ['run_conclusion', (e) => { e.run.conclusion = 'failure'; }],
               ['run_head_sha', (e) => { e.run.head_sha = '0'.repeat(40); }],
+              ['run_id_zero', (e) => { e.run.id = 0; }],
+              ['run_id_string', (e) => { e.run.id = '1'; }],
+              ['run_attempt_zero', (e) => { e.run.run_attempt = 0; }],
+              ['run_attempt_string', (e) => { e.run.run_attempt = '1'; }],
               ['run_pr_number', (e) => { e.run.pull_requests[0].number += 1; }],
               ['run_pr_head_repo', (e) => { e.run.pull_requests[0].head.repo.full_name = 'attacker/clone'; }],
               ['run_pr_base_sha', (e) => { e.run.pull_requests[0].base.sha = '0'.repeat(40); }],
