@@ -1,0 +1,44 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/monetary-causal-factorial-v1.schema.json",
+  "title":"Monetary Interoperability Causal Factorial v1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","experiment_id","factorial_size","factors","fixed_dimensions","profile_digests","seeds","pairs","estimands","execution_policy","measurement_semantics","claim_ceiling"],
+  "properties":{
+    "schema_version":{"const":"monetary-causal-factorial-v1"},
+    "experiment_id":{"type":"string","minLength":1},
+    "factorial_size":{"type":"integer","const":360},
+    "factors":{"type":"object","additionalProperties":false,"required":["monetary_pair","adapter","shock","seed"],"properties":{
+      "monetary_pair":{"type":"array","const":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"]},
+      "adapter":{"type":"array","const":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement","absent"]},
+      "shock":{"type":"array","const":["normal","liquidity_shock","network_partition","issuer_default","bridge_failure","stale_quote"]},
+      "seed":{"type":"array","const":[11,23,47,89,131]}
+    }},
+    "fixed_dimensions":{"type":"object","additionalProperties":false,"required":["synthetic_world","amount","topology_id","topology_digest","routing_policy_id","routing_policy_digest","operational_baseline_generation","composition_generation","composition_digest","fixed_topology","fixed_routing","common_random_number_identity","same_profile_and_edge_digests","direction_policy","seed_environment_jitter","no_cross_asset_scalar_conservation"],"properties":{
+      "synthetic_world":{"type":"string","minLength":1},"amount":{"type":"integer","minimum":1},"topology_id":{"type":"string","minLength":1},"topology_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+      "routing_policy_id":{"type":"string","minLength":1},"routing_policy_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"operational_baseline_generation":{"type":"string","minLength":1},
+      "composition_generation":{"type":"string","minLength":1},"composition_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},"fixed_topology":{"const":true},"fixed_routing":{"const":true},
+      "common_random_number_identity":{"type":"string","minLength":1},"same_profile_and_edge_digests":{"const":true},"direction_policy":{"type":"string","minLength":1},
+      "seed_environment_jitter":{"type":"string","minLength":1},"no_cross_asset_scalar_conservation":{"const":true}
+    }},
+    "profile_digests":{"type":"object","additionalProperties":false,"minProperties":5,"patternProperties":{"^[a-z0-9-]+-v[0-9]+$":{"type":"string","pattern":"^[a-f0-9]{64}$"}}},
+    "seeds":{"type":"array","const":[11,23,47,89,131]},
+    "pairs":{"type":"object","additionalProperties":false,"required":["bank_mutual","bank_stablecoin","tokenized_deposit_stablecoin"],"properties":{
+      "bank_mutual":{"$ref":"#/$defs/pair"},"bank_stablecoin":{"$ref":"#/$defs/pair"},"tokenized_deposit_stablecoin":{"$ref":"#/$defs/pair"}
+    }},
+    "estimands":{"type":"array","minItems":5,"items":{"type":"object","additionalProperties":false,"required":["id","definition"],"properties":{"id":{"type":"string","minLength":1},"definition":{"type":"string","minLength":1}}}},
+    "execution_policy":{"type":"object","additionalProperties":false,"required":["balanced_design","common_random_numbers","fixed_topology","fixed_routing","no_adapter_control","implementation_vs_reference","multiple_seeds"],"properties":{
+      "balanced_design":{"const":true},"common_random_numbers":{"const":true},"fixed_topology":{"const":true},"fixed_routing":{"const":true},"no_adapter_control":{"const":true},"implementation_vs_reference":{"const":"reference-only-v1"},"multiple_seeds":{"const":true}
+    }},
+    "measurement_semantics":{"type":"object","additionalProperties":false,"required":["completion_time","technical_settlement_time","operational_waiting_time","reconciliation_backlog","trace_binding","seed_binding"],"properties":{
+      "completion_time":{"type":"string","minLength":1},"technical_settlement_time":{"type":"string","minLength":1},"operational_waiting_time":{"type":"string","minLength":1},"reconciliation_backlog":{"type":"string","minLength":1},"trace_binding":{"type":"string","minLength":1},"seed_binding":{"type":"string","minLength":1}
+    }},
+    "claim_ceiling":{"type":"string","minLength":1}
+  },
+  "$defs":{"pair":{"type":"object","additionalProperties":false,"required":["source","target","edge_digest","technical_settlement_duration","requires_redemption_by_adapter"],"properties":{
+    "source":{"type":"string","minLength":1},"target":{"type":"string","minLength":1},"edge_digest":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "technical_settlement_duration":{"type":"object","additionalProperties":false,"required":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement"],"properties":{"redeem_reissue":{"type":"integer","minimum":1},"escrowed_atomic_swap":{"type":"integer","minimum":1},"multilateral_net_settlement":{"type":"integer","minimum":1}}},
+    "requires_redemption_by_adapter":{"type":"object","additionalProperties":false,"required":["redeem_reissue","escrowed_atomic_swap","multilateral_net_settlement"],"properties":{"redeem_reissue":{"type":"boolean"},"escrowed_atomic_swap":{"type":"boolean"},"multilateral_net_settlement":{"type":"boolean"}}}
+  }}}
+}
