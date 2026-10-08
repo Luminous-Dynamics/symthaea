@@ -84,13 +84,16 @@ jobs:
           test -n "$SYNTHETIC_MERGE_SHA"
           test "$LIVE_RUN_HEAD_SHA" = "$EVENT_HEAD_SHA"
           test -n "$GITHUB_WORKFLOW_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$SYNTHETIC_MERGE_SHA"
+          test "$SYNTHETIC_MERGE_SHA" != "$EVENT_HEAD_SHA"
+          test "$SYNTHETIC_MERGE_SHA" != "$PARENT_SHA"
           WORKFLOW_PATH=".github/workflows/hdc-linear-code-syndrome-qualify.yml"
-          CHECKED_OUT_WORKFLOW_SHA256="$(sha256sum "$WORKFLOW_PATH" | cut -d" " -f1)"
-          EXECUTED_WORKFLOW_SHA256="$(gh api --method GET \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/contents/${WORKFLOW_PATH}?ref=${GITHUB_WORKFLOW_SHA}" \
-            --jq '.content' | tr -d '\n' | base64 --decode | sha256sum | cut -d" " -f1)"
-          test "$EXECUTED_WORKFLOW_SHA256" = "$CHECKED_OUT_WORKFLOW_SHA256"
+          CHECKED_OUT_WORKFLOW_BLOB_SHA="$(git rev-parse "HEAD:$WORKFLOW_PATH")"
+          EXECUTED_WORKFLOW_BLOB_SHA="$(gh api --method GET \\
+            -H "Accept: application/vnd.github+json" \\
+            "/repos/${GITHUB_REPOSITORY}/contents/${WORKFLOW_PATH}?ref=${SYNTHETIC_MERGE_SHA}" \\
+            --jq '.sha')"
+          test "$EXECUTED_WORKFLOW_BLOB_SHA" = "$CHECKED_OUT_WORKFLOW_BLOB_SHA"
           if test "$GITHUB_EVENT_NAME" = "pull_request"; then
             test "$LIVE_RUN_PR_COUNT" -eq 1
             test "$LIVE_RUN_PR_NUMBER" = "$GITHUB_EVENT_NUMBER"
@@ -136,8 +139,8 @@ jobs:
           echo "live_run_pr_association_base_repo_name=$LIVE_RUN_PR_ASSOCIATION_BASE_REPO_NAME" >> "$GITHUB_OUTPUT"
           echo "workflow_sha=$GITHUB_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
           echo "workflow_ref=$GITHUB_WORKFLOW_REF" >> "$GITHUB_OUTPUT"
-          echo "workflow_file_sha256=$CHECKED_OUT_WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
-          echo "executed_workflow_file_sha256=$EXECUTED_WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
+          echo "workflow_file_blob_sha=$CHECKED_OUT_WORKFLOW_BLOB_SHA" >> "$GITHUB_OUTPUT"
+          echo "executed_workflow_file_blob_sha=$EXECUTED_WORKFLOW_BLOB_SHA" >> "$GITHUB_OUTPUT"
           echo "workflow_definition_match=true" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_count=$LIVE_RUN_PR_COUNT" >> "$GITHUB_OUTPUT"
           echo "live_run_pr_number=$LIVE_RUN_PR_NUMBER" >> "$GITHUB_OUTPUT"
@@ -538,7 +541,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v22
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v23
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -553,7 +556,12 @@ jobs:
           source_repo_id=${{ steps.head.outputs.source_repo_id }}
           canonical_repo=Luminous-Dynamics/symthaea
           checkout_persist_credentials=false
+          live_run_pr_association_is_non_authoritative=true
+          live_run_pr_association_head_sha=${{ steps.head.outputs.live_run_pr_association_head_sha }}
+          live_run_pr_association_head_repo_id=${{ steps.head.outputs.live_run_pr_association_head_repo_id }}
           live_run_pr_association_head_repo_name=${{ steps.head.outputs.live_run_pr_association_head_repo_name }}
+          live_run_pr_association_base_sha=${{ steps.head.outputs.live_run_pr_association_base_sha }}
+          live_run_pr_association_base_repo_id=${{ steps.head.outputs.live_run_pr_association_base_repo_id }}
           live_run_pr_association_base_repo_name=${{ steps.head.outputs.live_run_pr_association_base_repo_name }}
           event_repo_id=${{ steps.head.outputs.event_repo_id }}
           current_repo_id=${{ steps.head.outputs.current_repo_id }}
@@ -566,8 +574,8 @@ jobs:
           live_run_event=${{ steps.head.outputs.live_run_event }}
           workflow_sha=${{ steps.head.outputs.workflow_sha }}
           workflow_ref=${{ steps.head.outputs.workflow_ref }}
-          workflow_file_sha256=${{ steps.head.outputs.workflow_file_sha256 }}
-          executed_workflow_file_sha256=${{ steps.head.outputs.executed_workflow_file_sha256 }}
+          workflow_file_blob_sha=${{ steps.head.outputs.workflow_file_blob_sha }}
+          executed_workflow_file_blob_sha=${{ steps.head.outputs.executed_workflow_file_blob_sha }}
           workflow_definition_match=${{ steps.head.outputs.workflow_definition_match }}
           live_run_pr_count=${{ steps.head.outputs.live_run_pr_count }}
           live_run_pr_number=${{ steps.head.outputs.live_run_pr_number }}
