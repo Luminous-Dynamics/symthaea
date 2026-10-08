@@ -529,6 +529,25 @@ fn noncanonical_protected_algorithm_encoding_requires_exact_tbs() {
     let canonical = sign_with_protected(&canonical_protected);
     let noncanonical = sign_with_protected(&noncanonical_protected);
 
+    // Reusing the canonical signature while changing the protected bytes must
+    // fail: the protected bstr is an exact Sig_structure input, not a semantic
+    // value that verification may normalize.
+    let mut mismatched_wire = canonical.to_cbor();
+    let protected_marker = [0xa1, 0x01, 0x26];
+    let protected_pos = mismatched_wire
+        .windows(protected_marker.len())
+        .position(|window| window == protected_marker)
+        .unwrap();
+    mismatched_wire.splice(
+        protected_pos..protected_pos + protected_marker.len(),
+        noncanonical_protected,
+    );
+    let mismatched = Rfc9942SignatureWithReceipts::from_cbor(&mismatched_wire).unwrap();
+    assert_eq!(
+        mismatched.verify_es256(&outer_key, &[], None),
+        Err(symthaea_swarm::Rfc9942VdpError::InvalidEs256Signature)
+    );
+
     let (canonical_verified, _) = canonical
         .verify_es256_inclusion_priority_first_valid_receipt_selection_state(
             &receipt_key,
