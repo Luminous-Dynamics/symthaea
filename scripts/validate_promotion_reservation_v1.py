@@ -418,6 +418,95 @@ class ProviderTopologyCasTrustRootV1:
 
 
 @dataclass(frozen=True)
+class ProviderTopologyCasTrustPolicyV1:
+    """Versioned signer authorization policy whose digest is pinned out of band."""
+    policy_id: str
+    generation: int
+    repository: str
+    authorized_roots: tuple[ProviderTopologyCasTrustRootV1, ...]
+    revoked_key_ids: tuple[str, ...] = ()
+    revoked_signer_identities: tuple[str, ...] = ()
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "policy": "provider-topology-cas-trust-policy-v1",
+            "policy_id": self.policy_id,
+            "generation": self.generation,
+            "repository": self.repository,
+            "authorized_roots": [
+                {
+                    "trust_root_id": root.trust_root_id,
+                    "generation": root.generation,
+                    "repository": root.repository,
+                    "signer_identity": root.signer_identity,
+                    "key_id": root.key_id,
+                    "public_key_pem": root.public_key_pem,
+                }
+                for root in sorted(
+                    self.authorized_roots,
+                    key=lambda candidate: (candidate.key_id, candidate.trust_root_id),
+                )
+            ],
+            "revoked_key_ids": sorted(self.revoked_key_ids),
+            "revoked_signer_identities": sorted(self.revoked_signer_identities),
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def structurally_valid(self) -> bool:
+        if not self.policy_id or self.generation <= 0 or not self.repository:
+            return False
+        keys = [root.key_id for root in self.authorized_roots]
+        root_ids = [root.trust_root_id for root in self.authorized_roots]
+        if len(keys) != len(set(keys)) or len(root_ids) != len(set(root_ids)):
+            return False
+        if len(self.revoked_key_ids) != len(set(self.revoked_key_ids)):
+            return False
+        if len(self.revoked_signer_identities) != len(set(self.revoked_signer_identities)):
+            return False
+        return all(
+            root.repository == self.repository
+            and root.generation > 0
+            and bool(root.signer_identity)
+            and bool(root.key_id)
+            and bool(root.public_key_pem)
+            for root in self.authorized_roots
+        )
+
+    def authorizes(
+        self,
+        root: ProviderTopologyCasTrustRootV1,
+        identity: PromotionOperationIdentityV1,
+        expected_policy_digest: str | None,
+        expected_policy_generation: int | None,
+    ) -> bool:
+        if not self.structurally_valid():
+            return False
+        if not expected_policy_digest or self.digest() != expected_policy_digest:
+            return False
+        if expected_policy_generation is None or expected_policy_generation <= 0:
+            return False
+        if self.generation != expected_policy_generation:
+            return False
+        if self.repository != identity.repository or root.repository != self.repository:
+            return False
+        if root.generation != identity.trust_root_generation:
+            return False
+        if root.key_id in self.revoked_key_ids or root.signer_identity in self.revoked_signer_identities:
+            return False
+        if root not in self.authorized_roots:
+            return False
+        return _public_key_fingerprint(root.public_key_pem) == root.key_id
+
+
+@dataclass(frozen=True)
 class ProviderTopologyCasAttestationV1:
     """DSSE envelope containing a signed in-toto statement for topology enforcement."""
     envelope: ProviderTopologyCasDsseEnvelopeV1
