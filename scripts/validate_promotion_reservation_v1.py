@@ -151,6 +151,39 @@ class ProviderStackObservationV1:
         )
 
 
+def provider_stack_observation_matches_reserved(
+    observation: ProviderStackObservationV1 | None,
+    identity: PromotionOperationIdentityV1,
+) -> bool:
+    return observation is not None and observation.matches_reserved(identity)
+
+
+@dataclass(frozen=True)
+class ProviderTopologyBindingV1:
+    initial_observation: ProviderStackObservationV1 | None
+    pre_submit_observation: ProviderStackObservationV1 | None
+    initial_sequence: int
+    pre_submit_sequence: int | None
+    provider_topology_cas: bool = False
+
+    def classify(self, identity: PromotionOperationIdentityV1) -> str:
+        if self.initial_sequence <= 0:
+            return "invalid-observation-sequence"
+        if self.initial_observation is None:
+            return "unobserved"
+        if not self.initial_observation.matches_reserved(identity):
+            return "initial-mismatch"
+        if self.pre_submit_observation is None:
+            return "unrevalidated"
+        if self.pre_submit_sequence is None or self.pre_submit_sequence <= self.initial_sequence:
+            return "invalid-observation-order"
+        if not self.pre_submit_observation.matches_reserved(identity):
+            return "stale-before-submit"
+        if self.provider_topology_cas:
+            return "provider-topology-cas"
+        return "observed-not-cas"
+
+
 @dataclass
 class Reservation:
     reservation_id: str
@@ -533,6 +566,91 @@ def provider_stack_observation_fixture(
         ),
         observation_id="obs-1",
     )
+
+
+
+
+def topology_binding_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+    pre_submit_observation: ProviderStackObservationV1 | None = None,
+    pre_submit_sequence: int | None = 2,
+    provider_topology_cas: bool = False,
+) -> ProviderTopologyBindingV1:
+    identity = identity or stack_identity_fixture()
+    initial = provider_stack_observation_fixture(identity)
+    return ProviderTopologyBindingV1(
+        initial_observation=initial,
+        pre_submit_observation=(
+            pre_submit_observation if pre_submit_observation is not None else initial
+        ),
+        initial_sequence=1,
+        pre_submit_sequence=pre_submit_sequence,
+        provider_topology_cas=provider_topology_cas,
+    )
+
+
+def test_provider_topology_binding_requires_an_initial_observation():
+    identity = stack_identity_fixture()
+    binding = ProviderTopologyBindingV1(None, None, 1, None)
+    assert binding.classify(identity) == "unobserved"
+
+
+def test_provider_topology_binding_rejects_initial_topology_mismatch():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**observation.__dict__, "base_tip_sha": "T2"}
+    )
+    binding = ProviderTopologyBindingV1(changed, observation, 1, 2)
+    assert binding.classify(identity) == "initial-mismatch"
+
+
+def test_provider_topology_binding_requires_pre_submit_revalidation():
+    identity = stack_identity_fixture()
+    initial = provider_stack_observation_fixture(identity)
+    binding = ProviderTopologyBindingV1(initial, None, 1, None)
+    assert binding.classify(identity) == "unrevalidated"
+
+
+def test_provider_topology_binding_matching_revalidation_without_cas_is_observed_only():
+    identity = stack_identity_fixture()
+    binding = topology_binding_fixture(identity)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_binding_detects_stale_pre_submit_topology():
+    identity = stack_identity_fixture()
+    initial = provider_stack_observation_fixture(identity)
+    changed = ProviderStackObservationV1(
+        **{**initial.__dict__, "stack_number": 42}
+    )
+    binding = topology_binding_fixture(identity, changed, 2)
+    assert binding.classify(identity) == "stale-before-submit"
+
+
+def test_provider_topology_binding_detects_invalid_observation_order():
+    identity = stack_identity_fixture()
+    binding = topology_binding_fixture(identity, pre_submit_sequence=1)
+    assert binding.classify(identity) == "invalid-observation-order"
+
+
+def test_provider_topology_binding_requires_positive_initial_sequence():
+    identity = stack_identity_fixture()
+    initial = provider_stack_observation_fixture(identity)
+    binding = ProviderTopologyBindingV1(initial, initial, 0, 2)
+    assert binding.classify(identity) == "invalid-observation-sequence"
+
+
+def test_provider_topology_binding_synthetic_cas_is_explicit():
+    identity = stack_identity_fixture()
+    binding = topology_binding_fixture(identity, provider_topology_cas=True)
+    assert binding.classify(identity) == "provider-topology-cas"
+
+
+def test_matching_revalidation_does_not_claim_post_submit_freshness():
+    identity = stack_identity_fixture()
+    binding = topology_binding_fixture(identity)
+    assert binding.classify(identity) == "observed-not-cas"
 
 
 def test_provider_stack_observation_exact_selected_prefix_matches():
@@ -1116,6 +1234,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_topology_binding_requires_an_initial_observation,
+    test_provider_topology_binding_rejects_initial_topology_mismatch,
+    test_provider_topology_binding_requires_pre_submit_revalidation,
+    test_provider_topology_binding_matching_revalidation_without_cas_is_observed_only,
+    test_provider_topology_binding_detects_stale_pre_submit_topology,
+    test_provider_topology_binding_detects_invalid_observation_order,
+    test_provider_topology_binding_requires_positive_initial_sequence,
+    test_provider_topology_binding_synthetic_cas_is_explicit,
+    test_matching_revalidation_does_not_claim_post_submit_freshness,
     test_provider_stack_observation_exact_selected_prefix_matches,
     test_provider_stack_observation_missing_value_fails_closed,
     test_provider_stack_observation_rejects_stack_number_drift,
