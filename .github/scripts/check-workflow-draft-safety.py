@@ -478,7 +478,8 @@ jobs:
         raise AssertionError("branch name was incorrectly treated as ready_for_review activity")
 
 
-def main() -> int:    self_test()
+def main() -> int:
+    self_test()
 
     if not WORKFLOW_DIR.is_dir():
         fail(f"workflow directory not found: {WORKFLOW_DIR}")
