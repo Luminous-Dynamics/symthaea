@@ -522,10 +522,7 @@ impl NixLocalExecutionAuthorityV1 {
             action_intent_digest: self.intent.digest()?,
             service_effect_context_digest: service_effect_context_digest_for_intent(&self.intent)?,
             profile: NixAuthorizationProfileV1::LocalExplicitConfirmation,
-            authority_ref: format!(
-                "nixward-local-approval-v2:{}",
-                self.approval.request_id()
-            ),
+            authority_ref: format!("nixward-local-approval-v2:{}", self.approval.request_id()),
             issued_at_unix_ms: self.approval.request_created_at().as_u64(),
             expires_at_unix_ms: Some(self.approval.request_expires_at().as_u64()),
             decision: NixAuthorizationDecisionV1::Approved,
@@ -534,9 +531,7 @@ impl NixLocalExecutionAuthorityV1 {
         Ok(record)
     }
 
-    pub fn authorization_record_digest(
-        &self,
-    ) -> Result<String, NixAuthorizationErrorV1> {
+    pub fn authorization_record_digest(&self) -> Result<String, NixAuthorizationErrorV1> {
         self.historical_authorization_record()?.digest()
     }
 
