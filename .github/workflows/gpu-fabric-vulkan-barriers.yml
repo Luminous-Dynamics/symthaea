@@ -127,16 +127,22 @@ jobs:
           echo "gdb_exit=$GDB_STATUS" >> qualification-gdb.txt
           exit 0
 
-      - name: Seal runtime evidence digest
+      - name: Seal runtime and crash evidence
         if: always()
         working-directory: .ci/gpu-fabric-workspace
         run: |
           if test -f qualification-runtime.txt; then
-            sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
+            :
           else
             printf 'qualification_execution=not_reached\n' > qualification-runtime.txt
-            sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
           fi
+          if test -f qualification-gdb.txt; then
+            :
+          else
+            printf 'qualification_gdb=not_reached\n' > qualification-gdb.txt
+          fi
+          sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
+          sha256sum qualification-gdb.txt | tee qualification-gdb.sha256
 
       - name: Upload immutable qualification evidence
         if: always()
@@ -156,3 +162,4 @@ jobs:
             .ci/gpu-fabric-workspace/qualification-runtime.txt
             .ci/gpu-fabric-workspace/qualification-runtime.sha256
             .ci/gpu-fabric-workspace/qualification-gdb.txt
+            .ci/gpu-fabric-workspace/qualification-gdb.sha256
