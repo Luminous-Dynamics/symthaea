@@ -8772,7 +8772,7 @@ mod tests {
             .unwrap();
 
         topology.edges.push(CalibrationTraceabilityEdge {
-            from_node_id: "reference-a".into(),
+            from_node_id: "calibration".into(),
             to_node_id: "result".into(),
         });
         assert_eq!(
@@ -9369,6 +9369,9 @@ mod tests {
             .unwrap()
             .evaluation
             .calibration_topology_digest = Some("wrong-topology-digest".into());
+        let uncertainty = topology_digest_drift.evidence[0].uncertainty.as_mut().unwrap();
+        uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(uncertainty).unwrap();
         assert!(matches!(
             topology_digest_drift.evidence[0]
                 .validate()
@@ -9660,7 +9663,7 @@ mod tests {
         ));
 
         let mut wrong_frontier_count = topology.clone();
-        wrong_frontier_count.input_frontier.input_count = 1;
+        wrong_frontier_count.input_frontier.input_count = 2;
         assert!(matches!(
             wrong_frontier_count
                 .validate_against_observation(
@@ -10874,10 +10877,10 @@ mod tests {
                 CalibrationTraceabilityNodeRef {
                     node_id: "calibration".into(),
                     kind: CalibrationTraceabilityNodeKind::CalibrationRecord,
-                    record_id: "calibration".into(),
-                    record_revision: "v1".into(),
-                    record_digest: "calibration-digest".into(),
-                    used_at_epoch_seconds: 1_700_000_000,
+                    record_id: observation.calibration_chain_refs[0].calibration_id.clone(),
+                    record_revision: observation.calibration_chain_refs[0].calibration_revision.clone(),
+                    record_digest: observation.calibration_chain_refs[0].calibration_record_digest.clone(),
+                    used_at_epoch_seconds: observation.calibration_chain_refs[0].used_at_epoch_seconds,
                 },
                 CalibrationTraceabilityNodeRef {
                     node_id: "reference".into(),
@@ -12016,6 +12019,8 @@ mod tests {
         let ordered_uncertainty = ordered_evidence.uncertainty.as_mut().unwrap();
         ordered_uncertainty.evaluation.calibration_chain_digest = ordered_chain_digest;
         ordered_uncertainty.evaluation.calibration_chain_count = ordered_chain_count;
+        ordered_uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(ordered_uncertainty).unwrap();
 
         let mut reversed = ordered.clone();
         let reversed_evidence = reversed
@@ -12035,6 +12040,8 @@ mod tests {
         let reversed_uncertainty = reversed_evidence.uncertainty.as_mut().unwrap();
         reversed_uncertainty.evaluation.calibration_chain_digest = reversed_chain_digest;
         reversed_uncertainty.evaluation.calibration_chain_count = reversed_chain_count;
+        reversed_uncertainty.binding_digest =
+            canonical_measurement_uncertainty_binding_hash(reversed_uncertainty).unwrap();
 
         let ordered_result = AlternativesEngine
             .assess(&ordered.requirement, &ordered.candidates, Some(ordered.incumbent_id))
