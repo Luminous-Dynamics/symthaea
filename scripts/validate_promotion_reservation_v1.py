@@ -654,6 +654,18 @@ def test_fabricated_local_capture_cannot_establish_requested_causality():
     assert resolution.outcome == "causality-unestablished"
 
 
+def test_direct_provider_result_without_evidence_cannot_be_causal():
+    identity = stack_identity_fixture()
+    result = provider_merge_result_fixture(identity)
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=result,
+        effect_set=None,
+        provider_evidence=None,
+    )
+    assert resolution.outcome == "causality-unestablished"
+
+
 def test_authenticated_api_capture_can_support_requested_causality():
     identity = stack_identity_fixture()
     result = provider_merge_result_fixture(identity)
@@ -1998,6 +2010,7 @@ TESTS = [
     test_webhook_delivery_registry_rejects_same_id_with_different_payload,
     test_webhook_authentication_does_not_prove_merge_result_causality,
     test_fabricated_local_capture_cannot_establish_requested_causality,
+    test_direct_provider_result_without_evidence_cannot_be_causal,
     test_authenticated_api_capture_can_support_requested_causality,
     test_invalid_capture_cannot_support_requested_causality,
     test_provider_result_retention_captured_locally_survives_expiry,
