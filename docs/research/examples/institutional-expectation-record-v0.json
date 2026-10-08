@@ -14,5 +14,6 @@
   "confidence": 80,
   "signal_identity": "signal-001",
   "belief_current": true,
-  "superseded_by": null
+  "superseded_by": null,
+  "referenced_institution_status": "current"
 }
