@@ -37,6 +37,20 @@ jobs:
           path = Path("scripts/validate_promotion_reservation_v1.py")
           tree = ast.parse(path.read_text(), filename=str(path))
 
+          required_classes = {
+              "ProviderTopologyCasPredicateV1",
+              "ProviderTopologyCasEvidenceV1",
+              "ProviderTopologyBindingV1",
+          }
+          top_level_classes = {
+              node.name
+              for node in tree.body
+              if isinstance(node, ast.ClassDef)
+          }
+          assert required_classes <= top_level_classes, (
+              f"Required topology classes missing: {sorted(required_classes - top_level_classes)}"
+          )
+
           ledger = next(
               node for node in tree.body
               if isinstance(node, ast.ClassDef) and node.name == "Ledger"
