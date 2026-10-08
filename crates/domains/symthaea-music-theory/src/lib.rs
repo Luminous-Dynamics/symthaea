@@ -140,7 +140,9 @@ pub use sonata::{
 };
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
-pub use state_space::{MusicalStateFrame, MusicalStateTrajectory, STATE_DIMS};
+pub use state_space::{
+    MUSICAL_STATE_SPACE_V1, MusicalStateFrame, MusicalStateTrajectory, STATE_DIMS,
+};
 pub use world_state::{
     MotifRelationObservationV1, MusicalWorldStateContext, MusicalWorldStateV1,
     MUSICAL_WORLD_STATE_V1,
