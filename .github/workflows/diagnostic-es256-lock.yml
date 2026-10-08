@@ -1,0 +1,82 @@
+name: Diagnostic ES256 Cargo lock resolution
+
+on:
+  push:
+    branches:
+      - "diagnostics/**"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-swarm/Cargo.toml"
+      - ".github/workflows/diagnostic-es256-lock.yml"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact pushed commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
+        with:
+          toolchain: 1.96.0
+
+      - name: Assert checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Reproduce locked failure
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
+          status=$?
+          set -e
+          echo "locked_status=${status}"
+          test "${status}" -eq 101
+
+      - name: Regenerate lockfile for diagnosis only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo generate-lockfile
+          echo "=== LOCKFILE DIFF STAT ==="
+          git diff --stat -- Cargo.lock
+          echo "=== LOCKFILE DIFF (first 320 lines) ==="
+          git diff --unified=0 -- Cargo.lock | sed -n '1,320p'
+          echo "=== RESOLVED symthaea-swarm PACKAGE ==="
+          awk '
+            /^name = "symthaea-swarm"$/ { show=1; n=0 }
+            show { print; n++ }
+            show && /^\[\[package\]\]$/ && n > 2 { exit }
+          ' Cargo.lock
+          echo "=== RESOLVED ED25519-Dalek ENTRIES ==="
+          awk '
+            /^name = "ed25519-dalek"$/ { show=1; n=0 }
+            show { print; n++ }
+            show && /^\[\[package\]\]$/ && n > 2 { exit }
+          ' Cargo.lock
+
+      - name: Run metadata after regeneration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 > /tmp/metadata.json
+          python3 - <<'PY'
+          import json
+          m=json.load(open("/tmp/metadata.json"))
+          for p in m["packages"]:
+              if p["name"] == "symthaea-swarm":
+                  print("symthaea-swarm deps:")
+                  for d in p["dependencies"]:
+                      if d["name"] in {"ed25519-dalek", "sha2", "ring", "blake3"}:
+                          print(d["name"], d["req"], d["source"])
+          PY
