@@ -36,6 +36,7 @@ pub struct MusicalWorldStateContext {
     /// from pitch-class frequency alone.
     pub harmonic_function: Option<HarmonicFunction>,
     /// Thematic relations bound to exact source/target score regions.
+    /// These are symbolic measurements, not listener-recognition judgments.
     pub motif_relations: Vec<MotifRelationObservationV1>,
     /// Current prospective-memory pressure, when an obligation ledger is
     /// active for this composition.
@@ -290,16 +291,16 @@ mod tests {
             &piece,
             Duration::new(0, 1),
             Duration::new(1, 1),
-            Duration::new(3, 1),
-            Duration::new(4, 1),
+            Duration::new(1, 1),
+            Duration::new(2, 1),
             crate::obligation::ReturnTransformation::Literal,
         ).is_none());
         assert!(MotifRelationObservationV1::from_score(
             &piece,
-            Duration::new(0, 1),
             Duration::new(1, 1),
-            Duration::new(1, 1),
-            Duration::new(4, 1),
+            Duration::new(2, 1),
+            Duration::new(2, 1),
+            Duration::new(3, 1),
             crate::obligation::ReturnTransformation::Literal,
         ).is_none());
     }
