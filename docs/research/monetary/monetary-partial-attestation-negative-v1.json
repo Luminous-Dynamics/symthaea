@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-partial-attestation-negative-v1",
+  "cases":[
+    {"id":"ATTEST-X01","description":"coverage mask depends on reporting treatment"},
+    {"id":"ATTEST-X02","description":"unattested claim remains authoritative under neutral fallback"},
+    {"id":"ATTEST-X03","description":"declared liquidity demand is used as resource reservation quantity"},
+    {"id":"ATTEST-X04","description":"attestation state enters exogenous random namespace"},
+    {"id":"ATTEST-X05","description":"focal report mutates attestation coverage"},
+    {"id":"ATTEST-X06","description":"focal report mutates resource capacity"},
+    {"id":"ATTEST-X07","description":"focal report mutates allocation policy identity"},
+    {"id":"ATTEST-X08","description":"non-focal obligation is permitted to misreport"},
+    {"id":"ATTEST-X09","description":"truthful paired counterpart differs in coverage or fallback treatment"},
+    {"id":"ATTEST-X10","description":"neutral fallback gives an unverified claim a positive priority key"},
+    {"id":"ATTEST-X11","description":"reject mode allocates an unattested obligation before rejection"},
+    {"id":"ATTEST-X12","description":"execution omits a coverage/fallback factorial cell"}
+  ]
+}
