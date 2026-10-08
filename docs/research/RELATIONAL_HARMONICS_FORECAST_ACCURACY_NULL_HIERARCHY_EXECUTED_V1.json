@@ -1,0 +1,44 @@
+{
+  "schema": "rh006-forecast-accuracy-null-hierarchy-executed/v1",
+  "status": "research-diagnostic-only",
+  "faithfulness_scope": "independent-estimator-mechanics reimplementation; not the Symthaea Rust implementation",
+  "script_sha256": "05ee65adc68ab779d0433c75dc579c638e20f9846fcb52e6ab93553622b512aa",
+  "execution": {
+    "command": "python scripts/research/rh006_forecast_risk_null_quadratic.py --paths 50 --seed 20261008",
+    "observed_output_sha256": "f6ef4cec52bb3eb70db02306014044ab3a545a463518503d2b73112441057191"
+  },
+  "geometry": {
+    "train": 48,
+    "test": 16,
+    "gap": 4,
+    "origins": 24,
+    "step": 16,
+    "ridge": 1e-8,
+    "iid_sigma2": 0.0064,
+    "paths": 50
+  },
+  "nulls": {
+    "structural_null": "beta_relational = 0",
+    "forecast_accuracy_null": "E[D_o] = 0",
+    "not_equivalent_in_finite_sample": true
+  },
+  "risk_quadratic": {
+    "form": "Delta(kappa) = A*kappa^2 + B*kappa + C",
+    "relational_direction": "equal-amplitude [a_to_b, b_to_a, turn_taking]",
+    "positive_root_count": 50,
+    "positive_root_mean": 0.10614953832554297,
+    "positive_root_median": 0.10610631121493502,
+    "positive_root_min": 0.10484927108896422,
+    "positive_root_max": 0.10752852037616037,
+    "delta_at_zero_mean": -0.0005677078652454875,
+    "delta_at_zero_min": -0.0005834119464852161,
+    "delta_at_zero_max": -0.0005493428291345496
+  },
+  "interpretation": {
+    "finding": "In every tested synthetic feature path, the finite-sample equal-risk root was nonzero; coefficient-zero favored the restricted forecast in expected finite-sample MSE.",
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure",
+    "next_target": "derive the same quadratic risk expression with dependent/heteroskedastic error covariance and use it to construct an oracle forecast-risk-null bootstrap."
+  }
+}

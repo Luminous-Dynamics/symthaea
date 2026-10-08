@@ -1,0 +1,25 @@
+{
+  "schema": "relational-prediction-inference-procedure/v1",
+  "procedure_id": "nested-forecast-bootstrap-v1",
+  "status": "contract-only",
+  "scope": {
+    "primary_feature_set": "RelationalAugmented",
+    "benchmark_feature_set": "NonRelationalContext",
+    "loss": "squared_error",
+    "forecast_horizon": "fixed",
+    "design": "single-holdout-or-disjoint-rolling-origin"
+  },
+  "requirements": [
+    "Use a nested-model-aware forecast-accuracy procedure; do not substitute an IID equal-accuracy test.",
+    "Respect the retained target-level loss-differential vector as the inferential input.",
+    "Use a dependence-preserving moving-block bootstrap together with a residual-based component for the nested finite-sample problem.",
+    "Keep horizon, training/test geometry, model specification, resampling rule, small-sample rule, and multiplicity rule fixed before inference.",
+    "Do not select or switch the inferential method using observed forecast results."
+  ],
+  "scientific_boundary": {
+    "execution_in_this_pr": false,
+    "formal_p_value_in_this_pr": false,
+    "temporal_preregistration_proof_in_code": false,
+    "reference": "Tchatoka (2023), Journal of Forecasting, DOI 10.1002/for.2987"
+  }
+}

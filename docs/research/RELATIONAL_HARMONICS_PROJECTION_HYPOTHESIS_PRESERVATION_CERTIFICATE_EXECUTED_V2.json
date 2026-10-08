@@ -1,0 +1,393 @@
+{
+  "directions": {
+    "strong": "raw coefficient direction [1,1,0.5]; converted to the origin's training-standardized coefficient coordinates before projection retention is computed",
+    "weak": "raw coefficient direction [0,1,-2]; converted to the origin's training-standardized coefficient coordinates before projection retention is computed"
+  },
+  "execution": {
+    "command": "python scripts/research/rh006_projection_preservation_certificate_splitmix64.py --mc 1000 --seed 20261022",
+    "exact_execution_note": "The 1000-path run immediately followed the source edit and produced this result set from the resulting script bytes.",
+    "script_sha256": "f7f51828b6d2c63924ce40ce65409781de4873194709f7396dba7d9d9fb8230a"
+  },
+  "faithfulness_scope": "independent estimator-mechanics reimplementation; not the Symthaea Rust implementation",
+  "geometry": {
+    "epsilons": [0.01, 0.001, 0.0001, 0.0],
+    "gap": 4,
+    "mc_reps": 1000,
+    "origins": 24,
+    "preserve_tolerance": 1e-10,
+    "seed": 20261022,
+    "step": 16,
+    "taus": [0.01, 0.001, 0.0001],
+    "test": 16,
+    "train": 48
+  },
+  "hypothesis_rule": {
+    "directional": "a predeclared directional hypothesis is preserved only when its standardized coefficient vector lies in the retained projection at every required origin within numerical tolerance",
+    "full_three_channel": "preserve the original RH-006 coefficient space only when all three singular directions are retained at every required origin",
+    "projected_estimand": "otherwise the projection is treated as a distinct projected estimand and must not be reported as inference for the original hypothesis"
+  },
+  "interpretation": {
+    "applicability": "not-approved-for-execution",
+    "finding": "Rank improvement is not sufficient for hypothesis preservation. Any origin-local projection that removes a declared effect direction changes the inferential target; the original full-space RH-006 hypothesis requires an origin-local preservation certificate.",
+    "formal_inference": false,
+    "selection": "stop-assumption-failure"
+  },
+  "payload_sha256": "22609aa38493dfb0956759ccf2c9c0076cbba22529a7df85c144730a817d9bfd",
+  "references": [
+    "Chernozhukov, Hansen & Spindler (2015), Valid Post-Selection and Post-Regularization Inference",
+    "Kuchibhotla, Kolassa & Kuffner (2022), Post-Selection Inference"
+  ],
+  "results": [
+    {
+      "epsilon": 0.01,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18359107168619992,
+        "origin_effect_energy_loss_median": 0.18161544849524525,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9046460918529161,
+        "origin_retention_min_global": 0.9035535005265599,
+        "origin_retention_q05": 0.9041941840727679,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9041684223548871,
+        "path_worst_retention_min_global": 0.9035535005265599
+      },
+      "tau": 0.01,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.9999999999999493,
+        "origin_effect_energy_loss_median": 0.9999982439888442,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.0013251457110729954,
+        "origin_retention_min_global": 2.2534479793671996e-07,
+        "origin_retention_q05": 0.00011529264084826884,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 6.927454707777872e-05,
+        "path_worst_retention_min_global": 2.2534479793671996e-07
+      }
+    },
+    {
+      "epsilon": 0.01,
+      "full_three_channel_preserved_rate": 1.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 2.220446049250313e-15,
+        "origin_effect_energy_loss_median": 0.0,
+        "origin_exact_preservation_rate": 1.0,
+        "origin_retention_median": 1.0,
+        "origin_retention_min_global": 0.9999999999999989,
+        "origin_retention_q05": 0.9999999999999996,
+        "path_exact_preservation_rate": 1.0,
+        "path_worst_retention_median": 0.9999999999999994,
+        "path_worst_retention_min_global": 0.9999999999999989
+      },
+      "tau": 0.001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 2.6645352591003757e-15,
+        "origin_effect_energy_loss_median": 0.0,
+        "origin_exact_preservation_rate": 1.0,
+        "origin_retention_median": 1.0,
+        "origin_retention_min_global": 0.9999999999999987,
+        "origin_retention_q05": 0.9999999999999994,
+        "path_exact_preservation_rate": 1.0,
+        "path_worst_retention_median": 0.9999999999999993,
+        "path_worst_retention_min_global": 0.9999999999999987
+      }
+    },
+    {
+      "epsilon": 0.01,
+      "full_three_channel_preserved_rate": 1.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 2.220446049250313e-15,
+        "origin_effect_energy_loss_median": 0.0,
+        "origin_exact_preservation_rate": 1.0,
+        "origin_retention_median": 1.0,
+        "origin_retention_min_global": 0.9999999999999989,
+        "origin_retention_q05": 0.9999999999999996,
+        "path_exact_preservation_rate": 1.0,
+        "path_worst_retention_median": 0.9999999999999994,
+        "path_worst_retention_min_global": 0.9999999999999989
+      },
+      "tau": 0.0001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 2.6645352591003757e-15,
+        "origin_effect_energy_loss_median": 0.0,
+        "origin_exact_preservation_rate": 1.0,
+        "origin_retention_median": 1.0,
+        "origin_retention_min_global": 0.9999999999999987,
+        "origin_retention_q05": 0.9999999999999994,
+        "path_exact_preservation_rate": 1.0,
+        "path_worst_retention_median": 0.9999999999999993,
+        "path_worst_retention_min_global": 0.9999999999999987
+      }
+    },
+    {
+      "epsilon": 0.001,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18198874577428847,
+        "origin_effect_energy_loss_median": 0.18181880031910097,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045336918439794,
+        "origin_retention_min_global": 0.9044397460448714,
+        "origin_retention_q05": 0.9044956249172995,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9044932244821309,
+        "path_worst_retention_min_global": 0.9044397460448714
+      },
+      "tau": 0.01,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 0.9999999913342168,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 9.30901889867868e-05,
+        "origin_retention_min_global": 3.0998738327658813e-10,
+        "origin_retention_q05": 8.830815334970605e-06,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 5.1206193585091615e-06,
+        "path_worst_retention_min_global": 3.0998738327658813e-10
+      }
+    },
+    {
+      "epsilon": 0.001,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18198874577428847,
+        "origin_effect_energy_loss_median": 0.18180283701687588,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045425158515901,
+        "origin_retention_min_global": 0.9044397460448714,
+        "origin_retention_q05": 0.904497433495292,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.904494699879199,
+        "path_worst_retention_min_global": 0.9044397460448714
+      },
+      "tau": 0.001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 0.9999999829704749,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.00013049722249457635,
+        "origin_retention_min_global": 3.0998738327658813e-10,
+        "origin_retention_q05": 1.1633504069047457e-05,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 7.086724921738652e-06,
+        "path_worst_retention_min_global": 3.0998738327658813e-10
+      }
+    },
+    {
+      "epsilon": 0.001,
+      "full_three_channel_preserved_rate": 1.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 2.220446049250313e-15,
+        "origin_effect_energy_loss_median": 0.0,
+        "origin_exact_preservation_rate": 1.0,
+        "origin_retention_median": 1.0,
+        "origin_retention_min_global": 0.9999999999999989,
+        "origin_retention_q05": 0.9999999999999996,
+        "path_exact_preservation_rate": 1.0,
+        "path_worst_retention_median": 0.9999999999999994,
+        "path_worst_retention_min_global": 0.9999999999999989
+      },
+      "tau": 0.0001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 2.886579864025407e-15,
+        "origin_effect_energy_loss_median": 0.0,
+        "origin_exact_preservation_rate": 1.0,
+        "origin_retention_median": 1.0,
+        "origin_retention_min_global": 0.9999999999999986,
+        "origin_retention_q05": 0.9999999999999994,
+        "path_exact_preservation_rate": 1.0,
+        "path_worst_retention_median": 0.9999999999999993,
+        "path_worst_retention_min_global": 0.9999999999999986
+      }
+    },
+    {
+      "epsilon": 0.0001,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18183649873107088,
+        "origin_effect_energy_loss_median": 0.18181820786035374,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045340193379385,
+        "origin_retention_min_global": 0.9045239086220602,
+        "origin_retention_q05": 0.9045301492374105,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9045299666990023,
+        "path_worst_retention_min_global": 0.9045239086220602
+      },
+      "tau": 0.01,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 0.9999999999078293,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 9.60055349818692e-06,
+        "origin_retention_min_global": 9.502905522818693e-10,
+        "origin_retention_q05": 9.085577254867906e-07,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 5.163377651080868e-07,
+        "path_worst_retention_min_global": 9.502905522818693e-10
+      }
+    },
+    {
+      "epsilon": 0.0001,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18183649873107088,
+        "origin_effect_energy_loss_median": 0.18181820786035374,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045340193379385,
+        "origin_retention_min_global": 0.9045239086220602,
+        "origin_retention_q05": 0.9045301492374105,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9045299666990023,
+        "path_worst_retention_min_global": 0.9045239086220602
+      },
+      "tau": 0.001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 0.9999999999078293,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 9.60055349818692e-06,
+        "origin_retention_min_global": 9.502905522818693e-10,
+        "origin_retention_q05": 9.085577254867906e-07,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 5.163377651080868e-07,
+        "path_worst_retention_min_global": 9.502905522818693e-10
+      }
+    },
+    {
+      "epsilon": 0.0001,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18183649873107088,
+        "origin_effect_energy_loss_median": 0.18181661519813352,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045348997146911,
+        "origin_retention_min_global": 0.9045239086220602,
+        "origin_retention_q05": 0.9045303538269273,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9045301234393539,
+        "path_worst_retention_min_global": 0.9045239086220602
+      },
+      "tau": 0.0001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 0.999999999818345,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 1.3477946287769775e-05,
+        "origin_retention_min_global": 9.502905522818693e-10,
+        "origin_retention_q05": 1.2021798347470517e-06,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 6.966953664875537e-07,
+        "path_worst_retention_min_global": 9.502905522818693e-10
+      }
+    },
+    {
+      "epsilon": 0.0,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18181818181818343,
+        "origin_effect_energy_loss_median": 0.18181818181818177,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045340337332909,
+        "origin_retention_min_global": 0.90453403373329,
+        "origin_retention_q05": 0.9045340337332906,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9045340337332904,
+        "path_worst_retention_min_global": 0.90453403373329
+      },
+      "tau": 0.01,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 1.0,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 7.62677213696155e-17,
+        "origin_retention_min_global": 1.121151301789786e-19,
+        "origin_retention_q05": 1.041313422577151e-17,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 9.106362002781425e-18,
+        "path_worst_retention_min_global": 1.121151301789786e-19
+      }
+    },
+    {
+      "epsilon": 0.0,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18181818181818343,
+        "origin_effect_energy_loss_median": 0.18181818181818177,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045340337332909,
+        "origin_retention_min_global": 0.90453403373329,
+        "origin_retention_q05": 0.9045340337332906,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9045340337332904,
+        "path_worst_retention_min_global": 0.90453403373329
+      },
+      "tau": 0.001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 1.0,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 7.62677213696155e-17,
+        "origin_retention_min_global": 1.121151301789786e-19,
+        "origin_retention_q05": 1.041313422577151e-17,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 9.106362002781425e-18,
+        "path_worst_retention_min_global": 1.121151301789786e-19
+      }
+    },
+    {
+      "epsilon": 0.0,
+      "full_three_channel_preserved_rate": 0.0,
+      "strong": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 0.18181818181818343,
+        "origin_effect_energy_loss_median": 0.18181818181818177,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 0.9045340337332909,
+        "origin_retention_min_global": 0.90453403373329,
+        "origin_retention_q05": 0.9045340337332906,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 0.9045340337332904,
+        "path_worst_retention_min_global": 0.90453403373329
+      },
+      "tau": 0.0001,
+      "weak": {
+        "admissible_origin_cells": 24000,
+        "origin_effect_energy_loss_max_global": 1.0,
+        "origin_effect_energy_loss_median": 1.0,
+        "origin_exact_preservation_rate": 0.0,
+        "origin_retention_median": 7.62677213696155e-17,
+        "origin_retention_min_global": 1.121151301789786e-19,
+        "origin_retention_q05": 1.041313422577151e-17,
+        "path_exact_preservation_rate": 0.0,
+        "path_worst_retention_median": 9.106362002781425e-18,
+        "path_worst_retention_min_global": 1.121151301789786e-19
+      }
+    }
+  ],
+  "rng": "SplitMix64 v1 + Rademacher innovations",
+  "schema": "rh006-projection-hypothesis-preservation-certificate-executed/v2",
+  "status": "research-diagnostic-only"
+}

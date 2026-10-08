@@ -1,0 +1,7856 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Research-only held-out prediction for relational dynamics.
+//!
+//! The qualification question is deliberately predictive rather than
+//! ontological:
+//!
+//!   Does a relational feature set predict an independently observed future
+//!   interaction outcome better than isolated-agent, synchrony-only, or
+//!   common-driver baselines on data that occur strictly later in time?
+//!
+//! This module uses a fixed temporal holdout, an explicit label horizon, and a
+//! boundary check that prevents training labels from extending into the test
+//! feature interval. It never touches production partnership state, cognition,
+//! relational_psi, trust, or response generation.
+//!
+//! The null layer has three deterministic families:
+//!
+//! - CircularShift: shift all relational channels together within each split,
+//!   destroying partner-specific alignment while preserving each channel's
+//!   marginal sequence structure.
+//! - FeatureDecoupling: shift relational channels by distinct offsets within
+//!   each split, preserving their individual temporal structure while breaking
+//!   the coherent relational bundle.
+//! - IncrementalRelationalShift: preserve synchrony and non-relational context
+//!   while shifting only the added directional/turn-taking channels.
+//!
+//! Null outputs are empirical calibration diagnostics, not p-values. Their
+//! interpretation is tied to the explicit surrogate construction and its temporal
+//! assumptions; they are not generic significance tests.
+
+use super::relational_harmonics::EvidenceStatus;
+use sha2_relational_schedule::{Digest, Sha256};
+
+const EVIDENCE_SCHEMA: &str = "relational-prediction-evidence/v4";
+const ROLLING_EVIDENCE_SCHEMA: &str = "relational-prediction-rolling-evidence/v4";
+const NULL_EVIDENCE_SCHEMA: &str = "relational-prediction-null-evidence/v2";
+const FEATURE_SCHEMA: &str = "relational-prediction-features/v1";
+const MODEL_SCHEMA: &str = "linear-ridge-standardized-v1";
+const DEPENDENCE_PROFILE_SCHEMA: &str = "relational-prediction-loss-dependence/v1";
+const QUALIFICATION_SCHEMA: &str = "relational-prediction-qualification/v1";
+const ROLLING_QUALIFICATION_SCHEMA: &str = "relational-prediction-rolling-qualification/v1";
+
+/// A future outcome paired with features available strictly before that outcome.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RelationalPredictionSample {
+    /// Time at which the predictor features are available.
+    pub feature_time: f64,
+    /// Time at which the independently observed target becomes available.
+    pub outcome_time: f64,
+    /// Scalar state of agent A available at feature_time.
+    pub agent_a: f64,
+    /// Scalar state of agent B available at feature_time.
+    pub agent_b: f64,
+    /// Current relational alignment feature.
+    pub alignment: f64,
+    /// Current A -> B predictive-coupling proxy.
+    pub a_to_b: f64,
+    /// Current B -> A predictive-coupling proxy.
+    pub b_to_a: f64,
+    /// Current turn-taking feature.
+    pub turn_taking: f64,
+    /// Explicitly observed shared context available at feature_time.
+    pub common_driver: f64,
+    /// Independently observed future interaction outcome.
+    pub future_outcome: f64,
+}
+
+impl RelationalPredictionSample {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        feature_time: f64,
+        outcome_time: f64,
+        agent_a: f64,
+        agent_b: f64,
+        alignment: f64,
+        a_to_b: f64,
+        b_to_a: f64,
+        turn_taking: f64,
+        common_driver: f64,
+        future_outcome: f64,
+    ) -> Result<Self, RelationalPredictionError> {
+        if !feature_time.is_finite()
+            || !outcome_time.is_finite()
+            || !agent_a.is_finite()
+            || !agent_b.is_finite()
+            || !common_driver.is_finite()
+            || !future_outcome.is_finite()
+        {
+            return Err(RelationalPredictionError::NonFiniteSample);
+        }
+
+        for (name, value) in [
+            ("alignment", alignment),
+            ("a_to_b", a_to_b),
+            ("b_to_a", b_to_a),
+            ("turn_taking", turn_taking),
+        ] {
+            if !value.is_finite() {
+                return Err(RelationalPredictionError::NonFiniteValue(name));
+            }
+            if !(0.0..=1.0).contains(&value) {
+                return Err(RelationalPredictionError::OutOfRange(name, value));
+            }
+        }
+
+        if outcome_time <= feature_time {
+            return Err(RelationalPredictionError::OutcomeNotAfterFeatures);
+        }
+
+        Ok(Self {
+            feature_time,
+            outcome_time,
+            agent_a,
+            agent_b,
+            alignment,
+            a_to_b,
+            b_to_a,
+            turn_taking,
+            common_driver,
+            future_outcome,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RelationalPredictionError {
+    NonFiniteSample,
+    NonFiniteValue(&'static str),
+    OutOfRange(&'static str, f64),
+    OutcomeNotAfterFeatures,
+    InsufficientSamples(usize),
+    InvalidSplit,
+    TemporalLeakage,
+    InvalidRidgeLambda,
+    InvalidSurrogateCount,
+    InvalidEvidenceProvenance(&'static str),
+    InvalidEvidenceInputDigest,
+    ModelFitFailed,
+}
+
+impl std::fmt::Display for RelationalPredictionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonFiniteSample => write!(f, "prediction sample contains a non-finite value"),
+            Self::NonFiniteValue(name) => write!(f, "{name} must be finite"),
+            Self::OutOfRange(name, value) => write!(f, "{name}={value} is outside [0, 1]"),
+            Self::OutcomeNotAfterFeatures => {
+                write!(f, "future outcome time must be strictly after feature time")
+            }
+            Self::InsufficientSamples(n) => write!(f, "insufficient samples: got {n}"),
+            Self::InvalidSplit => write!(f, "prediction train/test split is invalid"),
+            Self::TemporalLeakage => {
+                write!(f, "training outcome horizon overlaps the held-out feature interval")
+            }
+            Self::InvalidRidgeLambda => write!(f, "ridge_lambda must be finite and non-negative"),
+            Self::InvalidSurrogateCount => write!(f, "surrogate_count must be greater than zero"),
+            Self::InvalidEvidenceProvenance(name) => {
+                write!(f, "evidence provenance field {name} is invalid")
+            }
+            Self::InvalidEvidenceInputDigest => {
+                write!(f, "evidence input digest does not match supplied evaluation data")
+            }
+            Self::ModelFitFailed => write!(f, "deterministic linear model fit failed"),
+        }
+    }
+}
+
+impl std::error::Error for RelationalPredictionError {}
+
+/// Predictor families used for the ablation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PredictionFeatureSet {
+    /// Predict the held-out target using the last observed training target.
+    PersistenceBaseline,
+    /// Only isolated agent state summaries.
+    IsolatedAgents,
+    /// Only the supplied common-context signal.
+    CommonDriver,
+    /// Only simultaneous relational alignment.
+    SynchronyOnly,
+    /// Isolated agents + common driver + synchrony, with no relational
+    /// directionality or turn-taking channels.
+    NonRelationalContext,
+    /// Non-relational context augmented with directional and turn-taking
+    /// relational channels.
+    RelationalAugmented,
+    /// Alignment plus directional and turn-taking relational channels.
+    RelationalProfile,
+}
+
+impl PredictionFeatureSet {
+    fn all() -> [Self; 7] {
+        [
+            Self::PersistenceBaseline,
+            Self::IsolatedAgents,
+            Self::CommonDriver,
+            Self::SynchronyOnly,
+            Self::NonRelationalContext,
+            Self::RelationalAugmented,
+            Self::RelationalProfile,
+        ]
+    }
+}
+
+
+/// A fixed temporal train/test configuration.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HeldOutRelationalPredictionConfig {
+    /// Number of earliest observations used for fitting.
+    pub train_samples: usize,
+    /// Number of subsequent observations evaluated out of sample.
+    pub test_samples: usize,
+    /// Number of observations skipped between train and test feature windows.
+    pub gap_samples: usize,
+    /// Fixed ridge coefficient. A small prespecified value stabilizes
+    /// deterministic normal-equation fits without adaptive tuning.
+    pub ridge_lambda: f64,
+}
+
+impl Default for HeldOutRelationalPredictionConfig {
+    fn default() -> Self {
+        Self {
+            train_samples: 32,
+            test_samples: 16,
+            gap_samples: 2,
+            ridge_lambda: 1e-8,
+        }
+    }
+}
+
+impl HeldOutRelationalPredictionConfig {
+    fn validate(&self, total_samples: usize) -> Result<(), RelationalPredictionError> {
+        if self.train_samples < 8 || self.test_samples < 4 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let required_samples = self
+            .train_samples
+            .checked_add(self.gap_samples)
+            .and_then(|value| value.checked_add(self.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        if required_samples > total_samples {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if !self.ridge_lambda.is_finite() || self.ridge_lambda < 0.0 {
+            return Err(RelationalPredictionError::InvalidRidgeLambda);
+        }
+
+        Ok(())
+    }
+
+    fn test_start(&self) -> usize {
+        self.train_samples + self.gap_samples
+    }
+}
+
+/// Out-of-sample accuracy for one predictor family.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PredictionScore {
+    pub feature_set: PredictionFeatureSet,
+    pub parameter_count: usize,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub mean_absolute_error: f64,
+    pub mean_squared_error: f64,
+}
+
+/// Per-target squared-loss differential for the critical nested comparison.
+///
+/// Defined as non-relational context loss minus relationally augmented loss,
+/// so a positive value means the relationally augmented forecast incurred
+/// lower squared loss on that target. This is the target-level estimand for
+/// later dependence-aware inference, not itself a significance statistic.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RelationalForecastLossDifferential {
+    pub origin_index: usize,
+    pub sample_index: usize,
+    pub feature_time: f64,
+    pub outcome_time: f64,
+    pub observed_outcome: f64,
+    pub non_relational_squared_error: f64,
+    pub relational_squared_error: f64,
+    pub loss_differential: f64,
+}
+
+/// Descriptive dependence structure of one ordered loss-differential series.
+///
+/// This is a characterization artifact, not an inferential test.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastLossDependenceProfile {
+    /// Exact evaluator commitment when this profile was produced from an
+    /// evidence packet; None for free-standing descriptive calculations.
+    pub evaluation_input_blake3: Option<String>,
+    pub sample_count: usize,
+    pub max_lag: usize,
+    pub mean: f64,
+    pub variance: f64,
+    pub autocovariances: Vec<f64>,
+    pub autocorrelations: Vec<f64>,
+    /// Number of paired observations supporting each lag estimate.
+    pub pair_counts: Vec<usize>,
+    pub lag_one_autocorrelation: Option<f64>,
+    pub first_nonpositive_autocorrelation_lag: Option<usize>,
+    pub max_absolute_autocorrelation_lag: Option<usize>,
+    pub max_absolute_autocorrelation: f64,
+    pub bartlett_long_run_variance: f64,
+    pub effective_sample_size: Option<f64>,
+    pub status: EvidenceStatus,
+}
+
+/// Two-level dependence characterization for disjoint rolling origins.
+///
+/// Each target window is characterized independently, avoiding artificial
+/// adjacency between the end of one origin and the beginning of another.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingForecastLossDependenceProfile {
+    /// Parent rolling evaluator commitment when produced from evidence.
+    /// None for free-standing descriptive calculations.
+    pub evaluation_input_blake3: Option<String>,
+    pub origin_count: usize,
+    pub test_samples: usize,
+    pub max_lag_within_origin: usize,
+    pub max_lag_across_origins: usize,
+    pub per_origin: Vec<ForecastLossDependenceProfile>,
+    pub origin_mean_differentials: Vec<f64>,
+    pub across_origin_mean_profile: ForecastLossDependenceProfile,
+    pub status: EvidenceStatus,
+}
+
+impl ForecastLossDependenceProfile {
+    /// Compute a deterministic descriptive profile for an ordered loss series.
+    ///
+    /// Autocovariances use a 1/n denominator. The Bartlett long-run variance
+    /// is truncated at max_lag using weights 1 - k/(max_lag + 1).
+    pub fn compute(
+        losses: &[f64],
+        max_lag: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        if losses.len() < 4 {
+            return Err(RelationalPredictionError::InsufficientSamples(losses.len()));
+        }
+        if losses.iter().any(|value| !value.is_finite()) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let max_lag = max_lag.min(losses.len() - 1);
+        let n = losses.len() as f64;
+        let mean = losses.iter().sum::<f64>() / n;
+        if !mean.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let variance = losses
+            .iter()
+            .map(|value| {
+                let centered = *value - mean;
+                centered * centered
+            })
+            .sum::<f64>()
+            / n;
+        if !variance.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let mut autocovariances = Vec::with_capacity(max_lag + 1);
+        let mut autocorrelations = Vec::with_capacity(max_lag + 1);
+        let mut pair_counts = Vec::with_capacity(max_lag + 1);
+
+        for lag in 0..=max_lag {
+            let mut covariance = 0.0;
+            pair_counts.push(losses.len() - lag);
+            for index in lag..losses.len() {
+                covariance += (losses[index] - mean) * (losses[index - lag] - mean);
+                if !covariance.is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
+            }
+            covariance /= n;
+            if !covariance.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            autocovariances.push(covariance);
+
+            let correlation = if variance <= 1e-20 {
+                0.0
+            } else {
+                covariance / variance
+            };
+            if !correlation.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            autocorrelations.push(correlation.clamp(-1.0, 1.0));
+        }
+
+        let mut bartlett_long_run_variance = autocovariances[0];
+        let bandwidth = max_lag + 1;
+        for lag in 1..=max_lag {
+            let weight = 1.0 - lag as f64 / bandwidth as f64;
+            bartlett_long_run_variance += 2.0 * weight * autocovariances[lag];
+            if !bartlett_long_run_variance.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+
+        let lag_one_autocorrelation = (max_lag >= 1).then(|| autocorrelations[1]);
+        let first_nonpositive_autocorrelation_lag = autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find_map(|(lag, correlation)| (*correlation <= 0.0).then_some(lag));
+        let (max_absolute_autocorrelation_lag, max_absolute_autocorrelation) = autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .map(|(lag, correlation)| (lag, correlation.abs()))
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map_or((None, 0.0), |(lag, magnitude)| (Some(lag), magnitude));
+
+        let effective_sample_size = if bartlett_long_run_variance > 1e-20 && variance > 1e-20 {
+            let value = n * variance / bartlett_long_run_variance;
+            value.is_finite().then_some(value.max(1.0).min(n))
+        } else {
+            None
+        };
+
+        Ok(Self {
+            evaluation_input_blake3: None,
+            sample_count: losses.len(),
+            max_lag,
+            mean,
+            variance,
+            autocovariances,
+            autocorrelations,
+            pair_counts,
+            lag_one_autocorrelation,
+            first_nonpositive_autocorrelation_lag,
+            max_absolute_autocorrelation_lag,
+            max_absolute_autocorrelation,
+            bartlett_long_run_variance,
+            effective_sample_size,
+            status: EvidenceStatus::Measured,
+        })
+    }
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.sample_count < 4
+            || self.max_lag >= self.sample_count
+            || self.autocovariances.len() != self.max_lag + 1
+            || self.autocorrelations.len() != self.max_lag + 1
+            || self.pair_counts.len() != self.max_lag + 1
+            || !self.mean.is_finite()
+            || !self.variance.is_finite()
+            || self.variance < 0.0
+            || !self.max_absolute_autocorrelation.is_finite()
+            || !(0.0..=1.0).contains(&self.max_absolute_autocorrelation)
+            || !self.bartlett_long_run_variance.is_finite()
+            || self.status != EvidenceStatus::Measured
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if let Some(digest) = &self.evaluation_input_blake3 {
+            if !is_hex_digest(digest, 64) {
+                return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+            }
+        }
+
+        if self.pair_counts.iter().enumerate().any(|(lag, count)| {
+            *count != self.sample_count - lag || *count < 1
+        }) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.autocovariances.iter().any(|value| !value.is_finite())
+            || self.autocorrelations.iter().any(|value| {
+                !value.is_finite() || !(-1.0..=1.0).contains(value)
+            })
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let tolerance = 1e-12 * self.variance.abs().max(1.0);
+        if (self.autocovariances[0] - self.variance).abs() > tolerance {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let expected_zero_lag = if self.variance > 1e-20 { 1.0 } else { 0.0 };
+        if (self.autocorrelations[0] - expected_zero_lag).abs() > 1e-12 {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.lag_one_autocorrelation.is_some_and(|value| {
+            self.max_lag < 1 || (value - self.autocorrelations[1]).abs() > 1e-12
+        }) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        if self.max_lag == 0 && self.lag_one_autocorrelation.is_some() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let expected_first_nonpositive = self
+            .autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find_map(|(lag, correlation)| (*correlation <= 0.0).then_some(lag));
+        if self.first_nonpositive_autocorrelation_lag != expected_first_nonpositive {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let expected_max = self
+            .autocorrelations
+            .iter()
+            .enumerate()
+            .skip(1)
+            .map(|(lag, correlation)| (lag, correlation.abs()))
+            .max_by(|(_, a), (_, b)| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map_or((None, 0.0), |(lag, magnitude)| (Some(lag), magnitude));
+        if self.max_absolute_autocorrelation_lag != expected_max.0
+            || (self.max_absolute_autocorrelation - expected_max.1).abs() > 1e-12
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.effective_sample_size.is_some_and(|value| {
+            !value.is_finite() || value < 1.0 || value > self.sample_count as f64
+        }) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": DEPENDENCE_PROFILE_SCHEMA,
+            "level": "single-window",
+            "binding": self.evaluation_input_blake3.as_deref().map_or("unbound", |_| "bound"),
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "sample_count": self.sample_count,
+            "max_lag": self.max_lag,
+            "mean": self.mean,
+            "variance": self.variance,
+            "autocovariances": &self.autocovariances,
+            "autocorrelations": &self.autocorrelations,
+            "pair_counts": &self.pair_counts,
+            "lag_one_autocorrelation": self.lag_one_autocorrelation,
+            "first_nonpositive_autocorrelation_lag": self.first_nonpositive_autocorrelation_lag,
+            "max_absolute_autocorrelation_lag": self.max_absolute_autocorrelation_lag,
+            "max_absolute_autocorrelation": self.max_absolute_autocorrelation,
+            "bartlett_long_run_variance": self.bartlett_long_run_variance,
+            "effective_sample_size": self.effective_sample_size,
+            "status": "Measured"
+        }).to_string())
+    }
+}
+
+impl RollingForecastLossDependenceProfile {
+    /// Characterize serial dependence within each disjoint target window and
+    /// dependence between origin-level mean differentials separately.
+    ///
+    /// Origins are never concatenated into one time series because that would
+    /// manufacture adjacency across distinct held-out windows.
+    pub fn compute(
+        differentials: &[RelationalForecastLossDifferential],
+        origin_count: usize,
+        test_samples: usize,
+        max_lag_within_origin: usize,
+        max_lag_across_origins: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        if origin_count == 0 || test_samples < 4 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        let expected = origin_count
+            .checked_mul(test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        if differentials.len() != expected {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let mut per_origin = Vec::with_capacity(origin_count);
+        let mut origin_mean_differentials = Vec::with_capacity(origin_count);
+
+        for origin_index in 0..origin_count {
+            let start = origin_index * test_samples;
+            let end = start + test_samples;
+            let slice = &differentials[start..end];
+
+            for (sample_index, differential) in slice.iter().enumerate() {
+                if differential.origin_index != origin_index
+                    || differential.sample_index != sample_index
+                    || !differential.loss_differential.is_finite()
+                {
+                    return Err(RelationalPredictionError::InvalidSplit);
+                }
+            }
+
+            let losses = slice
+                .iter()
+                .map(|differential| differential.loss_differential)
+                .collect::<Vec<_>>();
+            per_origin.push(ForecastLossDependenceProfile::compute(
+                &losses,
+                max_lag_within_origin,
+            )?);
+
+            let mean = losses.iter().sum::<f64>() / losses.len() as f64;
+            if !mean.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            origin_mean_differentials.push(mean);
+        }
+
+        let across_lag = max_lag_across_origins.min(origin_count.saturating_sub(1));
+        if origin_count < 4 {
+            return Err(RelationalPredictionError::InsufficientSamples(origin_count));
+        }
+        let across_origin_mean_profile = ForecastLossDependenceProfile::compute(
+            &origin_mean_differentials,
+            across_lag,
+        )?;
+
+        Ok(Self {
+            evaluation_input_blake3: None,
+            origin_count,
+            test_samples,
+            max_lag_within_origin: max_lag_within_origin.min(test_samples - 1),
+            max_lag_across_origins: across_lag,
+            per_origin,
+            origin_mean_differentials,
+            across_origin_mean_profile,
+            status: EvidenceStatus::Measured,
+        })
+    }
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.origin_count < 4
+            || self.test_samples < 4
+            || self.per_origin.len() != self.origin_count
+            || self.origin_mean_differentials.len() != self.origin_count
+            || self.max_lag_within_origin >= self.test_samples
+            || self.max_lag_across_origins >= self.origin_count
+            || self.status != EvidenceStatus::Measured
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if let Some(digest) = &self.evaluation_input_blake3 {
+            if !is_hex_digest(digest, 64) {
+                return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+            }
+        }
+
+        for profile in &self.per_origin {
+            profile.validate()?;
+            if profile.sample_count != self.test_samples
+                || profile.max_lag != self.max_lag_within_origin
+                || profile.evaluation_input_blake3 != self.evaluation_input_blake3
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        if self.origin_mean_differentials.iter().any(|value| !value.is_finite()) {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        self.across_origin_mean_profile.validate()?;
+        if self.across_origin_mean_profile.sample_count != self.origin_count
+            || self.across_origin_mean_profile.max_lag != self.max_lag_across_origins
+            || self.across_origin_mean_profile.evaluation_input_blake3
+                != self.evaluation_input_blake3
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        let per_origin = self
+            .per_origin
+            .iter()
+            .map(|profile| {
+                serde_json::from_str::<serde_json::Value>(&profile.to_json()?)
+                    .map_err(|_| RelationalPredictionError::ModelFitFailed)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": DEPENDENCE_PROFILE_SCHEMA,
+            "level": "rolling-two-level",
+            "binding": self.evaluation_input_blake3.as_deref().map_or("unbound", |_| "bound"),
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "origin_count": self.origin_count,
+            "test_samples": self.test_samples,
+            "max_lag_within_origin": self.max_lag_within_origin,
+            "max_lag_across_origins": self.max_lag_across_origins,
+            "origin_mean_differentials": &self.origin_mean_differentials,
+            "per_origin": per_origin,
+            "across_origin_mean_profile": serde_json::from_str::<serde_json::Value>(
+                &self.across_origin_mean_profile.to_json()?
+            ).map_err(|_| RelationalPredictionError::ModelFitFailed)?,
+            "status": "Measured"
+        }).to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct FittedLinearModel {
+    coefficients: Vec<f64>,
+    means: Vec<f64>,
+    scales: Vec<f64>,
+}
+
+impl PredictionScore {
+    pub fn is_finite(&self) -> bool {
+        self.mean_absolute_error.is_finite() && self.mean_squared_error.is_finite()
+    }
+}
+
+/// Caller-attested provenance for an empirical qualification run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationalPredictionProvenance {
+    pub protocol_id: String,
+    pub source_data_sha256: String,
+    pub software_commit_sha: String,
+}
+
+impl RelationalPredictionProvenance {
+    pub fn new(
+        protocol_id: impl Into<String>,
+        source_data_sha256: impl Into<String>,
+        software_commit_sha: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let provenance = Self {
+            protocol_id: protocol_id.into(),
+            source_data_sha256: source_data_sha256.into(),
+            software_commit_sha: software_commit_sha.into(),
+        };
+        validate_evidence_provenance(&provenance)?;
+        Ok(provenance)
+    }
+}
+
+/// Exact held-out prediction trace for one feature family.
+///
+/// The retained test rows make the fitted prediction path independently
+/// recomputable; the record is therefore stronger than a loss-only receipt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictionEvidenceRecord {
+    pub feature_set: PredictionFeatureSet,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub ridge_lambda: f64,
+    pub feature_times: Vec<f64>,
+    pub outcome_times: Vec<f64>,
+    pub observed_outcomes: Vec<f64>,
+    pub predictions: Vec<f64>,
+    /// Computed commitment over the exact samples and split configuration
+    /// supplied to the evaluator.
+    pub evaluation_input_blake3: String,
+    /// Held-out feature rows retained so fitted-model predictions can be
+    /// independently recomputed from retained coefficients and frozen
+    /// training preprocessing parameters.
+    pub test_features: Vec<Vec<f64>>,
+    /// The constant forecast used by the persistence baseline.
+    pub baseline_prediction: Option<f64>,
+    pub fit_coefficients: Option<Vec<f64>>,
+    pub feature_means: Vec<f64>,
+    pub feature_scales: Vec<f64>,
+    pub mean_absolute_error: f64,
+    pub mean_squared_error: f64,
+}
+
+impl PredictionEvidenceRecord {
+    pub fn score(&self) -> PredictionScore {
+        PredictionScore {
+            feature_set: self.feature_set,
+            parameter_count: self.fit_coefficients.as_ref().map_or(0, Vec::len),
+            train_samples: self.train_samples,
+            test_samples: self.test_samples,
+            mean_absolute_error: self.mean_absolute_error,
+            mean_squared_error: self.mean_squared_error,
+        }
+    }
+
+    pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
+        if !is_hex_digest(&self.evaluation_input_blake3, 64) {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        if self.train_samples < 8 || self.test_samples < 4 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if self.predictions.len() != self.test_samples
+            || self.observed_outcomes.len() != self.test_samples
+            || self.feature_times.len() != self.test_samples
+            || self.outcome_times.len() != self.test_samples
+            || !self.ridge_lambda.is_finite()
+            || self.ridge_lambda < 0.0
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let expected_feature_count = feature_count(self.feature_set);
+
+        if let Some(coefficients) = &self.fit_coefficients {
+            if coefficients.len() != expected_feature_count + 1
+                || coefficients.len() != self.feature_means.len() + 1
+                || coefficients.len() != self.feature_scales.len() + 1
+                || self.test_features.len() != self.test_samples
+                || self.baseline_prediction.is_some()
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            if coefficients.iter().any(|value| !value.is_finite())
+                || self.feature_means.iter().any(|value| !value.is_finite())
+                || self
+                    .feature_scales
+                    .iter()
+                    .any(|value| !value.is_finite() || *value <= 0.0)
+                || self.test_features.iter().any(|row| {
+                    row.len() != expected_feature_count
+                        || row.iter().any(|value| !value.is_finite())
+                })
+            {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+
+            let model = FittedLinearModel {
+                coefficients: coefficients.clone(),
+                means: self.feature_means.clone(),
+                scales: self.feature_scales.clone(),
+            };
+            for (features, recorded_prediction) in
+                self.test_features.iter().zip(&self.predictions)
+            {
+                let recomputed = predict(&model, features);
+                let tolerance =
+                    1e-12 * recomputed.abs().max(recorded_prediction.abs()).max(1.0);
+                if !recomputed.is_finite()
+                    || !recorded_prediction.is_finite()
+                    || (recomputed - *recorded_prediction).abs() > tolerance
+                {
+                    return Err(RelationalPredictionError::InvalidSplit);
+                }
+            }
+        } else if !self.feature_means.is_empty()
+            || !self.feature_scales.is_empty()
+            || !self.test_features.is_empty()
+            || self.baseline_prediction.is_none_or(|value| !value.is_finite())
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if self.feature_times.iter().any(|value| !value.is_finite())
+            || self.outcome_times.iter().any(|value| !value.is_finite())
+            || self.observed_outcomes.iter().any(|value| !value.is_finite())
+            || self.predictions.iter().any(|value| !value.is_finite())
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        if self.fit_coefficients.is_none() {
+            let baseline = self
+                .baseline_prediction
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let tolerance = 1e-12 * baseline.abs().max(1.0);
+            if self
+                .predictions
+                .iter()
+                .any(|prediction| (*prediction - baseline).abs() > tolerance)
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        for pair in self.feature_times.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+        for pair in self.outcome_times.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+        for (feature_time, outcome_time) in
+            self.feature_times.iter().zip(&self.outcome_times)
+        {
+            if *outcome_time <= *feature_time {
+                return Err(RelationalPredictionError::OutcomeNotAfterFeatures);
+            }
+        }
+
+        let mut absolute_error = 0.0;
+        let mut squared_error = 0.0;
+        for (prediction, outcome) in self.predictions.iter().zip(&self.observed_outcomes) {
+            let error = *prediction - *outcome;
+            absolute_error += error.abs();
+            squared_error += error * error;
+            if !absolute_error.is_finite() || !squared_error.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+
+        let n = self.test_samples as f64;
+        if n <= 0.0 {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        let mean_absolute_error = absolute_error / n;
+        let mean_squared_error = squared_error / n;
+        if !mean_absolute_error.is_finite() || !mean_squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        if (mean_absolute_error - self.mean_absolute_error).abs() > 1e-12
+            || (mean_squared_error - self.mean_squared_error).abs() > 1e-12
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
+}
+
+/// One complete held-out evidence packet.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldOutRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub config: HeldOutRelationalPredictionConfig,
+    pub summary: HeldOutRelationalPredictionSummary,
+    pub records: Vec<PredictionEvidenceRecord>,
+}
+
+/// Rolling-origin packet retaining a complete trace at each origin.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionEvidence {
+    pub provenance: RelationalPredictionProvenance,
+    pub config: RollingOriginRelationalPredictionConfig,
+    /// Computed commitment over the exact sample sequence and rolling
+    /// configuration supplied to the evaluator.
+    pub evaluation_input_blake3: String,
+    /// Exact source-slice start for each retained origin, in source sample
+    /// indices. This binds the realized rolling schedule to the declared
+    /// first_origin and step_samples.
+    pub origin_starts: Vec<usize>,
+    pub observed: RollingOriginRelationalPredictionSummary,
+    pub origins: Vec<HeldOutRelationalPredictionEvidence>,
+}
+
+
+/// Held-out comparison across the required baselines and the relational model.
+///
+/// No score is interpreted as a consciousness, relationship, value, or
+/// causality measure. The only claim this structure supports is predictive
+/// comparison under the supplied split and target definition.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldOutRelationalPredictionSummary {
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub gap_samples: usize,
+    pub minimum_outcome_horizon: f64,
+    pub maximum_outcome_horizon: f64,
+    pub persistence_baseline: PredictionScore,
+    pub isolated_agents: PredictionScore,
+    pub common_driver: PredictionScore,
+    pub synchrony_only: PredictionScore,
+    pub non_relational_context: PredictionScore,
+    pub relational_augmented: PredictionScore,
+    pub relational_profile: PredictionScore,
+    pub status: EvidenceStatus,
+}
+
+impl HeldOutRelationalPredictionEvidence {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
+        validate_held_out_config_shape(&self.config)?;
+        if self.summary.status != EvidenceStatus::Measured {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if self.summary.train_samples != self.config.train_samples
+            || self.summary.test_samples != self.config.test_samples
+            || self.summary.gap_samples != self.config.gap_samples
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if self.records.is_empty()
+            || self
+                .records
+                .iter()
+                .any(|record| record.evaluation_input_blake3 != self.records[0].evaluation_input_blake3)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if self.records.len() != PredictionFeatureSet::all().len() {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for feature_set in PredictionFeatureSet::all() {
+            if self.records.iter().filter(|record| record.feature_set == feature_set).count() != 1 {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        for record in &self.records {
+            record.validate_trace()?;
+            if record.train_samples != self.config.train_samples
+                || record.test_samples != self.config.test_samples
+                || record.ridge_lambda != self.config.ridge_lambda
+                || record.train_samples != self.summary.train_samples
+                || record.test_samples != self.summary.test_samples
+                || record.score() != self.summary.score(record.feature_set)
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        let reference = self
+            .records
+            .first()
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        for record in &self.records[1..] {
+            if record.feature_times != reference.feature_times
+                || record.outcome_times != reference.outcome_times
+                || record.observed_outcomes != reference.observed_outcomes
+                || record.ridge_lambda != reference.ridge_lambda
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        let min_horizon = reference
+            .outcome_times
+            .iter()
+            .zip(&reference.feature_times)
+            .map(|(outcome, feature)| outcome - feature)
+            .fold(f64::INFINITY, f64::min);
+        let max_horizon = reference
+            .outcome_times
+            .iter()
+            .zip(&reference.feature_times)
+            .map(|(outcome, feature)| outcome - feature)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        if (min_horizon - self.summary.minimum_outcome_horizon).abs() > 1e-12
+            || (max_horizon - self.summary.maximum_outcome_horizon).abs() > 1e-12
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        Ok(())
+    }
+
+    /// Return target-level squared-loss differentials for the critical
+    /// RelationalAugmented versus NonRelationalContext comparison.
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        relational_loss_differentials_from_records(0, &self.records)
+    }
+
+    /// Describe dependence in the ordered held-out loss differential sequence.
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag: usize,
+    ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
+        let differentials = self.relational_loss_differentials()?;
+        let mut profile = ForecastLossDependenceProfile::compute(
+            &differentials
+                .iter()
+                .map(|item| item.loss_differential)
+                .collect::<Vec<_>>(),
+            max_lag,
+        )?;
+        profile.evaluation_input_blake3 = self
+            .records
+            .first()
+            .map(|record| record.evaluation_input_blake3.clone());
+        Ok(profile)
+    }
+
+    /// Return the retained target-level loss differentials without recomputing
+    /// them from summary scores.
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        Ok(self.relational_loss_differentials.clone())
+    }
+
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag: usize,
+    ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
+        self.validate()?;
+        let mut profile = ForecastLossDependenceProfile::compute(
+            &self
+                .relational_loss_differentials
+                .iter()
+                .map(|item| item.loss_differential)
+                .collect::<Vec<_>>(),
+            max_lag,
+        )?;
+        profile.evaluation_input_blake3 = Some(self.evaluation_input_blake3.clone());
+        Ok(profile)
+    }
+
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        Ok(self.relational_loss_differentials.clone())
+    }
+
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag: usize,
+    ) -> Result<ForecastLossDependenceProfile, RelationalPredictionError> {
+        self.validate()?;
+        let mut profile = ForecastLossDependenceProfile::compute(
+            &self
+                .relational_loss_differentials
+                .iter()
+                .map(|item| item.loss_differential)
+                .collect::<Vec<_>>(),
+            max_lag,
+        )?;
+        profile.evaluation_input_blake3 = Some(self.evaluation_input_blake3.clone());
+        Ok(profile)
+    }
+
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+    ) -> Result<(), RelationalPredictionError> {
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if evaluation_input_digest(samples, config) != self.records
+            .first()
+            .map(|record| record.evaluation_input_blake3.as_str())
+            .unwrap_or("")
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute_evidence(samples, config, self.provenance.clone())?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let scores = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| {
+                let score = self.summary.score(feature_set);
+                serde_json::json!({
+                    "feature_set": feature_set_name(feature_set),
+                    "parameter_count": score.parameter_count,
+                    "train_samples": score.train_samples,
+                    "test_samples": score.test_samples,
+                    "mean_absolute_error": score.mean_absolute_error,
+                    "mean_squared_error": score.mean_squared_error
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let records = self
+            .records
+            .iter()
+            .map(prediction_evidence_record_json)
+            .collect::<Vec<_>>();
+
+        Ok(serde_json::json!({
+            "schema": EVIDENCE_SCHEMA,
+            "feature_schema": FEATURE_SCHEMA,
+            "model_schema": MODEL_SCHEMA,
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "evaluation_input_blake3": &self.records.first()
+                .map(|record| record.evaluation_input_blake3.as_str())
+                .unwrap_or(""),
+            "split": {
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "minimum_outcome_horizon": self.summary.minimum_outcome_horizon,
+                "maximum_outcome_horizon": self.summary.maximum_outcome_horizon,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "scores": scores,
+            "records": records
+        }).to_string())
+    }
+}
+
+impl HeldOutRelationalPredictionSummary {
+    pub fn compute_evidence(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<HeldOutRelationalPredictionEvidence, RelationalPredictionError> {
+        let summary = Self::compute(samples, config)?;
+        let evaluation_input_blake3 = evaluation_input_digest(samples, config);
+        let records = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| fit_prediction_record(
+                samples,
+                &config,
+                feature_set,
+                evaluation_input_blake3.clone(),
+            ))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let evidence = HeldOutRelationalPredictionEvidence {
+            provenance,
+            config,
+            summary,
+            records,
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+    ) -> Result<Self, RelationalPredictionError> {
+        validate_samples(samples)?;
+        config.validate(samples.len())?;
+        validate_temporal_boundary(samples, &config)?;
+
+        let persistence_baseline =
+            fit_and_score(samples, &config, PredictionFeatureSet::PersistenceBaseline)?;
+        let scores = [
+            fit_and_score(samples, &config, PredictionFeatureSet::IsolatedAgents)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::CommonDriver)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::SynchronyOnly)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::NonRelationalContext)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::RelationalAugmented)?,
+            fit_and_score(samples, &config, PredictionFeatureSet::RelationalProfile)?,
+        ];
+
+        let horizon_values = samples
+            .iter()
+            .map(|sample| sample.outcome_time - sample.feature_time)
+            .collect::<Vec<_>>();
+
+        Ok(Self {
+            train_samples: config.train_samples,
+            test_samples: config.test_samples,
+            gap_samples: config.gap_samples,
+            minimum_outcome_horizon: horizon_values
+                .iter()
+                .copied()
+                .fold(f64::INFINITY, f64::min),
+            maximum_outcome_horizon: horizon_values
+                .iter()
+                .copied()
+                .fold(f64::NEG_INFINITY, f64::max),
+            persistence_baseline,
+            isolated_agents: scores[0],
+            common_driver: scores[1],
+            synchrony_only: scores[2],
+            non_relational_context: scores[3],
+            relational_augmented: scores[4],
+            relational_profile: scores[5],
+            status: EvidenceStatus::Measured,
+        })
+    }
+
+    pub fn score(&self, feature_set: PredictionFeatureSet) -> PredictionScore {
+        match feature_set {
+            PredictionFeatureSet::PersistenceBaseline => self.persistence_baseline,
+            PredictionFeatureSet::IsolatedAgents => self.isolated_agents,
+            PredictionFeatureSet::CommonDriver => self.common_driver,
+            PredictionFeatureSet::SynchronyOnly => self.synchrony_only,
+            PredictionFeatureSet::NonRelationalContext => self.non_relational_context,
+            PredictionFeatureSet::RelationalAugmented => self.relational_augmented,
+            PredictionFeatureSet::RelationalProfile => self.relational_profile,
+        }
+    }
+
+    /// Positive values mean the selected relational model has lower MSE than
+    /// the specified baseline; negative values mean the baseline is better.
+    pub fn relational_mse_improvement_over(
+        &self,
+        baseline: PredictionFeatureSet,
+    ) -> Option<f64> {
+        let baseline_mse = self.score(baseline).mean_squared_error;
+        if baseline_mse <= 1e-20 {
+            return None;
+        }
+
+        Some((baseline_mse - self.relational_profile.mean_squared_error) / baseline_mse)
+    }
+
+    /// Positive values mean relational channels add predictive information
+    /// beyond the nested non-relational context model.
+    pub fn augmented_mse_improvement_over_non_relational(&self) -> Option<f64> {
+        let baseline_mse = self.non_relational_context.mean_squared_error;
+        if baseline_mse <= 1e-20 {
+            return None;
+        }
+
+        Some(
+            (baseline_mse - self.relational_augmented.mean_squared_error) / baseline_mse,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RollingOriginRelationalPredictionConfig {
+    /// Earliest index at which the first training window starts.
+    pub first_origin: usize,
+    /// Fixed training-window size.
+    pub train_samples: usize,
+    /// Fixed test-window size.
+    pub test_samples: usize,
+    /// Fixed gap between training and test feature windows.
+    pub gap_samples: usize,
+    /// Number of forward origins to evaluate.
+    pub origin_count: usize,
+    /// Forward step between origins. Must be at least test_samples so
+    /// held-out target windows do not overlap.
+    pub step_samples: usize,
+    /// Fixed forecast horizon in the same time units as the samples.
+    pub forecast_horizon: f64,
+    /// Fixed ridge coefficient shared across every origin.
+    pub ridge_lambda: f64,
+}
+
+impl Default for RollingOriginRelationalPredictionConfig {
+    fn default() -> Self {
+        Self {
+            first_origin: 0,
+            train_samples: 48,
+            test_samples: 16,
+            gap_samples: 4,
+            origin_count: 4,
+            step_samples: 16,
+            forecast_horizon: 1.0,
+            ridge_lambda: 1e-8,
+        }
+    }
+}
+
+const INFERENCE_PLAN_SCHEMA: &str = "relational-prediction-inference-plan/v2";
+const INFERENCE_BINDING_SCHEMA: &str = "relational-prediction-inference-binding/v1";
+const INFERENCE_SELECTION_SCHEMA: &str = "relational-prediction-inference-selection/v1";
+const CANONICAL_INFERENCE_SELECTION_RULE_ID: &str = "relational-inference-selection-rule-v1";
+const CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256: &str =
+    "61ecc22c11c7967fc7a6e9784ff4fa15ff191bcac49b1d24249d567615bbe3e5";
+const CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID: &str = "nested-forecast-bootstrap-v1";
+const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID: &str = "loss-dependence-bartlett-v1";
+const CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID: &str = "moving-block-bootstrap-v1";
+const CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256: &str =
+    "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b";
+const CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256: &str =
+    "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9";
+const CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256: &str =
+    "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d";
+const CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID: &str =
+    "small-sample-conservative-v1";
+const CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID: &str =
+    "single-primary-comparison-v1";
+const CANONICAL_INFERENCE_ESTIMATOR_ID: &str = "fixed-ridge-standardized-v1";
+const CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256: &str =
+    "703ff832ca6fed91ca05d76c891ba6b2edb3bf063e7af40a23ae2c475061027e";
+const CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_APPROVED: bool = false;
+
+/// Frozen analysis contract for future inferential qualification.
+/// This specifies the inferential procedure and all supporting choices without
+/// executing inference. The plan digest makes later method substitution detectable.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastInferencePlan {
+    pub primary_feature_set: PredictionFeatureSet,
+    pub benchmark_feature_set: PredictionFeatureSet,
+    pub loss: String,
+    pub forecast_horizon: f64,
+    pub origin_schedule_sha256: String,
+    /// Predeclared decision rule that maps design/dependence conditions to the inferential method.
+    pub method_selection_rule_id: String,
+    /// Cryptographic commitment to the exact decision-tree/specification used for method selection.
+    pub method_selection_rule_spec_sha256: String,
+    pub procedure_id: String,
+    pub procedure_spec_sha256: String,
+    pub dependence_method_id: String,
+    pub dependence_spec_sha256: String,
+    pub resampling_method_id: String,
+    pub resampling_spec_sha256: String,
+    pub small_sample_policy_id: String,
+    pub multiplicity_policy_id: String,
+    pub alpha: f64,
+    pub qualification_identity_blake3: String,
+    pub estimator_compatibility_id: String,
+    pub estimator_compatibility_spec_sha256: String,
+    pub plan_blake3: String,
+}
+
+impl ForecastInferencePlan {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        forecast_horizon: f64,
+        origin_schedule_sha256: impl Into<String>,
+        method_selection_rule_id: impl Into<String>,
+        method_selection_rule_spec_sha256: impl Into<String>,
+        procedure_id: impl Into<String>,
+        procedure_spec_sha256: impl Into<String>,
+        dependence_method_id: impl Into<String>,
+        dependence_spec_sha256: impl Into<String>,
+        resampling_method_id: impl Into<String>,
+        resampling_spec_sha256: impl Into<String>,
+        small_sample_policy_id: impl Into<String>,
+        multiplicity_policy_id: impl Into<String>,
+        alpha: f64,
+        qualification_identity_blake3: impl Into<String>,
+    ) -> Result<Self, RelationalPredictionError> {
+        let mut plan = Self {
+            primary_feature_set: PredictionFeatureSet::RelationalAugmented,
+            benchmark_feature_set: PredictionFeatureSet::NonRelationalContext,
+            loss: "squared_error".to_string(),
+            forecast_horizon,
+            origin_schedule_sha256: origin_schedule_sha256.into(),
+            method_selection_rule_id: method_selection_rule_id.into(),
+            method_selection_rule_spec_sha256: method_selection_rule_spec_sha256.into(),
+            procedure_id: procedure_id.into(),
+            procedure_spec_sha256: procedure_spec_sha256.into(),
+            dependence_method_id: dependence_method_id.into(),
+            dependence_spec_sha256: dependence_spec_sha256.into(),
+            resampling_method_id: resampling_method_id.into(),
+            resampling_spec_sha256: resampling_spec_sha256.into(),
+            small_sample_policy_id: small_sample_policy_id.into(),
+            multiplicity_policy_id: multiplicity_policy_id.into(),
+            alpha,
+            qualification_identity_blake3: qualification_identity_blake3.into(),
+            estimator_compatibility_id: CANONICAL_INFERENCE_ESTIMATOR_ID.to_string(),
+            estimator_compatibility_spec_sha256:
+                CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256.to_string(),
+            plan_blake3: String::new(),
+        };
+        plan.plan_blake3 = inference_plan_digest(&plan);
+        plan.validate()?;
+        Ok(plan)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if self.primary_feature_set != PredictionFeatureSet::RelationalAugmented
+            || self.benchmark_feature_set != PredictionFeatureSet::NonRelationalContext
+            || self.loss != "squared_error"
+            || !self.forecast_horizon.is_finite()
+            || self.forecast_horizon <= 0.0
+            || !is_hex_digest(&self.origin_schedule_sha256, 64)
+            || self.method_selection_rule_id.trim().is_empty()
+            || !is_hex_digest(&self.method_selection_rule_spec_sha256, 64)
+            || self.procedure_id.trim().is_empty()
+            || !is_hex_digest(&self.procedure_spec_sha256, 64)
+            || self.dependence_method_id.trim().is_empty()
+            || !is_hex_digest(&self.dependence_spec_sha256, 64)
+            || self.resampling_method_id.trim().is_empty()
+            || !is_hex_digest(&self.resampling_spec_sha256, 64)
+            || self.small_sample_policy_id.trim().is_empty()
+            || self.multiplicity_policy_id.trim().is_empty()
+            || !self.alpha.is_finite()
+            || self.alpha <= 0.0
+            || self.alpha >= 1.0
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || self.estimator_compatibility_id.trim().is_empty()
+            || !is_hex_digest(&self.estimator_compatibility_spec_sha256, 64)
+            || !is_hex_digest(&self.plan_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if inference_plan_digest(self) != self.plan_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn validate_against_qualification(
+        &self,
+        qualification_identity_blake3: &str,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        if self.qualification_identity_blake3 != qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": INFERENCE_PLAN_SCHEMA,
+            "primary_feature_set": feature_set_name(self.primary_feature_set),
+            "benchmark_feature_set": feature_set_name(self.benchmark_feature_set),
+            "loss": &self.loss,
+            "forecast_horizon": self.forecast_horizon,
+            "origin_schedule_sha256": &self.origin_schedule_sha256,
+            "method_selection_rule_id": &self.method_selection_rule_id,
+            "method_selection_rule_spec_sha256": &self.method_selection_rule_spec_sha256,
+            "procedure_id": &self.procedure_id,
+            "procedure_spec_sha256": &self.procedure_spec_sha256,
+            "dependence_method_id": &self.dependence_method_id,
+            "dependence_spec_sha256": &self.dependence_spec_sha256,
+            "resampling_method_id": &self.resampling_method_id,
+            "resampling_spec_sha256": &self.resampling_spec_sha256,
+            "small_sample_policy_id": &self.small_sample_policy_id,
+            "multiplicity_policy_id": &self.multiplicity_policy_id,
+            "alpha": self.alpha,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "estimator_compatibility_id": &self.estimator_compatibility_id,
+            "estimator_compatibility_spec_sha256": &self.estimator_compatibility_spec_sha256,
+            "plan_blake3": &self.plan_blake3
+        }).to_string())
+    }
+}
+
+
+
+/// Deterministic commitment to the single-window origin schedule.
+///
+/// The schedule digest covers only the declared split geometry and forecast
+/// horizon; model/provenance identity is committed separately by the
+/// qualification and inference-plan digests.
+pub fn single_origin_schedule_sha256(
+    config: HeldOutRelationalPredictionConfig,
+    forecast_horizon: f64,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"relational-prediction-origin-schedule/single/v1");
+    update_schedule_usize(&mut hasher, 0);
+    update_schedule_usize(&mut hasher, config.train_samples);
+    update_schedule_usize(&mut hasher, config.gap_samples);
+    update_schedule_usize(&mut hasher, config.test_samples);
+    update_schedule_f64(&mut hasher, forecast_horizon);
+    hex::encode(hasher.finalize())
+}
+
+/// Deterministic commitment to every rolling-origin split.
+///
+/// Origin starts are derived from the same checked arithmetic used by the
+/// rolling evaluator, so a caller cannot silently commit a different schedule
+/// while leaving the rolling qualification configuration unchanged.
+pub fn rolling_origin_schedule_sha256(
+    config: RollingOriginRelationalPredictionConfig,
+) -> Result<String, RelationalPredictionError> {
+    validate_rolling_qualification_config_shape(&config)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"relational-prediction-origin-schedule/rolling/v1");
+    update_schedule_usize(&mut hasher, config.first_origin);
+    update_schedule_usize(&mut hasher, config.train_samples);
+    update_schedule_usize(&mut hasher, config.gap_samples);
+    update_schedule_usize(&mut hasher, config.test_samples);
+    update_schedule_usize(&mut hasher, config.origin_count);
+    update_schedule_usize(&mut hasher, config.step_samples);
+    update_schedule_f64(&mut hasher, config.forecast_horizon);
+    for origin in 0..config.origin_count {
+        let start = config
+            .step_samples
+            .checked_mul(origin)
+            .and_then(|offset| config.first_origin.checked_add(offset))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        update_schedule_usize(&mut hasher, start);
+        let test_start = start
+            .checked_add(config.train_samples)
+            .and_then(|value| value.checked_add(config.gap_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        let test_end = test_start
+            .checked_add(config.test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        update_schedule_usize(&mut hasher, test_start);
+        update_schedule_usize(&mut hasher, test_end);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn update_schedule_usize(hasher: &mut Sha256, value: usize) {
+    hasher.update((value as u64).to_le_bytes());
+}
+
+fn update_schedule_f64(hasher: &mut Sha256, value: f64) {
+    hasher.update(value.to_bits().to_le_bytes());
+}
+
+/// In-crate witness proving that a qualification was replayed against its exact source
+/// sequence before an inference binding was minted. Its private construction prevents
+/// callers from forging the witness through a public struct literal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct VerifiedQualificationReplay;
+
+/// Pre-inference binding gate for a forecast-accuracy qualification.
+///
+/// This artifact deliberately performs no statistical inference. Its constructors
+/// first replay the qualification against the exact source sample sequence and then
+/// mint a private replay witness. The binding therefore cannot be reached through
+/// qualification self-consistency alone; it binds one replay-verified qualification,
+/// its retained loss differential vector, a measured dependence profile, and one
+/// frozen inference plan. A future inferential result should consume this binding
+/// rather than accepting those components independently.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForecastInferenceBinding {
+    pub analysis_level: String,
+    pub origin_schedule_sha256: String,
+    pub qualification_identity_blake3: String,
+    pub plan_blake3: String,
+    pub evaluation_input_blake3: String,
+    pub relational_loss_differentials_blake3: String,
+    pub dependence_profile_blake3: String,
+    pub dependence_max_lag_within_origin: usize,
+    pub dependence_max_lag_across_origins: usize,
+    pub origin_count: usize,
+    pub test_samples: usize,
+    pub forecast_horizon: f64,
+    pub binding_blake3: String,
+    replay_verified: VerifiedQualificationReplay,
+}
+
+impl ForecastInferenceBinding {
+    pub fn from_single(
+        samples: &[RelationalPredictionSample],
+        plan: &ForecastInferencePlan,
+        qualification: &HeldOutRelationalPredictionQualification,
+        dependence: &ForecastLossDependenceProfile,
+    ) -> Result<Self, RelationalPredictionError> {
+        qualification.verify_against_samples(samples, qualification.config)?;
+        let horizon = qualification.observed.minimum_outcome_horizon;
+        let binding = Self {
+            analysis_level: "single-window".to_string(),
+            origin_schedule_sha256: plan.origin_schedule_sha256.clone(),
+            qualification_identity_blake3: qualification.qualification_identity_blake3.clone(),
+            plan_blake3: plan.plan_blake3.clone(),
+            evaluation_input_blake3: qualification.evaluation_input_blake3.clone(),
+            relational_loss_differentials_blake3: qualification
+                .relational_loss_differentials_blake3
+                .clone(),
+            dependence_profile_blake3: dependence_profile_blake3.to_string(),
+            dependence_max_lag_within_origin: dependence.max_lag,
+            dependence_max_lag_across_origins: 0,
+            origin_count: 1,
+            test_samples: qualification.config.test_samples,
+            forecast_horizon: horizon,
+            binding_blake3: String::new(),
+            replay_verified: VerifiedQualificationReplay,
+        };
+        let mut binding = binding;
+        binding.binding_blake3 = inference_binding_digest(&binding);
+        binding.validate_against_single(plan, qualification, dependence)?;
+        Ok(binding)
+    }
+
+    pub fn from_rolling(
+        samples: &[RelationalPredictionSample],
+        plan: &ForecastInferencePlan,
+        qualification: &RollingOriginRelationalPredictionQualification,
+        dependence: &RollingForecastLossDependenceProfile,
+    ) -> Result<Self, RelationalPredictionError> {
+        qualification.verify_against_samples(samples, qualification.config)?;
+        let binding = Self {
+            analysis_level: "rolling-origin".to_string(),
+            origin_schedule_sha256: plan.origin_schedule_sha256.clone(),
+            qualification_identity_blake3: qualification.qualification_identity_blake3.clone(),
+            plan_blake3: plan.plan_blake3.clone(),
+            evaluation_input_blake3: qualification.evaluation_input_blake3.clone(),
+            relational_loss_differentials_blake3: qualification
+                .relational_loss_differentials_blake3
+                .clone(),
+            dependence_profile_blake3: rolling_forecast_loss_dependence_profile_digest(dependence),
+            dependence_max_lag_within_origin: dependence.max_lag_within_origin,
+            dependence_max_lag_across_origins: dependence.max_lag_across_origins,
+            origin_count: qualification.config.origin_count,
+            test_samples: qualification.config.test_samples,
+            forecast_horizon: qualification.config.forecast_horizon,
+            binding_blake3: String::new(),
+            replay_verified: VerifiedQualificationReplay,
+        };
+        let mut binding = binding;
+        binding.binding_blake3 = inference_binding_digest(&binding);
+        binding.validate_against_rolling(plan, qualification, dependence)?;
+        Ok(binding)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if !matches!(self.analysis_level.as_str(), "single-window" | "rolling-origin")
+            || !is_hex_digest(&self.origin_schedule_sha256, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || !is_hex_digest(&self.plan_blake3, 64)
+            || !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.relational_loss_differentials_blake3, 64)
+            || !is_hex_digest(&self.dependence_profile_blake3, 64)
+            || self.origin_count == 0
+            || self.test_samples < 4
+            || self.dependence_max_lag_within_origin >= self.test_samples
+            || !self.forecast_horizon.is_finite()
+            || self.forecast_horizon <= 0.0
+            || !is_hex_digest(&self.binding_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        match self.analysis_level.as_str() {
+            "single-window" if self.origin_count != 1 || self.dependence_max_lag_across_origins != 0 => {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            "rolling-origin"
+                if self.origin_count < 4
+                    || self.dependence_max_lag_across_origins >= self.origin_count =>
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            _ => {}
+        }
+        if inference_binding_digest(self) != self.binding_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn validate_against_single(
+        &self,
+        plan: &ForecastInferencePlan,
+        qualification: &HeldOutRelationalPredictionQualification,
+        dependence: &ForecastLossDependenceProfile,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        qualification.validate()?;
+        dependence.validate()?;
+        plan.validate_against_qualification(&qualification.qualification_identity_blake3)?;
+        let expected_schedule =
+            single_origin_schedule_sha256(qualification.config, plan.forecast_horizon);
+        if plan.origin_schedule_sha256 != expected_schedule {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        if self.analysis_level != "single-window"
+            || self.origin_count != 1
+            || self.test_samples != qualification.config.test_samples
+            || self.origin_schedule_sha256 != plan.origin_schedule_sha256
+            || self.qualification_identity_blake3 != qualification.qualification_identity_blake3
+            || self.plan_blake3 != plan.plan_blake3
+            || self.evaluation_input_blake3 != qualification.evaluation_input_blake3
+            || self.relational_loss_differentials_blake3
+                != qualification.relational_loss_differentials_blake3
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let horizon_tolerance = 1e-9 * self.forecast_horizon.abs().max(1.0);
+        if (plan.forecast_horizon - self.forecast_horizon).abs() > horizon_tolerance
+            || (qualification.observed.minimum_outcome_horizon - qualification.observed.maximum_outcome_horizon).abs()
+                > horizon_tolerance
+            || (qualification.observed.minimum_outcome_horizon - self.forecast_horizon).abs()
+                > horizon_tolerance
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let expected_dependence =
+            qualification.relational_loss_dependence(self.dependence_max_lag_within_origin)?;
+        if expected_dependence != *dependence
+            || self.dependence_max_lag_within_origin != dependence.max_lag
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_against_rolling(
+        &self,
+        plan: &ForecastInferencePlan,
+        qualification: &RollingOriginRelationalPredictionQualification,
+        dependence: &RollingForecastLossDependenceProfile,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        qualification.validate()?;
+        dependence.validate()?;
+        plan.validate_against_qualification(&qualification.qualification_identity_blake3)?;
+        let expected_schedule = rolling_origin_schedule_sha256(qualification.config)?;
+        if plan.origin_schedule_sha256 != expected_schedule {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        if self.analysis_level != "rolling-origin"
+            || self.origin_count != qualification.config.origin_count
+            || self.test_samples != qualification.config.test_samples
+            || self.forecast_horizon != qualification.config.forecast_horizon
+            || self.origin_schedule_sha256 != plan.origin_schedule_sha256
+            || self.qualification_identity_blake3 != qualification.qualification_identity_blake3
+            || self.plan_blake3 != plan.plan_blake3
+            || self.evaluation_input_blake3 != qualification.evaluation_input_blake3
+            || self.relational_loss_differentials_blake3
+                != qualification.relational_loss_differentials_blake3
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let expected_dependence = qualification.relational_loss_dependence(
+            self.dependence_max_lag_within_origin,
+            self.dependence_max_lag_across_origins,
+        )?;
+        if expected_dependence != *dependence
+            || self.dependence_profile_blake3
+                != rolling_forecast_loss_dependence_profile_digest(dependence)
+            || self.dependence_max_lag_within_origin != dependence.max_lag_within_origin
+            || self.dependence_max_lag_across_origins != dependence.max_lag_across_origins
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": INFERENCE_BINDING_SCHEMA,
+            "analysis_level": &self.analysis_level,
+            "origin_schedule_sha256": &self.origin_schedule_sha256,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "plan_blake3": &self.plan_blake3,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "relational_loss_differentials_blake3": &self.relational_loss_differentials_blake3,
+            "dependence_profile_blake3": &self.dependence_profile_blake3,
+            "dependence_max_lag_within_origin": self.dependence_max_lag_within_origin,
+            "dependence_max_lag_across_origins": self.dependence_max_lag_across_origins,
+            "origin_count": self.origin_count,
+            "test_samples": self.test_samples,
+            "forecast_horizon": self.forecast_horizon,
+            "binding_blake3": &self.binding_blake3
+        }).to_string())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ForecastInferenceSelectionPath {
+    NestedFixedHorizonBootstrap,
+    StopAssumptionFailure,
+}
+
+impl ForecastInferenceSelectionPath {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NestedFixedHorizonBootstrap => "nested-fixed-horizon-bootstrap",
+            Self::StopAssumptionFailure => "stop-assumption-failure",
+        }
+    }
+
+    fn for_plan(plan: &ForecastInferencePlan) -> Self {
+        if CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_APPROVED
+            && plan.estimator_compatibility_id == CANONICAL_INFERENCE_ESTIMATOR_ID
+            && plan.estimator_compatibility_spec_sha256
+                == CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
+            && plan.method_selection_rule_id == CANONICAL_INFERENCE_SELECTION_RULE_ID
+            && plan.method_selection_rule_spec_sha256
+                == CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256
+            && plan.procedure_id == CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID
+            && plan.procedure_spec_sha256 == CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256
+            && plan.dependence_method_id == CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID
+            && plan.dependence_spec_sha256 == CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256
+            && plan.resampling_method_id == CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID
+            && plan.resampling_spec_sha256 == CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256
+            && plan.small_sample_policy_id == CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID
+            && plan.multiplicity_policy_id == CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID
+        {
+            Self::NestedFixedHorizonBootstrap
+        } else {
+            Self::StopAssumptionFailure
+        }
+    }
+}
+
+/// Machine-readable record of the inference-selection branch derived from the
+/// prespecified decision rule.
+///
+/// This receipt sits above the validated pre-inference binding. It records the
+/// selected branch without executing inference and without claiming to prove
+/// that the plan was temporally preregistered before outcome inspection.
+pub struct ForecastInferenceSelectionReceipt {
+    pub analysis_level: String,
+    pub binding_blake3: String,
+    pub qualification_identity_blake3: String,
+    pub plan_blake3: String,
+    pub dependence_profile_blake3: String,
+    pub method_selection_rule_id: String,
+    pub method_selection_rule_spec_sha256: String,
+    /// Derived branch identifier from the compiled v1 mirror of the frozen selection rule.
+    /// This records the machine-derived outcome and does not prove temporal preregistration.
+    pub decision_path_id: String,
+    pub selected_procedure_id: String,
+    pub selected_procedure_spec_sha256: String,
+    pub selected_dependence_method_id: String,
+    pub selected_dependence_spec_sha256: String,
+    pub selected_resampling_method_id: String,
+    pub selected_resampling_spec_sha256: String,
+    pub selected_small_sample_policy_id: String,
+    pub selected_multiplicity_policy_id: String,
+    pub estimator_compatibility_id: String,
+    pub estimator_compatibility_spec_sha256: String,
+    pub selection_blake3: String,
+}
+
+impl ForecastInferenceSelectionReceipt {
+    pub fn from_single(
+        samples: &[RelationalPredictionSample],
+        plan: &ForecastInferencePlan,
+        qualification: &HeldOutRelationalPredictionQualification,
+        dependence: &ForecastLossDependenceProfile,
+    ) -> Result<Self, RelationalPredictionError> {
+        let binding =
+            ForecastInferenceBinding::from_single(samples, plan, qualification, dependence)?;
+        dependence.validate()?;
+        let dependence_profile_blake3 = forecast_loss_dependence_profile_digest(dependence);
+        Self::from_binding(
+            &binding,
+            plan,
+            qualification.qualification_identity_blake3.as_str(),
+            &dependence_profile_blake3,
+        )
+    }
+
+    pub fn from_rolling(
+        samples: &[RelationalPredictionSample],
+        plan: &ForecastInferencePlan,
+        qualification: &RollingOriginRelationalPredictionQualification,
+        dependence: &RollingForecastLossDependenceProfile,
+    ) -> Result<Self, RelationalPredictionError> {
+        let binding =
+            ForecastInferenceBinding::from_rolling(samples, plan, qualification, dependence)?;
+        dependence.validate()?;
+        let dependence_profile_blake3 = rolling_forecast_loss_dependence_profile_digest(dependence);
+        Self::from_binding(
+            &binding,
+            plan,
+            qualification.qualification_identity_blake3.as_str(),
+            &dependence_profile_blake3,
+        )
+    }
+
+    fn from_binding(
+        binding: &ForecastInferenceBinding,
+        plan: &ForecastInferencePlan,
+        qualification_identity_blake3: &str,
+        dependence_profile_blake3: &str,
+    ) -> Result<Self, RelationalPredictionError> {
+        let mut receipt = Self {
+            analysis_level: binding.analysis_level.clone(),
+            binding_blake3: binding.binding_blake3.clone(),
+            qualification_identity_blake3: qualification_identity_blake3.to_string(),
+            plan_blake3: plan.plan_blake3.clone(),
+            dependence_profile_blake3: dependence_profile_blake3.to_string(),
+            method_selection_rule_id: plan.method_selection_rule_id.clone(),
+            method_selection_rule_spec_sha256: plan.method_selection_rule_spec_sha256.clone(),
+            decision_path_id: ForecastInferenceSelectionPath::for_plan(plan)
+                .as_str()
+                .to_string(),
+            selected_procedure_id: plan.procedure_id.clone(),
+            selected_procedure_spec_sha256: plan.procedure_spec_sha256.clone(),
+            selected_dependence_method_id: plan.dependence_method_id.clone(),
+            selected_dependence_spec_sha256: plan.dependence_spec_sha256.clone(),
+            selected_resampling_method_id: plan.resampling_method_id.clone(),
+            selected_resampling_spec_sha256: plan.resampling_spec_sha256.clone(),
+            selected_small_sample_policy_id: plan.small_sample_policy_id.clone(),
+            selected_multiplicity_policy_id: plan.multiplicity_policy_id.clone(),
+            estimator_compatibility_id: plan.estimator_compatibility_id.clone(),
+            estimator_compatibility_spec_sha256: plan.estimator_compatibility_spec_sha256.clone(),
+            selection_blake3: String::new(),
+        };
+        receipt.selection_blake3 = inference_selection_digest(&receipt);
+        receipt.validate_against_binding(
+            binding,
+            plan,
+            qualification_identity_blake3,
+            dependence_profile_blake3,
+        )?;
+        Ok(receipt)
+    }
+
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        if !matches!(self.analysis_level.as_str(), "single-window" | "rolling-origin")
+            || !is_hex_digest(&self.binding_blake3, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || !is_hex_digest(&self.plan_blake3, 64)
+            || !is_hex_digest(&self.dependence_profile_blake3, 64)
+            || self.method_selection_rule_id.trim().is_empty()
+            || !is_hex_digest(&self.method_selection_rule_spec_sha256, 64)
+            || !matches!(
+                self.decision_path_id.as_str(),
+                "nested-fixed-horizon-bootstrap" | "stop-assumption-failure"
+            )
+            || self.selected_procedure_id.trim().is_empty()
+            || !is_hex_digest(&self.selected_procedure_spec_sha256, 64)
+            || self.selected_dependence_method_id.trim().is_empty()
+            || !is_hex_digest(&self.selected_dependence_spec_sha256, 64)
+            || self.selected_resampling_method_id.trim().is_empty()
+            || !is_hex_digest(&self.selected_resampling_spec_sha256, 64)
+            || self.selected_small_sample_policy_id.trim().is_empty()
+            || self.selected_multiplicity_policy_id.trim().is_empty()
+            || self.estimator_compatibility_id.trim().is_empty()
+            || !is_hex_digest(&self.estimator_compatibility_spec_sha256, 64)
+            || !is_hex_digest(&self.selection_blake3, 64)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        if inference_selection_digest(self) != self.selection_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn validate_against_binding(
+        &self,
+        binding: &ForecastInferenceBinding,
+        plan: &ForecastInferencePlan,
+        qualification_identity_blake3: &str,
+        dependence_profile_blake3: &str,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        binding.validate()?;
+        plan.validate_against_qualification(qualification_identity_blake3)?;
+        if self.analysis_level != binding.analysis_level
+            || self.binding_blake3 != binding.binding_blake3
+            || self.qualification_identity_blake3 != qualification_identity_blake3
+            || self.plan_blake3 != plan.plan_blake3
+            || self.method_selection_rule_id != plan.method_selection_rule_id
+            || self.method_selection_rule_spec_sha256 != plan.method_selection_rule_spec_sha256
+            || self.selected_procedure_id != plan.procedure_id
+            || self.selected_procedure_spec_sha256 != plan.procedure_spec_sha256
+            || self.selected_dependence_method_id != plan.dependence_method_id
+            || self.selected_dependence_spec_sha256 != plan.dependence_spec_sha256
+            || self.selected_resampling_method_id != plan.resampling_method_id
+            || self.selected_resampling_spec_sha256 != plan.resampling_spec_sha256
+            || self.selected_small_sample_policy_id != plan.small_sample_policy_id
+            || self.selected_multiplicity_policy_id != plan.multiplicity_policy_id
+            || self.estimator_compatibility_id != plan.estimator_compatibility_id
+            || self.estimator_compatibility_spec_sha256
+                != plan.estimator_compatibility_spec_sha256
+            || self.decision_path_id != ForecastInferenceSelectionPath::for_plan(plan).as_str()
+        {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        if self.dependence_profile_blake3 != dependence_profile_blake3
+            || self.dependence_profile_blake3 != binding.dependence_profile_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+        Ok(serde_json::json!({
+            "schema": INFERENCE_SELECTION_SCHEMA,
+            "analysis_level": &self.analysis_level,
+            "binding_blake3": &self.binding_blake3,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "plan_blake3": &self.plan_blake3,
+            "dependence_profile_blake3": &self.dependence_profile_blake3,
+            "method_selection_rule_id": &self.method_selection_rule_id,
+            "method_selection_rule_spec_sha256": &self.method_selection_rule_spec_sha256,
+            "decision_path_id": &self.decision_path_id,
+            "selected_procedure_id": &self.selected_procedure_id,
+            "selected_procedure_spec_sha256": &self.selected_procedure_spec_sha256,
+            "selected_dependence_method_id": &self.selected_dependence_method_id,
+            "selected_dependence_spec_sha256": &self.selected_dependence_spec_sha256,
+            "selected_resampling_method_id": &self.selected_resampling_method_id,
+            "selected_resampling_spec_sha256": &self.selected_resampling_spec_sha256,
+            "selected_small_sample_policy_id": &self.selected_small_sample_policy_id,
+            "selected_multiplicity_policy_id": &self.selected_multiplicity_policy_id,
+            "estimator_compatibility_id": &self.estimator_compatibility_id,
+            "estimator_compatibility_spec_sha256": &self.estimator_compatibility_spec_sha256,
+            "selection_blake3": &self.selection_blake3
+        }).to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionSummary {
+    pub first_origin: usize,
+    pub train_samples: usize,
+    pub test_samples: usize,
+    pub gap_samples: usize,
+    pub origin_count: usize,
+    pub step_samples: usize,
+    pub forecast_horizon: f64,
+    pub mean_persistence_mse: f64,
+    pub mean_isolated_agents_mse: f64,
+    pub mean_common_driver_mse: f64,
+    pub mean_synchrony_only_mse: f64,
+    pub mean_non_relational_context_mse: f64,
+    pub mean_relational_augmented_mse: f64,
+    pub mean_relational_profile_mse: f64,
+    pub segments: Vec<HeldOutRelationalPredictionSummary>,
+    pub status: EvidenceStatus,
+}
+
+impl RollingOriginRelationalPredictionEvidence {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || self.config.origin_count == 0
+            || self.config.step_samples < self.config.test_samples
+            || !self.config.forecast_horizon.is_finite()
+            || self.config.forecast_horizon <= 0.0
+            || !self.config.ridge_lambda.is_finite()
+            || self.config.ridge_lambda < 0.0
+            || self.observed.status != EvidenceStatus::Measured
+            || self.origins.len() != self.config.origin_count
+            || self.observed.segments.len() != self.config.origin_count
+            || self.origin_starts.len() != self.config.origin_count
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for segment in &self.observed.segments {
+            validate_prediction_summary_shape(
+                segment,
+                self.config.train_samples,
+                self.config.test_samples,
+                self.config.gap_samples,
+            )?;
+            validate_forecast_horizon_from_summary(segment, self.config.forecast_horizon)?;
+        }
+        validate_rolling_summary_aggregates(&self.observed)?;
+
+        for (index, origin) in self.origins.iter().enumerate() {
+            let expected_start = self
+                .config
+                .step_samples
+                .checked_mul(index)
+                .and_then(|offset| self.config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            if self.origin_starts[index] != expected_start {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+
+            origin.validate()?;
+            if origin.provenance != self.provenance
+                || origin.summary.status != EvidenceStatus::Measured
+                || origin.summary != self.observed.segments[index]
+                || origin.summary.train_samples != self.config.train_samples
+                || origin.summary.test_samples != self.config.test_samples
+                || origin.summary.gap_samples != self.config.gap_samples
+                || origin
+                    .records
+                    .first()
+                    .map(|record| record.ridge_lambda)
+                    != Some(self.config.ridge_lambda)
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+
+            for record in &origin.records {
+                let tolerance = 1e-9 * self.config.forecast_horizon.abs().max(1.0);
+                for (feature_time, outcome_time) in
+                    record.feature_times.iter().zip(&record.outcome_times)
+                {
+                    let horizon = *outcome_time - *feature_time;
+                    if (horizon - self.config.forecast_horizon).abs() > tolerance {
+                        return Err(RelationalPredictionError::InvalidSplit);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Return target-level squared-loss differentials across the disjoint
+    /// rolling test windows for the critical nested comparison.
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+
+        let capacity = self
+            .config
+            .origin_count
+            .checked_mul(self.config.test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        let mut differentials = Vec::with_capacity(capacity);
+
+        for (origin_index, origin) in self.origins.iter().enumerate() {
+            differentials.extend(relational_loss_differentials_from_records(
+                origin_index,
+                &origin.records,
+            )?);
+        }
+
+        Ok(differentials)
+    }
+
+    /// Characterize serial dependence within each disjoint target window and
+    /// dependence between origin-level mean differentials separately.
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag_within_origin: usize,
+        max_lag_across_origins: usize,
+    ) -> Result<RollingForecastLossDependenceProfile, RelationalPredictionError> {
+        let differentials = self.relational_loss_differentials()?;
+        let mut profile = RollingForecastLossDependenceProfile::compute(
+            &differentials,
+            self.config.origin_count,
+            self.config.test_samples,
+            max_lag_within_origin,
+            max_lag_across_origins,
+        )?;
+        let binding = self.evaluation_input_blake3.clone();
+        for child in &mut profile.per_origin {
+            child.evaluation_input_blake3 = Some(binding.clone());
+        }
+        profile.across_origin_mean_profile.evaluation_input_blake3 = Some(binding.clone());
+        profile.evaluation_input_blake3 = Some(binding);
+        Ok(profile)
+    }
+
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+    ) -> Result<(), RelationalPredictionError> {
+        if rolling_evaluation_input_digest(samples, self.config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute_evidence(
+            samples,
+            self.config,
+            self.provenance.clone(),
+        )?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let origins = self
+            .origins
+            .iter()
+            .map(|origin| {
+                let json = origin.to_json()?;
+                serde_json::from_str::<serde_json::Value>(&json)
+                    .map_err(|_| RelationalPredictionError::ModelFitFailed)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": ROLLING_EVIDENCE_SCHEMA,
+            "feature_schema": FEATURE_SCHEMA,
+            "model_schema": MODEL_SCHEMA,
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "rolling_config": {
+                "first_origin": self.config.first_origin,
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "origin_count": self.config.origin_count,
+                "step_samples": self.config.step_samples,
+                "forecast_horizon": self.config.forecast_horizon,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "origin_starts": &self.origin_starts,
+            "observed": {
+                "mean_persistence_mse": self.observed.mean_persistence_mse,
+                "mean_isolated_agents_mse": self.observed.mean_isolated_agents_mse,
+                "mean_common_driver_mse": self.observed.mean_common_driver_mse,
+                "mean_synchrony_only_mse": self.observed.mean_synchrony_only_mse,
+                "mean_non_relational_context_mse": self.observed.mean_non_relational_context_mse,
+                "mean_relational_augmented_mse": self.observed.mean_relational_augmented_mse,
+                "mean_relational_profile_mse": self.observed.mean_relational_profile_mse,
+                "per_origin_improvement": self.observed.augmented_mse_improvement_per_origin(),
+                "median_improvement": self.observed.median_augmented_mse_improvement(),
+                "minimum_improvement": self.observed.minimum_augmented_mse_improvement(),
+                "origins_beating_non_relational": self.observed.origins_beating_non_relational(),
+                "origins_beating_persistence": self.observed.origins_beating_persistence()
+            },
+            "origins": origins
+        }).to_string())
+    }
+}
+
+impl RollingOriginRelationalPredictionSummary {
+    pub fn compute_evidence(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<RollingOriginRelationalPredictionEvidence, RelationalPredictionError> {
+        let observed = Self::compute(samples, config)?;
+        let evaluation_input_blake3 = rolling_evaluation_input_digest(samples, config);
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        let mut origins = Vec::with_capacity(config.origin_count);
+        let mut origin_starts = Vec::with_capacity(config.origin_count);
+        for origin in 0..config.origin_count {
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let end = start
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+            origin_starts.push(start);
+            origins.push(HeldOutRelationalPredictionSummary::compute_evidence(
+                segment,
+                HeldOutRelationalPredictionConfig {
+                    train_samples: config.train_samples,
+                    test_samples: config.test_samples,
+                    gap_samples: config.gap_samples,
+                    ridge_lambda: config.ridge_lambda,
+                },
+                provenance.clone(),
+            )?);
+        }
+
+        let evidence = RollingOriginRelationalPredictionEvidence {
+            provenance,
+            config,
+            evaluation_input_blake3,
+            origin_starts,
+            observed,
+            origins,
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+    ) -> Result<Self, RelationalPredictionError> {
+        validate_rolling_config(samples.len(), &config)?;
+
+        let mut segments = Vec::with_capacity(config.origin_count);
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        for origin in 0..config.origin_count {
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let end = start
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+            validate_forecast_horizon(segment, config.forecast_horizon)?;
+
+            segments.push(HeldOutRelationalPredictionSummary::compute(
+                segment,
+                HeldOutRelationalPredictionConfig {
+                    train_samples: config.train_samples,
+                    test_samples: config.test_samples,
+                    gap_samples: config.gap_samples,
+                    ridge_lambda: config.ridge_lambda,
+                },
+            )?);
+        }
+
+        let mean = |select: fn(&HeldOutRelationalPredictionSummary) -> f64| {
+            let mut total = 0.0;
+            for segment in &segments {
+                total += select(segment);
+                if !total.is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
+            }
+            let result = total / segments.len() as f64;
+            if !result.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            Ok(result)
+        };
+
+        Ok(Self {
+            first_origin: config.first_origin,
+            train_samples: config.train_samples,
+            test_samples: config.test_samples,
+            gap_samples: config.gap_samples,
+            origin_count: config.origin_count,
+            step_samples: config.step_samples,
+            forecast_horizon: config.forecast_horizon,
+            mean_persistence_mse: mean(|s| s.persistence_baseline.mean_squared_error)?,
+            mean_isolated_agents_mse: mean(|s| s.isolated_agents.mean_squared_error)?,
+            mean_common_driver_mse: mean(|s| s.common_driver.mean_squared_error)?,
+            mean_synchrony_only_mse: mean(|s| s.synchrony_only.mean_squared_error)?,
+            mean_non_relational_context_mse: mean(|s| s.non_relational_context.mean_squared_error)?,
+            mean_relational_augmented_mse: mean(|s| s.relational_augmented.mean_squared_error)?,
+            mean_relational_profile_mse: mean(|s| s.relational_profile.mean_squared_error)?,
+            segments,
+            status: EvidenceStatus::Measured,
+        })
+    }
+
+    /// Positive means the relationally augmented model improves mean MSE over
+    /// the nested non-relational context model.
+    pub fn mean_augmented_mse_improvement(&self) -> Option<f64> {
+        if self.mean_non_relational_context_mse <= 1e-20 {
+            return None;
+        }
+
+        Some(
+            (self.mean_non_relational_context_mse - self.mean_relational_augmented_mse)
+                / self.mean_non_relational_context_mse,
+        )
+    }
+
+    /// Relative MSE improvement for every rolling origin, retaining the full
+    /// vector so heterogeneity cannot be hidden by the mean.
+    pub fn augmented_mse_improvement_per_origin(&self) -> Vec<Option<f64>> {
+        self.segments
+            .iter()
+            .map(|segment| segment.augmented_mse_improvement_over_non_relational())
+            .collect()
+    }
+
+    /// Median per-origin relative MSE improvement over the nested baseline.
+    pub fn median_augmented_mse_improvement(&self) -> Option<f64> {
+        let mut values = self
+            .augmented_mse_improvement_per_origin()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        if values.is_empty() {
+            return None;
+        }
+
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let middle = values.len() / 2;
+
+        if values.len() % 2 == 1 {
+            Some(values[middle])
+        } else {
+            Some((values[middle - 1] + values[middle]) / 2.0)
+        }
+    }
+
+    /// Worst per-origin relative MSE improvement over the nested baseline.
+    pub fn minimum_augmented_mse_improvement(&self) -> Option<f64> {
+        self.augmented_mse_improvement_per_origin()
+            .into_iter()
+            .flatten()
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// Number of origins where the relational augmentation strictly improves
+    /// held-out MSE over the nested non-relational context model.
+    pub fn origins_beating_non_relational(&self) -> usize {
+        self.segments
+            .iter()
+            .filter(|segment| {
+                segment.relational_augmented.mean_squared_error
+                    < segment.non_relational_context.mean_squared_error
+            })
+            .count()
+    }
+
+    /// Number of origins where the relational augmentation strictly improves
+    /// held-out MSE over the persistence baseline.
+    pub fn origins_beating_persistence(&self) -> usize {
+        self.segments
+            .iter()
+            .filter(|segment| {
+                segment.relational_augmented.mean_squared_error
+                    < segment.persistence_baseline.mean_squared_error
+            })
+            .count()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RollingOriginRelationalPredictionQualification {
+    /// Caller-attested dataset/software provenance for the qualification run.
+    pub provenance: RelationalPredictionProvenance,
+    pub config: RollingOriginRelationalPredictionConfig,
+    /// Requested surrogate count used at every rolling origin.
+    pub surrogate_count: usize,
+    /// Commitment over the exact source sample sequence and rolling configuration.
+    pub evaluation_input_blake3: String,
+    /// Commitment over input identity, configuration, surrogate count, and provenance.
+    pub qualification_identity_blake3: String,
+    /// Complete target-level loss differential vector for every retained rolling
+    /// origin, in origin-major/sample-major order.
+    pub relational_loss_differentials: Vec<RelationalForecastLossDifferential>,
+    /// Commitment over the retained loss differential vector and the parent
+    /// rolling evaluator identity.
+    pub relational_loss_differentials_blake3: String,
+    /// Exact source-sample start index for each rolling origin.
+    pub origin_starts: Vec<usize>,
+    pub observed: RollingOriginRelationalPredictionSummary,
+    pub circular_shift_nulls: Vec<PredictionNullSummary>,
+    pub feature_decoupling_nulls: Vec<PredictionNullSummary>,
+    pub incremental_relational_nulls: Vec<PredictionNullSummary>,
+}
+
+impl RollingOriginRelationalPredictionQualification {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
+        validate_rolling_qualification_config_shape(&self.config)?;
+
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || self.surrogate_count == 0
+            || self.observed.status != EvidenceStatus::Measured
+            || self.observed.first_origin != self.config.first_origin
+            || self.observed.train_samples != self.config.train_samples
+            || self.observed.test_samples != self.config.test_samples
+            || self.observed.gap_samples != self.config.gap_samples
+            || self.observed.origin_count != self.config.origin_count
+            || self.observed.step_samples != self.config.step_samples
+            || self.observed.forecast_horizon != self.config.forecast_horizon
+            || self.circular_shift_nulls.len() != self.config.origin_count
+            || self.feature_decoupling_nulls.len() != self.config.origin_count
+            || self.incremental_relational_nulls.len() != self.config.origin_count
+            || self.origin_starts.len() != self.config.origin_count
+            || self.observed.segments.len() != self.config.origin_count
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        for segment in &self.observed.segments {
+            validate_prediction_summary_shape(
+                segment,
+                self.config.train_samples,
+                self.config.test_samples,
+                self.config.gap_samples,
+            )?;
+            validate_forecast_horizon_from_summary(segment, self.config.forecast_horizon)?;
+        }
+        validate_rolling_summary_aggregates(&self.observed)?;
+
+        let expected_identity = rolling_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        );
+        if expected_identity != self.qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let expected_differential_count = self
+            .config
+            .origin_count
+            .checked_mul(self.config.test_samples)
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+        if self.relational_loss_differentials.len() != expected_differential_count {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        validate_loss_differentials(
+            &self.relational_loss_differentials,
+            self.config.origin_count,
+            self.config.test_samples,
+        )?;
+        let expected_loss_digest = loss_differentials_digest(
+            &self.evaluation_input_blake3,
+            &self.relational_loss_differentials,
+        );
+        if expected_loss_digest != self.relational_loss_differentials_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        for origin_index in 0..self.config.origin_count {
+            let start = origin_index * self.config.test_samples;
+            let end = start + self.config.test_samples;
+            let differential_mean = self.relational_loss_differentials[start..end]
+                .iter()
+                .map(|item| item.loss_differential)
+                .sum::<f64>()
+                / self.config.test_samples as f64;
+            let expected_differential_mean =
+                self.observed.segments[origin_index]
+                    .non_relational_context
+                    .mean_squared_error
+                    - self.observed.segments[origin_index]
+                        .relational_augmented
+                        .mean_squared_error;
+            if (differential_mean - expected_differential_mean).abs()
+                > 1e-12 * expected_differential_mean.abs().max(1.0)
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        let held_out_config = HeldOutRelationalPredictionConfig {
+            train_samples: self.config.train_samples,
+            test_samples: self.config.test_samples,
+            gap_samples: self.config.gap_samples,
+            ridge_lambda: self.config.ridge_lambda,
+        };
+
+        for index in 0..self.config.origin_count {
+            let expected_start = self
+                .config
+                .step_samples
+                .checked_mul(index)
+                .and_then(|offset| self.config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+            if self.origin_starts[index] != expected_start {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+
+            let expected_mse = self.observed.segments[index]
+                .relational_augmented
+                .mean_squared_error;
+
+            let nulls = [
+                (
+                    PredictionNullFamily::CircularShift,
+                    &self.circular_shift_nulls[index],
+                ),
+                (
+                    PredictionNullFamily::FeatureDecoupling,
+                    &self.feature_decoupling_nulls[index],
+                ),
+                (
+                    PredictionNullFamily::IncrementalRelationalShift,
+                    &self.incremental_relational_nulls[index],
+                ),
+            ];
+
+            for (expected_family, null_trace) in nulls {
+                null_trace.validate_trace()?;
+                if null_trace.family != expected_family
+                    || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
+                    || null_trace.status != EvidenceStatus::Proxy
+                    || null_trace.config != held_out_config
+                    || null_trace.requested_surrogate_count != self.surrogate_count
+                    || null_trace.source_slice_start != expected_start
+                    || null_trace.qualification_input_blake3 != self.qualification_identity_blake3
+                    || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
+                {
+                    return Err(RelationalPredictionError::InvalidSplit);
+                }
+            }
+
+            let segment = &self.observed.segments[index];
+            let horizon_tolerance = 1e-9 * self.config.forecast_horizon.abs().max(1.0);
+            if (segment.minimum_outcome_horizon - self.config.forecast_horizon).abs()
+                    > horizon_tolerance
+                || (segment.maximum_outcome_horizon - self.config.forecast_horizon).abs()
+                    > horizon_tolerance
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn relational_loss_differentials(
+        &self,
+    ) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+        self.validate()?;
+        Ok(self.relational_loss_differentials.clone())
+    }
+
+    pub fn relational_loss_dependence(
+        &self,
+        max_lag_within_origin: usize,
+        max_lag_across_origins: usize,
+    ) -> Result<RollingForecastLossDependenceProfile, RelationalPredictionError> {
+        self.validate()?;
+        let mut profile = RollingForecastLossDependenceProfile::compute(
+            &self.relational_loss_differentials,
+            self.config.origin_count,
+            self.config.test_samples,
+            max_lag_within_origin,
+            max_lag_across_origins,
+        )?;
+        let binding = self.evaluation_input_blake3.clone();
+        for child in &mut profile.per_origin {
+            child.evaluation_input_blake3 = Some(binding.clone());
+        }
+        profile.across_origin_mean_profile.evaluation_input_blake3 = Some(binding.clone());
+        profile.evaluation_input_blake3 = Some(binding);
+        Ok(profile)
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let origin_scores = self
+            .observed
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(origin_index, segment)| {
+                let scores = PredictionFeatureSet::all()
+                    .into_iter()
+                    .map(|feature_set| {
+                        let score = segment.score(feature_set);
+                        serde_json::json!({
+                            "feature_set": feature_set_name(feature_set),
+                            "parameter_count": score.parameter_count,
+                            "train_samples": score.train_samples,
+                            "test_samples": score.test_samples,
+                            "mean_absolute_error": score.mean_absolute_error,
+                            "mean_squared_error": score.mean_squared_error
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                serde_json::json!({
+                    "origin_index": origin_index,
+                    "source_slice_start": self.origin_starts[origin_index],
+                    "scores": scores,
+                    "minimum_outcome_horizon": segment.minimum_outcome_horizon,
+                    "maximum_outcome_horizon": segment.maximum_outcome_horizon
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let differentials = self
+            .relational_loss_differentials
+            .iter()
+            .map(|differential| {
+                serde_json::json!({
+                    "origin_index": differential.origin_index,
+                    "sample_index": differential.sample_index,
+                    "feature_time": differential.feature_time,
+                    "outcome_time": differential.outcome_time,
+                    "observed_outcome": differential.observed_outcome,
+                    "non_relational_squared_error": differential.non_relational_squared_error,
+                    "relational_squared_error": differential.relational_squared_error,
+                    "loss_differential": differential.loss_differential
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let null_families = [
+            ("CircularShift", &self.circular_shift_nulls),
+            ("FeatureDecoupling", &self.feature_decoupling_nulls),
+            ("IncrementalRelationalShift", &self.incremental_relational_nulls),
+        ];
+
+        let nulls = null_families
+            .into_iter()
+            .map(|(family, traces)| {
+                let values = traces
+                    .iter()
+                    .map(|trace| {
+                        let json = trace.to_json()?;
+                        serde_json::from_str::<serde_json::Value>(&json)
+                            .map_err(|_| RelationalPredictionError::ModelFitFailed)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok::<_, RelationalPredictionError>(serde_json::json!({
+                    "family": family,
+                    "traces": values
+                }))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": ROLLING_QUALIFICATION_SCHEMA,
+            "level": "rolling-origin",
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "rolling_config": {
+                "first_origin": self.config.first_origin,
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "origin_count": self.config.origin_count,
+                "step_samples": self.config.step_samples,
+                "forecast_horizon": self.config.forecast_horizon,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "surrogate_count": self.surrogate_count,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "relational_loss_differentials_blake3": &self.relational_loss_differentials_blake3,
+            "origin_starts": &self.origin_starts,
+            "mean_mse": {
+                "persistence": self.observed.mean_persistence_mse,
+                "isolated_agents": self.observed.mean_isolated_agents_mse,
+                "common_driver": self.observed.mean_common_driver_mse,
+                "synchrony_only": self.observed.mean_synchrony_only_mse,
+                "non_relational_context": self.observed.mean_non_relational_context_mse,
+                "relational_augmented": self.observed.mean_relational_augmented_mse,
+                "relational_profile": self.observed.mean_relational_profile_mse
+            },
+            "origins": origin_scores,
+            "relational_loss_differentials": differentials,
+            "nulls": nulls
+        }).to_string())
+    }
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if rolling_evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        if rolling_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        ) != self.qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute(
+            samples,
+            config,
+            self.surrogate_count,
+            self.provenance.clone(),
+        )?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        Ok(())
+    }
+
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: RollingOriginRelationalPredictionConfig,
+        surrogate_count: usize,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<Self, RelationalPredictionError> {
+        if surrogate_count == 0 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let observed_evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            samples,
+            config,
+            provenance.clone(),
+        )?;
+        let observed = observed_evidence.observed.clone();
+        let relational_loss_differentials =
+            observed_evidence.relational_loss_differentials()?;
+        let evaluation_input_blake3 = rolling_evaluation_input_digest(samples, config);
+        let relational_loss_differentials_blake3 =
+            loss_differentials_digest(&evaluation_input_blake3, &relational_loss_differentials);
+        let segment_total = config
+            .train_samples
+            .checked_add(config.gap_samples)
+            .and_then(|value| value.checked_add(config.test_samples))
+            .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+        let mut circular_shift_nulls = Vec::with_capacity(config.origin_count);
+        let mut feature_decoupling_nulls = Vec::with_capacity(config.origin_count);
+        let mut incremental_relational_nulls = Vec::with_capacity(config.origin_count);
+
+        for origin in 0..config.origin_count {
+            let start = config
+                .step_samples
+                .checked_mul(origin)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let end = start
+                .checked_add(segment_total)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let segment = samples
+                .get(start..end)
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let held_out_config = HeldOutRelationalPredictionConfig {
+                train_samples: config.train_samples,
+                test_samples: config.test_samples,
+                gap_samples: config.gap_samples,
+                ridge_lambda: config.ridge_lambda,
+            };
+
+            circular_shift_nulls.push(PredictionNullSummary::compute_for_feature_set_at_start(
+                segment,
+                held_out_config,
+                PredictionNullFamily::CircularShift,
+                PredictionFeatureSet::RelationalAugmented,
+                surrogate_count,
+                start,
+            )?);
+
+            feature_decoupling_nulls.push(PredictionNullSummary::compute_for_feature_set_at_start(
+                segment,
+                held_out_config,
+                PredictionNullFamily::FeatureDecoupling,
+                PredictionFeatureSet::RelationalAugmented,
+                surrogate_count,
+                start,
+            )?);
+
+            incremental_relational_nulls.push(PredictionNullSummary::compute_for_feature_set_at_start(
+                segment,
+                held_out_config,
+                PredictionNullFamily::IncrementalRelationalShift,
+                PredictionFeatureSet::RelationalAugmented,
+                surrogate_count,
+                start,
+            )?);
+        }
+
+        // The per-origin null traces are computed from local held-out slices,
+        // so their replay commitments remain origin-local. Bind a separate
+        // parent qualification commitment onto every retained child trace so
+        // the compound bundle cannot mix traces from different source/config
+        // identities.
+        for nulls in [
+            &mut circular_shift_nulls,
+            &mut feature_decoupling_nulls,
+            &mut incremental_relational_nulls,
+        ] {
+            for null_trace in nulls {
+                null_trace.qualification_input_blake3 = evaluation_input_blake3.clone();
+            }
+        }
+
+        let qualification_identity_blake3 = rolling_qualification_identity_digest(
+            &evaluation_input_blake3,
+            &provenance,
+            config,
+            surrogate_count,
+        );
+
+        for nulls in [
+            &mut circular_shift_nulls,
+            &mut feature_decoupling_nulls,
+            &mut incremental_relational_nulls,
+        ] {
+            for null_trace in nulls {
+                null_trace.qualification_input_blake3 = qualification_identity_blake3.clone();
+            }
+        }
+
+        let qualification = Self {
+            provenance,
+            config,
+            surrogate_count,
+            evaluation_input_blake3,
+            qualification_identity_blake3,
+            relational_loss_differentials,
+            relational_loss_differentials_blake3,
+            origin_starts: (0..config.origin_count)
+                .map(|origin| {
+                    config
+                        .step_samples
+                        .checked_mul(origin)
+                        .and_then(|offset| config.first_origin.checked_add(offset))
+                        .ok_or(RelationalPredictionError::InvalidSplit)
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+            observed,
+            circular_shift_nulls,
+            feature_decoupling_nulls,
+            incremental_relational_nulls,
+        };
+        qualification.validate()?;
+        Ok(qualification)
+    }
+}
+
+fn validate_rolling_qualification_config_shape(
+    config: &RollingOriginRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if config.train_samples < 8
+        || config.test_samples < 4
+        || config.origin_count == 0
+        || config.step_samples < config.test_samples
+        || !config.forecast_horizon.is_finite()
+        || config.forecast_horizon <= 0.0
+        || !config.ridge_lambda.is_finite()
+        || config.ridge_lambda < 0.0
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    config
+        .train_samples
+        .checked_add(config.gap_samples)
+        .and_then(|value| value.checked_add(config.test_samples))
+        .and_then(|segment_total| {
+            config
+                .step_samples
+                .checked_mul(config.origin_count - 1)
+                .and_then(|offset| config.first_origin.checked_add(offset))
+                .and_then(|start| start.checked_add(segment_total))
+        })
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    Ok(())
+}
+
+fn validate_forecast_horizon(
+    samples: &[RelationalPredictionSample],
+    expected_horizon: f64,
+) -> Result<(), RelationalPredictionError> {
+    if !expected_horizon.is_finite() || expected_horizon <= 0.0 {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let tolerance = 1e-9 * expected_horizon.abs().max(1.0);
+    for sample in samples {
+        let horizon = sample.outcome_time - sample.feature_time;
+        if (horizon - expected_horizon).abs() > tolerance {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_rolling_config(
+    total_samples: usize,
+    config: &RollingOriginRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if config.train_samples < 8
+        || config.test_samples < 4
+        || config.origin_count == 0
+        || config.step_samples < config.test_samples
+        || !config.forecast_horizon.is_finite()
+        || config.forecast_horizon <= 0.0
+        || !config.ridge_lambda.is_finite()
+        || config.ridge_lambda < 0.0
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let segment_total = config
+        .train_samples
+        .checked_add(config.gap_samples)
+        .and_then(|value| value.checked_add(config.test_samples))
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let final_start = config
+        .step_samples
+        .checked_mul(config.origin_count - 1)
+        .and_then(|offset| config.first_origin.checked_add(offset))
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let final_end = final_start
+        .checked_add(segment_total)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    if final_end > total_samples {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    Ok(())
+}
+
+/// Deterministic empirical calibration family for held-out relational prediction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PredictionNullFamily {
+    /// Shift the relational bundle together inside train and test partitions.
+    CircularShift,
+    /// Shift relational channels by channel-specific non-zero offsets inside each partition.
+    FeatureDecoupling,
+    /// Keep synchrony and all non-relational context fixed while shifting only
+    /// the incremental directionality/turn-taking channels.
+    IncrementalRelationalShift,
+}
+
+/// Empirical null calibration for held-out relational prediction.
+///
+/// The convenience constructor targets RelationalAugmented, matching the
+/// qualification protocol's critical nested comparison. Use
+/// compute_for_feature_set when a different feature family is explicitly
+/// intended.
+///
+/// The exceedance fraction is the fraction of surrogates whose relational model
+/// MSE is no worse than the observed relational model MSE. It is deliberately
+/// not named or exposed as a formal p-value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictionNullSummary {
+    pub family: PredictionNullFamily,
+    pub feature_set: PredictionFeatureSet,
+    pub config: HeldOutRelationalPredictionConfig,
+    pub requested_surrogate_count: usize,
+    pub surrogate_count: usize,
+    pub observed_relational_mse: f64,
+    /// Exact deterministic circular offsets realized for each surrogate.
+    pub surrogate_shifts: Vec<usize>,
+    /// Held-out MSE for each retained surrogate, in the same order as
+    /// surrogate_shifts.
+    pub surrogate_mse: Vec<f64>,
+    pub minimum_surrogate_mse: f64,
+    pub exceedance_count: usize,
+    pub exceedance_fraction: f64,
+    /// Absolute source-sample index at which this null trace's retained
+    /// evaluator slice begins. Standalone traces use zero; rolling traces use
+    /// the corresponding absolute origin start.
+    pub source_slice_start: usize,
+    /// Commitment over the exact samples, holdout configuration, null family,
+    /// feature family, requested surrogate count, and source-slice start.
+    ///
+    /// This is the null-local replay commitment. It deliberately remains
+    /// distinct from the parent qualification commitment below.
+    pub evaluation_input_blake3: String,
+    /// Parent qualification identity commitment. Compound qualification bundles
+    /// bind every retained null trace to one shared exact source/configuration/
+    /// provenance identity. Standalone null traces initialize this to their local
+    /// evaluation-input commitment until embedded in a parent bundle.
+    pub qualification_input_blake3: String,
+    pub status: EvidenceStatus,
+}
+
+impl PredictionNullSummary {
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        family: PredictionNullFamily,
+        surrogate_count: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        Self::compute_for_feature_set(
+            samples,
+            config,
+            family,
+            PredictionFeatureSet::RelationalAugmented,
+            surrogate_count,
+        )
+    }
+
+    pub fn compute_for_feature_set(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        family: PredictionNullFamily,
+        feature_set: PredictionFeatureSet,
+        surrogate_count: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        Self::compute_for_feature_set_at_start(
+            samples,
+            config,
+            family,
+            feature_set,
+            surrogate_count,
+            0,
+        )
+    }
+
+    fn compute_for_feature_set_at_start(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        family: PredictionNullFamily,
+        feature_set: PredictionFeatureSet,
+        surrogate_count: usize,
+        source_slice_start: usize,
+    ) -> Result<Self, RelationalPredictionError> {
+        validate_samples(samples)?;
+        config.validate(samples.len())?;
+        validate_null_family_shape(family, &config)?;
+        validate_temporal_boundary(samples, &config)?;
+
+        if surrogate_count == 0 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let observed = fit_and_score(samples, &config, feature_set)?;
+        let evaluation_input_blake3 = prediction_null_input_digest(
+            samples,
+            config,
+            family,
+            feature_set,
+            surrogate_count,
+            source_slice_start,
+        );
+
+        let capacity = config
+            .train_samples
+            .min(config.test_samples)
+            .saturating_sub(1);
+        if capacity == 0 {
+            return Err(RelationalPredictionError::InsufficientSamples(
+                config.train_samples.min(config.test_samples),
+            ));
+        }
+        let count = surrogate_count.min(capacity);
+
+        let mut surrogate_shifts = Vec::with_capacity(count);
+        let mut surrogate_mse = Vec::with_capacity(count);
+        let mut exceedance_count = 0usize;
+
+        for index in 0..count {
+            let shift = index
+                .checked_mul(capacity)
+                .and_then(|value| value.checked_div(count))
+                .and_then(|value| value.checked_add(1))
+                .ok_or(RelationalPredictionError::InvalidSplit)?;
+            let surrogate = make_surrogate(samples, &config, family, shift)?;
+            let score = fit_and_score(&surrogate, &config, feature_set)?;
+
+            surrogate_shifts.push(shift);
+            surrogate_mse.push(score.mean_squared_error);
+            if score.mean_squared_error <= observed.mean_squared_error + 1e-12 {
+                exceedance_count += 1;
+            }
+        }
+
+        let minimum_surrogate_mse = surrogate_mse
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        if !minimum_surrogate_mse.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        Ok(Self {
+            family,
+            feature_set,
+            config,
+            requested_surrogate_count: surrogate_count,
+            surrogate_count: count,
+            observed_relational_mse: observed.mean_squared_error,
+            source_slice_start,
+            surrogate_shifts,
+            surrogate_mse,
+            minimum_surrogate_mse,
+            exceedance_count,
+            exceedance_fraction: exceedance_count as f64 / count as f64,
+            qualification_input_blake3: evaluation_input_digest(samples, config),
+            evaluation_input_blake3,
+            status: EvidenceStatus::Proxy,
+        })
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate_trace()?;
+        Ok(serde_json::json!({
+            "schema": NULL_EVIDENCE_SCHEMA,
+            "feature_schema": FEATURE_SCHEMA,
+            "model_schema": MODEL_SCHEMA,
+            "family": null_family_name(self.family),
+            "feature_set": feature_set_name(self.feature_set),
+            "source_slice_start": self.source_slice_start,
+            "config": {
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "requested_surrogate_count": self.requested_surrogate_count,
+            "surrogate_count": self.surrogate_count,
+            "observed_relational_mse": self.observed_relational_mse,
+            "surrogate_shifts": &self.surrogate_shifts,
+            "surrogate_mse": &self.surrogate_mse,
+            "minimum_surrogate_mse": self.minimum_surrogate_mse,
+            "exceedance_count": self.exceedance_count,
+            "exceedance_fraction": self.exceedance_fraction,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "qualification_input_blake3": &self.qualification_input_blake3
+        }).to_string())
+    }
+
+    /// Reject malformed or tampered surrogate traces before interpretation.
+    pub fn validate_trace(&self) -> Result<(), RelationalPredictionError> {
+        validate_held_out_config_shape(&self.config)?;
+        validate_null_family_shape(self.family, &self.config)?;
+        let capacity = self
+            .config
+            .train_samples
+            .min(self.config.test_samples)
+            .checked_sub(1)
+            .ok_or(RelationalPredictionError::InsufficientSamples(
+                self.config.train_samples.min(self.config.test_samples),
+            ))?;
+        let expected_count = self.requested_surrogate_count.min(capacity);
+
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.qualification_input_blake3, 64)
+            || self.requested_surrogate_count == 0
+            || self.surrogate_count != expected_count
+            || self.surrogate_count == 0
+            || self.surrogate_count > self.requested_surrogate_count
+            || self.surrogate_shifts.len() != self.surrogate_count
+            || self.surrogate_mse.len() != self.surrogate_count
+            || !self.observed_relational_mse.is_finite()
+            || self.observed_relational_mse < 0.0
+            || !self.minimum_surrogate_mse.is_finite()
+            || self.minimum_surrogate_mse < 0.0
+            || !self.exceedance_fraction.is_finite()
+            || self.status != EvidenceStatus::Proxy
+        {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let mut shifts = self.surrogate_shifts.clone();
+        if shifts.iter().any(|shift| *shift == 0) {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+        for (index, shift) in self.surrogate_shifts.iter().copied().enumerate() {
+            let expected_shift = index
+                .checked_mul(capacity)
+                .and_then(|value| value.checked_div(self.surrogate_count))
+                .and_then(|value| value.checked_add(1))
+                .ok_or(RelationalPredictionError::InvalidSurrogateCount)?;
+            if shift != expected_shift {
+                return Err(RelationalPredictionError::InvalidSurrogateCount);
+            }
+        }
+        shifts.sort_unstable();
+        if shifts.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        if self
+            .surrogate_mse
+            .iter()
+            .any(|mse| !mse.is_finite() || *mse < 0.0)
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let minimum = self
+            .surrogate_mse
+            .iter()
+            .copied()
+            .fold(f64::INFINITY, f64::min);
+        if (minimum - self.minimum_surrogate_mse).abs() > 1e-12 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let exceedance_count = self
+            .surrogate_mse
+            .iter()
+            .filter(|mse| **mse <= self.observed_relational_mse + 1e-12)
+            .count();
+        if exceedance_count != self.exceedance_count {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        let exceedance_fraction = exceedance_count as f64 / self.surrogate_count as f64;
+        if (exceedance_fraction - self.exceedance_fraction).abs() > 1e-12 {
+            return Err(RelationalPredictionError::InvalidSurrogateCount);
+        }
+
+        Ok(())
+    }
+
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+    ) -> Result<(), RelationalPredictionError> {
+        self.verify_against_samples_at_start(samples, config, self.source_slice_start)
+    }
+
+    /// Replay a null trace against the exact origin-local sample slice used to
+    /// produce it, while preserving its absolute source-slice identity.
+    pub fn verify_against_samples_at_start(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        source_slice_start: usize,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate_trace()?;
+        if config != self.config || source_slice_start != self.source_slice_start {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        let expected = prediction_null_input_digest(
+            samples,
+            config,
+            self.family,
+            self.feature_set,
+            self.requested_surrogate_count,
+            source_slice_start,
+        );
+        // Standalone replay verifies the null-local commitment only.
+        // The parent qualification commitment may legitimately differ after
+        // this trace is embedded in a compound or rolling qualification bundle.
+        if expected != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        let recomputed = Self::compute_for_feature_set_at_start(
+            samples,
+            config,
+            self.family,
+            self.feature_set,
+            self.requested_surrogate_count,
+            source_slice_start,
+        )?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+}
+
+/// Full held-out qualification bundle: observed ablation plus multiple null families.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldOutRelationalPredictionQualification {
+    /// Caller-attested dataset/software provenance for the qualification run.
+    pub provenance: RelationalPredictionProvenance,
+    pub config: HeldOutRelationalPredictionConfig,
+    /// Requested surrogate count used for every null family.
+    pub surrogate_count: usize,
+    /// Commitment over the exact source sample sequence and holdout configuration.
+    pub evaluation_input_blake3: String,
+    /// Commitment over input identity, configuration, surrogate count, and provenance.
+    pub qualification_identity_blake3: String,
+    /// Complete target-level loss differential vector for the critical nested
+    /// comparison, retained directly in the qualification artifact.
+    pub relational_loss_differentials: Vec<RelationalForecastLossDifferential>,
+    /// Commitment over the retained loss differential vector and the parent
+    /// evaluator identity.
+    pub relational_loss_differentials_blake3: String,
+    pub observed: HeldOutRelationalPredictionSummary,
+    pub circular_shift_null: PredictionNullSummary,
+    pub feature_decoupling_null: PredictionNullSummary,
+    pub incremental_relational_null: PredictionNullSummary,
+}
+
+impl HeldOutRelationalPredictionQualification {
+    pub fn validate(&self) -> Result<(), RelationalPredictionError> {
+        validate_evidence_provenance(&self.provenance)?;
+        validate_held_out_config_shape(&self.config)?;
+        if !is_hex_digest(&self.evaluation_input_blake3, 64)
+            || !is_hex_digest(&self.qualification_identity_blake3, 64)
+            || self.surrogate_count == 0
+            || self.observed.status != EvidenceStatus::Measured
+            || self.observed.train_samples != self.config.train_samples
+            || self.observed.test_samples != self.config.test_samples
+            || self.observed.gap_samples != self.config.gap_samples
+            || self.observed.relational_augmented.feature_set
+                != PredictionFeatureSet::RelationalAugmented
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let observed_scores = [
+            (
+                self.observed.persistence_baseline,
+                PredictionFeatureSet::PersistenceBaseline,
+            ),
+            (self.observed.isolated_agents, PredictionFeatureSet::IsolatedAgents),
+            (self.observed.common_driver, PredictionFeatureSet::CommonDriver),
+            (self.observed.synchrony_only, PredictionFeatureSet::SynchronyOnly),
+            (
+                self.observed.non_relational_context,
+                PredictionFeatureSet::NonRelationalContext,
+            ),
+            (
+                self.observed.relational_augmented,
+                PredictionFeatureSet::RelationalAugmented,
+            ),
+            (
+                self.observed.relational_profile,
+                PredictionFeatureSet::RelationalProfile,
+            ),
+        ];
+        for (score, expected_feature_set) in observed_scores {
+            if score.feature_set != expected_feature_set
+                || score.train_samples != self.config.train_samples
+                || score.test_samples != self.config.test_samples
+                || score.parameter_count
+                    != if expected_feature_set == PredictionFeatureSet::PersistenceBaseline {
+                        0
+                    } else {
+                        feature_count(expected_feature_set) + 1
+                    }
+                || !score.mean_absolute_error.is_finite()
+                || score.mean_absolute_error < 0.0
+                || !score.mean_squared_error.is_finite()
+                || score.mean_squared_error < 0.0
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        validate_prediction_summary_shape(
+            &self.observed,
+            self.config.train_samples,
+            self.config.test_samples,
+            self.config.gap_samples,
+        )?;
+
+        let expected_identity = single_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        );
+        if expected_identity != self.qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+
+        validate_loss_differentials(&self.relational_loss_differentials, 1, self.config.test_samples)?;
+        let expected_loss_digest = loss_differentials_digest(
+            &self.evaluation_input_blake3,
+            &self.relational_loss_differentials,
+        );
+        if expected_loss_digest != self.relational_loss_differentials_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        let differential_mean = self
+            .relational_loss_differentials
+            .iter()
+            .map(|item| item.loss_differential)
+            .sum::<f64>()
+            / self.config.test_samples as f64;
+        let expected_differential_mean =
+            self.observed.non_relational_context.mean_squared_error
+                - self.observed.relational_augmented.mean_squared_error;
+        if (differential_mean - expected_differential_mean).abs()
+            > 1e-12 * expected_differential_mean.abs().max(1.0)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+
+        let expected_mse = self.observed.relational_augmented.mean_squared_error;
+        let nulls = [
+            (
+                PredictionNullFamily::CircularShift,
+                &self.circular_shift_null,
+            ),
+            (
+                PredictionNullFamily::FeatureDecoupling,
+                &self.feature_decoupling_null,
+            ),
+            (
+                PredictionNullFamily::IncrementalRelationalShift,
+                &self.incremental_relational_null,
+            ),
+        ];
+
+        for (expected_family, null_trace) in nulls {
+            null_trace.validate_trace()?;
+            if null_trace.source_slice_start != 0 {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+            if null_trace.family != expected_family
+                || null_trace.feature_set != PredictionFeatureSet::RelationalAugmented
+                || null_trace.status != EvidenceStatus::Proxy
+                || null_trace.config != self.config
+                || null_trace.requested_surrogate_count != self.surrogate_count
+                || null_trace.qualification_input_blake3 != self.qualification_identity_blake3
+                || (null_trace.observed_relational_mse - expected_mse).abs() > 1e-12
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, RelationalPredictionError> {
+        self.validate()?;
+
+        let scores = PredictionFeatureSet::all()
+            .into_iter()
+            .map(|feature_set| {
+                let score = self.observed.score(feature_set);
+                serde_json::json!({
+                    "feature_set": feature_set_name(feature_set),
+                    "parameter_count": score.parameter_count,
+                    "train_samples": score.train_samples,
+                    "test_samples": score.test_samples,
+                    "mean_absolute_error": score.mean_absolute_error,
+                    "mean_squared_error": score.mean_squared_error
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let differentials = self
+            .relational_loss_differentials
+            .iter()
+            .map(|differential| {
+                serde_json::json!({
+                    "origin_index": differential.origin_index,
+                    "sample_index": differential.sample_index,
+                    "feature_time": differential.feature_time,
+                    "outcome_time": differential.outcome_time,
+                    "observed_outcome": differential.observed_outcome,
+                    "non_relational_squared_error": differential.non_relational_squared_error,
+                    "relational_squared_error": differential.relational_squared_error,
+                    "loss_differential": differential.loss_differential
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let nulls = [
+            ("CircularShift", &self.circular_shift_null),
+            ("FeatureDecoupling", &self.feature_decoupling_null),
+            ("IncrementalRelationalShift", &self.incremental_relational_null),
+        ]
+        .into_iter()
+        .map(|(family, trace)| {
+            let json = trace.to_json()?;
+            let value = serde_json::from_str::<serde_json::Value>(&json)
+                .map_err(|_| RelationalPredictionError::ModelFitFailed)?;
+            Ok::<_, RelationalPredictionError>(serde_json::json!({
+                "family": family,
+                "trace": value
+            }))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(serde_json::json!({
+            "schema": QUALIFICATION_SCHEMA,
+            "level": "single-holdout",
+            "provenance": {
+                "protocol_id": &self.provenance.protocol_id,
+                "source_data_sha256": &self.provenance.source_data_sha256,
+                "software_commit_sha": &self.provenance.software_commit_sha
+            },
+            "config": {
+                "train_samples": self.config.train_samples,
+                "test_samples": self.config.test_samples,
+                "gap_samples": self.config.gap_samples,
+                "ridge_lambda": self.config.ridge_lambda
+            },
+            "surrogate_count": self.surrogate_count,
+            "evaluation_input_blake3": &self.evaluation_input_blake3,
+            "qualification_identity_blake3": &self.qualification_identity_blake3,
+            "relational_loss_differentials_blake3": &self.relational_loss_differentials_blake3,
+            "scores": scores,
+            "relational_loss_differentials": differentials,
+            "nulls": nulls
+        }).to_string())
+    }
+    pub fn verify_against_samples(
+        &self,
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+    ) -> Result<(), RelationalPredictionError> {
+        self.validate()?;
+        if config != self.config {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+        if evaluation_input_digest(samples, config) != self.evaluation_input_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        if single_qualification_identity_digest(
+            &self.evaluation_input_blake3,
+            &self.provenance,
+            self.config,
+            self.surrogate_count,
+        ) != self.qualification_identity_blake3 {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        let recomputed = Self::compute(
+            samples,
+            config,
+            self.surrogate_count,
+            self.provenance.clone(),
+        )?;
+        if recomputed != *self {
+            return Err(RelationalPredictionError::InvalidEvidenceInputDigest);
+        }
+        Ok(())
+    }
+
+    pub fn compute(
+        samples: &[RelationalPredictionSample],
+        config: HeldOutRelationalPredictionConfig,
+        surrogate_count: usize,
+        provenance: RelationalPredictionProvenance,
+    ) -> Result<Self, RelationalPredictionError> {
+        let observed_evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            samples,
+            config,
+            provenance.clone(),
+        )?;
+        let observed = observed_evidence.summary.clone();
+        let relational_loss_differentials =
+            observed_evidence.relational_loss_differentials()?;
+        let evaluation_input_blake3 = evaluation_input_digest(samples, config);
+        let relational_loss_differentials_blake3 =
+            loss_differentials_digest(&evaluation_input_blake3, &relational_loss_differentials);
+
+        let circular_shift_null = PredictionNullSummary::compute_for_feature_set(
+            samples,
+            config,
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            surrogate_count,
+        )?;
+        let feature_decoupling_null = PredictionNullSummary::compute_for_feature_set(
+            samples,
+            config,
+            PredictionNullFamily::FeatureDecoupling,
+            PredictionFeatureSet::RelationalAugmented,
+            surrogate_count,
+        )?;
+        let incremental_relational_null = PredictionNullSummary::compute_for_feature_set(
+            samples,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            surrogate_count,
+        )?;
+
+        let qualification_identity_blake3 = single_qualification_identity_digest(
+            &evaluation_input_blake3,
+            &provenance,
+            config,
+            surrogate_count,
+        );
+
+        circular_shift_null.qualification_input_blake3 = qualification_identity_blake3.clone();
+        feature_decoupling_null.qualification_input_blake3 = qualification_identity_blake3.clone();
+        incremental_relational_null.qualification_input_blake3 = qualification_identity_blake3.clone();
+
+        let qualification = Self {
+            provenance,
+            config,
+            surrogate_count,
+            evaluation_input_blake3,
+            qualification_identity_blake3,
+            relational_loss_differentials,
+            relational_loss_differentials_blake3,
+            observed,
+            circular_shift_null,
+            feature_decoupling_null,
+            incremental_relational_null,
+        };
+        qualification.validate()?;
+        Ok(qualification)
+    }
+}
+
+fn validate_prediction_summary_shape(
+    summary: &HeldOutRelationalPredictionSummary,
+    train_samples: usize,
+    test_samples: usize,
+    gap_samples: usize,
+) -> Result<(), RelationalPredictionError> {
+    if summary.status != EvidenceStatus::Measured
+        || summary.train_samples != train_samples
+        || summary.test_samples != test_samples
+        || summary.gap_samples != gap_samples
+        || !summary.minimum_outcome_horizon.is_finite()
+        || !summary.maximum_outcome_horizon.is_finite()
+        || summary.minimum_outcome_horizon <= 0.0
+        || summary.maximum_outcome_horizon < summary.minimum_outcome_horizon
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let scores = [
+        (
+            summary.persistence_baseline,
+            PredictionFeatureSet::PersistenceBaseline,
+        ),
+        (summary.isolated_agents, PredictionFeatureSet::IsolatedAgents),
+        (summary.common_driver, PredictionFeatureSet::CommonDriver),
+        (summary.synchrony_only, PredictionFeatureSet::SynchronyOnly),
+        (
+            summary.non_relational_context,
+            PredictionFeatureSet::NonRelationalContext,
+        ),
+        (
+            summary.relational_augmented,
+            PredictionFeatureSet::RelationalAugmented,
+        ),
+        (summary.relational_profile, PredictionFeatureSet::RelationalProfile),
+    ];
+
+    for (score, expected_feature_set) in scores {
+        let expected_parameter_count = if expected_feature_set
+            == PredictionFeatureSet::PersistenceBaseline
+        {
+            0
+        } else {
+            feature_count(expected_feature_set) + 1
+        };
+
+        if score.feature_set != expected_feature_set
+            || score.parameter_count != expected_parameter_count
+            || score.train_samples != train_samples
+            || score.test_samples != test_samples
+            || !score.mean_absolute_error.is_finite()
+            || score.mean_absolute_error < 0.0
+            || !score.mean_squared_error.is_finite()
+            || score.mean_squared_error < 0.0
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_forecast_horizon_from_summary(
+    summary: &HeldOutRelationalPredictionSummary,
+    expected_horizon: f64,
+) -> Result<(), RelationalPredictionError> {
+    if !expected_horizon.is_finite() || expected_horizon <= 0.0 {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let tolerance = 1e-9 * expected_horizon.abs().max(1.0);
+    if (summary.minimum_outcome_horizon - expected_horizon).abs() > tolerance
+        || (summary.maximum_outcome_horizon - expected_horizon).abs() > tolerance
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    Ok(())
+}
+
+fn validate_rolling_summary_aggregates(
+    summary: &RollingOriginRelationalPredictionSummary,
+) -> Result<(), RelationalPredictionError> {
+    let mean_mse = |select: fn(&HeldOutRelationalPredictionSummary) -> f64| {
+        let mut total = 0.0;
+        for segment in &summary.segments {
+            total += select(segment);
+            if !total.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+        let mean = total / summary.segments.len() as f64;
+        if !mean.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        Ok(mean)
+    };
+
+    let expected = [
+        (
+            mean_mse(|segment| segment.persistence_baseline.mean_squared_error)?,
+            summary.mean_persistence_mse,
+        ),
+        (
+            mean_mse(|segment| segment.isolated_agents.mean_squared_error)?,
+            summary.mean_isolated_agents_mse,
+        ),
+        (
+            mean_mse(|segment| segment.common_driver.mean_squared_error)?,
+            summary.mean_common_driver_mse,
+        ),
+        (
+            mean_mse(|segment| segment.synchrony_only.mean_squared_error)?,
+            summary.mean_synchrony_only_mse,
+        ),
+        (
+            mean_mse(|segment| segment.non_relational_context.mean_squared_error)?,
+            summary.mean_non_relational_context_mse,
+        ),
+        (
+            mean_mse(|segment| segment.relational_augmented.mean_squared_error)?,
+            summary.mean_relational_augmented_mse,
+        ),
+        (
+            mean_mse(|segment| segment.relational_profile.mean_squared_error)?,
+            summary.mean_relational_profile_mse,
+        ),
+    ];
+
+    if expected.iter().any(|(computed, recorded)| computed != recorded) {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    Ok(())
+}
+
+fn feature_set_name(feature_set: PredictionFeatureSet) -> &'static str {
+    match feature_set {
+        PredictionFeatureSet::PersistenceBaseline => "PersistenceBaseline",
+        PredictionFeatureSet::IsolatedAgents => "IsolatedAgents",
+        PredictionFeatureSet::CommonDriver => "CommonDriver",
+        PredictionFeatureSet::SynchronyOnly => "SynchronyOnly",
+        PredictionFeatureSet::NonRelationalContext => "NonRelationalContext",
+        PredictionFeatureSet::RelationalAugmented => "RelationalAugmented",
+        PredictionFeatureSet::RelationalProfile => "RelationalProfile",
+    }
+}
+
+fn relational_loss_differentials_from_records(
+    origin_index: usize,
+    records: &[PredictionEvidenceRecord],
+) -> Result<Vec<RelationalForecastLossDifferential>, RelationalPredictionError> {
+    let context = records
+        .iter()
+        .find(|record| record.feature_set == PredictionFeatureSet::NonRelationalContext)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+    let relational = records
+        .iter()
+        .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    if context.predictions.len() != relational.predictions.len()
+        || context.observed_outcomes != relational.observed_outcomes
+        || context.feature_times != relational.feature_times
+        || context.outcome_times != relational.outcome_times
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let mut differentials = Vec::with_capacity(context.predictions.len());
+    for sample_index in 0..context.predictions.len() {
+        let outcome = context.observed_outcomes[sample_index];
+        let context_error = context.predictions[sample_index] - outcome;
+        let relational_error = relational.predictions[sample_index] - outcome;
+        let context_loss = context_error * context_error;
+        let relational_loss = relational_error * relational_error;
+        let loss_differential = context_loss - relational_loss;
+
+        if !context_error.is_finite()
+            || !relational_error.is_finite()
+            || !context_loss.is_finite()
+            || !relational_loss.is_finite()
+            || !loss_differential.is_finite()
+        {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        differentials.push(RelationalForecastLossDifferential {
+            origin_index,
+            sample_index,
+            feature_time: context.feature_times[sample_index],
+            outcome_time: context.outcome_times[sample_index],
+            observed_outcome: outcome,
+            non_relational_squared_error: context_loss,
+            relational_squared_error: relational_loss,
+            loss_differential,
+        });
+    }
+
+    Ok(differentials)
+}
+
+fn prediction_evidence_record_json(record: &PredictionEvidenceRecord) -> serde_json::Value {
+    serde_json::json!({
+        "feature_schema": FEATURE_SCHEMA,
+        "model_schema": MODEL_SCHEMA,
+        "feature_set": feature_set_name(record.feature_set),
+        "train_samples": record.train_samples,
+        "test_samples": record.test_samples,
+        "ridge_lambda": record.ridge_lambda,
+        "feature_times": &record.feature_times,
+        "outcome_times": &record.outcome_times,
+        "observed_outcomes": &record.observed_outcomes,
+        "predictions": &record.predictions,
+        "evaluation_input_blake3": &record.evaluation_input_blake3,
+        "test_features": &record.test_features,
+        "baseline_prediction": record.baseline_prediction,
+        "fit_coefficients": &record.fit_coefficients,
+        "feature_means": &record.feature_means,
+        "feature_scales": &record.feature_scales,
+        "mean_absolute_error": record.mean_absolute_error,
+        "mean_squared_error": record.mean_squared_error
+    })
+}
+
+fn validate_evidence_provenance(
+    provenance: &RelationalPredictionProvenance,
+) -> Result<(), RelationalPredictionError> {
+    if provenance.protocol_id.trim().is_empty() {
+        return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+            "protocol_id",
+        ));
+    }
+    if !is_hex_digest(&provenance.source_data_sha256, 64) {
+        return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+            "source_data_sha256",
+        ));
+    }
+    if !is_hex_digest(&provenance.software_commit_sha, 40) {
+        return Err(RelationalPredictionError::InvalidEvidenceProvenance(
+            "software_commit_sha",
+        ));
+    }
+    Ok(())
+}
+
+fn is_hex_digest(value: &str, length: usize) -> bool {
+    value.len() == length && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn validate_samples(
+    samples: &[RelationalPredictionSample],
+) -> Result<(), RelationalPredictionError> {
+    if samples.len() < 12 {
+        return Err(RelationalPredictionError::InsufficientSamples(samples.len()));
+    }
+
+    for sample in samples {
+        RelationalPredictionSample::new(
+            sample.feature_time,
+            sample.outcome_time,
+            sample.agent_a,
+            sample.agent_b,
+            sample.alignment,
+            sample.a_to_b,
+            sample.b_to_a,
+            sample.turn_taking,
+            sample.common_driver,
+            sample.future_outcome,
+        )?;
+    }
+
+    for pair in samples.windows(2) {
+        if pair[1].feature_time <= pair[0].feature_time
+            || pair[1].outcome_time <= pair[0].outcome_time
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_temporal_boundary(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    let test_start = config.test_start();
+    let train_last = config.train_samples - 1;
+
+    if samples[train_last].outcome_time >= samples[test_start].feature_time {
+        return Err(RelationalPredictionError::TemporalLeakage);
+    }
+
+    Ok(())
+}
+
+fn fit_prediction_record(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+    feature_set: PredictionFeatureSet,
+    evaluation_input_blake3: String,
+) -> Result<PredictionEvidenceRecord, RelationalPredictionError> {
+    validate_samples(samples)?;
+    config.validate(samples.len())?;
+    validate_temporal_boundary(samples, config)?;
+
+    let test_start = config.test_start();
+    let test_end = test_start
+        .checked_add(config.test_samples)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    let (model, baseline) = if feature_set == PredictionFeatureSet::PersistenceBaseline {
+        (None, Some(samples[config.train_samples - 1].future_outcome))
+    } else {
+        (
+            Some(fit_linear_model(
+                &samples[..config.train_samples],
+                feature_set,
+                config.ridge_lambda,
+            )?),
+            None,
+        )
+    };
+
+    let fit_coefficients = model.as_ref().map(|model| model.coefficients.clone());
+    let feature_means = model
+        .as_ref()
+        .map_or_else(Vec::new, |model| model.means.clone());
+    let feature_scales = model
+        .as_ref()
+        .map_or_else(Vec::new, |model| model.scales.clone());
+
+    let mut feature_times = Vec::with_capacity(config.test_samples);
+    let mut outcome_times = Vec::with_capacity(config.test_samples);
+    let mut observed_outcomes = Vec::with_capacity(config.test_samples);
+    let mut predictions = Vec::with_capacity(config.test_samples);
+    let mut test_features = Vec::with_capacity(config.test_samples);
+    let mut absolute_error = 0.0;
+    let mut squared_error = 0.0;
+
+    for sample in &samples[test_start..test_end] {
+        let features = feature_vector(sample, feature_set);
+        let prediction = match (&model, baseline) {
+            (Some(model), None) => predict(model, &features),
+            (None, Some(value)) => value,
+            _ => return Err(RelationalPredictionError::ModelFitFailed),
+        };
+        if !prediction.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        if model.is_some() {
+            test_features.push(features);
+        }
+
+        let error = prediction - sample.future_outcome;
+        absolute_error += error.abs();
+        squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        feature_times.push(sample.feature_time);
+        outcome_times.push(sample.outcome_time);
+        observed_outcomes.push(sample.future_outcome);
+        predictions.push(prediction);
+    }
+
+    let n = config.test_samples as f64;
+    Ok(PredictionEvidenceRecord {
+        feature_set,
+        train_samples: config.train_samples,
+        test_samples: config.test_samples,
+        ridge_lambda: config.ridge_lambda,
+        feature_times,
+        outcome_times,
+        observed_outcomes,
+        predictions,
+        evaluation_input_blake3,
+        test_features,
+        baseline_prediction: baseline,
+        fit_coefficients,
+        feature_means,
+        feature_scales,
+        mean_absolute_error: absolute_error / n,
+        mean_squared_error: squared_error / n,
+    })
+}
+
+fn fit_and_score(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+    feature_set: PredictionFeatureSet,
+) -> Result<PredictionScore, RelationalPredictionError> {
+    if feature_set == PredictionFeatureSet::PersistenceBaseline {
+        return score_persistence_baseline(samples, config);
+    }
+
+    let model = fit_linear_model(
+        &samples[..config.train_samples],
+        feature_set,
+        config.ridge_lambda,
+    )?;
+
+    let test_start = config.test_start();
+    let test_end = test_start + config.test_samples;
+    let mut absolute_error = 0.0;
+    let mut squared_error = 0.0;
+
+    for sample in &samples[test_start..test_end] {
+        let features = feature_vector(sample, feature_set);
+        let prediction = predict(&model, &features);
+        if !prediction.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        let error = prediction - sample.future_outcome;
+        absolute_error += error.abs();
+        squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+    }
+
+    let n = config.test_samples as f64;
+    Ok(PredictionScore {
+        feature_set,
+        parameter_count: model.coefficients.len(),
+        train_samples: config.train_samples,
+        test_samples: config.test_samples,
+        mean_absolute_error: absolute_error / n,
+        mean_squared_error: squared_error / n,
+    })
+}
+
+fn score_persistence_baseline(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<PredictionScore, RelationalPredictionError> {
+    let prediction = samples[config.train_samples - 1].future_outcome;
+    if !prediction.is_finite() {
+        return Err(RelationalPredictionError::ModelFitFailed);
+    }
+
+    let test_start = config.test_start();
+    let test_end = test_start + config.test_samples;
+    let mut absolute_error = 0.0;
+    let mut squared_error = 0.0;
+
+    for sample in &samples[test_start..test_end] {
+        let error = prediction - sample.future_outcome;
+        absolute_error += error.abs();
+        squared_error += error * error;
+        if !absolute_error.is_finite() || !squared_error.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+    }
+
+    let n = config.test_samples as f64;
+    Ok(PredictionScore {
+        feature_set: PredictionFeatureSet::PersistenceBaseline,
+        parameter_count: 0,
+        train_samples: config.train_samples,
+        test_samples: config.test_samples,
+        mean_absolute_error: absolute_error / n,
+        mean_squared_error: squared_error / n,
+    })
+}
+
+// Deterministic commitment over evaluator inputs: raw IEEE-754 bit patterns
+// and explicit field order avoid serialization-format drift.
+fn prediction_null_input_digest(
+    samples: &[RelationalPredictionSample],
+    config: HeldOutRelationalPredictionConfig,
+    family: PredictionNullFamily,
+    feature_set: PredictionFeatureSet,
+    requested_surrogate_count: usize,
+    source_slice_start: usize,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-null-input/v1");
+    update_samples_digest(&mut hasher, samples);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_f64(&mut hasher, config.ridge_lambda);
+    hasher.update(null_family_name(family).as_bytes());
+    hasher.update(feature_set_name(feature_set).as_bytes());
+    update_usize(&mut hasher, requested_surrogate_count);
+    update_usize(&mut hasher, source_slice_start);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn null_family_name(family: PredictionNullFamily) -> &'static str {
+    match family {
+        PredictionNullFamily::CircularShift => "CircularShift",
+        PredictionNullFamily::FeatureDecoupling => "FeatureDecoupling",
+        PredictionNullFamily::IncrementalRelationalShift => "IncrementalRelationalShift",
+    }
+}
+
+fn evaluation_input_digest(
+    samples: &[RelationalPredictionSample],
+    config: HeldOutRelationalPredictionConfig,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-input/v1");
+    update_samples_digest(&mut hasher, samples);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_f64(&mut hasher, config.ridge_lambda);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn rolling_evaluation_input_digest(
+    samples: &[RelationalPredictionSample],
+    config: RollingOriginRelationalPredictionConfig,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-rolling-input/v1");
+    update_samples_digest(&mut hasher, samples);
+    update_usize(&mut hasher, config.first_origin);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_usize(&mut hasher, config.origin_count);
+    update_usize(&mut hasher, config.step_samples);
+    update_f64(&mut hasher, config.forecast_horizon);
+    update_f64(&mut hasher, config.ridge_lambda);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn single_qualification_identity_digest(
+    input_digest: &str,
+    provenance: &RelationalPredictionProvenance,
+    config: HeldOutRelationalPredictionConfig,
+    surrogate_count: usize,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-qualification-identity/v1");
+    update_string(&mut hasher, input_digest);
+    update_string(&mut hasher, &provenance.protocol_id);
+    update_string(&mut hasher, &provenance.source_data_sha256);
+    update_string(&mut hasher, &provenance.software_commit_sha);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_f64(&mut hasher, config.ridge_lambda);
+    update_usize(&mut hasher, surrogate_count);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn rolling_qualification_identity_digest(
+    input_digest: &str,
+    provenance: &RelationalPredictionProvenance,
+    config: RollingOriginRelationalPredictionConfig,
+    surrogate_count: usize,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-rolling-qualification-identity/v1");
+    update_string(&mut hasher, input_digest);
+    update_string(&mut hasher, &provenance.protocol_id);
+    update_string(&mut hasher, &provenance.source_data_sha256);
+    update_string(&mut hasher, &provenance.software_commit_sha);
+    update_usize(&mut hasher, config.first_origin);
+    update_usize(&mut hasher, config.train_samples);
+    update_usize(&mut hasher, config.test_samples);
+    update_usize(&mut hasher, config.gap_samples);
+    update_usize(&mut hasher, config.origin_count);
+    update_usize(&mut hasher, config.step_samples);
+    update_f64(&mut hasher, config.forecast_horizon);
+    update_f64(&mut hasher, config.ridge_lambda);
+    update_usize(&mut hasher, surrogate_count);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn inference_plan_digest(plan: &ForecastInferencePlan) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-inference-plan/v2");
+    update_string(&mut hasher, feature_set_name(plan.primary_feature_set));
+    update_string(&mut hasher, feature_set_name(plan.benchmark_feature_set));
+    update_string(&mut hasher, &plan.loss);
+    update_f64(&mut hasher, plan.forecast_horizon);
+    update_string(&mut hasher, &plan.origin_schedule_sha256);
+    update_string(&mut hasher, &plan.method_selection_rule_id);
+    update_string(&mut hasher, &plan.method_selection_rule_spec_sha256);
+    update_string(&mut hasher, &plan.procedure_id);
+    update_string(&mut hasher, &plan.procedure_spec_sha256);
+    update_string(&mut hasher, &plan.dependence_method_id);
+    update_string(&mut hasher, &plan.dependence_spec_sha256);
+    update_string(&mut hasher, &plan.resampling_method_id);
+    update_string(&mut hasher, &plan.resampling_spec_sha256);
+    update_string(&mut hasher, &plan.small_sample_policy_id);
+    update_string(&mut hasher, &plan.multiplicity_policy_id);
+    update_f64(&mut hasher, plan.alpha);
+    update_string(&mut hasher, &plan.qualification_identity_blake3);
+    update_string(&mut hasher, &plan.estimator_compatibility_id);
+    update_string(&mut hasher, &plan.estimator_compatibility_spec_sha256);
+    hasher.finalize().to_hex().to_string()
+}
+
+
+fn forecast_loss_dependence_profile_digest(
+    profile: &ForecastLossDependenceProfile,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-loss-dependence-digest/v1");
+    match &profile.evaluation_input_blake3 {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_string(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_usize(&mut hasher, profile.sample_count);
+    update_usize(&mut hasher, profile.max_lag);
+    update_f64(&mut hasher, profile.mean);
+    update_f64(&mut hasher, profile.variance);
+    update_usize(&mut hasher, profile.autocovariances.len());
+    for value in &profile.autocovariances {
+        update_f64(&mut hasher, *value);
+    }
+    update_usize(&mut hasher, profile.autocorrelations.len());
+    for value in &profile.autocorrelations {
+        update_f64(&mut hasher, *value);
+    }
+    update_usize(&mut hasher, profile.pair_counts.len());
+    for value in &profile.pair_counts {
+        update_usize(&mut hasher, *value);
+    }
+    match profile.lag_one_autocorrelation {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_f64(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    match profile.first_nonpositive_autocorrelation_lag {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_usize(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    match profile.max_absolute_autocorrelation_lag {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_usize(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_f64(&mut hasher, profile.max_absolute_autocorrelation);
+    update_f64(&mut hasher, profile.bartlett_long_run_variance);
+    match profile.effective_sample_size {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_f64(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_string(&mut hasher, "Measured");
+    hasher.finalize().to_hex().to_string()
+}
+
+fn rolling_forecast_loss_dependence_profile_digest(
+    profile: &RollingForecastLossDependenceProfile,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-rolling-loss-dependence-digest/v1");
+    match &profile.evaluation_input_blake3 {
+        Some(value) => {
+            hasher.update(&[1]);
+            update_string(&mut hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+    update_usize(&mut hasher, profile.origin_count);
+    update_usize(&mut hasher, profile.test_samples);
+    update_usize(&mut hasher, profile.max_lag_within_origin);
+    update_usize(&mut hasher, profile.max_lag_across_origins);
+    update_usize(&mut hasher, profile.per_origin.len());
+    for child in &profile.per_origin {
+        update_string(
+            &mut hasher,
+            &forecast_loss_dependence_profile_digest(child),
+        );
+    }
+    update_usize(&mut hasher, profile.origin_mean_differentials.len());
+    for value in &profile.origin_mean_differentials {
+        update_f64(&mut hasher, *value);
+    }
+    update_string(
+        &mut hasher,
+        &forecast_loss_dependence_profile_digest(&profile.across_origin_mean_profile),
+    );
+    update_string(&mut hasher, "Measured");
+    hasher.finalize().to_hex().to_string()
+}
+
+fn inference_selection_digest(receipt: &ForecastInferenceSelectionReceipt) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-inference-selection/v1");
+    update_string(&mut hasher, &receipt.analysis_level);
+    update_string(&mut hasher, &receipt.binding_blake3);
+    update_string(&mut hasher, &receipt.qualification_identity_blake3);
+    update_string(&mut hasher, &receipt.plan_blake3);
+    update_string(&mut hasher, &receipt.dependence_profile_blake3);
+    update_string(&mut hasher, &receipt.method_selection_rule_id);
+    update_string(&mut hasher, &receipt.method_selection_rule_spec_sha256);
+    update_string(&mut hasher, &receipt.decision_path_id);
+    update_string(&mut hasher, &receipt.selected_procedure_id);
+    update_string(&mut hasher, &receipt.selected_procedure_spec_sha256);
+    update_string(&mut hasher, &receipt.selected_dependence_method_id);
+    update_string(&mut hasher, &receipt.selected_dependence_spec_sha256);
+    update_string(&mut hasher, &receipt.selected_resampling_method_id);
+    update_string(&mut hasher, &receipt.selected_resampling_spec_sha256);
+    update_string(&mut hasher, &receipt.selected_small_sample_policy_id);
+    update_string(&mut hasher, &receipt.selected_multiplicity_policy_id);
+    update_string(&mut hasher, &receipt.estimator_compatibility_id);
+    update_string(&mut hasher, &receipt.estimator_compatibility_spec_sha256);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn inference_binding_digest(binding: &ForecastInferenceBinding) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-inference-binding/v1");
+    hasher.update(b"qualification-replay-verified/v1");
+    update_string(&mut hasher, &binding.analysis_level);
+    update_string(&mut hasher, &binding.origin_schedule_sha256);
+    update_string(&mut hasher, &binding.qualification_identity_blake3);
+    update_string(&mut hasher, &binding.plan_blake3);
+    update_string(&mut hasher, &binding.evaluation_input_blake3);
+    update_string(
+        &mut hasher,
+        &binding.relational_loss_differentials_blake3,
+    );
+    update_string(&mut hasher, &binding.dependence_profile_blake3);
+    update_usize(&mut hasher, binding.dependence_max_lag_within_origin);
+    update_usize(&mut hasher, binding.dependence_max_lag_across_origins);
+    update_usize(&mut hasher, binding.origin_count);
+    update_usize(&mut hasher, binding.test_samples);
+    update_f64(&mut hasher, binding.forecast_horizon);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn loss_differentials_digest(
+    parent_input_digest: &str,
+    differentials: &[RelationalForecastLossDifferential],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"relational-prediction-loss-differentials/v1");
+    update_string(&mut hasher, parent_input_digest);
+    update_usize(&mut hasher, differentials.len());
+    for differential in differentials {
+        update_usize(&mut hasher, differential.origin_index);
+        update_usize(&mut hasher, differential.sample_index);
+        update_f64(&mut hasher, differential.feature_time);
+        update_f64(&mut hasher, differential.outcome_time);
+        update_f64(&mut hasher, differential.observed_outcome);
+        update_f64(&mut hasher, differential.non_relational_squared_error);
+        update_f64(&mut hasher, differential.relational_squared_error);
+        update_f64(&mut hasher, differential.loss_differential);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn validate_loss_differentials(
+    differentials: &[RelationalForecastLossDifferential],
+    origin_count: usize,
+    test_samples: usize,
+) -> Result<(), RelationalPredictionError> {
+    if origin_count == 0 || test_samples < 4 {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    let expected = origin_count
+        .checked_mul(test_samples)
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+    if differentials.len() != expected {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    for (index, differential) in differentials.iter().enumerate() {
+        let expected_origin = index / test_samples;
+        let expected_sample = index % test_samples;
+        if differential.origin_index != expected_origin
+            || differential.sample_index != expected_sample
+            || !differential.feature_time.is_finite()
+            || !differential.outcome_time.is_finite()
+            || differential.outcome_time <= differential.feature_time
+            || !differential.observed_outcome.is_finite()
+            || !differential.non_relational_squared_error.is_finite()
+            || !differential.relational_squared_error.is_finite()
+            || !differential.loss_differential.is_finite()
+            || differential.non_relational_squared_error < 0.0
+            || differential.relational_squared_error < 0.0
+            || (differential.loss_differential
+                - (differential.non_relational_squared_error
+                    - differential.relational_squared_error))
+                .abs()
+                > 1e-12
+                    * differential.loss_differential.abs().max(1.0)
+        {
+            return Err(RelationalPredictionError::InvalidSplit);
+        }
+    }
+
+    for origin in 0..origin_count {
+        let start = origin * test_samples;
+        let slice = &differentials[start..start + test_samples];
+        for pair in slice.windows(2) {
+            if pair[1].feature_time <= pair[0].feature_time
+                || pair[1].outcome_time <= pair[0].outcome_time
+                || pair[0].outcome_time <= pair[0].feature_time
+                || pair[1].outcome_time <= pair[1].feature_time
+            {
+                return Err(RelationalPredictionError::InvalidSplit);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn update_samples_digest(
+    hasher: &mut blake3::Hasher,
+    samples: &[RelationalPredictionSample],
+) {
+    update_usize(hasher, samples.len());
+    for sample in samples {
+        update_f64(hasher, sample.feature_time);
+        update_f64(hasher, sample.outcome_time);
+        update_f64(hasher, sample.agent_a);
+        update_f64(hasher, sample.agent_b);
+        update_f64(hasher, sample.alignment);
+        update_f64(hasher, sample.a_to_b);
+        update_f64(hasher, sample.b_to_a);
+        update_f64(hasher, sample.turn_taking);
+        update_f64(hasher, sample.common_driver);
+        update_f64(hasher, sample.future_outcome);
+    }
+}
+
+fn update_string(hasher: &mut blake3::Hasher, value: &str) {
+    update_usize(hasher, value.len());
+    hasher.update(value.as_bytes());
+}
+
+fn update_usize(hasher: &mut blake3::Hasher, value: usize) {
+    hasher.update(&(value as u64).to_le_bytes());
+}
+
+fn update_f64(hasher: &mut blake3::Hasher, value: f64) {
+    hasher.update(&value.to_bits().to_le_bytes());
+}
+
+fn validate_null_family_shape(
+    family: PredictionNullFamily,
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if matches!(family, PredictionNullFamily::FeatureDecoupling)
+        && (config.train_samples < 5 || config.test_samples < 5)
+    {
+        return Err(RelationalPredictionError::InsufficientSamples(
+            config.train_samples.min(config.test_samples),
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_held_out_config_shape(
+    config: &HeldOutRelationalPredictionConfig,
+) -> Result<(), RelationalPredictionError> {
+    if config.train_samples < 8
+        || config.test_samples < 4
+        || !config.ridge_lambda.is_finite()
+        || config.ridge_lambda < 0.0
+    {
+        return Err(RelationalPredictionError::InvalidSplit);
+    }
+
+    config
+        .train_samples
+        .checked_add(config.gap_samples)
+        .and_then(|value| value.checked_add(config.test_samples))
+        .ok_or(RelationalPredictionError::InvalidSplit)?;
+
+    Ok(())
+}
+
+fn feature_count(feature_set: PredictionFeatureSet) -> usize {
+    match feature_set {
+        PredictionFeatureSet::PersistenceBaseline => 0,
+        PredictionFeatureSet::IsolatedAgents => 2,
+        PredictionFeatureSet::CommonDriver => 1,
+        PredictionFeatureSet::SynchronyOnly => 1,
+        PredictionFeatureSet::NonRelationalContext => 4,
+        PredictionFeatureSet::RelationalAugmented => 7,
+        PredictionFeatureSet::RelationalProfile => 4,
+    }
+}
+
+fn feature_vector(
+    sample: &RelationalPredictionSample,
+    feature_set: PredictionFeatureSet,
+) -> Vec<f64> {
+    match feature_set {
+        PredictionFeatureSet::IsolatedAgents => vec![sample.agent_a, sample.agent_b],
+        PredictionFeatureSet::CommonDriver => vec![sample.common_driver],
+        PredictionFeatureSet::SynchronyOnly => vec![sample.alignment],
+        PredictionFeatureSet::NonRelationalContext => vec![
+            sample.agent_a,
+            sample.agent_b,
+            sample.common_driver,
+            sample.alignment,
+        ],
+        PredictionFeatureSet::RelationalAugmented => vec![
+            sample.agent_a,
+            sample.agent_b,
+            sample.common_driver,
+            sample.alignment,
+            sample.a_to_b,
+            sample.b_to_a,
+            sample.turn_taking,
+        ],
+        PredictionFeatureSet::RelationalProfile => vec![
+            sample.alignment,
+            sample.a_to_b,
+            sample.b_to_a,
+            sample.turn_taking,
+        ],
+    }
+}
+
+fn fit_linear_model(
+    samples: &[RelationalPredictionSample],
+    feature_set: PredictionFeatureSet,
+    ridge_lambda: f64,
+) -> Result<FittedLinearModel, RelationalPredictionError> {
+    if samples.is_empty() {
+        return Err(RelationalPredictionError::InsufficientSamples(0));
+    }
+
+    let feature_count = feature_vector(&samples[0], feature_set).len();
+    let sample_count = samples.len() as f64;
+    let mut means = vec![0.0_f64; feature_count];
+
+    // Preprocessing statistics are fit exclusively on the training window.
+    for sample in samples {
+        let features = feature_vector(sample, feature_set);
+        for (mean, feature) in means.iter_mut().zip(features) {
+            *mean += feature;
+        }
+    }
+
+    for mean in &mut means {
+        *mean /= sample_count;
+        if !mean.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+    }
+
+    let mut scales = vec![0.0_f64; feature_count];
+    for sample in samples {
+        let features = feature_vector(sample, feature_set);
+        for ((scale, feature), mean) in scales.iter_mut().zip(features).zip(&means) {
+            let centered = feature - *mean;
+            *scale += centered * centered;
+            if !scale.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+    }
+
+    for scale in &mut scales {
+        *scale = (*scale / sample_count).sqrt();
+        if !scale.is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+        // Constant training features are centered to zero; unit scale keeps
+        // the transform total and avoids division by zero.
+        if *scale <= 1e-12 {
+            *scale = 1.0;
+        }
+    }
+
+    let dimension = feature_count + 1;
+    let mut normal = vec![vec![0.0_f64; dimension + 1]; dimension];
+
+    for sample in samples {
+        let features = feature_vector(sample, feature_set);
+        let mut row = Vec::with_capacity(dimension);
+        row.push(1.0);
+
+        for ((feature, mean), scale) in features.iter().zip(&means).zip(&scales) {
+            let standardized = (*feature - *mean) / *scale;
+            if !standardized.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+            row.push(standardized);
+        }
+
+        for i in 0..dimension {
+            for j in 0..dimension {
+                normal[i][j] += row[i] * row[j];
+                if !normal[i][j].is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
+            }
+            normal[i][dimension] += row[i] * sample.future_outcome;
+            if !normal[i][dimension].is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+    }
+
+    // Ridge is applied in standardized predictor space, so lambda is not
+    // implicitly changed by the raw units of a feature.
+    for i in 1..dimension {
+        normal[i][i] += ridge_lambda;
+        if !normal[i][i].is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+    }
+
+    Ok(FittedLinearModel {
+        coefficients: gaussian_elimination(&mut normal)?,
+        means,
+        scales,
+    })
+}
+
+fn gaussian_elimination(
+    matrix: &mut [Vec<f64>],
+) -> Result<Vec<f64>, RelationalPredictionError> {
+    let dimension = matrix.len();
+
+    for column in 0..dimension {
+        let pivot_row = (column..dimension)
+            .max_by(|&a, &b| {
+                matrix[a][column]
+                    .abs()
+                    .partial_cmp(&matrix[b][column].abs())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .ok_or(RelationalPredictionError::ModelFitFailed)?;
+
+        if matrix[pivot_row][column].abs() <= 1e-14 {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        matrix.swap(column, pivot_row);
+
+        for row in (column + 1)..dimension {
+            let factor = matrix[row][column] / matrix[column][column];
+            if !factor.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+
+            for j in column..=dimension {
+                matrix[row][j] -= factor * matrix[column][j];
+                if !matrix[row][j].is_finite() {
+                    return Err(RelationalPredictionError::ModelFitFailed);
+                }
+            }
+        }
+    }
+
+    let mut solution = vec![0.0_f64; dimension];
+    for row in (0..dimension).rev() {
+        let mut rhs = matrix[row][dimension];
+        for j in (row + 1)..dimension {
+            rhs -= matrix[row][j] * solution[j];
+            if !rhs.is_finite() {
+                return Err(RelationalPredictionError::ModelFitFailed);
+            }
+        }
+
+        let divisor = matrix[row][row];
+        if divisor.abs() <= 1e-14 {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+
+        solution[row] = rhs / divisor;
+        if !solution[row].is_finite() {
+            return Err(RelationalPredictionError::ModelFitFailed);
+        }
+    }
+
+    Ok(solution)
+}
+
+fn predict(model: &FittedLinearModel, features: &[f64]) -> f64 {
+    let mut prediction = model.coefficients[0];
+
+    for (((coefficient, mean), scale), feature) in model
+        .coefficients
+        .iter()
+        .skip(1)
+        .zip(&model.means)
+        .zip(&model.scales)
+        .zip(features)
+    {
+        let standardized = (*feature - *mean) / *scale;
+        if !standardized.is_finite() {
+            return f64::NAN;
+        }
+        prediction += coefficient * standardized;
+    }
+
+    prediction
+}
+
+fn make_surrogate(
+    samples: &[RelationalPredictionSample],
+    config: &HeldOutRelationalPredictionConfig,
+    family: PredictionNullFamily,
+    shift: usize,
+) -> Result<Vec<RelationalPredictionSample>, RelationalPredictionError> {
+    if shift == 0 {
+        return Err(RelationalPredictionError::InvalidSurrogateCount);
+    }
+
+    let test_start = config.test_start();
+
+    samples
+        .iter()
+        .enumerate()
+        .map(|(index, sample)| {
+            let segment_start = if index < config.train_samples {
+                0
+            } else if index >= test_start {
+                test_start
+            } else {
+                return *sample;
+            };
+            let segment_len = if index < config.train_samples {
+                config.train_samples
+            } else {
+                config.test_samples
+            };
+            let local_index = index - segment_start;
+            let source = |channel_offset: usize| -> Result<usize, RelationalPredictionError> {
+                let extra = match family {
+                    PredictionNullFamily::CircularShift => 0,
+                    PredictionNullFamily::FeatureDecoupling => channel_offset,
+                    // Keep the incremental relational block coherent while
+                    // shifting it away from its original temporal alignment.
+                    PredictionNullFamily::IncrementalRelationalShift => 0,
+                };
+                if segment_len < 2 {
+                    return Err(RelationalPredictionError::InsufficientSamples(segment_len));
+                }
+                if matches!(family, PredictionNullFamily::FeatureDecoupling) && segment_len < 5 {
+                    return Err(RelationalPredictionError::InsufficientSamples(segment_len));
+                }
+                // Use consecutive non-zero offsets rather than multiplication:
+                // for FeatureDecoupling this guarantees distinct channel offsets
+                // whenever at least four non-zero circular offsets exist.
+                let normalized_offset = shift
+                    .checked_sub(1)
+                    .and_then(|base| base.checked_add(extra))
+                    .ok_or(RelationalPredictionError::InvalidSplit)?;
+                let offset = 1 + normalized_offset % (segment_len - 1);
+                let source_index = local_index
+                    .checked_add(offset)
+                    .ok_or(RelationalPredictionError::InvalidSplit)?
+                    % segment_len;
+                segment_start
+                    .checked_add(source_index)
+                    .ok_or(RelationalPredictionError::InvalidSplit)
+            };
+
+            let shifted_alignment =
+                !matches!(family, PredictionNullFamily::IncrementalRelationalShift);
+            let alignment_sample = if shifted_alignment {
+                samples[source(0)?]
+            } else {
+                *sample
+            };
+            let a_to_b_sample = samples[source(1)?];
+            let b_to_a_sample = samples[source(2)?];
+            let turn_taking_sample = samples[source(3)?];
+
+            Ok(RelationalPredictionSample {
+                alignment: alignment_sample.alignment,
+                a_to_b: a_to_b_sample.a_to_b,
+                b_to_a: b_to_a_sample.b_to_a,
+                turn_taking: turn_taking_sample.turn_taking,
+                ..*sample
+            })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    const CANONICAL_SELECTION_RULE_ID: &str = super::CANONICAL_INFERENCE_SELECTION_RULE_ID;
+    const CANONICAL_SELECTION_RULE_SPEC_SHA256: &str =
+        super::CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256;
+    use super::*;
+
+    fn deterministic_sequence(i: usize, frequency: f64, phase: f64) -> f64 {
+        (i as f64 * frequency + phase).sin() * 0.45 + 0.5
+    }
+
+    fn build_samples(outcome_horizon: f64) -> Vec<RelationalPredictionSample> {
+        (0..80)
+            .map(|i| {
+                let alignment = deterministic_sequence(i, 0.13, 0.0);
+                let a_to_b = deterministic_sequence(i, 0.071, 0.6);
+                let b_to_a = deterministic_sequence(i, 0.097, 1.3);
+                let turn_taking = deterministic_sequence(i, 0.31, 0.4);
+                let agent_a = deterministic_sequence(i, 0.173, 0.2);
+                let agent_b = deterministic_sequence(i, 0.117, 1.1);
+                let common_driver = deterministic_sequence(i, 0.043, 0.9);
+                let outcome =
+                    0.61 * alignment + 0.23 * a_to_b + 0.11 * b_to_a + 0.05 * turn_taking;
+
+                RelationalPredictionSample::new(
+                    i as f64,
+                    i as f64 + outcome_horizon,
+                    agent_a,
+                    agent_b,
+                    alignment,
+                    a_to_b,
+                    b_to_a,
+                    turn_taking,
+                    common_driver,
+                    outcome,
+                )
+                .unwrap()
+            })
+            .collect()
+    }
+
+    fn config() -> HeldOutRelationalPredictionConfig {
+        HeldOutRelationalPredictionConfig {
+            train_samples: 36,
+            test_samples: 28,
+            gap_samples: 4,
+            ridge_lambda: 1e-8,
+        }
+    }
+
+    #[test]
+    fn loss_dependence_profile_recovers_positive_serial_structure() {
+        let losses = vec![1.0, 0.8, 0.64, 0.512, 0.4096, 0.32768, 0.262144, 0.2097152];
+        let profile = ForecastLossDependenceProfile::compute(&losses, 4).unwrap();
+
+        assert_eq!(profile.sample_count, losses.len());
+        assert_eq!(profile.max_lag, 4);
+        assert_eq!(profile.pair_counts, vec![8, 7, 6, 5, 4]);
+        assert!(profile.variance > 0.0);
+        assert!(profile.lag_one_autocorrelation.unwrap() > 0.5);
+        assert!(profile.max_absolute_autocorrelation > 0.5);
+        assert!(profile.bartlett_long_run_variance.is_finite());
+        assert!(profile.effective_sample_size.unwrap() < losses.len() as f64);
+        profile.validate().unwrap();
+        assert!(profile.to_json().unwrap().contains(DEPENDENCE_PROFILE_SCHEMA));
+
+        let mut tampered = profile.clone();
+        tampered.max_absolute_autocorrelation = 0.0;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::ModelFitFailed)
+        );
+    }
+
+    #[test]
+    fn loss_dependence_profile_clamps_declared_lag_and_handles_constant_losses() {
+        let losses = vec![0.25, 0.25, 0.25, 0.25];
+        let profile = ForecastLossDependenceProfile::compute(&losses, 99).unwrap();
+
+        assert_eq!(profile.max_lag, 3);
+        assert_eq!(profile.variance, 0.0);
+        assert_eq!(profile.autocorrelations, vec![0.0; 4]);
+        assert_eq!(profile.pair_counts, vec![4, 3, 2, 1]);
+        assert_eq!(profile.effective_sample_size, None);
+    }
+
+    #[test]
+    fn rolling_loss_dependence_does_not_create_cross_origin_adjacency() {
+        let differentials = (0..4)
+            .flat_map(|origin| {
+                (0..4).map(move |sample_index| RelationalForecastLossDifferential {
+                    origin_index: origin,
+                    sample_index,
+                    feature_time: (origin * 10 + sample_index) as f64,
+                    outcome_time: (origin * 10 + sample_index + 1) as f64,
+                    observed_outcome: 0.0,
+                    non_relational_squared_error: 1.0,
+                    relational_squared_error: 0.75,
+                    loss_differential: 0.1 * (origin + 1) as f64,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let profile = RollingForecastLossDependenceProfile::compute(
+            &differentials,
+            4,
+            4,
+            2,
+            2,
+        )
+        .unwrap();
+
+        assert_eq!(profile.origin_count, 4);
+        assert_eq!(profile.per_origin.len(), 4);
+        assert_eq!(profile.origin_mean_differentials, vec![0.1, 0.2, 0.3, 0.4]);
+        assert!(profile.across_origin_mean_profile.lag_one_autocorrelation.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn rolling_loss_dependence_rejects_origin_swap() {
+        let mut differentials = (0..4)
+            .flat_map(|origin| {
+                (0..4).map(move |sample_index| RelationalForecastLossDifferential {
+                    origin_index: origin,
+                    sample_index,
+                    feature_time: (origin * 10 + sample_index) as f64,
+                    outcome_time: (origin * 10 + sample_index + 1) as f64,
+                    observed_outcome: 0.0,
+                    non_relational_squared_error: 1.0,
+                    relational_squared_error: 0.5,
+                    loss_differential: 0.1,
+                })
+            })
+            .collect::<Vec<_>>();
+        differentials.swap(0, 4);
+
+        assert_eq!(
+            RollingForecastLossDependenceProfile::compute(&differentials, 4, 4, 2, 1),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_exposes_loss_dependence_profile() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let profile = evidence.relational_loss_dependence(8).unwrap();
+        assert_eq!(
+            profile.evaluation_input_blake3.as_deref(),
+            evidence.records.first().map(|record| record.evaluation_input_blake3.as_str())
+        );
+        assert_eq!(profile.sample_count, config().test_samples);
+        assert!(profile.autocorrelations.iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn rolling_evidence_exposes_two_level_loss_dependence_profile() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            provenance(),
+        )
+        .unwrap();
+
+        let profile = evidence.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(
+            profile.evaluation_input_blake3.as_deref(),
+            Some(evidence.evaluation_input_blake3.as_str())
+        );
+        assert_eq!(profile.origin_count, config.origin_count);
+        assert_eq!(profile.per_origin.len(), config.origin_count);
+        assert!(
+            profile
+                .per_origin
+                .iter()
+                .all(|child| child.evaluation_input_blake3.as_deref()
+                    == Some(evidence.evaluation_input_blake3.as_str()))
+        );
+        assert_eq!(profile.origin_mean_differentials.len(), config.origin_count);
+        assert_eq!(profile.across_origin_mean_profile.sample_count, config.origin_count);
+        profile.validate().unwrap();
+        assert!(profile.to_json().unwrap().contains("rolling-two-level"));
+
+        let mut tampered = profile.clone();
+        tampered.per_origin[1].evaluation_input_blake3 =
+            Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string());
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+        assert!(profile.to_json().unwrap().contains("evaluation_input_blake3"));
+    }
+
+    #[test]
+    fn evidence_exposes_critical_target_level_loss_differentials() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let differentials = evidence.relational_loss_differentials().unwrap();
+        assert_eq!(differentials.len(), config().test_samples);
+        assert!(differentials.iter().all(|item| item.origin_index == 0));
+
+        let context = evidence
+            .records
+            .iter()
+            .find(|record| record.feature_set == PredictionFeatureSet::NonRelationalContext)
+            .unwrap();
+        let relational = evidence
+            .records
+            .iter()
+            .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+            .unwrap();
+
+        let first = differentials[0];
+        let context_error = context.predictions[0] - context.observed_outcomes[0];
+        let relational_error = relational.predictions[0] - relational.observed_outcomes[0];
+
+        assert_eq!(first.sample_index, 0);
+        assert_eq!(first.feature_time, context.feature_times[0]);
+        assert_eq!(first.outcome_time, context.outcome_times[0]);
+        assert_eq!(first.observed_outcome, context.observed_outcomes[0]);
+        assert_eq!(
+            first.non_relational_squared_error,
+            context_error * context_error
+        );
+        assert_eq!(
+            first.relational_squared_error,
+            relational_error * relational_error
+        );
+        assert_eq!(
+            first.loss_differential,
+            first.non_relational_squared_error - first.relational_squared_error
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_undersized_training_or_test_windows() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let mut tampered = evidence.records[0].clone();
+        tampered.train_samples = 7;
+        assert_eq!(
+            tampered.validate_trace(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut tampered = evidence.records[0].clone();
+        tampered.test_samples = 3;
+        tampered.predictions.truncate(3);
+        tampered.observed_outcomes.truncate(3);
+        tampered.feature_times.truncate(3);
+        tampered.outcome_times.truncate(3);
+        tampered.test_features.truncate(3);
+        assert_eq!(
+            tampered.validate_trace(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_provenance_rejects_invalid_digest_shape() {
+        assert_eq!(
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "not-a-sha256",
+                "0123456789abcdef0123456789abcdef01234567",
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn single_holdout_split_rejects_arithmetic_overflow() {
+        let config = HeldOutRelationalPredictionConfig {
+            train_samples: usize::MAX,
+            test_samples: 4,
+            gap_samples: 1,
+            ridge_lambda: 1e-8,
+        };
+
+        assert_eq!(
+            config.validate(usize::MAX),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_packet_preserves_ridge_configuration() {
+        let samples = build_samples(0.5);
+        let ridge_lambda = 0.125;
+        let config = HeldOutRelationalPredictionConfig {
+            ridge_lambda,
+            ..config()
+        };
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(evidence.records.iter().all(|record| record.ridge_lambda == ridge_lambda));
+        assert!(evidence.to_json().unwrap().contains("0.125"));
+    }
+
+    #[test]
+    fn evaluator_rejects_directly_constructed_invalid_samples() {
+        let mut samples = build_samples(0.5);
+        samples[10].a_to_b = f64::NAN;
+
+        assert_eq!(
+            HeldOutRelationalPredictionSummary::compute(&samples, config()),
+            Err(RelationalPredictionError::NonFiniteValue("a_to_b"))
+        );
+    }
+
+    #[test]
+    fn evidence_replay_rejects_mismatched_config() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        let mut altered = config();
+        altered.ridge_lambda = 0.25;
+
+        assert_eq!(
+            evidence.verify_against_samples(&samples, altered),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_replay_verifier_binds_exact_training_input() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let mut altered_samples = samples.clone();
+        altered_samples[0].agent_a += 0.01;
+
+        assert_eq!(
+            evidence.verify_against_samples(&samples, config()),
+            Ok(())
+        );
+        assert_eq!(
+            evidence.verify_against_samples(&altered_samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        evidence.records[1].fit_coefficients.as_mut().unwrap()[0] += 0.01;
+        assert_eq!(
+            evidence.verify_against_samples(&samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_replay_verifier_binds_exact_input_sequence() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(evidence.verify_against_samples(&samples), Ok(()));
+        let mut altered_samples = samples.clone();
+        altered_samples[40].future_outcome += 0.01;
+        assert_eq!(
+            evidence.verify_against_samples(&altered_samples),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn evidence_packet_validates_and_serializes() {
+        let samples = build_samples(0.5);
+        let evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.validate().unwrap();
+        let json = evidence.to_json().unwrap();
+        assert!(json.contains(EVIDENCE_SCHEMA));
+        assert!(json.contains(FEATURE_SCHEMA));
+        assert!(json.contains(MODEL_SCHEMA));
+        assert!(json.contains("RelationalAugmented"));
+        assert!(json.contains("predictions"));
+        assert!(json.contains("test_features"));
+        assert!(json.contains("evaluation_input_blake3"));
+        assert_eq!(evidence.records.len(), 7);
+        assert_eq!(
+            evidence.records[0].score(),
+            evidence.summary.score(evidence.records[0].feature_set)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_rejects_tampered_origin_schedule() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let mut evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.origin_starts[1] += 1;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_rejects_tampered_summary_aggregate_mse() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let provenance = provenance();
+        let mut evidence =
+            RollingOriginRelationalPredictionSummary::compute_evidence(
+                &samples,
+                config,
+                provenance,
+            )
+            .unwrap();
+
+        evidence.observed.mean_relational_augmented_mse += 0.01;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_exposes_disjoint_target_level_loss_differentials() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            provenance(),
+        )
+        .unwrap();
+
+        let differentials = evidence.relational_loss_differentials().unwrap();
+        assert_eq!(differentials.len(), config.origin_count * config.test_samples);
+        assert_eq!(
+            differentials.iter().filter(|item| item.origin_index == 0).count(),
+            config.test_samples
+        );
+        assert_eq!(
+            differentials.iter().filter(|item| item.origin_index == 1).count(),
+            config.test_samples
+        );
+
+        for pair in differentials.windows(2) {
+            if pair[0].origin_index == pair[1].origin_index {
+                assert_eq!(pair[1].sample_index, pair[0].sample_index + 1);
+            } else {
+                assert_eq!(pair[1].origin_index, pair[0].origin_index + 1);
+                assert_eq!(pair[1].sample_index, 0);
+                assert!(pair[1].feature_time > pair[0].outcome_time);
+            }
+        }
+    }
+
+
+    #[test]
+    fn origin_schedule_digest_is_deterministic_and_configuration_bound() {
+        let config = config();
+        let single_a = single_origin_schedule_sha256(config, 0.5);
+        let single_b = single_origin_schedule_sha256(config, 0.5);
+        assert_eq!(single_a, single_b);
+        assert_eq!(single_a.len(), 64);
+
+        let mut altered_single = config;
+        altered_single.gap_samples += 1;
+        assert_ne!(
+            single_a,
+            single_origin_schedule_sha256(altered_single, 0.5)
+        );
+
+        let rolling = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let rolling_a = rolling_origin_schedule_sha256(rolling).unwrap();
+        let rolling_b = rolling_origin_schedule_sha256(rolling).unwrap();
+        assert_eq!(rolling_a, rolling_b);
+        assert_eq!(rolling_a.len(), 64);
+
+        let mut altered_rolling = rolling;
+        altered_rolling.step_samples += 1;
+        assert_ne!(
+            rolling_a,
+            rolling_origin_schedule_sha256(altered_rolling).unwrap()
+        );
+    }
+
+    #[test]
+    fn single_inference_binding_derives_and_enforces_schedule() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+
+        let schedule = single_origin_schedule_sha256(config, 0.5);
+        let plan = ForecastInferencePlan::new(
+            0.5,
+            schedule,
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
+            "nested-forecast-bootstrap-v1",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+            "loss-dependence-bartlett-v1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+            "moving-block-bootstrap-v1",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+
+        let dependence = qualification.relational_loss_dependence(8).unwrap();
+        let binding =
+            ForecastInferenceBinding::from_single(&samples, &plan, &qualification, &dependence).unwrap();
+        binding.validate_against_single(&plan, &qualification, &dependence)
+            .unwrap();
+
+        let mut bad_plan = plan.clone();
+        bad_plan.origin_schedule_sha256 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+        bad_plan.plan_blake3 = inference_plan_digest(&bad_plan);
+        bad_plan.validate().unwrap();
+        assert_eq!(
+            binding.validate_against_single(&bad_plan, &qualification, &dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_binding_binds_plan_qualification_loss_vector_and_dependence() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            rolling_origin_schedule_sha256(config).unwrap(),
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
+            "nested-forecast-bootstrap-v1",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+            "loss-dependence-bartlett-v1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+            "moving-block-bootstrap-v1",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+
+        let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
+        let binding =
+            ForecastInferenceBinding::from_rolling(&samples, &plan, &qualification, &dependence).unwrap();
+        binding.validate_against_rolling(&plan, &qualification, &dependence)
+            .unwrap();
+        assert_eq!(
+            binding.dependence_profile_blake3,
+            rolling_forecast_loss_dependence_profile_digest(&dependence)
+        );
+        assert!(binding.to_json().unwrap().contains(INFERENCE_BINDING_SCHEMA));
+        let mut invalid_schedule_plan = plan.clone();
+        invalid_schedule_plan.origin_schedule_sha256 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+        invalid_schedule_plan.plan_blake3 = inference_plan_digest(&invalid_schedule_plan);
+        invalid_schedule_plan.validate().unwrap();
+        assert_eq!(
+            binding.validate_against_rolling(
+                &invalid_schedule_plan,
+                &qualification,
+                &dependence
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered_binding = binding.clone();
+        tampered_binding.forecast_horizon += 0.25;
+        assert_eq!(
+            tampered_binding.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+
+        let mut tampered_dependence = dependence.clone();
+        tampered_dependence.mean += 0.001;
+        assert_eq!(
+            binding.validate_against_rolling(&plan, &qualification, &tampered_dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let alternate_qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1-alt",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let alternate_dependence = alternate_qualification.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(
+            binding.validate_against_rolling(&plan, &alternate_qualification, &alternate_dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let alternate_plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            plan.origin_schedule_sha256.clone(),
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "different-nested-procedure-v1",
+            plan.procedure_spec_sha256.clone(),
+            plan.dependence_method_id.clone(),
+            plan.dependence_spec_sha256.clone(),
+            plan.resampling_method_id.clone(),
+            plan.resampling_spec_sha256.clone(),
+            plan.small_sample_policy_id.clone(),
+            plan.multiplicity_policy_id.clone(),
+            plan.alpha,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            binding.validate_against_rolling(&alternate_plan, &qualification, &dependence),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_plan_rejects_cross_qualification_binding() {
+        let identity_a = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let identity_b = "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b";
+        let plan = ForecastInferencePlan::new(
+            0.5,
+            identity_a,
+            "relational-inference-selection-rule-v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "nested-forecast-bootstrap-v1",
+            identity_b,
+            "loss-dependence-bartlett-v1",
+            identity_a,
+            "moving-block-bootstrap-v1",
+            identity_b,
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            identity_a,
+        )
+        .unwrap();
+        plan.validate_against_qualification(identity_a).unwrap();
+        assert_eq!(
+            plan.validate_against_qualification(identity_b),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered = plan.clone();
+        tampered.procedure_id = "different-procedure".to_string();
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut rule_tampered = plan.clone();
+        rule_tampered.method_selection_rule_id = "different-selection-rule".to_string();
+        assert_eq!(
+            rule_tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut rule_spec_tampered = plan.clone();
+        rule_spec_tampered.method_selection_rule_spec_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        assert_eq!(
+            rule_spec_tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_binding_must_replay_exact_qualification_input() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+        let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
+        let plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            rolling_origin_schedule_sha256(config).unwrap(),
+            CANONICAL_INFERENCE_SELECTION_RULE_ID,
+            CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID,
+            CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID,
+            CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID,
+            CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256,
+            CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID,
+            CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID,
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+
+        let binding =
+            ForecastInferenceBinding::from_rolling(&samples, &plan, &qualification, &dependence)
+                .unwrap();
+        assert!(binding.validate().is_ok());
+
+        let mut altered_samples = samples.clone();
+        altered_samples[40].future_outcome += 0.01;
+        assert_eq!(
+            ForecastInferenceBinding::from_rolling(
+                &altered_samples,
+                &plan,
+                &qualification,
+                &dependence
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_selection_path_rejects_unpinned_method_specs() {
+        fn canonical_plan() -> ForecastInferencePlan {
+            ForecastInferencePlan::new(
+                0.5,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                CANONICAL_INFERENCE_SELECTION_RULE_ID,
+                CANONICAL_INFERENCE_SELECTION_RULE_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_PROCEDURE_ID,
+                CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_DEPENDENCE_ID,
+                CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_RESAMPLING_ID,
+                CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256,
+                CANONICAL_INFERENCE_SELECTION_SMALL_SAMPLE_POLICY_ID,
+                CANONICAL_INFERENCE_SELECTION_MULTIPLICITY_POLICY_ID,
+                0.05,
+                "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            )
+            .unwrap()
+        }
+
+        let plan = canonical_plan();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&plan),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+
+        let mut procedure_tampered = plan.clone();
+        procedure_tampered.procedure_spec_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        procedure_tampered.plan_blake3 = inference_plan_digest(&procedure_tampered);
+        procedure_tampered.validate().unwrap();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&procedure_tampered),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+
+        let mut dependence_tampered = plan.clone();
+        dependence_tampered.dependence_spec_sha256 =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string();
+        dependence_tampered.plan_blake3 = inference_plan_digest(&dependence_tampered);
+        dependence_tampered.validate().unwrap();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&dependence_tampered),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+
+        let mut resampling_tampered = plan;
+        resampling_tampered.resampling_spec_sha256 =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_string();
+        resampling_tampered.plan_blake3 = inference_plan_digest(&resampling_tampered);
+        resampling_tampered.validate().unwrap();
+        assert_eq!(
+            ForecastInferenceSelectionPath::for_plan(&resampling_tampered),
+            ForecastInferenceSelectionPath::StopAssumptionFailure
+        );
+    }
+
+    #[test]
+    fn canonical_estimator_applicability_is_exactly_pinned() {
+        let spec = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/docs/research/RELATIONAL_HARMONICS_INFERENCE_ESTIMATOR_APPLICABILITY_V1.json"
+        ));
+        let mut hasher = Sha256::new();
+        hasher.update(spec);
+        assert_eq!(
+            hex::encode(hasher.finalize()),
+            CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
+        );
+
+        let value: serde_json::Value = serde_json::from_slice(spec).unwrap();
+        assert_eq!(
+            value["schema"],
+            "relational-prediction-inference-estimator-applicability/v1"
+        );
+        assert_eq!(value["status"], "not-approved-for-execution");
+        assert_eq!(
+            value["current_evaluator"]["estimator_id"],
+            CANONICAL_INFERENCE_ESTIMATOR_ID
+        );
+        assert_eq!(
+            value["execution_gate"]["current_selection"],
+            "stop-assumption-failure"
+        );
+    }
+
+    #[test]
+    fn canonical_method_spec_artifacts_are_exactly_pinned() {
+        let specifications = [
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/docs/research/RELATIONAL_HARMONICS_NESTED_FORECAST_BOOTSTRAP_V1.json"
+                ))
+                .as_slice(),
+                CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256,
+            ),
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/docs/research/RELATIONAL_HARMONICS_LOSS_DEPENDENCE_BARTLETT_V1.json"
+                ))
+                .as_slice(),
+                CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256,
+            ),
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/docs/research/RELATIONAL_HARMONICS_MOVING_BLOCK_BOOTSTRAP_V1.json"
+                ))
+                .as_slice(),
+                CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256,
+            ),
+        ];
+
+        for (specification, expected_sha256) in specifications {
+            let mut hasher = Sha256::new();
+            hasher.update(specification);
+            assert_eq!(hex::encode(hasher.finalize()), expected_sha256);
+        }
+    }
+
+    #[test]
+    fn canonical_selection_rule_spec_is_exactly_pinned() {
+        let spec = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/docs/research/RELATIONAL_HARMONICS_INFERENCE_SELECTION_RULE_V1.json"
+        ));
+        let mut hasher = Sha256::new();
+        hasher.update(spec);
+        assert_eq!(
+            hex::encode(hasher.finalize()),
+            CANONICAL_SELECTION_RULE_SPEC_SHA256
+        );
+
+        let value: serde_json::Value = serde_json::from_slice(spec).unwrap();
+        assert_eq!(value["schema"], "relational-prediction-inference-selection-rule/v1");
+        assert_eq!(value["rule_id"], CANONICAL_SELECTION_RULE_ID);
+        assert_eq!(value["ordered_rules"].as_array().unwrap().len(), 7);
+        assert_eq!(value["ordered_rules"][5]["id"], "R6");
+        assert_eq!(
+            value["ordered_rules"][5]["then"],
+            "nested-fixed-horizon-bootstrap"
+        );
+        assert_eq!(value["ordered_rules"][6]["then"], "stop-assumption-failure");
+        assert_eq!(
+            value["selected_method_bundle"]["procedure_id"],
+            "nested-forecast-bootstrap-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["dependence_method_id"],
+            "loss-dependence-bartlett-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["resampling_method_id"],
+            "moving-block-bootstrap-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["estimator_compatibility_id"],
+            CANONICAL_INFERENCE_ESTIMATOR_ID
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["estimator_compatibility_spec_sha256"],
+            CANONICAL_INFERENCE_ESTIMATOR_APPLICABILITY_SPEC_SHA256
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["estimator_compatibility_id"],
+            CANONICAL_INFERENCE_ESTIMATOR_ID
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["procedure_spec_sha256"],
+            CANONICAL_INFERENCE_SELECTION_PROCEDURE_SPEC_SHA256
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["dependence_spec_sha256"],
+            CANONICAL_INFERENCE_SELECTION_DEPENDENCE_SPEC_SHA256
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["resampling_spec_sha256"],
+            CANONICAL_INFERENCE_SELECTION_RESAMPLING_SPEC_SHA256
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["small_sample_policy_id"],
+            "small-sample-conservative-v1"
+        );
+        assert_eq!(
+            value["selected_method_bundle"]["multiplicity_policy_id"],
+            "single-primary-comparison-v1"
+        );
+        assert_eq!(value["decision_semantics"]["result_dependent_method_switching"], false);
+        assert_eq!(value["decision_semantics"]["temporal_preregistration_proof_in_code"], false);
+        assert_eq!(value["decision_semantics"]["structural_floors_are_not_adequacy_claims"], true);
+    }
+
+    #[test]
+    fn inference_selection_receipt_binds_rule_branch_and_selected_method() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+        let plan = ForecastInferencePlan::new(
+            config.forecast_horizon,
+            rolling_origin_schedule_sha256(config).unwrap(),
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
+            "nested-forecast-bootstrap-v1",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+            "loss-dependence-bartlett-v1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+            "moving-block-bootstrap-v1",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+        let dependence = qualification.relational_loss_dependence(3, 2).unwrap();
+        let receipt = ForecastInferenceSelectionReceipt::from_rolling(
+            &samples,
+            &plan,
+            &qualification,
+            &dependence,
+        )
+        .unwrap();
+
+        receipt.validate().unwrap();
+        assert_eq!(receipt.plan_blake3, plan.plan_blake3);
+        assert_eq!(receipt.decision_path_id, "stop-assumption-failure");
+        assert_eq!(receipt.binding_blake3, ForecastInferenceBinding::from_rolling(
+            &samples,
+            &plan,
+            &qualification,
+            &dependence,
+        ).unwrap().binding_blake3);
+        assert_eq!(receipt.selected_procedure_id, plan.procedure_id);
+        assert_eq!(receipt.method_selection_rule_id, plan.method_selection_rule_id);
+        assert!(receipt.to_json().unwrap().contains(INFERENCE_SELECTION_SCHEMA));
+
+        let mut tampered_path = receipt.clone();
+        tampered_path.decision_path_id = "stop-assumption-failure".to_string();
+        assert_eq!(
+            tampered_path.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut invalid_path = receipt.clone();
+        invalid_path.decision_path_id = "unregistered-branch".to_string();
+        assert_eq!(
+            invalid_path.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut empty_policy = receipt.clone();
+        empty_policy.selected_small_sample_policy_id.clear();
+        assert_eq!(
+            empty_policy.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut tampered_method = receipt.clone();
+        tampered_method.selected_procedure_id = "different-procedure".to_string();
+        assert_eq!(
+            tampered_method.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered_rule = receipt.clone();
+        tampered_rule.method_selection_rule_spec_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        assert_eq!(
+            tampered_rule.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered_estimator = receipt.clone();
+        tampered_estimator.estimator_compatibility_id =
+            "alternate-estimator-compatibility-v1".to_string();
+        assert_eq!(
+            tampered_estimator.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut alternate_plan = plan.clone();
+        alternate_plan.procedure_id = "alternate-procedure".to_string();
+        alternate_plan.plan_blake3 = inference_plan_digest(&alternate_plan);
+        alternate_plan.validate().unwrap();
+        let stopped = ForecastInferenceSelectionReceipt::from_rolling(
+            &samples,
+            &alternate_plan,
+            &qualification,
+            &dependence,
+        )
+        .unwrap();
+        assert_eq!(stopped.decision_path_id, "stop-assumption-failure");
+        assert_eq!(
+            receipt.validate_against_binding(
+                &ForecastInferenceBinding::from_rolling(&samples, &plan, &qualification, &dependence).unwrap(),
+                &alternate_plan,
+                &qualification.qualification_identity_blake3,
+                &rolling_forecast_loss_dependence_profile_digest(&dependence),
+            ),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn inference_selection_receipt_supports_single_window() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            4,
+            provenance(),
+        )
+        .unwrap();
+        let plan = ForecastInferencePlan::new(
+            0.5,
+            single_origin_schedule_sha256(config, 0.5),
+            CANONICAL_SELECTION_RULE_ID,
+            CANONICAL_SELECTION_RULE_SPEC_SHA256,
+            "nested-forecast-bootstrap-v1",
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b",
+            "loss-dependence-bartlett-v1",
+            "0a6d4a8c4a9c96d1845af12a290e65b4c575c91678a85c79b1570b1c189553b9",
+            "moving-block-bootstrap-v1",
+            "b66046e1016389d126ef79abad15ab293d26a1fef9579d9578442cd1bd81d80d",
+            "small-sample-conservative-v1",
+            "single-primary-comparison-v1",
+            0.05,
+            qualification.qualification_identity_blake3.clone(),
+        )
+        .unwrap();
+        let dependence = qualification.relational_loss_dependence(8).unwrap();
+        let receipt = ForecastInferenceSelectionReceipt::from_single(
+            &samples,
+            &plan,
+            &qualification,
+            &dependence,
+        )
+        .unwrap();
+        receipt.validate().unwrap();
+        assert_eq!(receipt.analysis_level, "single-window");
+        assert_eq!(receipt.selected_procedure_id, plan.procedure_id);
+        assert_eq!(
+            receipt.dependence_profile_blake3,
+            forecast_loss_dependence_profile_digest(&dependence)
+        );
+
+        let mut tampered = receipt.clone();
+        tampered.decision_path_id = "stop-assumption-failure".to_string();
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_evidence_validates_and_serializes() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 2,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+        };
+        let evidence = RollingOriginRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config,
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.validate().unwrap();
+        let json = evidence.to_json().unwrap();
+        assert!(json.contains("relational-prediction-rolling-evidence/v4"));
+        assert!(json.contains("per_origin_improvement"));
+        assert_eq!(evidence.origins.len(), 2);
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_ridge_metadata() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.records[1].ridge_lambda = 0.25;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_rejects_tampered_top_level_split_config() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.config.test_samples += 1;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_non_monotonic_outcome_times() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+
+        evidence.records[0].outcome_times.swap(0, 1);
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_prediction() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let record = evidence
+            .records
+            .iter_mut()
+            .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+            .unwrap();
+        record.predictions[0] += 0.01;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_test_feature() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let record = evidence
+            .records
+            .iter_mut()
+            .find(|record| record.feature_set == PredictionFeatureSet::RelationalAugmented)
+            .unwrap();
+        record.test_features[0][0] += 0.01;
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn persistence_evidence_rejects_tampered_baseline_prediction() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let record = evidence
+            .records
+            .iter_mut()
+            .find(|record| record.feature_set == PredictionFeatureSet::PersistenceBaseline)
+            .unwrap();
+        record.baseline_prediction = Some(record.baseline_prediction.unwrap() + 0.01);
+
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_trace_rejects_tampered_loss() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            RelationalPredictionProvenance::new(
+                "RH-006-v1",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "0123456789abcdef0123456789abcdef01234567",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        evidence.records[0].mean_squared_error += 0.1;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn train_only_standardization_is_deterministic_and_finite() {
+        let samples = build_samples(0.5);
+        let first = fit_linear_model(
+            &samples[..36],
+            PredictionFeatureSet::RelationalAugmented,
+            1e-8,
+        )
+        .unwrap();
+        let second = fit_linear_model(
+            &samples[..36],
+            PredictionFeatureSet::RelationalAugmented,
+            1e-8,
+        )
+        .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.means.len(), 7);
+        assert_eq!(first.scales.len(), 7);
+        assert!(first.means.iter().all(|value| value.is_finite()));
+        assert!(first.scales.iter().all(|value| value.is_finite() && *value > 0.0));
+        assert!(first.coefficients.iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn held_out_prediction_is_temporally_separated() {
+        let summary =
+            HeldOutRelationalPredictionSummary::compute(&build_samples(0.5), config()).unwrap();
+
+        assert_eq!(summary.status, EvidenceStatus::Measured);
+        assert_eq!(summary.train_samples, 36);
+        assert_eq!(summary.test_samples, 28);
+        assert!(summary.minimum_outcome_horizon > 0.0);
+        assert!(summary.relational_profile.mean_squared_error.is_finite());
+    }
+
+    #[test]
+    fn relational_profile_outpredicts_synchrony_only_on_known_target() {
+        let summary =
+            HeldOutRelationalPredictionSummary::compute(&build_samples(0.5), config()).unwrap();
+
+        assert!(
+            summary.relational_profile.mean_squared_error
+                < summary.synchrony_only.mean_squared_error * 0.05
+        );
+        assert!(
+            summary.relational_profile.mean_squared_error
+                < summary.persistence_baseline.mean_squared_error
+        );
+        assert!(
+            summary.relational_augmented.mean_squared_error
+                < summary.non_relational_context.mean_squared_error
+        );
+        assert!(summary.augmented_mse_improvement_over_non_relational().unwrap() > 0.0);
+        assert!(
+            summary
+                .relational_mse_improvement_over(PredictionFeatureSet::SynchronyOnly)
+                .unwrap()
+                > 0.95
+        );
+    }
+
+    #[test]
+    fn temporal_leakage_is_rejected_by_outcome_horizon() {
+        let result =
+            HeldOutRelationalPredictionSummary::compute(&build_samples(5.0), config());
+
+        assert_eq!(result, Err(RelationalPredictionError::TemporalLeakage));
+    }
+
+    #[test]
+    fn qualification_rejects_tampered_summary_parameter_count() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.relational_augmented.parameter_count -= 1;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_rejects_tampered_summary_feature_label() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.relational_profile.feature_set =
+            PredictionFeatureSet::RelationalAugmented;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_rejects_tampered_summary_parameter_count() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.relational_augmented.parameter_count -= 1;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_binds_compound_input_commitment() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        let expected_digest = evaluation_input_digest(&samples, config());
+        assert_eq!(qualification.evaluation_input_blake3, expected_digest);
+        let expected_qualification_identity = single_qualification_identity_digest(
+            &qualification.evaluation_input_blake3,
+            &qualification.provenance,
+            config(),
+            qualification.surrogate_count,
+        );
+        assert_eq!(
+            qualification.circular_shift_null.qualification_input_blake3,
+            expected_qualification_identity
+        );
+        assert_eq!(
+            qualification.feature_decoupling_null.qualification_input_blake3,
+            expected_qualification_identity
+        );
+        assert_eq!(
+            qualification.incremental_relational_null.qualification_input_blake3,
+            expected_qualification_identity
+        );
+        qualification.validate().unwrap();
+
+        let mut tampered_top_level = qualification.clone();
+        tampered_top_level.evaluation_input_blake3 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+        assert_eq!(
+            tampered_top_level.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut tampered_null = qualification.clone();
+        tampered_null.circular_shift_null.qualification_input_blake3 =
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
+        assert_eq!(
+            tampered_null.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_rejects_null_from_different_provenance_identity() {
+        let samples = build_samples(0.5);
+        let config = config();
+
+        let qualification_a = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            12,
+            provenance(),
+        )
+        .unwrap();
+
+        let mut alternate_provenance = provenance();
+        alternate_provenance.source_data_sha256 =
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
+        let qualification_b = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            12,
+            alternate_provenance,
+        )
+        .unwrap();
+
+        let mut tampered = qualification_a.clone();
+        tampered.circular_shift_null.qualification_input_blake3 =
+            qualification_b.circular_shift_null.qualification_input_blake3.clone();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_serializes_committed_loss_vector_and_identity() {
+        let samples = build_samples(0.5);
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config(),
+            12,
+            provenance(),
+        )
+        .unwrap();
+
+        let json = qualification.to_json().unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            value["qualification_identity_blake3"].as_str().unwrap(),
+            qualification.qualification_identity_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials_blake3"].as_str().unwrap(),
+            qualification.relational_loss_differentials_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials"]
+                .as_array()
+                .unwrap()
+                .len(),
+            qualification.relational_loss_differentials.len()
+        );
+        assert_eq!(
+            value["nulls"][0]["trace"]["qualification_input_blake3"]
+                .as_str()
+                .unwrap(),
+            qualification.qualification_identity_blake3
+        );
+        assert!(json.contains(QUALIFICATION_SCHEMA));
+        assert!(json.contains("qualification_identity_blake3"));
+        assert!(json.contains("relational_loss_differentials_blake3"));
+        assert!(json.contains("relational_loss_differentials"));
+        assert!(json.contains("CircularShift"));
+        assert!(json.contains("FeatureDecoupling"));
+        assert!(json.contains("IncrementalRelationalShift"));
+    }
+
+    #[test]
+    fn qualification_retains_and_commits_target_loss_differentials() {
+        let samples = build_samples(0.5);
+        let qualification = HeldOutRelationalPredictionQualification::compute(
+            &samples,
+            config(),
+            12,
+            provenance(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            qualification.relational_loss_differentials.len(),
+            config().test_samples
+        );
+        assert_eq!(
+            qualification.relational_loss_differentials_blake3,
+            loss_differentials_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.relational_loss_differentials
+            )
+        );
+        qualification.relational_loss_dependence(8).unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.relational_loss_differentials[0].loss_differential += 0.01;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_retains_and_commits_target_loss_differentials() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            8,
+            provenance(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            qualification.relational_loss_differentials.len(),
+            config.origin_count * config.test_samples
+        );
+        assert_eq!(
+            qualification.relational_loss_differentials_blake3,
+            loss_differentials_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.relational_loss_differentials
+            )
+        );
+        let profile = qualification.relational_loss_dependence(3, 2).unwrap();
+        assert_eq!(
+            profile.evaluation_input_blake3.as_deref(),
+            Some(qualification.evaluation_input_blake3.as_str())
+        );
+    }
+
+    #[test]
+    fn qualification_binds_provenance_identity() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        qualification.validate().unwrap();
+        assert_eq!(qualification.provenance, provenance());
+        assert_eq!(
+            qualification.qualification_identity_blake3,
+            single_qualification_identity_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.provenance,
+                config(),
+                qualification.surrogate_count,
+            )
+        );
+
+        let mut tampered = qualification.clone();
+        tampered.provenance.software_commit_sha =
+            "fedcba9876543210fedcba9876543210fedcba98".to_string();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn qualification_binds_surrogate_count() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        assert_eq!(qualification.surrogate_count, 12);
+
+        let mut tampered = qualification.clone();
+        tampered.surrogate_count = 8;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_replay_binds_whole_bundle_to_exact_input() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            qualification.verify_against_samples(&samples, config()),
+            Ok(())
+        );
+
+        let mut altered_samples = samples.clone();
+        altered_samples[15].future_outcome += 0.01;
+        assert_eq!(
+            qualification.verify_against_samples(&altered_samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut altered_config = config();
+        altered_config.gap_samples += 1;
+        assert_eq!(
+            qualification.verify_against_samples(&samples, altered_config),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn qualification_binds_nulls_to_observed_result() {
+        let samples = build_samples(0.5);
+        let qualification =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        qualification.validate().unwrap();
+
+        let mut config_tampered = qualification.clone();
+        config_tampered.config.ridge_lambda = 0.25;
+        assert_eq!(
+            config_tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut observed_tampered = qualification.clone();
+        observed_tampered.observed.relational_augmented.mean_squared_error = f64::NAN;
+        assert_eq!(
+            observed_tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut tampered = qualification.clone();
+        tampered.circular_shift_null.observed_relational_mse += 0.01;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut status_tampered = qualification.clone();
+        status_tampered.incremental_relational_null.status = EvidenceStatus::Measured;
+        assert_eq!(
+            status_tampered.validate(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn incremental_relational_shift_preserves_baseline_and_moves_added_block_together() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let shift = 3usize;
+        let surrogate = make_surrogate(
+            &samples,
+            &config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            shift,
+        )
+        .unwrap();
+
+        for (index, (original, shifted)) in samples.iter().zip(&surrogate).enumerate() {
+            assert_eq!(shifted.feature_time, original.feature_time);
+            assert_eq!(shifted.outcome_time, original.outcome_time);
+            assert_eq!(shifted.agent_a, original.agent_a);
+            assert_eq!(shifted.agent_b, original.agent_b);
+            assert_eq!(shifted.alignment, original.alignment);
+            assert_eq!(shifted.common_driver, original.common_driver);
+
+            let train_or_test = if index < config.train_samples {
+                (0, config.train_samples)
+            } else if index >= config.test_start() {
+                (config.test_start(), config.test_samples)
+            } else {
+                continue;
+            };
+            let (segment_start, segment_len) = train_or_test;
+            let local_index = index - segment_start;
+            let source_index =
+                (local_index + (1 + (shift - 1) % (segment_len - 1))) % segment_len;
+            let source = &samples[segment_start + source_index];
+
+            assert_eq!(shifted.a_to_b, source.a_to_b);
+            assert_eq!(shifted.b_to_a, source.b_to_a);
+            assert_eq!(shifted.turn_taking, source.turn_taking);
+        }
+    }
+
+    #[test]
+    fn deterministic_null_calibration_has_multiple_families() {
+        let samples = build_samples(0.5);
+        let first =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+        let second =
+            HeldOutRelationalPredictionQualification::compute(
+                &samples,
+                config(),
+                12,
+                provenance(),
+            )
+            .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(
+            first.circular_shift_null.family,
+            PredictionNullFamily::CircularShift
+        );
+        assert_eq!(
+            first.feature_decoupling_null.family,
+            PredictionNullFamily::FeatureDecoupling
+        );
+        assert_eq!(
+            first.incremental_relational_null.family,
+            PredictionNullFamily::IncrementalRelationalShift
+        );
+        assert_eq!(
+            first.circular_shift_null.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(
+            first.feature_decoupling_null.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(
+            first.incremental_relational_null.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(first.circular_shift_null.status, EvidenceStatus::Proxy);
+        assert_eq!(first.feature_decoupling_null.status, EvidenceStatus::Proxy);
+        assert_eq!(first.incremental_relational_null.status, EvidenceStatus::Proxy);
+        assert_eq!(first.circular_shift_null.surrogate_count, 12);
+        assert_eq!(first.feature_decoupling_null.surrogate_count, 12);
+        assert_eq!(first.incremental_relational_null.surrogate_count, 12);
+        assert!(
+            (0.0..=1.0).contains(&first.circular_shift_null.exceedance_fraction)
+        );
+        assert!(
+            (0.0..=1.0).contains(&first.feature_decoupling_null.exceedance_fraction)
+        );
+        assert!(
+            (0.0..=1.0).contains(&first.incremental_relational_null.exceedance_fraction)
+        );
+        first.circular_shift_null.validate_trace().unwrap();
+        first.feature_decoupling_null.validate_trace().unwrap();
+        first.incremental_relational_null.validate_trace().unwrap();
+    }
+
+    #[test]
+    fn null_convenience_constructor_uses_qualification_feature_family() {
+        let summary = PredictionNullSummary::compute(
+            &build_samples(0.5),
+            config(),
+            PredictionNullFamily::CircularShift,
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+    }
+
+    #[test]
+    fn null_trace_serializes_with_explicit_schema() {
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &build_samples(0.5),
+            config(),
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        let json = summary.to_json().unwrap();
+        assert!(json.contains(NULL_EVIDENCE_SCHEMA));
+        assert!(json.contains("surrogate_shifts"));
+        assert!(json.contains("surrogate_mse"));
+        assert!(json.contains("evaluation_input_blake3"));
+    }
+
+    #[test]
+    fn null_replay_rejects_mismatched_config() {
+        let samples = build_samples(0.5);
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        let mut altered = config();
+        altered.ridge_lambda = 0.25;
+
+        assert_eq!(
+            summary.verify_against_samples(&samples, altered),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn evidence_and_null_traces_reject_tampered_status() {
+        let samples = build_samples(0.5);
+        let mut evidence = HeldOutRelationalPredictionSummary::compute_evidence(
+            &samples,
+            config(),
+            provenance(),
+        )
+        .unwrap();
+        evidence.summary.status = EvidenceStatus::Proxy;
+        assert_eq!(
+            evidence.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut null_trace = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+        null_trace.status = EvidenceStatus::Measured;
+        assert_eq!(
+            null_trace.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn null_compute_rejects_family_specific_undersized_partition_early() {
+        let result = PredictionNullSummary::compute_for_feature_set(
+            &build_samples(0.5),
+            HeldOutRelationalPredictionConfig {
+                train_samples: 36,
+                test_samples: 4,
+                gap_samples: 4,
+                ridge_lambda: 1e-8,
+            },
+            PredictionNullFamily::FeatureDecoupling,
+            PredictionFeatureSet::RelationalAugmented,
+            3,
+        );
+
+        assert_eq!(
+            result,
+            Err(RelationalPredictionError::InsufficientSamples(4))
+        );
+    }
+
+    #[test]
+    fn null_trace_rejects_family_specific_undersized_partition() {
+        let mut summary = PredictionNullSummary::compute_for_feature_set(
+            &build_samples(0.5),
+            HeldOutRelationalPredictionConfig {
+                train_samples: 36,
+                test_samples: 5,
+                gap_samples: 4,
+                ridge_lambda: 1e-8,
+            },
+            PredictionNullFamily::FeatureDecoupling,
+            PredictionFeatureSet::RelationalAugmented,
+            3,
+        )
+        .unwrap();
+
+        summary.config.test_samples = 4;
+
+        assert_eq!(
+            summary.validate_trace(),
+            Err(RelationalPredictionError::InsufficientSamples(4))
+        );
+    }
+
+    #[test]
+    fn null_trace_rejects_negative_mse() {
+        let samples = build_samples(0.5);
+        let mut observed = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+        observed.observed_relational_mse = -1.0;
+        assert_eq!(
+            observed.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+
+        let mut surrogate = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+        surrogate.surrogate_mse[0] = -1.0;
+        assert_eq!(
+            surrogate.validate_trace(),
+            Err(RelationalPredictionError::ModelFitFailed)
+        );
+    }
+
+    #[test]
+    fn null_trace_rejects_tampered_surrogate_schedule() {
+        let samples = build_samples(0.5);
+        let mut summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::CircularShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        summary.surrogate_shifts[0] += 1;
+
+        assert_eq!(
+            summary.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn null_evidence_replay_binds_exact_surrogate_trace() {
+        let samples = build_samples(0.5);
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            12,
+        )
+        .unwrap();
+
+        assert_eq!(summary.verify_against_samples(&samples, config()), Ok(()));
+
+        let mut altered_samples = samples.clone();
+        altered_samples[10].turn_taking += 0.01;
+        assert_eq!(
+            summary.verify_against_samples(&altered_samples, config()),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered = summary.clone();
+        tampered.surrogate_mse[0] += 0.01;
+        assert_eq!(
+            tampered.validate_trace(),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn zero_surrogate_request_is_distinct_validation_failure() {
+        let samples = build_samples(0.5);
+
+        assert_eq!(
+            PredictionNullSummary::compute(
+                &samples,
+                config(),
+                PredictionNullFamily::CircularShift,
+                0,
+            ),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn outcome_must_be_strictly_future() {
+        assert_eq!(
+            RelationalPredictionSample::new(
+                1.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0
+            ),
+            Err(RelationalPredictionError::OutcomeNotAfterFeatures)
+        );
+    }
+
+    #[test]
+    fn rolling_origin_rejects_overlapping_test_windows_or_wrong_horizon() {
+        let samples = build_samples(0.5);
+
+        let overlapping = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 4,
+                forecast_horizon: 0.5,
+                ..Default::default()
+            },
+        );
+        assert_eq!(overlapping, Err(RelationalPredictionError::InvalidSplit));
+
+        let wrong_horizon = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 8,
+                forecast_horizon: 1.0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(wrong_horizon, Err(RelationalPredictionError::InvalidSplit));
+    }
+
+    #[test]
+    fn rolling_origin_exposes_per_origin_stability_without_a_pass_threshold() {
+        let samples = build_samples(0.5);
+        let summary = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 8,
+                forecast_horizon: 0.5,
+                ridge_lambda: 1e-8,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let improvements = summary.augmented_mse_improvement_per_origin();
+        assert_eq!(improvements.len(), 4);
+        assert!(improvements.iter().all(Option::is_some));
+        assert!(summary.median_augmented_mse_improvement().is_some());
+        assert!(summary.minimum_augmented_mse_improvement().is_some());
+        assert!(summary.origins_beating_non_relational() <= 4);
+        assert!(summary.origins_beating_persistence() <= 4);
+    }
+
+    #[test]
+    fn rolling_origin_repeats_the_temporal_boundary() {
+        let samples = build_samples(0.5);
+        let summary = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                train_samples: 32,
+                test_samples: 8,
+                gap_samples: 2,
+                origin_count: 4,
+                step_samples: 8,
+                forecast_horizon: 0.5,
+                ridge_lambda: 1e-8,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(summary.status, EvidenceStatus::Measured);
+        assert_eq!(summary.origin_count, 4);
+        assert_eq!(summary.segments.len(), 4);
+        assert!(summary.mean_relational_profile_mse.is_finite());
+        assert!(summary.mean_augmented_mse_improvement().unwrap() >= 0.0);
+    }
+
+    #[test]
+    fn rolling_qualification_replay_binds_schedule_and_source() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
+        qualification.validate().unwrap();
+        assert_eq!(qualification.origin_starts, vec![0, 8, 16, 24]);
+        assert_eq!(
+            qualification.verify_against_samples(&samples, config),
+            Ok(())
+        );
+
+        let mut altered_samples = samples.clone();
+        altered_samples[40].future_outcome += 0.01;
+        assert_eq!(
+            qualification.verify_against_samples(&altered_samples, config),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+
+        let mut tampered = qualification.clone();
+        tampered.origin_starts[2] += 1;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn null_trace_json_uses_v2_parent_binding_schema() {
+        let samples = build_samples(0.5);
+        let trace = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config(),
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+        )
+        .unwrap();
+
+        let json = trace.to_json().unwrap();
+        assert!(json.contains(NULL_EVIDENCE_SCHEMA));
+        assert!(json.contains("evaluation_input_blake3"));
+        assert!(json.contains("qualification_input_blake3"));
+    }
+
+    #[test]
+    fn rolling_null_trace_replays_with_absolute_source_start() {
+        let samples = build_samples(0.5);
+        let config = config();
+        let source_start = 8;
+        let segment_total = config.train_samples + config.gap_samples + config.test_samples;
+        let segment = &samples[source_start..source_start + segment_total];
+
+        let trace = PredictionNullSummary::compute_for_feature_set_at_start(
+            segment,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+            source_start,
+        )
+        .unwrap();
+
+        trace
+            .verify_against_samples_at_start(segment, config, source_start)
+            .unwrap();
+        assert_eq!(
+            trace.verify_against_samples_at_start(segment, config, source_start + 1),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn null_trace_parent_binding_does_not_replace_local_replay_commitment() {
+        let samples = build_samples(0.5);
+        let config = config();
+
+        let mut trace = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+        )
+        .unwrap();
+
+        let local_digest = trace.evaluation_input_blake3.clone();
+        assert_eq!(trace.source_slice_start, 0);
+        assert_eq!(
+            trace.qualification_input_blake3,
+            evaluation_input_digest(&samples, config)
+        );
+
+        trace.qualification_input_blake3 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+
+        // Parent rebinding must not affect standalone replay of this exact
+        // null trace against its origin-local source slice.
+        trace.validate_trace().unwrap();
+        trace.verify_against_samples(&samples, config).unwrap();
+        assert_eq!(trace.evaluation_input_blake3, local_digest);
+    }
+
+    }
+
+    #[test]
+    fn rolling_qualification_rejects_tampered_summary_aggregate_mse() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
+
+        let mut tampered = qualification.clone();
+        tampered.observed.mean_relational_augmented_mse += 0.01;
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_binds_null_input_commitments() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
+        qualification.validate().unwrap();
+        assert!(
+            qualification
+                .circular_shift_nulls
+                .iter()
+                .chain(&qualification.feature_decoupling_nulls)
+                .chain(&qualification.incremental_relational_nulls)
+                .all(|trace| trace.qualification_input_blake3
+                    == qualification.qualification_identity_blake3)
+        );
+        assert_eq!(qualification.circular_shift_nulls[0].source_slice_start, config.first_origin);
+        assert_eq!(
+            qualification.circular_shift_nulls[1].source_slice_start,
+            config.first_origin + config.step_samples
+        );
+
+        let mut tampered = qualification.clone();
+        tampered.incremental_relational_nulls[2].qualification_input_blake3 =
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+
+        let mut swapped = qualification.clone();
+        swapped.circular_shift_nulls.swap(0, 1);
+        assert_eq!(
+            swapped.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_binds_provenance_identity() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
+
+        qualification.validate().unwrap();
+        assert_eq!(qualification.provenance, provenance());
+        assert_eq!(
+            qualification.qualification_identity_blake3,
+            rolling_qualification_identity_digest(
+                &qualification.evaluation_input_blake3,
+                &qualification.provenance,
+                config,
+                qualification.surrogate_count,
+            )
+        );
+
+        let mut tampered = qualification.clone();
+        tampered.provenance.source_data_sha256 =
+            "81ab44d881fe79d2059a69c0b0665a856f62506cbf4254f81c3e1cbcea00056b".to_string();
+
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidEvidenceInputDigest)
+        );
+    }
+
+    #[test]
+    fn rolling_qualification_serializes_committed_loss_vector_and_identity() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            config,
+            8,
+            provenance(),
+        )
+        .unwrap();
+
+        let json = qualification.to_json().unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            value["qualification_identity_blake3"].as_str().unwrap(),
+            qualification.qualification_identity_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials_blake3"].as_str().unwrap(),
+            qualification.relational_loss_differentials_blake3
+        );
+        assert_eq!(
+            value["relational_loss_differentials"]
+                .as_array()
+                .unwrap()
+                .len(),
+            qualification.relational_loss_differentials.len()
+        );
+        assert_eq!(
+            value["nulls"][0]["traces"][0]["qualification_input_blake3"]
+                .as_str()
+                .unwrap(),
+            qualification.qualification_identity_blake3
+        );
+        assert!(json.contains(ROLLING_QUALIFICATION_SCHEMA));
+        assert!(json.contains("qualification_identity_blake3"));
+        assert!(json.contains("relational_loss_differentials_blake3"));
+        assert!(json.contains("origin_starts"));
+        assert!(json.contains("CircularShift"));
+        assert!(json.contains("FeatureDecoupling"));
+        assert!(json.contains("IncrementalRelationalShift"));
+    }
+
+    #[test]
+    fn rolling_qualification_binds_surrogate_count() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
+
+        assert_eq!(qualification.surrogate_count, 8);
+
+        let mut tampered = qualification.clone();
+        tampered.surrogate_count = 4;
+        assert_eq!(
+            tampered.validate(),
+            Err(RelationalPredictionError::InvalidSplit)
+        );
+    }
+
+    #[test]
+    fn rolling_origin_nulls_target_the_nested_relational_model() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            forecast_horizon: 0.5,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let qualification =
+            RollingOriginRelationalPredictionQualification::compute(
+                &samples,
+                config,
+                8,
+                provenance(),
+            )
+            .unwrap();
+
+        assert_eq!(qualification.observed.origin_count, 4);
+        assert_eq!(qualification.circular_shift_nulls.len(), 4);
+        assert_eq!(qualification.feature_decoupling_nulls.len(), 4);
+        assert_eq!(qualification.incremental_relational_nulls.len(), 4);
+
+        for null in qualification
+            .circular_shift_nulls
+            .iter()
+            .chain(qualification.feature_decoupling_nulls.iter())
+            .chain(qualification.incremental_relational_nulls.iter())
+        {
+            assert_eq!(null.feature_set, PredictionFeatureSet::RelationalAugmented);
+            assert_eq!(null.status, EvidenceStatus::Proxy);
+            assert_eq!(null.surrogate_count, 8);
+            assert!((0.0..=1.0).contains(&null.exceedance_fraction));
+        }
+    }
+
+    #[test]
+    fn make_surrogate_rejects_zero_shift() {
+        let samples = build_samples(0.5);
+        let config = HeldOutRelationalPredictionConfig {
+            train_samples: 8,
+            test_samples: 4,
+            gap_samples: 2,
+            ridge_lambda: 1e-8,
+        };
+
+        assert_eq!(
+            make_surrogate(
+                &samples,
+                &config,
+                PredictionNullFamily::CircularShift,
+                0,
+            ),
+            Err(RelationalPredictionError::InvalidSurrogateCount)
+        );
+    }
+
+    #[test]
+    fn feature_decoupling_never_leaves_a_shifted_channel_identity_aligned() {
+        let samples = build_samples(0.5);
+        let config = HeldOutRelationalPredictionConfig {
+            train_samples: 8,
+            test_samples: 5,
+            gap_samples: 2,
+            ridge_lambda: 1e-8,
+        };
+
+        let surrogate = make_surrogate(
+            &samples,
+            &config,
+            PredictionNullFamily::FeatureDecoupling,
+            2,
+        )
+        .unwrap();
+
+        assert_ne!(surrogate[0].a_to_b, samples[0].a_to_b);
+        assert_ne!(surrogate[0].b_to_a, samples[0].b_to_a);
+        assert_ne!(surrogate[0].turn_taking, samples[0].turn_taking);
+
+        let short_config = HeldOutRelationalPredictionConfig {
+            train_samples: 8,
+            test_samples: 4,
+            gap_samples: 2,
+            ridge_lambda: 1e-8,
+        };
+        assert_eq!(
+            make_surrogate(
+                &samples,
+                &short_config,
+                PredictionNullFamily::FeatureDecoupling,
+                2,
+            ),
+            Err(RelationalPredictionError::InsufficientSamples(4))
+        );
+    }
+
+    #[test]
+    fn incremental_null_preserves_synchrony_and_breaks_relational_channels() {
+        let samples = build_samples(0.5);
+        let config = config();
+
+        let summary = PredictionNullSummary::compute_for_feature_set(
+            &samples,
+            config,
+            PredictionNullFamily::IncrementalRelationalShift,
+            PredictionFeatureSet::RelationalAugmented,
+            8,
+        )
+        .unwrap();
+
+        assert_eq!(
+            summary.feature_set,
+            PredictionFeatureSet::RelationalAugmented
+        );
+        assert_eq!(summary.family, PredictionNullFamily::IncrementalRelationalShift);
+        assert_eq!(summary.status, EvidenceStatus::Proxy);
+    }
+
+    #[test]
+    fn rolling_origin_is_deterministic() {
+        let samples = build_samples(0.5);
+        let config = RollingOriginRelationalPredictionConfig {
+            train_samples: 32,
+            test_samples: 8,
+            gap_samples: 2,
+            origin_count: 4,
+            step_samples: 8,
+            ridge_lambda: 1e-8,
+            ..Default::default()
+        };
+
+        let first = RollingOriginRelationalPredictionSummary::compute(&samples, config).unwrap();
+        let second = RollingOriginRelationalPredictionSummary::compute(&samples, config).unwrap();
+
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rolling_null_qualification_rejects_arithmetic_overflow() {
+        let samples = build_samples(0.5);
+
+        let result = RollingOriginRelationalPredictionQualification::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                first_origin: usize::MAX,
+                forecast_horizon: 0.5,
+                ..Default::default()
+            },
+            4,
+            provenance(),
+        );
+
+        assert_eq!(result, Err(RelationalPredictionError::InvalidSplit));
+    }
+
+    #[test]
+    fn rolling_origin_rejects_arithmetic_overflow() {
+        let samples = build_samples(0.5);
+        let result = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                first_origin: usize::MAX,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(result, Err(RelationalPredictionError::InvalidSplit));
+    }
+
+    #[test]
+    fn rolling_origin_rejects_zero_step_or_zero_origins() {
+        let samples = build_samples(0.5);
+
+        let zero_step = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                step_samples: 0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(zero_step, Err(RelationalPredictionError::InvalidSplit));
+
+        let zero_origins = RollingOriginRelationalPredictionSummary::compute(
+            &samples,
+            RollingOriginRelationalPredictionConfig {
+                origin_count: 0,
+                ..Default::default()
+            },
+        );
+        assert_eq!(zero_origins, Err(RelationalPredictionError::InvalidSplit));
+    }
+
+    #[test]
+    fn relational_score_is_not_promoted_to_authority() {
+        let summary =
+            HeldOutRelationalPredictionSummary::compute(&build_samples(0.5), config()).unwrap();
+
+        assert_eq!(summary.status, EvidenceStatus::Measured);
+        assert_eq!(
+            summary.relational_profile.feature_set,
+            PredictionFeatureSet::RelationalProfile
+        );
+    }
+}

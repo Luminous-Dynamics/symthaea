@@ -1,0 +1,15 @@
+{
+  "schema": "rh006-oracle-restricted-dgp-refit-bootstrap/v1",
+  "status": "superseded-unverified",
+  "reason": "The prior 40x99 numerical result was recorded without an independently executed simulation in the verification loop and must not be treated as observed evidence.",
+  "replacement": {
+    "artifact": "docs/research/RELATIONAL_HARMONICS_ORACLE_RESTRICTED_DGP_REFIT_BOOTSTRAP_EXECUTED_V2.json",
+    "harness": "scripts/research/rh006_oracle_refit_splitmix64.py"
+  },
+  "scientific_boundary": {
+    "not_a_validity_proof": true,
+    "formal_inference": false,
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure"
+  }
+}

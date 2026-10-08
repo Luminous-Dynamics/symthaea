@@ -1,0 +1,77 @@
+{
+  "schema": "rh006-general-k-joint-dgp-execution/v1",
+  "status": "research-diagnostic-only",
+  "applicability": "not-approved-for-execution",
+  "selection": "stop-assumption-failure",
+  "source_identity": {
+    "local_source_path": "scripts/research/rh006_general_k_joint_dgp_splitmix64.py",
+    "local_source_sha256": "05f493e0eb45bb26ecb86d952eb80f4751035c5533188701712b51231a3efd61"
+  },
+  "executions": {
+    "main": {
+      "args": "--paths 8 --mc-paths 1 --mc-outcomes 100 --transition-paths 0",
+      "result_sha256": "3ea12f4ad82e0335e4efae65288eaedec83b13fe317ef50750dd4547f6368c4e",
+      "payload_sha256": "4e641986bff5ee5b383d466fc68c464efb59b8bd7313ec75446efc3bd1c368e3",
+      "topology_cells": 168,
+      "theorem_spectrum_match_rate": 1.0,
+      "signature_case_counts": {
+        "all-directions-one-positive-root|+++": 120,
+        "cone-support|--+": 48
+      },
+      "min_q_eigen": 0.003734605233459449,
+      "min_conditional_cov_eigen": 0.0005220778910180891,
+      "quadratic_identity_max_abs_error": 2.7755575615628914e-17,
+      "conditional_covariance_identity_max_abs_error": 8.673617379884035e-19,
+      "mc_checks": 14,
+      "mc_max_abs_error": 0.00016369689549198695,
+      "mc_mean_abs_error": 0.00006580648479333398
+    },
+    "transition": {
+      "args": "--paths 4 --mc-paths 0 --mc-outcomes 40 --transition-paths 4",
+      "result_sha256": "73fced64a3aa47ff31813451fa9c4da9e2bbc9221a8d4ec808c8bea479d860bc",
+      "payload_sha256": "a73766decbe3a45e869693f8719d2ca979b8c681c3a04b55f80068824ba6b812",
+      "topology_cells": 84,
+      "theorem_spectrum_match_rate": 1.0,
+      "quadratic_identity_max_abs_error": 2.7755575615628914e-17,
+      "conditional_covariance_identity_max_abs_error": 8.673617379884035e-19
+    }
+  },
+  "operator": {
+    "channels": 3,
+    "sigma_q_channel": [[1.0,0.25,0.15],[0.25,1.0,-0.2],[0.15,-0.2,1.0]],
+    "conditional_mean": "E[e|q]=Kq",
+    "conditional_covariance": "Var(e|q)=Sigma_e-K Sigma_q K'",
+    "strength": "||Sigma_e^{-1/2} K Sigma_q^{1/2}||_2",
+    "families": ["single_rel","multi_rel","cross_channel","anti_rel","lag1","distributed_lag","full_lag"],
+    "strength_grid": [0.35,0.60,0.85]
+  },
+  "transition_audit": {
+    "c_zero_strength_median_by_family": {
+      "single_rel": 0.6547428070355,
+      "multi_rel": 0.6912604223765,
+      "cross_channel": 0.695997557864,
+      "anti_rel": 0.68221086266,
+      "distributed_lag": 0.7293024783435,
+      "full_lag": 0.6993903393784999,
+      "lag1": null
+    },
+    "lag1_c_zero_root_observed": false,
+    "directional_support_at_0.85": {
+      "anti_rel": {"weak": 1.0,"strong": 0.0},
+      "cross_channel": {"weak": 0.0,"strong": 0.0},
+      "distributed_lag": {"weak": 0.0,"strong": 0.0},
+      "full_lag": {"weak": 0.0,"strong": 0.0},
+      "lag1": {"weak": 1.0,"strong": 1.0},
+      "multi_rel": {"weak": 0.0,"strong": 0.0},
+      "single_rel": {"weak": 0.0,"strong": 0.0}
+    }
+  },
+  "nonclaims": [
+    "No formal p-value.",
+    "No confidence interval.",
+    "No uniform or least-favorable size guarantee.",
+    "No empirical validation.",
+    "No arbitrary-DGP validity claim.",
+    "No exact-Rust implementation qualification."
+  ]
+}

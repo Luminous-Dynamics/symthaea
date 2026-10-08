@@ -1,0 +1,65 @@
+{
+  "schema": "relational-prediction-inference-estimator-applicability/v8",
+  "status": "not-approved-for-execution",
+  "predecessor": "docs/research/RELATIONAL_HARMONICS_INFERENCE_ESTIMATOR_APPLICABILITY_V7.json",
+  "gates": {
+    "origin_local_conditioning": "required",
+    "hypothesis_preservation": "required",
+    "finite_sample_null_support": "required",
+    "estimated_nuisance_null": "required",
+    "uniform_null_surface": "required",
+    "least_favorable": "not-established",
+    "weak_identification": "requires robust calibration",
+    "null_surface_eigenstructure": "characterized",
+    "surface_criticality": "required",
+    "branch_conditioning": "derived",
+    "null_locality": "requires declared scientific radius or global estimand",
+    "effect_locality": "requires effect-space declaration",
+    "bootstrap_operator_equivalence": "established only for fixed-feature conditional refit equivalence",
+    "joint_feature_outcome_law": "characterized for declared shared-shock family",
+    "joint_dgp_risk_surface": "derived for declared rank-one cross-covariance family",
+    "cross_covariance_geometry": "extended to five channel/lag families",
+    "exact_q_pd_topology": "derived and independently spectrum-checked",
+    "weak_q_topology": "not solved; retain eigenstructure and stratified analysis",
+    "joint_dgp_uniform_calibration": "not-established",
+    "joint_dgp_resampling_validity": "not-established",
+    "rust_implementation_validation": "not-established"
+  },
+  "evidence": {
+    "joint_endogeneity_stress": "docs/research/RELATIONAL_HARMONICS_JOINT_FEATURE_OUTCOME_ENDOGENEITY_EXECUTED_V1.json",
+    "joint_risk_surface": "docs/research/RELATIONAL_HARMONICS_JOINT_DGP_RISK_SURFACE_CROSS_MOMENT_V1.md",
+    "joint_risk_surface_correction": "docs/research/RELATIONAL_HARMONICS_JOINT_DGP_RISK_SURFACE_CROSS_MOMENT_EXECUTION_CORRECTION_V1.json",
+    "crosscov_generalized_script": "scripts/research/rh006_crosscov_generalized_topology_splitmix64.py",
+    "crosscov_generalized_method": "docs/research/RELATIONAL_HARMONICS_CROSSCOV_GENERALIZED_TOPOLOGY_V1.md",
+    "crosscov_generalized_receipt": "docs/research/RELATIONAL_HARMONICS_CROSSCOV_GENERALIZED_TOPOLOGY_EXECUTED_V1.json"
+  },
+  "scientific_state": {
+    "surface_form_for_executed_family": "Delta(gamma;omega)=gamma'Qgamma+(b0+omega*b1)'gamma+c0+omega*c1+omega^2*c2",
+    "q_pd_topology": "exact classification by sign(c) and b'Q^{-1}b-4c",
+    "topology_cells_checked": 1000,
+    "theorem_vs_actual_spectrum_match_rate": 1.0,
+    "cross_covariance_transition_is_universal": false,
+    "lagged_counterexample_observed": true
+  },
+  "execution_gate": {
+    "current_selection": "stop-assumption-failure",
+    "required_before_formal_inference": [
+      "define the scientifically admissible cross-covariance nuisance class, including channel and lag structure",
+      "derive the matching estimator/procedure bridge for that class",
+      "preserve the joint feature/outcome law under resampling",
+      "use the exact Q-positive-definite topology theorem where applicable",
+      "retain weak-Q eigenstructure treatment where the theorem does not apply",
+      "stratify calibration by cross-moment geometry, Q curvature, discriminant topology, branch conditioning, and effect radius",
+      "evaluate prospective null size across independence, contemporaneous, lagged, and mixed cross-covariance regimes",
+      "validate the actual Rust implementation independently from the mechanics mirror"
+    ]
+  },
+  "scientific_boundary": {
+    "no_formal_inference_in_this_pr": true,
+    "no_p_value_claim": true,
+    "no_confidence_interval_claim": true,
+    "synthetic_calibration_is_not_empirical_validation": true,
+    "topology_diagnostics_are_not_least_favorable_calibration": true,
+    "finite_rank_family_is_not_all_endogeneity": true
+  }
+}

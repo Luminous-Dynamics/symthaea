@@ -1,0 +1,84 @@
+{
+  "schema": "rh006-oracle-restricted-dgp-refit-bootstrap-executed/v1",
+  "status": "research-diagnostic-only",
+  "faithfulness_scope": "independent-estimator-mechanics-reimplementation; not the Symthaea Rust implementation",
+  "script_sha256": "922eeb614075f478daa9dfcb80480efa54f0db9df27f321374db8fdae3a3337b",
+  "execution": {
+    "command": "python scripts/research/rh006_oracle_refit_smoke.py --mc 200 --bootstrap 199 --seed 20261008",
+    "environment": "local Python runtime with NumPy; executed independently of repository CI",
+    "result_file_sha256": "e9ac333792561a4e45432c60c21b0240d82d72c6eb3b0367f0b4f37be2efc81e"
+  },
+  "geometry": {
+    "train": 48,
+    "test": 16,
+    "gap": 4,
+    "origins": 24,
+    "step": 16,
+    "horizon": 1.0,
+    "ridge": 1e-8,
+    "bartlett_lag": 3,
+    "alpha": 0.05,
+    "monte_carlo_reps": 200,
+    "bootstrap_reps": 199
+  },
+  "null": {
+    "restriction": "beta_relational = 0",
+    "feature_conditioning": "fixed feature path in bootstrap",
+    "dgp_parameters": "oracle-known",
+    "full_refit_each_bootstrap": true
+  },
+  "scenarios": [
+    {
+      "rho": 0.0,
+      "heteroskedastic": false,
+      "reject_count": 11,
+      "empirical_size": 0.055,
+      "monte_carlo_se": 0.016120638945153507,
+      "mean_p": 0.516775,
+      "mean_T": -3.2004977837054382,
+      "mean_D": -0.0005952593030059564
+    },
+    {
+      "rho": 0.5,
+      "heteroskedastic": false,
+      "reject_count": 9,
+      "empirical_size": 0.045,
+      "monte_carlo_se": 0.014658615214269049,
+      "mean_p": 0.478525,
+      "mean_T": -2.5768693062982324,
+      "mean_D": -0.000863501640111451
+    },
+    {
+      "rho": 0.8,
+      "heteroskedastic": false,
+      "reject_count": 7,
+      "empirical_size": 0.035,
+      "monte_carlo_se": 0.012995191418367026,
+      "mean_p": 0.495125,
+      "mean_T": -2.218048247548153,
+      "mean_D": -0.001789990526773945
+    },
+    {
+      "rho": 0.5,
+      "heteroskedastic": true,
+      "reject_count": 12,
+      "empirical_size": 0.06,
+      "monte_carlo_se": 0.016792855623746664,
+      "mean_p": 0.5083749999999999,
+      "mean_T": -2.6864143222664656,
+      "mean_D": -0.0008959295005679366
+    }
+  ],
+  "interpretation": {
+    "finding": "In this oracle conditional-on-features benchmark, the full-refit bootstrap produced empirical rejection frequencies near the 5% target across the four declared pilot scenarios.",
+    "limitations": [
+      "Only the estimator mechanics were independently reimplemented; the benchmark does not execute the Symthaea Rust code.",
+      "The null DGP parameters are known by construction.",
+      "The feature path is conditioned on, so no exogeneity claim about real RH-006 data follows.",
+      "The Monte Carlo experiment is a calibration benchmark, not a theorem or validity proof."
+    ],
+    "applicability": "not-approved-for-execution",
+    "selection": "stop-assumption-failure",
+    "formal_inference": false
+  }
+}
