@@ -21,6 +21,8 @@ A reservation is not perpetual authority. Before dispatch, the coordinator must 
 
 A monotonic fencing token moves the stale-holder check to the protected resource boundary: a suspended coordinator with an older token must be rejected rather than trusting its historical lease. The token is a local ledger fence; GitHub does not enforce it.
 
+Trust-root generation is likewise non-regressing: an invalidation may advance or preserve the current generation, but a lower generation is rejected. This prevents a later transition from manufacturing an apparently current snapshot under an older trust-root epoch.
+
 This closes a second-order race where an unrelated ledger transition advances the shared current head without explicitly mutating the old reservation record.
 
 ## Dispatch-intent recovery fence
