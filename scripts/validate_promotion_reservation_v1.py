@@ -365,6 +365,7 @@ class ProviderWebhookRequestContextV1:
     repository: str
     received_at_ms: int | None = None
     received_monotonic_ns: int | None = None
+    monotonic_clock_id: str | None = None
 
     def matches_receipt(self, receipt: ProviderWebhookReceiptV1) -> bool:
         return (
@@ -431,6 +432,7 @@ class ProviderPullRequestMergeObservationV1:
     provider_stack: ProviderWebhookStackMetadataV1 | None = None
     local_received_at_ms: int | None = None
     local_received_monotonic_ns: int | None = None
+    local_monotonic_clock_id: str | None = None
     hook_id: str = ""
     source_authentication: str = ""
 
@@ -510,6 +512,7 @@ class ProviderPullRequestMergeObservationV1:
             provider_stack=provider_stack,
             local_received_at_ms=received_context.received_at_ms,
             local_received_monotonic_ns=received_context.received_monotonic_ns,
+            local_monotonic_clock_id=received_context.monotonic_clock_id,
             hook_id=receipt.hook_id,
             source_authentication="webhook-hmac-verified",
         )
@@ -924,6 +927,7 @@ class ProviderWebhookEffectTimingV1:
     local_reservation_monotonic_ns: int | None
     local_dispatch_monotonic_ns: int | None
     local_observation_monotonic_ns: int | None
+    local_monotonic_clock_id: str | None
     clock_relation: ClockRelationV1 | None
 
     @classmethod
@@ -937,6 +941,7 @@ class ProviderWebhookEffectTimingV1:
         timestamp_policy: ProviderTimestampPolicyV1 | None = None,
         local_reservation_monotonic_ns: int | None = None,
         local_dispatch_monotonic_ns: int | None = None,
+        local_monotonic_clock_id: str | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
         interval = (
             parse_provider_timestamp_interval_ms(
@@ -969,6 +974,11 @@ class ProviderWebhookEffectTimingV1:
             local_reservation_monotonic_ns=local_reservation_monotonic_ns,
             local_dispatch_monotonic_ns=local_dispatch_monotonic_ns,
             local_observation_monotonic_ns=observation.local_received_monotonic_ns,
+            local_monotonic_clock_id=(
+                local_monotonic_clock_id
+                if local_monotonic_clock_id is not None
+                else observation.local_monotonic_clock_id
+            ),
             clock_relation=clock_relation,
         )
 
@@ -1008,6 +1018,8 @@ class ProviderWebhookEffectTimingV1:
             return "local-dispatch-time-missing"
         if self.local_observation_time_ms is None:
             return "local-observation-time-missing"
+        if not self.local_monotonic_clock_id:
+            return "local-monotonic-clock-identity-missing"
         if self.local_reservation_monotonic_ns is None:
             return "local-reservation-monotonic-time-missing"
         if self.local_dispatch_monotonic_ns is None:
@@ -1062,6 +1074,7 @@ class ProviderWebhookEffectTimingV1:
             "local_dispatch_time_ms": self.local_dispatch_time_ms,
             "local_observation_monotonic_ns": self.local_observation_monotonic_ns,
             "local_observation_time_ms": self.local_observation_time_ms,
+            "local_monotonic_clock_id": self.local_monotonic_clock_id,
             "local_reservation_monotonic_ns": self.local_reservation_monotonic_ns,
             "local_reservation_time_ms": self.local_reservation_time_ms,
             "provider_delivery_time_ms": self.provider_delivery_time_ms,
@@ -1608,6 +1621,7 @@ def webhook_received_context(
     receipt: ProviderWebhookReceiptV1,
     received_at_ms: int | None = None,
     received_monotonic_ns: int | None = None,
+    monotonic_clock_id: str | None = "runtime-monotonic-1",
 ) -> ProviderWebhookRequestContextV1:
     return ProviderWebhookRequestContextV1(
         delivery_id=receipt.delivery_id,
@@ -1616,6 +1630,7 @@ def webhook_received_context(
         repository=receipt.repository,
         received_at_ms=received_at_ms,
         received_monotonic_ns=received_monotonic_ns,
+        monotonic_clock_id=monotonic_clock_id,
     )
 
 
@@ -1696,6 +1711,7 @@ def stack_webhook_observation(
     payload_extra: str | None = None,
     received_at_ms: int = 1791475205000,
     received_monotonic_ns: int = 9000000000000,
+    monotonic_clock_id: str | None = "runtime-monotonic-1",
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
     payload = webhook_merge_payload(
@@ -1716,7 +1732,12 @@ def stack_webhook_observation(
         receipt,
         payload,
         b"secret",
-        webhook_received_context(receipt, received_at_ms, received_monotonic_ns),
+        webhook_received_context(
+            receipt,
+            received_at_ms,
+            received_monotonic_ns,
+            monotonic_clock_id,
+        ),
         "hook-1",
         "pull_request",
         "Luminous-Dynamics/symthaea",
@@ -1779,6 +1800,7 @@ def effect_timing_fixture(
     reservation_monotonic_ns: int | None = 8999999000000,
     dispatch_monotonic_ns: int | None = 8999999500000,
     observation_monotonic_ns: int | None = 9000000000000,
+    monotonic_clock_id: str | None = "runtime-monotonic-1",
     clock_relation: ClockRelationV1 | None = None,
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
@@ -1803,6 +1825,7 @@ def effect_timing_fixture(
         local_reservation_monotonic_ns=reservation_monotonic_ns,
         local_dispatch_monotonic_ns=dispatch_monotonic_ns,
         local_observation_monotonic_ns=observation_monotonic_ns,
+        local_monotonic_clock_id=monotonic_clock_id,
         clock_relation=(
             clock_relation if clock_relation is not None else clock_relation_fixture()
         ),
@@ -2029,6 +2052,7 @@ def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
         local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
         clock_relation=timing.clock_relation,
     )
     assert tampered.classify() == "provider-timestamp-policy-integrity-invalid"
@@ -2092,6 +2116,7 @@ def test_timing_identity_detects_interval_tampering():
         local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
         clock_relation=timing.clock_relation,
     )
     assert tampered.identity_digest() != timing.identity_digest()
@@ -2218,6 +2243,7 @@ def test_temporal_effect_without_timestamp_policy_is_not_admissible():
         local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
         local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
         local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        local_monotonic_clock_id=timing.local_monotonic_clock_id,
         clock_relation=timing.clock_relation,
     )
     assert timing.classify() == "provider-timestamp-policy-unusable"
