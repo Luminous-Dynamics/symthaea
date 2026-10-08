@@ -414,7 +414,15 @@ impl VulkanBarrierWorkloadRuntime {
             }
             error
         })?;
+        let shader_spirv_bytes = spirv_to_bytes(&spirv);
+        let shader_spirv_hex = hex_bytes(&shader_spirv_bytes);
+        let shader_spirv_sha256 = sha256_hex(&shader_spirv_bytes);
+        let implementation_wgsl_hex = hex_bytes(WGSL.as_bytes());
+        let implementation_wgsl_sha256 = sha256_hex(WGSL.as_bytes());
+        let implementation_identity_digest = vulkan_implementation_identity_digest(&spirv);
         qualification_stage("shader_spirv_compiled");
+        qualification_stage(&format!("shader_spirv_sha256={shader_spirv_sha256}"));
+        qualification_stage(&format!("implementation_identity_sha256={implementation_identity_digest}"));
         let shader = match create_shader_module(&device, &spirv) {
             Ok(shader) => shader,
             Err(error) => {
@@ -545,6 +553,17 @@ impl VulkanBarrierWorkloadRuntime {
             physical_device_api_version: props.api_version,
             queue_family_index: family,
             device_uuid,
+            implementation_identity_digest,
+            shader_spirv_sha256,
+            implementation_wgsl_sha256,
+            implementation_wgsl_hex,
+            shader_spirv_hex,
+            physical_device_vendor_id: props.vendor_id,
+            physical_device_device_id: props.device_id,
+            physical_device_type: props.device_type.as_raw() as u32,
+            physical_device_driver_version: props.driver_version,
+            physical_device_name_hex: hex_bytes(physical_device_name),
+            physical_device_identity_digest,
             _entry: entry,
         })
     }
