@@ -309,6 +309,44 @@ def verify_trust_anchor_permissions(workflow: str) -> None:
         )
 
 
+def verify_trust_anchor_triggers(workflow: str) -> None:
+    match = re.search(
+        r"(?ms)^on:\n((?:^[ ]+[^\n]*\n|^\s*\n)*)"
+        r"(?=^[^ ]\S|\Z)",
+        workflow,
+    )
+    if not match:
+        raise VerificationError("trust-anchor workflow has no canonical top-level on: block")
+
+    observed = tuple(
+        line.rstrip()
+        for line in match.group(1).splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+    expected = (
+        "  workflow_run:",
+        "    workflows:",
+        "      - Broca Feature Matrix",
+        "      - Workflow Syntax",
+        "      - PR Governance",
+        "    types:",
+        "      - requested",
+        "      - in_progress",
+        "      - completed",
+        "  workflow_dispatch:",
+        "    inputs:",
+        "      workflow_run_id:",
+        "        description: \"Completed pull-request workflow run ID to replay\"",
+        "        required: true",
+        "        type: string",
+    )
+    if observed != expected:
+        raise VerificationError(
+            "trust-anchor workflow trigger topology mismatch: "
+            f"expected {expected!r}, got {observed!r}"
+        )
+
+
 def verify_trust_anchor_workflow() -> str:
     workflow_bytes, workflow_blob = get_file(
         ".github/workflows/qual-broca-independent-trust-anchor.yml",
@@ -316,6 +354,7 @@ def verify_trust_anchor_workflow() -> str:
     )
     workflow = workflow_bytes.decode("utf-8")
     verify_trust_anchor_permissions(workflow)
+    verify_trust_anchor_triggers(workflow)
     uses = [
         match.group(1)
         for line in workflow.splitlines()
