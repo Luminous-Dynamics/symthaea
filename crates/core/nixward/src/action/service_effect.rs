@@ -65,6 +65,13 @@ impl NixVerifiedServiceDefinitionContentV1 {
         Ok(Self { evidence })
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_test_evidence(
+        evidence: NixSystemdUnitDefinitionContentEvidenceV1,
+    ) -> Result<Self, NixServiceEffectContextErrorV1> {
+        Self::from_observer(evidence)
+    }
+
     pub(crate) fn as_ref(&self) -> &NixSystemdUnitDefinitionContentEvidenceV1 {
         &self.evidence
     }
