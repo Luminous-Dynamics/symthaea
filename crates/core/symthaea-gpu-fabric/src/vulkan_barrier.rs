@@ -1525,7 +1525,7 @@ mod tests {
             barrier_count: 1,
             resource_digests: digests,
             resource_storage_sizes: storage_sizes,
-            completion_expected: 1,
+            completion_expected: expected_final_timeline_value(&plan),
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
@@ -1533,7 +1533,10 @@ mod tests {
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
-            Err(VulkanBarrierReceiptError::TimelineCompletion { expected: 1, observed: 0 })
+            Err(VulkanBarrierReceiptError::TimelineCompletion {
+                expected: expected_final_timeline_value(&plan),
+                observed: 0,
+            })
         ));
     }
 
@@ -1826,7 +1829,10 @@ mod tests {
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
-            Err(VulkanBarrierReceiptError::TimelineCompletion { expected: 1, observed: 2 })
+            Err(VulkanBarrierReceiptError::TimelineCompletion {
+                expected,
+                observed: expected + 1,
+            })
         ));
     }
 
