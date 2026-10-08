@@ -359,7 +359,13 @@ impl ReceiptSelectionDecision {
 #[cfg(feature = "semantic-receipts")]
 impl Rfc9942VerifiedReceiptSelection {
     /// Bind a validated decision to the exact source collection and the exact
-    /// verified Receipt capability that produced the selected result.
+    /// verified Receipt capability compatible with the selected result.
+    ///
+    /// This proves identity compatibility among the three artifacts. It does
+    /// not, by itself, prove that the supplied capability was the callback
+    /// result that caused an earlier selection; the atomic
+    /// `verify_es256_inclusion_priority_first_valid_receipt_selection_state`
+    /// API establishes that stronger causal relationship.
     ///
     /// This is the narrowest durable-publication witness: after construction,
     /// downstream code receives one immutable object rather than three
