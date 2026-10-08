@@ -233,3 +233,19 @@ GitHub exposes webhook delivery history and redelivery controls separately from 
 That recovery window must not be used as the system's evidence-retention guarantee. A delivery may remain semantically important after provider-side redelivery is unavailable, so durable local capture/reconciliation remains a separate boundary.
 
 A later provider redelivery can help recover evidence, but it cannot retroactively turn an expired or unavailable local/provider result into continuous causal provenance.
+
+## Exact reservation/dispatch attempt binding
+
+`PromotionTemporalAttemptIdentityV1` binds the temporal model to one specific attempt identity:
+
+- the operation identity digest, including repository/stack/base/head and trust/governance generations;
+- reservation ID, promotion operation ID, reservation head, and dispatch-attempt ID;
+- fencing token;
+- local reservation and dispatch wall-clock values;
+- local reservation and dispatch monotonic readings and their runtime clock identity.
+
+The complete stack timing set pins one `temporal_attempt_identity_digest`. Every PR timing must use that exact attempt identity, it must validate against the same operation identity and authority generations, and its reservation/dispatch fields must equal the values inside that attempt. A complete effect set can no longer mix timing from different reservations or dispatch attempts just because the PR heads and clock policy happen to match.
+
+This is an identity/composition guard, not proof that the named reservation or dispatch actually occurred. The model remains provider-free and callers could fabricate an internally consistent object; production authority would need to source this identity from the durable reservation/dispatch journal and verify that journal's own integrity and writer fencing.
+
+The workflow also parses Python AST calls to enforce exact constructor arity for `PromotionStackEffectTimingV1` and `PromotionStackEffectTimingSetV1`. This guards against a real regression found during this tranche: the test registry could be complete while a test still called a four-field dataclass with three positional arguments.
