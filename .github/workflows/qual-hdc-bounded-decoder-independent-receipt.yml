@@ -62,10 +62,10 @@ jobs:
               return value;
             }
 
-            function sha256Canonical(value) {
+            function sha256Canonical(value, domain = 'promotion-eligibility-lease-v1\\u0000') {
               return crypto
                 .createHash('sha256')
-                .update('promotion-eligibility-lease-v1\\0' + JSON.stringify(canonicalize(value)))
+                .update(domain + JSON.stringify(canonicalize(value)))
                 .digest('hex');
             }
 
@@ -1129,6 +1129,16 @@ jobs:
                   liveEvaluation.artifact?.expired ?? null,
               },
               live_checks: liveEvaluation.checks,
+              governance_observation: governanceObservation,
+              independent_admission_policy: {
+                schema_version: 'hdc-bounded-decoder-admission-policy-v1',
+                identity_sha256: policyIdentity,
+              },
+              trusted_verifier_root: {
+                workflow_path: TRUSTED_VERIFIER_WORKFLOW_PATH,
+                workflow_blob_sha: verifierWorkflowBlobSha,
+                commit_sha: context.sha,
+              },
               promotion_eligibility_lease: promotionLease,
             };
 
@@ -1200,13 +1210,64 @@ jobs:
               branch_protection: publicationBranchProtection,
             };
             const publicationGovernanceIdentitySha256 = sha256Canonical(publicationGovernanceObserved);
+            const publicationRun = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+            })).data;
+            const publicationArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+            const publicationExpectedArtifactName =
+              'hdc-linear-code-bounded-decoder-' +
+              expected.subject +
+              '-run-' +
+              run.id +
+              '-attempt-' +
+              run.run_attempt;
+            const publicationArtifactMatches = publicationArtifacts.filter(
+              (candidate) => candidate.name === publicationExpectedArtifactName
+            );
+            const publicationArtifact = publicationArtifactMatches[0] ?? null;
+            const publicationArtifactStable =
+              publicationArtifacts.length === 1 &&
+              publicationArtifactMatches.length === 1 &&
+              artifactLifecycleVerified(publicationArtifact) &&
+              publicationArtifact.expired === false &&
+              publicationArtifact.size_in_bytes > 0 &&
+              publicationArtifact.workflow_run?.id === run.id &&
+              publicationArtifact.workflow_run?.repository_id === expected.repositoryId &&
+              publicationArtifact.workflow_run?.head_repository_id === expected.repositoryId &&
+              publicationArtifact.workflow_run?.head_sha === expected.subject &&
+              typeof publicationArtifact.digest === 'string' &&
+              /^sha256:[0-9a-f]{64}$/.test(publicationArtifact.digest) &&
+              publicationArtifact.id === liveEvaluation.finalArtifact?.id &&
+              publicationArtifact.digest === liveEvaluation.finalArtifact?.digest &&
+              publicationArtifact.created_at === liveEvaluation.finalArtifact?.created_at &&
+              publicationArtifact.expires_at === liveEvaluation.finalArtifact?.expires_at;
+
+            const publicationRunStable =
+              publicationRun.id === run.id &&
+              publicationRun.run_attempt === run.run_attempt &&
+              publicationRun.conclusion === run.conclusion &&
+              publicationRun.head_sha === run.head_sha &&
+              publicationRun.head_branch === run.head_branch;
+
             const publicationFencePassed =
               publicationMainSha === liveEvidence.finalMainSha &&
               publicationPr.head?.sha === liveEvidence.finalPr.head?.sha &&
               publicationPr.base?.sha === liveEvidence.finalPr.base?.sha &&
               publicationPr.merge_commit_sha === liveEvidence.finalPr.merge_commit_sha &&
               publicationBaseSha === liveEvidence.finalBaseBranchTipSha &&
-              publicationGovernanceIdentitySha256 === governanceIdentitySha256;
+              publicationGovernanceIdentitySha256 === governanceIdentitySha256 &&
+              publicationRunStable &&
+              publicationArtifactStable;
 
             const finalLeaseObservedAt = new Date().toISOString();
             promotionLease.observed_at = finalLeaseObservedAt;
@@ -1216,6 +1277,12 @@ jobs:
               main_tip_sha: publicationMainSha,
               base_tip_sha: publicationBaseSha,
               governance_identity_sha256: publicationGovernanceIdentitySha256,
+              run_id: publicationRun.id,
+              run_attempt: publicationRun.run_attempt,
+              run_stable: publicationRunStable,
+              artifact_id: publicationArtifact?.id ?? null,
+              artifact_digest: publicationArtifact?.digest ?? null,
+              artifact_lifecycle_stable: publicationArtifactStable,
             };
             if (!publicationFencePassed) {
               if (!promotionLease.invalidation_reasons.includes('publication_fence_failed')) {
