@@ -124,6 +124,19 @@
             "null"
           ]
         },
+        "authorizing_rule_level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "operational",
+            "collective_choice",
+            "constitutional",
+            "meta_constitutional",
+            null
+          ]
+        },
         "transition": {
           "type": "string",
           "enum": [
@@ -178,6 +191,11 @@
             "null"
           ]
         }
+      },
+      "dependentRequired": {
+        "authorizing_rule_hash": [
+          "authorizing_rule_level"
+        ]
       }
     }
   }
