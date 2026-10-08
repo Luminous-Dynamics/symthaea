@@ -1080,7 +1080,6 @@ impl NixPostStateReceiptV1 {
                 || self.systemd_job_unit.is_none()
                 || self.systemd_job_object_path.is_none()
                 || self.systemd_job_result.is_none()
-                || self.systemd_job_removed_at_monotonic_us.is_none()
             {
                 return Err(NixPostStateErrorV1::IncompleteJobEvidence);
             }
