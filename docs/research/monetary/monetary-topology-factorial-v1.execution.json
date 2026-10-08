@@ -1,0 +1,24 @@
+{
+  "schema_version":"monetary-topology-factorial-v1-execution",
+  "run_count":1080,
+  "common_random_number_cells":30,
+  "exogenous_random_namespace":"world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest":"6bd40ac4a502a2f44cd1f9dd0d6e38a95906006bab980eccd58bb3c8e62dfe54",
+  "completion_rate_by_topology":{
+    "full_mesh":0.3333333333333333,
+    "redundant_two_hub":0.3333333333333333,
+    "routing_only_hub":0.20833333333333334
+  },
+  "completion_rate_by_topology_and_shock":{
+    "full_mesh:normal":0.75,"full_mesh:liquidity_shock":0.5,"full_mesh:network_partition":0.75,"full_mesh:issuer_default":0.0,"full_mesh:bridge_failure":0.0,"full_mesh:stale_quote":0.0,
+    "routing_only_hub:normal":0.75,"routing_only_hub:liquidity_shock":0.5,"routing_only_hub:network_partition":0.0,"routing_only_hub:issuer_default":0.0,"routing_only_hub:bridge_failure":0.0,"routing_only_hub:stale_quote":0.0,
+    "redundant_two_hub:normal":0.75,"redundant_two_hub:liquidity_shock":0.5,"redundant_two_hub:network_partition":0.75,"redundant_two_hub:issuer_default":0.0,"redundant_two_hub:bridge_failure":0.0,"redundant_two_hub:stale_quote":0.0
+  },
+  "operational_waiting_by_topology":{
+    "full_mesh":9.9,
+    "routing_only_hub":10.733333333333333,
+    "redundant_two_hub":11.15
+  },
+  "correction_note":"This execution supersedes the prior topology digest because the prior runner keyed manual-breakpoint RNG by topology. The corrected run uses the treatment-independent namespace world:{shock}:{seed}:obligation:{index}.",
+  "claim_ceiling":"Local deterministic reference execution only; treatment-invariant CRN namespace; no empirical or systemic-safety claim."
+}

@@ -83,15 +83,15 @@ class WorkflowResult:
                 "dependency_count":self.dependency_count,"failure_reason":self.failure_reason.value,
                 "transitions":[{"tick":x.tick,"state":x.state.value,"cause":x.cause} for x in self.transitions],"trace_digest":self.trace_digest}
 
-def _breakpoint_hit(request_id,seed,ppm):
+def _breakpoint_hit(random_namespace,seed,ppm):
     if ppm<=0:return False
-    return int.from_bytes(sha256(f"{request_id}:{seed}".encode()).digest()[:8],"big")%1_000_000 < ppm
+    return int.from_bytes(sha256(f"{random_namespace}:{seed}".encode()).digest()[:8],"big")%1_000_000 < ppm
 
 class OperationalWorkflow:
     def __init__(self,policy):
         policy.validate(); self.policy=policy
         self.policy_digest=sha256(json.dumps(policy.__dict__,sort_keys=True,separators=(",",":")).encode()).hexdigest()
-    def run(self,request,settlement,*,seed,compliance_ok=True,duplicate_manual_approval=False):
+    def run(self,request,settlement,*,seed,exogenous_random_namespace=None,compliance_ok=True,duplicate_manual_approval=False):
         if settlement.status not in {"settled","queued","stranded","rejected"}: raise ValueError("unknown settlement status")
         if settlement.technical_settlement_duration is not None and settlement.technical_settlement_duration<0: raise ValueError("negative settlement duration")
         p=self.policy; t=request.submitted_at; tr=[]; manual=fallback=backlog=capacity=0; unresolved=False; reason=FailureReason.NONE
@@ -112,7 +112,8 @@ class OperationalWorkflow:
             reason=FailureReason.APPROVAL_TIMEOUT; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
         if duplicate_manual_approval:
             reason=FailureReason.DUPLICATE_APPROVAL; emit(WorkflowState.REJECTED,reason.value); return finish(WorkflowState.REJECTED,t,None)
-        if _breakpoint_hit(request.request_id,seed,p.manual_breakpoint_probability_ppm):
+        rng=exogenous_random_namespace or request.request_id
+        if _breakpoint_hit(rng,seed,p.manual_breakpoint_probability_ppm):
             if p.operator_capacity<1:
                 if p.fallback_enabled: fallback+=1; backlog+=1; unresolved=True; reason=FailureReason.OPERATOR_CAPACITY; emit(WorkflowState.RECONCILING,"manual_breakpoint_without_capacity"); emit(WorkflowState.UNRESOLVED,reason.value); return finish(WorkflowState.UNRESOLVED,t,None)
                 reason=FailureReason.OPERATOR_CAPACITY; emit(WorkflowState.TIMED_OUT,reason.value); return finish(WorkflowState.TIMED_OUT,t,None)
