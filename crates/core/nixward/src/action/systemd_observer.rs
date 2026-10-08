@@ -215,6 +215,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                     && removed.object_path.as_str() == expected.object_path.as_str()
                     && removed.unit == expected.unit
                 {
+                    let removed_at_monotonic_us = monotonic_now_us()?;
                     return Ok(NixSystemdJobEvidenceV1 {
                         id: removed.id,
                         job_type: expected.job_type,
@@ -222,6 +223,7 @@ impl NixSystemdJobRemovedWatcherV1 {
                         object_path: removed.object_path.as_str().to_string(),
                         result: removed.result,
                         manager_owner: self.manager_owner.clone(),
+                        removed_at_monotonic_us: Some(removed_at_monotonic_us),
                     });
                 }
             }
