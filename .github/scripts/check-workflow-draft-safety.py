@@ -477,9 +477,38 @@ jobs:
     else:
         raise AssertionError("branch name was incorrectly treated as ready_for_review activity")
 
+    spoofed_draft_guard = safe.replace(
+        "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+        "    if: ${{ true && \"github.event.pull_request.draft == false\" }}\n",
+    )
+    try:
+        validate_generic(
+            Path("spoofed-draft-guard.yml"),
+            spoofed_draft_guard,
+            pull_request_block(spoofed_draft_guard) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("draft guard hidden in a string literal was accepted")
 
-def main() -> int:
-    self_test()
+    spoofed_event_exclusion = safe.replace(
+        "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
+        "    if: ${{ true && \"github.event_name == 'workflow_dispatch'\" }}\n",
+    )
+    try:
+        validate_generic(
+            Path("spoofed-event-exclusion.yml"),
+            spoofed_event_exclusion,
+            pull_request_block(spoofed_event_exclusion) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("event exclusion hidden in a string literal was accepted")
+
+
+def main() -> int:    self_test()
 
     if not WORKFLOW_DIR.is_dir():
         fail(f"workflow directory not found: {WORKFLOW_DIR}")
