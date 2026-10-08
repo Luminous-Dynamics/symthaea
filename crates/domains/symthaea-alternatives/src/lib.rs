@@ -8919,6 +8919,17 @@ mod tests {
         };
         binding.validate().unwrap();
 
+        let serialized = serde_json::to_value(&binding).unwrap();
+        assert!(serialized.get("input_result_ref").is_some());
+        let mut legacy = serialized;
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("input_result_ref");
+        let decoded: CalibrationTraceabilityInputBinding =
+            serde_json::from_value(legacy).unwrap();
+        assert_eq!(decoded.input_result_ref, None);
+
         let frontier_digest =
             canonical_measurement_model_input_frontier_digest(std::slice::from_ref(&binding))
                 .unwrap();
