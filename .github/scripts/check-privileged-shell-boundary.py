@@ -340,6 +340,16 @@ def main() -> None:
     if "rm -rf" in production_text:
         fail("production relay source contains recursive rm -rf")
 
+    static_script_start = text.find("async fn run_privileged_script_source(")
+    static_script_end = text.find("\n}\n", static_script_start)
+    if static_script_start < 0 or static_script_end < 0:
+        fail("run_privileged_script_source helper disappeared")
+    static_script_body = text[static_script_start:static_script_end]
+    if "script: &'static str" not in static_script_body:
+        fail("privileged inline script capability must accept only &'static str")
+    if "stdin(std::process::Stdio::piped())" not in static_script_body:
+        fail("privileged inline script capability lost explicit stdin binding")
+
     # Config reads are read-only, but the pathname still crosses a filesystem
     # authority boundary. Require the same descriptor-relative O_NOFOLLOW reader
     # used by restore/postcondition verification.
