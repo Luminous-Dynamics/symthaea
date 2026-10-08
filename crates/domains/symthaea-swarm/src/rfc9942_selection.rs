@@ -139,6 +139,7 @@ pub enum ReceiptSelectionDecisionError {
     SelectedCandidateMismatch,
     CollectionDigestMismatch,
     CandidateDigestMismatch,
+    VerifiedCapabilityMismatch,
     RejectedAfterSelection,
     UnselectedCandidateMarkedNotEvaluated,
 }
@@ -314,6 +315,25 @@ impl ReceiptSelectionDecision {
         }
 
         Ok(())
+    }
+
+    /// Bind a cryptographically verified Receipt capability to the selected
+    /// candidate. The verified wrapper is only constructible through semantic
+    /// verification, and its exact Receipt-wire fingerprint must equal the
+    /// selected candidate before its capability identity is accepted.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verified_capability_sha256(
+        &self,
+        verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
+    ) -> Result<[u8; 32], ReceiptSelectionDecisionError> {
+        self.validate()?;
+        let selected = self
+            .selected_receipt_sha256
+            .ok_or(ReceiptSelectionDecisionError::SelectedCandidateMismatch)?;
+        if verified.receipt_sha256() != selected {
+            return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
+        }
+        Ok(verified.capability_sha256())
     }
 }
 
