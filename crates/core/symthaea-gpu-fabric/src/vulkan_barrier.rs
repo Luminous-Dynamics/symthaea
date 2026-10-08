@@ -2172,6 +2172,17 @@ mod tests {
 
     #[test]
     #[ignore = "requires a Vulkan 1.3 validation runner"]
+    fn real_vulkan_runtime_constructs_and_drops() {
+        qualification_stage("preflight_test_begin");
+        let runtime = VulkanBarrierWorkloadRuntime::new()
+            .expect("qualified Vulkan 1.3 synchronization2 timeline device");
+        qualification_stage("preflight_runtime_constructed");
+        drop(runtime);
+        qualification_stage("preflight_runtime_dropped");
+    }
+
+    #[test]
+    #[ignore = "requires a Vulkan 1.3 validation runner"]
     fn real_vulkan_barrier_workload_matches_cpu_oracle() {
         let runtime = VulkanBarrierWorkloadRuntime::new()
             .expect("qualified Vulkan 1.3 synchronization2 timeline device");
