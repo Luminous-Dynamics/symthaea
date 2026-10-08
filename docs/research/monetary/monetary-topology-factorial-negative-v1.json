@@ -1,0 +1,15 @@
+{
+  "schema_version":"monetary-topology-factorial-negative-v1",
+  "cases":[
+    {"id":"TOP-X01","kind":"routing_hub_silently_becomes_liquidity_hub","expected":"reject"},
+    {"id":"TOP-X02","kind":"topology_change_without_new_generation","expected":"reject"},
+    {"id":"TOP-X03","kind":"shared_resource_inferred_from_profile","expected":"reject"},
+    {"id":"TOP-X04","kind":"hub_failure_equals_component_failure","expected":"reject_inference"},
+    {"id":"TOP-X05","kind":"centrality_declared_causal_without_intervention","expected":"reject"},
+    {"id":"TOP-X06","kind":"aggregate_resilience_hides_blast_radius","expected":"reject_hidden_concentration"},
+    {"id":"TOP-X07","kind":"topology_changes_adapter_finality_without_declaration","expected":"reject_semantic_leak"},
+    {"id":"TOP-X08","kind":"same_topology_digest_for_distinct_graph","expected":"reject_digest_collision"},
+    {"id":"TOP-X09","kind":"partition_recovery_without_explicit_route","expected":"reject_invented_failover"},
+    {"id":"TOP-X10","kind":"topology_effect_averaged_across_shocks","expected":"reject_collapsed_interaction"}
+  ]
+}
