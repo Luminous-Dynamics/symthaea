@@ -18,6 +18,8 @@ VULKAN_ENTRY_POINT = "main"
 VULKAN_SHADER_STAGE = "compute"
 DRIVER_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-driver.v1"
 DRIVER_IDENTITY_VERSION_NUMBER = "1"
+QUEUE_FAMILY_IDENTITY_VERSION = "symthaea.gpu-fabric.vulkan-queue-family.v1"
+QUEUE_FAMILY_IDENTITY_VERSION_NUMBER = "1"
 
 FIXTURES = {
     "fixture": {
@@ -203,11 +205,58 @@ def verify_provenance(values: dict[str, str], root: Path) -> tuple[str, str, byt
     if values.get("physical_device_identity_sha256") != physical_digest:
         fail("physical-device identity digest mismatch")
 
+    if values.get("queue_family_identity_version") != QUEUE_FAMILY_IDENTITY_VERSION_NUMBER:
+        fail("queue-family identity version mismatch")
+    try:
+        queue_index = int(values["queue_family_index"])
+        queue_flags = int(values["queue_family_queue_flags"])
+        queue_count = int(values["queue_family_queue_count"])
+        timestamp_valid_bits = int(values["queue_family_timestamp_valid_bits"])
+        granularity = tuple(
+            int(part)
+            for part in values["queue_family_min_image_transfer_granularity"].split(",")
+        )
+    except (KeyError, ValueError) as exc:
+        fail(f"malformed queue-family identity: {exc}")
+    if queue_index < 0 or queue_index > 0xFFFFFFFF:
+        fail("queue-family index outside u32 range")
+    if queue_flags < 0 or queue_flags > 0xFFFFFFFF:
+        fail("queue-family flags outside u32 range")
+    if queue_count <= 0 or queue_count > 0xFFFFFFFF:
+        fail("queue-family count outside u32 range")
+    if timestamp_valid_bits < 0 or timestamp_valid_bits > 0xFFFFFFFF:
+        fail("queue-family timestamp-valid bits outside u32 range")
+    if len(granularity) != 3 or any(value < 0 or value > 0xFFFFFFFF for value in granularity):
+        fail("queue-family granularity outside u32 range")
+    if (queue_flags & 0x00000002) == 0:
+        fail("selected queue family lacks compute capability")
+    queue_hash = hashlib.sha256()
+    queue_hash.update(QUEUE_FAMILY_IDENTITY_VERSION.encode("utf-8"))
+    queue_hash.update(b"\x00")
+    queue_hash.update(struct.pack("<I", queue_index))
+    queue_hash.update(struct.pack("<I", queue_flags))
+    queue_hash.update(struct.pack("<I", queue_count))
+    queue_hash.update(struct.pack("<I", timestamp_valid_bits))
+    for value in granularity:
+        queue_hash.update(struct.pack("<I", value))
+    queue_digest = queue_hash.hexdigest()
+    if values.get("queue_family_identity_sha256") != queue_digest:
+        fail("queue-family identity digest mismatch")
+
     if int(values.get("vulkan_api_version", "-1")) != VULKAN_API_1_3:
         fail("Vulkan API version changed")
     if api_version < VULKAN_API_1_3:
         fail("physical-device API version below Vulkan 1.3")
-    return implementation_digest, physical_digest, uuid
+    return (
+        implementation_digest,
+        physical_digest,
+        uuid,
+        queue_digest,
+        queue_flags,
+        queue_count,
+        timestamp_valid_bits,
+        granularity,
+    )
 
 
 def verify_driver_provenance(values: dict[str, str]) -> tuple[str, bytes, int]:
@@ -245,7 +294,7 @@ def verify_runtime(path: Path) -> None:
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
         fail("runtime witness must contain fixture then hazard exactly once")
 
-    provenance: tuple[str, str, bytes, str, bytes, int] | None = None
+    provenance: tuple[str, str, bytes, str, bytes, int, str, int, int, int, tuple[int, int, int]] | None = None
     for name, lines in blocks:
         spec = FIXTURES[name]
         values = parse_kv(lines)
@@ -253,7 +302,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "5":
+        if values.get("receipt_version") != "6":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -270,14 +319,35 @@ def verify_runtime(path: Path) -> None:
         if int(values.get("queue_family_index", "-1")) != 0:
             fail(f"{name}: queue family mismatch")
 
-        implementation_digest, physical_digest, uuid = verify_provenance(values, path.parent)
+        (
+            implementation_digest,
+            physical_digest,
+            uuid,
+            queue_digest,
+            queue_flags,
+            queue_count,
+            timestamp_valid_bits,
+            granularity,
+        ) = verify_provenance(values, path.parent)
         driver_digest, driver_uuid, driver_id = verify_driver_provenance(values)
         if values.get("implementation_identity_sha256") != implementation_digest:
             fail(f"{name}: implementation identity receipt binding mismatch")
         if values.get("physical_device_identity_sha256") != physical_digest:
             fail(f"{name}: physical-device identity receipt binding mismatch")
 
-        current_provenance = (implementation_digest, physical_digest, uuid, driver_digest, driver_uuid, driver_id)
+        current_provenance = (
+            implementation_digest,
+            physical_digest,
+            uuid,
+            driver_digest,
+            driver_uuid,
+            driver_id,
+            queue_digest,
+            queue_flags,
+            queue_count,
+            timestamp_valid_bits,
+            granularity,
+        )
         if provenance is None:
             provenance = current_provenance
         elif current_provenance != provenance:
