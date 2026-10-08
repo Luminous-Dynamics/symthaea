@@ -1954,6 +1954,25 @@ mod tests {
     }
 
     #[test]
+    fn receipt_rejects_runtime_device_and_queue_binding_mismatch() {
+        let mut receipt = minimal_receipt_for_binding_tests();
+        assert!(receipt.verify_runtime_binding(VULKAN_API_VERSION, 0).is_ok());
+
+        receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
+        assert!(matches!(
+            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0),
+            Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
+        ));
+
+        receipt.physical_device_api_version = VULKAN_API_VERSION;
+        receipt.queue_family_index = 1;
+        assert!(matches!(
+            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0),
+            Err(VulkanBarrierReceiptError::QueueFamilyBinding)
+        ));
+    }
+
+    #[test]
     fn receipt_rejects_tampered_queue_family_binding() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
@@ -1994,6 +2013,27 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
         ));
+    }
+
+    fn minimal_receipt_for_binding_tests() -> VulkanBarrierExecutionReceipt {
+        VulkanBarrierExecutionReceipt {
+            version: RECEIPT_VERSION,
+            graph_digest: String::new(),
+            schedule_digest: String::new(),
+            sync_plan_digest: String::new(),
+            barrier_digest: String::new(),
+            barrier_lowering_digest: String::new(),
+            completion_lowering_digest: String::new(),
+            node_count: 0,
+            barrier_count: 0,
+            resource_digests: BTreeMap::new(),
+            resource_storage_sizes: BTreeMap::new(),
+            completion_expected: 0,
+            completion_observed: 0,
+            vulkan_api_version: VULKAN_API_VERSION,
+            physical_device_api_version: VULKAN_API_VERSION,
+            queue_family_index: 0,
+        }
     }
 
     fn print_receipt_evidence(label: &str, receipt: &VulkanBarrierExecutionReceipt) {
