@@ -1569,7 +1569,7 @@ mod tests {
             captured_at_monotonic_us: 1,
         };
         let sealed =
-            NixVerifiedServiceDefinitionContentV1::from_test_evidence(evidence.clone()).unwrap();
+            NixVerifiedServiceDefinitionContentV1::from_observer(evidence.clone()).unwrap();
 
         let bare_intent = NixActionIntentV1::from_command(
             "host:x",
@@ -1604,7 +1604,7 @@ mod tests {
         let mut altered_evidence = evidence;
         altered_evidence.files[0].content_digest = "33".repeat(32);
         let altered =
-            NixVerifiedServiceDefinitionContentV1::from_test_evidence(altered_evidence).unwrap();
+            NixVerifiedServiceDefinitionContentV1::from_observer(altered_evidence).unwrap();
         assert_eq!(
             validate_service_definition_capture_binding(&contextual, &altered).unwrap_err(),
             NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
@@ -1613,7 +1613,7 @@ mod tests {
         let mut manager_altered = sealed.as_ref().clone();
         manager_altered.manager_owner = ":1.43".into();
         let manager_altered =
-            NixVerifiedServiceDefinitionContentV1::from_test_evidence(manager_altered).unwrap();
+            NixVerifiedServiceDefinitionContentV1::from_observer(manager_altered).unwrap();
         assert_eq!(
             validate_service_definition_capture_binding(&contextual, &manager_altered).unwrap_err(),
             NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
@@ -1622,7 +1622,7 @@ mod tests {
         let mut bus_altered = sealed.as_ref().clone();
         bus_altered.bus_id = "fedcba9876543210fedcba9876543210".into();
         let bus_altered =
-            NixVerifiedServiceDefinitionContentV1::from_test_evidence(bus_altered).unwrap();
+            NixVerifiedServiceDefinitionContentV1::from_observer(bus_altered).unwrap();
         assert_eq!(
             validate_service_definition_capture_binding(&contextual, &bus_altered).unwrap_err(),
             NixAuthorizationErrorV1::DefinitionContentCaptureMismatch
