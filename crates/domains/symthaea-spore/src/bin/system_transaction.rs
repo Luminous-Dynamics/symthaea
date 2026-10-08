@@ -1366,6 +1366,15 @@ impl TransactionLedger {
         artifact_commitment: Option<ArtifactCommitment>,
         configuration_commitment: Option<ArtifactCommitment>,
     ) -> Result<(), String> {
+        if transaction.mutation == MutationKind::Install
+            && outcome == TransactionOutcome::ObservedSuccess
+            && transaction.execution_commitment.is_none()
+        {
+            return Err(
+                "successful install transactions require a durable execution commitment".into()
+            );
+        }
+
         if (artifact_commitment.is_some() || configuration_commitment.is_some())
             && transaction.mutation != MutationKind::CreateImage
         {
@@ -2159,6 +2168,30 @@ mod tests {
             std::fs::read(&path).unwrap().is_empty(),
             "unsafe journal must remain untouched"
         );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn successful_install_requires_execution_commitment() {
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir()
+            .join(format!("symthaea-install-success-evidence-{name}.jsonl"));
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let request_id = format!("install-success-evidence-{name}");
+        let transaction = SystemTransaction::begin(
+            MutationKind::Install,
+            &request_id,
+            Some(&"a".repeat(64)),
+            b"install",
+        )
+        .unwrap();
+
+        ledger.admit(transaction.clone()).unwrap();
+        let error = ledger
+            .mark_completed(&transaction, TransactionOutcome::ObservedSuccess)
+            .expect_err("successful install without script evidence must fail closed");
+        assert!(error.contains("durable execution commitment"));
+
         let _ = std::fs::remove_file(path);
     }
 
