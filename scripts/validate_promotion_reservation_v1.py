@@ -1464,6 +1464,7 @@ def webhook_merge_payload(
     merged: bool = True,
     action: str = "closed",
     merge_commit: str | None = None,
+    extra_field: str | None = None,
 ) -> bytes:
     return json.dumps(
         {
@@ -1485,6 +1486,11 @@ def webhook_merge_payload(
                 ),
             },
             "repository": {"full_name": repository},
+            **(
+                {"qualification_extra": extra_field}
+                if extra_field is not None
+                else {}
+            ),
         },
         separators=(",", ":"),
     ).encode("utf-8")
@@ -1515,6 +1521,7 @@ def stack_webhook_observation(
     merge_commit: str = "M2",
     delivery_id: str = "delivery-merge",
     repository: str = "Luminous-Dynamics/symthaea",
+    payload_extra: str | None = None,
     received_at_ms: int = 1791475205000,
 ) -> ProviderPullRequestMergeObservationV1:
     identity = identity or stack_identity_fixture()
@@ -1525,6 +1532,7 @@ def stack_webhook_observation(
         merged=True,
         action="closed",
         merge_commit=merge_commit,
+        extra_field=payload_extra,
     )
     receipt = webhook_merge_receipt(
         payload,
