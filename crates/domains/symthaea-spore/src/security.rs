@@ -60,6 +60,104 @@ pub fn validate_disk_path(d: &str) -> Result<String, String> {
     Ok(d.to_string())
 }
 
+/// A kernel-level binding for a whole block device node at one point in time.
+///
+/// This identifies the opened device by its Linux device number and reported
+/// capacity. It intentionally does not claim to be a globally unique physical
+/// disk identity: device numbers can be reused after hot-unplug/replug.
+#[cfg(target_os = "linux")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockDeviceBinding {
+    pub major: u32,
+    pub minor: u32,
+    pub size_bytes: u64,
+}
+
+#[cfg(target_os = "linux")]
+pub fn bind_block_device(path: &str) -> Result<BlockDeviceBinding, String> {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
+    use std::os::fd::AsRawFd;
+
+    let validated = validate_disk_path(path)?;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&validated)
+        .map_err(|error| format!("unable to open block device {validated}: {error}"))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("unable to inspect block device {validated}: {error}"))?;
+
+    if !metadata.file_type().is_block_device() {
+        return Err(format!("{validated} is not a block device"));
+    }
+
+    let major = unsafe { libc::major(metadata.rdev()) as u32 };
+    let minor = unsafe { libc::minor(metadata.rdev()) as u32 };
+
+    const BLKGETSIZE64: libc::c_ulong = 0x8008_1272;
+    let mut size_bytes = 0u64;
+    if unsafe {
+        libc::ioctl(
+            file.as_raw_fd(),
+            BLKGETSIZE64,
+            &mut size_bytes as *mut u64,
+        )
+    } != 0
+    {
+        return Err(format!(
+            "unable to query block-device capacity for {validated}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    if size_bytes == 0 {
+        return Err(format!(
+            "block device {validated} reports zero capacity"
+        ));
+    }
+
+    Ok(BlockDeviceBinding {
+        major,
+        minor,
+        size_bytes,
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn bind_block_device(_path: &str) -> Result<(), String> {
+    Err("block-device binding is only supported on Linux".into())
+}
+
+#[cfg(target_os = "linux")]
+pub fn verify_block_device_binding(
+    path: &str,
+    expected: BlockDeviceBinding,
+) -> Result<(), String> {
+    let observed = bind_block_device(path)?;
+    if observed == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "block device binding changed for {path}: expected {}:{}, {} bytes; observed {}:{}, {} bytes",
+            expected.major,
+            expected.minor,
+            expected.size_bytes,
+            observed.major,
+            observed.minor,
+            observed.size_bytes
+        ))
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn verify_block_device_binding(
+    _path: &str,
+    _expected: (),
+) -> Result<(), String> {
+    Err("block-device binding is only supported on Linux".into())
+}
+
 /// Sanitize a string for safe use in shell commands and Nix config.
 ///
 /// Only allows alphanumeric, hyphens, underscores, dots, and optionally forward slashes.
@@ -308,6 +406,34 @@ mod tests {
         let nul_error =
             validate_nix_pure_eval("1\0").expect_err("NUL-containing input must fail closed");
         assert!(nul_error.contains("NUL"));
+    }
+
+    // ── block-device binding ──
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn block_device_binding_rejects_regular_files() {
+        let path = std::env::temp_dir().join("nixforhumanity-not-a-block-device");
+        std::fs::write(&path, b"not a disk").unwrap();
+        let error = bind_block_device(path.to_str().unwrap())
+            .expect_err("regular file must not bind as a block device");
+        assert!(error.contains("not a block device"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn block_device_binding_is_self_consistent_when_rechecked() {
+        let candidates = ["/dev/sda", "/dev/nvme0n1", "/dev/vda", "/dev/mmcblk0"];
+        if let Some(path) = candidates
+            .iter()
+            .copied()
+            .find(|candidate| std::path::Path::new(candidate).exists())
+        {
+            let binding = bind_block_device(path).expect("existing candidate should bind");
+            verify_block_device_binding(path, binding)
+                .expect("unchanged block device should retain its binding");
+        }
     }
 
     // ── validate_disk_path ──
