@@ -130,6 +130,8 @@ pub mod resonator_geometry_temperature_harness;
 pub mod resonator_cleanup_rule_harness;
 /// Research-only GF(2) linear-code algebraic substrate.
 pub mod linear_code;
+/// Research-only bounded-distance syndrome decoder for linear-code recovery experiments.
+pub mod syndrome_decoder;
 
 /// HDC dimensionality configuration for runtime selection
 ///

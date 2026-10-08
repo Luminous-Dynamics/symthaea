@@ -1,0 +1,575 @@
+# Bounded-Distance Syndrome Decoder for the Linear-Code HDC Comparator
+
+This document defines the next noisy-recovery layer after the exact Raviv-style
+linear-code comparator. It is deliberately a separate research surface and does
+not change production HDC behavior.
+
+## Research boundary
+
+Raviv's random-linear-code construction provides an algebraic recovery route for
+clean bound representations by exploiting the subspace structure of the code.
+The present branch does **not** reinterpret that clean solver as a noise decoder.
+Instead it introduces an independent coding-theoretic decoder built around a
+parity-check matrix and syndrome search.
+
+For a binary linear code \(C\subseteq\mathbb F_2^n\) with minimum distance \(d\),
+unique correction is guaranteed only through
+\[
+t=\left\lfloor\frac{d-1}{2}\right\rfloor.
+\]
+At the first radius beyond guaranteed unique decoding, \(t+1=\lceil d/2\rceil\),
+a received word can have multiple equally-near codewords when the code geometry
+permits it; the decoder therefore reports ambiguity rather than selecting one by
+an arbitrary tie-break. For even \(d\), this is the half-distance radius
+\(d/2\). This is the semantics established by the finite qualification fixture,
+not an asymptotic claim about the random-linear-code family.
+
+## Decoder construction
+
+Given an independent generator basis \(G\), the decoder first derives a full-rank
+parity-check matrix \(H\) by GF(2) row reduction. If the generator is reduced to
+RREF, each non-pivot column produces one nullspace vector; those vectors are the
+rows of \(H\), giving
+\[
+GH^T=0.
+\]
+
+For an observation \(y=c+e\), linearity gives
+\[
+Hy^T=He^T,
+\]
+so the decoder need not enumerate codewords. It computes the observed syndrome,
+then searches error patterns in increasing Hamming weight until one or more
+patterns have the same syndrome.
+
+The implementation returns exactly one of:
+
+- **Unique** — one minimum-weight error pattern was found within the explicit
+  bound; the corresponding corrected codeword is returned.
+- **Ambiguous** — multiple minimum-weight error patterns have the same syndrome,
+  so unique decoding is unavailable at that distance.
+- **NoMatchWithinBound** — no error pattern at or below the declared bound has
+  the observed syndrome.
+- **InvalidBound** — the requested error bound exceeds the block length.
+
+No candidate codeword enumeration occurs inside the decoder.
+
+## Kernel and syndrome/coset invariant
+
+For the canonical \([8,2,4]\) fixture, the qualification suite exhaustively
+enumerates all \(2^8=256\) ambient words and partitions them by their six-bit
+syndrome. It records 64 non-empty syndrome fibers, each of cardinality 4.
+
+The zero-syndrome fiber is checked element-for-element against the four codewords,
+establishing
+\[
+\ker(H)=C
+\]
+on the complete fixture. Every other fiber is checked in both directions:
+members of the same syndrome fiber differ by a codeword, and translating a
+representative by every codeword stays in that fiber. Thus, on the finite fixture,
+\[
+Hy^T=Hy'^T \iff y+y'\in C,
+\]
+so the syndrome classes are exactly the additive cosets of the code.
+
+This invariant matters for decoder semantics. A bounded syndrome search can only
+interpret a matched error pattern as a correction of a codeword because the
+syndrome kernel is exactly the code. The exhaustive finite proof therefore closes
+the representation-to-decoder boundary explicitly rather than inferring it from
+annihilation alone.
+
+The same fixture now carries a stronger exhaustive identity. All 256 ambient
+observations are decoded with bound 4 (the fixture's covering radius), and the
+number of minimum-weight error patterns sharing the observed syndrome is required
+to equal the number of nearest codewords from the independent distance oracle.
+The observed aggregate is 100 uniquely nearest observations, 156 ambiguous
+observations, and 484 nearest-codeword incidences. This checks the multiplicity
+correspondence across the entire ambient Boolean space rather than only on the
+weight-2 boundary shell.
+    
+The qualification suite also explicitly separates this decoder ambiguity from
+factor-presentation ambiguity. Four one-dimensional factor presentations of the
+same [8,2,4] code have a two-dimensional factorization kernel, giving four
+representations of the zero target. The same code, treated purely as a code
+rather than as a factor presentation, has an observation whose nearest-codeword
+and minimum-syndrome multiplicities are both two. The certificate records both
+quantities and requires them to remain distinct rather than interpreting either
+count as the other kind of ambiguity.
+
+
+## Deterministic bounded minimum-syndrome lists
+
+The decoder exposes a list-valued evidence surface in addition to the scalar
+unique/ambiguous outcome. Callers provide both an error-weight bound and a
+maximum capture size. The search still determines the exact minimum-syndrome
+multiplicity; list_complete is false whenever the concrete list was truncated.
+
+For the [8,2,4] fixture, the exhaustive 256-observation qualification first
+computes the covering radius independently and requires it to equal 4. It then
+uses a capture cap of 8 and requires every concrete minimum-syndrome list to be
+complete and to match the nearest-codeword set from the independent distance
+oracle. Separate tests exercise caps of 1 and 0 and require truncation to remain
+explicit.
+
+This is the finite coset-leader perspective: minimum-weight errors are
+representatives of syndrome classes, while their multiplicity and captured list
+are distinct evidence fields. Work on computing coset leaders likewise treats
+complete leader sets and covering-radius structure as explicit finite-code
+properties.
+
+## Random-code list qualification and independent parity-check oracle
+
+The randomized qualification surface uses a test-side parity-check construction based on u64
+nullspace elimination, which is intentionally separate from the production constructor. The
+resulting syndrome is compared directly with the production parity-check syndrome for every probe.
+
+A stronger algebraic-independence witness now covers one deterministic code in each selected
+small random regime: `[12,4]`, `[16,8]`, and `[20,3]`. For each code, the complete dual space is
+enumerated directly by checking
+orthogonality against the generator basis. Every production parity-check row must occur in that brute-force dual space, and the
+complete XOR-span of the production check rows must equal the independently enumerated dual space
+element-for-element. The production zero-syndrome kernel is also exhaustively compared element-for-element with
+the independently reconstructed codeword set. This does not reconstruct (H) by the same
+nullspace-elimination procedure; it instead establishes exact equality between the production
+check-row span and the independently enumerated dual code while separately binding the kernel to an
+independent codeword reconstruction.
+
+
+The randomized qualification surface now probes deterministic observations from the
+existing moderate-rate and low-rate regimes, using an independent test-side
+parity-check construction based on u64 nullspace elimination. It does not call the
+decoder's parity-check constructor. The resulting syndrome is compared directly
+with the production parity-check syndrome for every probe.
+
+The nearest-codeword oracle is also independently reconstructed from the generator
+basis by explicit GF(2) subset enumeration rather than calling the production
+codeword-enumeration method. The qualification first requires the production and
+independent codeword sets to agree exactly, then uses the independently reconstructed
+set for nearest-distance and multiplicity checks.
+
+For each generated code, the probe bound is one above the guaranteed unique-decoding
+radius. When the independent nearest-codeword oracle places the observation within
+that bound, every minimum-syndrome error and corresponding nearest codeword must be
+returned completely with capture cap 32. Their syndromes, weights, distances, and
+set membership are independently checked. Observations outside the bound must
+remain explicit NoMatchWithinBound results.
+
+The entire probe is repeated with identical seeds and observations and the
+complete multiplicity histogram (1 through 16) must be identical. Codeword
+translation is also required to preserve the exact decoder work ledger, not only
+outcome, list cardinality, and nearest-codeword translation. The emitted ledger
+therefore exposes both deterministic list-size behavior and translation-equivariant
+search effort without pretending it is an asymptotic theorem.
+
+## Spectrum is a geometry witness, not an additive-coordinate proof
+
+The full syndrome-quotient Hamming-distance spectrum is intentionally promoted as a
+geometry-only witness rather than a complete certificate of the quotient's additive
+coordinate law. The finite fixture admits an explicit adversarial syndrome-label
+permutation that preserves the full pairwise spectrum while failing XOR additivity:
+swap labels \(40..47\) with \(56..63\) and fix every other label. This map fixes zero
+and preserves the spectrum condition, but
+\[
+8\oplus32=40,\qquad p(8)\oplus p(32)=40,\qquad p(40)=56,
+\]
+so
+\[
+p(8\oplus32)\ne p(8)\oplus p(32).
+\]
+
+This boundary matters because a distance spectrum observes only Hamming weights of
+ambient differences. It can therefore certify a strong colored metric geometry
+without certifying the chosen syndrome labels form an additive coordinate system.
+
+The qualification suite now also executes this exact permutation as a negative guard: it must preserve all 4,096 pairwise weight-spectrum entries while failing XOR additivity. This is an anti-overclaim regression, not a positive algebraic certificate.
+
+The next witness closes exactly that blind spot without claiming a new mathematical
+foundation. For every syndrome pair \(s,t\), every anchor \(x\in F_s\), and the complete
+target fiber, the qualification checks the exact finite identity
+\[
+\{x\oplus y:y\in F_t\}=F_{s\oplus t}.
+\]
+For this fixture that produces 4,096 ordered syndrome pairs, 16,384 anchored
+set identities, and 65,536 underlying XOR differences. It is a closure/sensitivity
+witness over the already established coset partition, so it should be interpreted as
+a direct guard against the spectrum blind spot rather than as an independent proof
+of linearity.
+
+## Coordinate-permutation equivariance
+
+A binary Hamming-space coordinate permutation is an isometry, and two linear codes related
+by such a permutation are equivalent codes. citeturn631975search0turn631975search1
+The bounded decoder should therefore be equivariant under a coordinate relabeling: distances,
+minimum error weights, unique/ambiguous/no-match classes, and the concrete error/codeword
+lists should transform with the same permutation.
+
+The qualification now checks this metamorphic property on every one of the 256 ambient
+observations of the [8,2,4] fixture, and on 32 deterministic probes of a packed 73-bit
+[73,8] random code using a permutation that exercises coordinates across the 64-bit word
+boundary. The list surface is compared as an unordered set after applying the permutation,
+preventing an implementation-specific traversal order from becoming part of the claim.
+
+This is an algorithmic invariance witness rather than another restatement of the quotient
+spectrum. It specifically probes coordinate indexing, packed-word boundaries, parity-check
+construction, and the decoder's interpretation of Hamming geometry under representation
+isomorphism.
+
+The same metamorphic check now includes exact decoder work-ledger equality (`weights_examined`,
+`error_patterns_examined`, `syndrome_column_xors`, and `matching_error_patterns`) and explicit
+fail-closed equivalence for invalid observation dimensions and invalid bounds. These guards keep
+representation changes from silently changing the searched state space or error-handling class.
+
+## Execution identity and receipt integrity
+
+The qualification workflow is intentionally PR-event-only: `opened`, `synchronize`, `reopened`, and `ready_for_review`. Push and manual invocations are not qualification events. This removes alternate trigger modalities from the qualification boundary.
+
+The qualification workflow does not treat the event payload alone as sufficient provenance. It
+binds the current repository, triggering repository, and head repository by numeric repository ID,
+then re-fetches the live Actions run and requires its repository ID, exact workflow identity, head
+ref, and event type to agree with the triggering event. For a pull-request run, GitHub's Actions run
+`head_sha` is the PR-head commit, while the pull-request execution context's `GITHUB_SHA` is the
+synthetic merge-ref SHA. The qualification therefore binds the run to the exact PR-head subject and
+records the synthetic merge SHA separately as execution-context provenance.
+
+A further distinction is required for historical runs: `workflow_run.pull_requests` is treated only
+as a PR association view. Its embedded head/base metadata can reflect the PR's later state after a
+force-push or base movement, so those fields are not admitted as immutable run identity. Historical
+run identity comes from the run's own `head_sha` / head ref plus the immutable triggering event
+fields and the independently fetched PR snapshot used by the verifier. This prevents a mutable
+association record from either falsifying a valid historical run or silently replacing its subject.
+
+The executed workflow definition is bound separately by requiring `GITHUB_WORKFLOW_SHA` to equal
+the observed synthetic merge SHA and comparing the exact Git blob of the workflow file at the PR
+head with the same file in the synthetic merge snapshot. The receipt records these distinctions in
+schema v23, using explicit blob-SHA and non-authoritative association fields. Its local status field
+is pre-artifact; final qualification remains contingent on successful artifact revalidation and the
+completed hosted run.
+
+The same execution boundary also revalidates the uploaded artifact against the live run after upload.
+The artifact name binds the exact PR-head SHA, and the artifact's `workflow_run.head_sha` is checked
+against that same PR-head subject. The pull-request merge-ref SHA is recorded separately and is never
+substituted for the research subject, so the evidence cannot conflate GitHub's execution object with
+the code identity under qualification.
+
+## Walsh/dual-fiber structure
+
+A metric-orthogonal witness is obtained from the Boolean Walsh characters
+\[
+W_s(u)=\sum_{x\in F_s}(-1)^{u\cdot x}.
+\]
+For a linear subspace, the Fourier transform of its indicator is supported exactly on
+the dual subspace and has magnitude equal to the subspace cardinality; the same result
+on an affine coset adds only a character-dependent sign. See the finite-code Fourier
+identity in Mathematical Tours, §6.4.2, and the coding-theory lecture notes cited
+below.
+
+The finite [8,2,4] qualification does not ask the production parity-check constructor
+to supply this support. It independently derives the 64 dual characters by checking
+the dot products against the two hand-specified fixture generators, then evaluates
+all 256 Walsh coefficients on all 64 fibers. Every fiber has exactly 64 supported
+characters, each coefficient has magnitude 4, all other 192 characters vanish, and
+Parseval energy is 1,024 per fiber (65,536 total). The phase is also checked directly
+against each fiber anchor. This is evidence for the finite affine-dual structure of
+the fixture, not a general decoder theorem.
+
+## Why this is an independent algorithm
+
+The existing finite oracle enumerates codewords, computes Hamming distances, and
+constructs the complete nearest-codeword set. The new decoder instead:
+
+1. constructs H from the generator basis;
+2. computes a syndrome using the columns of H;
+3. enumerates error supports by increasing weight;
+4. compares error syndromes;
+5. reconstructs a codeword only after a unique minimum-weight error is found.
+
+The two paths therefore meet only at the test boundary. Agreement is evidence
+that two materially different implementations describe the same finite geometry.
+
+## Complexity boundary
+
+The decoder's search space through weight t is
+\[
+\sum_{i=0}^{t}\binom{n}{i}.
+\]
+This is the standard bounded-weight syndrome-search surface. For fixed small
+t, the number of tested error supports is polynomial in n; for growing
+t, the search becomes combinatorial and is not claimed to solve general
+syndrome decoding efficiently.
+
+This distinction matters because minimum-weight syndrome decoding for arbitrary
+binary linear codes is computationally hard. The branch therefore qualifies a
+**bounded** decoder for controlled finite experiments, not a general efficient
+decoder.
+
+The implementation records deterministic work units:
+
+- "weights_examined";
+- "error_patterns_examined";
+- "syndrome_column_xors";
+- "matching_error_patterns".
+
+These are algorithmic operation counts, not wall-clock performance measurements.
+
+## Canonical finite boundary fixture
+
+The decoder is cross-checked on the existing [8,2,4] Boolean fixture generated
+by the two basis words
+
+- "11110000";
+- "00001111".
+
+Its codewords have minimum distance 4, so the guaranteed unique radius is 1.
+
+The independent qualification checks:
+
+- all 36 observations formed from the four codewords and error weights 0 or 1;
+  every observation decodes uniquely to the same nearest codeword;
+- all 112 weight-2 boundary observations formed from the four codewords;
+  each oracle nearest-codeword set is reproduced as either a unique result or
+  an ambiguity with the same multiplicity;
+- every clean target has exactly 16 unique and 12 ambiguous weight-2 cases;
+- the ambiguous boundary cases have exactly two nearest codewords / minimum-weight
+  syndrome matches;
+- the observation "00110011" is at distance 4 from every codeword and therefore
+  yields "NoMatchWithinBound" at bound 2;
+- the decoder work ledger for the boundary case examines exactly
+  \(1+8+\binom82=37\) error patterns.
+
+The cross-target check is important: the result is not tied to the arbitrary choice
+of one clean target.
+
+## Relationship to the HDC literature
+
+Raviv's 2024 construction is a clean-recovery result: random linear codes expose
+subspace structure that permits algebraic factor recovery. It explicitly leaves
+noise robustness as a separate issue.
+
+Deng and Raviv's later work addresses that gap using a **different representation
+family** based on Reed--Solomon/Hadamard concatenation and histogram-recovery
+machinery related to list decoding. That construction should remain a separate
+comparator rather than being folded into this Boolean random-linear-code branch.
+
+Recent 2026 random-linear-code list-size results sharpen the theoretical boundary
+around list decoding near capacity, but they do not establish noise performance
+for this small deterministic Boolean fixture. The present branch therefore keeps
+the finite observed distance, search radius, and ambiguity counts explicit.
+
+## Qualification gates
+
+A future stronger decoder may be added only after this bounded syndrome path
+passes its independent finite qualification. The following remain separate
+evidence layers:
+
+**Representation layer** — random-linear-code construction and exact clean
+factor recovery.
+
+**Channel layer** — corruption radius, distribution, and observation alphabet.
+
+**Codeword layer** — syndrome-decoder uniqueness, ambiguity, or no-match outcome.
+
+**Factor layer** — affine factorization multiplicity after a candidate codeword is
+identified.
+
+A codeword-level unique decode does not imply a unique factorization: the existing
+affine-fiber certificate may still contain multiple factor tuples. Conversely,
+decoder ambiguity must not be credited or blamed on factorization geometry.
+
+No production integration, timing claim, or superiority claim is made here.
+
+## References
+
+- Netanel Raviv, *Linear Codes for Hyperdimensional Computing*, 2024:
+  https://arxiv.org/abs/2403.03278
+- Zirui Deng and Netanel Raviv, *Efficient Vector Symbolic Architectures from
+  Histogram Recovery*, 2025/ISIT 2026:
+  https://arxiv.org/abs/2511.01838
+- Shashwat Silas, *The list size of random linear codes at capacity*, 2026:
+  https://arxiv.org/abs/2609.06570
+- Error Correction Zoo, *Linear binary code*:
+  https://errorcorrectionzoo.org/c/binary_linear
+- Error Correction Zoo, *Binary code*:
+  https://errorcorrectionzoo.org/c/bits_into_bits
+- Berlekamp, McEliece and van Tilborg (1978), *On the inherent intractability of certain coding problems*:
+  https://doi.org/10.1109/TIT.1978.1055873
+- MathWorld, *Syndrome Decoding Problem*:
+  https://mathworld.wolfram.com/SyndromeDecodingProblem.html
+
+## Deterministic random-code cross-check
+
+The boundary fixture is not sufficient by itself to establish that the syndrome implementation is faithful to the general binary linear-code semantics. The qualification suite therefore adds deterministic sweeps over two independently generated Boolean random-linear-code regimes: a moderate-rate [12,4] family and a lower-rate [20,3] family that is closer to the low-rate regime of the paper-scale comparator.
+
+For each usable seed whose exhaustive code geometry has unique-decoding radius between one and four, every codeword and every error pattern inside that guaranteed radius are passed through the syndrome decoder. The independent nearest-codeword oracle is required to report the same unique codeword, distance, and exact error pattern.
+
+This remains a finite implementation cross-check. It is not a probabilistic claim about the entire random-code ensemble.
+
+## Syndrome-space oracle qualification
+
+The canonical [8,2,4] fixture also receives a separate exhaustive syndrome-space
+cross-check. For all 256 ambient observations, the production parity-check
+syndrome is compared against an independently reconstructed syndrome oracle.
+The test additionally checks the linearity law
+
+`H(x xor y) = H(x) xor H(y)`
+
+for all 65,536 ordered observation pairs, both for the independent oracle and the
+production parity-check implementation.
+
+This establishes the syndrome map itself as a qualified GF(2) homomorphism on
+the finite fixture, rather than inferring correctness only from successful
+decoding outcomes. It is still a finite fixture proof and makes no asymptotic
+or performance claim.
+## Fixed-fixture specification oracle
+
+The [8,2,4] fixture now has a third syndrome reference that is deliberately not
+derived from either implementation's nullspace construction. Six parity checks are
+specified directly from the fixture invariant that the first four bits are equal and
+the last four bits are equal:
+
+`x0+x1`, `x1+x2`, `x2+x3`, `x4+x5`, `x5+x6`, `x6+x7`.
+
+This fixture-specific specification oracle is intentionally non-general. Its purpose
+is to detect a common-mode error in the two algorithmic syndrome constructions: both
+the production parity-check derivation and the copied test-side nullspace elimination
+could agree with each other while sharing the same derivation mistake. The fixed
+checks instead encode the mathematical definition of this finite code directly.
+
+All 256 ambient words are compared across all three maps, and the fixed specification
+must expose all 64 syndromes with four observations per fiber while its zero-syndrome
+fiber contains exactly the four codewords. The qualification receipt records this as
+`FIXED_SYNDROME_SPEC` separately from the generic coset and syndrome ledgers.
+
+This does not replace the generic independent nullspace oracle. The two serve different
+purposes: the generic oracle exercises the construction across random codes, while the
+fixed specification oracle breaks algorithmic coupling on the canonical fixture.
+
+
+## Quotient-metric closure
+
+The fixed specification is now used to verify more than the scalar leader profile.
+All 64 syndrome classes are materialized as their four-element ambient fibers, and
+for every ordered pair of syndrome classes the minimum Hamming distance between
+their ambient fibers is compared with the leader weight of the XOR difference of
+the two syndromes.
+
+This closes the induced quotient metric directly:
+
+`d_bar(s,t) = min { wt(x+y) : Hx^T=s, Hy^T=t } = leader(s xor t)`.
+
+The test exhausts all 4,096 syndrome pairs (16 ambient word pairs per class pair)
+and then checks the triangle inequality over all 64^3 ordered triples. It also
+records the covering-radius ceiling of 4.
+
+Unlike nearest-codeword comparison, this check never enumerates codewords at all.
+It reasons only over the independently specified syndrome partition and ambient
+Hamming distance. This makes it a geometry-level invariant rather than another
+decoder-vs-oracle equality check.
+
+
+## Full coset-pair distance-spectrum closure
+
+The quotient-metric test can be strengthened without moving back to codeword
+enumeration. For every ordered pair of the 64 syndrome fibers, the qualification
+now compares the complete multiset of all 16 ambient Hamming distances between
+their four representatives.
+
+For fibers \\(F_s\\) and \\(F_t\\), let \\(\\Delta=s\\oplus t\\). Because these are additive
+cosets, every difference \\(x\\oplus y\\) with \\(x\\in F_s\\) and \\(y\\in F_t\\) lies in
+\\(F_\\Delta\\), and each element of \\(F_\\Delta\\) occurs exactly \\(|C|=4\\) times among
+the 16 ordered pairs. Therefore the complete distance spectrum between \\(F_s\\)
+and \\(F_t\\) must equal the Hamming-weight spectrum of \\(F_{s\\oplus t}\\), with every
+multiplicity multiplied by four.
+
+The finite qualification exhausts all 4,096 ordered syndrome-fiber pairs and all
+65,536 underlying ambient word pairs. It requires the complete spectrum to agree,
+not merely its minimum. This establishes translation invariance of the quotient
+distance distribution across the entire fixed Boolean fixture while remaining
+independent of the decoder and independent of codeword enumeration.
+
+The emitted ledger is
+`SYNDROME_QUOTIENT_SPECTRUM`. It is a geometry witness only: it does not establish
+an efficient decoder, a random-code asymptotic, or any production performance
+property.
+
+## Beyond-radius semantics
+
+A separate fixture tests corruption beyond the unique-decoding radius without asking the decoder to recover an arbitrarily designated clean target.
+
+For the [8,2,4] fixture, all 56 weight-3 corruptions around one clean codeword are classified against the exhaustive nearest-codeword oracle. With decoder bound 2:
+
+- 8 observations have a unique nearest codeword at distance 1; the bounded decoder therefore returns that other codeword.
+- 48 observations have nearest-codeword distance 3, so the bounded decoder correctly returns NoMatchWithinBound.
+- no result is credited as intended-target recovery merely because the decoder returns some codeword.
+
+This is an important evidence boundary: bounded-distance decoding identifies a nearest codeword within its declared radius; it does not establish recovery of the original semantic factor tuple once the channel exceeds the code's unique-decoding guarantee.
+
+The factorization layer remains separate. Even a unique codeword result can still carry an affine factorization fiber of cardinality 2^d, and the decoder does not inspect that fiber when making its codeword-level decision.
+
+
+## Generator-basis presentation invariance
+
+Coordinate relabeling tests establish equivariance under an ambient Hamming-space
+permutation. A separate metamorphic boundary now changes the presentation of the
+same linear code instead: the eight-generator basis is reversed and each generator
+is sheared with its adjacent predecessor by XOR. This transformation is invertible,
+so it changes the basis presentation without changing the represented subspace.
+
+The qualification reconstructs both codes from their respective bases and requires:
+
+- exact equality of the complete represented codeword set;
+- identical canonical parity-check rows, columns, and fingerprint;
+- identical bounded-decoder scalar/list outcomes on 64 deterministic 73-bit probes;
+- exact equality of all four decoder work counters.
+
+The witness is intentionally metamorphic rather than an independent oracle: its
+purpose is to catch hidden dependence on generator ordering or basis presentation
+inside the parity-check/decoder pipeline, which is a different failure mode from
+coordinate-indexing errors.
+
+The emitted ledger is `GENERATOR_BASIS_EQUIVARIANCE`, and the workflow promotes it
+to a required gate in receipt schema v18.
+
+## Composed metamorphic invariance
+
+Single-axis metamorphic relations can miss interaction faults. The qualification suite
+therefore composes the generator-basis transformation with the 73-coordinate Hamming
+permutation used by the packed-word witness.
+
+The composed representation must produce exactly the same codeword set and canonical
+parity-check representation as applying the coordinate permutation to the original basis.
+On 64 deterministic observations, the bounded list outcome and all four decoder work
+counters must also be identical.
+
+The emitted ledger is `COMPOSED_METAMORPHIC_EQUIVARIANCE`. This is deliberately an
+interaction witness: it tests that basis presentation and coordinate representation do
+not introduce a hidden cross-term in parity-check construction or bounded decoding.
+
+## Artifact provenance revalidation
+
+Receipt provenance is now checked in both directions: before receipt emission, the live
+Actions run is bound to repository, event, head, pull-request identity, workflow identity,
+and the exact workflow-file bytes; after upload, the artifact is independently re-fetched
+through the GitHub API and required to match the current run, exact head, repository identity,
+artifact name, and a non-empty GitHub artifact digest.
+
+The artifact name includes the exact research head, workflow run ID, and run attempt, so
+two executions of the same source head cannot collapse to an indistinguishable evidence name.
+
+## Runner credential boundary
+
+The checkout now uses `persist-credentials: false`. The qualification step that needs to
+fetch the pinned public recovery parent supplies its short-lived GitHub token only to that
+inline verification step, rather than leaving credentials in the repository's local Git
+configuration available to subsequent test/build commands.
+## 2026 coding-theory context
+
+Recent results sharpen, rather than collapse, this distinction. Silas determines the sharp typical worst-case list-size behavior of random linear codes at capacity for every finite field, while Yuan and Zhu obtain asymptotically optimal list-size scaling for fixed finite fields. These are asymptotic list-decoding results and do not certify the finite Boolean fixtures used here.
+
+Deng and Raviv explicitly frame noisy VSA recovery as a separate difficulty for random-linear-code representations and use a Reed--Solomon/Hadamard representation with histogram-recovery algorithms. That remains a distinct future representation family rather than an implementation detail of this bounded Boolean decoder.
+
+References:
+
+- Silas (2026), The list size of random linear codes at capacity: https://arxiv.org/abs/2609.06570
+- Yuan & Zhu (2026), Asymptotically Optimal List Size of Random Linear Codes: https://arxiv.org/abs/2609.01070
+- Deng & Raviv (2025/ISIT 2026), Efficient Vector Symbolic Architectures from Histogram Recovery: https://arxiv.org/abs/2511.01838
