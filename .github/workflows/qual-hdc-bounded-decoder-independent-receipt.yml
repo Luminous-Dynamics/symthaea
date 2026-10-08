@@ -565,7 +565,7 @@ jobs:
               new Set(requiredSteps).size === requiredSteps.length &&
               requiredSteps.every((name) => typeof name === 'string' && name.length > 0);
             const adversarialCorpusShapeValid =
-              attackCases.length >= 55 &&
+              attackCases.length === 63 &&
               new Set(attackCases.map(([name]) => name)).size === attackCases.length &&
               attackCases.every(
                 ([name, mutate]) =>
@@ -909,7 +909,7 @@ jobs:
 
             const outputPath = path.join(
               process.env.RUNNER_TEMP,
-              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V3.json'
+              'HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V6.json'
             );
             fs.writeFileSync(outputPath, JSON.stringify(receipt, null, 2) + '\n');
             core.info('Independent verifier adversarial corpus: ' + (adversarialCorpusPassed ? 'PASS' : 'NOT_PASS'));
@@ -923,6 +923,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hdc-linear-code-bounded-decoder-independent-run-receipt
-          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V3.json
+          path: ${{ runner.temp }}/HDC_LINEAR_CODE_BOUNDED_DECODER_INDEPENDENT_RUN_RECEIPT_V6.json
           if-no-files-found: error
           retention-days: 90
