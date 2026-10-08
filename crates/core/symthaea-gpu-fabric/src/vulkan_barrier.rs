@@ -89,7 +89,7 @@ pub enum VulkanBarrierError {
     Receipt(VulkanBarrierReceiptError),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum VulkanBarrierReceiptError {
     #[error("unsupported receipt version {0}")]
     Version(u16),
