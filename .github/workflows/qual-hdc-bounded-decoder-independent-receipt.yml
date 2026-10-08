@@ -1416,6 +1416,8 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # pinned
         env:
           EXPECTED_SUBJECT: "433ca9c92b16bfac824225950e32692e8e151238"
+          EXPECTED_PR: "6803"
+          EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
           STATUS_CONTEXT: "HDC / Independent Qualification"
           VERIFIER_OUTCOME: ${{ steps.verify.outcome }}
           UPLOAD_OUTCOME: ${{ steps.upload_receipt.outcome }}
@@ -1439,6 +1441,21 @@ jobs:
             const uploadSucceeded = process.env.UPLOAD_OUTCOME === 'success';
             const verifierSucceeded = process.env.VERIFIER_OUTCOME === 'success';
 
+            function artifactLifecycleVerified(artifact, nowMs = Date.now()) {
+              if (!artifact || !Number.isSafeInteger(artifact.id) || artifact.id <= 0) return false;
+              if (
+                typeof artifact.created_at !== 'string' ||
+                typeof artifact.expires_at !== 'string' ||
+                !Number.isSafeInteger(artifact.size_in_bytes) ||
+                artifact.size_in_bytes <= 0
+              ) return false;
+              const createdAt = Date.parse(artifact.created_at);
+              const expiresAt = Date.parse(artifact.expires_at);
+              return Number.isFinite(createdAt) &&
+                Number.isFinite(expiresAt) &&
+                createdAt <= nowMs &&
+                nowMs < expiresAt;
+            }
             function canonicalize(value) {
               if (Array.isArray(value)) return value.map(canonicalize);
               if (value && typeof value === 'object') {
@@ -1495,13 +1512,13 @@ jobs:
             const currentPr = (await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: 6803,
+              pull_number: Number(process.env.EXPECTED_PR),
             })).data;
 
             const currentBaseRef = (await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: 'heads/research/hdc-linear-code-recovery-design-v1',
+              ref: 'heads/' + process.env.EXPECTED_BASE_BRANCH,
             })).data;
             const currentBaseSha = String(currentBaseRef.object?.sha ?? '');
 
