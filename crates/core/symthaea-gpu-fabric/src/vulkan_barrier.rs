@@ -21,6 +21,14 @@ const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
 const RECEIPT_VERSION: u16 = 3;
 
+#[cfg(test)]
+fn qualification_stage(label: &str) {
+    eprintln!("qualification_stage={label}");
+}
+
+#[cfg(not(test))]
+fn qualification_stage(_label: &str) {}
+
 const WGSL: &str = r#"
 @group(0) @binding(0)
 var<storage, read> lhs: array<u32>;
@@ -276,6 +284,7 @@ pub struct VulkanBarrierWorkloadRuntime {
 impl VulkanBarrierWorkloadRuntime {
     pub fn new() -> Result<Self, VulkanBarrierError> {
         let entry = unsafe { Entry::load() }.map_err(|e| VulkanBarrierError::Loader(e.to_string()))?;
+        qualification_stage("entry_loaded");
         let loader_version = unsafe { entry.try_enumerate_instance_version() }
             .map_err(VulkanBarrierError::Vk)?.unwrap_or(vk::API_VERSION_1_0);
         if loader_version < VULKAN_API_VERSION { return Err(VulkanBarrierError::NoQualifiedDevice); }
@@ -288,6 +297,7 @@ impl VulkanBarrierWorkloadRuntime {
             .api_version(VULKAN_API_VERSION);
         let instance_info = vk::InstanceCreateInfo::default().application_info(&app_info);
         let instance = unsafe { entry.create_instance(&instance_info, None).map_err(VulkanBarrierError::Vk)? };
+        qualification_stage("instance_created");
 
         let physical_devices = match unsafe { instance.enumerate_physical_devices() } {
             Ok(devices) => devices,
@@ -324,6 +334,10 @@ impl VulkanBarrierWorkloadRuntime {
         };
         let props = unsafe { instance.get_physical_device_properties(physical) };
         let memory_properties = unsafe { instance.get_physical_device_memory_properties(physical) };
+        qualification_stage(&format!("device_selected_api={}.{}.{} queue_family={family}",
+            vk::api_version_major(props.api_version),
+            vk::api_version_minor(props.api_version),
+            vk::api_version_patch(props.api_version)));
 
         let priorities = [1.0_f32];
         let queue_info = vk::DeviceQueueCreateInfo::default().queue_family_index(family).queue_priorities(&priorities);
@@ -340,6 +354,7 @@ impl VulkanBarrierWorkloadRuntime {
             })?
         };
         let queue = unsafe { device.get_device_queue(family, 0) };
+        qualification_stage("device_created");
 
         let spirv = compile_spirv().map_err(|error| {
             unsafe {
@@ -348,6 +363,7 @@ impl VulkanBarrierWorkloadRuntime {
             }
             error
         })?;
+        qualification_stage("shader_spirv_compiled");
         let shader = match create_shader_module(&device, &spirv) {
             Ok(shader) => shader,
             Err(error) => {
@@ -358,6 +374,7 @@ impl VulkanBarrierWorkloadRuntime {
                 return Err(error);
             }
         };
+        qualification_stage("shader_module_created");
         let bindings = [
             vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
             vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
@@ -377,6 +394,7 @@ impl VulkanBarrierWorkloadRuntime {
                 return Err(VulkanBarrierError::Vk(error));
             }
         };
+        qualification_stage("descriptor_layout_created");
         let pipeline_layout_info = vk::PipelineLayoutCreateInfo::default().set_layouts(std::slice::from_ref(&descriptor_layout));
         let pipeline_layout = match unsafe {
             device.create_pipeline_layout(&pipeline_layout_info, None)
@@ -392,6 +410,7 @@ impl VulkanBarrierWorkloadRuntime {
                 return Err(VulkanBarrierError::Vk(error));
             }
         };
+        qualification_stage("pipeline_layout_created");
         let entry_point = CString::new("main").unwrap();
         let stage = vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::COMPUTE).module(shader).name(&entry_point);
         let pipeline_info = vk::ComputePipelineCreateInfo::default().stage(stage).layout(pipeline_layout);
@@ -425,6 +444,7 @@ impl VulkanBarrierWorkloadRuntime {
                 }
             }
         };
+        qualification_stage("compute_pipeline_created");
         let command_pool_info = vk::CommandPoolCreateInfo::default().queue_family_index(family);
         let command_pool = match unsafe { device.create_command_pool(&command_pool_info, None) } {
             Ok(pool) => pool,
@@ -440,6 +460,7 @@ impl VulkanBarrierWorkloadRuntime {
                 return Err(VulkanBarrierError::Vk(error));
             }
         };
+        qualification_stage("command_pool_created");
         let pool_size = vk::DescriptorPoolSize::default()
             .ty(vk::DescriptorType::STORAGE_BUFFER)
             .descriptor_count((MAX_WORKLOAD_NODES * 3) as u32);
@@ -463,6 +484,7 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
 
+        qualification_stage("descriptor_pool_created");
         Ok(Self {
             instance, device, queue, command_pool, descriptor_layout, descriptor_pool,
             pipeline_layout, pipeline, shader, memory_properties,
@@ -480,6 +502,7 @@ impl VulkanBarrierWorkloadRuntime {
         plan: &VulkanSyncPlan,
         initial: &BTreeMap<ResourceId, BinaryHypervector>,
     ) -> Result<(BTreeMap<ResourceId, BinaryHypervector>, VulkanBarrierExecutionReceipt), VulkanBarrierError> {
+        qualification_stage("execute_begin");
         schedule.verify_against(graph).map_err(VulkanBarrierError::Schedule)?;
         plan.verify_against_schedule(schedule).map_err(VulkanBarrierError::SyncPlan)?;
         if schedule.nodes.is_empty() { return Err(VulkanBarrierError::EmptyWorkload); }
@@ -495,6 +518,7 @@ impl VulkanBarrierWorkloadRuntime {
             buffers.insert(resource.clone(), WorkloadBuffer::new(&self.device, &self.memory_properties, physical)?);
         }
         for (resource, value) in initial { buffers[resource].write(&self.device, value.as_bytes())?; }
+        qualification_stage("inputs_uploaded");
 
         let command_info = vk::CommandBufferAllocateInfo::default()
             .command_pool(self.command_pool)
@@ -513,6 +537,7 @@ impl VulkanBarrierWorkloadRuntime {
             self.command_pool,
             command,
         );
+        qualification_stage("command_buffer_allocated");
 
         let begin = vk::CommandBufferBeginInfo::default()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
@@ -521,6 +546,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .begin_command_buffer(command_guard.command(), &begin)
                 .map_err(VulkanBarrierError::Vk)?;
         }
+        qualification_stage("command_buffer_begun");
 
         let mut set_guard =
             DescriptorSetGuard::new(self.device.clone(), self.descriptor_pool);
@@ -564,6 +590,7 @@ impl VulkanBarrierWorkloadRuntime {
 
             let groups = dispatch_group_count(range, self.max_compute_workgroup_count_x)
                 .ok_or_else(|| VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone()))?;
+            qualification_stage(&format!("node_{}_dispatch_begin", node.id));
             unsafe {
                 self.device.cmd_bind_pipeline(
                     command_guard.command(),
@@ -581,15 +608,18 @@ impl VulkanBarrierWorkloadRuntime {
                 self.device
                     .cmd_dispatch(command_guard.command(), groups.max(1), 1, 1);
             }
+            qualification_stage(&format!("node_{}_dispatch_recorded", node.id));
         }
 
         record_host_readback_barrier(&self.device, command_guard.command());
+        qualification_stage("host_readback_barrier_recorded");
 
         unsafe {
             self.device
                 .end_command_buffer(command_guard.command())
                 .map_err(VulkanBarrierError::Vk)?;
         }
+        qualification_stage("command_buffer_ended");
         let completion_expected = expected_final_timeline_value(plan);
 
         let mut timeline_info = vk::SemaphoreTypeCreateInfo::default()
@@ -602,6 +632,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .map_err(VulkanBarrierError::TimelineSemaphoreCreate)?
         };
         let mut semaphore_guard = TimelineSemaphoreGuard::new(self.device.clone(), semaphore);
+        qualification_stage("timeline_semaphore_created");
 
         let command_buffer_info = vk::CommandBufferSubmitInfo::default()
             .command_buffer(command_guard.command())
@@ -620,6 +651,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .queue_submit2(self.queue, std::slice::from_ref(&submit), vk::Fence::null())
                 .map_err(VulkanBarrierError::TimelineSubmit)?;
         }
+        qualification_stage(&format!("queue_submitted_expected={completion_expected}"));
         semaphore_guard.mark_submitted();
 
         let wait_info = vk::SemaphoreWaitInfo::default()
@@ -630,6 +662,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .wait_semaphores(&wait_info, VULKAN_TIMELINE_TIMEOUT_NS)
                 .map_err(VulkanBarrierError::TimelineWait)?;
         }
+        qualification_stage("timeline_wait_completed");
         semaphore_guard.mark_completed();
 
         let completion_observed = unsafe {
@@ -637,6 +670,7 @@ impl VulkanBarrierWorkloadRuntime {
                 .get_semaphore_counter_value(semaphore)
                 .map_err(VulkanBarrierError::TimelineCounter)?
         };
+        qualification_stage(&format!("timeline_counter_observed={completion_observed}"));
         if completion_observed != completion_expected {
             return Err(VulkanBarrierError::TimelineCompletionNotReached {
                 expected: completion_expected,
@@ -646,6 +680,7 @@ impl VulkanBarrierWorkloadRuntime {
 
         let mut observed = BTreeMap::new();
         for (resource, value) in initial {
+            qualification_stage(&format!("readback_begin_resource={}", resource.as_str()));
             let bytes = buffers[resource].read(&self.device, value.as_bytes().len())?;
             observed.insert(resource.clone(), BinaryHypervector::from_bytes(value.dimensions, bytes)
                 .map_err(|_| VulkanBarrierError::OracleMismatch(resource.clone()))?);
@@ -653,6 +688,7 @@ impl VulkanBarrierWorkloadRuntime {
         for (resource, expected_value) in &expected {
             if observed.get(resource) != Some(expected_value) { return Err(VulkanBarrierError::OracleMismatch(resource.clone())); }
         }
+        qualification_stage("oracle_matched");
         let mut digests = BTreeMap::new();
         let mut storage_sizes = BTreeMap::new();
         for (resource, value) in &observed {
@@ -687,6 +723,7 @@ impl VulkanBarrierWorkloadRuntime {
             queue_family_index: self.queue_family_index,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
+        qualification_stage("receipt_verified");
         receipt
             .verify_runtime_binding(self.physical_device_api_version, self.queue_family_index)
             .map_err(VulkanBarrierError::Receipt)?;
