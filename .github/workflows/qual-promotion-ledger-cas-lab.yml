@@ -373,6 +373,9 @@ jobs:
             echo "- late_stale_http: \`${stale_after_invalidation_status}\`"
             echo "- rollback_http: \`${rollback_status}\`"
             echo "- malformed_transition_rejected: \`true\`"
+            echo "- force_reset_http: \`${force_reset_status}\`"
+            echo "- post_force_resurrection_http: \`${force_resurrection_status}\`"
+            echo "- force_writer_aba_escape_observed: \`true\`"
             echo "- winner_sha: \`${WINNER_SHA}\`"
             echo "- stale_candidate_sha: \`${STALE_SHA}\`"
             echo "- invalidation_sha: \`${INVALIDATION_SHA}\`"
@@ -382,12 +385,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # A successful lab requires proven cleanup, not merely an attempted DELETE.
-          if ! delete_ref_if_owned "${ref_path}" "${BASE_SHA}" "${WINNER_SHA}" "${STALE_SHA}" "${INVALIDATION_SHA}" || ! delete_ref_if_owned "${race_ref_path}" "${BASE_SHA}" "${RACE_LEFT_SHA}" "${RACE_RIGHT_SHA}"; then
+          if ! delete_ref_if_owned "${ref_path}" "${BASE_SHA}" "${WINNER_SHA}" "${STALE_SHA}" "${INVALIDATION_SHA}" "${malformed_transition_sha}" || ! delete_ref_if_owned "${race_ref_path}" "${BASE_SHA}" "${RACE_LEFT_SHA}" "${RACE_RIGHT_SHA}" || ! delete_ref_if_owned "${force_ref_path}" "${BASE_SHA}" "${FORCE_INTERMEDIATE_SHA}" "${FORCE_RESURRECTION_SHA}"; then
             echo "temporary promotion-ledger lab ref cleanup failed" >&2
             exit 1
           fi
 
-          for candidate_ref in "${ref_path}" "${race_ref_path}"; do
+          for candidate_ref in "${ref_path}" "${race_ref_path}" "${force_ref_path}"; do
             delete_status="$(curl -sS -o /dev/null -w '%{http_code}' \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
