@@ -10,10 +10,7 @@
     {
       "id": "PC-001",
       "name": "marketplace deletion without seller payment",
-      "opening_balances": {
-        "buyer": 100,
-        "seller": 0
-      },
+      "opening_balances": {},
       "events": [
         {
           "type": "PersonalCreditIssuedForExistence",
