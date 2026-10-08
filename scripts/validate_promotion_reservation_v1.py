@@ -1552,6 +1552,7 @@ def effect_state_fixture(
     return PromotionPrEffectStateV1(
         repository=identity.repository,
         expected_entry=entry,
+        operation_identity_digest=identity.digest(),
     )
 
 
