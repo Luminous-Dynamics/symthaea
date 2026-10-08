@@ -228,9 +228,9 @@ The qualification workflow does not treat the event payload alone as sufficient 
 binds the current repository, triggering repository, and head repository by numeric repository ID,
 then re-fetches the live Actions run and requires its repository ID, exact workflow identity, head
 ref, and event type to agree with the triggering event. For a pull-request run, GitHub's Actions run
-`head_sha` is the synthetic merge-ref SHA rather than the PR-head commit; the qualification therefore
-binds that run SHA to the event's synthetic merge SHA while independently binding the PR-head SHA to
-the checkout and PR association. The receipt records these validated values in schema v22. Its local status
+`head_sha` is the PR-head commit, while the pull-request execution context's `GITHUB_SHA` is the
+synthetic merge-ref SHA. The qualification therefore binds the run to the exact PR-head subject and
+records the synthetic merge SHA separately as execution-context provenance. The receipt records these validated values in schema v22. Its local status
 field is explicitly pre-artifact; final qualification remains contingent on successful artifact revalidation
 and the completed hosted run.
 
