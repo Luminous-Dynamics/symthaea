@@ -179,8 +179,12 @@ pub mod steering;
 pub mod stewardship_governance;
 #[cfg(feature = "theory")]
 pub mod stewardship_release;
+#[cfg(feature = "theory")]
+pub mod symbolic_import;
 pub mod stream;
 pub mod streaming;
+#[cfg(feature = "theory")]
+pub mod teaching_corpus;
 #[cfg(feature = "theory")]
 pub mod structural_evidence;
 pub mod structure;
