@@ -14,7 +14,7 @@ Near-term profile:
 - Existing RFC 9942 ES256 receipt remains independently valid and independently qualified.
 - The hybrid layer is a second assurance result; it does not change the meaning of the RFC 9942 VDS proof or make a selection decision into cryptographic proof.
 
-This is intentionally an application-level dual-signature profile rather than the still-evolving JOSE/COSE composite-signature profile.
+This is intentionally an application-level PQ-bound attestation profile rather than the still-evolving JOSE/COSE composite-signature profile.
 
 ## Why now
 
@@ -98,7 +98,7 @@ Do **not** reuse an existing standalone ML-DSA key as a component of a future st
 
 The current IETF composite work explicitly requires both component keys to be freshly generated for the composite and prohibits reuse of component key material in standalone or other composite contexts.
 
-For the interim application-level dual-signature profile, key identities must remain independently addressable:
+For the interim application-level PQ-bound attestation profile, key identities must remain independently addressable:
 
 - classical_key_id
 - pq_key_id
@@ -170,7 +170,7 @@ A hybrid capability must never expose an API that implies "true" merely because 
 
 Receipt selection remains downstream:
 
-wire → verify-classical → verify-PQ attestation over exact Receipt + classical capability → form-hybrid-capability → (not yet implemented: hybrid-required selection admission) → durable projection
+wire → verify-classical → verify PQ attestation over exact Receipt + classical capability → form-hybrid-capability → hybrid-required admission gate → schema-v2 durable projection
 
 The existing ReceiptSelectionDecision remains audit/evaluator evidence only.
 
@@ -273,7 +273,7 @@ Instead:
 2. validate the final key serialization;
 3. verify both components;
 4. run a new interop corpus;
-5. compare capability semantics between the application-level dual-signature profile and the standardized composite profile;
+5. compare capability semantics between the application-level PQ-bound attestation profile and the standardized composite profile;
 6. keep explicit versioned policy IDs so old receipts remain interpretable.
 
 ## Security posture
