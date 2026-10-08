@@ -41,7 +41,7 @@ The final class requires explicit CAS evidence; it is not a Boolean switch.
 
 observed-not-cas is the normal conservative class when the provider exposes stack state but does not expose an independent conditional topology fence.
 
-provider-topology-cas is now evidence-gated in the synthetic model. A matching observation alone remains observed-not-cas; the stronger class requires a typed ProviderTopologyCasEvidenceV1 witness bound to the exact reserved operation digest, the exact pre-submit observation digest, and the pre-submit observation sequence. This witness is still only synthetic evidence in the reference model; it must not be represented as GitHub capability unless an independent provider surface actually supplies the corresponding conditional predicate.
+provider-topology-cas is now evidence-gated in the synthetic model. A matching observation alone remains observed-not-cas; the stronger class requires a typed ProviderTopologyCasEvidenceV1 witness bound to the exact reserved operation digest, the exact pre-submit observation digest, and the pre-submit observation sequence. The complete provider observation is content-addressed, so the witness binds the whole observed payload rather than a hand-picked subset. The executable oracle includes negative controls for an unbound witness and sequence-mismatched witness. This witness is still only synthetic evidence in the reference model; it must not be represented as GitHub capability unless an independent provider surface actually supplies the corresponding conditional predicate.
 
 ## GitHub interpretation
 
