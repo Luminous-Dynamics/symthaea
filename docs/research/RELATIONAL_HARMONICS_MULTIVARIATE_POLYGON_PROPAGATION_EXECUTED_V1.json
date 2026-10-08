@@ -1,0 +1,28 @@
+{
+  "schema": "rh006-multivariate-polygon-propagation/v1",
+  "status": "research-diagnostic-only",
+  "execution": {
+    "date": "2026-10-08",
+    "seed": 20261008,
+    "trials": 250,
+    "random_convex_combinations_per_trial": 4096,
+    "script_sha256": "96836bd66d993b2a10d52837b045594756752836cc98d200093ea75901cc27b0",
+    "observed_containment_violations": 0,
+    "canonical_image": [
+      -0.75,
+      0.25
+    ],
+    "local_rust_compile": "not-available"
+  },
+  "analytic_method": {
+    "object": "closed convex 2-D polygon",
+    "extrema": "vertices + edge stationary points + admissible interior stationary point",
+    "sampling_role": "falsification-only"
+  },
+  "claim_boundary": {
+    "polygon_is_sharp_identified_set": false,
+    "formal_inference": false,
+    "grid_or_sampling_defines_image": false
+  },
+  "payload_sha256": "ae2c4782faa30692c05435f363edd460063ad54b46801641ab2e8d1f53b83d74"
+}

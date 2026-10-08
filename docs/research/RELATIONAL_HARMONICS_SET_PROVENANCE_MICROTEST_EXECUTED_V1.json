@@ -1,0 +1,21 @@
+{
+  "schema": "rh006-set-provenance-microtest/v1",
+  "status": "research-diagnostic-only",
+  "execution": {
+    "date": "2026-10-08",
+    "script_sha256": "60ddf776eb1e38380520f9753372b6d604ed10fcd189d6019fc2c5bf0e9a15d6",
+    "local_python": "3.13.5"
+  },
+  "assertions": {
+    "sensitivity_sharp_is_identified": false,
+    "observed_outer_stable": true,
+    "observed_inner_unstable": true,
+    "witness_neither": true
+  },
+  "claim_boundary": {
+    "formal_inference": false,
+    "p_value": false,
+    "confidence_interval": false
+  },
+  "payload_sha256": "9b3ca705055d0df49f024799d9155779d057f501b0f8fb44b5a5b49906083928"
+}
