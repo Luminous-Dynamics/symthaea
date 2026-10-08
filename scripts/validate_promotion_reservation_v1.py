@@ -915,6 +915,79 @@ class ClockRelationV1:
 
 
 @dataclass(frozen=True)
+class PromotionTemporalAttemptIdentityV1:
+    operation_identity_digest: str
+    reservation_id: str
+    promotion_operation_id: str
+    reservation_head: str
+    dispatch_attempt_id: str
+    fencing_token: int
+    trust_root_generation: int
+    governance_generation: int
+    local_monotonic_clock_id: str
+    reservation_time_ms: int | None
+    dispatch_time_ms: int | None
+    reservation_monotonic_ns: int | None
+    dispatch_monotonic_ns: int | None
+
+    def structurally_valid(self) -> bool:
+        return (
+            bool(self.operation_identity_digest)
+            and bool(self.reservation_id)
+            and bool(self.promotion_operation_id)
+            and bool(self.reservation_head)
+            and bool(self.dispatch_attempt_id)
+            and self.fencing_token > 0
+            and self.trust_root_generation >= 0
+            and self.governance_generation >= 0
+            and bool(self.local_monotonic_clock_id)
+        )
+
+    def identity_digest(self) -> str:
+        payload = {
+            "dispatch_attempt_id": self.dispatch_attempt_id,
+            "dispatch_monotonic_ns": self.dispatch_monotonic_ns,
+            "dispatch_time_ms": self.dispatch_time_ms,
+            "fencing_token": self.fencing_token,
+            "governance_generation": self.governance_generation,
+            "local_monotonic_clock_id": self.local_monotonic_clock_id,
+            "operation_identity_digest": self.operation_identity_digest,
+            "promotion_operation_id": self.promotion_operation_id,
+            "reservation_head": self.reservation_head,
+            "reservation_id": self.reservation_id,
+            "reservation_monotonic_ns": self.reservation_monotonic_ns,
+            "reservation_time_ms": self.reservation_time_ms,
+            "trust_root_generation": self.trust_root_generation,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def validates_operation(self, identity: PromotionOperationIdentityV1) -> bool:
+        return (
+            self.structurally_valid()
+            and self.operation_identity_digest == identity.digest()
+            and self.trust_root_generation == identity.trust_root_generation
+            and self.governance_generation == identity.governance_generation
+        )
+
+    def matches_timing(self, timing: "ProviderWebhookEffectTimingV1") -> bool:
+        return (
+            self.structurally_valid()
+            and self.local_monotonic_clock_id == timing.local_monotonic_clock_id
+            and self.reservation_time_ms == timing.local_reservation_time_ms
+            and self.dispatch_time_ms == timing.local_dispatch_time_ms
+            and self.reservation_monotonic_ns == timing.local_reservation_monotonic_ns
+            and self.dispatch_monotonic_ns == timing.local_dispatch_monotonic_ns
+        )
+
+
+@dataclass(frozen=True)
 class ProviderWebhookEffectTimingV1:
     provider_event_time_ms: int | None
     provider_event_time_upper_ms: int | None
@@ -928,6 +1001,7 @@ class ProviderWebhookEffectTimingV1:
     local_dispatch_monotonic_ns: int | None
     local_observation_monotonic_ns: int | None
     local_monotonic_clock_id: str | None
+    temporal_attempt_identity: PromotionTemporalAttemptIdentityV1 | None
     clock_relation: ClockRelationV1 | None
 
     @classmethod
@@ -942,6 +1016,7 @@ class ProviderWebhookEffectTimingV1:
         local_reservation_monotonic_ns: int | None = None,
         local_dispatch_monotonic_ns: int | None = None,
         local_monotonic_clock_id: str | None = None,
+        temporal_attempt_identity: PromotionTemporalAttemptIdentityV1 | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
         interval = (
             parse_provider_timestamp_interval_ms(
@@ -979,6 +1054,7 @@ class ProviderWebhookEffectTimingV1:
                 if local_monotonic_clock_id is not None
                 else observation.local_monotonic_clock_id
             ),
+            temporal_attempt_identity=temporal_attempt_identity,
             clock_relation=clock_relation,
         )
 
@@ -1020,6 +1096,10 @@ class ProviderWebhookEffectTimingV1:
             return "local-observation-time-missing"
         if not self.local_monotonic_clock_id:
             return "local-monotonic-clock-identity-missing"
+        if self.temporal_attempt_identity is None:
+            return "promotion-temporal-attempt-identity-missing"
+        if not self.temporal_attempt_identity.matches_timing(self):
+            return "promotion-temporal-attempt-binding-invalid"
         if self.local_reservation_monotonic_ns is None:
             return "local-reservation-monotonic-time-missing"
         if self.local_dispatch_monotonic_ns is None:
@@ -1080,6 +1160,11 @@ class ProviderWebhookEffectTimingV1:
             "local_observation_monotonic_ns": self.local_observation_monotonic_ns,
             "local_observation_time_ms": self.local_observation_time_ms,
             "local_monotonic_clock_id": self.local_monotonic_clock_id,
+            "promotion_temporal_attempt_identity_digest": (
+                self.temporal_attempt_identity.identity_digest()
+                if self.temporal_attempt_identity is not None
+                else None
+            ),
             "local_reservation_monotonic_ns": self.local_reservation_monotonic_ns,
             "local_reservation_time_ms": self.local_reservation_time_ms,
             "provider_delivery_time_ms": self.provider_delivery_time_ms,
@@ -1113,6 +1198,7 @@ class PromotionStackEffectTimingSetV1:
     operation_identity_digest: str
     timestamp_policy_identity_digest: str
     clock_relation_identity_digest: str
+    temporal_attempt_identity_digest: str
     timings: tuple[PromotionStackEffectTimingV1, ...]
 
     def validates_complete(
@@ -1125,6 +1211,8 @@ class PromotionStackEffectTimingSetV1:
         if not self.timestamp_policy_identity_digest:
             return False
         if not self.clock_relation_identity_digest:
+            return False
+        if not self.temporal_attempt_identity_digest:
             return False
         if effect_evidence is None or not effect_evidence.validates_complete(identity):
             return False
@@ -1145,6 +1233,11 @@ class PromotionStackEffectTimingSetV1:
             and item.timing.clock_relation is not None
             and item.timing.clock_relation.identity_digest()
             == self.clock_relation_identity_digest
+            and item.timing.temporal_attempt_identity is not None
+            and item.timing.temporal_attempt_identity.identity_digest()
+            == self.temporal_attempt_identity_digest
+            and item.timing.temporal_attempt_identity.validates_operation(identity)
+            and item.timing.temporal_attempt_identity.matches_timing(item.timing)
             and item.timing.temporally_admissible()
             for entry, item, evidence in zip(
                 expected,
