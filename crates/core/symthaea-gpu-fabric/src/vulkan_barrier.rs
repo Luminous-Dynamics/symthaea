@@ -26,6 +26,7 @@ const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
 const VULKAN_SHADER_STAGE: &str = "compute";
+const DRIVER_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-driver.v1";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -1238,7 +1239,8 @@ fn driver_identity_digest(
     driver_info: &[u8],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea.gpu-fabric.vulkan-driver.v1\0");
+    hasher.update(DRIVER_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
     sha256_len_prefixed_update(&mut hasher, &driver_uuid);
     hasher.update(&driver_id.to_le_bytes());
     sha256_len_prefixed_update(&mut hasher, driver_name);
@@ -2524,6 +2526,12 @@ mod tests {
         println!("physical_device_type={}", runtime.physical_device_type);
         println!("physical_device_driver_version={}", runtime.physical_device_driver_version);
         println!("physical_device_name_hex={}", runtime.physical_device_name_hex);
+        println!("driver_identity_version=1");
+        println!("driver_identity_sha256={}", receipt.driver_identity_digest);
+        println!("driver_uuid={}", hex_bytes(&receipt.driver_uuid));
+        println!("driver_id={}", receipt.driver_id);
+        println!("driver_name_hex={}", runtime.driver_name_hex);
+        println!("driver_info_hex={}", runtime.driver_info_hex);
         for (resource, value) in initial {
             println!("resource_initial_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
