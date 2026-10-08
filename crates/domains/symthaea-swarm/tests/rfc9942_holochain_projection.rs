@@ -438,6 +438,45 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
 
 #[cfg(feature = "semantic-receipts")]
 #[test]
+fn equivalent_receipt_outer_framings_are_semantically_equal() {
+    let rng = SystemRandom::new();
+    let receipt_signer = signing_key(&rng);
+
+    let constructed = signed_inclusion_receipt(
+        &[b"candidate".to_vec(), b"other".to_vec()],
+        &receipt_signer,
+        &rng,
+    );
+    let canonical_wire = constructed.to_cbor();
+    assert_eq!(canonical_wire.first(), Some(&0xd2));
+    assert_eq!(canonical_wire.get(1), Some(&0x84));
+
+    let canonical =
+        Rfc9942ReceiptEnvelope::from_cbor(&canonical_wire).expect("canonical receipt");
+
+    let mut indefinite_wire = Vec::with_capacity(canonical_wire.len() + 1);
+    indefinite_wire.extend_from_slice(&canonical_wire[..1]);
+    indefinite_wire.push(0x9f);
+    indefinite_wire.extend_from_slice(&canonical_wire[2..]);
+    indefinite_wire.push(0xff);
+
+    let indefinite =
+        Rfc9942ReceiptEnvelope::from_cbor(&indefinite_wire).expect("indefinite receipt");
+
+    // Top-level COSE_Sign1 array framing is not part of Sig_structure. The
+    // semantic Receipt object therefore compares equal even though exact source
+    // bytes remain separately observable and provenance-sensitive.
+    assert_eq!(canonical, indefinite);
+    assert_ne!(canonical.to_cbor(), indefinite.to_cbor());
+    assert_ne!(
+        canonical.to_cbor(),
+        constructed.to_cbor(),
+        "parsed canonical wire should preserve its exact source too"
+    );
+}
+
+#[cfg(feature = "semantic-receipts")]
+#[test]
 fn unprotected_outer_metadata_is_not_authenticated_but_is_provenance_bound() {
     let rng = SystemRandom::new();
     let receipt_signer = signing_key(&rng);
