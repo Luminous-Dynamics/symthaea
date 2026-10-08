@@ -109,6 +109,26 @@ jobs:
               'Publish artifact provenance summary',
             ];
 
+            function artifactLifecycleVerified(artifact) {
+              if (!artifact || !Number.isSafeInteger(artifact.id) || artifact.id <= 0) {
+                return false;
+              }
+              if (
+                typeof artifact.created_at !== 'string' ||
+                typeof artifact.expires_at !== 'string'
+              ) {
+                return false;
+              }
+
+              const createdAt = Date.parse(artifact.created_at);
+              const expiresAt = Date.parse(artifact.expires_at);
+              return (
+                Number.isFinite(createdAt) &&
+                Number.isFinite(expiresAt) &&
+                createdAt < expiresAt
+              );
+            }
+
             function evaluate(evidence) {
               const jobs = evidence.jobs ?? [];
               const firstJobSteps =
@@ -152,6 +172,7 @@ jobs:
               const artifactVerified =
                 artifacts.length === 1 &&
                 artifactMatches.length === 1 &&
+                artifactLifecycleVerified(artifact) &&
                 artifact.expired === false &&
                 artifact.size_in_bytes > 0 &&
                 artifact.workflow_run?.id === evidence.run.id &&
@@ -159,7 +180,7 @@ jobs:
                 artifact.workflow_run?.head_repository_id === expected.repositoryId &&
                 artifact.workflow_run?.head_sha === expected.mergeCommit &&
                 typeof artifact.digest === 'string' &&
-                artifact.digest.startsWith('sha256:');
+                /^sha256:[0-9a-f]{64}$/.test(artifact.digest);
 
               const sourceIdentityVerified =
                 JSON.stringify(evidence.sourceBlobShas) ===
@@ -334,6 +355,7 @@ jobs:
                 ],
                 artifacts: [
                   {
+                    id: 1,
                     name:
                       'hdc-linear-code-bounded-decoder-' +
                       expected.subject +
@@ -341,6 +363,8 @@ jobs:
                       runId +
                       '-attempt-1',
                     expired: false,
+                    created_at: '2026-01-01T00:00:00Z',
+                    expires_at: '2027-01-01T00:00:00Z',
                     size_in_bytes: 1,
                     digest: 'sha256:' + 'a'.repeat(64),
                     workflow_run: {
@@ -383,14 +407,23 @@ jobs:
               ['job_step_conclusion', (e) => { e.jobs[0].steps[20].conclusion = 'failure'; }],
               ['extra_job_step', (e) => { e.jobs[0].steps.push({ name: 'unreviewed step', conclusion: 'success' }); }],
               ['artifact_name', (e) => { e.artifacts[0].name = 'decoy'; }],
+              ['artifact_id_missing', (e) => { delete e.artifacts[0].id; }],
+              ['artifact_lifetime_equal', (e) => { e.artifacts[0].expires_at = e.artifacts[0].created_at; }],
+              ['artifact_lifetime_inverted', (e) => { e.artifacts[0].created_at = '2027-01-01T00:00:00Z'; }],
+              ['artifact_created_at_malformed', (e) => { e.artifacts[0].created_at = 'not-a-timestamp'; }],
+              ['artifact_expires_at_malformed', (e) => { e.artifacts[0].expires_at = 'not-a-timestamp'; }],
+              ['artifact_digest_nonhex', (e) => { e.artifacts[0].digest = 'sha256:' + 'g'.repeat(64); }],
               ['artifact_expired', (e) => { e.artifacts[0].expired = true; }],
               ['artifact_head_sha', (e) => { e.artifacts[0].workflow_run.head_sha = '0'.repeat(40); }],
               ['artifact_digest', (e) => { e.artifacts[0].digest = ''; }],
               ['artifact_repository_id', (e) => { e.artifacts[0].workflow_run.repository_id += 1; }],
               ['artifact_extra_decoy', (e) => {
                 e.artifacts.push({
+                  id: 2,
                   name: 'decoy',
                   expired: false,
+                  created_at: '2026-01-01T00:00:00Z',
+                  expires_at: '2027-01-01T00:00:00Z',
                   size_in_bytes: 1,
                   digest: 'sha256:' + 'b'.repeat(64),
                   workflow_run: {
