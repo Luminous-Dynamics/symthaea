@@ -170,6 +170,31 @@ jobs:
               );
 
               const artifact = artifactMatches[0] ?? null;
+              const finalArtifacts = evidence.finalArtifacts ?? evidence.artifacts ?? [];
+              const finalArtifactMatches = finalArtifacts.filter(
+                (candidate) => candidate.name === expectedArtifactName
+              );
+              const finalArtifact = finalArtifactMatches[0] ?? null;
+              const finalArtifactVerified =
+                finalArtifacts.length === 1 &&
+                finalArtifactMatches.length === 1 &&
+                artifactLifecycleVerified(finalArtifact) &&
+                finalArtifact.expired === false &&
+                finalArtifact.size_in_bytes > 0 &&
+                finalArtifact.workflow_run?.id === evidence.run.id &&
+                finalArtifact.workflow_run?.repository_id === expected.repositoryId &&
+                finalArtifact.workflow_run?.head_repository_id === expected.repositoryId &&
+                finalArtifact.workflow_run?.head_sha === expected.subject &&
+                typeof finalArtifact.digest === 'string' &&
+                /^sha256:[0-9a-f]{64}$/.test(finalArtifact.digest);
+              const artifactSnapshotStable =
+                artifact !== null &&
+                finalArtifact !== null &&
+                artifact.id === finalArtifact.id &&
+                artifact.name === finalArtifact.name &&
+                artifact.digest === finalArtifact.digest &&
+                artifact.created_at === finalArtifact.created_at &&
+                artifact.expires_at === finalArtifact.expires_at;
               const artifactVerified =
                 artifacts.length === 1 &&
                 artifactMatches.length === 1 &&
@@ -219,6 +244,8 @@ jobs:
               const checks = {
                 verifier_on_main: evidence.contextRef === 'refs/heads/main',
                 run_identity_shape: runIdentityShapeVerified,
+                run_attempt_matches_trigger:
+                  evidence.run.run_attempt === evidence.triggerRunAttempt,
                 verifier_root_current: evidence.contextSha === evidence.currentMainSha,
                 verifier_root_stable:
                   evidence.contextSha === evidence.currentMainSha &&
@@ -235,6 +262,15 @@ jobs:
                   evidence.run.conclusion === 'success' &&
                   evidence.run.head_branch === expected.branch &&
                   evidence.run.head_sha === expected.subject,
+                pr_snapshot_stable:
+                  evidence.finalPr?.number === evidence.pr.number &&
+                  evidence.finalPr?.head?.sha === evidence.pr.head?.sha &&
+                  evidence.finalPr?.head?.ref === evidence.pr.head?.ref &&
+                  Number(evidence.finalPr?.head?.repo?.id) === Number(evidence.pr.head?.repo?.id) &&
+                  evidence.finalPr?.base?.sha === evidence.pr.base?.sha &&
+                  evidence.finalPr?.base?.ref === evidence.pr.base?.ref &&
+                  Number(evidence.finalPr?.base?.repo?.id) === Number(evidence.pr.base?.repo?.id) &&
+                  evidence.finalPr?.merge_commit_sha === evidence.pr.merge_commit_sha,
                 pr_identity:
                   evidence.pr.number === expected.pr &&
                   evidence.pr.head.ref === expected.branch &&
@@ -264,6 +300,7 @@ jobs:
                 exact_step_surface: exactStepSurface,
                 required_steps_succeeded: requiredStepsSucceeded,
                 artifact_verified: artifactVerified,
+                artifact_snapshot_stable: artifactSnapshotStable && finalArtifactVerified,
                 source_identity_verified: sourceIdentityVerified,
               };
 
@@ -285,6 +322,7 @@ jobs:
                 currentMainSha: 'synthetic-main',
                 finalMainSha: 'synthetic-main',
                 contextRepository: expected.repository,
+                triggerRunAttempt: 1,
                 run: {
                   id: runId,
                   run_attempt: 1,
@@ -341,6 +379,26 @@ jobs:
                   },
                    merge_commit_sha: 'c'.repeat(40),
                 },
+                finalPr: {
+                  number: expected.pr,
+                  head: {
+                    sha: expected.subject,
+                    ref: expected.branch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                  base: {
+                    sha: expected.parent,
+                    ref: expected.baseBranch,
+                    repo: {
+                      id: expected.repositoryId,
+                      full_name: expected.repository,
+                    },
+                  },
+                  merge_commit_sha: 'c'.repeat(40),
+                },
                 parentCommit: {
                   sha: expected.subject,
                   parents: [{ sha: expected.parent }],
@@ -390,6 +448,28 @@ jobs:
                     },
                   },
                 ],
+                finalArtifacts: [
+                  {
+                    id: 1,
+                    name:
+                      'hdc-linear-code-bounded-decoder-' +
+                      expected.subject +
+                      '-run-' +
+                      runId +
+                      '-attempt-1',
+                    expired: false,
+                    created_at: '2026-01-01T00:00:00Z',
+                    expires_at: '2027-01-01T00:00:00Z',
+                    size_in_bytes: 1,
+                    digest: 'sha256:' + 'a'.repeat(64),
+                    workflow_run: {
+                      id: runId,
+                      repository_id: expected.repositoryId,
+                      head_repository_id: expected.repositoryId,
+                      head_sha: expected.subject,
+                    },
+                  },
+                ],
               };
             }
 
@@ -409,6 +489,7 @@ jobs:
               ['run_id_string', (e) => { e.run.id = '1'; }],
               ['run_attempt_zero', (e) => { e.run.run_attempt = 0; }],
               ['run_attempt_string', (e) => { e.run.run_attempt = '1'; }],
+              ['run_attempt_mismatch', (e) => { e.run.run_attempt = 2; }],
               ['run_pr_number', (e) => { e.run.pull_requests[0].number += 1; }],
               ['run_pr_association_missing', (e) => { e.run.pull_requests = []; }],
               ['run_pr_head_repo', (e) => { e.run.pull_requests[0].head.repo.full_name = 'attacker/clone'; }],
@@ -419,6 +500,9 @@ jobs:
               ['pr_head_ref', (e) => { e.pr.head.ref = 'untrusted-branch'; }],
               ['pr_head_sha', (e) => { e.pr.head.sha = '0'.repeat(40); }],
               ['pr_head_repo_id', (e) => { e.pr.head.repo.id += 1; }],
+              ['pr_snapshot_drift_head', (e) => { e.finalPr.head.sha = '0'.repeat(40); }],
+              ['pr_snapshot_drift_base', (e) => { e.finalPr.base.sha = '0'.repeat(40); }],
+              ['pr_snapshot_drift_merge', (e) => { e.finalPr.merge_commit_sha = '0'.repeat(40); }],
               ['pr_base_ref', (e) => { e.pr.base.ref = 'untrusted-base'; }],
               ['pr_base_sha', (e) => { e.pr.base.sha = '0'.repeat(40); }],
               ['pr_base_repo_id', (e) => { e.pr.base.repo.id += 1; }],
@@ -453,6 +537,9 @@ jobs:
               ['artifact_head_sha', (e) => { e.artifacts[0].workflow_run.head_sha = '0'.repeat(40); }],
               ['artifact_digest', (e) => { e.artifacts[0].digest = ''; }],
               ['artifact_repository_id', (e) => { e.artifacts[0].workflow_run.repository_id += 1; }],
+              ['final_artifact_deleted', (e) => { e.finalArtifacts = []; }],
+              ['final_artifact_expired', (e) => { e.finalArtifacts[0].expired = true; }],
+              ['final_artifact_digest', (e) => { e.finalArtifacts[0].digest = ''; }],
               ['artifact_extra_decoy', (e) => {
                 e.artifacts.push({
                   id: 2,
@@ -525,6 +612,10 @@ jobs:
             const runId = context.payload.workflow_run?.id;
             if (!Number.isInteger(runId) || runId <= 0) {
               throw new Error('workflow_run.id is missing or invalid');
+            }
+            const triggerRunAttempt = context.payload.workflow_run?.run_attempt;
+            if (!Number.isInteger(triggerRunAttempt) || triggerRunAttempt <= 0) {
+              throw new Error('workflow_run.run_attempt is missing or invalid');
             }
 
             const run = (await github.rest.actions.getWorkflowRun({
@@ -657,15 +748,33 @@ jobs:
               );
             }
 
+            const finalPr = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: expected.pr,
+            })).data;
+
+            const finalArtifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              }
+            );
+
             const liveEvidence = {
               contextRef: context.ref,
               contextSha: context.sha,
               currentMainSha: initialMainSha,
               finalMainSha,
               contextRepository: context.repo.owner + '/' + context.repo.repo,
+              triggerRunAttempt,
               run,
               jobs,
               pr,
+              finalPr,
               parentCommit,
               mergeCommit,
               mergeSourceBlobShas,
@@ -679,12 +788,13 @@ jobs:
               workflowFileSha: workflowFile.data.sha,
               sourceBlobShas,
               artifacts,
+              finalArtifacts,
             };
 
             const liveEvaluation = evaluate(liveEvidence);
 
             const receipt = {
-              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v5',
+              schema_version: 'hdc-linear-code-bounded-decoder-independent-run-receipt-v6',
               qualification_result:
                 adversarialCorpusPassed && liveEvaluation.qualificationResult === 'PASS'
                   ? 'PASS'
@@ -703,6 +813,20 @@ jobs:
               run_pr_association_view: {
                 expected_immutable_identity: false,
                 stale_association_view_accepted: staleAssociationViewPassed,
+              },
+              triggering_run_attempt: {
+                observed_attempt: liveEvidence.run.run_attempt,
+                triggering_event_attempt: liveEvidence.triggerRunAttempt,
+                exact_match: liveEvaluation.checks.run_attempt_matches_trigger,
+              },
+              pr_reconciliation: {
+                initial_head_sha: liveEvidence.pr.head?.sha ?? null,
+                final_head_sha: liveEvidence.finalPr.head?.sha ?? null,
+                initial_base_sha: liveEvidence.pr.base?.sha ?? null,
+                final_base_sha: liveEvidence.finalPr.base?.sha ?? null,
+                initial_merge_commit_sha: liveEvidence.pr.merge_commit_sha ?? null,
+                final_merge_commit_sha: liveEvidence.finalPr.merge_commit_sha ?? null,
+                stable: liveEvaluation.checks.pr_snapshot_stable,
               },
               adversarial_verifier_corpus: {
                 test_count: adversarialResults.length,
@@ -761,6 +885,13 @@ jobs:
                 step_conclusions: liveEvaluation.stepConclusions,
               },
               artifact: liveEvaluation.artifact,
+              artifact_reconciliation: {
+                initial_artifact_id: liveEvaluation.artifact?.id ?? null,
+                final_artifact_id: liveEvaluation.finalArtifact?.id ?? null,
+                initial_digest: liveEvaluation.artifact?.digest ?? null,
+                final_digest: liveEvaluation.finalArtifact?.digest ?? null,
+                stable: liveEvaluation.checks.artifact_snapshot_stable,
+              },
               artifact_lifecycle: {
                 artifact_id: liveEvaluation.artifact?.id ?? null,
                 created_at: liveEvaluation.artifact?.created_at ?? null,
