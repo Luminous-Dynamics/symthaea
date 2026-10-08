@@ -73,7 +73,7 @@ impl PersonalCreditLedger {
         let mut ledger = Self::new();
         for (account, amount) in balances {
             validate_account(&account)?;
-            validate_amount(amount)?;
+            validate_nonnegative_amount(amount)?;
             match ledger.balances.entry(account) {
                 Entry::Vacant(entry) => {
                     entry.insert(amount);
@@ -473,6 +473,18 @@ mod tests {
             PersonalCreditLedger::from_opening_balances([("".to_owned(), 10.0)]),
             Err(CreditismError::UnknownAccount(String::new()))
         );
+    }
+
+    #[test]
+    fn zero_opening_balance_is_valid_state() {
+        let ledger = PersonalCreditLedger::from_opening_balances([
+            ("empty".to_owned(), 0.0),
+        ])
+        .unwrap();
+
+        assert_eq!(ledger.balance("empty"), 0.0);
+        assert_eq!(ledger.opening_stock(), 0.0);
+        assert!(ledger.reconciles(0.0));
     }
 
     #[test]
