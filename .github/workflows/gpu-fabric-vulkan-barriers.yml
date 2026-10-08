@@ -99,34 +99,51 @@ jobs:
         working-directory: .ci/gpu-fabric-workspace
         run: cargo test --locked --features vulkan --lib
 
-      - name: Execute real workload barrier qualification
-        id: execute_runtime
+      - name: Execute Vulkan runtime construction preflight
+        id: runtime_preflight
         working-directory: .ci/gpu-fabric-workspace
         run: |
           set -o pipefail
-          cargo test --locked --features vulkan --lib -- --ignored --nocapture 2>&1 | tee qualification-runtime.txt
+          cargo test --locked --features vulkan --lib -- --ignored --nocapture --test-threads=1 real_vulkan_runtime_constructs_and_drops 2>&1 | tee qualification-preflight.txt
+
+      - name: Execute real workload barrier qualification
+        id: execute_runtime
+        if: ${{ steps.runtime_preflight.outcome == 'success' }}
+        working-directory: .ci/gpu-fabric-workspace
+        run: |
+          set -o pipefail
+          cargo test --locked --features vulkan --lib -- --ignored --nocapture --test-threads=1 real_vulkan_barrier_workload_matches_cpu_oracle 2>&1 | tee qualification-runtime.txt
 
       - name: Capture native crash backtrace
-        if: ${{ failure() && steps.execute_runtime.outcome == 'failure' }}
+        if: ${{ failure() && (steps.runtime_preflight.outcome == 'failure' || steps.execute_runtime.outcome == 'failure') }}
         working-directory: .ci/gpu-fabric-workspace
         continue-on-error: true
         run: |
           set +e
           TEST_BINARY="$(find target/debug/deps -maxdepth 1 -type f -name 'symthaea_gpu_fabric-*' -executable | sort | head -n 1)"
           test -n "$TEST_BINARY"
+          if [[ "${{ steps.runtime_preflight.outcome }}" == "failure" ]]; then
+            TEST_FILTER=real_vulkan_runtime_constructs_and_drops
+          else
+            TEST_FILTER=real_vulkan_barrier_workload_matches_cpu_oracle
+          fi
           {
             echo "test_binary=$TEST_BINARY"
+            echo "test_filter=$TEST_FILTER"
             gdb -q -batch \
               -ex 'set pagination off' \
               -ex 'set confirm off' \
               -ex 'handle SIGSEGV stop print nopass' \
               -ex run \
               -ex 'info registers' \
+              -ex 'x/32gx $rsp' \
               -ex 'x/16i $pc' \
               -ex 'info sharedlibrary' \
               -ex 'info proc mappings' \
+              -ex 'info threads' \
+              -ex 'thread apply all bt 50' \
               -ex 'thread apply all bt full' \
-              --args "$TEST_BINARY" --ignored --nocapture
+              --args "$TEST_BINARY" --ignored --nocapture --test-threads=1 "$TEST_FILTER"
           } > qualification-gdb.txt 2>&1
           GDB_STATUS=$?
           echo "gdb_exit=$GDB_STATUS" >> qualification-gdb.txt
@@ -136,6 +153,11 @@ jobs:
         if: always()
         working-directory: .ci/gpu-fabric-workspace
         run: |
+          if test -f qualification-preflight.txt; then
+            :
+          else
+            printf 'qualification_preflight=not_reached\n' > qualification-preflight.txt
+          fi
           if test -f qualification-runtime.txt; then
             :
           else
@@ -146,9 +168,9 @@ jobs:
           else
             printf 'qualification_gdb=not_reached\n' > qualification-gdb.txt
           fi
+          sha256sum qualification-preflight.txt | tee qualification-preflight.sha256
           sha256sum qualification-runtime.txt | tee qualification-runtime.sha256
           sha256sum qualification-gdb.txt | tee qualification-gdb.sha256
-
       - name: Upload immutable qualification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -164,6 +186,8 @@ jobs:
             .ci/gpu-fabric-workspace/qualification-input-sha256.txt
             .ci/gpu-fabric-workspace/qualification-environment.txt
             .ci/gpu-fabric-workspace/vulkan-package-versions.txt
+            .ci/gpu-fabric-workspace/qualification-preflight.txt
+            .ci/gpu-fabric-workspace/qualification-preflight.sha256
             .ci/gpu-fabric-workspace/qualification-runtime.txt
             .ci/gpu-fabric-workspace/qualification-runtime.sha256
             .ci/gpu-fabric-workspace/qualification-gdb.txt
