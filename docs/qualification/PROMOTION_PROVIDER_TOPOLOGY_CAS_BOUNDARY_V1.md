@@ -34,6 +34,7 @@ The model distinguishes:
     stale-before-submit
     invalid-observation-order
     invalid-observation-sequence
+    invalid-provider-operation-options
     observed-not-cas
     provider-topology-cas
 
@@ -41,8 +42,7 @@ The final class requires explicit CAS evidence; it is not a Boolean switch.
 
 observed-not-cas is the normal conservative class when the provider exposes stack state but does not expose an independent conditional topology fence.
 
-provider-topology-cas is now evidence-gated in the synthetic model. A matching observation alone remains observed-not-cas; the stronger class requires a typed ProviderTopologyCasEvidenceV1 witness bound to the exact reserved operation digest, the exact pre-submit observation digest, and the pre-submit observation sequence. The complete provider observation is content-addressed, so the witness binds the whole observed payload rather than a hand-picked subset. The executable oracle includes negative controls for an unbound witness and sequence-mismatched witness. This witness is still only synthetic evidence in the reference model; it must not be represented as GitHub capability unless an independent provider surface actually supplies the corresponding conditional predicate.
-
+provider-topology-cas is now evidence-gated in the synthetic model. A matching observation alone remains observed-not-cas; the stronger class requires a typed ProviderTopologyCasEvidenceV1 whose predicate digest identifies an explicit ProviderTopologyCasPredicateV1 over the exact reserved operation identity, exact pre-submit observation, and pre-submit sequence. The evidence carries two explicit captured provider witnesses: a canonical ProviderTopologyCasSubmissionV1 that binds the provider-assigned operation handle to one exact request, and a canonical ProviderTopologyCasProviderResultV1 that binds the later result to that submission and request. Their respective digests are carried by ProviderTopologyCasEvidenceV1, so submission identity and result identity cannot be reconstructed or silently substituted. The provider request contains the requested PR, expected head, merge method, merge action, bypass mode, and predicate digest. The capture wrapper binds the exact submission digest and provider-result digest and uses the provider-result-capture source. This prevents a generic local receipt, a reconstructed acceptance record, a field-spliced result, a stale provider-result identifier, or a result captured for a different provider request or submission from being silently reinterpreted as a provider-side conditional mutation. The complete provider observation is content-addressed, so the predicate binds the whole observed payload rather than a hand-picked subset. The executable oracle includes negative controls for wrong observation, sequence drift, non-provider source, empty operation identity, non-accepted predicate results, provider-result digest splicing, and result-field splicing. This witness remains synthetic evidence in the reference model; it must not be represented as GitHub capability unless an independent provider surface actually supplies the corresponding conditional predicate.
 ## GitHub interpretation
 
 GitHub's asynchronous stacked merge operation takes the requested pull request and expected head SHA, together with merge parameters. Its documented stacked semantics operate on the open downstack at execution time.
@@ -53,11 +53,11 @@ Therefore:
         !=
     GitHub topology CAS
 
-The provider-specific adapter must keep this boundary visible unless a future provider surface supplies an independently evidenced conditional topology predicate.
+The provider-specific adapter must keep this boundary visible unless a future provider surface supplies an independently evidenced conditional topology predicate. In particular, the async merge UUID and expected requested head are not, by themselves, a topology-CAS predicate over the selected downstack. Because GitHub also accepts `bypass_rules`, the promotion operation identity binds that option rather than treating normal-rule and bypassed execution as interchangeable requests. For a multi-PR stacked operation, the reference model rejects `bypass_rules=true`: GitHub's stacked-PR documentation permits bypass-rule merging only for the bottom pull request, not for merging the whole stack.
 
 ## Claim ceiling
 
-This tranche establishes only a deterministic classification of provider-topology observation and revalidation evidence.
+This tranche establishes only a deterministic classification of provider-topology observation, revalidation, and explicitly represented conditional-predicate evidence.
 
 It does not establish:
 

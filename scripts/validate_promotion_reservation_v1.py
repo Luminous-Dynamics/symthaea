@@ -41,6 +41,7 @@ class PromotionOperationIdentityV1:
     merge_action: str
     trust_root_generation: int
     governance_generation: int
+    bypass_rules: bool = False
 
     def canonical_bytes(self) -> bytes:
         payload = {
@@ -48,6 +49,7 @@ class PromotionOperationIdentityV1:
             "provider_stack_number": self.provider_stack_number,
             "base_tip_sha": self.base_tip_sha,
             "governance_generation": self.governance_generation,
+            "bypass_rules": self.bypass_rules,
             "merge_action": self.merge_action,
             "merge_method": self.merge_method,
             "ordered_stack": [
@@ -73,6 +75,11 @@ class PromotionOperationIdentityV1:
 
     def digest(self) -> str:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def provider_constraints_valid(self) -> bool:
+        # GitHub stacked merges do not support bypass_rules for a whole
+        # multi-PR stack; bypass is only available for the bottom PR.
+        return not (len(self.ordered_stack) > 1 and self.bypass_rules)
 
 
 @dataclass(frozen=True)
@@ -182,10 +189,176 @@ def provider_stack_observation_matches_reserved(
 
 
 @dataclass(frozen=True)
-class ProviderTopologyCasEvidenceV1:
+class ProviderTopologyCasPredicateV1:
+    """Explicit conditional predicate a provider would have to enforce."""
     operation_identity_digest: str
     observation_digest: str
     pre_submit_sequence: int
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "observation_digest": self.observation_digest,
+            "operation_identity_digest": self.operation_identity_digest,
+            "pre_submit_sequence": self.pre_submit_sequence,
+            "predicate": "provider-topology-cas-v1",
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    @classmethod
+    def from_binding(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        observation: ProviderStackObservationV1,
+        pre_submit_sequence: int,
+    ) -> "ProviderTopologyCasPredicateV1":
+        return cls(
+            operation_identity_digest=identity.digest(),
+            observation_digest=observation.digest(),
+            pre_submit_sequence=pre_submit_sequence,
+        )
+
+
+@dataclass(frozen=True)
+class ProviderTopologyCasRequestV1:
+    """Canonical provider request that carries the conditional topology predicate."""
+    requested_pr_number: int
+    expected_head_sha: str
+    merge_method: str
+    merge_action: str
+    bypass_rules: bool
+    predicate_digest: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "bypass_rules": self.bypass_rules,
+            "expected_head_sha": self.expected_head_sha,
+            "merge_action": self.merge_action,
+            "merge_method": self.merge_method,
+            "predicate_digest": self.predicate_digest,
+            "requested_pr_number": self.requested_pr_number,
+            "request": "provider-topology-cas-v1",
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    @classmethod
+    def from_identity_predicate(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        predicate: ProviderTopologyCasPredicateV1,
+    ) -> "ProviderTopologyCasRequestV1":
+        return cls(
+            requested_pr_number=identity.requested_pr_number,
+            expected_head_sha=identity.requested_pr_head_sha,
+            merge_method=identity.merge_method,
+            merge_action=identity.merge_action,
+            bypass_rules=identity.bypass_rules,
+            predicate_digest=predicate.digest(),
+        )
+
+
+@dataclass(frozen=True)
+class ProviderTopologyCasSubmissionV1:
+    """Canonical acceptance record binding a provider operation handle to one request."""
+    request_digest: str
+    provider_operation_id: str
+    submission_source: str
+    submission_result: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "provider_operation_id": self.provider_operation_id,
+            "request_digest": self.request_digest,
+            "submission": "provider-topology-cas-v1",
+            "submission_result": self.submission_result,
+            "submission_source": self.submission_source,
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def validates(self, request: ProviderTopologyCasRequestV1) -> bool:
+        return (
+            self.submission_source == "provider-submission-response"
+            and self.submission_result == "accepted"
+            and bool(self.provider_operation_id)
+            and self.request_digest == request.digest()
+        )
+
+
+@dataclass(frozen=True)
+class ProviderTopologyCasProviderResultV1:
+    """Canonical provider result carrying one topology-CAS predicate decision."""
+    result_source: str
+    provider_operation_id: str
+    request_digest: str
+    submission_digest: str
+    predicate_result: str
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "predicate_result": self.predicate_result,
+            "provider_operation_id": self.provider_operation_id,
+            "request_digest": self.request_digest,
+            "result_source": self.result_source,
+            "submission_digest": self.submission_digest,
+            "result": "provider-topology-cas-v1",
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def validates(
+        self,
+        request: ProviderTopologyCasRequestV1,
+        submission: ProviderTopologyCasSubmissionV1,
+        predicate: ProviderTopologyCasPredicateV1,
+    ) -> bool:
+        return (
+            self.result_source == "provider-operation-result"
+            and bool(self.provider_operation_id)
+            and self.predicate_result == "accepted"
+            and self.request_digest == request.digest()
+            and self.submission_digest == submission.digest()
+            and submission.provider_operation_id == self.provider_operation_id
+            and request.predicate_digest == predicate.digest()
+        )
+
+
+@dataclass(frozen=True)
+class ProviderTopologyCasEvidenceV1:
+    submission: ProviderTopologyCasSubmissionV1
+    submission_digest: str
+    provider_result: ProviderTopologyCasProviderResultV1
+    provider_result_digest: str
+    evidence_source: str
 
     def validates(
         self,
@@ -193,11 +366,23 @@ class ProviderTopologyCasEvidenceV1:
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
     ) -> bool:
+        if self.evidence_source != "provider-result-capture":
+            return False
+        if self.submission_digest != self.submission.digest():
+            return False
+        if self.provider_result_digest != self.provider_result.digest():
+            return False
+        if pre_submit_sequence <= 0:
+            return False
+        predicate = ProviderTopologyCasPredicateV1.from_binding(
+            identity,
+            observation,
+            pre_submit_sequence,
+        )
+        request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
         return (
-            self.operation_identity_digest == identity.digest()
-            and self.observation_digest == observation.digest()
-            and self.pre_submit_sequence == pre_submit_sequence
-            and self.pre_submit_sequence > 0
+            self.submission.validates(request)
+            and self.provider_result.validates(request, self.submission, predicate)
         )
 
 
@@ -210,6 +395,8 @@ class ProviderTopologyBindingV1:
     provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
+        if not identity.provider_constraints_valid():
+            return "invalid-provider-operation-options"
         if self.initial_sequence <= 0:
             return "invalid-observation-sequence"
         if self.initial_observation is None:
@@ -361,12 +548,14 @@ class ProviderOutcome:
         uuid: str | None = None,
         merge_method: str | None = None,
         merge_action: str | None = None,
+        bypass_rules: bool = False,
     ):
         self.http = http
         self.kind = kind
         self.uuid = uuid
         self.merge_method = merge_method
         self.merge_action = merge_action
+        self.bypass_rules = bypass_rules
 
 
 @dataclass(frozen=True)
@@ -383,6 +572,7 @@ class GitHubAsyncModel:
         self.pending_uuid: str | None = None
         self.pending_merge_method: str | None = None
         self.pending_merge_action: str | None = None
+        self.pending_bypass_rules: bool = False
         self.async_status: str | None = None
         self.merge_sha: str | None = None
         self.expired: set[str] = set()
@@ -393,9 +583,15 @@ class GitHubAsyncModel:
         expected_head: str,
         merge_method: str = "squash",
         merge_action: str = "direct_merge",
+        bypass_rules: bool = False,
         timeout_after_accept: bool = False,
+        stack_size: int = 1,
     ) -> ProviderOutcome:
         self.calls += 1
+        if stack_size <= 0:
+            return ProviderOutcome(400, "invalid-stack-size")
+        if bypass_rules and stack_size > 1:
+            return ProviderOutcome(400, "bypass-not-supported-for-stack")
         if expected_head != self.pr_head:
             return ProviderOutcome(409, "rejected")
         if self.merge_sha is not None:
@@ -404,6 +600,7 @@ class GitHubAsyncModel:
             if (
                 merge_method == self.pending_merge_method
                 and merge_action == self.pending_merge_action
+                and bypass_rules == self.pending_bypass_rules
             ):
                 return ProviderOutcome(
                     409,
@@ -411,6 +608,7 @@ class GitHubAsyncModel:
                     self.pending_uuid,
                     self.pending_merge_method,
                     self.pending_merge_action,
+                    self.pending_bypass_rules,
                 )
             return ProviderOutcome(
                 409,
@@ -418,10 +616,12 @@ class GitHubAsyncModel:
                 self.pending_uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         self.pending_uuid = f"uuid-{self.calls}"
         self.pending_merge_method = merge_method
         self.pending_merge_action = merge_action
+        self.pending_bypass_rules = bypass_rules
         self.async_status = "pending"
         if timeout_after_accept:
             return ProviderOutcome(
@@ -430,6 +630,7 @@ class GitHubAsyncModel:
                 self.pending_uuid,
                 merge_method,
                 merge_action,
+                bypass_rules,
             )
         return ProviderOutcome(
             202,
@@ -437,6 +638,7 @@ class GitHubAsyncModel:
             self.pending_uuid,
             merge_method,
             merge_action,
+            bypass_rules,
         )
 
     def get_async_result(self, uuid: str) -> ProviderOutcome:
@@ -449,6 +651,7 @@ class GitHubAsyncModel:
                 uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         if self.async_status == "merged" and self.pending_uuid == uuid:
             return ProviderOutcome(
@@ -457,6 +660,7 @@ class GitHubAsyncModel:
                 uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         if self.pending_uuid == uuid:
             return ProviderOutcome(
@@ -465,6 +669,7 @@ class GitHubAsyncModel:
                 uuid,
                 self.pending_merge_method,
                 self.pending_merge_action,
+                self.pending_bypass_rules,
             )
         return ProviderOutcome(404, "not-found")
 
@@ -486,6 +691,7 @@ class GitHubAsyncModel:
         expected_head: str,
         merge_method: str = "squash",
         merge_action: str = "direct_merge",
+        bypass_rules: bool = False,
     ) -> EffectReconciliation:
         result = self.get_async_result(uuid)
 
@@ -494,6 +700,7 @@ class GitHubAsyncModel:
                 result.uuid == uuid
                 and result.merge_method == merge_method
                 and result.merge_action == merge_action
+                and result.bypass_rules == bypass_rules
                 and expected_head == self.pr_head
             ):
                 return EffectReconciliation(
@@ -639,13 +846,39 @@ def provider_topology_cas_evidence_fixture(
     identity: PromotionOperationIdentityV1 | None = None,
     observation: ProviderStackObservationV1 | None = None,
     pre_submit_sequence: int = 2,
+    *,
+    provider_operation_id: str = "provider-op-1",
+    result_source: str = "provider-operation-result",
+    predicate_result: str = "accepted",
+    evidence_source: str = "provider-result-capture",
 ) -> ProviderTopologyCasEvidenceV1:
     identity = identity or stack_identity_fixture()
     observation = observation or provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        observation,
+        pre_submit_sequence,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    submission = ProviderTopologyCasSubmissionV1(
+        request_digest=request.digest(),
+        provider_operation_id=provider_operation_id,
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    provider_result = ProviderTopologyCasProviderResultV1(
+        result_source=result_source,
+        provider_operation_id=provider_operation_id,
+        request_digest=request.digest(),
+        submission_digest=submission.digest(),
+        predicate_result=predicate_result,
+    )
     return ProviderTopologyCasEvidenceV1(
-        operation_identity_digest=identity.digest(),
-        observation_digest=observation.digest(),
-        pre_submit_sequence=pre_submit_sequence,
+        submission=submission,
+        submission_digest=submission.digest(),
+        provider_result=provider_result,
+        provider_result_digest=provider_result.digest(),
+        evidence_source=evidence_source,
     )
 
 
@@ -725,6 +958,232 @@ def test_provider_topology_binding_rejects_cas_evidence_sequence_drift():
     binding = topology_binding_fixture(
         identity,
         pre_submit_sequence=2,
+        provider_topology_cas_evidence=evidence,
+    )
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_predicate_digest_binds_observation():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    changed = ProviderStackObservationV1(**{**observation.__dict__, "stack_number": 42})
+    changed_predicate = ProviderTopologyCasPredicateV1.from_binding(identity, changed, 2)
+    assert predicate.digest() != changed_predicate.digest()
+
+
+def test_provider_topology_cas_predicate_digest_binds_sequence():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    first = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    second = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 3)
+    assert first.digest() != second.digest()
+
+
+def test_provider_topology_cas_predicate_digest_binds_bypass_rules():
+    identity = stack_identity_fixture()
+    observation = provider_stack_observation_fixture(identity)
+    normal = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    bypass_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "bypass_rules": True},
+    )
+    bypass = ProviderTopologyCasPredicateV1.from_binding(bypass_identity, observation, 2)
+    assert normal.digest() != bypass.digest()
+
+
+def test_provider_topology_cas_request_binds_requested_operation_parameters():
+    identity = stack_identity_fixture()
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        provider_stack_observation_fixture(identity),
+        2,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    changed = ProviderTopologyCasRequestV1(
+        **{**request.__dict__, "expected_head_sha": "H0"},
+    )
+    assert request.digest() != changed.digest()
+
+
+def test_provider_topology_cas_provider_result_binds_request_digest():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(
+        identity,
+        ProviderTopologyCasPredicateV1.from_binding(
+            identity,
+            provider_stack_observation_fixture(identity),
+            2,
+        ),
+    )
+    assert evidence.provider_result.request_digest == request.digest()
+
+
+def test_provider_topology_cas_submission_digest_binds_operation_id():
+    identity = stack_identity_fixture()
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        provider_stack_observation_fixture(identity),
+        2,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    first = ProviderTopologyCasSubmissionV1(
+        request_digest=request.digest(),
+        provider_operation_id="provider-op-1",
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    second = ProviderTopologyCasSubmissionV1(
+        **{**first.__dict__, "provider_operation_id": "provider-op-2"},
+    )
+    assert first.digest() != second.digest()
+
+
+def test_provider_topology_cas_provider_result_binds_submission():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(
+        identity,
+        provider_stack_observation_fixture(identity),
+        2,
+    )
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    submission = ProviderTopologyCasSubmissionV1(
+        request_digest=request.digest(),
+        provider_operation_id=evidence.provider_result.provider_operation_id,
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    assert evidence.provider_result.submission_digest == submission.digest()
+
+
+def test_provider_topology_cas_evidence_rejects_submission_digest_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    other = ProviderTopologyCasSubmissionV1(
+        request_digest=evidence.submission.request_digest,
+        provider_operation_id="provider-op-other",
+        submission_source="provider-submission-response",
+        submission_result="accepted",
+    )
+    spliced_result = ProviderTopologyCasProviderResultV1(
+        **{
+            **evidence.provider_result.__dict__,
+            "submission_digest": other.digest(),
+        }
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        submission=evidence.submission,
+        submission_digest=evidence.submission_digest,
+        provider_result=spliced_result,
+        provider_result_digest=spliced_result.digest(),
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_evidence_rejects_submission_field_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    changed_submission = ProviderTopologyCasSubmissionV1(
+        **{**evidence.submission.__dict__, "submission_result": "accepted-with-warning"},
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        submission=changed_submission,
+        submission_digest=evidence.submission_digest,
+        provider_result=evidence.provider_result,
+        provider_result_digest=evidence.provider_result_digest,
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_provider_result_digest_binds_operation_id():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    changed = ProviderTopologyCasProviderResultV1(
+        **{**evidence.provider_result.__dict__, "provider_operation_id": "provider-op-2"},
+    )
+    assert evidence.provider_result.digest() != changed.digest()
+
+
+def test_provider_topology_cas_evidence_rejects_provider_result_digest_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    other = provider_topology_cas_evidence_fixture(identity, provider_operation_id="provider-op-2")
+    spliced = ProviderTopologyCasEvidenceV1(
+        provider_result=evidence.provider_result,
+        provider_result_digest=other.provider_result_digest,
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_cas_evidence_rejects_result_field_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    changed = ProviderTopologyCasProviderResultV1(
+        **{**evidence.provider_result.__dict__, "predicate_result": "observed-only"},
+    )
+    spliced = ProviderTopologyCasEvidenceV1(
+        provider_result=changed,
+        provider_result_digest=evidence.provider_result_digest,
+        evidence_source="provider-result-capture",
+    )
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=spliced)
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_binding_rejects_bypass_mode_splice():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    bypass_identity = PromotionOperationIdentityV1(
+        **{**identity.__dict__, "bypass_rules": True},
+    )
+    binding = topology_binding_fixture(
+        bypass_identity,
+        provider_topology_cas_evidence=evidence,
+    )
+    assert binding.classify(bypass_identity) == "invalid-provider-operation-options"
+
+
+def test_provider_topology_binding_rejects_non_provider_cas_evidence_source():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(
+        identity,
+        result_source="local-receipt",
+    )
+    binding = topology_binding_fixture(
+        identity,
+        provider_topology_cas_evidence=evidence,
+    )
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_binding_rejects_empty_provider_operation_id():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(
+        identity,
+        provider_operation_id="",
+    )
+    binding = topology_binding_fixture(
+        identity,
+        provider_topology_cas_evidence=evidence,
+    )
+    assert binding.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_binding_rejects_unaccepted_cas_predicate_result():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(
+        identity,
+        predicate_result="observed-only",
+    )
+    binding = topology_binding_fixture(
+        identity,
         provider_topology_cas_evidence=evidence,
     )
     assert binding.classify(identity) == "observed-not-cas"
@@ -1038,6 +1497,21 @@ def test_stack_identity_binds_provider_stack_number():
     assert original.digest() != changed.digest()
 
 
+def test_stack_identity_binds_bypass_rules():
+    original = stack_identity_fixture()
+    changed = PromotionOperationIdentityV1(
+        **{**original.__dict__, "bypass_rules": True},
+    )
+    assert original.digest() != changed.digest()
+
+
+def test_stack_identity_rejects_bypass_for_multi_pr_stack():
+    identity = PromotionOperationIdentityV1(
+        **{**stack_identity_fixture().__dict__, "bypass_rules": True},
+    )
+    assert not identity.provider_constraints_valid()
+
+
 def test_stack_identity_binds_requested_subject_identity():
     original = stack_identity_fixture()
     changed_pr = PromotionOperationIdentityV1(
@@ -1122,6 +1596,68 @@ def test_duplicate_async_request_option_mismatch_is_not_idempotent():
     assert second.uuid == first.uuid
     assert second.merge_method == "squash"
     assert second.merge_action == "direct_merge"
+
+
+def test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent():
+    provider = GitHubAsyncModel()
+    first = provider.submit("H1", "squash", "direct_merge", False)
+    second = provider.submit("H1", "squash", "direct_merge", True)
+    assert first.uuid is not None
+    assert second.http == 409
+    assert second.kind == "duplicate-parameter-mismatch"
+    assert second.uuid == first.uuid
+    assert second.bypass_rules is False
+
+
+def test_provider_model_rejects_bypass_for_multi_pr_stack():
+    provider = GitHubAsyncModel()
+    result = provider.submit(
+        "H1",
+        "squash",
+        "direct_merge",
+        True,
+        stack_size=2,
+    )
+    assert result.http == 400
+    assert result.kind == "bypass-not-supported-for-stack"
+    assert provider.pending_uuid is None
+
+
+def test_async_provider_result_preserves_bypass_rules_for_reconciliation():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1", "squash", "direct_merge", True)
+    assert accepted.uuid is not None
+    assert accepted.bypass_rules is True
+    pending = provider.get_async_result(accepted.uuid)
+    assert pending.bypass_rules is True
+    provider.merge_directly()
+    merged = provider.get_async_result(accepted.uuid)
+    assert merged.bypass_rules is True
+    reconciliation = provider.reconcile(
+        accepted.uuid,
+        "H1",
+        "squash",
+        "direct_merge",
+        True,
+    )
+    assert reconciliation.effect_observed
+    assert reconciliation.causal_attribution == "established"
+
+
+def test_async_provider_result_bypass_rules_mismatch_is_not_causal():
+    provider = GitHubAsyncModel()
+    accepted = provider.submit("H1", "squash", "direct_merge", True)
+    assert accepted.uuid is not None
+    provider.merge_directly()
+    reconciliation = provider.reconcile(
+        accepted.uuid,
+        "H1",
+        "squash",
+        "direct_merge",
+        False,
+    )
+    assert not reconciliation.effect_observed
+    assert reconciliation.causal_attribution == "unestablished"
 
 
 def test_direct_provider_merge_establishes_causal_attribution():
@@ -1327,6 +1863,22 @@ TESTS = [
     test_provider_topology_binding_requires_cas_evidence_for_strong_class,
     test_provider_topology_binding_rejects_unbound_cas_evidence,
     test_provider_topology_binding_rejects_cas_evidence_sequence_drift,
+    test_provider_topology_cas_predicate_digest_binds_observation,
+    test_provider_topology_cas_predicate_digest_binds_sequence,
+    test_provider_topology_cas_predicate_digest_binds_bypass_rules,
+    test_provider_topology_cas_request_binds_requested_operation_parameters,
+    test_provider_topology_cas_provider_result_binds_request_digest,
+    test_provider_topology_cas_submission_digest_binds_operation_id,
+    test_provider_topology_cas_provider_result_binds_submission,
+    test_provider_topology_cas_evidence_rejects_submission_digest_splice,
+    test_provider_topology_cas_evidence_rejects_submission_field_splice,
+    test_provider_topology_cas_provider_result_digest_binds_operation_id,
+    test_provider_topology_cas_evidence_rejects_provider_result_digest_splice,
+    test_provider_topology_cas_evidence_rejects_result_field_splice,
+    test_provider_topology_binding_rejects_bypass_mode_splice,
+    test_provider_topology_binding_rejects_non_provider_cas_evidence_source,
+    test_provider_topology_binding_rejects_empty_provider_operation_id,
+    test_provider_topology_binding_rejects_unaccepted_cas_predicate_result,
     test_matching_revalidation_does_not_claim_post_submit_freshness,
     test_provider_stack_observation_exact_selected_prefix_matches,
     test_provider_stack_observation_missing_value_fails_closed,
@@ -1358,6 +1910,8 @@ TESTS = [
     test_stack_identity_binds_merge_parameters,
     test_stack_identity_binds_authority_generations,
     test_stack_identity_binds_provider_stack_number,
+    test_stack_identity_binds_bypass_rules,
+    test_stack_identity_rejects_bypass_for_multi_pr_stack,
     test_stack_identity_binds_requested_subject_identity,
     test_exact_20_schedules_are_executed,
     test_single_use_reservation,
@@ -1365,6 +1919,10 @@ TESTS = [
     test_timeout_after_acceptance_is_unknown,
     test_duplicate_async_request_reuses_provider_handle,
     test_duplicate_async_request_option_mismatch_is_not_idempotent,
+    test_duplicate_async_request_bypass_rules_mismatch_is_not_idempotent,
+    test_provider_model_rejects_bypass_for_multi_pr_stack,
+    test_async_provider_result_preserves_bypass_rules_for_reconciliation,
+    test_async_provider_result_bypass_rules_mismatch_is_not_causal,
     test_direct_provider_merge_establishes_causal_attribution,
     test_enqueued_then_durable_merge_observes_effect_without_causality,
     test_expired_uuid_then_durable_merge_observes_effect_without_causality,
