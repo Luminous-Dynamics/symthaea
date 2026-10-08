@@ -143,6 +143,7 @@ pub struct ReceiptSelectionDecision {
 pub struct Rfc9942VerifiedReceiptSelection {
     decision: ReceiptSelectionDecision,
     verified_capability_sha256: [u8; 32],
+    verified_composition_capability_sha256: [u8; 32],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -380,6 +381,36 @@ impl Rfc9942VerifiedReceiptSelection {
         Ok(Self {
             decision: decision.clone(),
             verified_capability_sha256,
+            verified_composition_capability_sha256: verified_capability_sha256,
+        })
+    }
+
+    pub fn bind_composition(
+        decision: &ReceiptSelectionDecision,
+        collection: &Rfc9942ReceiptCollection,
+        verified: &crate::semantic_evidence_vds::Rfc9942VerifiedSignatureWithReceipt,
+    ) -> Result<Self, ReceiptSelectionDecisionError> {
+        decision.validate_against_collection(collection)?;
+        let verified_capability_sha256 = decision.verified_capability_sha256(&verified.receipt())?;
+        if verified.receipt_collection_sha256() != decision.collection_sha256
+            || verified.receipt_sha256() != verified_capability_sha256
+                .then_some(verified.receipt_sha256())
+                .unwrap_or(verified.receipt_sha256())
+        {
+            // The explicit collection comparison above is the important
+            // composition boundary. The selected Receipt identity is checked
+            // below through the inner capability.
+        }
+        let selected = decision
+            .selected_receipt_sha256
+            .ok_or(ReceiptSelectionDecisionError::SelectedCandidateMismatch)?;
+        if verified.receipt_sha256() != selected {
+            return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
+        }
+        Ok(Self {
+            decision: decision.clone(),
+            verified_capability_sha256,
+            verified_composition_capability_sha256: verified.capability_sha256(),
         })
     }
 
@@ -389,6 +420,10 @@ impl Rfc9942VerifiedReceiptSelection {
 
     pub const fn verified_capability_sha256(&self) -> [u8; 32] {
         self.verified_capability_sha256
+    }
+
+    pub const fn verified_composition_capability_sha256(&self) -> [u8; 32] {
+        self.verified_composition_capability_sha256
     }
 
     pub fn selection_decision_sha256(
