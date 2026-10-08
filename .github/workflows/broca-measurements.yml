@@ -37,6 +37,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact PR-head checkout
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          expected="${{ github.event.pull_request.head.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
