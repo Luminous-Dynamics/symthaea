@@ -298,6 +298,6 @@ mod tests {
         ).unwrap();
         let mut schedule = ExecutionSchedule::from_graph(&graph).unwrap();
         schedule.dependencies[0].from_ordinal = schedule.dependencies[0].to_ordinal;
-        assert!(matches!(schedule.digest(), Err(ScheduleError::NonForwardDependency { .. })));
+        assert!(matches!(schedule.digest(), Err(ScheduleError::OrdinalMismatch)));
     }
 }
