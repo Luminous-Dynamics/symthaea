@@ -8760,7 +8760,7 @@ echo '}'
                     continue;
                 };
                 eprintln!("[{}] {} Switching to generation {}...", peer_addr, transaction.log_line(), r#gen);
-                let generation_result = run_privileged_args(
+                let generation_result = run_privileged_isolated_nix_args(
                     "nix-env",
                     &["--switch-generation", r#gen, "-p", "/nix/var/nix/profiles/system"],
                 )
