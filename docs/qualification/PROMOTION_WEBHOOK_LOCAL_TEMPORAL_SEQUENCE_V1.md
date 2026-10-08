@@ -135,6 +135,8 @@ The evidence binds the exact promotion operation identity, local sequence source
 
 A timing artifact carrying a correctly ordered sequence from another operation is rejected as local-sequence-operation-identity-mismatch.
 
+Clock-relation evidence also commits the source challenge, response, and verifier-attestation digests into its canonical evidence digest. This prevents mutation of one underlying source-message layer from leaving the outer clock-evidence identity unchanged.
+
 A correctly ordered sequence with missing provenance is rejected as local-sequence-provenance-missing. A malformed or internally inconsistent provenance record is rejected as local-sequence-source-invalid.
 
 The reference model deliberately does not claim a kernel or hardware attestation of the sequence source. It establishes provenance and binding semantics so a bare caller-authored sequence cannot satisfy the full cross-domain timing predicate.
