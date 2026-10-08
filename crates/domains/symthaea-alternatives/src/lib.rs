@@ -8653,6 +8653,138 @@ mod tests {
     }
 
     #[test]
+    fn measurement_model_input_definition_identity_fields_are_frontier_significant() {
+        let binding = CalibrationTraceabilityInputBinding {
+            input_quantity_id: "temperature".into(),
+            input_specification: MeasurementModelInputSpecificationRef {
+                specification_id: "fixture-temperature-spec".into(),
+                specification_revision: "v1".into(),
+                specification_digest: "fixture-temperature-spec-digest".into(),
+                quantity_definition: Some(MeasurementModelInputQuantityDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/quantitykind".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/quantitykind/Temperature".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: "quantity-definition-v1".into(),
+                }),
+                unit_definition: Some(MeasurementModelInputUnitDefinitionRef {
+                    vocabulary_id: "http://qudt.org/3.5.2/vocab/unit".into(),
+                    vocabulary_revision: "3.5.2".into(),
+                    definition_id: "http://qudt.org/vocab/unit/K".into(),
+                    definition_revision: "3.5.2".into(),
+                    definition_digest: "unit-definition-v1".into(),
+                }),
+            },
+            role: MeasurementModelInputRole::Influence,
+            node_id: "temperature-calibration".into(),
+        };
+        let baseline =
+            canonical_measurement_model_input_frontier_digest(std::slice::from_ref(&binding))
+                .unwrap();
+
+        let assert_change =
+            |label: &str, mutate: fn(&mut CalibrationTraceabilityInputBinding)| {
+                let mut mutated = binding.clone();
+                mutate(&mut mutated);
+                let digest =
+                    canonical_measurement_model_input_frontier_digest(&[mutated]).unwrap();
+                assert_ne!(
+                    baseline, digest,
+                    "{label} must be committed to the authoritative input frontier"
+                );
+            };
+
+        assert_change("quantity vocabulary identity", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_id = "http://qudt.example/alternate/quantitykind".into();
+        });
+        assert_change("quantity vocabulary revision", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_revision = "3.5.3".into();
+        });
+        assert_change("quantity definition identity", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .definition_id = "http://qudt.org/vocab/quantitykind/WetBulbTemperature".into();
+        });
+        assert_change("quantity definition revision", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .definition_revision = "3.5.3".into();
+        });
+        assert_change("quantity definition digest", |binding| {
+            binding
+                .input_specification
+                .quantity_definition
+                .as_mut()
+                .unwrap()
+                .definition_digest = "quantity-definition-v2".into();
+        });
+
+        assert_change("unit vocabulary identity", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_id = "http://qudt.example/alternate/unit".into();
+        });
+        assert_change("unit vocabulary revision", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .vocabulary_revision = "3.5.3".into();
+        });
+        assert_change("unit definition identity", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .definition_id = "http://qudt.org/vocab/unit/degreeCelsius".into();
+        });
+        assert_change("unit definition revision", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .definition_revision = "3.5.3".into();
+        });
+        assert_change("unit definition digest", |binding| {
+            binding
+                .input_specification
+                .unit_definition
+                .as_mut()
+                .unwrap()
+                .definition_digest = "unit-definition-v2".into();
+        });
+
+        assert_change("quantity definition omission", |binding| {
+            binding.input_specification.quantity_definition = None;
+        });
+        assert_change("unit definition omission", |binding| {
+            binding.input_specification.unit_definition = None;
+        });
+    }
+
+    #[test]
     fn branched_traceability_topology_is_typed_and_uncertainty_bound() {
         let mut candidate = candidate(
             "branched-traceability-topology",
