@@ -34,6 +34,7 @@ The model distinguishes:
     stale-before-submit
     invalid-observation-order
     invalid-observation-sequence
+    invalid-provider-operation-options
     observed-not-cas
     provider-topology-cas
 
