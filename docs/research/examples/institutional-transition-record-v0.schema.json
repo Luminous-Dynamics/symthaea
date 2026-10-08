@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Institutional Transition Record v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_profile_hash",
+    "target_profile_hash",
+    "legacy_state_hash",
+    "conversion_profile_hash",
+    "transition_phase",
+    "legacy_claims",
+    "oracle_version",
+    "claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "institutional-transition-record-v0"
+    },
+    "source_profile_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_profile_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "legacy_state_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "conversion_profile_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transition_phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "legacy_claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "oracle_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "historical_qualification",
+        "currentness",
+        "transition_feasible",
+        "political_acceptability"
+      ],
+      "properties": {
+        "historical_qualification": {
+          "type": "boolean"
+        },
+        "currentness": {
+          "type": "boolean"
+        },
+        "transition_feasible": {
+          "type": "boolean"
+        },
+        "political_acceptability": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "disposition"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "retained",
+            "converted",
+            "settled",
+            "extinguished",
+            "transferred",
+            "phased_out",
+            "disputed",
+            "stranded",
+            "unresolved"
+          ]
+        },
+        "source_asset_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_asset_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authority_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "settlement_event_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rollback_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observation_window": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
