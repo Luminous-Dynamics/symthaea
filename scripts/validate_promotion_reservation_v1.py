@@ -899,8 +899,11 @@ class ProviderTopologyCasEvidenceV1:
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
         trust_root: ProviderTopologyCasTrustRootV1 | None,
+        trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_trust_policy_digest: str | None,
+        expected_trust_policy_generation: int | None,
     ) -> bool:
-        if trust_root is None:
+        if trust_root is None or trust_policy is None:
             return False
         if self.evidence_source != "provider-result-capture":
             return False
@@ -926,6 +929,9 @@ class ProviderTopologyCasEvidenceV1:
                 observation,
                 pre_submit_sequence,
                 trust_root,
+                trust_policy,
+                expected_trust_policy_digest,
+                expected_trust_policy_generation,
             )
         )
 
@@ -938,6 +944,9 @@ class ProviderTopologyBindingV1:
     pre_submit_sequence: int | None
     provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None
     attestation_trust_root: ProviderTopologyCasTrustRootV1 | None = None
+    attestation_trust_policy: ProviderTopologyCasTrustPolicyV1 | None = None
+    expected_trust_policy_digest: str | None = None
+    expected_trust_policy_generation: int | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
         if not identity.provider_constraints_valid():
@@ -961,6 +970,9 @@ class ProviderTopologyBindingV1:
             self.pre_submit_observation,
             self.pre_submit_sequence,
             self.attestation_trust_root,
+            self.attestation_trust_policy,
+            self.expected_trust_policy_digest,
+            self.expected_trust_policy_generation,
         ):
             return "observed-not-cas"
         return "provider-topology-cas"
