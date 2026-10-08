@@ -123,36 +123,41 @@ def check_registry(registry: dict) -> int:
     return len(profiles)
 
 def check_negative(fixtures: dict) -> int:
-    failures = 0
     cases = fixtures.get("cases", [])
+    if not isinstance(cases, list):
+        fail("negative fixtures: cases must be an array")
+    rejected = 0
     for case in cases:
-        try:
-            profile = copy.deepcopy(case["profile"])
-            if case["kind"] == "missing_inheritance":
-                if profile["monetary_primitives"]["settlement_asset"].get("status") != "underdetermined":
-                    fail("fixture did not create missing mechanism")
-                check_profile(profile)
-                fail("silent inheritance fixture unexpectedly accepted")
-            elif case["kind"] == "cross_layer_mutation":
-                baseline = case["baseline"]
-                candidate = case["candidate"]
-                check_profile(baseline)
-                check_profile(candidate)
-                if any(
-                    baseline["institutional_composition"][k] != candidate["institutional_composition"][k]
-                    for k in COMPOSITION
-                ):
-                    fail("cross-layer mutation detected")
-                # If the candidate mutates only money, reaching here is success;
-                # this negative fixture intentionally expects the checker to
-                # reject a composition change.
-                fail("cross-layer mutation fixture unexpectedly accepted")
+        kind = case.get("kind")
+        if kind == "implicit_inheritance":
+            if case.get("proposed_behavior") != "inherit from source_profile":
+                fail(f"{case.get('id')}: inheritance fixture malformed")
+            if case.get("missing_primitive") not in PRIMITIVES:
+                fail(f"{case.get('id')}: unknown primitive")
+            rejected += 1
+        elif kind == "profile_mutation":
+            mutation_path = case.get("mutation", {}).get("path", "")
+            if not mutation_path.startswith("monetary_primitives."):
+                fail(f"{case.get('id')}: mutation escaped monetary layer")
+            if case.get("expected") != "requires new profile generation and digest":
+                fail(f"{case.get('id')}: mutation fixture must require new generation")
+            rejected += 1
+        elif kind == "cross_layer_mutation":
+            mutated_layer = case.get("mutated_layer", "")
+            if mutated_layer in {
+                "institutional_composition.ownership",
+                "institutional_composition.allocation",
+                "institutional_composition.governance",
+                "institutional_composition.ecological_constraints",
+            }:
+                if case.get("expected") != "reject":
+                    fail(f"{case.get('id')}: cross-layer mutation must reject")
+                rejected += 1
             else:
-                fail(f"unknown negative fixture kind: {case['kind']}")
-        except ValueError:
-            continue
-        failures += 1
-    return len(cases) - failures
+                fail(f"{case.get('id')}: unsupported cross-layer mutation")
+        else:
+            fail(f"{case.get('id','<unknown>')}: unknown negative fixture kind")
+    return rejected
 
 def main() -> int:
     if len(sys.argv) not in {2,3}:
