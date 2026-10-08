@@ -212,6 +212,45 @@ class ProviderMergeResultV1:
 
 
 @dataclass(frozen=True)
+class ProviderResultRetentionV1:
+    retention_hours: int = 24
+    age_hours: int = 0
+    captured_locally: bool = False
+    provider_available: bool = True
+
+    def classify(self) -> str:
+        if self.retention_hours <= 0 or self.age_hours < 0:
+            return "invalid-retention-state"
+        if self.captured_locally:
+            return "provider-result-captured-locally"
+        if not self.provider_available:
+            return "provider-result-unavailable"
+        if self.age_hours >= self.retention_hours:
+            return "provider-result-expired"
+        return "provider-result-provider-recoverable"
+
+    def direct_evidence_recoverable(self) -> bool:
+        return self.classify() in {
+            "provider-result-captured-locally",
+            "provider-result-provider-recoverable",
+        }
+
+
+def provider_result_retention_fixture(
+    *,
+    age_hours: int = 1,
+    captured_locally: bool = False,
+    provider_available: bool = True,
+) -> ProviderResultRetentionV1:
+    return ProviderResultRetentionV1(
+        retention_hours=24,
+        age_hours=age_hours,
+        captured_locally=captured_locally,
+        provider_available=provider_available,
+    )
+
+
+@dataclass(frozen=True)
 class PromotionCausalResolutionV1:
     outcome: str
     requested_effect_causal: bool
@@ -291,6 +330,67 @@ def causal_resolution_fixture(
         effect_set if effect_set is not None else stack_effect_fixture(identity),
         topology_binding if topology_binding is not None else topology_binding_fixture(identity),
     )
+
+
+def test_provider_result_retention_captured_locally_survives_expiry():
+    retention = provider_result_retention_fixture(
+        age_hours=72,
+        captured_locally=True,
+    )
+    assert retention.classify() == "provider-result-captured-locally"
+    assert retention.direct_evidence_recoverable()
+
+
+def test_provider_result_retention_is_recoverable_before_expiry():
+    retention = provider_result_retention_fixture(age_hours=12)
+    assert retention.classify() == "provider-result-provider-recoverable"
+    assert retention.direct_evidence_recoverable()
+
+
+def test_provider_result_retention_expires_at_window_boundary():
+    retention = provider_result_retention_fixture(age_hours=24)
+    assert retention.classify() == "provider-result-expired"
+    assert not retention.direct_evidence_recoverable()
+
+
+def test_provider_result_retention_expired_after_window():
+    retention = provider_result_retention_fixture(age_hours=48)
+    assert retention.classify() == "provider-result-expired"
+    assert not retention.direct_evidence_recoverable()
+
+
+def test_provider_result_retention_provider_unavailable_before_expiry_is_distinct():
+    retention = provider_result_retention_fixture(
+        age_hours=6,
+        provider_available=False,
+    )
+    assert retention.classify() == "provider-result-unavailable"
+    assert not retention.direct_evidence_recoverable()
+
+
+def test_provider_result_retention_invalid_negative_age_fails_closed():
+    retention = provider_result_retention_fixture(age_hours=-1)
+    assert retention.classify() == "invalid-retention-state"
+    assert not retention.direct_evidence_recoverable()
+
+
+def test_provider_result_retention_invalid_nonpositive_window_fails_closed():
+    retention = ProviderResultRetentionV1(retention_hours=0, age_hours=1)
+    assert retention.classify() == "invalid-retention-state"
+    assert not retention.direct_evidence_recoverable()
+
+
+def test_expiry_does_not_change_later_effect_observation_class():
+    identity = stack_identity_fixture()
+    retention = provider_result_retention_fixture(age_hours=48)
+    assert retention.classify() == "provider-result-expired"
+    resolution = causal_resolution_fixture(
+        identity,
+        provider_result=None,
+        effect_set=stack_effect_fixture(identity),
+        topology_binding=topology_binding_fixture(identity),
+    )
+    assert resolution.outcome == "effect-observed-only"
 
 
 def test_requested_effect_causality_from_direct_provider_result():
@@ -1537,6 +1637,14 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_result_retention_captured_locally_survives_expiry,
+    test_provider_result_retention_is_recoverable_before_expiry,
+    test_provider_result_retention_expires_at_window_boundary,
+    test_provider_result_retention_expired_after_window,
+    test_provider_result_retention_provider_unavailable_before_expiry_is_distinct,
+    test_provider_result_retention_invalid_negative_age_fails_closed,
+    test_provider_result_retention_invalid_nonpositive_window_fails_closed,
+    test_expiry_does_not_change_later_effect_observation_class,
     test_requested_effect_causality_from_direct_provider_result,
     test_direct_result_plus_exact_effect_set_stays_requested_causal_without_provider_cas,
     test_direct_result_plus_exact_effect_set_becomes_stack_causal_only_with_explicit_provider_cas,
