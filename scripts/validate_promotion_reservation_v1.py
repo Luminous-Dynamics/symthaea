@@ -738,6 +738,41 @@ def parse_provider_timestamp_interval_ms(
 
 
 @dataclass(frozen=True)
+class ProviderTimestampPolicyV1:
+    provider_identity: str
+    source_field: str
+    occurrence_semantics: str
+    max_reported_resolution_ms: int
+    policy_generation: int
+
+    def usable(self) -> bool:
+        return (
+            bool(self.provider_identity)
+            and self.source_field == "pull_request.merged_at"
+            and self.occurrence_semantics in {"truncated", "exact"}
+            and self.max_reported_resolution_ms > 0
+            and self.policy_generation > 0
+        )
+
+    def identity_digest(self) -> str:
+        payload = {
+            "max_reported_resolution_ms": self.max_reported_resolution_ms,
+            "occurrence_semantics": self.occurrence_semantics,
+            "policy_generation": self.policy_generation,
+            "provider_identity": self.provider_identity,
+            "source_field": self.source_field,
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+
+
+@dataclass(frozen=True)
 class ClockRelationV1:
     provider_clock_domain: str
     local_clock_domain: str
@@ -779,7 +814,8 @@ class ClockRelationV1:
 class ProviderWebhookEffectTimingV1:
     provider_event_time_ms: int | None
     provider_event_time_upper_ms: int | None
-    provider_timestamp_semantics: str | None
+    provider_timestamp_policy: ProviderTimestampPolicyV1 | None
+    provider_timestamp_policy_digest: str | None
     provider_delivery_time_ms: int | None
     local_reservation_time_ms: int | None
     local_dispatch_time_ms: int | None
@@ -794,20 +830,25 @@ class ProviderWebhookEffectTimingV1:
         local_dispatch_time_ms: int | None,
         clock_relation: ClockRelationV1 | None,
         provider_delivery_time_ms: int | None = None,
-        provider_timestamp_semantics: str | None = None,
+        timestamp_policy: ProviderTimestampPolicyV1 | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
         interval = (
             parse_provider_timestamp_interval_ms(
                 observation.merged_at,
-                occurrence_semantics=provider_timestamp_semantics,
+                occurrence_semantics=timestamp_policy.occurrence_semantics,
             )
-            if provider_timestamp_semantics is not None
+            if timestamp_policy is not None and timestamp_policy.usable()
             else None
         )
         return cls(
             provider_event_time_ms=interval[0] if interval is not None else None,
             provider_event_time_upper_ms=interval[1] if interval is not None else None,
-            provider_timestamp_semantics=provider_timestamp_semantics,
+            provider_timestamp_policy=timestamp_policy,
+            provider_timestamp_policy_digest=(
+                timestamp_policy.identity_digest()
+                if timestamp_policy is not None
+                else None
+            ),
             provider_delivery_time_ms=provider_delivery_time_ms,
             local_reservation_time_ms=local_reservation_time_ms,
             local_dispatch_time_ms=local_dispatch_time_ms,
@@ -832,8 +873,16 @@ class ProviderWebhookEffectTimingV1:
             return "provider-event-time-upper-missing"
         if self.provider_event_time_upper_ms < self.provider_event_time_ms:
             return "invalid-provider-event-interval"
-        if self.provider_timestamp_semantics not in {"truncated", "exact"}:
-            return "provider-timestamp-semantics-unverified"
+        if (
+            self.provider_timestamp_policy is None
+            or not self.provider_timestamp_policy.usable()
+        ):
+            return "provider-timestamp-policy-unusable"
+        if (
+            self.provider_timestamp_policy_digest
+            != self.provider_timestamp_policy.identity_digest()
+        ):
+            return "provider-timestamp-policy-integrity-invalid"
         if self.local_reservation_time_ms is None:
             return "local-reservation-time-missing"
         if self.local_dispatch_time_ms is None:
@@ -1483,6 +1532,23 @@ def stack_webhook_observation(
     return observation
 
 
+def timestamp_policy_fixture(
+    *,
+    provider_identity: str = "github",
+    source_field: str = "pull_request.merged_at",
+    occurrence_semantics: str = "truncated",
+    max_reported_resolution_ms: int = 1000,
+    policy_generation: int = 1,
+) -> ProviderTimestampPolicyV1:
+    return ProviderTimestampPolicyV1(
+        provider_identity=provider_identity,
+        source_field=source_field,
+        occurrence_semantics=occurrence_semantics,
+        max_reported_resolution_ms=max_reported_resolution_ms,
+        policy_generation=policy_generation,
+    )
+
+
 def clock_relation_fixture(
     *,
     max_skew_ms: int = 1000,
@@ -1506,7 +1572,7 @@ def effect_timing_fixture(
     *,
     event_time_ms: int | None = 1791475200000,
     event_upper_time_ms: int | None = 1791475200999,
-    timestamp_semantics: str | None = "truncated",
+    timestamp_policy: ProviderTimestampPolicyV1 | None = None,
     delivery_time_ms: int | None = None,
     reservation_time_ms: int | None = 1791475190000,
     dispatch_time_ms: int | None = 1791475195000,
@@ -1516,7 +1582,18 @@ def effect_timing_fixture(
     return ProviderWebhookEffectTimingV1(
         provider_event_time_ms=event_time_ms,
         provider_event_time_upper_ms=event_upper_time_ms,
-        provider_timestamp_semantics=timestamp_semantics,
+        provider_timestamp_policy=(
+            timestamp_policy
+            if timestamp_policy is not None
+            else timestamp_policy_fixture()
+        ),
+        provider_timestamp_policy_digest=(
+            (
+                timestamp_policy
+                if timestamp_policy is not None
+                else timestamp_policy_fixture()
+            ).identity_digest()
+        ),
         provider_delivery_time_ms=delivery_time_ms,
         local_reservation_time_ms=reservation_time_ms,
         local_dispatch_time_ms=dispatch_time_ms,
@@ -1540,7 +1617,7 @@ def webhook_effect_timing_from_observation(
         local_reservation_time_ms=1791475190000,
         local_dispatch_time_ms=1791475195000,
         clock_relation=clock_relation_fixture(),
-        provider_timestamp_semantics="truncated",
+        timestamp_policy=timestamp_policy_fixture(),
     )
 
 
@@ -1585,6 +1662,47 @@ def test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics(
         "2026-10-08T16:00:00Z",
         occurrence_semantics="unknown",
     ) is None
+
+
+def test_timestamp_policy_binds_provider_source_and_interpretation():
+    policy = timestamp_policy_fixture()
+    assert policy.usable()
+    assert policy.identity_digest()
+    assert not timestamp_policy_fixture(source_field="pull_request.closed_at").usable()
+    assert not timestamp_policy_fixture(occurrence_semantics="unknown").usable()
+
+
+def test_temporal_effect_rejects_tampered_timestamp_policy_identity():
+    policy = timestamp_policy_fixture()
+    timing = effect_timing_fixture(timestamp_policy=policy)
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=timestamp_policy_fixture(policy_generation=2),
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        clock_relation=timing.clock_relation,
+    )
+    assert tampered.classify() == "provider-timestamp-policy-integrity-invalid"
+
+
+def test_temporal_effect_without_timestamp_policy_is_not_admissible():
+    timing = effect_timing_fixture(timestamp_policy=None)
+    timing = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=None,
+        provider_timestamp_policy_digest=None,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        clock_relation=timing.clock_relation,
+    )
+    assert timing.classify() == "provider-timestamp-policy-unusable"
 
 
 def test_provider_timestamp_parser_rejects_malformed_timestamp():
@@ -4141,6 +4259,9 @@ TESTS = [
     test_provider_timestamp_parser_accepts_utc_and_offset,
     test_provider_timestamp_interval_respects_reported_precision,
     test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics,
+    test_timestamp_policy_binds_provider_source_and_interpretation,
+    test_temporal_effect_rejects_tampered_timestamp_policy_identity,
+    test_temporal_effect_without_timestamp_policy_is_not_admissible,
     test_provider_timestamp_parser_rejects_malformed_timestamp,
     test_clock_relation_unverified_is_unusable,
     test_clock_relation_negative_skew_is_unusable,
