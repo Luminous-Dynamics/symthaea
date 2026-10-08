@@ -125,6 +125,7 @@ jobs:
               "clock-relation-invalid",
               "clock-relation-policy-drift",
               "clock-relation-revoked",
+              "clock-relation-trust-snapshot-after-verification",
               "clock-relation-trust-snapshot-after-dispatch",
               "clock-relation-established-after-dispatch",
               "clock-relation-outside-validity",
