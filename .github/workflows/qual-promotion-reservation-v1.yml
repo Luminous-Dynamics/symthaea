@@ -41,6 +41,7 @@ jobs:
               "ProviderTopologyCasPredicateV1",
               "ProviderTopologyCasRequestV1",
               "ProviderTopologyCasSubmissionV1",
+              "ProviderTopologyCasExecutionV1",
               "ProviderTopologyCasProviderResultV1",
               "ProviderTopologyCasEvidenceV1",
               "ProviderTopologyBindingV1",
@@ -58,6 +59,10 @@ jobs:
           for marker in (
               "provider_constraints_valid",
               "bypass-not-supported-for-stack",
+              "ProviderTopologyCasExecutionV1",
+              "provider-conditional-execution",
+              "test_provider_topology_cas_provider_result_requires_enforcement_witness",
+              "test_provider_topology_cas_evidence_rejects_unenforced_execution",
               "test_stack_identity_rejects_bypass_for_multi_pr_stack",
               "test_provider_model_rejects_bypass_for_multi_pr_stack",
           ):
