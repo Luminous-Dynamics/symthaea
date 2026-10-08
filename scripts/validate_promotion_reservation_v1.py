@@ -1446,6 +1446,10 @@ def test_webhook_merge_effect_rejects_invalid_hmac():
             receipt,
             payload,
             b"wrong",
+            webhook_received_context(receipt),
+            "hook-1",
+            "pull_request",
+            "Luminous-Dynamics/symthaea",
         )
         is None
     )
@@ -1590,6 +1594,10 @@ def test_webhook_merge_effect_rejects_tampered_payload_after_receipt():
         receipt,
         tampered,
         b"secret",
+        webhook_received_context(receipt),
+        "hook-1",
+        "pull_request",
+        "Luminous-Dynamics/symthaea",
     ) is None
 
 
