@@ -652,7 +652,11 @@ impl VulkanBarrierWorkloadRuntime {
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
             barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes)
-                .map_err(VulkanBarrierError::Receipt)?,
+                .map_err(|resource| {
+                    VulkanBarrierError::Receipt(
+                        VulkanBarrierReceiptError::MissingResourceStorageSize(resource),
+                    )
+                })?,
             completion_lowering_digest: completion_lowering_digest(
                 plan,
                 completion_expected,
