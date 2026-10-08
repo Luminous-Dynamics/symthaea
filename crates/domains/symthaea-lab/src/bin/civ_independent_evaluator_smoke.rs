@@ -27,19 +27,59 @@ struct CandidateRevision {
     candidate: Digest,
     parent: Option<Digest>,
     code_lineage: Digest,
+    data_lineage: Digest,
+    scenario_lineage: Digest,
+    privileged_access_lineage: Digest,
+    authority_lineage: Digest,
+    operator_lineage: Digest,
     change_set: Digest,
 }
 
 impl CandidateRevision {
     fn digest(self) -> Digest {
         // The smoke fixture uses content-address-like stable identities.
-        // A production implementation must bind the canonical artifact bytes.
-        match (self.candidate, self.change_set) {
-            (Digest("candidate-v1"), Digest("candidate-expected")) => Digest("candidate-v1"),
-            (Digest("candidate-v1"), Digest("candidate-tampered")) => Digest("candidate-tampered"),
-            (Digest("candidate-degraded"), Digest("candidate-degraded")) => {
-                Digest("candidate-degraded")
-            }
+        // A production implementation must bind canonical artifact bytes plus
+        // the lineage dimensions that define the qualified subject.
+        match (
+            self.candidate,
+            self.code_lineage,
+            self.data_lineage,
+            self.scenario_lineage,
+            self.privileged_access_lineage,
+            self.authority_lineage,
+            self.operator_lineage,
+            self.change_set,
+        ) {
+            (
+                Digest("candidate-v1"),
+                Digest("candidate-code-v1"),
+                Digest("candidate-data-v1"),
+                Digest("candidate-scenario-v1"),
+                Digest("candidate-access-v1"),
+                Digest("candidate-authority-v1"),
+                Digest("candidate-operator-v1"),
+                Digest("candidate-expected"),
+            ) => Digest("candidate-v1"),
+            (
+                Digest("candidate-v1"),
+                Digest("candidate-code-v1"),
+                Digest("candidate-data-v1"),
+                Digest("candidate-scenario-v1"),
+                Digest("candidate-access-v1"),
+                Digest("candidate-authority-v1"),
+                Digest("candidate-operator-v1"),
+                Digest("candidate-tampered"),
+            ) => Digest("candidate-tampered"),
+            (
+                Digest("candidate-degraded"),
+                Digest("candidate-code-v2"),
+                Digest("candidate-data-v1"),
+                Digest("candidate-scenario-v1"),
+                Digest("candidate-access-v1"),
+                Digest("candidate-authority-v1"),
+                Digest("candidate-operator-v1"),
+                Digest("candidate-degraded"),
+            ) => Digest("candidate-degraded"),
             _ => Digest("candidate-other"),
         }
     }
@@ -49,10 +89,14 @@ impl CandidateRevision {
 struct EvaluationProfile {
     evaluator: Digest,
     profile: Digest,
+    rule_set: Digest,
     holdout: Digest,
     evaluator_code_lineage: Digest,
     evaluator_data_lineage: Digest,
+    scenario_generation_lineage: Digest,
+    privileged_access_lineage: Digest,
     authority_lineage: Digest,
+    operator_lineage: Digest,
     valid_from_epoch: u64,
     valid_until_epoch: u64,
 }
@@ -63,10 +107,34 @@ impl EvaluationProfile {
     }
 
     fn digest(self) -> Digest {
-        // Stable fixture identity for this smoke. The profile field is part of
-        // the bound evaluation subject rather than free-form metadata.
-        match self.profile {
-            Digest("evaluation-profile-v1") => Digest("evaluator-profile-v1"),
+        // The evaluator identity binds the rule set, holdout, lineage, and
+        // validity window. Changing any of these creates a new profile identity.
+        match (
+            self.profile,
+            self.rule_set,
+            self.holdout,
+            self.evaluator_code_lineage,
+            self.evaluator_data_lineage,
+            self.scenario_generation_lineage,
+            self.privileged_access_lineage,
+            self.authority_lineage,
+            self.operator_lineage,
+            self.valid_from_epoch,
+            self.valid_until_epoch,
+        ) {
+            (
+                Digest("evaluation-profile-v1"),
+                Digest("rule-set-v1"),
+                Digest("holdout-v1"),
+                Digest("evaluator-code-v1"),
+                Digest("evaluator-data-v1"),
+                Digest("evaluator-scenario-v1"),
+                Digest("evaluator-access-v1"),
+                Digest("authority-evaluator-v1"),
+                Digest("evaluator-operator-v1"),
+                100,
+                200,
+            ) => Digest("evaluator-profile-v1"),
             _ => Digest("evaluator-profile-other"),
         }
     }
@@ -81,6 +149,7 @@ struct Observation {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct EvaluationReceipt {
+    receipt_id: Digest,
     candidate: Digest,
     evaluator: Digest,
     profile: Digest,
@@ -92,11 +161,7 @@ struct EvaluationReceipt {
 
 impl EvaluationReceipt {
     fn digest(self) -> Digest {
-        match self.verdict {
-            Verdict::Pass => Digest("evaluation-pass-v1"),
-            Verdict::Fail => Digest("evaluation-fail-v1"),
-            Verdict::Indeterminate => Digest("evaluation-indeterminate-v1"),
-        }
+        self.receipt_id
     }
 
     fn matches_subject(self, profile: EvaluationProfile, candidate: CandidateRevision) -> bool {
@@ -161,10 +226,35 @@ impl Evaluator {
             Verdict::Indeterminate
         };
 
+        let candidate_digest = candidate.digest();
+        let profile_digest = self.profile.digest();
+        let receipt_id = match (candidate_digest, profile_digest, observation.id, verdict) {
+            (
+                Digest("candidate-v1"),
+                Digest("evaluator-profile-v1"),
+                Digest("observation-1"),
+                Verdict::Pass,
+            ) => Digest("evaluation-receipt-candidate-v1-observation-1"),
+            (
+                Digest("candidate-degraded"),
+                Digest("evaluator-profile-v1"),
+                Digest("observation-2"),
+                Verdict::Fail,
+            ) => Digest("evaluation-receipt-candidate-degraded-observation-2"),
+            (
+                Digest("candidate-v1"),
+                Digest("evaluator-profile-v1"),
+                Digest("observation-3"),
+                Verdict::Indeterminate,
+            ) => Digest("evaluation-receipt-candidate-v1-observation-3"),
+            _ => Digest("evaluation-receipt-other"),
+        };
+
         Ok(EvaluationReceipt {
-            candidate: candidate.digest(),
+            receipt_id,
+            candidate: candidate_digest,
             evaluator: self.profile.evaluator,
-            profile: self.profile.digest(),
+            profile: profile_digest,
             holdout: self.oracle_holdout,
             observation: observation.id,
             verdict,
@@ -177,7 +267,10 @@ impl Evaluator {
 enum IndependenceFinding {
     SharedCodeLineage,
     SharedDataLineage,
+    SharedScenarioGeneration,
+    SharedPrivilegedAccess,
     SharedAuthorityLineage,
+    SharedOperatorLineage,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -186,20 +279,36 @@ struct IndependenceRecord {
     evaluator_code_lineage: Digest,
     candidate_data_lineage: Digest,
     evaluator_data_lineage: Digest,
+    candidate_scenario_lineage: Digest,
+    evaluator_scenario_lineage: Digest,
+    candidate_privileged_access_lineage: Digest,
+    evaluator_privileged_access_lineage: Digest,
     candidate_authority_lineage: Digest,
     evaluator_authority_lineage: Digest,
+    candidate_operator_lineage: Digest,
+    evaluator_operator_lineage: Digest,
 }
 
 impl IndependenceRecord {
-    fn findings(self) -> [Option<IndependenceFinding>; 3] {
+    fn findings(self) -> [Option<IndependenceFinding>; 6] {
         [
             (self.candidate_code_lineage == self.evaluator_code_lineage)
                 .then_some(IndependenceFinding::SharedCodeLineage),
             (self.candidate_data_lineage == self.evaluator_data_lineage)
                 .then_some(IndependenceFinding::SharedDataLineage),
+            (self.candidate_scenario_lineage == self.evaluator_scenario_lineage)
+                .then_some(IndependenceFinding::SharedScenarioGeneration),
+            (self.candidate_privileged_access_lineage == self.evaluator_privileged_access_lineage)
+                .then_some(IndependenceFinding::SharedPrivilegedAccess),
             (self.candidate_authority_lineage == self.evaluator_authority_lineage)
                 .then_some(IndependenceFinding::SharedAuthorityLineage),
+            (self.candidate_operator_lineage == self.evaluator_operator_lineage)
+                .then_some(IndependenceFinding::SharedOperatorLineage),
         ]
+    }
+
+    fn is_independent(self) -> bool {
+        self.findings().iter().all(Option::is_none)
     }
 }
 
@@ -208,6 +317,7 @@ impl IndependenceRecord {
 struct PromotionAuthorization {
     authority: Digest,
     evaluation: Digest,
+    independence: IndependenceRecord,
     scope: Digest,
     expires_at_epoch: u64,
     allowed: bool,
@@ -235,6 +345,9 @@ fn issue_deployment_receipt(
     }
     if promotion.evaluation != evaluation.digest() {
         return Err("promotion does not bind the exact evaluation receipt");
+    }
+    if !promotion.independence.is_independent() {
+        return Err("evaluator independence evidence is insufficient");
     }
     if promotion.expires_at_epoch < now_epoch {
         return Err("promotion authorization is expired");
@@ -266,10 +379,14 @@ fn main() {
     let evaluator_profile = EvaluationProfile {
         evaluator: Digest("evaluator-v1"),
         profile: Digest("evaluation-profile-v1"),
+        rule_set: Digest("rule-set-v1"),
         holdout: Digest("holdout-v1"),
         evaluator_code_lineage: Digest("evaluator-code-v1"),
         evaluator_data_lineage: Digest("evaluator-data-v1"),
+        scenario_generation_lineage: Digest("evaluator-scenario-v1"),
+        privileged_access_lineage: Digest("evaluator-access-v1"),
         authority_lineage: Digest("authority-evaluator-v1"),
+        operator_lineage: Digest("evaluator-operator-v1"),
         valid_from_epoch: 100,
         valid_until_epoch: 200,
     };
@@ -280,6 +397,11 @@ fn main() {
         candidate: Digest("candidate-v1"),
         parent: None,
         code_lineage: Digest("candidate-code-v1"),
+        data_lineage: Digest("candidate-data-v1"),
+        scenario_lineage: Digest("candidate-scenario-v1"),
+        privileged_access_lineage: Digest("candidate-access-v1"),
+        authority_lineage: Digest("candidate-authority-v1"),
+        operator_lineage: Digest("candidate-operator-v1"),
         change_set: Digest("candidate-expected"),
     };
 
@@ -314,11 +436,25 @@ fn main() {
     };
     assert!(!pass.matches_subject(changed_holdout, candidate));
 
+    // Evaluator rule changes are also identity changes. An old receipt cannot
+    // silently survive a changed qualification rule set.
+    let changed_rules = EvaluationProfile {
+        rule_set: Digest("rule-set-v2"),
+        ..evaluator_profile
+    };
+    assert_ne!(changed_rules.digest(), evaluator_profile.digest());
+    assert!(!pass.matches_subject(changed_rules, candidate));
+
     // Failed and indeterminate outcomes remain first-class.
     let degraded = CandidateRevision {
         candidate: Digest("candidate-degraded"),
         parent: Some(candidate.digest()),
         code_lineage: Digest("candidate-code-v2"),
+        data_lineage: Digest("candidate-data-v1"),
+        scenario_lineage: Digest("candidate-scenario-v1"),
+        privileged_access_lineage: Digest("candidate-access-v1"),
+        authority_lineage: Digest("candidate-authority-v1"),
+        operator_lineage: Digest("candidate-operator-v1"),
         change_set: Digest("candidate-degraded"),
     };
     let degraded_observation = Observation {
@@ -343,9 +479,26 @@ fn main() {
         .expect("mismatch should be indeterminate");
     assert_eq!(uncertain.verdict, Verdict::Indeterminate);
 
+    let independent = IndependenceRecord {
+        candidate_code_lineage: candidate.code_lineage,
+        evaluator_code_lineage: evaluator_profile.evaluator_code_lineage,
+        candidate_data_lineage: candidate.data_lineage,
+        evaluator_data_lineage: evaluator_profile.evaluator_data_lineage,
+        candidate_scenario_lineage: candidate.scenario_lineage,
+        evaluator_scenario_lineage: evaluator_profile.scenario_generation_lineage,
+        candidate_privileged_access_lineage: candidate.privileged_access_lineage,
+        evaluator_privileged_access_lineage: evaluator_profile.privileged_access_lineage,
+        candidate_authority_lineage: candidate.authority_lineage,
+        evaluator_authority_lineage: evaluator_profile.authority_lineage,
+        candidate_operator_lineage: candidate.operator_lineage,
+        evaluator_operator_lineage: evaluator_profile.operator_lineage,
+    };
+    assert!(independent.is_independent());
+
     let forced_pass = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: uncertain.digest(),
+        independence,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: true,
@@ -359,6 +512,7 @@ fn main() {
     let refused = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: pass.digest(),
+        independence,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: false,
@@ -370,9 +524,36 @@ fn main() {
 
     // Only an externally supplied, scoped authorization can bridge evaluation
     // evidence into a deployment receipt.
+    // Shared lineage is retained as a concrete finding and cannot be laundered
+    // into "independence" merely because the authority allows promotion.
+    let shared_data = IndependenceRecord {
+        candidate_data_lineage: candidate.data_lineage,
+        evaluator_data_lineage: candidate.data_lineage,
+        ..independent
+    };
+    assert_eq!(
+        shared_data.findings()[1],
+        Some(IndependenceFinding::SharedDataLineage)
+    );
+    assert!(!shared_data.is_independent());
+
+    let refused_for_shared_data = PromotionAuthorization {
+        authority: Digest("external-authority"),
+        evaluation: pass.digest(),
+        independence: shared_data,
+        scope: Digest("bounded-test-scope"),
+        expires_at_epoch: 180,
+        allowed: true,
+    };
+    assert_eq!(
+        issue_deployment_receipt(pass, refused_for_shared_data, 160),
+        Err("evaluator independence evidence is insufficient")
+    );
+
     let admitted = PromotionAuthorization {
         authority: Digest("external-authority"),
         evaluation: pass.digest(),
+        independence,
         scope: Digest("bounded-test-scope"),
         expires_at_epoch: 180,
         allowed: true,
@@ -401,18 +582,13 @@ fn main() {
     );
 
     // Independence is multi-dimensional evidence, not a magic trust scalar.
-    let independence = IndependenceRecord {
-        candidate_code_lineage: candidate.code_lineage,
-        evaluator_code_lineage: evaluator_profile.evaluator_code_lineage,
-        candidate_data_lineage: Digest("shared-dataset-v1"),
-        evaluator_data_lineage: Digest("shared-dataset-v1"),
-        candidate_authority_lineage: Digest("candidate-owner-v1"),
-        evaluator_authority_lineage: evaluator_profile.authority_lineage,
-    };
-    let findings = independence.findings();
+    let findings = shared_data.findings();
     assert_eq!(findings[0], None);
     assert_eq!(findings[1], Some(IndependenceFinding::SharedDataLineage));
     assert_eq!(findings[2], None);
+    assert_eq!(findings[3], None);
+    assert_eq!(findings[4], None);
+    assert_eq!(findings[5], None);
 
     assert_oracle_is_not_authority();
 
