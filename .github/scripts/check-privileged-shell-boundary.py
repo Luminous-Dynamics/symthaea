@@ -281,6 +281,29 @@ def main() -> None:
                 f"{required!r}"
             )
 
+    shell_start = text.find("fn trusted_script_shell(")
+    shell_end = text.find("\nfn trusted_nix_script_process(", shell_start)
+    if shell_start < 0 or shell_end < 0:
+        fail("trusted script shell capability disappeared")
+    shell_body = text[shell_start:shell_end]
+    for required in (
+        'trusted_typed_executable("bash")',
+        'trusted_typed_executable("sh")',
+    ):
+        if required not in shell_body:
+            fail(f"trusted script shell capability lost immutable resolver call {required!r}")
+    for forbidden_shell in (
+        '"/bin/bash"',
+        '"/bin/sh"',
+        '"/run/current-system/sw/bin/bash"',
+        '"/run/current-system/sw/bin/sh"',
+    ):
+        if forbidden_shell in shell_body:
+            fail(
+                "trusted script shell capability regained mutable pathname interpreter "
+                f"{forbidden_shell!r}"
+            )
+
     # There should be no privileged command-construction sites outside the
     # intentionally narrow capability adapters. This keeps helper functions from
     # bypassing the trusted executable resolver while preserving shell compatibility
@@ -294,6 +317,7 @@ def main() -> None:
     allowed_constructor_fragments = (
         "fn privileged_process(",
         "privileged_process(shell)",
+        "privileged_process(&shell)",
         "privileged_process(executable.as_ref())",
     )
     for line in process_calls:
@@ -333,6 +357,11 @@ def main() -> None:
     nix_script_body = text[nix_script_start:nix_script_end]
     if '"NIX_PATH"' not in nix_script_body:
         fail("installer script capability lost its explicit NIX_PATH environment")
+    if "trusted_script_shell()?" not in nix_script_body:
+        fail(
+            "installer script capability no longer resolves its interpreter through "
+            "the typed immutable executable resolver"
+        )
 
     process_start = text.find("fn preservation_process_identity(")
     process_end = text.find("\nfn preservation_user_identity", process_start)

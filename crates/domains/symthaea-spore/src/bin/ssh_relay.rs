@@ -132,9 +132,10 @@ fn trusted_typed_executable(
     const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
 
     let requested = match program {
-        "btrfs" | "docker" | "du" | "echo" | "find" | "gzip" | "lsblk" | "nix-collect-garbage"
-        | "nix-env" | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli"
-        | "pg_dumpall" | "python3" | "systemctl" | "tar" | "uname" | "zstd" => {
+        "bash" | "btrfs" | "docker" | "du" | "echo" | "find" | "gzip" | "lsblk"
+        | "nix-collect-garbage" | "nix-env" | "nix-instantiate" | "nixos-rebuild"
+        | "mysqldump" | "nixos-version" | "nmcli" | "pg_dumpall" | "python3"
+        | "sh" | "systemctl" | "tar" | "uname" | "zstd" => {
             format!("{SYSTEM_BIN}{program}")
         }
         _ => {
@@ -268,26 +269,74 @@ fn stage_trusted_script(path: &str, contents: &[u8]) -> Result<StagedScript, std
 }
 
 fn open_trusted_script(path: &str) -> Result<std::fs::File, std::io::Error> {
-fn trusted_script_shell() -> &'static str {
-    if std::path::Path::new("/bin/bash").exists() {
-        "/bin/bash"
-    } else if std::path::Path::new("/run/current-system/sw/bin/bash").exists() {
-        "/run/current-system/sw/bin/bash"
-    } else {
-        "/bin/sh"
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+    let metadata = file.metadata()?;
+
+    if !metadata.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!("privileged script {path:?} is not a regular file"),
+        ));
+    }
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!("privileged script {path:?} is not owned by the relay user"),
+        ));
+    }
+    if metadata.permissions().mode() & 0o777 != 0o700 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "privileged script {path:?} has unsafe permissions {:04o}; require 0700",
+                metadata.permissions().mode() & 0o777
+            ),
+        ));
+    }
+    if metadata.len() == 0 || metadata.len() > 256 * 1024 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "privileged script {path:?} has unsupported size {}",
+                metadata.len()
+            ),
+        ));
+    }
+
+    Ok(file)
+}
+
+fn trusted_script_shell() -> Result<(String, bool), std::io::Error> {
+    match trusted_typed_executable("bash") {
+        Ok(path) => Ok((path.into_owned(), true)),
+        Err(bash_error) => match trusted_typed_executable("sh") {
+            Ok(path) => Ok((path.into_owned(), false)),
+            Err(sh_error) => Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!(
+                    "no immutable Nix-store shell interpreter is available: bash: {bash_error}; sh: {sh_error}"
+                ),
+            )),
+        },
     }
 }
+
 fn trusted_nix_script_process(
     script: std::fs::File,
     args: &[&str],
-) -> tokio::process::Command {
-    let shell = trusted_script_shell();
-    let mut command = privileged_process(shell);
+) -> Result<tokio::process::Command, std::io::Error> {
+    let (shell, is_bash) = trusted_script_shell()?;
+    let mut command = privileged_process(&shell);
     command.env(
         "NIX_PATH",
         "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix",
     );
-    if shell.ends_with("/bash") {
+    if is_bash {
         command.arg("-p");
     }
     command
@@ -296,17 +345,16 @@ fn trusted_nix_script_process(
         .arg("nixforhumanity-install")
         .args(args)
         .stdin(std::process::Stdio::from(script));
-    command
+    Ok(command)
 }
-
 
 fn trusted_script_process(
     script: std::fs::File,
     args: &[&str],
-) -> tokio::process::Command {
-    let shell = trusted_script_shell();
-    let mut command = privileged_process(shell);
-    if shell.ends_with("/bash") {
+) -> Result<tokio::process::Command, std::io::Error> {
+    let (shell, is_bash) = trusted_script_shell()?;
+    let mut command = privileged_process(&shell);
+    if is_bash {
         command.arg("-p");
     }
     command
@@ -315,70 +363,23 @@ fn trusted_script_process(
         .arg("nixforhumanity-script")
         .args(args)
         .stdin(std::process::Stdio::from(script));
-    command
+    Ok(command)
 }
 
 fn trusted_script_process_from_stdin(
     args: &[&str],
-) -> tokio::process::Command {
-    let shell = trusted_script_shell();
-    let mut command = privileged_process(shell);
-    if shell.ends_with("/bash") {
+) -> Result<tokio::process::Command, std::io::Error> {
+    let (shell, is_bash) = trusted_script_shell()?;
+    let mut command = privileged_process(&shell);
+    if is_bash {
         command.arg("-p");
     }
-    command
+    Ok(command
         .arg("-s")
         .arg("--")
         .arg("nixforhumanity-inline-script")
-        .args(args)
+        .args(args))
 }
-
-async fn run_privileged_script_source(
-    script: &'static str,
-    args: &[&str],
-) -> Result<CmdResult, std::io::Error> {
-    use tokio::io::AsyncWriteExt;
-
-    let mut command = trusted_script_process_from_stdin(args);
-    command.stdin(std::process::Stdio::piped());
-    let mut child = command.spawn().await?;
-    let mut stdin = child.stdin.take().ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::BrokenPipe,
-            "trusted inline script did not expose stdin",
-        )
-    })?;
-    stdin.write_all(script.as_bytes()).await?;
-    drop(stdin);
-    let output = child.wait_with_output().await?;
-    Ok(CmdResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_status: output.status.code().unwrap_or(1) as u32,
-    })
-}
-
-async fn run_privileged_script_file(
-    script: std::fs::File,
-    args: &[&str],
-) -> Result<CmdResult, std::io::Error> {
-    let mut command = trusted_script_process(script, args);
-    let output = command.output().await?;
-    Ok(CmdResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_status: output.status.code().unwrap_or(1) as u32,
-    })
-}
-
-async fn run_privileged_script_with_args(
-    path: &str,
-    args: &[&str],
-) -> Result<CmdResult, std::io::Error> {
-    let script = open_trusted_script(path)?;
-    run_privileged_script_file(script, args).await
-}
-
 
 fn create_private_runtime_file(path: &str, mode: u32) -> Result<std::fs::File, std::io::Error> {
     std::fs::OpenOptions::new()
@@ -699,7 +700,7 @@ async fn spawn_privileged_background_script_file(
     args: &[&str],
 ) -> Result<u32, std::io::Error> {
     spawn_privileged_background_process(
-        trusted_nix_script_process(script, args),
+        trusted_nix_script_process(script, args)?,
         log_path,
         status_path,
         pid_path,
