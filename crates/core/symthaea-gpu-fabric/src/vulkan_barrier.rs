@@ -113,8 +113,12 @@ pub enum VulkanBarrierReceiptError {
     MissingResourceStorageSize(ResourceId),
     #[error("receipt Vulkan API version does not match the qualified runtime")]
     ApiVersion,
-    #[error("receipt physical-device API version does not match the qualified device")]
+    #[error("receipt physical-device API version is below the qualified Vulkan API version")]
     PhysicalDeviceApiVersion,
+    #[error("receipt physical-device API version does not match the execution runtime")]
+    PhysicalDeviceApiVersionBinding,
+    #[error("receipt queue family does not match the execution runtime")]
+    QueueFamilyBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
     TimelineExpected,
     #[error("receipt uses an unsupported multi-queue synchronization plan")]
@@ -228,6 +232,20 @@ impl VulkanBarrierExecutionReceipt {
                 expected: self.completion_expected,
                 observed: self.completion_observed,
             });
+        }
+        Ok(())
+    }
+
+    pub fn verify_runtime_binding(
+        &self,
+        physical_device_api_version: u32,
+        queue_family_index: u32,
+    ) -> Result<(), VulkanBarrierReceiptError> {
+        if self.physical_device_api_version != physical_device_api_version {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
+        }
+        if self.queue_family_index != queue_family_index {
+            return Err(VulkanBarrierReceiptError::QueueFamilyBinding);
         }
         Ok(())
     }
@@ -673,6 +691,9 @@ impl VulkanBarrierWorkloadRuntime {
             queue_family_index: self.queue_family_index,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
+        receipt
+            .verify_runtime_binding(self.physical_device_api_version, self.queue_family_index)
+            .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
     }
 }
