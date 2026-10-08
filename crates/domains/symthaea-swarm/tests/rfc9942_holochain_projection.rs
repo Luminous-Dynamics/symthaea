@@ -118,7 +118,9 @@ use ring::{
 };
 
 #[cfg(feature = "semantic-receipts")]
-use symthaea_swarm::rfc9942_selection::evaluate_priority_first_valid;
+use symthaea_swarm::rfc9942_selection::{
+    evaluate_priority_first_valid, Rfc9942VerifiedReceiptSelection,
+  };
 
 #[cfg(feature = "semantic-receipts")]
 use symthaea_swarm::semantic_evidence_vds::{
@@ -230,29 +232,26 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
         symthaea_swarm::rfc9942_selection::ReceiptSelectionCandidateStatus::NotEvaluatedAfterSelection
     ));
 
-    let context = ReceiptSelectionContext::from_verified_decision(
-        &decision,
-        &collection,
-        &first_verified,
-    )
-    .unwrap();
+    let witness =
+        Rfc9942VerifiedReceiptSelection::bind(&decision, &collection, &first_verified).unwrap();
+    let context = ReceiptSelectionContext::from_verified_selection(&witness).unwrap();
 
     assert_eq!(
-        context.verified_capability_sha256,
+        witness.verified_capability_sha256(),
         first_verified.capability_sha256()
     );
     assert_eq!(
-        decision.verified_capability_sha256(&first_verified).unwrap(),
-        context.verified_capability_sha256
+        witness.selection_decision_sha256().unwrap(),
+        decision.validated_digest().unwrap()
+    );
+    assert_eq!(
+        context.verified_capability_sha256,
+        witness.verified_capability_sha256()
     );
 
     assert_eq!(
-        ReceiptSelectionContext::from_verified_decision(
-            &decision,
-            &collection,
-            &second_verified,
-        ),
-        Err(HolochainProjectionError::InvalidReceiptSelection)
+        Rfc9942VerifiedReceiptSelection::bind(&decision, &collection, &second_verified),
+        Err(symthaea_swarm::rfc9942_selection::ReceiptSelectionDecisionError::VerifiedCapabilityMismatch)
     );
 
     let reversed = Rfc9942ReceiptCollection::new(
@@ -260,12 +259,8 @@ fn verified_selection_projection_requires_exact_capability_and_collection() {
     )
     .unwrap();
     assert_eq!(
-        ReceiptSelectionContext::from_verified_decision(
-            &decision,
-            &reversed,
-            &second_verified,
-        ),
-        Err(HolochainProjectionError::InvalidReceiptSelection)
+        Rfc9942VerifiedReceiptSelection::bind(&decision, &reversed, &first_verified),
+        Err(symthaea_swarm::rfc9942_selection::ReceiptSelectionDecisionError::CollectionDigestMismatch)
     );
 
     assert!(MAX_RECEIPT_SELECTION_CANDIDATES >= collection.len() as u32);
