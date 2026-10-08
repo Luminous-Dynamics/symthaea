@@ -400,10 +400,10 @@ jobs:
       # directly exercised; workspace-wide root tests do not imply that a
       # newly-added domain crate was compiled or its tests were discovered.
       - name: Test alternatives engine
-        run: cargo test -p symthaea-alternatives --all-targets
+        run: cargo test --locked -p symthaea-alternatives --all-targets
 
       - name: Clippy alternatives engine
-        run: cargo clippy -p symthaea-alternatives --all-targets -- -D warnings
+        run: cargo clippy --locked -p symthaea-alternatives --all-targets -- -D warnings
 
   clippy:
     name: Clippy
