@@ -36,6 +36,7 @@ pub enum CreditismError {
         cost: f64,
     },
     NonFiniteAmount,
+    NonFiniteResult,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -149,14 +150,43 @@ impl PersonalCreditLedger {
         seller_acquisition_cost: f64,
     ) -> Result<ExchangeSettlement, CreditismError> {
         validate_amount(purchase_price)?;
-        validate_amount(seller_acquisition_cost)?;
+        validate_nonnegative_amount(seller_acquisition_cost)?;
+        if seller.is_empty() {
+            return Err(CreditismError::UnknownAccount(seller.to_owned()));
+        }
 
-        self.delete(buyer, purchase_price)?;
+        let buyer_balance = self
+            .balances
+            .get(buyer)
+            .copied()
+            .ok_or_else(|| CreditismError::UnknownAccount(buyer.to_owned()))?;
+        if buyer_balance < purchase_price {
+            return Err(CreditismError::InsufficientPersonalCredit {
+                account: buyer.to_owned(),
+                available: buyer_balance,
+                requested: purchase_price,
+            });
+        }
 
         let seller_recognized = purchase_price.min(seller_acquisition_cost);
-        if seller_recognized > 0.0 {
-            self.issue(seller, seller_recognized)?;
+        let new_seller_balance = self.balance(seller) + seller_recognized;
+        let new_deleted = self.deleted + purchase_price;
+        let new_issued = self.issued + seller_recognized;
+        if !new_seller_balance.is_finite()
+            || !new_deleted.is_finite()
+            || !new_issued.is_finite()
+        {
+            return Err(CreditismError::NonFiniteResult);
         }
+
+        if let Some(balance) = self.balances.get_mut(buyer) {
+            *balance -= purchase_price;
+        } else {
+            unreachable!("buyer balance was checked above");
+        }
+        *self.balances.entry(seller.to_owned()).or_default() = new_seller_balance;
+        self.deleted = new_deleted;
+        self.issued = new_issued;
 
         Ok(ExchangeSettlement {
             buyer_deleted: purchase_price,
@@ -222,8 +252,14 @@ impl PersonalCreditLedger {
         if account.is_empty() {
             return Err(CreditismError::UnknownAccount(account.to_owned()));
         }
-        *self.balances.entry(account.to_owned()).or_default() += amount;
-        self.issued += amount;
+        let current_balance = self.balance(account);
+        let new_balance = current_balance + amount;
+        let new_issued = self.issued + amount;
+        if !new_balance.is_finite() || !new_issued.is_finite() {
+            return Err(CreditismError::NonFiniteResult);
+        }
+        self.balances.insert(account.to_owned(), new_balance);
+        self.issued = new_issued;
         Ok(())
     }
 
@@ -259,6 +295,16 @@ fn validate_amount(amount: f64) -> Result<(), CreditismError> {
         return Err(CreditismError::NonFiniteAmount);
     }
     if amount <= 0.0 {
+        return Err(CreditismError::NonPositiveAmount);
+    }
+    Ok(())
+}
+
+fn validate_nonnegative_amount(amount: f64) -> Result<(), CreditismError> {
+    if !amount.is_finite() {
+        return Err(CreditismError::NonFiniteAmount);
+    }
+    if amount < 0.0 {
         return Err(CreditismError::NonPositiveAmount);
     }
     Ok(())
@@ -345,6 +391,37 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn failed_exchange_is_atomic() {
+        let mut ledger = PersonalCreditLedger::from_opening_balances([
+            ("buyer".to_owned(), 100.0),
+            ("seller".to_owned(), 10.0),
+        ])
+        .unwrap();
+        let before = ledger.clone();
+
+        assert_eq!(
+            ledger.exchange("buyer", "", 50.0, 10.0),
+            Err(CreditismError::UnknownAccount(String::new()))
+        );
+        assert_eq!(ledger, before);
+    }
+
+    #[test]
+    fn zero_acquisition_cost_is_valid_exchange_input() {
+        let mut ledger = PersonalCreditLedger::from_opening_balances([
+            ("buyer".to_owned(), 20.0),
+            ("seller".to_owned(), 0.0),
+        ])
+        .unwrap();
+
+        let settlement = ledger.exchange("buyer", "seller", 20.0, 0.0).unwrap();
+
+        assert_eq!(settlement.buyer_deleted, 20.0);
+        assert_eq!(settlement.seller_recognized, 0.0);
+        assert!(ledger.reconciles(0.0));
+    }
+
     fn malformed_amounts_fail_closed() {
         let mut ledger = PersonalCreditLedger::new();
         assert_eq!(
