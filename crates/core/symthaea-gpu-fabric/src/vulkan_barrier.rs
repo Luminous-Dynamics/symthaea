@@ -1827,6 +1827,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert_eq!(
             receipt.verify_against(&graph, &schedule, &plan, &BTreeMap::new()),
@@ -1873,6 +1876,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         let expected = expected_final_timeline_value(&plan);
         assert!(matches!(
@@ -1923,6 +1929,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
@@ -1970,6 +1979,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2019,6 +2031,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -2070,6 +2085,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -2124,6 +2142,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.barrier_digest = String::from("tampered");
 
@@ -2197,6 +2218,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2255,6 +2279,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2301,6 +2328,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.completion_lowering_digest = String::from("tampered");
         assert!(matches!(
@@ -2451,6 +2481,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2479,6 +2512,9 @@ mod tests {
             device_uuid: [1; 16],
             implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
             physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         }
     }
 
