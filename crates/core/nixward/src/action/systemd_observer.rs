@@ -935,9 +935,10 @@ impl NixSystemdReadOnlyObserverV1 {
             if lookup_bus_id != bus_id {
                 return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
             }
-            if resolved_path.as_str() != object_path.as_str() {
-                return Err(NixSystemdObserverErrorV1::InvocationUnitObjectMismatch);
-            }
+            validate_invocation_unit_object_binding(
+                object_path.as_str(),
+                resolved_path.as_str(),
+            )?;
         }
 
         let service_result =
@@ -1090,6 +1091,16 @@ impl NixSystemdJobHandleV1 {
         }
         Ok(())
     }
+}
+
+fn validate_invocation_unit_object_binding(
+    expected_object_path: &str,
+    resolved_object_path: &str,
+) -> Result<(), NixSystemdObserverErrorV1> {
+    if expected_object_path != resolved_object_path {
+        return Err(NixSystemdObserverErrorV1::InvocationUnitObjectMismatch);
+    }
+    Ok(())
 }
 
 fn validate_bus_id_shape(value: &str) -> Result<(), NixSystemdObserverErrorV1> {
@@ -1733,6 +1744,20 @@ mod tests {
         );
         assert!(invocation_id_to_string(vec![0; 15]).is_err());
         assert!(invocation_id_to_string(vec![0; 17]).is_err());
+    }
+
+    #[test]
+    fn post_invocation_unit_object_binding_is_exact() {
+        let expected = "/org/freedesktop/systemd1/unit/nginx_2eservice";
+        assert!(validate_invocation_unit_object_binding(expected, expected).is_ok());
+        assert_eq!(
+            validate_invocation_unit_object_binding(
+                expected,
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+            )
+            .unwrap_err(),
+            NixSystemdObserverErrorV1::InvocationUnitObjectMismatch
+        );
     }
 
     #[test]
