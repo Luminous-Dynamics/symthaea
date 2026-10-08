@@ -19,7 +19,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
@@ -579,10 +579,7 @@ impl TransactionLedger {
     }
 
     fn load(&self) -> Result<HashMap<String, JournalRecord>, String> {
-        // Open first, then validate the descriptor we actually received. This
-        // removes the metadata/open TOCTOU window while O_NOFOLLOW rejects a
-        // symlink at the final path component.
-        let Some(file) = self.open_ledger_file(libc::O_RDONLY, 0)? else {
+        let Some(mut file) = self.open_ledger_file(libc::O_RDONLY, 0)? else {
             return Ok(HashMap::new());
         };
 
@@ -596,6 +593,17 @@ impl TransactionLedger {
                 std::io::Error::last_os_error()
             ));
         }
+
+        self.load_locked_file(&mut file)
+    }
+
+    fn load_locked_file(&self, file: &mut File) -> Result<HashMap<String, JournalRecord>, String> {
+        file.seek(SeekFrom::Start(0)).map_err(|error| {
+            format!(
+                "unable to rewind transaction ledger {} before replay: {error}",
+                self.path.display()
+            )
+        })?;
 
         let metadata = file.metadata().map_err(|error| {
             format!(
@@ -635,7 +643,7 @@ impl TransactionLedger {
         }
         let mut records = HashMap::new();
         let mut transaction_owners = HashMap::<String, String>::new();
-        let mut reader = BufReader::new(file);
+        let mut reader = BufReader::new(&mut *file);
         let mut line_number = 0usize;
         loop {
             let mut line = Vec::with_capacity(MAX_JOURNAL_EVENT_BYTES.min(4096));
@@ -861,22 +869,31 @@ impl TransactionLedger {
                 }
                 other => {
                     return Err(format!(
-                        "transaction ledger has unknown event '{}' at line {}",
-                        other,
-                        line_number + 1
-                    ));
-                }
-            }
+                        "transaction ledger has unknown event '{}' at    fn append(&self, event: &JournalEvent) -> Result<(), String> {
+        let Some(file) = self.open_ledger_file(
+            libc::O_RDWR | libc::O_CREAT | libc::O_APPEND,
+            0o600,
+        )? else {
+            return Err(format!(
+                "transaction ledger {} could not be opened for append",
+                self.path.display()
+            ));
+        };
+
+        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+        if lock_result != 0 {
+            return Err(format!(
+                "unable to lock transaction ledger {} for append: {}",
+                self.path.display(),
+                std::io::Error::last_os_error()
+            ));
         }
-        Ok(records)
+
+        self.append_locked_file(&file, event)
     }
 
-    fn append(&self, event: &JournalEvent) -> Result<(), String> {
-        let serialized = serde_json::to_string(event)
-            .map_err(|error| format!("unable to serialize transaction ledger event: {error}"))?;
-        if serialized.len() > MAX_JOURNAL_EVENT_BYTES {
-            return Err(format!(
-                "transaction ledger event exceeds {} bytes",
+    fn append_locked_file(&self, file: &File, event: &JournalEvent) -> Result<(), String> {
+              "transaction ledger event exceeds {} bytes",
                 MAX_JOURNAL_EVENT_BYTES
             ));
         }
@@ -953,26 +970,34 @@ impl TransactionLedger {
             .map_err(|error| {
                 format!(
                     "unable to commit transaction ledger {}: {error}",
-                    self.path.display()
-                )
-            })?;
-
-        // fsync(file) does not necessarily make the containing directory entry
-        // durable across power loss; the exact parent directory descriptor held
-        // by this ledger is synchronized explicitly.
-        self.directory.sync_all().map_err(|error| {
-            format!(
-                "unable to synchronize transaction ledger directory {}: {error}",
-                self.path.parent().unwrap_or(Path::new("/")).display()
-            )
-        })
-    }
-
-    pub(crate) fn admit(
+         pub(crate) fn admit(
         &self,
         transaction: SystemTransaction,
     ) -> Result<TransactionAdmission, String> {
-        let mut records = self.load()?;
+        let Some(mut file) = self.open_ledger_file(
+            libc::O_RDWR | libc::O_CREAT | libc::O_APPEND,
+            0o600,
+        )? else {
+            return Err(format!(
+                "transaction ledger {} could not be opened for admission",
+                self.path.display()
+            ));
+        };
+
+        // Critical invariant: replay lookup, transaction-id collision detection,
+        // and the new-start append all occur under one exclusive lock on the
+        // already-open ledger descriptor. No concurrent caller can observe the
+        // same request_id as absent and both append a start event.
+        let lock_result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
+        if lock_result != 0 {
+            return Err(format!(
+                "unable to lock transaction ledger {} for admission: {}",
+                self.path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+
+        let records = self.load_locked_file(&mut file)?;
         if let Some(existing) = records.get(&transaction.request_id) {
             if existing.mutation != transaction.mutation
                 || existing.target_machine_digest != transaction.target_machine_digest
@@ -997,10 +1022,6 @@ impl TransactionLedger {
             });
         }
 
-        // A fresh transaction ID is generated before admission, so check it
-        // against the durable namespace before appending a new start event.
-        // A collision must fail closed here rather than corrupting the journal
-        // and only being discovered on the next reload.
         if records
             .values()
             .any(|record| record.transaction_id == transaction.transaction_id)
@@ -1011,7 +1032,7 @@ impl TransactionLedger {
             ));
         }
 
-        self.append(&JournalEvent {
+        self.append_locked_file(&file, &JournalEvent {
             schema_version: SCHEMA_VERSION,
             event: JournalEventKind::Started,
             request_id: transaction.request_id.clone(),
@@ -1023,6 +1044,7 @@ impl TransactionLedger {
             artifact_commitment: None,
             configuration_commitment: None,
         })?;
+
         Ok(TransactionAdmission::New(transaction))
     }
 
@@ -1522,6 +1544,85 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(moved_dir);
         let _ = std::fs::remove_dir_all(replacement_dir);
+    }
+
+    #[test]
+    fn concurrent_duplicate_request_id_has_exactly_one_new_admission() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Barrier, Mutex,
+        };
+        use std::thread;
+
+        let name = random_operation_id().unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-transaction-ledger-duplicate-request-{name}.jsonl"
+        ));
+        let workers = 12usize;
+        let barrier = Arc::new(Barrier::new(workers));
+        let new_count = Arc::new(AtomicUsize::new(0));
+        let replay_count = Arc::new(AtomicUsize::new(0));
+        let errors = Arc::new(Mutex::new(Vec::<String>::new()));
+
+        thread::scope(|scope| {
+            for _ in 0..workers {
+                let barrier = Arc::clone(&barrier);
+                let new_count = Arc::clone(&new_count);
+                let replay_count = Arc::clone(&replay_count);
+                let errors = Arc::clone(&errors);
+                let path = path.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    let ledger = match TransactionLedger::open_at(&path) {
+                        Ok(ledger) => ledger,
+                        Err(error) => {
+                            errors.lock().unwrap().push(error);
+                            return;
+                        }
+                    };
+                    let transaction = match SystemTransaction::begin(
+                        MutationKind::GcCollect,
+                        "concurrent-duplicate-request-0001",
+                        None,
+                        b"gc-duplicate",
+                    ) {
+                        Ok(transaction) => transaction,
+                        Err(error) => {
+                            errors.lock().unwrap().push(error);
+                            return;
+                        }
+                    };
+
+                    match ledger.admit(transaction) {
+                        Ok(TransactionAdmission::New(_)) => {
+                            new_count.fetch_add(1, Ordering::SeqCst);
+                        }
+                        Ok(TransactionAdmission::Replayed(_)) => {
+                            replay_count.fetch_add(1, Ordering::SeqCst);
+                        }
+                        Ok(TransactionAdmission::Indeterminate(_)) => {
+                            errors
+                                .lock()
+                                .unwrap()
+                                .push("duplicate request became indeterminate".into());
+                        }
+                        Err(error) => {
+                            errors.lock().unwrap().push(error);
+                        }
+                    }
+                });
+            }
+        });
+
+        assert!(errors.lock().unwrap().is_empty());
+        assert_eq!(new_count.load(Ordering::SeqCst), 1);
+        assert_eq!(replay_count.load(Ordering::SeqCst), workers - 1);
+
+        let ledger = TransactionLedger::open_at(&path).unwrap();
+        let records = ledger.load().unwrap();
+        assert_eq!(records.len(), 1);
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
