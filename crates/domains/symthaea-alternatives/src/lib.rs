@@ -11647,6 +11647,9 @@ mod tests {
             surface: ExperimentalDiscriminationSurface::PerformanceMetric(
                 "unconstrained_metric".into(),
             ),
+            unit: "unit".into(),
+            scope: "synthetic functional unit".into(),
+            basis: fixture_basis(),
             decision_rule: burden.decision_rule.clone(),
         };
         assert!(unconstrained
