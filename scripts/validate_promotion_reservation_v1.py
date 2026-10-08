@@ -2501,15 +2501,30 @@ def test_clock_measurement_sequence_requires_two_rounds():
 
 def test_clock_measurement_sequence_requires_same_source_order():
     sequence = clock_source_measurement_sequence_fixture()
+    first, second, third = sequence.second_round
+    reordered_first = replace(
+        second,
+        sequence_index=1,
+        previous_response_digest=None,
+    )
+    reordered_first = replace(
+        reordered_first,
+        chain_link_digest=reordered_first.expected_chain_link_digest(),
+    )
+    reordered_second = replace(
+        first,
+        sequence_index=2,
+        previous_response_digest=second.relation.evidence.source_response.digest(),
+    )
+    reordered_second = replace(
+        reordered_second,
+        chain_link_digest=reordered_second.expected_chain_link_digest(),
+    )
     reordered = replace(
         sequence,
-        second_round=(
-            sequence.second_round[1],
-            sequence.second_round[0],
-            sequence.second_round[2],
-        ),
+        second_round=(reordered_first, reordered_second, third),
     )
-    assert reordered.classify() == "clock-source-independence-invalid"
+    assert reordered.classify() == "clock-source-measurement-round-mismatch"
 
 
 def test_clock_measurement_sequence_rejects_chain_link_tamper():
@@ -2534,6 +2549,10 @@ def test_clock_measurement_sequence_rejects_previous_response_mismatch():
     altered = replace(
         sequence.second_round[1],
         previous_response_digest="aa" * 32,
+    )
+    altered = replace(
+        altered,
+        chain_link_digest=altered.expected_chain_link_digest(),
     )
     tampered = replace(
         sequence,
@@ -2565,7 +2584,7 @@ def test_clock_measurement_sequence_rejects_replayed_response():
 
 def test_clock_measurement_sequence_rejects_causal_order_contradiction():
     sequence = clock_source_measurement_sequence_fixture(
-        provider_offsets_round_2=(-2500, 0, 2500),
+        provider_offsets_round_2=(2500, 0, -2500),
     )
     assert sequence.classify() == "clock-source-causal-order-contradiction"
 
