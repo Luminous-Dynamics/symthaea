@@ -16,6 +16,10 @@ from functools import lru_cache
 from itertools import permutations
 from pathlib import Path
 
+MAX_PROVIDER_TOPOLOGY_ATTESTATION_BYTES = 1_048_576
+ED25519_SIGNATURE_BYTES = 64
+ED25519_SPKI_PREFIX = bytes.fromhex("302a300506032b6570032100")
+
 
 @dataclass
 class PromotionEffectReceipt:
@@ -642,7 +646,11 @@ def _public_key_fingerprint(public_key_pem: str) -> str | None:
                 capture_output=True,
                 timeout=10,
             )
-            if result.returncode != 0 or not result.stdout:
+            if (
+                result.returncode != 0
+                or len(result.stdout) != 44
+                or not result.stdout.startswith(ED25519_SPKI_PREFIX)
+            ):
                 return None
             return "sha256:" + hashlib.sha256(result.stdout).hexdigest()
     except (OSError, subprocess.SubprocessError, ValueError):
@@ -674,11 +682,19 @@ def verify_provider_topology_cas_attestation(
     envelope = attestation.envelope
     if envelope.key_id != trust_root.key_id:
         return None
+    if len(envelope.payload_base64) > 4 * ((MAX_PROVIDER_TOPOLOGY_ATTESTATION_BYTES + 2) // 3):
+        return None
+    if len(envelope.signature_base64) > 4 * ((ED25519_SIGNATURE_BYTES + 2) // 3):
+        return None
     if _public_key_fingerprint(trust_root.public_key_pem) != trust_root.key_id:
         return None
     try:
         payload = envelope.decoded_payload()
         signature = base64.b64decode(envelope.signature_base64, validate=True)
+        if not payload or len(payload) > MAX_PROVIDER_TOPOLOGY_ATTESTATION_BYTES:
+            return None
+        if len(signature) != ED25519_SIGNATURE_BYTES:
+            return None
         parsed = json.loads(payload.decode("utf-8"), object_pairs_hook=_strict_json_object)
         if not isinstance(parsed, dict) or _canonical_json_bytes(parsed) != payload:
             return None
@@ -1836,6 +1852,66 @@ def test_provider_topology_cas_signature_tampering_rejects():
     ) is None
 
 
+def test_provider_topology_cas_payload_size_limit_fails_closed():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.attestation is not None
+    assert evidence.provider_result.execution is not None
+    envelope = evidence.provider_result.attestation.envelope
+    oversized = ProviderTopologyCasAttestationV1(
+        envelope=ProviderTopologyCasDsseEnvelopeV1(
+            **{
+                **envelope.__dict__,
+                "payload_base64": base64.b64encode(
+                    b"x" * (MAX_PROVIDER_TOPOLOGY_ATTESTATION_BYTES + 1)
+                ).decode("ascii"),
+            }
+        )
+    )
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert verify_provider_topology_cas_attestation(
+        oversized,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
+
+
+def test_provider_topology_cas_signature_length_mismatch_fails_closed():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    assert evidence.provider_result.attestation is not None
+    assert evidence.provider_result.execution is not None
+    envelope = evidence.provider_result.attestation.envelope
+    malformed = ProviderTopologyCasAttestationV1(
+        envelope=ProviderTopologyCasDsseEnvelopeV1(
+            **{
+                **envelope.__dict__,
+                "signature_base64": base64.b64encode(b"short").decode("ascii"),
+            }
+        )
+    )
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    assert verify_provider_topology_cas_attestation(
+        malformed,
+        _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+    ) is None
+
+
 def test_provider_topology_cas_trust_root_key_id_mismatch_rejects():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
@@ -2881,6 +2957,8 @@ TESTS = [
     test_provider_topology_cas_attestation_rejects_wrong_source,
     test_provider_topology_cas_verification_rejects_wrong_source,
     test_provider_topology_cas_signature_tampering_rejects,
+    test_provider_topology_cas_payload_size_limit_fails_closed,
+    test_provider_topology_cas_signature_length_mismatch_fails_closed,
     test_provider_topology_cas_trust_root_key_id_mismatch_rejects,
     test_provider_topology_cas_missing_trust_root_fails_closed,
     test_provider_topology_cas_trust_root_generation_mismatch_rejects,
