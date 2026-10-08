@@ -1,0 +1,37 @@
+{
+  "schema": "rh006-multivariate-set-propagation/v1",
+  "status": "research-diagnostic-only",
+  "execution": {
+    "date": "2026-10-08",
+    "seed": 20261008,
+    "trials": 250,
+    "grid_cross_check": "129x129",
+    "grid_role": "falsification-only",
+    "script_sha256": "9ef750b3c89498fce000df4debccf13ae83d6cf61039ba4c438830ec03e39b4b",
+    "observed_containment_violations": 0,
+    "canonical_discriminant_image": [
+      -1.75,
+      0.25
+    ],
+    "stable_fixture_C_image": [
+      -0.65,
+      -0.35
+    ],
+    "local_rust_compile": "not-available"
+  },
+  "analytic_method": {
+    "object": "2-D compact axis-aligned nuisance box",
+    "quadratic_extrema": "corners + edge stationary points + admissible interior stationary point",
+    "rh006_discriminant": "D(x,y)=B(x,y)^2-4*A*C(x,y)",
+    "decision": "certify only when interval ranges force a single positive-root count; otherwise unknown"
+  },
+  "claim_boundary": {
+    "point_identification": false,
+    "formal_inference": false,
+    "p_value": false,
+    "confidence_interval": false,
+    "arbitrary_dimension": false,
+    "sharp_multivariate_identified_set": false
+  },
+  "payload_sha256": "8db2ffc53ea96e99ae00e253b8601f0ad057ba408d931e1e05ddb1986340b5e5"
+}

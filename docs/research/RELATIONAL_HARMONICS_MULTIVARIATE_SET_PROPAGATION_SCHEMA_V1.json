@@ -1,0 +1,73 @@
+{
+  "schema": "rh006-multivariate-set-propagation/v1",
+  "status": "research-diagnostic-only",
+  "parameter_dimension": 2,
+  "set_representation_enum": [
+    "witness-only",
+    "inner-approximation",
+    "outer-approximation",
+    "sharp"
+  ],
+  "surface_class": "quadratic",
+  "exact_image_method": [
+    "rectangle corners",
+    "edge stationary points",
+    "interior stationary point when nonsingular and admissible"
+  ],
+  "rh006_form": {
+    "ray_equation": "Delta(tu;x,y)=A*t^2+B(x,y)*t+C(x,y)",
+    "B": "B0+B_x*x+B_y*y",
+    "C": "C0+C_x*x+C_y*y+C_xx*x^2+C_xy*x*y+C_yy*y^2",
+    "discriminant": "D(x,y)=B(x,y)^2-4*A*C(x,y)"
+  },
+  "decision_certification": {
+    "zero": "D upper < 0",
+    "one": "D lower > 0 and C upper < 0",
+    "two": "D lower > 0 and C lower > 0 and B upper < 0",
+    "unknown": "otherwise; fail closed",
+    "zero_positive_roots": "D lower > 0 and C lower > 0 and B lower > 0",
+    "boundary": "Any D/C/B boundary touching zero yields unknown rather than being rounded into a branch"
+  },
+  "claim_rules": {
+    "stable_decision": "requires outer or sharp set representation and regularity",
+    "unstable_decision": "requires inner or sharp set representation",
+    "point_target": "sharp point / O / MI only",
+    "formal_inference": "disabled"
+  },
+  "falsification_run": {
+    "seed": 20261008,
+    "trials": 250,
+    "grid": "129x129",
+    "containment_violations": 0
+  },
+  "region_class_enum": [
+    "axis-aligned-box",
+    "convex-polygon"
+  ],
+  "region_exact_image_method": {
+    "axis-aligned-box": "corners + edge stationary points + admissible interior stationary point",
+    "convex-polygon": "vertices + edge stationary points + admissible interior stationary point"
+  },
+  "polygon_claim_boundary": {
+    "polygon_is_sharp_identified_set": false,
+    "convexity_required": true,
+    "sampling_defines_image": false
+  },
+  "execution_provenance": {
+    "box_harness": "frozen receipt may predate later zero-root hardening",
+    "polygon_harness": "separate execution receipt binds exact polygon script"
+  },
+  "set_origin_enum": [
+    "observational-equivalence-derived",
+    "maintained-restriction-region",
+    "sensitivity-analysis-region",
+    "unknown"
+  ],
+  "set_origin_claim_rule": "only observational-equivalence-derived can support an identified-set claim",
+  "provenance_microtest": {
+    "script": "scripts/research/rh006_set_provenance_microtest_v1.py",
+    "receipt": "docs/research/RELATIONAL_HARMONICS_SET_PROVENANCE_MICROTEST_EXECUTED_V1.json",
+    "sensitivity_sharp_is_identified": false,
+    "witness_only_neither": true
+  }
+}
