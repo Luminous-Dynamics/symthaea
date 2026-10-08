@@ -1382,6 +1382,11 @@ impl Drop for VulkanBarrierWorkloadRuntime {
 mod tests {
     use super::*;
 
+    const TEST_IMPLEMENTATION_IDENTITY_DIGEST: &str =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+    const TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST: &str =
+        "1111111111111111111111111111111111111111111111111111111111111111";
+
     fn fixture() -> (
         ExecutionGraph,
         ExecutionSchedule,
