@@ -6,7 +6,7 @@ This tranche makes the promotion effect boundary explicit without pretending the
 
 The composition is:
 
-`text
+```text
 HistoricalQualificationReceipt
         ↓
 QualificationClaimDispositionV1
@@ -25,7 +25,7 @@ PromotionCompleted | PromotionRejected
                  \→ PromotionOutcomeUnknown
                          ↓
                  PromotionReconciliationRequired
-`
+```
 
 PromotionEligibilityLeaseV1 remains the narrow decision-time projection. PromotionReservationV1 consumes that lease exactly once. PromotionDispatchIntentV1 is the crash-recovery fence created before the external call.
 
@@ -53,7 +53,7 @@ A valid reservation binds, at minimum:
 
 The reservation is admitted only when:
 
-`text
+```text
 observed_ledger_head == current_ledger_head
 AND
 active_lease == reservation.lease_id
@@ -61,7 +61,7 @@ AND
 no reservation already consumes that lease
 AND
 reservation.predecessor == observed_ledger_head
-`
+```
 
 The successful ledger successor consumes the lease. Any competing candidate from the old predecessor is stale/non-authoritative even if its Git object still exists.
 
@@ -69,14 +69,14 @@ The successful ledger successor consumes the lease. Any competing candidate from
 
 The external boundary has an unavoidable crash window:
 
-`text
+```text
 persist reservation
 persist dispatch intent
         ↓
 provider accepts request
         ↓
 process crashes before local response persistence
-`
+```
 
 Without the intent, recovery cannot distinguish "never attempted" from "may already have happened".
 
@@ -98,11 +98,11 @@ The provider may still accept or reject the operation independently. The local r
 
 For one lease identity:
 
-`text
+```text
 0 active reservation
     -> exactly 1 reservation
     -> 0 or 1 dispatch intents
-`
+```
 
 A second coordinator may not create a second reservation. A second dispatch intent for the same reservation is invalid.
 
@@ -122,12 +122,12 @@ The current GitHub REST API documents that:
 
 These capabilities are useful, but they are four separate properties:
 
-`text
+```text
 exact-subject CAS
 provider operation handle
 duplicate-request reconciliation
 durable effect reconciliation
-`
+```
 
 Do not collapse them into one "idempotent transaction" capability.
 
@@ -135,12 +135,12 @@ Do not collapse them into one "idempotent transaction" capability.
 
 The REST Git-ref lab establishes a strong and useful theorem for this ledger shape:
 
-`text
+```text
 single-parent append-only successor
 + force=false
 + all trusted writers share one ref
 → stale sibling successor cannot become current
-`
+```
 
 That is stronger than last-write-wins, but it should not be described as a generic compare-and-set primitive.
 
@@ -150,7 +150,7 @@ The current ledger design does not require GraphQL; the REST fast-forward fence 
 
 ## Failure semantics
 
-`text
+```text
 Reservation failure
     -> no provider call
 
@@ -183,7 +183,7 @@ Trust root changes after dispatch
     -> do not rewrite historical dispatch
     -> fence follow-on promotion
     -> reconcile/adjudicate the effect under the newer root
-`
+```
 
 ## Reconciliation rule
 
@@ -218,10 +218,10 @@ The harness imports no Symthaea production code and has no promotion credentials
 
 A passing model establishes only:
 
-`text
+```text
 the local single-use reservation/dispatch-intent state machine is
 internally consistent under the enumerated synthetic failure cases.
-`
+```
 
 It does not establish:
 

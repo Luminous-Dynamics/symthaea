@@ -1,0 +1,48 @@
+name: QUAL promotion reservation v1 deterministic lab
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reservation-lab:
+    if: github.repository == 'Luminous-Dynamics/symthaea' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove trusted checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          grep -Fq "claim_ceiling=deterministic local transaction/reconciliation model only" scripts/validate_promotion_reservation_v1.py
+          grep -Fq "promotion_authority=false" scripts/validate_promotion_reservation_v1.py
+
+      - name: Run independent deterministic reservation model
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_promotion_reservation_v1.py | tee /tmp/promotion-reservation-v1.out
+
+      - name: Record model evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Promotion Reservation v1 deterministic lab"
+            echo
+            echo "trusted_head=$GITHUB_SHA"
+            echo "source=scripts/validate_promotion_reservation_v1.py"
+            echo "promotion_authority=false"
+            echo "provider_dispatch=not invoked"
+            echo
+            cat /tmp/promotion-reservation-v1.out
+          } >> "$GITHUB_STEP_SUMMARY"
