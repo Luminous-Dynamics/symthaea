@@ -9845,31 +9845,20 @@ echo '}'
                                         transaction.log_line(),
                                         error
                                     );
-                                    (1, TransactionOutcome::Indeterminate, false)
+                                    (1, TransactionOutcome::Indeterminate, true)
                                 }
                             },
                             Ok(false) => {
                                 eprintln!(
-                                    "[{}] {} rebuild returned 0 but requested configuration was not observed",
+                                    "[{}] {} rebuild returned 0 but requested configuration was not observed; preserving the exact swap for manual recovery because activation may have partially applied",
                                     peer_addr,
                                     transaction.log_line()
                                 );
-                                match finalize_configuration_swap(swap, false).await {
-                                    Ok(()) => (1, TransactionOutcome::Indeterminate, false),
-                                    Err(error) => {
-                                        eprintln!(
-                                            "[{}] {} configuration rollback after failed postcondition failed: {}",
-                                            peer_addr,
-                                            transaction.log_line(),
-                                            error
-                                        );
-                                        (1, TransactionOutcome::Indeterminate, true)
-                                    }
-                                }
+                                (1, TransactionOutcome::Indeterminate, true)
                             }
                             Err(error) => {
                                 eprintln!(
-                                    "[{}] {} configuration postcondition could not be observed; preserving swap artifacts: {}",
+                                    "[{}] {} configuration postcondition could not be observed; preserving the exact swap for manual recovery: {}",
                                     peer_addr,
                                     transaction.log_line(),
                                     error
@@ -9878,40 +9867,25 @@ echo '}'
                             }
                         }
                     }
-                    Ok(result) => match finalize_configuration_swap(swap, false).await {
-                        Ok(()) => (
-                            result.exit_status,
-                            TransactionOutcome::Failed,
-                            false,
-                        ),
-                        Err(error) => {
-                            eprintln!(
-                                "[{}] {} configuration rollback after rebuild failure failed: {}",
-                                peer_addr,
-                                transaction.log_line(),
-                                error
-                            );
-                            (1, TransactionOutcome::Indeterminate, true)
-                        }
-                    },
-                    Err(error) => match finalize_configuration_swap(swap, false).await {
-                        Ok(()) => (
-                            1,
-                            TransactionOutcome::Failed,
-                            false,
-                        ),
-                        Err(rollback_error) => {
-                            eprintln!(
-                                "[{}] {} configuration rollback after rebuild launch error failed: {}",
-                                peer_addr,
-                                transaction.log_line(),
-                                rollback_error
-                            );
-                            (1, TransactionOutcome::Indeterminate, true)
-                        }
-                    },
+                    Ok(result) => {
+                        eprintln!(
+                            "[{}] {} nixos-rebuild exited with status {} after activation began; the running system may be partially changed, so source rollback is forbidden",
+                            peer_addr,
+                            transaction.log_line(),
+                            result.exit_status
+                        );
+                        (result.exit_status.max(1), TransactionOutcome::Indeterminate, true)
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "[{}] {} nixos-rebuild execution outcome could not be observed; preserving the exact swap rather than assuming activation did not begin: {}",
+                            peer_addr,
+                            transaction.log_line(),
+                            error
+                        );
+                        (1, TransactionOutcome::Indeterminate, true)
+                    }
                 };
-
                 if !retain_swap {
                     remove_transaction_artifact_dir(&transaction_dir);
                 } else {

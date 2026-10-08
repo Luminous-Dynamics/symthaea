@@ -149,6 +149,33 @@ def main() -> None:
     if 'run_privileged_isolated_nix_args("nix-env"' not in switch_body:
         fail("switch_generation lost isolated Nix execution for nix-env mutation")
 
+    # write_config owns two distinct state domains: the source-file swap and
+    # the running NixOS generation. Once nixos-rebuild has started, restoring
+    # configuration.nix cannot roll back a partially activated generation.
+    write_start = arm_indexes.get("write_config")
+    if write_start is None:
+        fail("write_config arm census missing")
+    next_write = next(
+        (index for index, name in ordered if index > write_start),
+        len(lines),
+    )
+    write_body = "\n".join(lines[write_start:next_write])
+    activation_marker = 'run_privileged_nixos_rebuild_args(&["switch"]).await'
+    activation_index = write_body.find(activation_marker)
+    if activation_index < 0:
+        fail("write_config lost its explicit nixos-rebuild activation boundary")
+    post_activation = write_body[activation_index:]
+    if "finalize_configuration_swap(swap, false)" in post_activation:
+        fail(
+            "write_config regressed to source rollback after nixos-rebuild activation began; "
+            "preserve the exact swap and classify the running state as indeterminate"
+        )
+    if "TransactionOutcome::Indeterminate" not in post_activation:
+        fail("write_config activation uncertainty no longer maps to indeterminate")
+    if "preserving the exact swap" not in post_activation:
+        fail("write_config activation uncertainty no longer preserves its exact swap")
+
+
     # The pre-install check is non-destructive, but it accepts a browser-selected
     # disk. Keep that value out of generated shell source: the script must receive
     # it only through argv.
