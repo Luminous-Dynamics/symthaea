@@ -80,6 +80,10 @@ pub struct ReceiptSelectionContext {
     /// Identity of the cryptographically verified Receipt capability selected
     /// by the decision. This is not itself an authorization or truth claim.
     pub verified_capability_sha256: [u8; 32],
+    /// Identity of the verified outer Signature_With_Receipt composition that
+    /// carried the selected Receipt and caused the atomic selection result.
+    /// This is a provenance capability, not an authorization or truth claim.
+    pub verified_composition_capability_sha256: [u8; 32],
     /// Digest of the complete selection decision, including rejected and
     /// not-evaluated candidates. This is an application digest, not a
     /// Holochain EntryHash; a conductor adapter must map the decision to a
@@ -96,6 +100,7 @@ impl ReceiptSelectionContext {
     fn from_decision(
         decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
         verified_capability_sha256: [u8; 32],
+        verified_composition_capability_sha256: [u8; 32],
     ) -> Result<Self, HolochainProjectionError> {
         let selection_decision_sha256 = decision
             .validated_digest()
@@ -114,6 +119,7 @@ impl ReceiptSelectionContext {
             selected_index,
             selected_receipt_sha256,
             verified_capability_sha256,
+            verified_composition_capability_sha256,
             selection_decision_sha256,
             selection_policy: decision.policy_id.to_owned(),
             selection_policy_version: decision.policy_version,
@@ -122,9 +128,9 @@ impl ReceiptSelectionContext {
 
     /// Build the durable selection context from the proof-carrying witness.
     ///
-    /// The witness is the only input needed here: its private fields can only
-    /// have been produced after exact collection binding and verified-capability
-    /// binding succeeded.
+    /// The witness carries both the inner verified Receipt capability and the
+    /// verified outer Signature_With_Receipt composition, so neither causal
+    /// provenance layer is discarded when crossing into the durable model.
     #[cfg(feature = "semantic-receipts")]
     pub fn from_verified_selection(
         selection: &crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection,
@@ -132,29 +138,8 @@ impl ReceiptSelectionContext {
         Self::from_decision(
             selection.decision(),
             selection.verified_capability_sha256(),
+            selection.verified_composition_capability_sha256(),
         )
-    }
-
-    /// Compatibility wrapper for callers still holding the three independent
-    /// verification inputs. New durable callers should construct the bound
-    /// witness first and use from_verified_selection.
-    #[cfg(feature = "semantic-receipts")]
-    #[deprecated(
-        note = "use Rfc9942VerifiedReceiptSelection::bind followed by from_verified_selection"
-    )]
-    pub fn from_verified_decision(
-        decision: &crate::rfc9942_selection::ReceiptSelectionDecision,
-        collection: &crate::semantic_evidence_vds::Rfc9942ReceiptCollection,
-        verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
-    ) -> Result<Self, HolochainProjectionError> {
-        let selection =
-            crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection::bind(
-                decision,
-                collection,
-                verified,
-            )
-            .map_err(|_| HolochainProjectionError::InvalidReceiptSelection)?;
-        Self::from_verified_selection(&selection)
     }
 
     fn validate(&self) -> Result<(), HolochainProjectionError> {
@@ -174,6 +159,7 @@ impl ReceiptSelectionContext {
         if self.collection_sha256 == [0; 32]
             || self.selected_receipt_sha256 == [0; 32]
             || self.verified_capability_sha256 == [0; 32]
+            || self.verified_composition_capability_sha256 == [0; 32]
             || self.selection_decision_sha256 == [0; 32]
         {
             return Err(HolochainProjectionError::ZeroDigest);
@@ -289,6 +275,7 @@ impl HolochainEvidenceAnchor {
                 put_u32(&mut out, selection.selected_index);
                 out.extend_from_slice(&selection.selected_receipt_sha256);
                 out.extend_from_slice(&selection.verified_capability_sha256);
+                out.extend_from_slice(&selection.verified_composition_capability_sha256);
                 out.extend_from_slice(&selection.selection_decision_sha256);
                 put_string(&mut out, &selection.selection_policy);
                 put_u16(&mut out, selection.selection_policy_version);
