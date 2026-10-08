@@ -13,6 +13,7 @@ pub mod creditism;
 pub mod error;
 pub mod finance;
 pub mod game;
+pub mod institution;
 pub mod inequality;
 pub mod market;
 
@@ -24,6 +25,10 @@ pub use finance::{
     nominal_annual_rate, npv, present_value,
 };
 pub use game::{Game2x2, MixedNash};
+pub use institution::{
+    AdoptionDecision, FailureDisposition, InstitutionLineageEvent, InstitutionState,
+    InstitutionalEvolution, MutationCandidate, Proposal, RuleLevel, SemanticDelta, Transition,
+};
 pub use inequality::{
     LorenzPoint, atkinson_index, gini, hoover_index, lorenz_curve, normalized_gini, theil_t,
 };
