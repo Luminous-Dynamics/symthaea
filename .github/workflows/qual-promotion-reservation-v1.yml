@@ -80,7 +80,9 @@ jobs:
               "ProviderWebhookStackMetadataV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
+              "ProviderWebhookStackMetadataV1",
               "PromotionStackEffectTimingSetV1",
+              "ProviderWebhookStackMetadataV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
           }
@@ -180,6 +182,7 @@ jobs:
               "ProviderWebhookStackMetadataV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingSetV1",
+              "ProviderWebhookStackMetadataV1",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"
