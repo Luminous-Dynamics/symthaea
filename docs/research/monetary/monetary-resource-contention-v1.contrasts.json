@@ -1,0 +1,60 @@
+{
+  "schema_version": "monetary-resource-contention-v1-contrasts",
+  "resource_effects_vs_unrestricted": {
+    "bounded_shared_settlement_liquidity": {
+      "completion_delta": -0.04166666666666663,
+      "operational_wait_delta": 2.2318783068783077,
+      "liquidity_queue_delta": 0.2777777777777778
+    },
+    "bounded_operator_capacity": {
+      "completion_delta": 0,
+      "operational_wait_delta": 0.5981481481481499,
+      "operator_queue_delta": 0.10092592592592593
+    },
+    "both_bounded": {
+      "completion_delta": -0.04166666666666663,
+      "operational_wait_delta": 2.788492063492063,
+      "liquidity_queue_delta": 0.2777777777777778,
+      "operator_queue_delta": 0.08055555555555556
+    }
+  },
+  "adapter_resource_interaction": {
+    "bounded_shared_settlement_liquidity_vs_unrestricted": {
+      "redeem_reissue": 0,
+      "escrowed_atomic_swap": -0.16666666666666663,
+      "multilateral_net_settlement": 0
+    },
+    "bounded_operator_capacity_vs_unrestricted": {
+      "redeem_reissue": 0,
+      "escrowed_atomic_swap": 0,
+      "multilateral_net_settlement": 0
+    },
+    "both_bounded_vs_unrestricted": {
+      "redeem_reissue": 0,
+      "escrowed_atomic_swap": -0.16666666666666663,
+      "multilateral_net_settlement": 0
+    }
+  },
+  "shock_resource_interaction": {
+    "bounded_shared_settlement_liquidity_vs_unrestricted": {
+      "normal": 0,
+      "liquidity_shock": -0.25,
+      "network_partition": 0,
+      "issuer_default": 0,
+      "bridge_failure": 0,
+      "stale_quote": 0
+    },
+    "bounded_operator_capacity_vs_unrestricted": {
+      "normal": 0,
+      "liquidity_shock": 0,
+      "network_partition": 0,
+      "issuer_default": 0,
+      "bridge_failure": 0,
+      "stale_quote": 0
+    }
+  },
+  "topology_resource_interaction_completion": {
+    "statement": "No completion-rate interaction was produced by the v1 synthetic resource model; resource capacity is intentionally orthogonal to topology. This is a design-controlled null, not evidence that real systems lack topology-resource interactions."
+  },
+  "claim_ceiling": "Synthetic contrasts only; no empirical causal identification or live-system inference."
+}
