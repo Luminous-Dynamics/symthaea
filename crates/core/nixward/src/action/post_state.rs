@@ -2242,6 +2242,59 @@ mod tests {
     }
 
     #[test]
+    fn live_execution_witness_rejects_same_intent_different_authorization_record() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.required_stability_us = 1_000;
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let intent = contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            ":1.42",
+            "0123456789abcdef0123456789abcdef",
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        );
+        let authorization = contextual_authorization(&intent);
+        let witness = NixLiveExecutionWitnessV1::for_test(
+            intent.digest().unwrap(),
+            authorization.digest().unwrap(),
+            "approval:test",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            intent.pre_state_identity.clone(),
+            intent
+                .service_effect_context
+                .as_ref()
+                .map(|context| context.authorized_definition_content_digest.clone()),
+            exp.pre_invocation_id.clone(),
+        );
+
+        let mut substituted = authorization.clone();
+        substituted.authority_ref = "nixward-local-approval-v2:substituted".to_string();
+        assert_ne!(
+            authorization.digest().unwrap(),
+            substituted.digest().unwrap()
+        );
+
+        assert_eq!(
+            validate_live_execution_witness(
+                &witness,
+                &intent,
+                &exp,
+                &intent.digest().unwrap(),
+                &substituted,
+            )
+            .unwrap_err(),
+            NixPostStateErrorV1::LiveExecutionWitnessMismatch
+        );
+    }
+
+    #[test]
     fn live_execution_witness_enables_proven_claim() {
         let mut exp = expectation(NixServiceOperationKindV1::Start);
         exp.required_stability_us = 1_000;
