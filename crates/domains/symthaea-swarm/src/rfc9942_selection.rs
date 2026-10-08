@@ -360,53 +360,39 @@ impl ReceiptSelectionDecision {
 #[cfg(feature = "semantic-receipts")]
 impl Rfc9942VerifiedReceiptSelection {
     /// Bind a validated decision to the exact source collection and the exact
-    /// verified Receipt capability compatible with the selected result.
+    /// verified outer Signature_With_Receipt composition that produced the
+    /// selected result.
     ///
-    /// This proves identity compatibility among the three artifacts. It does
-    /// not, by itself, prove that the supplied capability was the callback
-    /// result that caused an earlier selection; the atomic
-    /// `verify_es256_inclusion_priority_first_valid_receipt_selection_state`
-    /// API establishes that stronger causal relationship.
-    ///
-    /// This is the narrowest durable-publication witness: after construction,
-    /// downstream code receives one immutable object rather than three
-    /// independently supplied values whose relationship could be forgotten.
+    /// This is the narrowest durable-publication witness: downstream code
+    /// receives one immutable object whose private fields prove compatibility
+    /// among the collection, selected Receipt, inner verification capability,
+    /// and authenticated outer composition.
     pub fn bind(
-        decision: &ReceiptSelectionDecision,
-        collection: &Rfc9942ReceiptCollection,
-        verified: &crate::semantic_evidence_vds::Rfc9942VerifiedReceipt,
-    ) -> Result<Self, ReceiptSelectionDecisionError> {
-        decision.validate_against_collection(collection)?;
-        let verified_capability_sha256 = decision.verified_capability_sha256(verified)?;
-        Ok(Self {
-            decision: decision.clone(),
-            verified_capability_sha256,
-            verified_composition_capability_sha256: verified_capability_sha256,
-        })
-    }
-
-    pub fn bind_composition(
         decision: &ReceiptSelectionDecision,
         collection: &Rfc9942ReceiptCollection,
         verified: &crate::semantic_evidence_vds::Rfc9942VerifiedSignatureWithReceipt,
     ) -> Result<Self, ReceiptSelectionDecisionError> {
         decision.validate_against_collection(collection)?;
-        let verified_capability_sha256 = decision.verified_capability_sha256(&verified.receipt())?;
+
+        let verified_capability_sha256 =
+            decision.verified_capability_sha256(&verified.receipt())?;
         if verified.receipt_collection_sha256() != decision.collection_sha256
-            || verified.receipt_sha256() != verified_capability_sha256
-                .then_some(verified.receipt_sha256())
-                .unwrap_or(verified.receipt_sha256())
+            || verified.receipt_sha256() != verified.receipt().receipt_sha256()
         {
-            // The explicit collection comparison above is the important
-            // composition boundary. The selected Receipt identity is checked
-            // below through the inner capability.
+            return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
         }
+
         let selected = decision
             .selected_receipt_sha256
             .ok_or(ReceiptSelectionDecisionError::SelectedCandidateMismatch)?;
         if verified.receipt_sha256() != selected {
             return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
         }
+
+        if verified.receipt_index() as u32 != decision.selected_index.unwrap_or(u32::MAX) {
+            return Err(ReceiptSelectionDecisionError::VerifiedCapabilityMismatch);
+        }
+
         Ok(Self {
             decision: decision.clone(),
             verified_capability_sha256,
