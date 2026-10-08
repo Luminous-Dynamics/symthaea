@@ -9821,7 +9821,11 @@ echo '}'
                     }
                 }
 
-                let expected_current = match read_regular_file_bytes_at(\n                    std::path::Path::new("/etc/nixos"),\n                    "configuration.nix",\n                )\n                .await {
+                let expected_current = match read_regular_file_bytes_at(
+                    std::path::Path::new("/etc/nixos"),
+                    "configuration.nix",
+                )
+                .await {
                     Ok(bytes) => bytes,
                     Err(error) => {
                         remove_transaction_artifact_dir(&transaction_dir);

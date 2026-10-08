@@ -168,6 +168,12 @@ def main() -> None:
     if "read_regular_file_bytes_at(" not in write_body:
         fail("write_config lost descriptor-relative preimage binding")
 
+    if 'read_regular_file_bytes_at(\\n' in write_body:
+        fail(
+            "write_config contains literal escaped newlines in Rust source; "
+            "source must contain actual line breaks"
+        )
+
     activation_marker = 'run_privileged_nixos_rebuild_args(&["switch"]).await'
     activation_index = write_body.find(activation_marker)
     if activation_index < 0:
