@@ -2323,6 +2323,7 @@ mod tests {
         initial: &BTreeMap<ResourceId, BinaryHypervector>,
         observed: &BTreeMap<ResourceId, BinaryHypervector>,
         receipt: &VulkanBarrierExecutionReceipt,
+        runtime: &VulkanBarrierWorkloadRuntime,
     ) {
         println!("qualification_witness_version=1");
         println!("qualification_claim=workload_execution+synchronization_only");
@@ -2344,6 +2345,21 @@ mod tests {
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
         println!("device_uuid={}", hex_bytes(&receipt.device_uuid));
+        println!("implementation_identity_version=1");
+        println!("implementation_identity_sha256={}", receipt.implementation_identity_digest);
+        println!("implementation_abi_marker={}", WGSL_ABI_MARKER);
+        println!("implementation_kernel_id={}", HDC_BIND_XOR_KERNEL_ID);
+        println!("implementation_wgsl_sha256={}", runtime.implementation_wgsl_sha256);
+        println!("implementation_wgsl_hex={}", runtime.implementation_wgsl_hex);
+        println!("shader_spirv_sha256={}", runtime.shader_spirv_sha256);
+        println!("shader_spirv_hex={}", runtime.shader_spirv_hex);
+        println!("physical_device_identity_version=1");
+        println!("physical_device_identity_sha256={}", receipt.physical_device_identity_digest);
+        println!("physical_device_vendor_id={}", runtime.physical_device_vendor_id);
+        println!("physical_device_device_id={}", runtime.physical_device_device_id);
+        println!("physical_device_type={}", runtime.physical_device_type);
+        println!("physical_device_driver_version={}", runtime.physical_device_driver_version);
+        println!("physical_device_name_hex={}", runtime.physical_device_name_hex);
         for (resource, value) in initial {
             println!("resource_initial_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
@@ -2429,6 +2445,7 @@ mod tests {
                 &initial,
                 &observed,
                 &receipt,
+                &runtime,
             );
         }
 
