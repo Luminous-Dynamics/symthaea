@@ -96,6 +96,8 @@ jobs:
               if (!evaluation.checks.base_branch_tip_stable) reasons.push('base_branch_tip_drift');
               if (!evaluation.checks.artifact_snapshot_stable) reasons.push('artifact_snapshot_drift');
               if (!governanceObservation.verified) reasons.push('governance_authority_unverified');
+              if (evidence.finalPr?.state !== 'open') reasons.push('pr_not_open');
+              if (evidence.finalPr?.draft !== false) reasons.push('pr_not_ready_for_review');
 
               const lease = {
                 schema_version: 'PromotionEligibilityLeaseV1',
@@ -471,6 +473,8 @@ jobs:
                 },
                 pr: {
                   number: expected.pr,
+                  state: 'open',
+                  draft: false,
                   head: {
                     sha: expected.subject,
                     ref: expected.branch,
@@ -493,6 +497,8 @@ jobs:
                 finalBaseBranchTipSha: expected.parent,
                 finalPr: {
                   number: expected.pr,
+                  state: 'open',
+                  draft: false,
                   head: {
                     sha: expected.subject,
                     ref: expected.branch,
@@ -741,6 +747,31 @@ jobs:
               governanceUnverifiedLease.invalidation_reasons.includes(
                 'governance_authority_unverified'
               );
+            const closedPrSynthetic = syntheticEvidence();
+            closedPrSynthetic.finalPr.state = 'closed';
+            const closedPrLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: closedPrSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const draftPrSynthetic = syntheticEvidence();
+            draftPrSynthetic.finalPr.draft = true;
+            const draftPrLease = buildPromotionEligibilityLease({
+              evaluation: syntheticBaseline,
+              evidence: draftPrSynthetic,
+              governanceObservation: syntheticGovernanceVerified,
+              verifierWorkflowBlobSha: 'd'.repeat(40),
+              policyIdentity: 'p'.repeat(64),
+              observedAt: '2026-01-01T00:00:00Z',
+            });
+            const prStateLeaseInvalidationPassed =
+              closedPrLease.lease_state === 'NOT_ELIGIBLE' &&
+              closedPrLease.invalidation_reasons.includes('pr_not_open') &&
+              draftPrLease.lease_state === 'NOT_ELIGIBLE' &&
+              draftPrLease.invalidation_reasons.includes('pr_not_ready_for_review');
 
             const adversarialResults = [];
             for (const [name, mutate] of attackCases) {
@@ -762,7 +793,8 @@ jobs:
               adversarialResults.length === attackCases.length &&
               adversarialResults.every((result) => result.passed) &&
               syntheticLeasePassed &&
-              governanceLeaseInvalidationPassed;
+              governanceLeaseInvalidationPassed &&
+              prStateLeaseInvalidationPassed;
 
             const runId = context.payload.workflow_run?.id;
             if (!Number.isInteger(runId) || runId <= 0) {
@@ -1177,6 +1209,7 @@ jobs:
                 passed: adversarialCorpusPassed,
                 lease_baseline_passed: syntheticLeasePassed,
                 governance_invalidation_lease_passed: governanceLeaseInvalidationPassed,
+                pr_state_invalidation_lease_passed: prStateLeaseInvalidationPassed,
                 cases: adversarialResults,
               },
               subject: {
@@ -1415,11 +1448,23 @@ jobs:
               publicationRun.head_sha === run.head_sha &&
               publicationRun.head_branch === run.head_branch;
 
+            const publicationPrIdentityStable =
+              publicationPr?.number === expected.pr &&
+              publicationPr?.state === 'open' &&
+              publicationPr?.draft === false &&
+              publicationPr?.head?.ref === expected.branch &&
+              Number(publicationPr?.head?.repo?.id) === expected.repositoryId &&
+              publicationPr?.head?.repo?.full_name === expected.repository &&
+              publicationPr?.base?.ref === expected.baseBranch &&
+              Number(publicationPr?.base?.repo?.id) === expected.repositoryId &&
+              publicationPr?.base?.repo?.full_name === expected.repository;
+
             const publicationFencePassed =
               publicationMainSha === liveEvidence.finalMainSha &&
               publicationPr.head?.sha === liveEvidence.finalPr.head?.sha &&
               publicationPr.base?.sha === liveEvidence.finalPr.base?.sha &&
               publicationPr.merge_commit_sha === liveEvidence.finalPr.merge_commit_sha &&
+              publicationPrIdentityStable &&
               publicationBaseSha === liveEvidence.finalBaseBranchTipSha &&
               publicationGovernanceIdentitySha256 === governanceIdentitySha256 &&
               publicationRunStable &&
@@ -1439,6 +1484,7 @@ jobs:
               artifact_id: publicationArtifact?.id ?? null,
               artifact_digest: publicationArtifact?.digest ?? null,
               artifact_lifecycle_stable: publicationArtifactStable,
+              pr_identity_stable: publicationPrIdentityStable,
             };
             if (!publicationFencePassed) {
               if (!promotionLease.invalidation_reasons.includes('publication_fence_failed')) {
@@ -1504,6 +1550,8 @@ jobs:
         env:
           EXPECTED_SUBJECT: "433ca9c92b16bfac824225950e32692e8e151238"
           EXPECTED_PR: "6803"
+          EXPECTED_BRANCH: "research/hdc-linear-code-bounded-decoder-v2"
+          EXPECTED_REPOSITORY_ID: "1136141775"
           EXPECTED_BASE_BRANCH: "research/hdc-linear-code-recovery-design-v1"
           STATUS_CONTEXT: "HDC / Independent Qualification"
           VERIFIER_OUTCOME: ${{ steps.verify.outcome }}
@@ -1527,6 +1575,14 @@ jobs:
             const crypto = require('crypto');
             const uploadSucceeded = process.env.UPLOAD_OUTCOME === 'success';
             const verifierSucceeded = process.env.VERIFIER_OUTCOME === 'success';
+            const targetUrl =
+              context.serverUrl +
+              '/' +
+              context.repo.owner +
+              '/' +
+              context.repo.repo +
+              '/actions/runs/' +
+              context.runId;
 
             function artifactLifecycleVerified(artifact, nowMs = Date.now()) {
               if (!artifact || !Number.isSafeInteger(artifact.id) || artifact.id <= 0) return false;
@@ -1597,6 +1653,7 @@ jobs:
                 matches.length === 1 &&
                 receiptArtifact !== null &&
                 receiptArtifact.expired === false &&
+                artifactLifecycleVerified(receiptArtifact) &&
                 Number.isSafeInteger(receiptArtifact.id) &&
                 receiptArtifact.id > 0 &&
                 Number.isSafeInteger(receiptArtifact.size_in_bytes) &&
@@ -1724,12 +1781,24 @@ jobs:
             };
             const currentGovernanceIdentitySha256 = governanceIdentity(currentGovernanceObserved);
 
+            const finalPrIdentityStable =
+              currentPr?.number === Number(process.env.EXPECTED_PR) &&
+              currentPr?.state === 'open' &&
+              currentPr?.draft === false &&
+              currentPr?.head?.ref === process.env.EXPECTED_BRANCH &&
+              Number(currentPr?.head?.repo?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+              currentPr?.head?.repo?.full_name === context.repo.owner + '/' + context.repo.repo &&
+              currentPr?.base?.ref === process.env.EXPECTED_BASE_BRANCH &&
+              Number(currentPr?.base?.repo?.id) === Number(process.env.EXPECTED_REPOSITORY_ID) &&
+              currentPr?.base?.repo?.full_name === context.repo.owner + '/' + context.repo.repo;
+
             const finalLeaseFenceStable =
               currentMainSha === process.env.EXPECTED_MAIN_SHA &&
               currentBaseSha === process.env.EXPECTED_BASE_SHA &&
               currentPr.head?.sha === process.env.EXPECTED_PR_HEAD_SHA &&
               currentPr.base?.sha === process.env.EXPECTED_PR_BASE_SHA &&
               currentPr.merge_commit_sha === process.env.EXPECTED_PR_MERGE_SHA &&
+              finalPrIdentityStable &&
               currentRun.id === Number(process.env.EXPECTED_RUN_ID) &&
               currentRun.run_attempt === Number(process.env.EXPECTED_RUN_ATTEMPT) &&
               currentRun.conclusion === 'success' &&
@@ -1752,14 +1821,6 @@ jobs:
             const description = success
               ? 'Qualification and decision-time promotion lease verified.'
               : 'Qualification evidence is not currently promotion-eligible; evidence publication or currentness fence is not satisfied.';
-            const targetUrl =
-              context.serverUrl +
-              '/' +
-              context.repo.owner +
-              '/' +
-              context.repo.repo +
-              '/actions/runs/' +
-              context.runId;
 
             await github.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
               owner: context.repo.owner,
