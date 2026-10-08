@@ -312,6 +312,23 @@ impl NixServicePostStateObservationV1 {
             }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
+        if self.invocation_id.is_some() {
+            let binding = self
+                .post_invocation_binding_digest
+                .as_deref()
+                .ok_or(NixPostStateErrorV1::MissingPostInvocationBinding)?;
+            let expected_binding = invocation_binding_digest(
+                self.invocation_id.as_deref(),
+                &self.unit_object_path,
+                self.systemd_manager_owner.as_deref(),
+                self.systemd_bus_id.as_deref(),
+            )?;
+            if binding != expected_binding {
+                return Err(NixPostStateErrorV1::PostInvocationBindingMismatch);
+            }
+        } else if self.post_invocation_binding_digest.is_some() {
+            return Err(NixPostStateErrorV1::PostInvocationBindingMismatch);
+        }
         if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
         }
