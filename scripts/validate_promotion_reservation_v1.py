@@ -873,6 +873,9 @@ def provider_evidence_fixture(
     verified: bool = True,
     durable: bool = True,
     sequence: int = 1,
+    status: str = "merged",
+    provider_uuid: str | None = "uuid-1",
+    observed_merge_commit: str | None = "M2",
 ) -> ProviderAsyncMergeEvidencePairV1:
     request_capture = ProviderCaptureIntegrityV1(
         raw_bytes_digest=hashlib.sha256(
