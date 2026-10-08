@@ -1,0 +1,97 @@
+{
+  "schema_version": "monetary-attestation-reference-v1-execution",
+  "run_count": 324000,
+  "obligation_count": 972000,
+  "common_random_number_cells": 90,
+  "exogenous_random_namespace": "world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest": "5e6ca9d3ac8381121058ed6e625306462220a2380913f3c0822bc8bdc3e02437",
+  "reference_acceptance_matrix": {
+    "verifier_current": {
+      "exact_current": 1,
+      "subject_substitution": 0,
+      "attribute_substitution": 0,
+      "generation_substitution": 0,
+      "context_substitution": 0
+    },
+    "verifier_stale_generation": {
+      "exact_current": 0,
+      "subject_substitution": 0,
+      "attribute_substitution": 0,
+      "generation_substitution": 1,
+      "context_substitution": 0
+    },
+    "verifier_stale_context": {
+      "exact_current": 0,
+      "subject_substitution": 0,
+      "attribute_substitution": 0,
+      "generation_substitution": 0,
+      "context_substitution": 1
+    },
+    "participant_supplied": {
+      "exact_current": 1,
+      "subject_substitution": 1,
+      "attribute_substitution": 1,
+      "generation_substitution": 1,
+      "context_substitution": 1
+    },
+    "cross_authority": {
+      "exact_current": 1,
+      "subject_substitution": 0,
+      "attribute_substitution": 0,
+      "generation_substitution": 0,
+      "context_substitution": 0
+    }
+  },
+  "headline": {
+    "trusted_current_exact_acceptance_rate": 1,
+    "unqualified_reference_acceptance_rate": 0.4,
+    "participant_supplied_acceptance_rate": 1,
+    "cross_authority_exact_current_acceptance_rate": 1,
+    "stale_reference_exact_current_rejection_rate": {
+      "verifier_stale_generation": 1,
+      "verifier_stale_context": 1
+    }
+  },
+  "selected_attack_effects_if_reference_is_admitted": {
+    "participant_supplied|subject_substitution": {
+      "positive_gain_rate": 0.2111111111111111,
+      "mean_gain_ticks": 0.17555555555555555,
+      "max_gain_ticks": 14
+    },
+    "participant_supplied|attribute_substitution": {
+      "positive_gain_rate": 0.12222222222222222,
+      "mean_gain_ticks": 0.14444444444444443,
+      "max_gain_ticks": 9
+    },
+    "participant_supplied|generation_substitution": {
+      "positive_gain_rate": 0,
+      "mean_gain_ticks": 0,
+      "max_gain_ticks": 0
+    },
+    "participant_supplied|context_substitution": {
+      "positive_gain_rate": 0.011111111111111112,
+      "mean_gain_ticks": -0.2311111111111111,
+      "max_gain_ticks": 6
+    },
+    "verifier_stale_generation|generation_substitution": {
+      "positive_gain_rate": 0,
+      "mean_gain_ticks": 0,
+      "max_gain_ticks": 0
+    },
+    "verifier_stale_context|context_substitution": {
+      "positive_gain_rate": 0.011111111111111112,
+      "mean_gain_ticks": -0.2311111111111111,
+      "max_gain_ticks": 6
+    }
+  },
+  "invariants": {
+    "factorial_cardinality_exact": true,
+    "obligation_cardinality_exact": true,
+    "signature_valid_for_all_variants": true,
+    "reference_variant_matrix_exact": true,
+    "reporting_independent_authoritative_result": true,
+    "resource_integrity_failures": 0,
+    "crn_independent_of_reference_and_variant": true
+  },
+  "claim_ceiling": "Deterministic synthetic reference-provenance/currentness experiment only; no real cryptographic key custody, trusted hardware, empirical attacker behavior, calibrated uncertainty, equilibrium, legal finality, interoperability conformance, or production-readiness claim."
+}

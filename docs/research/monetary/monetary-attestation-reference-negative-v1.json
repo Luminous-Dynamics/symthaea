@@ -1,0 +1,53 @@
+{
+  "schema_version": "monetary-attestation-reference-negative-v1",
+  "cases": [
+    {
+      "id": "REF-X01",
+      "description": "participant controls the expected subject"
+    },
+    {
+      "id": "REF-X02",
+      "description": "participant controls the expected attribute"
+    },
+    {
+      "id": "REF-X03",
+      "description": "participant controls the expected generation"
+    },
+    {
+      "id": "REF-X04",
+      "description": "participant controls the expected context"
+    },
+    {
+      "id": "REF-X05",
+      "description": "stale generation is treated as current"
+    },
+    {
+      "id": "REF-X06",
+      "description": "stale context is treated as current"
+    },
+    {
+      "id": "REF-X07",
+      "description": "cross-authority reference is treated as local"
+    },
+    {
+      "id": "REF-X08",
+      "description": "stale-reference rejection is misclassified as attacker success"
+    },
+    {
+      "id": "REF-X09",
+      "description": "reference context includes reporting treatment"
+    },
+    {
+      "id": "REF-X10",
+      "description": "reference source identity is omitted"
+    },
+    {
+      "id": "REF-X11",
+      "description": "participant reporting changes the expected reference tuple"
+    },
+    {
+      "id": "REF-X12",
+      "description": "one reference-source × attestation-variant cell is omitted"
+    }
+  ]
+}
