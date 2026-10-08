@@ -921,6 +921,7 @@ class PromotionTemporalAttemptIdentityV1:
     promotion_operation_id: str
     reservation_head: str
     dispatch_attempt_id: str
+    dispatch_attempt_sequence: int
     fencing_token: int
     trust_root_generation: int
     governance_generation: int
@@ -937,6 +938,7 @@ class PromotionTemporalAttemptIdentityV1:
             and bool(self.promotion_operation_id)
             and bool(self.reservation_head)
             and bool(self.dispatch_attempt_id)
+            and self.dispatch_attempt_sequence > 0
             and self.fencing_token > 0
             and self.trust_root_generation >= 0
             and self.governance_generation >= 0
@@ -946,6 +948,7 @@ class PromotionTemporalAttemptIdentityV1:
     def identity_digest(self) -> str:
         payload = {
             "dispatch_attempt_id": self.dispatch_attempt_id,
+            "dispatch_attempt_sequence": self.dispatch_attempt_sequence,
             "dispatch_monotonic_ns": self.dispatch_monotonic_ns,
             "dispatch_time_ms": self.dispatch_time_ms,
             "fencing_token": self.fencing_token,
@@ -967,6 +970,53 @@ class PromotionTemporalAttemptIdentityV1:
                 ensure_ascii=True,
             ).encode("utf-8")
         ).hexdigest()
+
+    @classmethod
+    def from_prepared_reservation(
+        cls,
+        identity: PromotionOperationIdentityV1,
+        reservation: "Reservation",
+        *,
+        local_monotonic_clock_id: str,
+        reservation_time_ms: int,
+        dispatch_time_ms: int,
+        reservation_monotonic_ns: int,
+        dispatch_monotonic_ns: int,
+    ) -> "PromotionTemporalAttemptIdentityV1 | None":
+        sequence = reservation.dispatch_attempt_sequence
+        if not (
+            reservation.dispatch_intent
+            and reservation.state == "PromotionDispatchPrepared"
+            and sequence is not None
+            and sequence > 0
+            and reservation.operation_identity_digest == identity.digest()
+            and reservation.trust_root_generation == identity.trust_root_generation
+            and reservation.expected_pr_head_sha == identity.requested_pr_head_sha
+            and reservation.fencing_token > 0
+            and bool(local_monotonic_clock_id)
+            and reservation_time_ms >= 0
+            and dispatch_time_ms >= reservation_time_ms
+            and reservation_monotonic_ns >= 0
+            and dispatch_monotonic_ns >= reservation_monotonic_ns
+        ):
+            return None
+        candidate = cls(
+            operation_identity_digest=identity.digest(),
+            reservation_id=reservation.reservation_id,
+            promotion_operation_id=reservation.operation_id,
+            reservation_head=reservation.reservation_head,
+            dispatch_attempt_id=f"{reservation.operation_id}:dispatch:{sequence}",
+            dispatch_attempt_sequence=sequence,
+            fencing_token=reservation.fencing_token,
+            trust_root_generation=reservation.trust_root_generation,
+            governance_generation=identity.governance_generation,
+            local_monotonic_clock_id=local_monotonic_clock_id,
+            reservation_time_ms=reservation_time_ms,
+            dispatch_time_ms=dispatch_time_ms,
+            reservation_monotonic_ns=reservation_monotonic_ns,
+            dispatch_monotonic_ns=dispatch_monotonic_ns,
+        )
+        return candidate if candidate.structurally_valid() else None
 
     def validates_operation(self, identity: PromotionOperationIdentityV1) -> bool:
         return (
@@ -4220,6 +4270,8 @@ class Reservation:
     expected_pr_head_sha: str = "H1"
     trust_root_generation: int = 1
     effect_receipt: PromotionEffectReceipt | None = None
+    operation_identity_digest: str = ""
+    dispatch_attempt_sequence: int | None = None
 
 
 class Ledger:
@@ -4239,6 +4291,7 @@ class Ledger:
         candidate: str,
         trust_root_generation: int = 1,
         expected_pr_head_sha: str = "H1",
+        operation_identity_digest: str = "",
     ) -> bool:
         if observed_head != self.head or lease_id != self.active_lease:
             return False
@@ -4258,6 +4311,7 @@ class Ledger:
         self.reservation.fencing_token = self.fencing_token
         self.reservation.expected_pr_head_sha = expected_pr_head_sha
         self.reservation.trust_root_generation = trust_root_generation
+        self.reservation.operation_identity_digest = operation_identity_digest
         self.active_lease = None
         self.head = candidate
         self.transitions.append(("reservation", observed_head, candidate))
@@ -4281,9 +4335,14 @@ class Ledger:
         observed_fencing_token: int,
         attempt_sequence: int,
     ) -> bool:
-        del attempt_sequence  # Reserved for durable dispatch-intent sequencing.
         r = self.reservation
-        if r is None or r.dispatch_intent or r.state != "PromotionReserved":
+        if (
+            attempt_sequence <= 0
+            or r is None
+            or r.dispatch_intent
+            or r.dispatch_attempt_sequence is not None
+            or r.state != "PromotionReserved"
+        ):
             return False
         if observed_head != self.head:
             return False
@@ -4295,6 +4354,7 @@ class Ledger:
             return False
         if r.trust_root_generation != self.trust_root_generation:
             return False
+        r.dispatch_attempt_sequence = attempt_sequence
         r.dispatch_intent = True
         r.state = "PromotionDispatchPrepared"
         return True
