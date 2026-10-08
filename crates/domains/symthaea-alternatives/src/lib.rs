@@ -11455,6 +11455,11 @@ mod tests {
             .as_mut()
             .unwrap()
             .experimental_design_id = Some("design:orphan".into());
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_target_id = None;
         assert_eq!(
             AlternativesEngine
                 .assess(&case.requirement, &[candidate], None)
