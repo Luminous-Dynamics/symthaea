@@ -1,0 +1,192 @@
+{
+  "schema_version": "monetary-strategic-reporting-v1-execution",
+  "run_count": 12960,
+  "obligation_count": 38880,
+  "common_random_number_cells": 90,
+  "exogenous_random_namespace": "world:{shock}:{seed}:obligation:{index}",
+  "trace_set_digest": "b201bd03d6388f5f00f068c8b0ab1c6eb18451ed8503689c043fb22cb8689c03",
+  "aggregate_by_reporting_policy": {
+    "criticality_inflation": {
+      "cells": 3240,
+      "mean_completion_rate": 0.4166666666666667,
+      "mean_system_completion_time": 16.77979797979798,
+      "resource_integrity_failures": 0
+    },
+    "dual_misreport": {
+      "cells": 3240,
+      "mean_completion_rate": 0.4166666666666667,
+      "mean_system_completion_time": 16.77979797979798,
+      "resource_integrity_failures": 0
+    },
+    "liquidity_demand_underreport": {
+      "cells": 3240,
+      "mean_completion_rate": 0.4166666666666667,
+      "mean_system_completion_time": 17.236363636363638,
+      "resource_integrity_failures": 0
+    },
+    "truthful": {
+      "cells": 3240,
+      "mean_completion_rate": 0.4166666666666667,
+      "mean_system_completion_time": 17.236363636363638,
+      "resource_integrity_failures": 0
+    }
+  },
+  "mechanism_breakdown": {
+    "criticality_priority": {
+      "criticality_inflation": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0.6333333333333333,
+        "mean_focal_completion_gain_ticks": 4.1,
+        "max_focal_completion_gain_ticks": 14,
+        "mean_rank_improvement": 1,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0.7818181818181819
+      },
+      "dual_misreport": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0.6333333333333333,
+        "mean_focal_completion_gain_ticks": 4.1,
+        "max_focal_completion_gain_ticks": 14,
+        "mean_rank_improvement": 1,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0.7818181818181819
+      },
+      "liquidity_demand_underreport": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0,
+        "mean_focal_completion_gain_ticks": 0,
+        "max_focal_completion_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0
+      }
+    },
+    "fifo": {
+      "criticality_inflation": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0,
+        "mean_focal_completion_gain_ticks": 0,
+        "max_focal_completion_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0
+      },
+      "dual_misreport": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0,
+        "mean_focal_completion_gain_ticks": 0,
+        "max_focal_completion_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0
+      },
+      "liquidity_demand_underreport": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0,
+        "mean_focal_completion_gain_ticks": 0,
+        "max_focal_completion_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0
+      }
+    },
+    "minimum_liquidity_demand": {
+      "criticality_inflation": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0,
+        "mean_focal_completion_gain_ticks": 0,
+        "max_focal_completion_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 0
+      },
+      "dual_misreport": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0.36666666666666664,
+        "mean_focal_completion_gain_ticks": 1.8733333333333333,
+        "max_focal_completion_gain_ticks": 9,
+        "mean_rank_improvement": 0.4722222222222222,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 1.5818181818181818
+      },
+      "liquidity_demand_underreport": {
+        "common_completion_pairs": 450,
+        "positive_focal_gain_rate": 0.36666666666666664,
+        "mean_focal_completion_gain_ticks": 1.8733333333333333,
+        "max_focal_completion_gain_ticks": 9,
+        "mean_rank_improvement": 0.4722222222222222,
+        "report_only_rate": 0,
+        "truth_only_rate": 0,
+        "mean_other_completion_externality_ticks": 1.5818181818181818
+      }
+    }
+  },
+  "focal_breakdown": {
+    "0": {
+      "criticality_inflation": {
+        "mean_gain_ticks": 1.6333333333333333,
+        "mean_rank_improvement": 0.3333333333333333,
+        "positive_gain_rate": 0.3333333333333333
+      },
+      "dual_misreport": {
+        "mean_gain_ticks": 3.3,
+        "mean_rank_improvement": 0.7638888888888888,
+        "positive_gain_rate": 0.6666666666666666
+      },
+      "liquidity_demand_underreport": {
+        "mean_gain_ticks": 1.6666666666666667,
+        "mean_rank_improvement": 0.4305555555555556,
+        "positive_gain_rate": 0.3333333333333333
+      }
+    },
+    "1": {
+      "criticality_inflation": {
+        "mean_gain_ticks": 2.5393939393939395,
+        "mean_rank_improvement": 0.6666666666666666,
+        "positive_gain_rate": 0.3333333333333333
+      },
+      "dual_misreport": {
+        "mean_gain_ticks": 2.5393939393939395,
+        "mean_rank_improvement": 0.6666666666666666,
+        "positive_gain_rate": 0.3333333333333333
+      },
+      "liquidity_demand_underreport": {
+        "mean_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "positive_gain_rate": 0
+      }
+    },
+    "2": {
+      "criticality_inflation": {
+        "mean_gain_ticks": 0,
+        "mean_rank_improvement": 0,
+        "positive_gain_rate": 0
+      },
+      "dual_misreport": {
+        "mean_gain_ticks": 0.4909090909090909,
+        "mean_rank_improvement": 0.041666666666666664,
+        "positive_gain_rate": 0.09090909090909091
+      },
+      "liquidity_demand_underreport": {
+        "mean_gain_ticks": 0.4909090909090909,
+        "mean_rank_improvement": 0.041666666666666664,
+        "positive_gain_rate": 0.09090909090909091
+      }
+    }
+  },
+  "invariants": {
+    "crn_invariant": true,
+    "nonfocal_reporting_truthful": true,
+    "resource_integrity_failures": 0,
+    "true_values_immutable": true
+  },
+  "claim_ceiling": "Deterministic mechanism-manipulability experiment only; reporting probes are synthetic adversarial strategies, not empirical behavior, equilibrium, a truthfulness theorem, welfare analysis, systemic-safety evidence, or policy recommendation."
+}

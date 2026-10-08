@@ -1,0 +1,60 @@
+{
+  "schema_version": "monetary-strategic-reporting-v1-contrasts",
+  "trace_set_digest": "b201bd03d6388f5f00f068c8b0ab1c6eb18451ed8503689c043fb22cb8689c03",
+  "paired_reference": "Every non-truthful cell is compared to the exact truthful counterpart with identical pair, adapter, shock, seed, allocation policy and focal obligation.",
+  "mechanism_findings": [
+    "Criticality-priority is manipulable by criticality inflation: 63.3333% of comparable focal outcomes improve, mean gain 4.1 ticks, maximum 14 ticks.",
+    "Minimum-liquidity-demand is manipulable by liquidity-demand underreporting: 36.6667% of comparable focal outcomes improve, mean gain 1.8733333 ticks, maximum 9 ticks.",
+    "FIFO is insensitive to these declarations in the declared model because it does not consume them for ordering."
+  ],
+  "externality_finding": "The focal advantage can delay non-focal obligations: mean other-obligation completion externality is +0.7818182 ticks for criticality-priority manipulation and +1.5818182 ticks for minimum-liquidity-demand manipulation.",
+  "resource_integrity": "All reservations consume immutable true liquidity demand; peak concurrent reservation stayed within capacity in all 12,960 cells.",
+  "representative_max_gain_cells": [
+    {
+      "reporting_policy": "criticality_inflation",
+      "allocation_policy": "criticality_priority",
+      "pair": "bank_mutual",
+      "adapter": "redeem_reissue",
+      "shock": "network_partition",
+      "seed": 23,
+      "focal_obligation": 1,
+      "truthful_order": [
+        2,
+        0,
+        1
+      ],
+      "reported_order": [
+        1,
+        2,
+        0
+      ],
+      "truthful_completion": 26,
+      "reported_completion": 12,
+      "gain_ticks": 14
+    },
+    {
+      "reporting_policy": "liquidity_demand_underreport",
+      "allocation_policy": "minimum_liquidity_demand",
+      "pair": "bank_mutual",
+      "adapter": "redeem_reissue",
+      "shock": "liquidity_shock",
+      "seed": 47,
+      "focal_obligation": 2,
+      "truthful_order": [
+        1,
+        2,
+        0
+      ],
+      "reported_order": [
+        2,
+        1,
+        0
+      ],
+      "truthful_completion": 21,
+      "reported_completion": 12,
+      "gain_ticks": 9
+    }
+  ],
+  "design_implication": "Claims used as allocation inputs require an explicit authority/truth layer, cost for misreporting, verification, bounded influence, or another mechanism-design safeguard; otherwise the synthetic mechanism can reward assertion rather than the underlying fact.",
+  "claim_ceiling": "Synthetic deterministic mechanism-design observation only; this does not establish empirical strategic behavior, equilibrium, incentive compatibility, truthfulness, welfare superiority, or real-system safety."
+}
