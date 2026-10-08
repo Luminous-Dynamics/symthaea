@@ -129,7 +129,7 @@ An admission reference can now contribute to higher-tier authority diversity onl
 
 ## Experimental-design provenance
 
-The assessment schema is now **53** and the assessment algorithm is **v75**. The v75 heuristic target carries the exact requirement-declared comparison scale (unit, scope, and basis digest) alongside candidate-pair and dimension identity, so a serialized measurement priority cannot silently lose the comparability context that justified the overlap.
+The assessment schema remains **53** and the assessment algorithm is now **v76**. v76 adds the fail-closed requirement that a design-bound observation must actually be linked into the candidate estimate named by its experimental target surface. The v75 heuristic target carries the exact requirement-declared comparison scale (unit, scope, and basis digest) alongside candidate-pair and dimension identity, so a serialized measurement priority cannot silently lose the comparability context that justified the overlap.
 
 The heuristic next-measurement target is intentionally weaker than an experiment specification. It identifies an unresolved dimension, candidate set, exact uncertainty identities when the linked evidence actually carries them, and interval-overlap discrimination targets without inventing a laboratory protocol. It never synthesizes an uncertainty identifier when the evidence layer has not supplied one.
 
@@ -142,7 +142,7 @@ An observation may then carry the resulting experimental_design_id, closing the 
 
 ExperimentalDesignProvenance uses typed discrimination targets rather than free-text pair descriptions. Each target identifies both candidate endpoints, the exact surface being discriminated (burden, performance metric, or operating condition), and a versioned decision-rule identity/digest. The target's surface must resolve to a declared requirement context and its comparison basis must exactly match the design and protocol basis.
 
-Observations linked to an experimental design must also carry that exact design identity. Observations carrying a design identity without a supplied design are rejected, as are observations carrying a different design identity. This makes proposal-to-observation lineage bidirectional at the Symthaea boundary rather than merely advisory.
+Observations linked to an experimental design must also carry that exact design identity. Observations carrying a design identity without a supplied design are rejected, as are observations carrying a different design identity. A design-bound observation must additionally be listed in the exact candidate estimate named by its target surface (burden, constrained performance, or operating capability); an observation that is merely present in the candidate evidence bundle but detached from the assessed surface fails closed. This makes proposal-to-observation-to-assessed-surface lineage bidirectional at the Symthaea boundary rather than merely advisory.
 
 
 Experimental observations are now bound to the exact documented procedure prescribed by the experimental protocol. A design-bound observation must match both the design's protocol procedure identity and its exact procedure digest; procedure identity or semantic procedure drift fails closed. This keeps the planned protocol distinct from merely having an observation produced by some procedure.
