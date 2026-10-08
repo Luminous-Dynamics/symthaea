@@ -101,6 +101,10 @@ pub struct NixSystemdJobEvidenceV1 {
     pub manager_owner: String,
     /// Job object path returned by systemd.
     pub object_path: String,
+    /// Monotonic timestamp when the observer received the matching JobRemoved signal.
+    /// This is local observation-order evidence, not a systemd-provided event timestamp.
+    #[serde(default)]
+    pub removed_at_monotonic_us: Option<u64>,
     /// systemd JobRemoved result. Only the exact `done` value is accepted as
     /// successful evidence; unknown future vocabulary remains recordable but
     /// cannot satisfy the proof predicate.
@@ -118,6 +122,11 @@ impl NixSystemdJobEvidenceV1 {
             return Err(NixPostStateErrorV1::InvalidJobUnit);
         }
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(removed_at) = self.removed_at_monotonic_us {
+            if removed_at == 0 {
+                return Err(NixPostStateErrorV1::InvalidObservationTimestamp);
+            }
+        }
         require_nonempty(&self.object_path, "systemd job object path")?;
         if !self
             .object_path
@@ -576,6 +585,9 @@ pub struct NixPostStateReceiptV1 {
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
+    /// Monotonic timestamp when the observer received the matching JobRemoved signal.
+    #[serde(default)]
+    pub systemd_job_removed_at_monotonic_us: Option<u64>,
     /// Exact systemd Unit object path corresponding to the persisted semantic state.
     pub observed_unit_object_path: String,
     pub observed_load_state: ServiceLoadStateV1,
@@ -811,6 +823,10 @@ impl NixPostStateReceiptV1 {
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
+            systemd_job_removed_at_monotonic_us: observation
+                .systemd_job
+                .as_ref()
+                .and_then(|job| job.removed_at_monotonic_us),
             observed_unit_object_path: observation.unit_object_path.clone(),
             observed_load_state: observation.load_state,
             observed_active_state: observation.active_state,
@@ -927,6 +943,12 @@ impl NixPostStateReceiptV1 {
                 else {
                     return Ok(NixPostconditionAssessmentV1::Unproven);
                 };
+                let Some(removed_at) = self.systemd_job_removed_at_monotonic_us else {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                };
+                if removed_at > self.observed_at_monotonic_us {
+                    return Ok(NixPostconditionAssessmentV1::Unproven);
+                }
 
                 if job_id == 0
                     || job_unit != self.target_unit
@@ -1065,6 +1087,7 @@ impl NixPostStateReceiptV1 {
             || self.systemd_job_unit.is_some()
             || self.systemd_job_object_path.is_some()
             || self.systemd_job_result.is_some()
+            || self.systemd_job_removed_at_monotonic_us.is_some()
         {
             return Err(NixPostStateErrorV1::IncompleteJobEvidence);
         }
@@ -1077,6 +1100,11 @@ impl NixPostStateReceiptV1 {
         }
         if let Some(result) = &self.systemd_job_result {
             require_nonempty(result, "systemd job result")?;
+        }
+        if let Some(removed_at) = self.systemd_job_removed_at_monotonic_us {
+            if removed_at == 0 {
+                return Err(NixPostStateErrorV1::InvalidObservationTimestamp);
+            }
         }
         validate_systemd_unit_object_path(&self.observed_unit_object_path)?;
         require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
@@ -1212,6 +1240,7 @@ impl NixPostStateReceiptV1 {
         put_opt_str(&mut h, self.systemd_job_unit.as_deref());
         put_opt_str(&mut h, self.systemd_job_object_path.as_deref());
         put_opt_str(&mut h, self.systemd_job_result.as_deref());
+        put_opt_u64(&mut h, self.systemd_job_removed_at_monotonic_us);
         put_str(&mut h, &self.observed_unit_object_path);
         put_u8(&mut h, load_state_tag(self.observed_load_state));
         put_u8(&mut h, active_state_tag(self.observed_active_state));
@@ -1342,6 +1371,12 @@ fn evaluate_postcondition(
             }
             if !job.succeeded() {
                 return Ok(NixPostconditionAssessmentV1::Violated);
+            }
+            let Some(removed_at) = job.removed_at_monotonic_us else {
+                return Ok(NixPostconditionAssessmentV1::Unproven);
+            };
+            if removed_at > observation.observed_at_monotonic_us {
+                return Ok(NixPostconditionAssessmentV1::Unproven);
             }
         }
         NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable => {}
@@ -2064,6 +2099,7 @@ mod tests {
                     job_type,
                     unit: "nginx.service".to_string(),
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
+                    removed_at_monotonic_us: Some(1_000),
                     result: "done".to_string(),
                     manager_owner: ":1.123".to_string(),
                 }
@@ -2466,6 +2502,45 @@ mod tests {
             receipt.approval_projection_digest.as_deref(),
             Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
         );
+    }
+
+    #[test]
+    fn job_removed_after_post_state_is_unproven() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.required_stability_us = 1_000;
+
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.observed_at_monotonic_us = 2_000;
+
+        let stability = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+
+        let mut receipt = build_proven_receipt(&exp, &obs, Some(stability)).unwrap();
+        receipt.systemd_job_removed_at_monotonic_us = Some(3_000);
+        assert!(matches!(
+            receipt.validate_shape(),
+            Err(NixPostStateErrorV1::PostconditionMismatch)
+        ));
+
+    }
+
+    #[test]
+    fn missing_job_removed_ordering_downgrades_non_proven_receipt_only() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().removed_at_monotonic_us = None;
+
+        let result = build_receipt(&exp, &obs, None);
+        assert!(result.is_ok());
+        let receipt = result.unwrap();
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Unproven);
     }
 
     #[test]
