@@ -275,6 +275,26 @@ def main() -> None:
     if '"NIX_PATH"' not in nix_script_body:
         fail("installer script capability lost its explicit NIX_PATH environment")
 
+    sensitive_start = text.find("fn cleanup_sensitive_file(path: &str) -> Result<(), String> {")
+    sensitive_end = text.find("\nfn cleanup_sensitive_files(", sensitive_start)
+    if sensitive_start < 0 or sensitive_end < 0:
+        fail("sensitive cleanup helper disappeared")
+    sensitive_body = text[sensitive_start:sensitive_end]
+    for required in (
+        "unlink_verified_sensitive_file(",
+        "O_NOFOLLOW",
+        "fstatat(",
+        "AT_SYMLINK_NOFOLLOW",
+        "st_dev",
+        "st_ino",
+        "unlinkat(",
+        "sync_all()",
+    ):
+        if required not in sensitive_body:
+            fail(f"sensitive cleanup lost required descriptor/inode primitive {required!r}")
+    if "remove_file(path)" in sensitive_body:
+        fail("sensitive cleanup regressed to pathname-based unlink")
+
     # Transaction cleanup is itself a privileged authority boundary. It must stay
     # descriptor-relative and never fall back to pathname-based recursive deletion.
     cleanup_start = text.find("fn remove_transaction_artifact_dir(path: &str)")
