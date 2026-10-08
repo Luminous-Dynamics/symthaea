@@ -539,7 +539,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v21
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v22
           github_run_id=${{ github.run_id }}
           github_run_attempt=${{ github.run_attempt }}
           github_workflow_sha=${{ github.workflow_sha }}
@@ -637,12 +637,13 @@ jobs:
           artifact_refetch_head_sha=${{ steps.artifact_revalidate.outputs.artifact_refetch_head_sha }}
           artifact_refetch_expected_merge_sha=${{ steps.artifact_revalidate.outputs.artifact_refetch_expected_merge_sha }}
           artifact_refetch_pr_head_sha=${{ steps.artifact_revalidate.outputs.artifact_refetch_pr_head_sha }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.brute_force_dual_space.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status_pre_artifact=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.generator_basis_equivariance.outcome == 'success' && steps.composed_metamorphic.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.syndrome_oracle.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.brute_force_dual_space.outcome == 'success' && steps.fixed_syndrome_spec.outcome == 'success' && steps.quotient_metric.outcome == 'success' && steps.quotient_spectrum.outcome == 'success' && steps.spectrum_adversary.outcome == 'success' && steps.coordinate_permutation.outcome == 'success' && steps.fiber_difference.outcome == 'success' && steps.walsh_dual_fiber.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.random_list_oracle.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}
           beyond_radius_status=${{ steps.beyond_radius.outcome }}
           beyond_radius_ledger=${{ steps.beyond_radius.outputs.beyond_radius_ledger }}
+          artifact_revalidation_deferred=true
           EOF
 
       - name: Upload qualification receipt
