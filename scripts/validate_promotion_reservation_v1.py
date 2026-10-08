@@ -776,7 +776,6 @@ class ClockRelationEvidenceV1:
             "max_skew_ms": self.max_skew_ms,
             "measured_at_local_time_ms": self.measured_at_local_time_ms,
             "provider_clock_domain": self.provider_clock_domain,
-            "source_authentication": self.source_authentication,
             "source_origin": self.source_origin,
             "valid_from_local_time_ms": self.valid_from_local_time_ms,
             "valid_until_local_time_ms": self.valid_until_local_time_ms,
@@ -822,6 +821,26 @@ class ClockRelationEvidenceV1:
                 self.source_response,
             )
         )
+
+    def classify_source(self) -> str:
+        if (
+            self.source_challenge is None
+            or self.source_response is None
+            or self.source_attestation is None
+        ):
+            return "clock-relation-source-provenance-missing"
+        if not self.source_challenge.internally_consistent():
+            return "clock-relation-source-challenge-mismatch"
+        if not self.source_response.internally_consistent():
+            return "clock-relation-source-response-mismatch"
+        if self.source_response.challenge_digest != self.source_challenge.digest():
+            return "clock-relation-source-response-mismatch"
+        if not self.source_attestation.internally_consistent(
+            self.source_challenge,
+            self.source_response,
+        ):
+            return "clock-relation-source-attestation-invalid"
+        return "clock-relation-source-admissible"
 
 
 @dataclass(frozen=True)
@@ -1040,6 +1059,7 @@ class LocalTemporalSequenceV1:
 
 @dataclass(frozen=True)
 class ProviderWebhookEffectTimingV1:
+    operation_identity_digest: str
     provider_event_time_ms: int | None
     provider_delivery_time_ms: int | None
     local_reservation_time_ms: int | None
@@ -1052,6 +1072,7 @@ class ProviderWebhookEffectTimingV1:
     def from_observation(
         cls,
         observation: ProviderPullRequestMergeObservationV1,
+        operation_identity_digest: str,
         local_reservation_time_ms: int | None,
         local_dispatch_time_ms: int | None,
         clock_relation: ClockRelationV1 | None,
@@ -1059,6 +1080,7 @@ class ProviderWebhookEffectTimingV1:
         local_sequence: LocalTemporalSequenceV1 | None = None,
     ) -> "ProviderWebhookEffectTimingV1":
         return cls(
+            operation_identity_digest=operation_identity_digest,
             provider_event_time_ms=parse_provider_timestamp_ms(observation.merged_at),
             provider_delivery_time_ms=provider_delivery_time_ms,
             local_reservation_time_ms=local_reservation_time_ms,
@@ -1069,6 +1091,18 @@ class ProviderWebhookEffectTimingV1:
         )
 
     def classify(self) -> str:
+        if not self.operation_identity_digest:
+            return "operation-identity-missing"
+        if self.clock_relation is not None:
+            if self.clock_relation.evidence is None:
+                return "clock-relation-provenance-missing"
+            if self.clock_relation.evidence.source_challenge is None:
+                return "clock-relation-source-provenance-missing"
+            if (
+                self.clock_relation.evidence.source_challenge.operation_identity_digest
+                != self.operation_identity_digest
+            ):
+                return "clock-relation-operation-identity-mismatch"
         values = (
             self.provider_event_time_ms,
             self.provider_delivery_time_ms,
@@ -1138,6 +1172,11 @@ class PromotionStackEffectTimingSetV1:
             return False
         expected = identity.ordered_stack
         if len(self.timings) != len(expected):
+            return False
+        if any(
+            item.timing.operation_identity_digest != identity.digest()
+            for item in self.timings
+        ):
             return False
         observed_prs = [item.pr_number for item in self.timings]
         if len(observed_prs) != len(set(observed_prs)):
@@ -1776,6 +1815,7 @@ def effect_timing_fixture(
     local_sequence: LocalTemporalSequenceV1 | None = LocalTemporalSequenceV1(1, 2, 3),
 ) -> ProviderWebhookEffectTimingV1:
     return ProviderWebhookEffectTimingV1(
+        operation_identity_digest=stack_identity_fixture().digest(),
         provider_event_time_ms=event_time_ms,
         provider_delivery_time_ms=delivery_time_ms,
         local_reservation_time_ms=reservation_time_ms,
@@ -1796,6 +1836,7 @@ def webhook_effect_timing_from_observation(
     )
     return ProviderWebhookEffectTimingV1.from_observation(
         observation,
+        operation_identity_digest=identity.digest(),
         local_reservation_time_ms=1791475190000,
         local_dispatch_time_ms=1791475195000,
         clock_relation=clock_relation_fixture(),
@@ -1882,6 +1923,80 @@ def test_clock_source_attestation_binds_exact_response():
 def test_clock_source_attestation_rejects_unverified_signature():
     relation = clock_relation_fixture(verified=False)
     assert not relation.usable(1791475195000, 1791475205000)
+
+
+def test_clock_source_challenge_rejects_wrong_nonce_length():
+    challenge = ClockRelationSourceChallengeV1(
+        challenge_id="c",
+        operation_identity_digest="op",
+        nonce_hex="11",
+        issued_local_time_ms=1,
+        expires_local_time_ms=2,
+        trust_anchor_id="anchor",
+    )
+    assert not challenge.internally_consistent()
+
+
+def test_clock_source_challenge_rejects_zero_nonce():
+    challenge = ClockRelationSourceChallengeV1(
+        challenge_id="c",
+        operation_identity_digest="op",
+        nonce_hex="00" * 32,
+        issued_local_time_ms=1,
+        expires_local_time_ms=2,
+        trust_anchor_id="anchor",
+    )
+    assert not challenge.internally_consistent()
+
+
+def test_clock_source_response_binds_exact_challenge():
+    relation = clock_relation_fixture()
+    altered = ClockRelationSourceResponseV1(
+        **{**relation.evidence.source_response.__dict__, "challenge_digest": "forged"},
+    )
+    forged = ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_response": altered},
+    )
+    assert forged.classify_source() == "clock-relation-source-response-mismatch"
+
+
+def test_clock_source_attestation_binds_exact_response():
+    relation = clock_relation_fixture()
+    altered = ClockRelationSourceAttestationV1(
+        **{**relation.evidence.source_attestation.__dict__, "response_digest": "forged"},
+    )
+    assert not altered.internally_consistent(
+        relation.evidence.source_challenge,
+        relation.evidence.source_response,
+    )
+
+
+def test_clock_source_attestation_rejects_unverified_signature():
+    relation = clock_relation_fixture(verified=False)
+    assert not relation.usable(1791475195000, 1791475205000)
+
+
+def test_clock_relation_rejects_source_operation_identity_mismatch():
+    relation = clock_relation_fixture()
+    timing = effect_timing_fixture()
+    foreign_challenge = ClockRelationSourceChallengeV1(
+        **{
+            **relation.evidence.source_challenge.__dict__,
+            "operation_identity_digest": "foreign-operation",
+        },
+    )
+    foreign_evidence = ClockRelationEvidenceV1(
+        **{**relation.evidence.__dict__, "source_challenge": foreign_challenge},
+    )
+    foreign_relation = ClockRelationV1(
+        evidence=foreign_evidence,
+        verification=relation.verification,
+        trust_snapshot=relation.trust_snapshot,
+    )
+    foreign_timing = ProviderWebhookEffectTimingV1(
+        **{**timing.__dict__, "clock_relation": foreign_relation},
+    )
+    assert foreign_timing.classify() == "clock-relation-operation-identity-mismatch"
 
 
 def test_clock_relation_requires_provenance():
