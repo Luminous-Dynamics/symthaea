@@ -2257,6 +2257,22 @@ mod tests {
     }
 
     #[test]
+    fn job_and_observation_bus_incarnations_must_match() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().bus_id =
+            Some("fedcba9876543210fedcba9876543210".to_string());
+
+        assert_eq!(
+            NixVerifiedPostStateObservationV1::from_observer(obs).unwrap_err(),
+            NixPostStateErrorV1::BusIncarnationMismatch
+        );
+    }
+
+    #[test]
     fn malformed_bus_incarnation_is_rejected() {
         let mut obs = observation(
             NixServiceOperationKindV1::Start,
