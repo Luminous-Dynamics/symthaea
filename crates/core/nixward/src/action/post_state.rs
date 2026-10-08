@@ -2093,6 +2093,7 @@ mod tests {
                     job_type,
                     unit: "nginx.service".to_string(),
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
+                    removed_at_monotonic_us: Some(1_000),
                     result: "done".to_string(),
                     manager_owner: ":1.123".to_string(),
                 }
@@ -2495,6 +2496,54 @@ mod tests {
             receipt.approval_projection_digest.as_deref(),
             Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
         );
+    }
+
+    #[test]
+    fn job_removed_after_post_state_is_unproven() {
+        let mut exp = expectation(NixServiceOperationKindV1::Start);
+        exp.required_stability_us = 1_000;
+
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.observed_at_monotonic_us = 2_000;
+
+        let stability = stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000]);
+        let authorization = contextual_authorization(&contextual_intent(
+            NixServiceOperationKindV1::Start,
+            &exp.unit,
+            exp.authorized_generation,
+            exp.authorized_definition_content_digest.clone(),
+            exp.pre_invocation_id.clone(),
+            exp.required_stability_us,
+        ));
+
+        let mut receipt = build_proven_receipt(&exp, &obs, Some(stability)).unwrap();
+        receipt.systemd_job_removed_at_monotonic_us = Some(3_000);
+        assert!(matches!(
+            receipt.validate_shape(),
+            Err(NixPostStateErrorV1::PostconditionMismatch)
+        ));
+
+        let _ = authorization;
+    }
+
+    #[test]
+    fn missing_job_removed_ordering_downgrades_non_proven_receipt_only() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().removed_at_monotonic_us = None;
+
+        let result = build_receipt(&exp, &obs, None);
+        assert!(result.is_ok());
+        let receipt = result.unwrap();
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Unproven);
     }
 
     #[test]
