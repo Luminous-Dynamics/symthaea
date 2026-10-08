@@ -28,7 +28,7 @@ jobs:
           EXPECTED_REPOSITORY_ID: "1136141775"
           EXPECTED_WORKFLOW_PATH: ".github/workflows/qual-hdc-bounded-decoder-trusted-runner.yml"
           EXPECTED_WORKFLOW_NAME: "QUAL HDC bounded decoder trusted runner"
-          EXPECTED_WORKFLOW_BLOB_SHA: "219ea425437c66d1438c28a67d98cdb4cffe3aef"
+          EXPECTED_WORKFLOW_BLOB_SHA: "8b2f52280ae42fd1399ec84b47cc4dc255b55a5f"
           EXPECTED_MERGE_COMMIT: "e4389375ab14512da018b5d448df441b533d9986"
         with:
           script: |
