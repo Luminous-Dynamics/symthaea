@@ -70,6 +70,7 @@ jobs:
               "ProviderEvidenceEnvelopeV1",
               "ProviderWebhookReceiptV1",
               "ProviderPullRequestMergeObservationV1",
+              "PromotionStackEffectSetV1",
               "ProviderDeliveryRegistryV1",
               "ProviderTopologyBindingV1",
               "PromotionStackEffectSetV1",
@@ -125,6 +126,14 @@ jobs:
           }
           for field in semantic_webhook_fields:
               assert field in source, f"Missing webhook semantic field: {field}"
+
+          stack_effect_derivation_markers = {
+              "from_webhook_observations",
+              "to_effect_for_stack_entry",
+              "stack_webhook_observation",
+          }
+          for marker in stack_effect_derivation_markers:
+              assert marker in source, f"Missing stack-effect derivation marker: {marker}"
           for field in webhook_context_fields:
               assert field in source, f"Missing webhook context field: {field}"
 
