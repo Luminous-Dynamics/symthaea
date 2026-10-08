@@ -117,6 +117,23 @@ Reasons:
 
 The wire-size increase is material but acceptable for a receipt/provenance channel where correctness and long-term verifiability are more important than minimum packet size.
 
+## Implementation / oracle strategy
+
+Do not make an unaudited implementation the only cryptographic acceptance oracle.
+
+The current RustCrypto `ml-dsa` crate tracks FIPS 204 and its latest published release is the right kind of API candidate for a Rust implementation, but its documentation explicitly states that the implementation has **never been independently audited**. It has also had multiple 2026 security advisories, including a signature-verification malleability regression that was fixed in later releases.
+
+For qualification, use an independent implementation as an oracle. OpenSSL 3.5+ documents ML-DSA-44/65/87 support in both its default and FIPS providers and exposes one-shot sign/verify operations. This makes OpenSSL a useful independent vector-generation and cross-verification oracle even if the runtime Rust implementation is kept separate.
+
+The acceptance rule should therefore be:
+
+runtime verifier passes
++ independent implementation verifies the same bytes
++ independent implementation rejects the negative vectors
++ exact wire/transcript identity matches
+
+No single library implementation should be treated as its own proof of correctness.
+
 ## Capability model
 
 Add a private capability layer, conceptually:
