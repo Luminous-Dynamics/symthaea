@@ -162,6 +162,56 @@ pub fn verify_block_device_binding(
     Err("block-device binding is only supported on Linux".into())
 }
 
+/// Validate a disk path specifically as a whole-disk target.
+///
+/// The generic validator intentionally accepts any syntactically valid
+/// block-device node. Destructive install topology is narrower: partition
+/// nodes must never be accepted as the disk we intend to repartition.
+pub fn validate_whole_disk_path(value: &str) -> Result<String, String> {
+    let path = validate_disk_path(value)?;
+    let dev = &path["/dev/".len()..];
+
+    let is_ascii_digits = |part: &str| {
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+    };
+    let is_ascii_lower = |part: &str| {
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_lowercase())
+    };
+
+    let whole = if let Some(rest) = dev.strip_prefix("nvme") {
+        if let Some((controller, namespace)) = rest.split_once('n') {
+            is_ascii_digits(controller) && is_ascii_digits(namespace)
+        } else {
+            false
+        }
+    } else if let Some(rest) = dev.strip_prefix("mmcblk") {
+        is_ascii_digits(rest)
+    } else if let Some(rest) = dev.strip_prefix("loop") {
+        is_ascii_digits(rest)
+    } else if let Some(rest) = dev.strip_prefix("fd") {
+        is_ascii_digits(rest)
+    } else if let Some(rest) = dev.strip_prefix("sd") {
+        is_ascii_lower(rest)
+    } else if let Some(rest) = dev.strip_prefix("vd") {
+        is_ascii_lower(rest)
+    } else if let Some(rest) = dev.strip_prefix("xvd") {
+        is_ascii_lower(rest)
+    } else if let Some(rest) = dev.strip_prefix("hd") {
+        is_ascii_lower(rest)
+    } else {
+        false
+    };
+
+    if whole {
+        Ok(path)
+    } else {
+        Err(format!(
+            "Install target must be a whole-disk device, not partition node: {}",
+            path
+        ))
+    }
+}
+
 /// Sanitize a string for safe use in shell commands and Nix config.
 ///
 /// Only allows alphanumeric, hyphens, underscores, dots, and optionally forward slashes.
@@ -460,6 +510,33 @@ mod tests {
         assert!(validate_disk_path("/dev/zz0").is_err());
         assert!(validate_disk_path("/dev/").is_err());
     }
+    #[test]
+    fn whole_disk_accepts_supported_whole_device_names() {
+        assert_eq!(validate_whole_disk_path("/dev/sda").unwrap(), "/dev/sda");
+        assert_eq!(validate_whole_disk_path("/dev/vda").unwrap(), "/dev/vda");
+        assert_eq!(validate_whole_disk_path("/dev/xvdb").unwrap(), "/dev/xvdb");
+        assert_eq!(validate_whole_disk_path("/dev/nvme0n1").unwrap(), "/dev/nvme0n1");
+        assert_eq!(validate_whole_disk_path("/dev/mmcblk0").unwrap(), "/dev/mmcblk0");
+        assert_eq!(validate_whole_disk_path("/dev/loop0").unwrap(), "/dev/loop0");
+    }
+
+    #[test]
+    fn whole_disk_rejects_partition_nodes() {
+        for path in [
+            "/dev/sda1",
+            "/dev/vda2",
+            "/dev/xvdb3",
+            "/dev/nvme0n1p1",
+            "/dev/mmcblk0p1",
+            "/dev/fd0p1",
+        ] {
+            assert!(
+                validate_whole_disk_path(path).is_err(),
+                "partition node must be rejected: {path}"
+            );
+        }
+    }
+
 
     // ── sanitize_input ──
 
