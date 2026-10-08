@@ -519,6 +519,78 @@ class ProviderPullRequestMergeObservationV1:
 
 
 @dataclass(frozen=True)
+class PromotionPrEffectStateV1:
+    repository: str
+    expected_entry: StackEntryV1
+    state: str = "Unobserved"
+    effect: PromotionStackEffectV1 | None = None
+    source_delivery_ids: tuple[str, ...] = ()
+
+    def ingest(
+        self,
+        observation: ProviderPullRequestMergeObservationV1 | None,
+    ) -> tuple["PromotionPrEffectStateV1", str]:
+        if observation is None:
+            return self, "no-eligible-effect"
+
+        if not observation.has_authenticated_source_provenance():
+            return self, "rejected-untrusted"
+
+        if observation.repository != self.repository:
+            return self, "ignored-unrelated"
+
+        if observation.pr_number != self.expected_entry.pr_number:
+            return self, "ignored-unrelated"
+
+        candidate = observation.to_effect_for_stack_entry(self.expected_entry)
+        if candidate is None:
+            return self, "rejected-non-effect"
+
+        if self.state == "Unobserved":
+            return (
+                PromotionPrEffectStateV1(
+                    repository=self.repository,
+                    expected_entry=self.expected_entry,
+                    state="EffectObserved",
+                    effect=candidate,
+                    source_delivery_ids=(observation.delivery_id,),
+                ),
+                "admitted",
+            )
+
+        if self.state != "EffectObserved" or self.effect is None:
+            return self, "rejected-invalid-state"
+
+        if candidate != self.effect:
+            return (
+                PromotionPrEffectStateV1(
+                    repository=self.repository,
+                    expected_entry=self.expected_entry,
+                    state="Conflict",
+                    effect=None,
+                    source_delivery_ids=self.source_delivery_ids,
+                ),
+                "conflict",
+            )
+
+        if observation.delivery_id in self.source_delivery_ids:
+            return self, "duplicate-delivery"
+
+        return (
+            PromotionPrEffectStateV1(
+                repository=self.repository,
+                expected_entry=self.expected_entry,
+                state=self.state,
+                effect=self.effect,
+                source_delivery_ids=self.source_delivery_ids + (observation.delivery_id,),
+            ),
+            "compatible-repeat",
+        )
+
+    def is_terminally_observed(self) -> bool:
+        return self.state == "EffectObserved" and self.effect is not None
+
+@dataclass(frozen=True)
 class PromotionStackEffectEvidenceV1:
     effect: PromotionStackEffectV1
     source_delivery_id: str
@@ -1044,6 +1116,160 @@ def stack_webhook_observation(
     )
     assert observation is not None
     return observation
+
+
+def effect_state_fixture(
+    identity: PromotionOperationIdentityV1 | None = None,
+) -> PromotionPrEffectStateV1:
+    identity = identity or stack_identity_fixture()
+    entry = identity.ordered_stack[-1]
+    return PromotionPrEffectStateV1(
+        repository=identity.repository,
+        expected_entry=entry,
+    )
+
+
+def test_effect_state_admits_first_authenticated_merge():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    observation = stack_webhook_observation(identity)
+    state, decision = state.ingest(observation)
+    assert decision == "admitted"
+    assert state.is_terminally_observed()
+    assert state.effect is not None
+    assert state.effect.observed_merge_commit == "M2"
+
+
+def test_effect_state_merged_then_non_effect_does_not_downgrade():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    merged = stack_webhook_observation(identity)
+    state, decision = state.ingest(merged)
+    assert decision == "admitted"
+    state, decision = state.ingest(None)
+    assert decision == "no-eligible-effect"
+    assert state.is_terminally_observed()
+    assert state.effect == merged.to_stack_effect(identity)
+
+
+def test_effect_state_equivalent_second_delivery_is_idempotent():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-first",
+    )
+    second = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-second",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(second)
+    assert decision == "compatible-repeat"
+    assert state.is_terminally_observed()
+    assert state.source_delivery_ids == ("delivery-first", "delivery-second")
+
+
+def test_effect_state_repeated_same_delivery_is_idempotent():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    observation = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-repeat",
+    )
+    state, _ = state.ingest(observation)
+    state_after, decision = state.ingest(observation)
+    assert decision == "duplicate-delivery"
+    assert state_after == state
+
+
+def test_effect_state_conflicting_merge_commit_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-conflict-first",
+        merge_commit="M2",
+    )
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-conflict-second",
+        merge_commit="M9",
+    )
+    state, _ = state.ingest(first)
+    state, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state.state == "Conflict"
+    assert state.effect is None
+
+
+def test_effect_state_conflicting_head_fails_closed():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-head-first")
+    conflicting = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-head-second",
+        head_sha="H0",
+    )
+    state, _ = state.ingest(first)
+    state_after, decision = state.ingest(conflicting)
+    assert decision == "conflict"
+    assert state_after.state == "Conflict"
+    assert not state_after.is_terminally_observed()
+
+
+def test_effect_state_untrusted_after_merge_does_not_downgrade():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity, delivery_id="delivery-trust-first")
+    state, _ = state.ingest(first)
+    untrusted = ProviderPullRequestMergeObservationV1(
+        delivery_id="delivery-untrusted",
+        repository=identity.repository,
+        pr_number=identity.requested_pr_number,
+        event_type="pull_request",
+        action="closed",
+        merged=True,
+        head_sha=identity.requested_pr_head_sha,
+        merge_commit_sha="M2",
+        payload_bytes_digest="digest",
+    )
+    state_after, decision = state.ingest(untrusted)
+    assert decision == "rejected-untrusted"
+    assert state_after == state
+
+
+def test_effect_state_unrelated_pr_does_not_downgrade():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(identity)
+    state, _ = state.ingest(first)
+    unrelated = stack_webhook_observation(
+        identity,
+        pr_number=7090,
+        head_sha="H9",
+        merge_commit="M9",
+        delivery_id="delivery-unrelated",
+    )
+    state_after, decision = state.ingest(unrelated)
+    assert decision == "ignored-unrelated"
+    assert state_after == state
+
+
+def test_effect_state_is_not_latest_delivery_wins():
+    identity = stack_identity_fixture()
+    state = effect_state_fixture(identity)
+    first = stack_webhook_observation(
+        identity,
+        delivery_id="delivery-terminal",
+    )
+    state, _ = state.ingest(first)
+    later_non_effect = None
+    state_after, decision = state.ingest(later_non_effect)
+    assert decision == "no-eligible-effect"
+    assert state_after.effect == first.to_stack_effect(identity)
+    assert state_after.state == "EffectObserved"
 
 
 def test_webhook_effect_provenance_set_is_complete():
@@ -3195,6 +3421,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_effect_state_admits_first_authenticated_merge,
+    test_effect_state_merged_then_non_effect_does_not_downgrade,
+    test_effect_state_equivalent_second_delivery_is_idempotent,
+    test_effect_state_repeated_same_delivery_is_idempotent,
+    test_effect_state_conflicting_merge_commit_fails_closed,
+    test_effect_state_conflicting_head_fails_closed,
+    test_effect_state_untrusted_after_merge_does_not_downgrade,
+    test_effect_state_unrelated_pr_does_not_downgrade,
+    test_effect_state_is_not_latest_delivery_wins,
     test_webhook_effect_provenance_set_is_complete,
     test_webhook_effect_provenance_normalizes_input_order,
     test_webhook_effect_provenance_rejects_missing_source_provenance,
