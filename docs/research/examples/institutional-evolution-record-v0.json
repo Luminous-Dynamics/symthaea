@@ -13,6 +13,8 @@
       "parent_institution_hash": "blake3:institution-v0",
       "candidate_institution_hash": "blake3:candidate-v1",
       "mutation_id": "M-COORD-QUEUE-001",
+      "rule_level": "operational",
+      "authorizing_rule_hash": null,
       "transition": "proposed",
       "semantic_delta": {
         "path": "allocation.reservation",
@@ -33,6 +35,8 @@
       "parent_institution_hash": "blake3:institution-v0",
       "candidate_institution_hash": "blake3:candidate-v1",
       "mutation_id": "M-COORD-QUEUE-001",
+      "rule_level": "operational",
+      "authorizing_rule_hash": "blake3:collective-choice-rule-v0",
       "transition": "adopted",
       "semantic_delta": {
         "path": "allocation.reservation",
@@ -44,6 +48,27 @@
       "trigger": "commons_waiting_time_spike",
       "evidence_refs": [
         "decision:adoption-005"
+      ],
+      "implementation_outcome": null,
+      "supersession": null
+    },
+    {
+      "parent_institution_hash": "blake3:collective-choice-rule-v0",
+      "candidate_institution_hash": "blake3:collective-choice-rule-v1",
+      "mutation_id": "M-GOV-VOTE-002",
+      "rule_level": "constitutional",
+      "authorizing_rule_hash": "blake3:constitutional-rule-v0",
+      "transition": "proposed",
+      "semantic_delta": {
+        "path": "amendment.threshold",
+        "from": "2/3",
+        "to": "3/5"
+      },
+      "proposer": "agent-07",
+      "authority": null,
+      "trigger": "adoption_latency",
+      "evidence_refs": [
+        "snapshot:governance-031"
       ],
       "implementation_outcome": null,
       "supersession": null
