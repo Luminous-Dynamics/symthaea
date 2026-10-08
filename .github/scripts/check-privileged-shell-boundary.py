@@ -269,8 +269,18 @@ def main() -> None:
     if nix_env_start < 0 or nix_env_end < 0:
         fail("privileged_nix_process helper boundary disappeared")
     nix_env_body = text[nix_env_start:nix_env_end]
-    if '"NIX_PATH"' not in nix_env_body:
-        fail("explicit NixOS capability lost its required legacy NIX_PATH input")
+    if '"NIX_PATH"' in nix_env_body:
+        fail("generic privileged_nix_process regained target-specific NIX_PATH authority")
+
+    rebuild_start = text.find("fn privileged_nixos_rebuild_process(")
+    rebuild_end = text.find("\nasync fn run_privileged_nixos_rebuild_args(", rebuild_start)
+    if rebuild_start < 0 or rebuild_end < 0:
+        fail("privileged_nixos_rebuild_process helper disappeared")
+    rebuild_body = text[rebuild_start:rebuild_end]
+    if '"NIX_PATH"' not in rebuild_body:
+        fail("nixos-rebuild capability lost its explicit configuration NIX_PATH input")
+    if '"nixos-rebuild"' not in rebuild_body:
+        fail("nixos-rebuild capability lost fixed executable identity")
 
     nix_script_start = text.find("fn trusted_nix_script_process(")
     nix_script_end = text.find("\nfn trusted_script_process(", nix_script_start)
