@@ -12,6 +12,7 @@
     {"id":"RES-X09","kind":"same_resource_digest_for_different_owner_scope","expected":"reject_digest_mismatch"},
     {"id":"RES-X10","kind":"resource_exhaustion_silently_retried_as_success","expected":"reject_hidden_recovery"},
     {"id":"RES-X11","kind":"fifo_order_mutated_without_new_resource_generation","expected":"reject_generation_mismatch"},
-    {"id":"RES-X12","kind":"resource_blast_radius_averaged_into_completion_rate","expected":"reject_hidden_concentration"}
+    {"id":"RES-X12","kind":"resource_blast_radius_averaged_into_completion_rate","expected":"reject_hidden_concentration"},
+    {"id":"RES-X13","kind":"treatment_dependent_exogenous_rng_namespace","expected":"reject_common_random_number_breach"}
   ]
 }
