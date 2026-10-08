@@ -138,3 +138,9 @@ The occurrence semantics are carried by `ProviderTimestampPolicyV1`, not selecte
 - policy generation.
 
 The timing record retains the policy identity digest and rejects a tampered policy object or an interval that exceeds the policy's maximum accepted resolution. A different timestamp interpretation therefore creates a different policy identity rather than silently changing the meaning of the same payload.
+
+## Stack-level temporal policy pin
+
+`PromotionStackEffectTimingSetV1` now carries one `timestamp_policy_identity_digest` and requires every timing record in the complete set to reference that same policy identity.
+
+This prevents a complete stack from mixing, for example, a newer exact-resolution interpretation for one PR with an older/coarser interpretation for another PR. A policy generation change therefore creates a new temporal evidence identity instead of silently coexisting inside one stack result.
