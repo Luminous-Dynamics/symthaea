@@ -99,6 +99,9 @@ pub struct NixSystemdJobEvidenceV1 {
     /// this value prevents a durable receipt from collapsing two systemd
     /// manager incarnations that happen to reuse other job identifiers.
     pub manager_owner: String,
+    /// D-Bus daemon incarnation for this Job evidence.
+    #[serde(default)]
+    pub bus_id: Option<String>,
     /// Job object path returned by systemd.
     pub object_path: String,
     /// systemd JobRemoved result. Only the exact `done` value is accepted as
@@ -118,6 +121,9 @@ impl NixSystemdJobEvidenceV1 {
             return Err(NixPostStateErrorV1::InvalidJobUnit);
         }
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         require_nonempty(&self.object_path, "systemd job object path")?;
         if !self
             .object_path
@@ -258,6 +264,9 @@ pub struct NixServicePostStateObservationV1 {
     pub systemd_job: Option<NixSystemdJobEvidenceV1>,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this observation.
     pub systemd_manager_owner: Option<String>,
+    /// D-Bus daemon incarnation observed with this service state.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub invocation_id: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
@@ -282,10 +291,18 @@ impl NixServicePostStateObservationV1 {
         if let Some(owner) = self.systemd_manager_owner.as_deref() {
             validate_unique_manager_owner(owner)?;
         }
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         if let Some(job) = &self.systemd_job {
             job.validate_shape()?;
             if self.systemd_manager_owner.as_deref() != Some(job.manager_owner.as_str()) {
                 return Err(NixPostStateErrorV1::ManagerOwnerMismatch);
+            }
+            if let Some(job_bus_id) = job.bus_id.as_deref() {
+                if self.systemd_bus_id.as_deref() != Some(job_bus_id) {
+                    return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+                }
             }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
@@ -325,6 +342,9 @@ pub struct NixPostStateStabilitySampleV1 {
     pub definition_content_digest: String,
     pub state_digest: String,
     pub manager_owner: String,
+    /// D-Bus daemon incarnation for this stability sample.
+    #[serde(default)]
+    pub bus_id: Option<String>,
     pub invocation_id: Option<String>,
     pub state_change_at_monotonic_us: u64,
     pub captured_at_monotonic_us: u64,
@@ -345,6 +365,9 @@ impl NixPostStateStabilitySampleV1 {
         )?;
         validate_digest(&self.state_digest, "stability state digest")?;
         validate_unique_manager_owner(&self.manager_owner)?;
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "stability invocation id")?;
         if self.captured_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
@@ -364,6 +387,12 @@ impl NixPostStateStabilitySampleV1 {
         put_str(&mut h, &self.definition_content_digest);
         put_str(&mut h, &self.state_digest);
         put_str(&mut h, &self.manager_owner);
+        // Preserve the historical sample digest byte layout when bus identity is
+        // absent; new observer-sealed samples extend the commitment with bus epoch.
+        if let Some(bus_id) = self.bus_id.as_deref() {
+            put_u8(&mut h, 1);
+            put_str(&mut h, bus_id);
+        }
         put_opt_str(&mut h, self.invocation_id.as_deref());
         put_u64(&mut h, self.state_change_at_monotonic_us);
         put_u64(&mut h, self.captured_at_monotonic_us);
@@ -430,6 +459,7 @@ impl NixPostStateStabilityEvidenceV1 {
                 || sample.definition_digest != first.definition_digest
                 || sample.state_digest != first.state_digest
                 || sample.manager_owner != first.manager_owner
+                || sample.bus_id != first.bus_id
                 || sample.invocation_id != first.invocation_id
                 || sample.state_change_at_monotonic_us != first.state_change_at_monotonic_us
             {
@@ -505,6 +535,7 @@ fn validate_stability_against_observation(
                 .systemd_manager_owner
                 .as_deref()
                 .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.bus_id != observation.systemd_bus_id
         || last.invocation_id != observation.invocation_id
         || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
         || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
@@ -570,6 +601,9 @@ pub struct NixPostStateReceiptV1 {
     pub observed_service_result: String,
     /// Unique D-Bus owner of systemd1 for the observed service-manager epoch.
     pub systemd_manager_owner: String,
+    /// D-Bus daemon incarnation for the observed service-manager epoch.
+    #[serde(default)]
+    pub systemd_bus_id: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
@@ -693,6 +727,16 @@ impl NixPostStateReceiptV1 {
             .systemd_manager_owner
             .clone()
             .ok_or(NixPostStateErrorV1::MissingManagerOwner)?;
+
+        if let Some(context) = intent.service_effect_context() {
+            let observed_bus_id = observation
+                .systemd_bus_id
+                .as_deref()
+                .ok_or(NixPostStateErrorV1::BusIncarnationMismatch)?;
+            if observed_bus_id != context.authorized_bus_id {
+                return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+            }
+        }
 
         if let Some(stability) = stability {
             let stability = stability.as_ref();
@@ -854,6 +898,13 @@ impl NixPostStateReceiptV1 {
             required_stability_us: self.required_stability_us,
         };
         validate_expectation_against_intent(intent, &rebound_expectation)?;
+        if let Some(context) = intent.service_effect_context() {
+            match self.systemd_bus_id.as_deref() {
+                Some(observed) if observed == context.authorized_bus_id => {}
+                None if self.claim != NixPostStateClaimV1::Proven => {}
+                _ => return Err(NixPostStateErrorV1::BusIncarnationMismatch),
+            }
+        }
         Ok(())
     }
 
@@ -1037,6 +1088,9 @@ impl NixPostStateReceiptV1 {
         require_nonempty(&self.observed_sub_state, "observed service sub-state")?;
         require_nonempty(&self.observed_service_result, "observed service result")?;
         validate_unique_manager_owner(&self.systemd_manager_owner)?;
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            validate_bus_id_shape(bus_id)?;
+        }
         let recomputed_state_digest = semantic_state_digest(
             self.operation,
             &self.target_unit,
@@ -1125,6 +1179,9 @@ impl NixPostStateReceiptV1 {
                 if self.approval_request_id.is_none() || self.approval_projection_digest.is_none() {
                     return Err(NixPostStateErrorV1::MissingLiveExecutionWitness);
                 }
+                if self.systemd_bus_id.is_none() {
+                    return Err(NixPostStateErrorV1::BusIncarnationMismatch);
+                }
             }
             _ => {}
         }
@@ -1168,6 +1225,11 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, unit_file_state_tag(self.observed_unit_file_state));
         put_str(&mut h, &self.observed_service_result);
         put_str(&mut h, &self.systemd_manager_owner);
+        // Preserve the legacy v1 receipt digest for records that predate bus identity.
+        if let Some(bus_id) = self.systemd_bus_id.as_deref() {
+            put_u8(&mut h, 1);
+            put_str(&mut h, bus_id);
+        }
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
         put_u8(&mut h, assessment_tag(self.postcondition));
@@ -1507,6 +1569,13 @@ fn validate_digest(value: &str, field: &'static str) -> Result<(), NixPostStateE
     Ok(())
 }
 
+fn validate_bus_id_shape(value: &str) -> Result<(), NixPostStateErrorV1> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(NixPostStateErrorV1::InvalidBusId);
+    }
+    Ok(())
+}
+
 fn validate_optional_invocation_id(
     value: Option<&str>,
     field: &'static str,
@@ -1593,6 +1662,8 @@ pub enum NixPostStateErrorV1 {
     EmptyField(&'static str),
     #[error("invalid digest: {0}")]
     InvalidDigest(&'static str),
+    #[error("invalid D-Bus daemon incarnation")]
+    InvalidBusId,
     #[error("invalid invocation id: {0}")]
     InvalidInvocationId(&'static str),
     #[error("invalid generation")]
@@ -1651,6 +1722,8 @@ pub enum NixPostStateErrorV1 {
     MissingManagerOwner,
     #[error("systemd manager incarnation does not match the observation/job binding")]
     ManagerOwnerMismatch,
+    #[error("D-Bus daemon incarnation does not match the bound observation")]
+    BusIncarnationMismatch,
     #[error("incomplete systemd job evidence")]
     IncompleteJobEvidence,
     #[error("duplicate drop-in path")]
@@ -2004,8 +2077,10 @@ mod tests {
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
                     manager_owner: ":1.123".to_string(),
+                    bus_id: Some("0123456789abcdef0123456789abcdef".to_string()),
                 }
             }),
+            systemd_bus_id: Some("0123456789abcdef0123456789abcdef".to_string()),
             systemd_manager_owner: Some(":1.123".to_string()),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
             state_change_at_monotonic_us: 900,
@@ -2031,6 +2106,7 @@ mod tests {
                 definition_content_digest: obs.definition_content_digest.clone(),
                 state_digest: obs.state_digest().unwrap(),
                 manager_owner: obs.systemd_manager_owner.clone().unwrap(),
+                bus_id: obs.systemd_bus_id.clone(),
                 invocation_id: obs.invocation_id.clone(),
                 state_change_at_monotonic_us: obs.state_change_at_monotonic_us,
                 captured_at_monotonic_us: *captured_at_monotonic_us,
@@ -2178,6 +2254,96 @@ mod tests {
             NixPostconditionAssessmentV1::Violated
         );
         assert_eq!(receipt.claim, NixPostStateClaimV1::Violated);
+    }
+
+    #[test]
+    fn job_and_observation_bus_incarnations_must_match() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_job.as_mut().unwrap().bus_id =
+            Some("fedcba9876543210fedcba9876543210".to_string());
+
+        assert_eq!(
+            NixVerifiedPostStateObservationV1::from_observer(obs).unwrap_err(),
+            NixPostStateErrorV1::BusIncarnationMismatch
+        );
+    }
+
+    #[test]
+    fn malformed_bus_incarnation_is_rejected() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.systemd_bus_id = Some("not-a-valid-bus-id".to_string());
+        assert_eq!(
+            NixVerifiedPostStateObservationV1::from_observer(obs).unwrap_err(),
+            NixPostStateErrorV1::InvalidBusId
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_bus_incarnation_rollover() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut rolled = obs.clone();
+        rolled.systemd_bus_id = Some(
+            "fedcba9876543210fedcba9876543210".to_string(),
+        );
+
+        assert_eq!(
+            build_receipt(&exp, &rolled, None).unwrap_err(),
+            NixPostStateErrorV1::BusIncarnationMismatch
+        );
+    }
+
+    #[test]
+    fn stability_rejects_bus_incarnation_rollover() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut evidence = stability(
+            &obs,
+            1_000,
+            1_000,
+            2_000,
+            &[1_000, 2_000],
+        );
+        evidence.samples[1].bus_id =
+            Some("fedcba9876543210fedcba9876543210".to_string());
+        evidence.sequence_digest = stability_sequence_digest(&evidence.samples).unwrap();
+
+        assert_eq!(
+            build_receipt(&exp, &obs, Some(evidence)).unwrap_err(),
+            NixPostStateErrorV1::StabilityIdentityOrStateChanged
+        );
+    }
+
+    #[test]
+    fn legacy_non_proven_receipt_can_omit_bus_incarnation() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let mut legacy = receipt;
+        legacy.systemd_bus_id = None;
+        assert_ne!(legacy.claim, NixPostStateClaimV1::Proven);
+        assert!(legacy.validate_shape().is_ok());
+        assert!(legacy.digest().is_ok());
     }
 
     #[test]
