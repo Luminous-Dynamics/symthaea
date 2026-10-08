@@ -32,7 +32,7 @@ jobs:
 
           is_lab_ref_path() {
             case "$1" in
-              "${ref_path}"|"${race_ref_path}"|"${force_ref_path}") return 0 ;;
+              "${ref_path}"|"${race_ref_path}"|"${force_ref_path}"|"${recreate_ref_path}") return 0 ;;
               *)
                 echo "ref helper target is outside this run's temporary namespace: $1" >&2
                 return 1
