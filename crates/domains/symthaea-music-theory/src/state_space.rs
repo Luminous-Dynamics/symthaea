@@ -389,9 +389,9 @@ mod tests {
             note(0, 4, 0),
             note(2, 4, 1),
             note(4, 4, 2),
-            note(0, 4, 4),
-            note(2, 4, 5),
-            note(4, 4, 6),
+            note(0, 4, 3),
+            note(2, 4, 4),
+            note(4, 4, 5),
         ];
         let trajectory =
             MusicalStateTrajectory::from_score(&score(&notes, 0), 3.0, 3.0).unwrap();
@@ -415,9 +415,9 @@ mod tests {
             note(0, 4, 0),
             note(2, 4, 1),
             note(4, 4, 2),
-            note(0, 5, 4),
-            note(11, 4, 5),
-            note(10, 4, 6),
+            note(0, 5, 3),
+            note(11, 4, 4),
+            note(10, 4, 5),
         ];
         let trajectory =
             MusicalStateTrajectory::from_score(&score(&notes, 0), 3.0, 3.0).unwrap();
