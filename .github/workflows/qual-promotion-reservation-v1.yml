@@ -81,7 +81,12 @@ jobs:
               "ClockRelationEvidenceV1",
               "ClockRelationVerificationV1",
               "ClockRelationTrustSnapshotV1",
+              "LocalTemporalSequenceEvidenceV1",
               "ClockRelationV1",
+              "LocalTemporalSequenceEvidenceV1",
+              "source_challenge_digest",
+              "source_response_digest",
+              "source_attestation_digest",
               "LocalTemporalSequenceV1",
               "ProviderWebhookEffectTimingV1",
               "PromotionStackEffectTimingV1",
@@ -197,6 +202,9 @@ jobs:
               "LocalTemporalSequenceV1(1, 2, 3)",
               "local-monotonic-sequence-missing",
               "invalid-local-monotonic-sequence",
+              "local-sequence-provenance-missing",
+              "local-sequence-operation-identity-mismatch",
+              "local-sequence-source-invalid",
           }
           for marker in stack_effect_derivation_markers:
               assert marker in source, f"Missing stack-effect derivation marker: {marker}"
