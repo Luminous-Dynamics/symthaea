@@ -1,0 +1,17 @@
+{
+  "schema_version":"monetary-strategic-reporting-negative-v1",
+  "cases":[
+    {"id":"REPORT-X01","description":"reporting policy mutates immutable true criticality"},
+    {"id":"REPORT-X02","description":"reporting policy mutates immutable true liquidity demand"},
+    {"id":"REPORT-X03","description":"declared liquidity demand is used as the resource reservation quantity"},
+    {"id":"REPORT-X04","description":"declared criticality is introduced into the exogenous random namespace"},
+    {"id":"REPORT-X05","description":"declared liquidity demand is introduced into the exogenous random namespace"},
+    {"id":"REPORT-X06","description":"focal report changes topology identity"},
+    {"id":"REPORT-X07","description":"focal report changes resource capacity"},
+    {"id":"REPORT-X08","description":"focal report changes adapter or monetary mechanism"},
+    {"id":"REPORT-X09","description":"focal report changes allocation policy identity"},
+    {"id":"REPORT-X10","description":"non-focal obligations are allowed to become non-truthful"},
+    {"id":"REPORT-X11","description":"non-truthful cell lacks exact truthful paired counterpart"},
+    {"id":"REPORT-X12","description":"paired cells do not share the exact treatment-independent CRN namespace"}
+  ]
+}
