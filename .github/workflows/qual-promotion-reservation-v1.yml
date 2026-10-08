@@ -79,6 +79,7 @@ jobs:
               "ProviderTimestampPolicyV1",
               "ProviderWebhookStackMetadataV1",
               "ProviderWebhookEffectTimingV1",
+              "ProviderDeliveryIdentityV1",
               "PromotionStackEffectTimingV1",
               "PromotionStackEffectTimingSetV1",
               "ProviderDeliveryRegistryV1",
@@ -174,6 +175,9 @@ jobs:
               "provider_clock_id",
               "provider_timestamp_policy",
               "provider_timestamp_policy_digest",
+              "clock_relation_identity_digest",
+              "source_effect_evidence_identity_digest",
+              "timing_identity_digest",
               "verification_evidence_digest",
               "verification_method",
           }
