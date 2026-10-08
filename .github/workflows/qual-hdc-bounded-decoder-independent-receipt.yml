@@ -208,6 +208,7 @@ jobs:
 
               const checks = {
                 verifier_on_main: evidence.contextRef === 'refs/heads/main',
+                verifier_root_current: evidence.contextSha === evidence.currentMainSha,
                 repository_identity:
                   evidence.contextRepository === expected.repository &&
                   Number(evidence.run.repository?.id) === expected.repositoryId &&
@@ -269,6 +270,8 @@ jobs:
               const runId = 1;
               return {
                 contextRef: 'refs/heads/main',
+                contextSha: 'synthetic-main',
+                currentMainSha: 'synthetic-main',
                 contextRepository: expected.repository,
                 run: {
                   id: runId,
@@ -380,6 +383,7 @@ jobs:
 
             const attackCases = [
               ['verifier_ref', (e) => { e.contextRef = 'refs/heads/research/evil'; }],
+              ['verifier_root_stale', (e) => { e.currentMainSha = '0'.repeat(40); }],
               ['repository_id', (e) => { e.run.repository.id += 1; }],
               ['run_workflow_path', (e) => { e.run.path = 'untrusted/workflow.yml'; }],
               ['run_event', (e) => { e.run.event = 'push'; }],
@@ -549,8 +553,32 @@ jobs:
               }
             }
 
+            const repositoryMetadata = (await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            })).data;
+            if (repositoryMetadata.default_branch !== 'main') {
+              throw new Error(
+                'independent verifier requires the repository default branch to remain main'
+              );
+            }
+
+            const liveMainRef = (await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            })).data;
+            const currentMainSha = String(liveMainRef.object?.sha ?? '');
+            if (!/^[0-9a-f]{40}$/.test(currentMainSha)) {
+              throw new Error(
+                'live default-branch ref did not resolve to a canonical commit SHA'
+              );
+            }
+
             const liveEvidence = {
               contextRef: context.ref,
+              contextSha: context.sha,
+              currentMainSha,
               contextRepository: context.repo.owner + '/' + context.repo.repo,
               run,
               jobs,
