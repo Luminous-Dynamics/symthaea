@@ -228,6 +228,51 @@ https://www.sciencedirect.com/science/article/pii/S0921800925001831
 https://doi.org/10.1016/j.sftr.2026.101802
 https://www.nature.com/articles/s41586-025-09385-1
 
+### Georgist / Land-Value Socialization
+
+Classification:
+- land/property architecture;
+- not a complete macroeconomic replacement.
+
+Core divergence: treat unimproved land value as a socially created rent and shift the fiscal/property regime toward capturing that location value rather than taxing productive improvements.
+
+Key experiments:
+- land-price capitalization;
+- housing affordability;
+- speculation and vacancy;
+- development intensity;
+- infrastructure-value capture;
+- spatial inequality;
+- migration and land-use conversion;
+- interaction with property taxation and credit.
+
+This deserves its own profile because the housing/land constraint is otherwise easy to hide inside generic taxation or Creditism allocation.
+
+### Community Land Trusts / Housing Commons
+
+Classification:
+- ownership/housing architecture;
+- high-value composition with housing and commons profiles.
+
+Core divergence: land is held in a community-serving trust while use rights and housing ownership are separated or shared through durable affordability rules.
+
+Key experiments:
+- long-run affordability;
+- displacement;
+- resale constraints;
+- land retention;
+- governance capture;
+- maintenance funding;
+- climate adaptation;
+- interaction with mortgages and external capital.
+
+Recent empirical work studies CLT financial health and neighborhood effects, while 2026 work explicitly tests the relationship between CLT ownership and just-transition activity.
+
+Source frontier:
+https://onlinelibrary.wiley.com/doi/10.1111/1540-6229.12525
+https://www.tandfonline.com/doi/full/10.1080/07352166.2025.2554755
+https://academic.oup.com/cjres/advance-article/doi/10.1093/cjres/rsag013/8695669
+
 ### Polycentric Commons
 
 Use as a governance architecture rather than pretending it is a full macroeconomic replacement.
