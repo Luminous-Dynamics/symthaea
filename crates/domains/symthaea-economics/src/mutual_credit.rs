@@ -27,6 +27,11 @@ pub enum MutualCreditError {
     SelfTrade,
     DefaultedMember(String),
     NonZeroBalance(String),
+    InsufficientPositiveBalance {
+        member: String,
+        balance: f64,
+        requested: f64,
+    },
     ExternalSettlementWouldExceedLimit {
         member: String,
         balance: f64,
@@ -200,6 +205,14 @@ impl MutualCreditNetwork {
 
         let limit = self.limits[member];
         let balance = self.balances[member];
+        if balance <= 0.0 || amount > balance {
+            return Err(MutualCreditError::InsufficientPositiveBalance {
+                member: member.to_owned(),
+                balance,
+                requested: amount,
+            });
+        }
+
         let requested_balance = balance - amount;
         if requested_balance < limit.lower() || requested_balance > limit.upper() {
             return Err(
@@ -272,7 +285,7 @@ fn validate_balance(
     if requested_balance < limit.lower() || requested_balance > limit.upper() {
         return Err(MutualCreditError::CreditLimitExceeded {
             member: member.to_owned(),
-            balance: 0.0,
+            balance: requested_balance,
             requested_balance,
             lower_limit: limit.lower(),
             upper_limit: limit.upper(),
@@ -351,9 +364,18 @@ mod tests {
     }
 
     #[test]
-    fn external_settlement_reduces_positive_claim() {
+    fn external_settlement_requires_positive_claim() {
         let mut network = network();
         network.trade("alice", "bob", 40.0).unwrap();
+
+        assert_eq!(
+            network.settle_external("alice", 15.0),
+            Err(MutualCreditError::InsufficientPositiveBalance {
+                member: "alice".into(),
+                balance: -40.0,
+                requested: 15.0,
+            })
+        );
 
         network.settle_external("bob", 15.0).unwrap();
 
