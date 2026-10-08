@@ -2054,6 +2054,25 @@ def test_timing_identity_detects_interval_tampering():
     assert tampered.identity_digest() != timing.identity_digest()
 
 
+def test_timing_identity_detects_clock_relation_tampering():
+    timing = effect_timing_fixture()
+    tampered = ProviderWebhookEffectTimingV1(
+        provider_event_time_ms=timing.provider_event_time_ms,
+        provider_event_time_upper_ms=timing.provider_event_time_upper_ms,
+        provider_timestamp_policy=timing.provider_timestamp_policy,
+        provider_timestamp_policy_digest=timing.provider_timestamp_policy_digest,
+        provider_delivery_time_ms=timing.provider_delivery_time_ms,
+        local_reservation_time_ms=timing.local_reservation_time_ms,
+        local_dispatch_time_ms=timing.local_dispatch_time_ms,
+        local_observation_time_ms=timing.local_observation_time_ms,
+        local_reservation_monotonic_ns=timing.local_reservation_monotonic_ns,
+        local_dispatch_monotonic_ns=timing.local_dispatch_monotonic_ns,
+        local_observation_monotonic_ns=timing.local_observation_monotonic_ns,
+        clock_relation=clock_relation_fixture(max_skew_ms=1001),
+    )
+    assert tampered.identity_digest() != timing.identity_digest()
+
+
 def test_stack_timing_rejects_tampered_timing_identity_digest():
     identity = stack_identity_fixture()
     bottom = stack_webhook_observation(
@@ -4884,6 +4903,7 @@ TESTS = [
     test_clock_relation_drift_expands_uncertainty_monotonically,
     test_temporal_effect_with_valid_skew_is_admissible,
     test_timing_identity_detects_interval_tampering,
+    test_timing_identity_detects_clock_relation_tampering,
     test_stack_timing_rejects_tampered_timing_identity_digest,
     test_stack_timing_rejects_mixed_timestamp_policy_identities,
     test_stack_timing_rejects_mixed_clock_relation_identities,
