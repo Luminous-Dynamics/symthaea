@@ -2961,6 +2961,71 @@ mod tests {
     }
 
     #[test]
+    fn legacy_nonproven_receipt_can_omit_post_invocation_binding() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = None;
+
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Observed);
+        receipt.validate_shape().unwrap();
+    }
+
+    #[test]
+    fn post_invocation_binding_rejects_manager_epoch_substitution() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                &receipt.observed_unit_object_path,
+                Some(":1.999"),
+                receipt.systemd_bus_id.as_deref(),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
+    fn post_invocation_binding_rejects_bus_epoch_substitution() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                &receipt.observed_unit_object_path,
+                Some(&receipt.systemd_manager_owner),
+                Some("fedcba98765432100123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
     fn receipt_requires_observation_manager_incarnation() {
         let mut obs = observation(
             NixServiceOperationKindV1::Start,
