@@ -1367,6 +1367,7 @@ fn stability_sample_from_observation(
             .state_digest()
             .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
         manager_owner: manager_owner.to_string(),
+        bus_id: observation.systemd_bus_id.clone(),
         invocation_id: observation.invocation_id.clone(),
         state_change_at_monotonic_us: observation.state_change_at_monotonic_us,
         captured_at_monotonic_us: observation.observed_at_monotonic_us,
