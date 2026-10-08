@@ -376,6 +376,47 @@ class ProviderWebhookRequestContextV1:
 
 
 @dataclass(frozen=True)
+class ProviderWebhookStackMetadataV1:
+    stack_number: int
+    stack_size: int
+    stack_position: int
+    base_ref: str
+    base_sha: str
+
+    def internally_consistent(self) -> bool:
+        return (
+            self.stack_number > 0
+            and self.stack_size > 0
+            and 1 <= self.stack_position <= self.stack_size
+            and bool(self.base_ref)
+            and bool(self.base_sha)
+        )
+
+    def matches_operation(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        if not self.internally_consistent():
+            return False
+        expected_position = next(
+            (
+                index + 1
+                for index, entry in enumerate(identity.ordered_stack)
+                if entry.pr_number == identity.requested_pr_number
+            ),
+            None,
+        )
+        return (
+            expected_position is not None
+            and self.stack_number == identity.provider_stack_number
+            and self.stack_size >= len(identity.ordered_stack)
+            and self.stack_position == expected_position
+            and self.base_ref == identity.base_ref
+            and self.base_sha == identity.base_tip_sha
+        )
+
+
+@dataclass(frozen=True)
 class ProviderPullRequestMergeObservationV1:
     delivery_id: str
     repository: str
@@ -387,6 +428,7 @@ class ProviderPullRequestMergeObservationV1:
     merge_commit_sha: str
     payload_bytes_digest: str
     merged_at: str = ""
+    provider_stack: ProviderWebhookStackMetadataV1 | None = None
     local_received_at_ms: int | None = None
     local_received_monotonic_ns: int | None = None
     hook_id: str = ""
@@ -420,6 +462,18 @@ class ProviderPullRequestMergeObservationV1:
             head = pull_request["head"]
             merge_commit_sha = pull_request["merge_commit_sha"]
             merged_at = pull_request.get("merged_at") or ""
+            stack = pull_request.get("stack")
+            provider_stack = (
+                ProviderWebhookStackMetadataV1(
+                    stack_number=int(stack["number"]),
+                    stack_size=int(stack["size"]),
+                    stack_position=int(stack["position"]),
+                    base_ref=str(stack["base"]["ref"]),
+                    base_sha=str(stack["base"]["sha"]),
+                )
+                if stack is not None
+                else None
+            )
             pr_number = int(document["number"])
             nested_pr_number = int(pull_request["number"])
             event_type = receipt.event_type
@@ -453,6 +507,7 @@ class ProviderPullRequestMergeObservationV1:
             merge_commit_sha=str(merge_commit_sha),
             payload_bytes_digest=hashlib.sha256(payload).hexdigest(),
             merged_at=str(merged_at),
+            provider_stack=provider_stack,
             local_received_at_ms=received_context.received_at_ms,
             local_received_monotonic_ns=received_context.received_monotonic_ns,
             hook_id=receipt.hook_id,
@@ -503,6 +558,15 @@ class ProviderPullRequestMergeObservationV1:
             source_event_type=self.event_type,
             source_repository=self.repository,
             source_authentication=self.source_authentication,
+        )
+
+    def validates_provider_stack_metadata(
+        self,
+        identity: PromotionOperationIdentityV1,
+    ) -> bool:
+        return (
+            self.provider_stack is not None
+            and self.provider_stack.matches_operation(identity)
         )
 
     def validates_requested_effect(self, identity: PromotionOperationIdentityV1) -> bool:
@@ -1516,6 +1580,15 @@ def webhook_merge_payload(
                     if merged
                     else None
                 ),
+                "stack": {
+                    "number": 41,
+                    "size": 3,
+                    "position": 2,
+                    "base": {
+                        "ref": "main",
+                        "sha": "T1",
+                    },
+                },
             },
             "repository": {"full_name": repository},
             **(
@@ -1692,6 +1765,61 @@ def effect_state_fixture(
         expected_entry=entry,
         operation_identity_digest=identity.digest(),
     )
+
+
+def test_webhook_stack_metadata_matches_exact_operation():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    assert observation.provider_stack is not None
+    assert observation.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_stack_number_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=99,
+                stack_size=3,
+                stack_position=2,
+                base_ref="main",
+                base_sha="T1",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_rejects_base_sha_drift():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": ProviderWebhookStackMetadataV1(
+                stack_number=41,
+                stack_size=3,
+                stack_position=2,
+                base_ref="main",
+                base_sha="T-DRIFT",
+            ),
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
+
+
+def test_webhook_stack_metadata_missing_is_not_topology_proof():
+    identity = stack_identity_fixture()
+    observation = stack_webhook_observation(identity)
+    altered = ProviderPullRequestMergeObservationV1(
+        **{
+            **observation.__dict__,
+            "provider_stack": None,
+        }
+    )
+    assert not altered.validates_provider_stack_metadata(identity)
 
 
 def test_provider_timestamp_parser_accepts_utc_and_offset():
@@ -4564,6 +4692,10 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_webhook_stack_metadata_matches_exact_operation,
+    test_webhook_stack_metadata_rejects_stack_number_drift,
+    test_webhook_stack_metadata_rejects_base_sha_drift,
+    test_webhook_stack_metadata_missing_is_not_topology_proof,
     test_provider_timestamp_parser_accepts_utc_and_offset,
     test_provider_timestamp_interval_respects_reported_precision,
     test_provider_timestamp_interval_rejects_unsupported_precision_or_semantics,
