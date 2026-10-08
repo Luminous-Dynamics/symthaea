@@ -1751,7 +1751,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert_eq!(
             receipt.verify_against(&graph, &schedule, &plan, &BTreeMap::new()),
@@ -1795,7 +1797,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         let expected = expected_final_timeline_value(&plan);
         assert!(matches!(
@@ -1843,7 +1847,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
@@ -1888,7 +1894,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: vk::API_VERSION_1_2,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1935,7 +1943,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -1984,7 +1994,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -2036,7 +2048,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.barrier_digest = String::from("tampered");
 
@@ -2107,7 +2121,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2163,7 +2179,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2207,7 +2225,9 @@ mod tests {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
         };
         receipt.completion_lowering_digest = String::from("tampered");
         assert!(matches!(
@@ -2253,7 +2273,6 @@ mod tests {
         ));
     }
 
-    #[test]
     #[test]
     fn receipt_rejects_runtime_provenance_binding_mismatch() {
         let mut receipt = minimal_receipt_for_binding_tests();
