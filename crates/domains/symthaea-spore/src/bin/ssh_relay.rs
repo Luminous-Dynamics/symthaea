@@ -130,28 +130,74 @@ fn trusted_typed_executable(
 ) -> Result<std::borrow::Cow<'_, str>, std::io::Error> {
     const SYSTEM_BIN: &str = "/run/current-system/sw/bin/";
 
-    let basename = match program {
+    let requested = match program {
         "btrfs" | "docker" | "du" | "echo" | "find" | "gzip" | "lsblk" | "nix-collect-garbage"
         | "nix-env" | "nix-instantiate" | "nixos-rebuild" | "mysqldump" | "nixos-version" | "nmcli"
-        | "pg_dumpall" | "python3" | "systemctl" | "tar" | "uname" | "zstd" => Some(program),
-        _ => None,
+        | "pg_dumpall" | "python3" | "systemctl" | "tar" | "uname" | "zstd" => {
+            format!("{SYSTEM_BIN}{program}")
+        }
+        _ => {
+            if std::path::Path::new(program)
+                .strip_prefix("/nix/var/nix/profiles/system/bin/")
+                .ok()
+                .is_some_and(|name| name == std::path::Path::new("switch-to-configuration"))
+            {
+                program.to_owned()
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!("typed privileged executor rejected untrusted program {program:?}"),
+                ));
+            }
+        }
     };
 
-    if let Some(name) = basename {
-        return Ok(std::borrow::Cow::Owned(format!("{SYSTEM_BIN}{name}")));
+    let resolved = std::fs::canonicalize(&requested).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "trusted executable {program:?} could not be resolved to an immutable store path: {error}"
+            ),
+        )
+    })?;
+
+    if !resolved.starts_with("/nix/store/") {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "trusted executable {program:?} resolved outside the immutable Nix store: {}",
+                resolved.display()
+            ),
+        ));
     }
 
-    if std::path::Path::new(program)
-        .strip_prefix("/nix/var/nix/profiles/system/bin/")
-        .ok()
-        .is_some_and(|name| name == std::path::Path::new("switch-to-configuration"))
+    let metadata = std::fs::metadata(&resolved)?;
+    if !metadata.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "trusted executable {program:?} resolved to a non-regular file: {}",
+                resolved.display()
+            ),
+        ));
+    }
+
+    #[cfg(unix)]
     {
-        return Ok(std::borrow::Cow::Borrowed(program));
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o111 == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!(
+                    "trusted executable {program:?} is not executable: {}",
+                    resolved.display()
+                ),
+            ));
+        }
     }
 
-    Err(std::io::Error::new(
-        std::io::ErrorKind::PermissionDenied,
-        format!("typed privileged executor rejected untrusted program {program:?}"),
+    Ok(std::borrow::Cow::Owned(
+        resolved.to_string_lossy().into_owned(),
     ))
 }
 
