@@ -21,7 +21,7 @@ Before exposing correctness labels for the evaluation split, persist and indepen
 - calibration-set manifest/content root and the baseline profile for every task family;
 - inclusion/exclusion rules, sample-count expectations, and the command/configuration used to produce receipts.
 
-The private fields in \`FrozenCorrectnessForecastSet\` prevent ordinary API mutation after construction; they are not a cryptographic seal. Serialize and retain the frozen batch before the outcome oracle is made available. Independently verify the saved bytes, commit, manifest roots, and custody/order receipts. A caller-supplied split name or non-empty reference alone is not proof of disjointness or chronology.
+The private fields in `FrozenCorrectnessForecastSet` prevent ordinary API mutation after construction; they are not a cryptographic seal. Serialize and retain the frozen batch before the outcome oracle is made available. Independently verify the saved bytes, commit, manifest roots, and custody/order receipts. A caller-supplied split name or non-empty reference alone is not proof of disjointness or chronology.
 
 ## Data separation
 
@@ -45,6 +45,19 @@ Different split IDs are necessary but not sufficient: a trusted manifest verifie
 Score the candidate and both baselines against the exact same bound holdout outcomes, separately per task family. Report at least Brier score, log loss, mean confidence, empirical accuracy, reliability bins, calibration uncertainty, and selective risk/coverage where applicable. The comparison report provides `candidate - baseline` deltas: negative deltas favor the candidate on Brier/log loss. For paired Brier deltas it also reports conservative two-sided 95% Hoeffding intervals with Bonferroni correction across every observed task-family × baseline comparison. These intervals assume IID evaluation episodes within each family and frozen candidate/baseline probabilities; they are expected-loss uncertainty estimates, not a distribution-shift guarantee. Intervals spanning zero are inconclusive, and small holdouts may yield uninformative intervals. Do not collapse families into one unqualified scalar or automatically select a winner from one metric.
 
 Brier score and log loss are proper scoring rules for probabilistic forecasts. They combine multiple aspects of probabilistic performance, so interpret them alongside calibration curves/reliability bins, discrimination, uncertainty, and family-local sample sizes. Do not interpret a lower Brier score alone as proof of better calibration. Fit any learned calibration transformation using calibration/validation data only; evaluate once on untouched holdout data.
+
+## Abstention semantics — current v1 limitation
+
+`CorrectnessForecastV1.predicted_probability` is described as the probability that an asserted answer would be correct. The current prospective implementation nevertheless passes every bound forecast/outcome pair—including `asserted = false`—into correctness calibration metrics and baseline scoring. It also derives abstention opportunity cost from the generic `correct` bit without a separately specified counterfactual candidate-answer reference.
+
+Therefore, **do not qualify mixed asserted/abstained batches through the current v1 prospective scorer**. Until [#7292](https://github.com/Luminous-Dynamics/symthaea/issues/7292) is implemented and validated:
+
+- qualification runs using the v1 prospective path must contain only asserted answers with independently scoreable correctness outcomes; an orchestration/qualification layer must reject any batch containing an abstention rather than silently filtering it;
+- abstention counts and whole-cohort coverage must be reported separately, with their own explicit denominator; the v1 correctness report must not be represented as joint calibration-and-abstention qualification;
+- abstention opportunity cost must be reported as unavailable unless a separately frozen candidate answer and independently verified counterfactual outcome make that quantity well-defined;
+- no baseline comparison may treat an abstention as an ordinary correct/incorrect answer.
+
+Issue #7292 requires a versioned outcome/eligibility contract, separate scored-assertion and episode denominators, zero-assertion family handling, exact-cohort baseline comparisons, and regression coverage. Close that gap only after those behaviors pass exact-head CI. This limitation does not invalidate the existing all-asserted fixtures; it bounds what can be claimed from the v1 path.
 
 ## Rejection and acceptance gates
 
