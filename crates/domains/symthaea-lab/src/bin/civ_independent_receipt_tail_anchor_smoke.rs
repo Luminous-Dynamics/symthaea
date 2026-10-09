@@ -671,6 +671,9 @@ fn main() {
     let suffix = receipt_suffix(&events, previous.receipt_sequence, candidate.receipt_sequence);
 
     // Three logically separate stores start with the same explicit trust anchor.
+    // Collect attestations emitted by each successful state transition; do not
+    // synthesize a separate quorum detached from the witness operations.
+    let mut attestations = Vec::new();
     for (id, lineage) in [
         ("witness-a", "lineage-a"),
         ("witness-b", "lineage-b"),
@@ -678,29 +681,19 @@ fn main() {
     ] {
         let mut store = WitnessStore::new(id, lineage);
         store.seed_trusted(previous.clone()).expect("explicit trusted bootstrap");
-        assert_eq!(
-            store
-                .observe(
-                    candidate.clone(),
-                    Some(&proof),
-                    &suffix,
-                    102,
-                    10,
-                )
-                .map(|(decision, _)| decision),
-            Ok(Decision::TreeAdvanced)
-        );
+        let (decision, attestation) = store
+            .observe(
+                candidate.clone(),
+                Some(&proof),
+                &suffix,
+                102,
+                10,
+            )
+            .expect("witness should validate exact checkpoint transition");
+        assert_eq!(decision, Decision::TreeAdvanced);
         assert_eq!(store.current.get("civ-log-v1"), Some(&candidate));
+        attestations.push(attestation);
     }
-
-    let attestations: Vec<_> = [
-        ("witness-a", "lineage-a"),
-        ("witness-b", "lineage-b"),
-        ("witness-c", "lineage-c"),
-    ]
-    .iter()
-    .map(|(id, lineage)| fixture_attestation(id, lineage, anchor_identity(&candidate)))
-    .collect();
     assert_eq!(verify_quorum(&attestations, &candidate, 3), Ok(()));
 
     // A restarted client detects a truncated receipt tail using the independently
