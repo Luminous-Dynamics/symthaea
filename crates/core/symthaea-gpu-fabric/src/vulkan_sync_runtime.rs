@@ -9,7 +9,7 @@
 //! semantics without claiming that separate logical lanes are separate hardware
 //! queues.
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
 use ash::{vk, Device, Entry, Instance};
 use serde::{Deserialize, Serialize};
@@ -573,4 +573,236 @@ mod tests {
         assert_eq!(final_values[0], 1);
         assert_eq!(final_values[1], 1);
     }
+
+    unsafe extern "system" fn syncval_probe_debug_callback(
+        _severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+        _message_types: vk::DebugUtilsMessageTypeFlagsEXT,
+        callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT<'_>,
+        _user_data: *mut std::ffi::c_void,
+    ) -> vk::Bool32 {
+        if callback_data.is_null() {
+            return vk::FALSE;
+        }
+        let data = unsafe { &*callback_data };
+        let id = if data.p_message_id_name.is_null() {
+            "unknown".to_owned()
+        } else {
+            unsafe { CStr::from_ptr(data.p_message_id_name) }
+                .to_string_lossy()
+                .into_owned()
+        };
+        let message = if data.p_message.is_null() {
+            String::new()
+        } else {
+            unsafe { CStr::from_ptr(data.p_message) }
+                .to_string_lossy()
+                .replace('\n', " ")
+        };
+        eprintln!("SYNCVAL_PROBE_DIAGNOSTIC id={id} message={message}");
+        vk::FALSE
+    }
+
+    fn create_syncval_probe_buffer(
+        device: &Device,
+        memory_properties: &vk::PhysicalDeviceMemoryProperties,
+    ) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
+        const BUFFER_BYTES: u64 = 64;
+        let buffer_info = vk::BufferCreateInfo::default()
+            .size(BUFFER_BYTES)
+            .usage(vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let buffer = unsafe { device.create_buffer(&buffer_info, None) }
+            .map_err(|error| format!("create probe buffer: {error:?}"))?;
+        let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
+        let memory_type_index = (0..memory_properties.memory_type_count)
+            .find(|index| (requirements.memory_type_bits & (1_u32 << *index)) != 0)
+            .ok_or_else(|| "probe buffer has no compatible memory type".to_owned())?;
+        let allocation_info = vk::MemoryAllocateInfo::default()
+            .allocation_size(requirements.size)
+            .memory_type_index(memory_type_index);
+        let memory = unsafe { device.allocate_memory(&allocation_info, None) }
+            .map_err(|error| format!("allocate probe buffer memory: {error:?}"))?;
+        unsafe { device.bind_buffer_memory(buffer, memory, 0) }
+            .map_err(|error| format!("bind probe buffer memory: {error:?}"))?;
+        Ok((buffer, memory))
+    }
+
+    fn run_syncval_transfer_probe(include_memory_barrier: bool) -> Result<(), String> {
+        const BUFFER_BYTES: u64 = 64;
+        let entry = unsafe { Entry::load() }
+            .map_err(|error| format!("load Vulkan loader: {error}"))?;
+        let loader_version = unsafe { entry.try_enumerate_instance_version() }
+            .map_err(|error| format!("query Vulkan loader version: {error:?}"))?
+            .unwrap_or(vk::API_VERSION_1_0);
+        if loader_version < vk::API_VERSION_1_0 {
+            return Err("Vulkan 1.0 loader is required for the SyncVal probe".to_owned());
+        }
+
+        let app_name = CString::new("symthaea-syncval-activation-probe").unwrap();
+        let app_info = vk::ApplicationInfo::default()
+            .application_name(&app_name)
+            .application_version(1)
+            .api_version(vk::API_VERSION_1_0);
+        let layer_name = CString::new("VK_LAYER_KHRONOS_validation").unwrap();
+        let layer_names = [layer_name.as_ptr()];
+        let extension_names = [ash::ext::debug_utils::NAME.as_ptr()];
+        let instance_info = vk::InstanceCreateInfo::default()
+            .application_info(&app_info)
+            .enabled_layer_names(&layer_names)
+            .enabled_extension_names(&extension_names);
+        let instance = unsafe { entry.create_instance(&instance_info, None) }
+            .map_err(|error| format!("create probe instance with validation layer: {error:?}"))?;
+
+        let debug_utils = ash::ext::debug_utils::Instance::new(&entry, &instance);
+        let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::default()
+            .message_severity(
+                vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                    | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+            )
+            .message_type(
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
+            )
+            .pfn_user_callback(Some(syncval_probe_debug_callback));
+        let messenger = unsafe { debug_utils.create_debug_utils_messenger(&debug_info, None) }
+            .map_err(|error| format!("create SyncVal debug messenger: {error:?}"))?;
+
+        let physical_devices = unsafe { instance.enumerate_physical_devices() }
+            .map_err(|error| format!("enumerate probe devices: {error:?}"))?;
+        let mut selected = None;
+        for physical in physical_devices {
+            let queue_families = unsafe {
+                instance.get_physical_device_queue_family_properties(physical)
+            };
+            if let Some((index, _)) = queue_families
+                .iter()
+                .enumerate()
+                .find(|(_, family)| family.queue_flags.contains(vk::QueueFlags::TRANSFER))
+            {
+                selected = Some((physical, index as u32));
+                break;
+            }
+        }
+        let (physical, queue_family_index) =
+            selected.ok_or_else(|| "no transfer-capable Vulkan queue is available".to_owned())?;
+
+        let priorities = [1.0_f32];
+        let queue_info = vk::DeviceQueueCreateInfo::default()
+            .queue_family_index(queue_family_index)
+            .queue_priorities(&priorities);
+        let device_info =
+            vk::DeviceCreateInfo::default().queue_create_infos(std::slice::from_ref(&queue_info));
+        let device = unsafe { instance.create_device(physical, &device_info, None) }
+            .map_err(|error| format!("create probe device: {error:?}"))?;
+        let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+        let memory_properties =
+            unsafe { instance.get_physical_device_memory_properties(physical) };
+
+        let (source_buffer, source_memory) =
+            create_syncval_probe_buffer(&device, &memory_properties)?;
+        let (destination_buffer, destination_memory) =
+            create_syncval_probe_buffer(&device, &memory_properties)?;
+
+        let pool_info = vk::CommandPoolCreateInfo::default()
+            .queue_family_index(queue_family_index);
+        let command_pool = unsafe { device.create_command_pool(&pool_info, None) }
+            .map_err(|error| format!("create probe command pool: {error:?}"))?;
+        let allocate_info = vk::CommandBufferAllocateInfo::default()
+            .command_pool(command_pool)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
+        let command_buffers = unsafe { device.allocate_command_buffers(&allocate_info) }
+            .map_err(|error| format!("allocate probe command buffer: {error:?}"))?;
+        let command_buffer = command_buffers[0];
+        let begin_info = vk::CommandBufferBeginInfo::default()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        unsafe { device.begin_command_buffer(command_buffer, &begin_info) }
+            .map_err(|error| format!("begin probe command buffer: {error:?}"))?;
+        unsafe {
+            device.cmd_fill_buffer(
+                command_buffer,
+                source_buffer,
+                0,
+                BUFFER_BYTES,
+                0x51A7_C0DE,
+            );
+        }
+        if include_memory_barrier {
+            let barrier = vk::MemoryBarrier::default()
+                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                .dst_access_mask(vk::AccessFlags::TRANSFER_READ);
+            unsafe {
+                device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::DependencyFlags::empty(),
+                    std::slice::from_ref(&barrier),
+                    &[],
+                    &[],
+                );
+            }
+        }
+        let copy_region = vk::BufferCopy::default()
+            .src_offset(0)
+            .dst_offset(0)
+            .size(BUFFER_BYTES);
+        unsafe {
+            device.cmd_copy_buffer(
+                command_buffer,
+                source_buffer,
+                destination_buffer,
+                std::slice::from_ref(&copy_region),
+            );
+        }
+        unsafe { device.end_command_buffer(command_buffer) }
+            .map_err(|error| format!("end probe command buffer: {error:?}"))?;
+
+        let fence_info = vk::FenceCreateInfo::default();
+        let fence = unsafe { device.create_fence(&fence_info, None) }
+            .map_err(|error| format!("create probe fence: {error:?}"))?;
+        let submit_info =
+            vk::SubmitInfo::default().command_buffers(std::slice::from_ref(&command_buffer));
+        unsafe { device.queue_submit(queue, std::slice::from_ref(&submit_info), fence) }
+            .map_err(|error| format!("submit probe commands: {error:?}"))?;
+        unsafe { device.wait_for_fences(std::slice::from_ref(&fence), true, 5_000_000_000) }
+            .map_err(|error| format!("wait for probe completion: {error:?}"))?;
+        unsafe { device.device_wait_idle() }
+            .map_err(|error| format!("wait for probe device idle: {error:?}"))?;
+
+        unsafe {
+            device.destroy_fence(fence, None);
+            device.destroy_command_pool(command_pool, None);
+            device.destroy_buffer(destination_buffer, None);
+            device.free_memory(destination_memory, None);
+            device.destroy_buffer(source_buffer, None);
+            device.free_memory(source_memory, None);
+            device.destroy_device(None);
+            debug_utils.destroy_debug_utils_messenger(messenger, None);
+            instance.destroy_instance(None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "requires Vulkan validation layer and a real transfer queue"]
+    fn real_vulkan_syncval_activation_probe() {
+        let case = std::env::var("SYNCVAL_PROBE_CASE")
+            .expect("SYNCVAL_PROBE_CASE must be set to hazard or safe");
+        match case.as_str() {
+            "hazard" => {
+                println!("SYNCVAL_SENTINEL_BEGIN case=hazard");
+                run_syncval_transfer_probe(false).expect("hazard probe must execute to completion");
+                println!("SYNCVAL_SENTINEL_END case=hazard result=completed");
+            }
+            "safe" => {
+                println!("SYNCVAL_SENTINEL_BEGIN case=safe");
+                run_syncval_transfer_probe(true).expect("safe control must execute to completion");
+                println!("SYNCVAL_SENTINEL_END case=safe result=completed");
+            }
+            other => panic!("unsupported SYNCVAL_PROBE_CASE={other:?}"),
+        }
+    }
+
 }
