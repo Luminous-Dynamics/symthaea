@@ -2061,6 +2061,30 @@ impl VisionManifold {
         coherent
     }
 
+    /// Measure mean local transition coherence across a latent trajectory.
+    ///
+    /// This uses the same geometric proxy as `enforce_sheaf_coherence` so the
+    /// reported metric describes what the path validator actually checks.
+    /// It measures latent-state continuity, not semantic correctness,
+    /// predictive accuracy, or subjective experience. A score is unavailable
+    /// for paths with fewer than two states or any non-finite transition score.
+    pub fn measure_path_coherence(&self, path: &[ContinuousHV]) -> Option<f32> {
+        if path.len() < 2 {
+            return None;
+        }
+
+        let mut total = 0.0f32;
+        for pair in path.windows(2) {
+            let score = self.compute_local_coherence(&pair[0], &pair[1]);
+            if !score.is_finite() {
+                return None;
+            }
+            total += score;
+        }
+
+        Some((total / (path.len() - 1) as f32).clamp(0.0, 1.0))
+    }
+
     fn compute_local_coherence(&self, a: &ContinuousHV, b: &ContinuousHV) -> f32 {
         // Use semantic similarity + binding strength as a proxy for sheaf consistency.
         let sim = a.similarity(b);

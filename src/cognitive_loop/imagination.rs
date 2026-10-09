@@ -86,6 +86,9 @@ impl CognitiveLoopService {
                 return Err(ImagineFutureError::NoGeodesic);
             }
 
+            // Report the measured transition-coherence proxy; do not invent a fixed score.
+            let trajectory_coherence = manifold.measure_path_coherence(&path).unwrap_or(0.0);
+
             // Apply thermodynamic cost (helping others costs energy!)
             let cost = manifold.telemetry().last_geodesic_cost;
             self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
@@ -104,7 +107,8 @@ impl CognitiveLoopService {
                 height: self.config.vision_frame_height,
                 channels: bridge.manifold().last_frame_channels(),
                 path_length: path.len(),
-                semantic_coherence: 0.5, // Collaborative dreams are inherently uncertain
+                // Legacy field name retained for wire/API compatibility.
+                semantic_coherence: trajectory_coherence,
                 trajectory: path,
             })
         }
@@ -149,6 +153,9 @@ impl CognitiveLoopService {
             return Err(ImagineFutureError::NoGeodesic);
         }
 
+        // This is geometric path continuity, not a semantic-truth score.
+        let trajectory_coherence = manifold.measure_path_coherence(&path).unwrap_or(0.0);
+
         // Cost accounting (0.025 per step candidate evaluated)
         // select_best_geodesic already added (steps * candidates) to geodesic_compute_cost.
         // We just need to sync it to the service's thermodynamic load here.
@@ -174,7 +181,8 @@ impl CognitiveLoopService {
             height: self.config.vision_frame_height,
             channels: bridge.manifold().last_frame_channels(),
             path_length: path.len(),
-            semantic_coherence: 0.0, // TODO: Compute from score_path_with_fep results if needed
+            // Legacy field name retained for wire/API compatibility.
+            semantic_coherence: trajectory_coherence,
             trajectory: path,
         };
 
