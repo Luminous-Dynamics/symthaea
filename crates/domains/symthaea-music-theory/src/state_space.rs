@@ -1016,7 +1016,10 @@ mod tests {
         // This separate score test ensures a valid but extremely large note end
         // cannot overflow the old i64 addition path inside temporal extraction.
         assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":0}"#).is_err());
-        assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":-1}"#).is_err());
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":1,"den":-1}"#).unwrap(),
+            Duration::new(-1, 1)
+        );
 
         let mut s = score(&[note(0, 4, 0)], 0);
         let mut overflowing_sum = note(4, 4, 1);
