@@ -427,36 +427,62 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
     return 1
 
 
+def best_effort_failure_status(repo: str, subject: str, token: str, reason: str, target: str | None = None) -> bool:
+    """Clear an old success when current-run identity checks cannot complete."""
+    if repo not in POLICY or not token or not re.fullmatch(r"[0-9a-f]{40}", subject):
+        return False
+    try:
+        post_status(repo, subject, token, "failure",
+                    f"Independent security audit verifier could not qualify this run: {reason}", target)
+        return True
+    except VerificationError as exc:
+        print(f"Unable to publish fail-closed commit status: {exc}", file=sys.stderr)
+        return False
+
+
 def main() -> int:
     repo = os.environ.get("REPOSITORY", "").strip()
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     mode = os.environ.get("TRUST_ANCHOR_MODE", "").strip()
     default_branch = os.environ.get("DEFAULT_BRANCH", "main").strip() or "main"
-    if repo not in POLICY:
-        raise VerificationError(f"no base-owned policy for repository {repo!r}")
-    if not token:
-        raise VerificationError("GITHUB_TOKEN is required")
-    if mode not in {"workflow_run", "workflow_dispatch"}:
-        raise VerificationError(f"unsupported verifier mode {mode!r}")
-    if mode == "workflow_dispatch":
-        raw_id = os.environ.get("MANUAL_WORKFLOW_RUN_ID", "").strip()
-        if not raw_id.isdigit() or int(raw_id) <= 0:
-            raise VerificationError("manual replay requires a positive workflow_run_id")
-        run_id, expected_sha, attempt = int(raw_id), None, None
-        activity = "manual_replay"
-    else:
-        raw_id = os.environ.get("TRIGGER_RUN_ID", "").strip()
-        if not raw_id.isdigit() or int(raw_id) <= 0:
-            raise VerificationError("workflow_run event has no positive run ID")
-        run_id = int(raw_id)
-        expected_sha = sha(os.environ.get("TRIGGER_RUN_HEAD_SHA", "").strip(), "event.head_sha")
-        raw_attempt = os.environ.get("TRIGGER_RUN_ATTEMPT", "").strip()
-        if not raw_attempt.isdigit() or int(raw_attempt) <= 0:
-            raise VerificationError("workflow_run event has no positive run attempt")
-        attempt = int(raw_attempt)
-        activity = os.environ.get("TRIGGER_ACTIVITY_TYPE", "").strip()
-    return process(repo, POLICY[repo], run_id, token, mode, activity,
-                   expected_sha, attempt, default_branch)
+    try:
+        if repo not in POLICY:
+            raise VerificationError(f"no base-owned policy for repository {repo!r}")
+        if not token:
+            raise VerificationError("GITHUB_TOKEN is required")
+        if mode not in {"workflow_run", "workflow_dispatch"}:
+            raise VerificationError(f"unsupported verifier mode {mode!r}")
+        if mode == "workflow_dispatch":
+            raw_id = os.environ.get("MANUAL_WORKFLOW_RUN_ID", "").strip()
+            if not raw_id.isdigit() or int(raw_id) <= 0:
+                raise VerificationError("manual replay requires a positive workflow_run_id")
+            run_id, expected_sha, attempt = int(raw_id), None, None
+            activity = "manual_replay"
+        else:
+            raw_id = os.environ.get("TRIGGER_RUN_ID", "").strip()
+            if not raw_id.isdigit() or int(raw_id) <= 0:
+                raise VerificationError("workflow_run event has no positive run ID")
+            run_id = int(raw_id)
+            expected_sha = sha(os.environ.get("TRIGGER_RUN_HEAD_SHA", "").strip(), "event.head_sha")
+            raw_attempt = os.environ.get("TRIGGER_RUN_ATTEMPT", "").strip()
+            if not raw_attempt.isdigit() or int(raw_attempt) <= 0:
+                raise VerificationError("workflow_run event has no positive run attempt")
+            attempt = int(raw_attempt)
+            activity = os.environ.get("TRIGGER_ACTIVITY_TYPE", "").strip()
+        return process(repo, POLICY[repo], run_id, token, mode, activity,
+                       expected_sha, attempt, default_branch)
+    except VerificationError as exc:
+        # On workflow_run events the expected commit SHA is supplied by
+        # GitHub's event payload. If API or identity checks fail, best-effort
+        # publishing a failure status prevents a stale green status from
+        # silently surviving on the same commit.
+        if mode == "workflow_run":
+            subject = os.environ.get("TRIGGER_RUN_HEAD_SHA", "").strip()
+            raw_id = os.environ.get("TRIGGER_RUN_ID", "").strip()
+            target = (f"https://github.com/{repo}/actions/runs/{raw_id}"
+                      if raw_id.isdigit() and repo in POLICY else None)
+            best_effort_failure_status(repo, subject, token, str(exc), target)
+        raise
 
 
 if __name__ == "__main__":
