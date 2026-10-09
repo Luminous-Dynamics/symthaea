@@ -217,6 +217,50 @@ mod tests {
     }
 
     #[test]
+    fn one_dimensional_hamiltonian_matches_stage_a_energy_expression() {
+        use crate::pde_wave_stage_a::wave_energy_truth;
+
+        let state = [0.7, -0.2, 0.4, -0.6];
+        let names = ["u1", "u2", "v1", "v2"];
+        let assignments: Vec<(&str, f64)> = names.into_iter().zip(state).collect();
+        let stage_a_energy = wave_energy_truth().eval(&assignments);
+        let hypercubic_energy = hypercubic_wave_energy(&state);
+
+        assert!(
+            (stage_a_energy - hypercubic_energy).abs() < 1e-12,
+            "Stage A energy={stage_a_energy}, hypercubic energy={hypercubic_energy}"
+        );
+    }
+
+    #[test]
+    fn finite_difference_directional_derivative_of_energy_is_zero_in_dimensions_one_through_six() {
+        // Independent check: estimate ∇H · f(u,v) directly from the energy
+        // function, without calling hypercubic_wave_energy_derivative.
+        let epsilon = 1e-6;
+        for dimensions in 1..=6 {
+            let sites = 1usize << dimensions;
+            let mut state = vec![0.0; 2 * sites];
+            for i in 0..sites {
+                state[i] = ((i + 1) as f64 * 0.37).sin();
+                state[sites + i] = 0.3 * ((i + 1) as f64 * 0.61).cos();
+            }
+            let flow = hypercubic_wave_rhs(&state, 0.0);
+            let plus: Vec<f64> = state.iter().zip(&flow)
+                .map(|(x, dx)| x + epsilon * dx).collect();
+            let minus: Vec<f64> = state.iter().zip(&flow)
+                .map(|(x, dx)| x - epsilon * dx).collect();
+            let directional_derivative =
+                (hypercubic_wave_energy(&plus) - hypercubic_wave_energy(&minus))
+                    / (2.0 * epsilon);
+
+            assert!(
+                directional_derivative.abs() < 1e-8,
+                "d={dimensions}, finite-difference dH/dt={directional_derivative:.3e}"
+            );
+        }
+    }
+
+    #[test]
     fn rk4_energy_drift_remains_small_for_one_two_and_three_spatial_dimensions() {
         for dimensions in 1..=3 {
             let sites = 1usize << dimensions;
