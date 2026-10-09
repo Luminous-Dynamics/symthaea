@@ -1095,7 +1095,7 @@ impl SqliteWitnessStore {
         if result != "ok" {
             return Err(WitnessError::CorruptStore("SQLite integrity_check failed"));
         }
-        let foreign_key_violation: Option<String> = conn
+        let foreign_key_violation: Option<String> = tx
             .query_row("PRAGMA foreign_key_check", [], |row| row.get(0))
             .optional()?;
         if foreign_key_violation.is_some() {
