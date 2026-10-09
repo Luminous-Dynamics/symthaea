@@ -658,6 +658,41 @@ impl SqliteWitnessStore {
                     return Ok(());
                 }
             }
+
+            // Recovery may have finalized this candidate and a later writer may
+            // already have advanced the head before the original caller resumes.
+            // Return idempotent success only if this exact candidate is still a
+            // committed historical record, is self-consistent, and is the exact
+            // successor named by the caller's predecessor. Never move the head
+            // backwards or treat a different same-generation candidate as success.
+            if *generation > candidate.generation as i64 {
+                let expected_candidate_generation = expected_generation
+                    .checked_add(1)
+                    .ok_or(WitnessError::GenerationOverflow)?;
+                if candidate.generation == expected_candidate_generation
+                    && candidate.previous_record_digest
+                        == (expected_generation > 0).then_some(expected_digest)
+                    && candidate.is_self_consistent()
+                {
+                    let status: Option<i64> = tx
+                        .query_row(
+                            "SELECT status FROM witness_records
+                             WHERE log_id=?1 AND generation=?2 AND record_digest=?3",
+                            params![
+                                candidate.log_id,
+                                candidate.generation as i64,
+                                candidate.digest.as_slice()
+                            ],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+                    if status == Some(1) {
+                        tx.commit()?;
+                        return Ok(());
+                    }
+                }
+                return Err(WitnessError::StalePredecessor);
+            }
         }
 
         match (expected_generation, meta) {
