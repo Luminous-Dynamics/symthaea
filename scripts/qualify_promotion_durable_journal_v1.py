@@ -696,7 +696,11 @@ class DurablePromotionJournalV1:
                 ),
             )
             if changed.rowcount != 1:
-                return False
+                # The ledger revision was already changed in this transaction.
+                # A silent compare-and-swap miss must abort, never commit a partial prepare.
+                raise RuntimeError(
+                    "reservation compare-and-swap failed after ledger revision update"
+                )
 
             payload = {
                 "reservation_id": reservation_id,
@@ -1084,6 +1088,31 @@ class DurablePromotionJournalTests(unittest.TestCase):
         self.assertEqual(journal.current_state()["revision"], before_revision)
         self.assertEqual(journal.get_reservation("RES-1")["state"], "PromotionReserved")
         self.assertEqual(journal.event_count(), 2)
+        self.assertTrue(journal.verify_journal())
+
+    def test_silent_reservation_compare_and_swap_miss_rolls_back_revision(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        before_state = journal.current_state()
+        before_events = journal.event_count()
+        connection = sqlite3.connect(journal.path)
+        try:
+            connection.execute(
+                """CREATE TRIGGER ignore_dispatch_transition
+                   BEFORE UPDATE OF state ON reservations
+                   WHEN OLD.reservation_id = 'RES-1'
+                    AND NEW.state = 'PromotionDispatchPrepared'
+                   BEGIN SELECT RAISE(IGNORE); END"""
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        with self.assertRaisesRegex(RuntimeError, "compare-and-swap failed"):
+            self.prepare_one(journal)
+        self.assertEqual(journal.current_state(), before_state)
+        self.assertEqual(journal.get_reservation("RES-1")["state"], "PromotionReserved")
+        self.assertEqual(journal.event_count(), before_events)
         self.assertTrue(journal.verify_journal())
 
     def test_database_trigger_rejects_stale_writer_even_if_api_guard_is_bypassed(self) -> None:
