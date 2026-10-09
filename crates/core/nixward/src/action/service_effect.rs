@@ -65,6 +65,13 @@ impl NixVerifiedServiceDefinitionContentV1 {
         Ok(Self { evidence })
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_test_evidence(
+        evidence: NixSystemdUnitDefinitionContentEvidenceV1,
+    ) -> Result<Self, NixServiceEffectContextErrorV1> {
+        Self::from_observer(evidence)
+    }
+
     pub(crate) fn as_ref(&self) -> &NixSystemdUnitDefinitionContentEvidenceV1 {
         &self.evidence
     }
@@ -76,6 +83,16 @@ impl NixVerifiedServiceDefinitionContentV1 {
     /// Return the observer-derived service invocation identity from this capture epoch.
     pub fn pre_invocation_id(&self) -> Option<&str> {
         self.evidence.pre_invocation_id.as_deref()
+    }
+
+    /// Exact systemd manager unique owner captured with this definition.
+    pub fn manager_owner(&self) -> &str {
+        &self.evidence.manager_owner
+    }
+
+    /// Exact D-Bus daemon incarnation captured with this definition.
+    pub fn bus_id(&self) -> &str {
+        &self.evidence.bus_id
     }
 }
 
@@ -151,6 +168,12 @@ pub struct NixServiceEffectContextV1 {
     /// Byte-level content commitment captured by the observer boundary.
     #[serde(default)]
     pub authorized_definition_content_digest: String,
+    /// Exact systemd manager unique owner captured with the definition.
+    #[serde(default)]
+    pub authorized_manager_owner: String,
+    /// Exact D-Bus daemon incarnation captured with the definition.
+    #[serde(default)]
+    pub authorized_bus_id: String,
     pub pre_invocation_id: Option<String>,
     pub required_stability_us: u64,
 }
@@ -163,6 +186,8 @@ impl NixServiceEffectContextV1 {
         pre_state_digest: impl Into<String>,
         authorized_definition_digest: impl Into<String>,
         authorized_definition_content_digest: impl Into<String>,
+        authorized_manager_owner: impl Into<String>,
+        authorized_bus_id: impl Into<String>,
         pre_invocation_id: Option<String>,
         required_stability_us: u64,
     ) -> Result<Self, NixServiceEffectContextErrorV1> {
@@ -173,6 +198,8 @@ impl NixServiceEffectContextV1 {
             pre_state_digest: pre_state_digest.into(),
             authorized_definition_digest: authorized_definition_digest.into(),
             authorized_definition_content_digest: authorized_definition_content_digest.into(),
+            authorized_manager_owner: authorized_manager_owner.into(),
+            authorized_bus_id: authorized_bus_id.into(),
             pre_invocation_id,
             required_stability_us,
         };
@@ -199,6 +226,9 @@ impl NixServiceEffectContextV1 {
             &self.authorized_definition_content_digest,
             "authorized definition content digest",
         )?;
+        validate_unique_manager_owner(&self.authorized_manager_owner)
+            .map_err(|_| NixServiceEffectContextErrorV1::InvalidManagerOwner)?;
+        validate_bus_id(&self.authorized_bus_id)?;
         validate_invocation_id(self.pre_invocation_id.as_deref())?;
         if self.operation == NixServiceOperationKindV1::Restart
             && self.pre_invocation_id.is_none()
@@ -225,7 +255,8 @@ impl NixServiceEffectContextV1 {
         if evidence.unit != unit {
             return Err(NixServiceEffectContextErrorV1::DefinitionContentUnitMismatch);
         }
-        let pre_invocation_id = match operation {
+        let content_digest = content.digest()?;
+        let observed_invocation_id = match operation {
             NixServiceOperationKindV1::Restart => {
                 let observed = content
                     .pre_invocation_id()
@@ -237,7 +268,6 @@ impl NixServiceEffectContextV1 {
             }
             _ => pre_invocation_id,
         };
-        let content_digest = content.digest()?;
         Self::new(
             operation,
             unit,
@@ -245,7 +275,9 @@ impl NixServiceEffectContextV1 {
             pre_state_digest,
             evidence.source_identity_digest.clone(),
             content_digest,
-            pre_invocation_id,
+            content.manager_owner().to_string(),
+            content.bus_id().to_string(),
+            observed_invocation_id,
             required_stability_us,
         )
     }
@@ -260,6 +292,8 @@ impl NixServiceEffectContextV1 {
         put_str(&mut hasher, &self.pre_state_digest);
         put_str(&mut hasher, &self.authorized_definition_digest);
         put_str(&mut hasher, &self.authorized_definition_content_digest);
+        put_str(&mut hasher, &self.authorized_manager_owner);
+        put_str(&mut hasher, &self.authorized_bus_id);
         put_opt_str(&mut hasher, self.pre_invocation_id.as_deref());
         put_u64(&mut hasher, self.required_stability_us);
         Ok(hasher.finalize().to_hex().to_string())
@@ -399,6 +433,8 @@ mod tests {
             &"aa".repeat(32),
             &"bb".repeat(32),
             &"dd".repeat(32),
+            ":1.42",
+            "0123456789abcdef0123456789abcdef",
             Some("cc".repeat(16)),
             1_000,
         )
@@ -463,6 +499,14 @@ mod tests {
             },
             NixServiceEffectContextV1 {
                 authorized_definition_content_digest: "gg".repeat(32),
+                ..base.clone()
+            },
+            NixServiceEffectContextV1 {
+                authorized_manager_owner: ":1.43".into(),
+                ..base.clone()
+            },
+            NixServiceEffectContextV1 {
+                authorized_bus_id: "fedcba9876543210fedcba9876543210".into(),
                 ..base.clone()
             },
             NixServiceEffectContextV1 {

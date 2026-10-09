@@ -426,7 +426,7 @@ mod tests {
             }],
             captured_at_monotonic_us: 1,
         };
-        NixVerifiedServiceDefinitionContentV1::from_observer(evidence).unwrap()
+        NixVerifiedServiceDefinitionContentV1::from_test_evidence(evidence).unwrap()
     }
 
     fn create_pending_service_request(
@@ -1007,7 +1007,7 @@ mod tests {
             action.digest().unwrap()
         );
 
-        let altered_content = NixVerifiedServiceDefinitionContentV1::from_observer(
+        let altered_content = NixVerifiedServiceDefinitionContentV1::from_test_evidence(
             NixSystemdUnitDefinitionContentEvidenceV1 {
                 unit: "nginx.service".to_string(),
                 source_identity_digest: "3333333333333333333333333333333333333333333333333333333333333333"
@@ -1046,7 +1046,7 @@ mod tests {
 
         // Invocation identity is separate from the content digest, but it is still
         // required to match for Restart approval provenance.
-        let invocation_altered = NixVerifiedServiceDefinitionContentV1::from_observer(
+        let invocation_altered = NixVerifiedServiceDefinitionContentV1::from_test_evidence(
             NixSystemdUnitDefinitionContentEvidenceV1 {
                 unit: "nginx.service".to_string(),
                 source_identity_digest: "2222222222222222222222222222222222222222222222222222222222222222"

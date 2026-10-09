@@ -21,9 +21,7 @@ use super::authorization::{
 };
 use super::execution_witness::NixLiveExecutionWitnessV1;
 use super::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
-use super::service_state::{
-    ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1,
-};
+use super::service_state::{ServiceActiveStateV1, ServiceLoadStateV1, ServiceUnitFileStateV1};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -121,7 +119,10 @@ impl NixSystemdJobEvidenceV1 {
         }
         validate_unique_manager_owner(&self.manager_owner)?;
         require_nonempty(&self.object_path, "systemd job object path")?;
-        if !self.object_path.starts_with("/org/freedesktop/systemd1/job/") {
+        if !self
+            .object_path
+            .starts_with("/org/freedesktop/systemd1/job/")
+        {
             return Err(NixPostStateErrorV1::InvalidJobObjectPath);
         }
         if !self.object_path.ends_with(&format!("/{}", self.id)) {
@@ -212,7 +213,10 @@ impl NixServicePostStateExpectationV1 {
         if self.authorized_generation == 0 {
             return Err(NixPostStateErrorV1::InvalidGeneration);
         }
-        validate_digest(&self.authorized_definition_digest, "authorized definition digest")?;
+        validate_digest(
+            &self.authorized_definition_digest,
+            "authorized definition digest",
+        )?;
         validate_digest(
             &self.authorized_definition_content_digest,
             "authorized definition content digest",
@@ -470,9 +474,10 @@ pub(crate) fn stability_sequence_digest(
 ) -> Result<String, NixPostStateErrorV1> {
     let mut h = Hasher::new();
     h.update(STABILITY_SEQUENCE_DOMAIN_V1);
-    put_u32(&mut h, u32::try_from(samples.len()).map_err(|_| {
-        NixPostStateErrorV1::TooManyStabilitySamples
-    })?);
+    put_u32(
+        &mut h,
+        u32::try_from(samples.len()).map_err(|_| NixPostStateErrorV1::TooManyStabilitySamples)?,
+    );
     for sample in samples {
         put_str(&mut h, &sample.digest()?);
     }
@@ -495,10 +500,11 @@ fn validate_stability_against_observation(
         || last.definition_digest != observation.definition_digest()?
         || last.definition_content_digest != observation.definition_content_digest
         || last.state_digest != observation.state_digest()?
-        || last.manager_owner != observation
-            .systemd_manager_owner
-            .as_deref()
-            .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
+        || last.manager_owner
+            != observation
+                .systemd_manager_owner
+                .as_deref()
+                .ok_or(NixPostStateErrorV1::MissingManagerOwner)?
         || last.invocation_id != observation.invocation_id
         || last.state_change_at_monotonic_us != observation.state_change_at_monotonic_us
         || last.captured_at_monotonic_us > observation.observed_at_monotonic_us
@@ -717,7 +723,8 @@ impl NixPostStateReceiptV1 {
                         witness.as_ref(),
                     ) {
                         (Some(stability), Some(_))
-                            if stability.required_window_us >= expectation.required_stability_us =>
+                            if stability.required_window_us
+                                >= expectation.required_stability_us =>
                         {
                             NixPostStateClaimV1::Proven
                         }
@@ -751,14 +758,20 @@ impl NixPostStateReceiptV1 {
         let receipt = Self {
             action_intent_digest,
             authorization_record_digest,
-            approval_request_id: witness.as_ref().map(|value| value.approval_request_id().to_string()),
-            approval_projection_digest: witness.as_ref().map(|value| value.projection_digest().to_string()),
+            approval_request_id: witness
+                .as_ref()
+                .map(|value| value.approval_request_id().to_string()),
+            approval_projection_digest: witness
+                .as_ref()
+                .map(|value| value.projection_digest().to_string()),
             effect_digest: expectation.effect_digest()?,
             target_unit: expectation.unit.clone(),
             authorized_generation: expectation.authorized_generation,
             observed_generation: observation.observed_generation,
             authorized_definition_digest: expectation.authorized_definition_digest.clone(),
-            authorized_definition_content_digest: expectation.authorized_definition_content_digest.clone(),
+            authorized_definition_content_digest: expectation
+                .authorized_definition_content_digest
+                .clone(),
             observed_definition_identity: observation.definition_identity.clone(),
             observed_definition_digest,
             observed_definition_content_digest,
@@ -872,9 +885,7 @@ impl NixPostStateReceiptV1 {
 
                 if job_id == 0
                     || job_unit != self.target_unit
-                    || job_object_path != format!(
-                        "/org/freedesktop/systemd1/job/{job_id}"
-                    )
+                    || job_object_path != format!("/org/freedesktop/systemd1/job/{job_id}")
                     || Some(job_type) != expected_job_type
                 {
                     return Ok(NixPostconditionAssessmentV1::Violated);
@@ -967,7 +978,10 @@ impl NixPostStateReceiptV1 {
             &self.authorized_definition_digest,
             "authorized definition digest",
         )?;
-        validate_digest(&self.observed_definition_digest, "observed definition digest")?;
+        validate_digest(
+            &self.observed_definition_digest,
+            "observed definition digest",
+        )?;
         self.observed_definition_identity.validate_shape()?;
         let recomputed_definition_digest = self
             .observed_definition_identity
@@ -1079,9 +1093,7 @@ impl NixPostStateReceiptV1 {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
                 if let Some(job_type) = self.systemd_job_type {
-                    if Some(job_type)
-                        != NixSystemdJobTypeV1::for_operation(self.operation)
-                    {
+                    if Some(job_type) != NixSystemdJobTypeV1::for_operation(self.operation) {
                         return Err(NixPostStateErrorV1::InvalidClaim);
                     }
                 }
@@ -1110,9 +1122,7 @@ impl NixPostStateReceiptV1 {
                 {
                     return Err(NixPostStateErrorV1::InvalidClaim);
                 }
-                if self.approval_request_id.is_none()
-                    || self.approval_projection_digest.is_none()
-                {
+                if self.approval_request_id.is_none() || self.approval_projection_digest.is_none() {
                     return Err(NixPostStateErrorV1::MissingLiveExecutionWitness);
                 }
             }
@@ -1733,9 +1743,7 @@ mod tests {
     fn definition() -> NixSystemdUnitDefinitionIdentityV1 {
         NixSystemdUnitDefinitionIdentityV1::new(
             "/nix/store/authorized-unit.service",
-            vec![
-                "/etc/systemd/system/nginx.service.d/override.conf".to_string(),
-            ],
+            vec!["/etc/systemd/system/nginx.service.d/override.conf".to_string()],
         )
         .unwrap()
     }
@@ -1746,12 +1754,12 @@ mod tests {
             unit: "nginx.service".to_string(),
             authorized_generation: 42,
             authorized_definition_digest: definition().digest("nginx.service").unwrap(),
-            authorized_definition_content_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            authorized_definition_content_digest:
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
             pre_invocation_id: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
             required_stability_us: 0,
         }
     }
-
 
     fn contextual_intent(
         operation: NixServiceOperationKindV1,
@@ -1781,6 +1789,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     definition_digest,
                     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    ":1.42",
+                    "0123456789abcdef0123456789abcdef",
                     pre_invocation_id,
                     required_stability_us,
                 )
@@ -1793,9 +1803,7 @@ mod tests {
         }
     }
 
-    fn contextual_authorization(
-        intent: &NixActionIntentV1,
-    ) -> NixExecutionAuthorizationRecordV1 {
+    fn contextual_authorization(intent: &NixActionIntentV1) -> NixExecutionAuthorizationRecordV1 {
         NixExecutionAuthorizationRecordV1 {
             action_intent_digest: intent.digest().unwrap(),
             service_effect_context_digest: intent
@@ -1816,12 +1824,11 @@ mod tests {
         stability: Option<NixPostStateStabilityEvidenceV1>,
     ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
         let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
-        let verified_stability = stability.map(|evidence| {
-            NixVerifiedPostStateStabilityEvidenceV1 { evidence }
-        });
+        let verified_stability =
+            stability.map(|evidence| NixVerifiedPostStateStabilityEvidenceV1 { evidence });
 
         use super::super::authorization::{
-            NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
+            NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1,
         };
         let intent = NixActionIntentV1 {
             subject_identity: "host:test".to_string(),
@@ -1843,6 +1850,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
                     exp.authorized_definition_content_digest.clone(),
+                    ":1.42",
+                    "0123456789abcdef0123456789abcdef",
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -1886,12 +1895,11 @@ mod tests {
         stability: Option<NixPostStateStabilityEvidenceV1>,
     ) -> Result<NixPostStateReceiptV1, NixPostStateErrorV1> {
         let verified = NixVerifiedPostStateObservationV1::from_observer(obs.clone())?;
-        let verified_stability = stability.map(|evidence| {
-            NixVerifiedPostStateStabilityEvidenceV1 { evidence }
-        });
+        let verified_stability =
+            stability.map(|evidence| NixVerifiedPostStateStabilityEvidenceV1 { evidence });
 
         use super::super::authorization::{
-            NixActionIntentV1, NixAuthorizationProfileV1, NixActionScopeV1,
+            NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1,
         };
         let intent = NixActionIntentV1 {
             subject_identity: "host:test".to_string(),
@@ -1913,6 +1921,8 @@ mod tests {
                     "1111111111111111111111111111111111111111111111111111111111111111",
                     exp.authorized_definition_digest.clone(),
                     exp.authorized_definition_content_digest.clone(),
+                    ":1.42",
+                    "0123456789abcdef0123456789abcdef",
                     exp.pre_invocation_id.clone(),
                     exp.required_stability_us,
                 )
@@ -1974,7 +1984,8 @@ mod tests {
             observed_generation: 42,
             unit_object_path: "/org/freedesktop/systemd1/unit/nginx_2eservice".to_string(),
             definition_identity: definition(),
-            definition_content_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            definition_content_digest:
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
             load_state: ServiceLoadStateV1::Loaded,
             active_state,
             sub_state: "running".to_string(),
@@ -2087,7 +2098,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(receipt.postcondition, NixPostconditionAssessmentV1::Satisfied);
+        assert_eq!(
+            receipt.postcondition,
+            NixPostconditionAssessmentV1::Satisfied
+        );
         assert_eq!(receipt.claim, NixPostStateClaimV1::Observed);
         assert!(receipt.digest().is_ok());
     }
@@ -2102,12 +2116,7 @@ mod tests {
         );
 
         obs.invocation_id = exp.pre_invocation_id.clone();
-        let receipt = build_receipt(
-            &exp,
-            &obs,
-            None,
-        )
-        .unwrap();
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
 
         assert_eq!(receipt.claim, NixPostStateClaimV1::Unproven);
     }
@@ -2125,7 +2134,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(receipt.postcondition, NixPostconditionAssessmentV1::Satisfied);
+        assert_eq!(
+            receipt.postcondition,
+            NixPostconditionAssessmentV1::Satisfied
+        );
     }
 
     #[test]
@@ -2153,14 +2165,13 @@ mod tests {
         );
         obs.systemd_job.as_mut().unwrap().job_type = NixSystemdJobTypeV1::Start;
 
-        let receipt = build_receipt(
-            &expectation(NixServiceOperationKindV1::Restart),
-            &obs,
-            None,
-        )
-        .unwrap();
+        let receipt =
+            build_receipt(&expectation(NixServiceOperationKindV1::Restart), &obs, None).unwrap();
 
-        assert_eq!(receipt.postcondition, NixPostconditionAssessmentV1::Violated);
+        assert_eq!(
+            receipt.postcondition,
+            NixPostconditionAssessmentV1::Violated
+        );
         assert_eq!(receipt.claim, NixPostStateClaimV1::Violated);
     }
 
@@ -2178,13 +2189,7 @@ mod tests {
         let receipt = build_receipt(
             &exp,
             &obs,
-            Some(stability(
-                &obs,
-                1_000,
-                1_000,
-                2_000,
-                &[1_000, 2_000],
-            )),
+            Some(stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000])),
         )
         .unwrap();
 
@@ -2199,6 +2204,8 @@ mod tests {
             &exp.unit,
             exp.authorized_generation,
             exp.authorized_definition_content_digest.clone(),
+            ":1.42",
+            "0123456789abcdef0123456789abcdef",
             exp.pre_invocation_id.clone(),
             exp.required_stability_us,
         );
@@ -2241,13 +2248,7 @@ mod tests {
         let receipt = build_proven_receipt(
             &exp,
             &obs,
-            Some(stability(
-                &obs,
-                1_000,
-                1_000,
-                2_000,
-                &[1_000, 2_000],
-            )),
+            Some(stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000])),
         )
         .unwrap();
 
@@ -2302,11 +2303,7 @@ mod tests {
         );
         obs.observed_generation = 43;
 
-        let result = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        );
+        let result = build_receipt(&expectation(NixServiceOperationKindV1::Start), &obs, None);
 
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::GenerationMismatch);
 
@@ -2319,17 +2316,14 @@ mod tests {
             NixSystemdUnitDefinitionIdentityV1::new("/nix/store/different.service", vec![])
                 .unwrap();
 
-        let result = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        );
+        let result = build_receipt(&expectation(NixServiceOperationKindV1::Start), &obs, None);
 
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::DefinitionMismatch);
     }
 
     #[test]
-    fn receipt_digest_changes_on_intent_authority_target_generation_job_invocation_and_observer_mutation() {
+    fn receipt_digest_changes_on_intent_authority_target_generation_job_invocation_and_observer_mutation()
+     {
         let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Restart),
             &observation(
@@ -2346,11 +2340,13 @@ mod tests {
         let mut variants = Vec::new();
 
         let mut changed = receipt.clone();
-        changed.action_intent_digest = "1111111111111111111111111111111111111111111111111111111111111111".into();
+        changed.action_intent_digest =
+            "1111111111111111111111111111111111111111111111111111111111111111".into();
         variants.push(changed);
 
         let mut changed = receipt.clone();
-        changed.authorization_record_digest = "2222222222222222222222222222222222222222222222222222222222222222".into();
+        changed.authorization_record_digest =
+            "2222222222222222222222222222222222222222222222222222222222222222".into();
         variants.push(changed);
 
         let mut changed = receipt.clone();
@@ -2386,8 +2382,7 @@ mod tests {
         variants.push(changed);
 
         let mut changed = receipt.clone();
-        changed.observed_unit_object_path =
-            "/org/freedesktop/systemd1/unit/sshd_2eservice".into();
+        changed.observed_unit_object_path = "/org/freedesktop/systemd1/unit/sshd_2eservice".into();
         variants.push(changed);
 
         let mut changed = receipt.clone();
@@ -2437,11 +2432,7 @@ mod tests {
         );
         obs.systemd_manager_owner = None;
         assert_eq!(
-            build_receipt(
-                &expectation(NixServiceOperationKindV1::Start),
-                &obs,
-                None,
-            ).unwrap_err(),
+            build_receipt(&expectation(NixServiceOperationKindV1::Start), &obs, None,).unwrap_err(),
             NixPostStateErrorV1::MissingManagerOwner
         );
     }
@@ -2599,8 +2590,7 @@ mod tests {
             ServiceUnitFileStateV1::Enabled,
         );
         let mut receipt = build_receipt(&exp, &obs, None).unwrap();
-        receipt.observed_definition_identity.fragment_path =
-            "/nix/store/changed.service".into();
+        receipt.observed_definition_identity.fragment_path = "/nix/store/changed.service".into();
         assert_eq!(
             receipt.validate_shape().unwrap_err(),
             NixPostStateErrorV1::DefinitionMismatch
@@ -2617,8 +2607,7 @@ mod tests {
         );
         let mut receipt = build_receipt(&exp, &obs, None).unwrap();
         receipt.observed_definition_identity =
-            NixSystemdUnitDefinitionIdentityV1::new("/nix/store/changed.service", vec![])
-                .unwrap();
+            NixSystemdUnitDefinitionIdentityV1::new("/nix/store/changed.service", vec![]).unwrap();
         receipt.observed_definition_digest = receipt
             .observed_definition_identity
             .digest(&receipt.target_unit)
@@ -2640,8 +2629,7 @@ mod tests {
         let receipt = build_receipt(&exp, &obs, None).unwrap();
         let baseline = receipt.digest().unwrap();
         let mut changed = receipt.clone();
-        changed.observed_definition_identity.drop_in_paths =
-            vec!["/nix/store/changed.conf".into()];
+        changed.observed_definition_identity.drop_in_paths = vec!["/nix/store/changed.conf".into()];
         changed.observed_definition_digest = changed
             .observed_definition_identity
             .digest(&changed.target_unit)
@@ -2742,13 +2730,7 @@ mod tests {
         let mut receipt = build_proven_receipt(
             &exp,
             &obs,
-            Some(stability(
-                &obs,
-                1_000,
-                1_000,
-                2_000,
-                &[1_000, 2_000],
-            )),
+            Some(stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000])),
         )
         .unwrap();
         assert_eq!(receipt.claim, NixPostStateClaimV1::Proven);
@@ -2778,13 +2760,7 @@ mod tests {
         let result = build_receipt(
             &exp,
             &obs,
-            Some(stability(
-                &obs,
-                1,
-                1_000,
-                2_000,
-                &[1_000, 2_000],
-            )),
+            Some(stability(&obs, 1, 1_000, 2_000, &[1_000, 2_000])),
         );
         assert_eq!(result.unwrap_err(), NixPostStateErrorV1::Violated);
     }
@@ -2817,20 +2793,21 @@ mod tests {
             ServiceUnitFileStateV1::Enabled,
         );
         obs.systemd_job.as_mut().unwrap().result = "failed".to_string();
-        let receipt = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        )
-        .unwrap();
+        let receipt =
+            build_receipt(&expectation(NixServiceOperationKindV1::Start), &obs, None).unwrap();
 
-        assert_eq!(receipt.postcondition, NixPostconditionAssessmentV1::Violated);
+        assert_eq!(
+            receipt.postcondition,
+            NixPostconditionAssessmentV1::Violated
+        );
         assert_eq!(receipt.claim, NixPostStateClaimV1::Violated);
     }
 
     #[test]
     fn mismatched_typed_intent_is_rejected_even_when_observation_is_valid() {
-        use super::super::authorization::{NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1};
+        use super::super::authorization::{
+            NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1,
+        };
 
         let exp = expectation(NixServiceOperationKindV1::Start);
         let obs = observation(
@@ -2865,7 +2842,9 @@ mod tests {
 
     #[test]
     fn serialized_receipt_requires_trusted_intent_and_authorization_rebinding() {
-        use super::super::authorization::{NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1};
+        use super::super::authorization::{
+            NixActionIntentV1, NixActionScopeV1, NixAuthorizationProfileV1,
+        };
 
         let receipt = build_receipt(
             &expectation(NixServiceOperationKindV1::Start),
@@ -2894,7 +2873,9 @@ mod tests {
         tampered.action_intent_digest =
             "1111111111111111111111111111111111111111111111111111111111111111".into();
         assert_eq!(
-            tampered.verify_against(&intent, &authorization).unwrap_err(),
+            tampered
+                .verify_against(&intent, &authorization)
+                .unwrap_err(),
             NixPostStateErrorV1::AuthorizationIntentMismatch
         );
 
@@ -2902,7 +2883,9 @@ mod tests {
         tampered.authorization_record_digest =
             "2222222222222222222222222222222222222222222222222222222222222222".into();
         assert_eq!(
-            tampered.verify_against(&intent, &authorization).unwrap_err(),
+            tampered
+                .verify_against(&intent, &authorization)
+                .unwrap_err(),
             NixPostStateErrorV1::AuthorizationRecordMismatch
         );
     }
@@ -3009,7 +2992,9 @@ mod tests {
         );
 
         assert_eq!(
-            tampered.verify_against(&intent, &authorization).unwrap_err(),
+            tampered
+                .verify_against(&intent, &authorization)
+                .unwrap_err(),
             NixPostStateErrorV1::GenerationMismatch
         );
     }
@@ -3023,12 +3008,8 @@ mod tests {
         );
         obs.systemd_job.as_mut().unwrap().unit = "sshd.service".to_string();
 
-        let receipt = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        )
-        .unwrap();
+        let receipt =
+            build_receipt(&expectation(NixServiceOperationKindV1::Start), &obs, None).unwrap();
 
         assert_eq!(
             receipt.postcondition,
@@ -3049,7 +3030,10 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(enable.postcondition, NixPostconditionAssessmentV1::Satisfied);
+        assert_eq!(
+            enable.postcondition,
+            NixPostconditionAssessmentV1::Satisfied
+        );
 
         let disable = build_receipt(
             &expectation(NixServiceOperationKindV1::Disable),
@@ -3061,6 +3045,9 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(disable.postcondition, NixPostconditionAssessmentV1::Satisfied);
+        assert_eq!(
+            disable.postcondition,
+            NixPostconditionAssessmentV1::Satisfied
+        );
     }
 }
