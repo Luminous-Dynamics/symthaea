@@ -236,9 +236,13 @@ impl LoadRegistry {
             if !valid_label(&demand.load_id) {
                 return Err(LoadRegistryError::EmptyLoadId);
             }
-            if !self.entries.iter().any(|entry| entry.load_id == demand.load_id) {
+            let Some(entry) = self
+                .entries
+                .iter()
+                .find(|entry| entry.load_id == demand.load_id)
+            else {
                 return Err(LoadRegistryError::UnknownDemandLoad(demand.load_id.clone()));
-            }
+            };
             if demand_by_id
                 .insert(demand.load_id.clone(), demand.requested_power_kw)
                 .is_some()
@@ -248,13 +252,6 @@ impl LoadRegistry {
             if !demand.requested_power_kw.is_finite() || demand.requested_power_kw < 0.0 {
                 return Err(LoadRegistryError::InvalidRequestedPower(demand.load_id.clone()));
             }
-            let Some(entry) = self
-                .entries
-                .iter()
-                .find(|entry| entry.load_id == demand.load_id)
-            else {
-                return Err(LoadRegistryError::UnknownDemandLoad(demand.load_id.clone()));
-            };
             if demand.requested_power_kw > entry.rated_power_kw {
                 return Err(LoadRegistryError::RequestedPowerExceedsRating(
                     demand.load_id.clone(),
@@ -434,9 +431,10 @@ impl LoadServiceLedger {
                     record.requested_kwh,
                 )
                 || !close_enough(
-                record.requested_kwh,
-                record.served_kwh + record.intentional_shed_kwh + record.unserved_kwh,
-            ) {
+                    record.requested_kwh,
+                    record.served_kwh + record.intentional_shed_kwh + record.unserved_kwh,
+                )
+            {
                 return false;
             }
             if record.served_kwh > record.requested_kwh + tolerance(record.requested_kwh) {
