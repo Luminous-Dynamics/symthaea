@@ -23,7 +23,13 @@ pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v3";
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
-const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = "IID evaluation episodes; frozen scoring and selection rule; supplied threshold set predeclared before correctness outcomes; task-family taxonomy predeclared and outcome-independent; simultaneous bounds cover pooled and observed task-family by threshold comparisons; no distribution-shift guarantee";
+const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = concat!(
+    "IID evaluation episodes; frozen scoring and selection rule; ",
+    "supplied threshold set predeclared before correctness outcomes; ",
+    "task-family taxonomy predeclared and outcome-independent; ",
+    "simultaneous bounds cover pooled and observed task-family by threshold comparisons; ",
+    "no distribution-shift guarantee",
+);
 
 /// One pre-outcome prediction of whether the subject's answer is correct.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -119,7 +125,8 @@ pub struct TaskFamilyCalibrationReport {
     pub current_episode_binding_rate: Option<f64>,
     pub assertion_rate: Option<f64>,
     pub asserted_risk: Option<f64>,
-    /// Group-local coverage and risk; upper bounds share family-wise correction with pooled results.
+    /// Group-local coverage and risk; upper bounds share family-wise correction
+    /// with pooled results.
     pub selective_risk: Vec<SelectiveRiskPoint>,
 }
 
@@ -179,8 +186,12 @@ pub enum MetacognitionEvaluationError {
 impl fmt::Display for MetacognitionEvaluationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidBinCount(count) => write!(f, "calibration bin count must be in 1..=100, got {count}"),
-            Self::EmptyEpisodeId(field) => write!(f, "required episode identifier `{field}` is empty"),
+            Self::InvalidBinCount(count) => {
+                write!(f, "calibration bin count must be in 1..=100, got {count}")
+            }
+            Self::EmptyEpisodeId(field) => {
+                write!(f, "required episode identifier `{field}` is empty")
+            }
             Self::DuplicatePredictionEpisode(id) => {
                 write!(f, "episode `{id}` has more than one correctness prediction")
             }
@@ -190,7 +201,9 @@ impl fmt::Display for MetacognitionEvaluationError {
             Self::DuplicateAssumptionEpisode(id) => {
                 write!(f, "episode `{id}` has more than one weak-assumption observation")
             }
-            Self::DuplicateRevisionPair(id) => write!(f, "revision pair `{id}` appears more than once"),
+            Self::DuplicateRevisionPair(id) => {
+                write!(f, "revision pair `{id}` appears more than once")
+            }
             Self::InvalidProbability { field, value } => {
                 write!(f, "probability `{field}` must be finite and within [0, 1], got {value}")
             }
@@ -349,7 +362,9 @@ pub fn evaluate_metacognition(
     })
 }
 
-fn validate_predictions(predictions: &[CorrectnessPrediction]) -> Result<(), MetacognitionEvaluationError> {
+fn validate_predictions(
+    predictions: &[CorrectnessPrediction],
+) -> Result<(), MetacognitionEvaluationError> {
     let mut seen = HashSet::new();
     for prediction in predictions {
         if prediction.episode_id.trim().is_empty() {
@@ -428,7 +443,10 @@ fn validate_revisions(
     Ok(())
 }
 
-fn validate_probability(field: &'static str, value: f64) -> Result<(), MetacognitionEvaluationError> {
+fn validate_probability(
+    field: &'static str,
+    value: f64,
+) -> Result<(), MetacognitionEvaluationError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(())
     } else {
@@ -442,14 +460,14 @@ fn validate_probability(field: &'static str, value: f64) -> Result<(), Metacogni
 fn hoeffding_familywise_risk_upper_bound(
     errors: usize,
     selected: usize,
-    threshold_count: usize,
+    comparison_count: usize,
 ) -> Option<f64> {
-    if selected == 0 || threshold_count == 0 || errors > selected {
+    if selected == 0 || comparison_count == 0 || errors > selected {
         return None;
     }
     let empirical_risk = errors as f64 / selected as f64;
-    let per_threshold_alpha = SELECTIVE_RISK_FAMILYWISE_ALPHA / threshold_count as f64;
-    let radius = ((1.0 / per_threshold_alpha).ln() / (2.0 * selected as f64)).sqrt();
+    let per_comparison_alpha = SELECTIVE_RISK_FAMILYWISE_ALPHA / comparison_count as f64;
+    let radius = ((1.0 / per_comparison_alpha).ln() / (2.0 * selected as f64)).sqrt();
     Some((empirical_risk + radius).min(1.0))
 }
 
@@ -565,7 +583,10 @@ fn calibration_errors(
 
 fn auroc(predictions: &[CorrectnessPrediction]) -> Option<f64> {
     let positives: Vec<&CorrectnessPrediction> = predictions.iter().filter(|p| p.correct).collect();
-    let negatives: Vec<&CorrectnessPrediction> = predictions.iter().filter(|p| !p.correct).collect();
+    let negatives: Vec<&CorrectnessPrediction> = predictions
+        .iter()
+        .filter(|p| !p.correct)
+        .collect();
     if positives.is_empty() || negatives.is_empty() {
         return None;
     }
@@ -696,7 +717,12 @@ fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
 mod tests {
     use super::*;
 
-    fn prediction(id: &str, confidence: f64, correct: bool, asserted: bool) -> CorrectnessPrediction {
+    fn prediction(
+        id: &str,
+        confidence: f64,
+        correct: bool,
+        asserted: bool,
+    ) -> CorrectnessPrediction {
         CorrectnessPrediction {
             episode_id: id.into(),
             task_family_id: "general".into(),
@@ -820,8 +846,12 @@ mod tests {
             .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"));
         assert_eq!(report.selective_risk_bound_method, "hoeffding-familywise-95-v1");
         assert!(report.selective_risk_bound_assumptions.contains("IID evaluation episodes"));
-        assert!(report.selective_risk_bound_assumptions.contains("no distribution-shift guarantee"));
-        assert!(report.selective_risk_bound_assumptions.contains("task-family taxonomy predeclared"));
+        assert!(report
+            .selective_risk_bound_assumptions
+            .contains("no distribution-shift guarantee"));
+        assert!(report
+            .selective_risk_bound_assumptions
+            .contains("task-family taxonomy predeclared"));
         assert_eq!(report.selective_risk[0].selected, 3);
         assert_eq!(report.selective_risk[0].coverage, 0.75);
         assert!((report.selective_risk[0].risk.unwrap_or_default() - 1.0 / 3.0).abs() < 1.0e-12);
@@ -876,7 +906,14 @@ mod tests {
         assert_eq!(report.task_family_calibration[0].task_family_id, "reasoning");
         assert_eq!(report.task_family_calibration[0].expected_calibration_error, Some(0.0));
         assert_eq!(report.task_family_calibration[1].task_family_id, "retrieval");
-        assert!((report.task_family_calibration[1].expected_calibration_error.unwrap_or_default() - 0.1).abs() < 1.0e-12);
+        assert!(
+            (report.task_family_calibration[1]
+                .expected_calibration_error
+                .unwrap_or_default()
+                - 0.1)
+                .abs()
+                < 1.0e-12
+        );
         assert!(report.task_family_calibration.iter().all(|family| {
             family.selective_risk.iter().all(|point| {
                 point.risk_upper_bound_95.unwrap_or_default() >= point.risk.unwrap_or_default()
