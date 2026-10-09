@@ -84,6 +84,7 @@ enum Failure {
     InvalidReceiptTailShape,
     ReceiptRollback,
     ReceiptTailEquivocation,
+    ReceiptTailHistoryInvalid,
     StalePredecessor,
     GenerationOverflow,
     JournalCorrupt,
@@ -265,6 +266,22 @@ fn validate_receipt_tail(sequence: u64, digest: Option<Hash>) -> Result<(), Fail
     Ok(())
 }
 
+fn rehash_record_and_marker(disk: &mut DiskSnapshot, index: usize) {
+    let mut record = disk.records[index].clone();
+    record.digest = record_digest(
+        record.protocol_version,
+        record.generation,
+        &record.log_id,
+        &record.policy_version,
+        record.anchor_digest,
+        record.receipt_sequence,
+        record.receipt_digest,
+        record.previous_record_digest,
+    );
+    disk.records[index] = record.clone();
+    disk.markers[index] = make_marker(&record);
+}
+
 impl WitnessModel {
     fn bootstrap(
         witness_id: &str,
@@ -342,6 +359,13 @@ impl WitnessModel {
                 || validate_receipt_tail(record.receipt_sequence, record.receipt_digest).is_err()
             {
                 return Err(Failure::JournalCorrupt);
+            }
+            if previous.as_ref().is_some_and(|prior| {
+                record.receipt_sequence < prior.receipt_sequence
+                    || (record.receipt_sequence == prior.receipt_sequence
+                        && record.receipt_digest != prior.receipt_digest)
+            }) {
+                return Err(Failure::ReceiptTailHistoryInvalid);
             }
             previous = Some(record.clone());
         }
@@ -766,6 +790,65 @@ fn main() {
         .expect("preserve conflicting view");
     assert_eq!(fork_store.recover(), Ok(before_fork.clone()));
     assert_eq!(fork_store.disk.fork_evidence.len(), 1);
+
+    // Recovery validates receipt-tail history across committed records, not
+    // merely the shape of each record. Mutate a committed successor, recompute
+    // its record digest and commit marker, and ensure semantic tampering is caught.
+    let mut regressed_history = WitnessModel::bootstrap(
+        "witness-recovery-sequence-regression",
+        "civ-log-v1",
+        initial_anchor,
+        4,
+        initial_tail,
+    )
+    .expect("trusted bootstrap");
+    let regressed_predecessor = regressed_history.recover().expect("predecessor");
+    regressed_history
+        .advance(
+            regressed_predecessor.generation,
+            regressed_predecessor.digest,
+            proposed_anchor,
+            5,
+            proposed_tail,
+            None,
+        )
+        .expect("append valid successor before mutation");
+    regressed_history.disk.records[1].receipt_sequence = 3;
+    regressed_history.disk.records[1].receipt_digest =
+        Some(hash_bytes(b"rehashed-older-receipt"));
+    rehash_record_and_marker(&mut regressed_history.disk, 1);
+    assert_eq!(
+        regressed_history.recover(),
+        Err(Failure::ReceiptTailHistoryInvalid)
+    );
+
+    let mut equivocated_history = WitnessModel::bootstrap(
+        "witness-recovery-tail-equivocation",
+        "civ-log-v1",
+        initial_anchor,
+        4,
+        initial_tail,
+    )
+    .expect("trusted bootstrap");
+    let equivocated_predecessor = equivocated_history.recover().expect("predecessor");
+    equivocated_history
+        .advance(
+            equivocated_predecessor.generation,
+            equivocated_predecessor.digest,
+            proposed_anchor,
+            5,
+            proposed_tail,
+            None,
+        )
+        .expect("append valid successor before mutation");
+    equivocated_history.disk.records[1].receipt_sequence = 4;
+    equivocated_history.disk.records[1].receipt_digest =
+        Some(hash_bytes(b"rehashed-conflicting-receipt-at-same-sequence"));
+    rehash_record_and_marker(&mut equivocated_history.disk, 1);
+    assert_eq!(
+        equivocated_history.recover(),
+        Err(Failure::ReceiptTailHistoryInvalid)
+    );
 
     // A validly hashed history becomes invalid if conflict evidence is reordered.
     let mut reordered_forks = fork_store.clone();
