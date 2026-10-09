@@ -1126,6 +1126,50 @@ mod tests {
     }
 
     #[test]
+    fn cohort_freeze_requires_both_baseline_methods_per_family() {
+        let forecast = forecast("f1", "e1", "reasoning", 0.5, true, None);
+        let only_one_baseline = vec![baseline(
+            "reasoning-constant",
+            ForecastBaselineMethod::ConstantBaseRate,
+            "reasoning",
+            0.6,
+        )];
+        assert!(
+            freeze_decision_cohort_for_split(
+                vec![forecast],
+                only_one_baseline,
+                5,
+                vec![0.5],
+                "holdout".into(),
+                "manifest".into(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn decision_outcomes_must_bind_exactly_once() {
+        let forecast = forecast("f1", "e1", "reasoning", 0.5, true, None);
+        let frozen = freeze_decision_cohort_for_split(
+            vec![forecast.clone()],
+            family_baselines("reasoning"),
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
+        .unwrap_or_else(|e| panic!("freeze: {e}"));
+        let receipt = outcome(&forecast, Some(true), None);
+        assert!(evaluate_decision_cohort(
+            &frozen,
+            &[receipt.clone(), receipt],
+            &[],
+            &[],
+        ).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[], &[], &[]).is_err());
+    }
+
+    #[test]
     fn abstention_cannot_be_given_asserted_answer_correctness() {
         let f = forecast("f1", "e1", "reasoning", 0.5, false, None);
         let mut o = outcome(&f, None, None);
@@ -1204,8 +1248,26 @@ mod tests {
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         let encoded = serde_json::to_string(&frozen).unwrap_or_else(|e| panic!("serialize: {e}"));
-        let mut tampered: serde_json::Value = serde_json::from_str(&encoded)
-            .unwrap_or_else(|e| panic!("parse: {e}"));
+        let restored: FrozenDecisionCohortV2 =
+            serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("restore: {e}"));
+        assert_eq!(restored, frozen);
+        assert_eq!(restored.baselines(), frozen.baselines());
+
+        let mut old_schema: serde_json::Value =
+            serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
+        old_schema["schema_version"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<FrozenDecisionCohortV2>(old_schema).is_err());
+
+        let mut baseline_swap: serde_json::Value =
+            serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
+        baseline_swap["baselines"][0]["training_split_id"] = serde_json::json!("holdout");
+        assert!(
+            serde_json::from_value::<FrozenDecisionCohortV2>(baseline_swap).is_err(),
+            "baseline profiles may not be rebound to the evaluation split"
+        );
+
+        let mut tampered: serde_json::Value =
+            serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
         tampered["calibration_bins"] = serde_json::json!(0);
         assert!(serde_json::from_value::<FrozenDecisionCohortV2>(tampered).is_err());
     }
