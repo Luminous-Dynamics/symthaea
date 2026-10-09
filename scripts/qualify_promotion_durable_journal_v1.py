@@ -1517,7 +1517,7 @@ class DurablePromotionJournalTests(unittest.TestCase):
         self.assertEqual(journal.event_count(), before_count)
         self.assertTrue(journal.verify_journal())
 
-    def test_unversioned_existing_journal_refuses_implicit_schema_upgrade(self) -> None:
+    def test_unsupported_existing_schema_version_refuses_implicit_upgrade(self) -> None:
         journal = self.make_journal()
         connection = sqlite3.connect(journal.path)
         try:
