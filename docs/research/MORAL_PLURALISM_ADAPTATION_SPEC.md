@@ -345,3 +345,20 @@ This is evaluation **coverage**, not proof of moral adequacy. A caller can still
 That distinction is consistent with the current research gap described in [“Position: Evaluations of AI Moral Reasoning Still Miss Half of the Picture”](https://arxiv.org/abs/2608.14566) (2026): values-level alignment and norm identification/application are different evaluation targets, and moral competence also depends on identifying relevant contextual features. Therefore later Symthaea qualification should assess both value representation and context-sensitive norm application, rather than scoring only multi-framework agreement.
 
 The [NIST AI RMF Measure guidance](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/) calls for documented test sets, metrics, uncertainty and evaluation methods, and recommends independent review and consideration of external stakeholders. The [AI Standards Lab's June 2026 endorsement of the Evals-Consensus recommendations](https://aistandardslab.org/we-have-endorsed-the-recommendations-coming-out-of-the-evals-consensus-project/) further supports treating evaluation coverage, documentation, execution, and reporting as part of the contract, not informal assumptions. Symthaea's current tests are authored but remain unexecuted; these sources motivate the design and do not validate the implementation.
+
+
+### Framework plurality and roster sufficiency — 2026-10-09
+
+The strict roster API in [draft PR #7279](https://github.com/Luminous-Dynamics/symthaea/pull/7279) now distinguishes **coverage** from **plurality**:
+
+- Missing a required framework/version yields `Incomplete`, with a sorted `missing_frameworks` list.
+- Supplying an undeclared framework/version yields `FrameworkSetMismatch`, with a sorted `unexpected_frameworks` list.
+- Fewer than two distinct framework IDs yields `InsufficientFrameworks`; multiple versions of one framework do not count as independent perspectives.
+- Explicit `Unavailable` rows preserve the fact that a required evaluator did not run and cannot claim a confidence value or used premise/evidence references.
+- Subject, provenance, or freshness failures are not masked by a simultaneous roster mismatch.
+
+This makes a declared roster auditable, but does not settle which roster is ethically adequate. Roster choice must remain explicit, versioned and justified for the use case, with affected-party representation considered where impacts warrant it. A technically complete but normatively narrow roster is still inadequate.
+
+This reflects current measurement guidance: [NIST AI RMF Measure](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/) calls for documented test sets, metrics and methods, measurement uncertainty, regular assessment, and independent/external perspectives where relevant. A 2026 position paper on moral-reasoning evaluations likewise distinguishes values-level alignment from identifying and applying context-sensitive norms ([arXiv:2608.14566](https://arxiv.org/abs/2608.14566)). Consequently, later qualification should measure not only whether declared frameworks agree, but also whether each framework identifies relevant facts and applies its stated norms faithfully.
+
+The latest draft now has 30 authored unit tests in `ethical_pluralism.rs`; none should be described as passing until executed on the exact head in the pinned environment. PR #7279 remains draft and does not wire the comparator into the existing EthicsEngine or alter authorization.
