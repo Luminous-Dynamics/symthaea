@@ -123,10 +123,14 @@ impl EvidenceView {
         // Do not silently accept a stale/mismatched receipt as metadata.
         let mut item_ids = items.iter().map(|item| item.canonical_identity.clone()).collect::<Vec<_>>();
         item_ids.sort();
-        item_ids.dedup();
+        // Each selected canonical identity must occur exactly once in the normalized view.
+        // Deduplicating here would let duplicate groups pass a set-equality check and could
+        // make one claim appear as multiple items even though the receipt selected it once.
+        if item_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
         let mut receipt_ids = receipt.selected.clone();
         receipt_ids.sort();
-        receipt_ids.dedup();
         if item_ids != receipt_ids {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
@@ -327,6 +331,37 @@ mod tests {
         receipt.receipt_digest = receipt.canonical_digest();
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn duplicate_canonical_groups_cannot_pass_receipt_binding() {
+        let (groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![
+                candidate("claim:x", 0.7, "family:a"),
+                candidate("claim:x", 0.6, "family:b"),
+            ],
+        );
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].representations.len(), 2);
+        let verified = receipt.verify().unwrap();
+
+        // Split one selected claim's representations across two groups. The complete
+        // set of receipt-bound representation digests remains unchanged; only the
+        // one-claim/one-item normalization invariant is violated.
+        let mut first = groups[0].clone();
+        let second_representation = first.representations.pop().unwrap();
+        let duplicate = crate::RetrievedMemory {
+            canonical_identity: first.canonical_identity.clone(),
+            representations: vec![second_representation],
+            provenance_families: groups[0].provenance_families.clone(),
+            best_retrieval_score: groups[0].best_retrieval_score,
+        };
+        let malformed = vec![first, duplicate];
+        assert_eq!(
+            EvidenceView::from_verified_retrieval(&malformed, &verified),
             Err(EvidenceViewError::ReceiptMismatch)
         );
     }
