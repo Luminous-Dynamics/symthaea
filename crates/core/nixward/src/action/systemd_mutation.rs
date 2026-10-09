@@ -42,6 +42,8 @@ pub enum NixSystemdMutationTransportErrorV1 {
     BusIncarnationChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
+    #[error("systemd returned an invalid unit-file change record")]
+    InvalidUnitFileChange,
 }
 
 /// Typed lifecycle mutation transport.
@@ -50,6 +52,23 @@ pub enum NixSystemdMutationTransportErrorV1 {
 /// service operation type. No free-form shell command can enter this boundary.
 pub struct NixSystemdLifecycleMutationTransportV1 {
     connection: Connection,
+}
+
+/// Result returned by systemd's unit-file mutation APIs.
+///
+/// Enable/Disable are configuration mutations, not lifecycle jobs; their
+/// return value is deliberately kept distinct from JobRemoved evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixSystemdUnitFileOperationResultV1 {
+    pub carries_install_info: Option<bool>,
+    pub changes: Vec<NixSystemdUnitFileChangeV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixSystemdUnitFileChangeV1 {
+    pub change_type: String,
+    pub filename: String,
+    pub destination: String,
 }
 
 impl NixSystemdLifecycleMutationTransportV1 {
