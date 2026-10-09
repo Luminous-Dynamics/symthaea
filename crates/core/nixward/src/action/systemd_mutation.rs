@@ -284,22 +284,17 @@ impl NixSystemdLifecycleMutationTransportV1 {
         )
         .await?;
 
-        let current_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
-        if current_owner != manager_owner {
-            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
-        }
-
-        let current_bus_id: String = bus.call("GetId", &()).await?;
-        validate_bus_id(&current_bus_id)?;
-        if current_bus_id != expected_bus_id {
-            return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
-        }
-
+        let first_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        let observed_bus_id: String = bus.call("GetId", &()).await?;
         let confirmed_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
-        if confirmed_owner != manager_owner {
-            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
-        }
-        Ok(())
+
+        validate_manager_epoch_observation(
+            manager_owner,
+            expected_bus_id,
+            &first_owner,
+            &observed_bus_id,
+            &confirmed_owner,
+        )
     }
 
     pub fn method_name(
@@ -346,6 +341,34 @@ fn validate_manager_owner(owner: &str) -> Result<(), NixSystemdMutationTransport
 fn validate_bus_id(bus_id: &str) -> Result<(), NixSystemdMutationTransportErrorV1> {
     if bus_id.len() != 32 || !bus_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+    }
+    Ok(())
+}
+
+/// Validate a bounded owner/bus/owner observation around a bus-incarnation read.
+///
+/// This narrows manager rollover ambiguity, but it is not an atomic snapshot of
+/// external systemd state; consumers must retain the surrounding claim ceiling.
+fn validate_manager_epoch_observation(
+    expected_owner: &str,
+    expected_bus_id: &str,
+    first_owner: &str,
+    observed_bus_id: &str,
+    confirmed_owner: &str,
+) -> Result<(), NixSystemdMutationTransportErrorV1> {
+    validate_manager_owner(expected_owner)?;
+    validate_bus_id(expected_bus_id)?;
+    validate_manager_owner(first_owner)?;
+    if first_owner != expected_owner {
+        return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+    }
+    validate_bus_id(observed_bus_id)?;
+    if observed_bus_id != expected_bus_id {
+        return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+    }
+    validate_manager_owner(confirmed_owner)?;
+    if confirmed_owner != expected_owner {
+        return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
     }
     Ok(())
 }
@@ -407,6 +430,41 @@ fn validate_job_object_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manager_epoch_validation_rejects_owner_and_bus_rollover() {
+        let owner = ":1.42";
+        let bus_id = "0123456789abcdef0123456789abcdef";
+
+        assert!(validate_manager_epoch_observation(owner, bus_id, owner, bus_id, owner).is_ok());
+        assert_eq!(
+            validate_manager_epoch_observation(
+                owner,
+                bus_id,
+                ":1.43",
+                bus_id,
+                ":1.43",
+            )
+            .unwrap_err(),
+            NixSystemdMutationTransportErrorV1::ManagerOwnerChanged
+        );
+        assert_eq!(
+            validate_manager_epoch_observation(
+                owner,
+                bus_id,
+                owner,
+                "fedcba9876543210fedcba9876543210",
+                owner,
+            )
+            .unwrap_err(),
+            NixSystemdMutationTransportErrorV1::BusIncarnationChanged
+        );
+        assert_eq!(
+            validate_manager_epoch_observation(owner, bus_id, owner, bus_id, ":1.43")
+                .unwrap_err(),
+            NixSystemdMutationTransportErrorV1::ManagerOwnerChanged
+        );
+    }
 
     #[test]
     fn unit_file_change_records_are_strict() {
