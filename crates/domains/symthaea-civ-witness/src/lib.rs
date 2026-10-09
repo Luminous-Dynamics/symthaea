@@ -1042,6 +1042,10 @@ fn append_fork_evidence(
         ));
     }
 
+    // Never extend a chain whose prefix or persisted tail commitment is already
+    // inconsistent, even if the current count and last-row pointer happen to agree.
+    validate_fork_history(tx, log_id)?;
+
     let row_count: i64 = tx.query_row(
         "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
         params![log_id],
@@ -2296,6 +2300,10 @@ mod tests {
         )
         .expect("tamper fork tail pointer");
         drop(conn);
+        assert!(matches!(
+            store.record_fork(log_id, 3, h(b"next-fork-first"), h(b"next-fork-conflict")),
+            Err(WitnessError::CorruptForkEvidence)
+        ), "do not append to a corrupted evidence chain");
         assert!(matches!(
             store.load_history(log_id),
             Err(WitnessError::CorruptForkEvidence)
