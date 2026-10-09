@@ -27,6 +27,14 @@
 //! `VoltageDroop`/reactive-power machinery is intentionally unused here;
 //! islanded-mode voltage droop is instead approximated by a simple linear
 //! inverter-output-impedance term keyed to real power, documented inline.
+//! **Load-service contract**: the illustrative demand profile is divided into
+//! 35% protected community demand, 55% deferrable community demand, and 10%
+//! ordinary community auxiliary demand. In islanded mode a deterministic
+//! local guard allocates storage output by priority and reports demand/served/
+//! intentional-shed/unserved energy independently. Cooling becomes a protected
+//! auxiliary only above a documented thermal-risk threshold. These ratios are
+//! synthetic scaffolding, not metered community criticality or a deployable
+//! load-control policy; local interlocks are simulation behavior only.
 
 use symthaea_grid_physics::battery::{Battery, BatteryError};
 use symthaea_grid_physics::droop::FrequencyDroop;
@@ -1271,6 +1279,65 @@ mod failure_mode_tests {
         assert!(report.total_unserved_kwh > 0.0);
         assert_eq!(report.noncritical_unserved_kwh, report.protected_cooling_unserved_kwh);
         assert!(report.energy_balance_residual_kwh().abs() < 1e-12);
+    }
+
+    #[test]
+    fn load_service_accounting_closes_across_supply_and_thermal_profiles() {
+        let dt_hours = 0.25;
+        let community_kw = 200.0;
+        let cooling_kw = 20.0;
+        let heating_kw = 15.0;
+        let demand_kwh = (community_kw + cooling_kw + heating_kw) * dt_hours;
+
+        for thermal_risk in [0.0, 0.29, 0.30, 0.6, 1.0] {
+            for storage_supply_kwh in [
+                0.0,
+                0.25,
+                community_kw * 0.35 * dt_hours,
+                community_kw * 0.35 * dt_hours + cooling_kw * dt_hours * 0.5,
+                demand_kwh * 0.75,
+                demand_kwh,
+                demand_kwh + 1.0,
+            ] {
+                let islanded = LoadServiceReport::allocate(
+                    community_kw,
+                    cooling_kw,
+                    heating_kw,
+                    thermal_risk,
+                    dt_hours,
+                    true,
+                    storage_supply_kwh,
+                    0.0,
+                );
+                assert!(
+                    islanded.is_valid(),
+                    "invalid islanded accounting at risk={thermal_risk}, supply={storage_supply_kwh}: {islanded:?}"
+                );
+                assert!(islanded.energy_balance_residual_kwh().abs() < 1e-9);
+                assert_eq!(
+                    islanded.noncritical_unserved_kwh,
+                    islanded.protected_cooling_unserved_kwh
+                );
+                assert!(
+                    islanded.critical_served_kwh <= islanded.critical_demand_kwh + 1e-9
+                );
+
+                let grid_tied = LoadServiceReport::allocate(
+                    community_kw,
+                    cooling_kw,
+                    heating_kw,
+                    thermal_risk,
+                    dt_hours,
+                    false,
+                    storage_supply_kwh,
+                    0.0,
+                );
+                assert!(grid_tied.is_valid(), "invalid grid-tied accounting: {grid_tied:?}");
+                assert_eq!(grid_tied.intentional_shed_kwh, 0.0);
+                assert_eq!(grid_tied.total_unserved_kwh, 0.0);
+                assert!((grid_tied.total_served_kwh - demand_kwh).abs() < 1e-9);
+            }
+        }
     }
 
     #[test]
