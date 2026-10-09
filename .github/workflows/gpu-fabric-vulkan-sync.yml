@@ -100,13 +100,46 @@ jobs:
           set -o pipefail
           timeout --foreground --kill-after=15s 180s \
             cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib \
-              -- --ignored --nocapture --test-threads=1 2>&1 \
+              -- --ignored --nocapture --test-threads=1 real_vulkan_timeline_submission_reaches_completion 2>&1 \
             | tee .ci/vulkan-sync-qualification/runtime.log
+
+      - name: SyncVal known-hazard positive control
+        id: syncval_hazard
+        env:
+          SYNCVAL_PROBE_CASE: hazard
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 180s \
+            cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib \
+              -- --ignored --nocapture --test-threads=1 real_vulkan_syncval_activation_probe 2>&1 \
+            | tee .ci/vulkan-sync-qualification/syncval-hazard.log
+          grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' \
+            .ci/vulkan-sync-qualification/syncval-hazard.log
+          grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' \
+            .ci/vulkan-sync-qualification/syncval-hazard.log
+
+      - name: SyncVal safe negative control
+        id: syncval_safe
+        env:
+          SYNCVAL_PROBE_CASE: safe
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 180s \
+            cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib \
+              -- --ignored --nocapture --test-threads=1 real_vulkan_syncval_activation_probe 2>&1 \
+            | tee .ci/vulkan-sync-qualification/syncval-safe.log
+          grep -Fq 'SYNCVAL_SENTINEL_END case=safe result=completed' \
+            .ci/vulkan-sync-qualification/syncval-safe.log
+          if grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' \
+              .ci/vulkan-sync-qualification/syncval-safe.log; then
+            echo 'SyncVal reported a hazard in the safe control' >&2
+            exit 1
+          fi
 
       - name: Seal qualification evidence
         if: always()
         env:
-          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_QUALIFICATION_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           EVIDENCE_DIR=.ci/vulkan-sync-qualification
           test -d "$EVIDENCE_DIR" || mkdir -p "$EVIDENCE_DIR"
@@ -122,15 +155,32 @@ jobs:
             printf 'compile=not_reached\n' > "$EVIDENCE_DIR/compile.log"
           test -s "$EVIDENCE_DIR/runtime.log" || \
             printf 'runtime=not_reached\n' > "$EVIDENCE_DIR/runtime.log"
+          test -s "$EVIDENCE_DIR/syncval-hazard.log" || \
+            printf 'syncval_hazard_probe=not_reached\n' > "$EVIDENCE_DIR/syncval-hazard.log"
+          test -s "$EVIDENCE_DIR/syncval-safe.log" || \
+            printf 'syncval_safe_control=not_reached\n' > "$EVIDENCE_DIR/syncval-safe.log"
+          HAZARD_OUTCOME='\${{ steps.syncval_hazard.outcome }}'
+          SAFE_OUTCOME='\${{ steps.syncval_safe.outcome }}'
+          SYNCVAL_ACTIVATION=not_proven_without_hazard_sentinel
+          if [[ "$HAZARD_OUTCOME" == success && "$SAFE_OUTCOME" == success ]] \
+            && grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$EVIDENCE_DIR/syncval-hazard.log" \
+            && grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' "$EVIDENCE_DIR/syncval-hazard.log" \
+            && grep -Fq 'SYNCVAL_SENTINEL_END case=safe result=completed' "$EVIDENCE_DIR/syncval-safe.log" \
+            && ! grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$EVIDENCE_DIR/syncval-safe.log"; then
+            SYNCVAL_ACTIVATION=confirmed_by_positive_and_negative_controls
+          fi
           {
             echo "qualification_commit=$EXPECTED_QUALIFICATION_SHA"
-            echo "compile_outcome=${{ steps.compile.outcome }}"
-            echo "runtime_outcome=${{ steps.runtime.outcome }}"
-            echo "syncval_activation=not_proven_without_hazard_sentinel"
+            echo "compile_outcome=\${{ steps.compile.outcome }}"
+            echo "runtime_outcome=\${{ steps.runtime.outcome }}"
+            echo "syncval_hazard_outcome=$HAZARD_OUTCOME"
+            echo "syncval_safe_outcome=$SAFE_OUTCOME"
+            echo "syncval_activation=$SYNCVAL_ACTIVATION"
           } > "$EVIDENCE_DIR/qualification-status.txt"
           (cd "$EVIDENCE_DIR" && sha256sum \
             qualification-environment.txt vulkan-package-versions.txt source-sha256.txt \
-            qualification-input-sha256.txt compile.log runtime.log qualification-status.txt \
+            qualification-input-sha256.txt compile.log runtime.log syncval-hazard.log \
+            syncval-safe.log qualification-status.txt \
             > evidence-sha256.txt)
 
       - name: Upload immutable qualification evidence
