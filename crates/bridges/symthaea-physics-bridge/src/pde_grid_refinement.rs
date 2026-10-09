@@ -346,6 +346,100 @@ mod tests {
     }
 
     #[test]
+    fn mixed_modes_with_nonzero_initial_velocity_converge_at_second_order() {
+        // Superpose two exact continuum modes with phase offsets. Unlike the
+        // fundamental-mode test, this challenges spatial mode interaction and
+        // nonzero initial velocity while preserving a known closed-form answer.
+        let final_time: f64 = 0.75;
+        let resolutions = [12, 24, 48, 96];
+        let mut displacement_errors = Vec::with_capacity(resolutions.len());
+        let mut velocity_errors = Vec::with_capacity(resolutions.len());
+        let mut combined_errors = Vec::with_capacity(resolutions.len());
+        let mut spacings = Vec::with_capacity(resolutions.len());
+
+        for n in resolutions {
+            let h = grid_spacing(n).unwrap();
+            let max_dt = h * h;
+            let steps = (final_time / max_dt).ceil() as usize;
+            let dt = final_time / steps as f64;
+            assert!(dt <= max_dt, "n={n}, dt={dt}, h^2={max_dt}");
+
+            let mut initial = vec![0.0; 2 * n];
+            for i in 0..n {
+                let x = (i + 1) as f64 * h;
+                let mode_1 = (std::f64::consts::PI * x).sin();
+                let mode_2 = (2.0 * std::f64::consts::PI * x).sin();
+                initial[i] = mode_1 + 0.3 * mode_2;
+                initial[n + i] =
+                    0.2 * std::f64::consts::PI * mode_1
+                        - 0.24 * std::f64::consts::PI * mode_2;
+            }
+
+            let numerical = wave_1d_integrate_rk4(&initial, steps, dt).unwrap();
+            let mut squared_displacement_error = 0.0;
+            let mut squared_velocity_error = 0.0;
+
+            for i in 0..n {
+                let x = (i + 1) as f64 * h;
+                let mode_1 = (std::f64::consts::PI * x).sin();
+                let mode_2 = (2.0 * std::f64::consts::PI * x).sin();
+                let exact_u = mode_1
+                    * ((std::f64::consts::PI * final_time).cos()
+                        + 0.2 * (std::f64::consts::PI * final_time).sin())
+                    + 0.3 * mode_2
+                        * ((2.0 * std::f64::consts::PI * final_time).cos()
+                            - 0.4 * (2.0 * std::f64::consts::PI * final_time).sin());
+                let exact_v = std::f64::consts::PI
+                    * mode_1
+                    * (-(std::f64::consts::PI * final_time).sin()
+                        + 0.2 * (std::f64::consts::PI * final_time).cos())
+                    + 0.6
+                        * std::f64::consts::PI
+                        * mode_2
+                        * (-(2.0 * std::f64::consts::PI * final_time).sin()
+                            - 0.4 * (2.0 * std::f64::consts::PI * final_time).cos());
+
+                let du = numerical[i] - exact_u;
+                let dv_scaled = (numerical[n + i] - exact_v) / std::f64::consts::PI;
+                squared_displacement_error += du * du;
+                squared_velocity_error += dv_scaled * dv_scaled;
+            }
+
+            let displacement_error = (h * squared_displacement_error).sqrt();
+            let velocity_error = (h * squared_velocity_error).sqrt();
+            spacings.push(h);
+            displacement_errors.push(displacement_error);
+            velocity_errors.push(velocity_error);
+            combined_errors.push(
+                (displacement_error * displacement_error
+                    + velocity_error * velocity_error)
+                    .sqrt(),
+            );
+        }
+
+        for (name, errors) in [
+            ("combined mixed-mode", &combined_errors),
+            ("mixed-mode displacement", &displacement_errors),
+            ("mixed-mode velocity", &velocity_errors),
+        ] {
+            for pair in errors.windows(2) {
+                assert!(
+                    pair[1] < pair[0],
+                    "{name} error must decrease under refinement: {errors:?}"
+                );
+            }
+            for i in 0..errors.len() - 1 {
+                let observed_order =
+                    (errors[i] / errors[i + 1]).ln() / (spacings[i] / spacings[i + 1]).ln();
+                assert!(
+                    observed_order > 1.7 && observed_order < 2.2,
+                    "{name} observed order={observed_order:.4}; h={spacings:?}; errors={errors:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn independent_finite_difference_energy_derivative_is_small() {
         let epsilon = 1e-6;
         for n in [1, 2, 4, 8, 16] {
