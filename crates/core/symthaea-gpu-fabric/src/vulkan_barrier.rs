@@ -2746,6 +2746,51 @@ mod tests {
     }
 
     #[test]
+    fn memory_topology_rejects_tampered_digest_and_invalid_heap_association() {
+        let mut topology = test_memory_topology();
+        assert_eq!(topology.verify(), Ok(()));
+        let baseline = topology.identity_digest.clone();
+
+        topology.memory_heaps[0].size += 1;
+        assert_ne!(baseline, memory_topology_identity_digest(
+            topology.memory_type_count,
+            topology.memory_heap_count,
+            &topology.memory_types,
+            &topology.memory_heaps,
+        ));
+        assert_eq!(topology.verify(), Err(VulkanBarrierReceiptError::MemoryTopology));
+
+        topology = test_memory_topology();
+        topology.memory_types[0].heap_index = 1;
+        topology.identity_digest = memory_topology_identity_digest(
+            topology.memory_type_count,
+            topology.memory_heap_count,
+            &topology.memory_types,
+            &topology.memory_heaps,
+        );
+        assert_eq!(topology.verify(), Err(VulkanBarrierReceiptError::MemoryTopology));
+    }
+
+    #[test]
+    fn resource_memory_profile_must_match_sealed_topology() {
+        let (_, _, _, final_state) = fixture();
+        let sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let topology = test_memory_topology();
+        let mut profiles = test_resource_memory_profiles(&sizes);
+        assert!(profiles.values().all(|profile| profile.is_consistent_with_topology(&topology)));
+        let lhs = ResourceId::new("lhs").unwrap();
+        profiles.get_mut(&lhs).unwrap().memory_property_flags =
+            vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        assert!(!profiles[&lhs].is_consistent_with_topology(&topology));
+    }
+
+    #[test]
     fn memory_profile_digest_binds_selection_and_cache_maintenance() {
         let (_, _, _, final_state) = fixture();
         let storage_sizes = final_state
