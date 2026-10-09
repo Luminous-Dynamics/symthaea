@@ -85,6 +85,8 @@ pub enum ReceiptVerificationError {
     UnselectedProjectionIdentity,
     MissingRepresentationBinding,
     MissingProjectionIdentityBinding,
+    BindingCountMismatch,
+    InvalidRequest(RetrievalRequestError),
 }
 
 /// A receipt whose canonical digest and internal selection bindings were checked.
@@ -105,6 +107,16 @@ impl MemoryRetrievalReceipt {
         if self.receipt_digest.is_empty() || self.receipt_digest != expected_digest {
             return Err(ReceiptVerificationError::DigestMismatch);
         }
+        // Receipts are public data structures; revalidate the request contract here
+        // instead of assuming only RetrievalEngine could have produced this value.
+        MemoryRetrievalRequest {
+            mode: self.mode,
+            frontier_ref: self.frontier_ref.clone(),
+            query: self.query.clone(),
+            max_results: self.max_results,
+        }
+        .validate()
+        .map_err(ReceiptVerificationError::InvalidRequest)?;
         let mut selected = self.selected.clone();
         selected.sort();
         selected.dedup();
@@ -142,6 +154,16 @@ impl MemoryRetrievalReceipt {
         }
         if selected.iter().any(|identity| !bindings.iter().any(|(bound, _)| bound == identity)) {
             return Err(ReceiptVerificationError::MissingRepresentationBinding);
+        }
+        // Retrieval emits one representation binding and one projection-identity
+        // binding per candidate representation. A receipt with unequal counts for
+        // one selected identity cannot describe a concrete retrieved group.
+        for identity in &selected {
+            let representation_count = bindings.iter().filter(|(bound, _)| bound == identity).count();
+            let projection_count = projection_bindings.iter().filter(|(bound, _)| bound == identity).count();
+            if representation_count != projection_count {
+                return Err(ReceiptVerificationError::BindingCountMismatch);
+            }
         }
         let mut exclusions = self.excluded.clone();
         exclusions.sort_by(|a, b| {
@@ -507,6 +529,38 @@ mod tests {
         assert_eq!(
             malformed.verify(),
             Err(ReceiptVerificationError::MissingProjectionIdentityBinding)
+        );
+    }
+
+    #[test]
+    fn historical_receipt_without_frontier_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        let mut malformed = receipt;
+        malformed.frontier_ref = None;
+        malformed.receipt_digest = malformed.canonical_digest().unwrap();
+        assert_eq!(
+            malformed.verify(),
+            Err(ReceiptVerificationError::InvalidRequest(
+                RetrievalRequestError::MissingHistoricalFrontier
+            ))
+        );
+    }
+
+    #[test]
+    fn mismatched_representation_and_projection_binding_counts_are_rejected() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        let mut malformed = receipt;
+        malformed.selected_representation_digests.push(("x".into(), "extra-representation-digest".into()));
+        malformed.receipt_digest = malformed.canonical_digest().unwrap();
+        assert_eq!(
+            malformed.verify(),
+            Err(ReceiptVerificationError::BindingCountMismatch)
         );
     }
 
