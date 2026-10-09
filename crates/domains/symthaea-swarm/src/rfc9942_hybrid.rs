@@ -18,6 +18,7 @@ use crate::semantic_evidence_vds::{
 pub const HYBRID_POLICY_ID: &str =
     "symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-v1";
 pub const HYBRID_POLICY_VERSION: u16 = 1;
+pub const CLASSICAL_COSE_ALGORITHM_ID: i64 = COSE_ES256_ALGORITHM_ID;
 pub const ML_DSA_65_COSE_ALGORITHM_ID: i64 = -49;
 pub const ML_DSA_65_PUBLIC_KEY_BYTES: usize = 1952;
 pub const ML_DSA_65_SIGNATURE_BYTES: usize = 3309;
@@ -174,7 +175,7 @@ impl Rfc9942HybridTranscript {
         verifying_key_sha256: [u8; 32],
         policy_digest_sha256: [u8; 32],
     ) -> Result<Self, Rfc9942HybridError> {
-        if verified_classical.algorithm_id() != COSE_ES256_ALGORITHM_ID {
+        if verified_classical.algorithm_id() != CLASSICAL_COSE_ALGORITHM_ID {
             return Err(Rfc9942HybridError::ClassicalAlgorithmMismatch);
         }
         let receipt_sha256 =
@@ -195,7 +196,7 @@ impl Rfc9942HybridTranscript {
         policy_digest_sha256: [u8; 32],
         receipt_sha256: [u8; 32],
     ) -> Result<Self, Rfc9942HybridError> {
-        if verified_classical.algorithm_id() != COSE_ES256_ALGORITHM_ID {
+        if verified_classical.algorithm_id() != CLASSICAL_COSE_ALGORITHM_ID {
             return Err(Rfc9942HybridError::ClassicalAlgorithmMismatch);
         }
         if policy_digest_sha256 == [0; 32] {
@@ -327,7 +328,7 @@ impl Rfc9942HybridVerifiedReceipt {
         key_policy: &impl MlDsa65KeyPolicy,
         verifier: &impl MlDsa65Verifier,
     ) -> Result<Self, Rfc9942HybridError> {
-        if verified_classical.algorithm_id() != COSE_ES256_ALGORITHM_ID {
+        if verified_classical.algorithm_id() != CLASSICAL_COSE_ALGORITHM_ID {
             return Err(Rfc9942HybridError::ClassicalAlgorithmMismatch);
         }
         if verifying_key.len() != ML_DSA_65_PUBLIC_KEY_BYTES {
@@ -910,7 +911,7 @@ mod tests {
         let verifying_key_sha256 = [8; 32];
         let policy_digest_sha256 = [7; 32];
         Rfc9942HybridTranscript {
-            classical_algorithm_id: COSE_ES256_ALGORITHM_ID,
+            classical_algorithm_id: CLASSICAL_COSE_ALGORITHM_ID,
             policy_digest_sha256,
             key_id,
             verifying_key_sha256,
@@ -931,7 +932,7 @@ mod tests {
     fn transcript_is_fixed_width_and_domain_separated() {
         let t = transcript(1, 2);
         assert_eq!(t.signing_bytes().len(), 194);
-        assert_eq!(t.classical_algorithm_id(), COSE_ES256_ALGORITHM_ID);
+        assert_eq!(t.classical_algorithm_id(), CLASSICAL_COSE_ALGORITHM_ID);
 
         let mut second_domain = HYBRID_TRANSCRIPT_DOMAIN.to_vec();
         second_domain.push(0);
