@@ -391,3 +391,18 @@ For Symthaea, represent these as different claim types:
 A descriptive estimate can inform context or reveal stakeholder expectations; it must not be silently converted into a premise saying that the majority is right. Likewise, observed cultural or institutional norms should not automatically override consent, rights, or safety boundaries. This separation complements the 2026 argument that evaluations should test both value representation and context-sensitive norm application ([Kierans et al.](https://arxiv.org/abs/2608.14566)).
 
 The subject fingerprint in [PR #7283](https://github.com/Luminous-Dynamics/symthaea/pull/7283) now allows exact scenario/action bytes to be bound to an assessment, but the claim type, dataset scope, and provenance still need to be supplied by a future evidence/context layer. Hashing a norm statement does not validate the norm.
+
+
+### Context schema identity is part of the assessment subject — 2026-10-09
+
+Draft PR [#7285](https://github.com/Luminous-Dynamics/symthaea/pull/7285), stacked on [#7283](https://github.com/Luminous-Dynamics/symthaea/pull/7283), now binds each subject's digests to explicit `context_schema_id` and `context_schema_version` fields. The schema ID/version are included in the length-prefixed, domain-separated BLAKE3 input for both the scenario and candidate action. Same bytes under different schema versions therefore produce different subject digests. The canonical-byte comparison API takes this schema identity explicitly.
+
+The public subject struct can be constructed without its constructor, so validation also checks schema ID/version on both the reported subject and provenance source subject; the byte verifier refuses subjects whose schema identity is blank. This avoids relying on constructor validation alone.
+
+#### JSON canonicalization decision
+
+For JSON-based context payloads, adopt a reviewed implementation of [RFC 8785, JSON Canonicalization Scheme (JCS)](https://www.rfc-editor.org/rfc/rfc8785.html) rather than implementing number formatting and recursive property sorting by hand. RFC 8785 requires deterministic property sorting and ECMAScript-compatible JSON primitive serialization for hash/signature use. The Rust crate [`serde_json_canonicalizer`](https://docs.rs/serde_json_canonicalizer/latest/serde_json_canonicalizer/) advertises an RFC 8785-compatible `to_vec`/ `to_string` implementation; version 0.3.2 is published as of this research pass. It is a candidate for an isolated dependency review and test-vector comparison, **not yet adopted or qualified in Symthaea**.
+
+Before adopting any canonicalizer, verify published RFC 8785 vectors (including nested object sorting, arrays, Unicode, escaped control characters, and difficult floating-point cases), duplicate-key/input validity policy, dependency tree and licensing, and Rust/toolchain compatibility. If the domain model can avoid floating-point JSON numbers or adopts a schema-specific canonical binary encoding, that should be an explicit versioned choice instead of silently claiming JCS conformance.
+
+The current PR still accepts caller-supplied canonical bytes; it binds those bytes to a schema identity and digest but does not canonicalize JSON itself. Hashing must not be described as canonicalization, schema validation, source authentication, or proof that the evaluator consumed the bytes. The existing EthicsEngine and action gate remain unchanged. The module's 42 tests are authored but unexecuted on this exact head.
