@@ -481,6 +481,62 @@ def verify_materialized_submission_contract(values: dict[str, str], spec: dict, 
         fail(f"{name}: materialized Vulkan submission digest mismatch")
 
 
+def verify_materialized_dispatch_contract(values: dict[str, str], spec: dict, name: str) -> None:
+    """Reconstruct descriptor bindings and workgroup dimensions from semantic operations."""
+    operations = spec.get("ops")
+    if operations is None or len(operations) != spec["node_count"]:
+        fail(f"{name}: semantic dispatch fixture is missing or inconsistent")
+
+    fields = [f"dispatch_record_count:{len(operations)}"]
+    for ordinal, (output, left, right) in enumerate(operations):
+        if output not in spec["initial"] or left not in spec["initial"] or right not in spec["initial"]:
+            fail(f"{name}: dispatch references a resource absent from its input fixture")
+
+        # The Rust workload canonicalizes read resources by ResourceId before
+        # descriptor binding 0/1 and binds the single write to slot 2.
+        resources = sorted((left, right)) + [output]
+        ranges = []
+        for resource in resources:
+            byte_length = len(bytes.fromhex(spec["initial"][resource]))
+            ranges.append(((byte_length + 3) // 4) * 4)
+
+        output_elements = ranges[2] // 4
+        groups_x = max(1, (output_elements + 63) // 64)
+        node_id = ordinal + 1
+        fields.extend([
+            "dispatch_record",
+            f"node_id={node_id}",
+            f"schedule_ordinal={ordinal}",
+            "pipeline_bind_point_raw=1",
+            "pipeline_layout_set_index=0",
+            "descriptor_set_count=1",
+            "dynamic_offset_count=0",
+            "descriptor_binding_count=3",
+        ])
+        for binding, resource in enumerate(resources):
+            fields.extend([
+                "descriptor_binding",
+                f"binding={binding}",
+                f"resource={resource}",
+                "offset=0",
+                f"range={ranges[binding]}",
+                "descriptor_type_raw=7",
+                "stage_flags_raw=32",
+            ])
+        fields.extend([
+            f"dispatch_group_count_x={groups_x}",
+            "dispatch_group_count_y=1",
+            "dispatch_group_count_z=1",
+        ])
+
+    expected = sha256_len_prefixed(
+        [field.encode("utf-8") for field in fields],
+        b"symthaea.gpu-fabric.vulkan-materialized-dispatch.v1",
+    )
+    if values.get("execution_lowering_digest") != expected:
+        fail(f"{name}: materialized descriptor/dispatch digest mismatch")
+
+
 def verify_runtime(path: Path) -> None:
     blocks = parse_runtime(path)
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
@@ -508,7 +564,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "9":
+        if values.get("receipt_version") != "10":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -516,6 +572,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: barrier count mismatch")
         verify_materialized_barrier_lowering(values, spec, name)
         verify_materialized_submission_contract(values, spec, name)
+        verify_materialized_dispatch_contract(values, spec, name)
         if int(values.get("completion_expected", "-1")) != spec["completion"]:
             fail(f"{name}: completion expected mismatch")
         if int(values.get("completion_observed", "-1")) != spec["completion"]:
