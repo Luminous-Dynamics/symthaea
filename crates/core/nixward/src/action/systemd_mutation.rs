@@ -336,6 +336,40 @@ fn validate_bus_id(bus_id: &str) -> Result<(), NixSystemdMutationTransportErrorV
     Ok(())
 }
 
+fn validate_unit_file_name(
+    unit: &str,
+) -> Result<String, NixSystemdMutationTransportErrorV1> {
+    let operation = NixServiceOperationV1::new(
+        unit.to_string(),
+        NixServiceOperationKindV1::Start,
+    )
+    .map_err(|error| {
+        NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
+    })?;
+    Ok(operation.unit().to_string())
+}
+
+fn validate_unit_file_changes(
+    changes: Vec<(String, String, String)>,
+) -> Result<Vec<NixSystemdUnitFileChangeV1>, NixSystemdMutationTransportErrorV1> {
+    changes
+        .into_iter()
+        .map(|(change_type, filename, destination)| {
+            if !matches!(change_type.as_str(), "symlink" | "unlink")
+                || filename.is_empty()
+                || destination.is_empty()
+            {
+                return Err(NixSystemdMutationTransportErrorV1::InvalidUnitFileChange);
+            }
+            Ok(NixSystemdUnitFileChangeV1 {
+                change_type,
+                filename,
+                destination,
+            })
+        })
+        .collect()
+}
+
 fn validate_job_object_path(
     path: &OwnedObjectPath,
 ) -> Result<(), NixSystemdMutationTransportErrorV1> {
@@ -359,6 +393,43 @@ fn validate_job_object_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unit_file_change_records_are_strict() {
+        let changes = validate_unit_file_changes(vec![
+            (
+                "symlink".into(),
+                "/etc/systemd/system/multi-user.target.wants/nginx.service".into(),
+                "/nix/store/nginx.service".into(),
+            ),
+            (
+                "unlink".into(),
+                "/etc/systemd/system/multi-user.target.wants/nginx.service".into(),
+                "/nix/store/nginx.service".into(),
+            ),
+        ])
+        .unwrap();
+        assert_eq!(changes.len(), 2);
+        assert!(validate_unit_file_changes(vec![(
+            "unknown".into(),
+            "/etc/systemd/system/nginx.service".into(),
+            "/nix/store/nginx.service".into(),
+        )])
+        .is_err());
+        assert!(validate_unit_file_changes(vec![(
+            "symlink".into(),
+            String::new(),
+            "/nix/store/nginx.service".into(),
+        )])
+        .is_err());
+    }
+
+    #[test]
+    fn unit_file_name_reuses_typed_unit_validation() {
+        assert_eq!(validate_unit_file_name("nginx.service").unwrap(), "nginx.service");
+        assert!(validate_unit_file_name("nginx*.service").is_err());
+        assert!(validate_unit_file_name("").is_err());
+    }
 
     #[test]
     fn lifecycle_methods_are_exact() {
