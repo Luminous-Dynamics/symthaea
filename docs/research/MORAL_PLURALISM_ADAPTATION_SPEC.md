@@ -406,3 +406,29 @@ For JSON-based context payloads, adopt a reviewed implementation of [RFC 8785, J
 Before adopting any canonicalizer, verify published RFC 8785 vectors (including nested object sorting, arrays, Unicode, escaped control characters, and difficult floating-point cases), duplicate-key/input validity policy, dependency tree and licensing, and Rust/toolchain compatibility. If the domain model can avoid floating-point JSON numbers or adopts a schema-specific canonical binary encoding, that should be an explicit versioned choice instead of silently claiming JCS conformance.
 
 The current PR still accepts caller-supplied canonical bytes; it binds those bytes to a schema identity and digest but does not canonicalize JSON itself. Hashing must not be described as canonicalization, schema validation, source authentication, or proof that the evaluator consumed the bytes. The existing EthicsEngine and action gate remain unchanged. The module's 42 tests are authored but unexecuted on this exact head.
+
+### JCS candidate source audit — 2026-10-09
+
+**Disposition: retain as a candidate; do not adopt yet.** This was a static-source review, not a build, dependency-tree execution, or test run.
+
+The published `serde_json_canonicalizer` 0.3.2 manifest declares MIT licensing, Rust edition 2021, and runtime dependencies on `ryu-js ^1.0.1`, `serde ^1.0`, and `serde_json ^1.0` with `float_roundtrip`. Its manifest does **not** declare `rust-version`/MSRV. Symthaea's repository pins Rust 1.96.0 in `rust-toolchain.toml` and uses edition 2024; the candidate's compatibility with that exact pinned toolchain remains unverified until built and tested there. The crate adds a runtime `ryu-js` dependency, while Symthaea already uses `serde_json`; a lockfile/dependency-tree diff and license scan are still required before adoption.
+
+The candidate's checked-in tests include RFC 8785 example/sorting data (sections 3.2.2 and 3.2.3), a reference-implementation test-data suite, number-formatting cases from Appendix B, and non-finite-number rejection tests. It also contains a generated-number stress test marked `#[ignore]`; its source comment says the input file is generated separately and is about 3.7 GB. These test assets are encouraging, but their existence does not establish that tests pass on Symthaea's pinned toolchain or cover the production ingestion path.
+
+#### Input-contract blocker: duplicate JSON object properties
+
+The candidate's `pipe(json)` implementation parses with `serde_json::from_str::<serde_json::Value>` before serializing. The `serde_json` project documents that duplicate keys parsed into `Value` use last-value-wins behavior ([serde_json issue #1112](https://github.com/serde-rs/json/issues/1112); [issue #762](https://github.com/serde-rs/json/issues/762)). RFC 8785 says JCS input must not contain duplicate property names ([RFC 8785 §3.1](https://www.rfc-editor.org/rfc/rfc8785.html)). Therefore, **`pipe` is not by itself an acceptable strict-ingestion boundary for untrusted raw JSON**: it can canonicalize a value after a duplicate property has already been discarded. This is a specific known gap, not merely an untested edge case.
+
+For the first integration, prefer serializing a validated typed envelope directly with `to_vec`. If raw JSON must be accepted, put a duplicate-rejecting parser/visitor in front of canonical serialization and test duplicate names recursively, including escaped aliases that decode to the same key. Preserve the original accepted bytes or the exact resulting canonical byte slice all the way into the evaluator; do not reconstruct the evaluator input after fingerprinting.
+
+#### Required isolated qualification matrix
+
+1. Run the upstream crate tests under the pinned Rust 1.96.0 environment and record the exact lockfile, commit/release, command, exit status, and logs. Separately decide whether to generate and run the ignored 100-million-case number corpus; do not imply that the default suite includes it.
+2. Add Symthaea-owned golden vectors for RFC example output, nested key sorting, UTF-16 key ordering, array-order preservation, Unicode and control escapes, signed zero, exponent thresholds, binary64 rounding boundaries, non-finite serialization rejection, malformed JSON, trailing data, and lone-surrogate input.
+3. Add fail-closed tests for duplicate property names at the root and nested levels, including alternate escape spellings of the same decoded key. These tests must exercise the exact intended ingestion path, not only the serializer on already-parsed values.
+4. Show property-order invariance (semantically equivalent objects serialize to equal bytes and digests) and semantic-change sensitivity (a changed value or array order changes bytes and digest). Document that JCS uses IEEE-754 binary64 number semantics; encode precision-sensitive identifiers and exact quantities as schema-defined strings/integers rather than allowing silent precision loss.
+5. Check the dependency graph, license compatibility, and locked versions. Record an explicit canonicalization profile/version alongside schema ID/version. For non-JSON or binary inputs, keep the existing byte-oriented path but require a named/versioned encoding profile rather than labeling arbitrary bytes JCS.
+6. Before any `EthicsEngine` adapter, produce a receipt that binds the evaluator result to the exact scenario/action byte digests, schema and canonicalization profile, evaluator build identity, invocation identity, and the bytes actually consumed by that invocation. Caller-supplied metadata alone does not attest evaluator execution.
+
+Until these are evidenced on an exact commit and reviewed, the current subject helper establishes only byte-to-digest consistency. It does not canonicalize JSON, prove input validity, or prove that the evaluator consumed the fingerprinted bytes. The plural-ethics comparator remains read-only and must not alter action authorization.
+
