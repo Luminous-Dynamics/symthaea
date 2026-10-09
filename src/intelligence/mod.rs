@@ -67,11 +67,13 @@ pub use reasoning_metacognition::{
     FROZEN_FORECAST_SET_SCHEMA_VERSION, METACOGNITION_EVALUATOR_VERSION,
 };
 pub use reasoning_metacognition_cohort::{
-    evaluate_decision_cohort, freeze_decision_cohort_for_split, DecisionBaselineScoreV2,
-    DecisionCohortBindingV1, DecisionCohortError, DecisionCohortFamilyReportV2,
-    DecisionCohortReportV2, DecisionCounterfactualForecastMetricsV2, DecisionForecastV2,
+    evaluate_decision_cohort, freeze_decision_cohort_for_split,
+    freeze_decision_cohort_for_split_with_observations, DecisionBaselineScoreV3,
+    DecisionCohortBindingV1, DecisionCohortError, DecisionCohortFamilyReportV3,
+    DecisionBehaviorMetricsV1, DecisionCohortReportV3, DecisionCounterfactualForecastMetricsV2,
+    DecisionForecastV2,
     DecisionOutcomeV1, DecisionSelectiveRiskPoint,
-    FrozenDecisionCohortV2, DECISION_COHORT_EVALUATOR_VERSION,
+    FrozenDecisionCohortV3, DECISION_COHORT_EVALUATOR_VERSION,
     DECISION_COHORT_REPORT_SCHEMA_VERSION, DECISION_FORECAST_SCHEMA_VERSION,
     DECISION_OUTCOME_SCHEMA_VERSION, FROZEN_DECISION_COHORT_SCHEMA_VERSION,
 };
