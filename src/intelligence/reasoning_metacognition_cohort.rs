@@ -11,7 +11,7 @@
 use super::reasoning_metacognition::{
     evaluate_metacognition, ConfidenceRevisionObservation, CorrectnessPrediction,
     ForecastBaselineMethod, ForecastBaselineV1, MetacognitionEvaluationError, MetacognitionReport,
-    WeakAssumptionObservation, CORRECTNESS_FORECAST_SCHEMA_VERSION, FORECAST_BASELINE_SCHEMA_VERSION,
+    WeakAssumptionObservation, FORECAST_BASELINE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
@@ -809,7 +809,7 @@ mod tests {
         assert_eq!(report.abstained_decisions, 2);
         assert_eq!(report.decision_coverage, 1.0 / 3.0);
         assert_eq!(report.correctness_metrics.predictions, 1);
-        assert_eq!(report.correctness_metrics.brier_score, Some(0.04));
+        assert!((report.correctness_metrics.brier_score.unwrap_or(f64::NAN) - 0.04).abs() < 1.0e-12);
         assert_eq!(report.selective_risk[0].threshold, 0.5);
         assert_eq!(report.selective_risk[0].coverage_all_decisions, 1.0 / 3.0);
         assert_eq!(report.counterfactual_adjudications, 1);
