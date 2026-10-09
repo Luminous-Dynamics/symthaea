@@ -1505,10 +1505,10 @@ def provider_topology_cas_evidence_fixture(
     )
 
 
-@lru_cache(maxsize=1)
-def _test_signer_material() -> tuple[str, str, str]:
-    """Create one ephemeral Ed25519 key for executable verifier tests only."""
-    with tempfile.TemporaryDirectory(prefix="topology-cas-test-key-") as temp:
+@lru_cache(maxsize=4)
+def _test_signer_material_named(name: str) -> tuple[str, str, str]:
+    """Create ephemeral Ed25519 test keys; never use them as production trust roots."""
+    with tempfile.TemporaryDirectory(prefix=f"topology-cas-test-key-{name}-") as temp:
         private_path = Path(temp) / "private.pem"
         public_path = Path(temp) / "public.pem"
         generated = subprocess.run(
@@ -1533,6 +1533,14 @@ def _test_signer_material() -> tuple[str, str, str]:
         if fingerprint is None:
             raise RuntimeError("OpenSSL public-key fingerprint failed")
         return private_pem, public_pem, fingerprint
+
+
+def _test_signer_material() -> tuple[str, str, str]:
+    return _test_signer_material_named("primary")
+
+
+def _test_rotated_signer_material() -> tuple[str, str, str]:
+    return _test_signer_material_named("rotated")
 
 
 def _test_trust_root(identity: PromotionOperationIdentityV1) -> ProviderTopologyCasTrustRootV1:
@@ -1571,8 +1579,16 @@ def _test_trust_policy(
     )
 
 
-def _test_sign_dsse_payload(payload: bytes, payload_type: str = "application/vnd.in-toto+json") -> ProviderTopologyCasAttestationV1:
-    private_pem, _, key_id = _test_signer_material()
+def _test_sign_dsse_payload(
+    payload: bytes,
+    payload_type: str = "application/vnd.in-toto+json",
+    *,
+    signer_private_pem: str | None = None,
+    signer_key_id: str | None = None,
+) -> ProviderTopologyCasAttestationV1:
+    default_private_pem, _, default_key_id = _test_signer_material()
+    private_pem = signer_private_pem or default_private_pem
+    key_id = signer_key_id or default_key_id
     unsigned = ProviderTopologyCasDsseEnvelopeV1(
         payload_type=payload_type,
         payload_base64=base64.b64encode(payload).decode("ascii"),
@@ -1624,6 +1640,7 @@ def _test_sign_topology_statement(
     execution: ProviderTopologyCasExecutionV1,
     trust_root: ProviderTopologyCasTrustRootV1,
     trust_policy: ProviderTopologyCasTrustPolicyV1,
+    signer_private_pem: str | None = None,
 ) -> ProviderTopologyCasAttestationV1:
     payload = _canonical_json_bytes(
         _provider_topology_statement(
@@ -1637,7 +1654,11 @@ def _test_sign_topology_statement(
             trust_policy,
         )
     )
-    return _test_sign_dsse_payload(payload)
+    return _test_sign_dsse_payload(
+        payload,
+        signer_private_pem=signer_private_pem,
+        signer_key_id=trust_root.key_id,
+    )
 
 
 def test_provider_topology_binding_requires_an_initial_observation():
