@@ -1417,6 +1417,43 @@ mod failure_mode_tests {
     }
 
     #[test]
+    fn grid_tied_charge_energy_is_reconciled_to_upstream_supply() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[0] = 0.2;
+        cmd.torques[4] = 1.0; // keep the upstream tie connected
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        let report = sim.load_service_report();
+        assert!(report.battery_charge_input_kwh > 0.0);
+        assert!(report.battery_charge_stored_kwh > 0.0);
+        assert!(report.battery_charge_conversion_loss_kwh > 0.0);
+        assert_eq!(report.grid_supply_to_battery_kwh, report.battery_charge_input_kwh);
+        assert!(
+            (report.battery_charge_input_kwh
+                - report.battery_charge_stored_kwh
+                - report.battery_charge_conversion_loss_kwh)
+                .abs()
+                < 1e-12
+        );
+        assert!(report.is_valid());
+    }
+
+    #[test]
+    fn grid_tied_surplus_storage_output_is_reported_as_export() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 1.0;
+        cmd.torques[4] = 1.0; // allow the idealized grid export path
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        let report = sim.load_service_report();
+        assert!(report.storage_export_to_grid_kwh > 0.0);
+        assert_eq!(report.unused_storage_supply_kwh, 0.0);
+        assert!(report.is_valid());
+    }
+
+    #[test]
     fn islanded_guard_disables_unfunded_charging_and_caps_excess_discharge() {
         let mut sim = GridPhysicsInfrastructureSimulator::new();
         let soc_before = sim.battery.soc();
