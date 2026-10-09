@@ -213,8 +213,10 @@ impl MusicalStateTrajectory {
 
         // Only earlier frames are allowed to influence recurrence/novelty.
         for i in 1..frames.len() {
+            // Every emitted frame contains at least one sounding note, even if
+            // it has no new attacks. Such sustain-only states are valid prior
+            // context for recurrence and novelty.
             let best = (0..i)
-                .filter(|&j| frames[j].event_count > 0)
                 .map(|j| frames[i].similarity(&frames[j]))
                 .max_by(f64::total_cmp);
             frames[i].nearest_prior_similarity = best;
@@ -366,10 +368,8 @@ fn frame_from_notes(
     let part_identity_available = !active_notes.is_empty()
         && active_notes.iter().all(|note| note.part.is_assigned());
 
-    let mut intensity_sum = 0.0;
     for note in notes {
         let duration = note.duration.beats().max(0.0);
-        intensity_sum += note.section_intensity as f64;
 
         let duration_bin = RHYTHM_THRESHOLDS
             .iter()
@@ -377,6 +377,13 @@ fn frame_from_notes(
             .unwrap_or(RHYTHM_BINS - 1);
         rhythm_hist[duration_bin] += 1.0;
     }
+
+    // Structural intensity follows the notes actually sounding in this window,
+    // including carry-ins, rather than dropping to zero in a sustain-only frame.
+    let intensity_sum = active_notes
+        .iter()
+        .map(|note| note.section_intensity as f64)
+        .sum::<f64>();
 
     // Pitch-class and register features describe occupancy *inside* the frame,
     // not the full notated duration of attacks. Include notes carried in from
@@ -476,7 +483,7 @@ fn frame_from_notes(
             (interval_sum / line_transition_count as f64 / 11.0).clamp(0.0, 1.0)
         },
         contour_asymmetry,
-        structural_intensity: (intensity_sum / notes.len().max(1) as f64).clamp(0.0, 1.0),
+        structural_intensity: (intensity_sum / active_notes.len().max(1) as f64).clamp(0.0, 1.0),
         nearest_prior_similarity: None,
         novelty: None,
     }
@@ -675,6 +682,7 @@ mod tests {
         let mut held = note(0, 4, 0);
         held.duration = Duration::new(4, 1);
         held.part = PartId(7);
+        held.section_intensity = 0.6;
         let piece = score(&[held], 0);
 
         let sustain = MusicalStateFrame::from_region(
@@ -688,6 +696,7 @@ mod tests {
         assert!(sustain.part_identity_available);
         assert!((sustain.pitch_class_hist[0] - 1.0).abs() < 1e-9);
         assert!((sustain.register_hist[3] - 1.0).abs() < 1e-9);
+        assert!((sustain.structural_intensity - 0.6).abs() < 1e-9);
 
         let trajectory = MusicalStateTrajectory::from_score(&piece, 1.0, 1.0).unwrap();
         assert_eq!(trajectory.frames.len(), 4);
@@ -696,6 +705,8 @@ mod tests {
         assert!(trajectory.frames[1..]
             .iter()
             .all(|frame| frame.pitch_class_hist[0] == 1.0));
+        assert!((trajectory.frames[2].nearest_prior_similarity.unwrap() - 1.0).abs() < 1e-9);
+        assert!(trajectory.frames[2].novelty.unwrap() < 1e-9);
     }
 
     #[test]
