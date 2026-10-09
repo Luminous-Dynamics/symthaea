@@ -380,12 +380,12 @@ mod tests {
     fn rejects_forged_and_same_version_but_changed_registry_digests() {
         let registry = registry();
         let mut ledger = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        let first = ledger.registry_digest.as_bytes()[0];
-        let replacement = if first == b'0' { b'1' } else { b'0' };
-        ledger.registry_digest.replace_range(
-            0..1,
-            std::str::from_utf8(&[replacement]).unwrap(),
-        );
+        let replacement = if ledger.registry_digest.starts_with('0') {
+            "1"
+        } else {
+            "0"
+        };
+        ledger.registry_digest.replace_range(0..1, replacement);
 
         assert_eq!(
             verify_load_service_ledger(&registry, &ledger).unwrap_err(),
