@@ -257,9 +257,9 @@ class TrustAnchorPolicyTests(unittest.TestCase):
                                                                     "failure", **event_meta))
                 post.assert_not_called()
 
-    def test_best_effort_failure_status_survives_status_api_failure(self):
+    def test_best_effort_failure_status_survives_unexpected_status_api_failure(self):
         repo = "Luminous-Dynamics/mycelix"
-        with patch.object(module, "post_status", side_effect=module.VerificationError("forbidden")):
+        with patch.object(module, "post_status", side_effect=RuntimeError("unexpected transport failure")):
             self.assertFalse(module.best_effort_failure_status(repo, "a" * 40, "token",
                                                                "API unavailable", **self.event_meta(repo)))
 
