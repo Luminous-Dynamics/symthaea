@@ -1766,8 +1766,6 @@ mod tests {
     }
 
     #[test]
-    fn linked_sqlite_includes_wal_reset_fix() {
-    #[test]
     fn uses_wal_full_and_recovers_after_reopen() {
         let db = TempDb::new();
         let anchor = MemoryAnchor::default();
