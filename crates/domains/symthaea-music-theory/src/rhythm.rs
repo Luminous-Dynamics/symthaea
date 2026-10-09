@@ -192,7 +192,10 @@ impl Duration {
             return Duration::zero();
         };
         from_i128_rational(num, den).unwrap_or_else(|| {
-            if num > i128::from(i64::MAX) * den {
+            let quotient = num / den;
+            let exceeds_max = quotient > i128::from(i64::MAX)
+                || (quotient == i128::from(i64::MAX) && num % den > 0);
+            if exceeds_max {
                 Duration::new(i64::MAX, 1)
             } else {
                 // A positive but unrepresentable sub-beat fraction cannot be
@@ -272,6 +275,14 @@ mod tests {
         assert_eq!(
             Duration::new(1, 2).checked_add(Duration::new(1, 3)),
             Some(Duration::new(5, 6))
+        );
+        assert_eq!(
+            Duration::new(i64::MAX, 1).saturating_sub(Duration::new(-i64::MAX, 1)),
+            Duration::new(i64::MAX, 1)
+        );
+        assert_eq!(
+            Duration::new(1, i64::MAX - 1).saturating_sub(Duration::new(1, i64::MAX)),
+            Duration::zero()
         );
     }
 
