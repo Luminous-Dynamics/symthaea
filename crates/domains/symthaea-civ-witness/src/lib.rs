@@ -2030,6 +2030,61 @@ mod tests {
     }
 
     #[test]
+    fn anchor_already_ahead_before_prepare_is_not_recorded_as_fork() {
+        let db = TempDb::new();
+        let store = db.open();
+        let log_id = "log-anchor-ahead-before-prepare";
+        let initial_anchor = MemoryAnchor::default();
+        let first = store
+            .initialize(
+                log_id,
+                "policy-v1",
+                h(b"checkpoint-one"),
+                0,
+                None,
+                &initial_anchor,
+            )
+            .expect("initialize first record");
+        let advanced = AnchorState {
+            log_id: log_id.to_owned(),
+            generation: 3,
+            record_digest: h(b"later-external-generation-three"),
+        };
+        // Recovery reads once; the pre-prepare observation is the second read.
+        let racing = AdvanceDuringReadAnchor::new(
+            log_id,
+            AnchorState::from_record(&first),
+            2,
+            advanced,
+        );
+        assert!(matches!(
+            store.advance(
+                log_id,
+                first.generation,
+                first.digest,
+                h(b"candidate-generation-two"),
+                1,
+                Some(h(b"receipt-one")),
+                &racing,
+            ),
+            Err(WitnessError::RollbackDetected)
+        ));
+
+        let history = store.load_history(log_id).expect("history remains valid");
+        assert_eq!(history.accepted.as_ref(), Some(&first));
+        assert!(history.prepared.is_none(), "pre-prepare rejection writes no candidate");
+        let conn = store.open_connection().expect("open fork evidence query");
+        let fork_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("count fork evidence");
+        assert_eq!(fork_count, 0, "anchor-ahead state is not same-generation fork evidence");
+    }
+
+    #[test]
     fn anchor_that_advances_past_candidate_is_not_recorded_as_same_generation_fork() {
         let db = TempDb::new();
         let store = db.open();
