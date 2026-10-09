@@ -94,7 +94,7 @@ jobs:
               "test_provider_topology_trust_checkpoint_matches_only_exact_policy",
               "test_provider_topology_trust_checkpoint_advance_requires_next_generation",
               "test_provider_topology_binding_without_trust_checkpoint_fails_closed",
-              "test_provider_topology_binding_rejects_stale_trust_checkpoint",
+              "test_provider_topology_binding_rejects_policy_rollback_after_checkpoint_advance",
               "attestation_trust_checkpoint",
               "propose_advance",
               "test_provider_topology_cas_missing_trust_root_fails_closed",
