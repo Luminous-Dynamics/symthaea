@@ -443,7 +443,11 @@ impl WitnessModel {
             // is committed. Preserve that state and refuse to overwrite it.
             self.external.generation = candidate.generation;
             self.external.record_digest = hash_bytes(b"competing-anchor-transition");
-            return Err(Failure::ExternalAnchorCompareFailed);
+            return self.external.compare_and_advance(
+                current.generation,
+                current.digest,
+                &candidate,
+            );
         }
         // Boundary 3: the external store must atomically compare the exact
         // previously retained generation/digest before it advances.
