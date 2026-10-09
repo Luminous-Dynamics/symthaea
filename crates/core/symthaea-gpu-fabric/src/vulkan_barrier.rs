@@ -439,6 +439,7 @@ impl VulkanResourceMemoryProfile {
             && self.memory_requirement_alignment > 0
             && self.memory_requirement_size == self.allocation_size
             && self.allocation_size >= expected_storage_size
+            && self.allocation_size <= self.memory_heap_size
             && self.storage_size == expected_storage_size
             && self.buffer_usage_flags == vk::BufferUsageFlags::STORAGE_BUFFER.as_raw()
             && self.sharing_mode_raw == vk::SharingMode::EXCLUSIVE.as_raw()
@@ -2871,6 +2872,9 @@ mod tests {
             assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
             profile.write_flush_size = vk::WHOLE_SIZE;
             profile.read_invalidate_size = 4;
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+            profile.read_invalidate_size = vk::WHOLE_SIZE;
+            profile.memory_heap_size = storage_sizes[&lhs] - 1;
             assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
         }
     }
