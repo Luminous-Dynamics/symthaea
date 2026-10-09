@@ -9,6 +9,8 @@ on:
     paths:
       - 'crates/core/symthaea-gpu-fabric/**'
       - '.github/workflows/gpu-fabric-vulkan-barriers.yml'
+      - '.github/scripts/verify-gpu-fabric-vulkan-qualification.py'
+      - '.github/scripts/check-workflow-draft-safety.py'
   workflow_dispatch:
 
 jobs:
