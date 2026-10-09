@@ -1,7 +1,16 @@
 name: GPU Fabric Vulkan Synchronization Qualification
 
+permissions:
+  contents: read
+
+# Keep only the newest exact-head qualification for each PR.
+concurrency:
+  group: gpu-fabric-vulkan-sync-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'crates/core/symthaea-gpu-fabric/**'
       - '.github/workflows/gpu-fabric-vulkan-sync.yml'
@@ -10,12 +19,29 @@ on:
 jobs:
   vulkan-sync:
     name: Vulkan synchronization2 + timeline qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+      # Request SyncVal using the current setting; do not use deprecated VK_LAYER_ENABLES.
+      # The setting request alone does not prove SyncVal activation.
+      VK_LAYER_VALIDATE_SYNC: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact qualification checkout
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          ACTUAL_QUALIFICATION_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_QUALIFICATION_SHA" = "$EXPECTED_QUALIFICATION_SHA"
+          echo "qualification_head=$ACTUAL_QUALIFICATION_SHA"
+          mkdir -p .ci/vulkan-sync-qualification
 
       - name: Install Vulkan runtime and validation
         run: |
@@ -31,10 +57,86 @@ jobs:
           }
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
+
+      - name: Record qualification environment and exact inputs
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          EVIDENCE_DIR=.ci/vulkan-sync-qualification
+          {
+            echo "qualification_commit=$EXPECTED_QUALIFICATION_SHA"
+            echo "qualification_tree=$(git rev-parse HEAD^{tree})"
+            echo "workflow_sha=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "validation_layer=VK_LAYER_KHRONOS_validation"
+            echo "validation_sync_requested=VK_LAYER_VALIDATE_SYNC=1"
+            echo "validation_sync_activation=unproven_by_setting_request_alone"
+            rustc -Vv
+            cargo -V
+            echo "--- vulkaninfo --summary ---"
+            vulkaninfo --summary
+          } > "$EVIDENCE_DIR/qualification-environment.txt"
+          dpkg-query -W -f='${Package}\t${Version}\n' \
+            libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers \
+            > "$EVIDENCE_DIR/vulkan-package-versions.txt"
+          find crates/core/symthaea-gpu-fabric -type f -print0 | sort -z | xargs -0 sha256sum \
+            > "$EVIDENCE_DIR/source-sha256.txt"
+          sha256sum Cargo.lock crates/core/symthaea-gpu-fabric/Cargo.toml \
+            .github/workflows/gpu-fabric-vulkan-sync.yml \
+            > "$EVIDENCE_DIR/qualification-input-sha256.txt"
 
       - name: Compile Vulkan synchronization runtime
-        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib
+        id: compile
+        run: |
+          set -o pipefail
+          cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib 2>&1 \
+            | tee .ci/vulkan-sync-qualification/compile.log
 
       - name: Execute real Vulkan synchronization qualification
-        run: cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib -- --ignored --nocapture
+        id: runtime
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 180s \
+            cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib \
+              -- --ignored --nocapture --test-threads=1 2>&1 \
+            | tee .ci/vulkan-sync-qualification/runtime.log
+
+      - name: Seal qualification evidence
+        if: always()
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          EVIDENCE_DIR=.ci/vulkan-sync-qualification
+          test -d "$EVIDENCE_DIR" || mkdir -p "$EVIDENCE_DIR"
+          test -s "$EVIDENCE_DIR/qualification-environment.txt" || \
+            printf 'qualification_environment=not_reached\n' > "$EVIDENCE_DIR/qualification-environment.txt"
+          test -s "$EVIDENCE_DIR/vulkan-package-versions.txt" || \
+            printf 'vulkan_package_versions=not_reached\n' > "$EVIDENCE_DIR/vulkan-package-versions.txt"
+          test -s "$EVIDENCE_DIR/source-sha256.txt" || \
+            printf 'source_hashes=not_reached\n' > "$EVIDENCE_DIR/source-sha256.txt"
+          test -s "$EVIDENCE_DIR/qualification-input-sha256.txt" || \
+            printf 'input_hashes=not_reached\n' > "$EVIDENCE_DIR/qualification-input-sha256.txt"
+          test -s "$EVIDENCE_DIR/compile.log" || \
+            printf 'compile=not_reached\n' > "$EVIDENCE_DIR/compile.log"
+          test -s "$EVIDENCE_DIR/runtime.log" || \
+            printf 'runtime=not_reached\n' > "$EVIDENCE_DIR/runtime.log"
+          {
+            echo "qualification_commit=$EXPECTED_QUALIFICATION_SHA"
+            echo "compile_outcome=${{ steps.compile.outcome }}"
+            echo "runtime_outcome=${{ steps.runtime.outcome }}"
+            echo "syncval_activation=not_proven_without_hazard_sentinel"
+          } > "$EVIDENCE_DIR/qualification-status.txt"
+          (cd "$EVIDENCE_DIR" && sha256sum \
+            qualification-environment.txt vulkan-package-versions.txt source-sha256.txt \
+            qualification-input-sha256.txt compile.log runtime.log qualification-status.txt \
+            > evidence-sha256.txt)
+
+      - name: Upload immutable qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gpu-fabric-vulkan-sync-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: error
+          path: .ci/vulkan-sync-qualification/
