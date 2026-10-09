@@ -209,7 +209,7 @@ impl MusicalWorldStateV1 {
             .filter(|note| {
                 let onset = note.onset.beats();
                 let note_end = (note.onset + note.duration).beats();
-                note_end > start_beats && onset < end_beats
+                note_end > onset && note_end > start_beats && onset < end_beats
             })
             .collect();
         let part_identity_available = !overlapping_notes.is_empty()
@@ -245,7 +245,10 @@ fn active_voice_roles(score: &Score, start: f64, end: f64) -> Vec<VoiceRole> {
             score.notes.iter().any(|note| {
                 let onset = note.onset.beats();
                 let note_end = (note.onset + note.duration).beats();
-                note.role == *role && note_end > start && onset < end
+                note.role == *role
+                    && note_end > onset
+                    && note_end > start
+                    && onset < end
             })
         })
         .collect()
@@ -575,6 +578,51 @@ mod tests {
         assert!(state.temporal_state.is_none());
         assert!(!state.part_identity_available);
         assert!(state.active_voice_roles.is_empty());
+    }
+
+    #[test]
+    fn zero_and_negative_duration_notes_do_not_create_world_state_activity() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(
+            PitchClass::C,
+            4,
+            2,
+            VoiceRole::Melody,
+            PartId(1),
+        ));
+        score.notes[0].duration = Duration::zero();
+        let mut negative = note(
+            PitchClass::G,
+            4,
+            2,
+            VoiceRole::Bass,
+            PartId(2),
+        );
+        negative.onset = Duration::new(5, 2);
+        negative.duration = Duration::new(-1, 2);
+        score.push(negative);
+        // Extend the score past the observed interval without adding sound there.
+        score.push(note(
+            PitchClass::C,
+            3,
+            4,
+            VoiceRole::Bass,
+            PartId(3),
+        ));
+
+        let state = MusicalWorldStateV1::observe_region(
+            &score,
+            Duration::new(2, 1),
+            Duration::new(3, 1),
+            Default::default(),
+        )
+        .expect("a silent interval inside the score remains observable");
+
+        assert!(state.temporal_state.is_none());
+        assert_eq!(state.cognitive_profile.note_count, 0);
+        assert_eq!(state.cognitive_profile.onset_count, 0);
+        assert!(state.active_voice_roles.is_empty());
+        assert!(!state.part_identity_available);
     }
 
     #[test]
