@@ -8,6 +8,7 @@ on:
       - '.github/workflows/ci.yml'
       - '.github/workflows/civ-governance-smokes.yml'
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'Cargo.toml'
       - 'crates/domains/symthaea-lab/**'
@@ -24,7 +25,8 @@ concurrency:
 
 jobs:
   civ-smokes:
-    name: Format and execute CIV-CORE-003 through CIV-CORE-009
+    name: Format and execute CIV-CORE-003 through CIV-CORE-011
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -47,7 +49,8 @@ jobs:
             crates/domains/symthaea-lab/src/bin/civ_plural_authority_quorum_smoke.rs \
             crates/domains/symthaea-lab/src/bin/civ_governance_audit_chain_smoke.rs \
             crates/domains/symthaea-lab/src/bin/civ_merkle_governance_checkpoint_smoke.rs \
-            crates/domains/symthaea-lab/src/bin/civ_signed_tree_head_witness_smoke.rs
+            crates/domains/symthaea-lab/src/bin/civ_signed_tree_head_witness_smoke.rs \
+            crates/domains/symthaea-lab/src/bin/civ_monotonic_checkpoint_acceptance_smoke.rs
 
       - name: Execute standalone CIV smoke binaries
         shell: bash
@@ -61,3 +64,4 @@ jobs:
           cargo run --manifest-path "$manifest" --bin civ_governance_audit_chain_smoke
           cargo run --manifest-path "$manifest" --bin civ_merkle_governance_checkpoint_smoke
           cargo run --manifest-path "$manifest" --bin civ_signed_tree_head_witness_smoke
+          cargo run --manifest-path "$manifest" --bin civ_monotonic_checkpoint_acceptance_smoke
