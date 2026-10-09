@@ -310,7 +310,7 @@ mod tests {
         let observed_order = (coarse / fine).ln() / (spacings[1] / spacings[2]).ln();
         assert!(
             observed_order > 1.7 && observed_order < 2.2,
-            "observed space-time convergence order={observed_order:.4}; h={spacings:?}, errors={errors:?}"
+            "observed order={observed_order:.4}; h={spacings:?}; errors={errors:?}"
         );
     }
 
