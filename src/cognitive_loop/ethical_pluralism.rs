@@ -30,6 +30,24 @@ pub enum FrameworkStance {
     Underdetermined,
 }
 
+/// Exact subject binding shared by assessments that may be compared.
+///
+/// The producer should compute each digest from a canonical serialization of
+/// the corresponding context/action. This module only checks that the IDs and
+/// digests are non-empty and exactly equal across assessments; it does not
+/// recompute digests, authenticate producers, or prove the source bytes match.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssessmentSubject {
+    /// Stable reference to the normalized scenario/context.
+    pub scenario_ref: String,
+    /// Opaque digest/fingerprint of the canonical scenario/context.
+    pub scenario_digest: String,
+    /// Stable reference to the candidate action being assessed.
+    pub candidate_action_ref: String,
+    /// Opaque digest/fingerprint of the canonical candidate action.
+    pub candidate_action_digest: String,
+}
+
 /// A single result from one versioned ethical framework.
 ///
 /// `premise_refs` identify normative premises/rules used in the assessment.
@@ -41,6 +59,8 @@ pub struct FrameworkAssessment {
     pub framework_id: String,
     /// Exact version of the framework that produced this assessment.
     pub framework_version: String,
+    /// Scenario and candidate action this assessment actually evaluated.
+    pub subject: AssessmentSubject,
     /// Framework-relative position; never an execution authorization.
     pub stance: FrameworkStance,
     /// Optional calibrated confidence in this assessment, if defined by the caller.
@@ -79,6 +99,8 @@ pub enum ComparisonState {
     /// At least one result is mixed, conditional, or underdetermined, so agreement
     /// cannot be asserted from the supplied results.
     Incomplete,
+    /// Valid assessments refer to different scenarios or candidate actions.
+    SubjectMismatch,
     /// An assessment is malformed or the same framework/version appears twice.
     InvalidInput,
 }
@@ -115,6 +137,9 @@ pub fn compare_assessments(assessments: &[FrameworkAssessment]) -> PluralEthicsC
         ComparisonState::InvalidInput
     } else if assessments.is_empty() {
         ComparisonState::NoAssessments
+    } else if !subjects_match(assessments) {
+        // Never report agreement between assessments of different inputs.
+        ComparisonState::SubjectMismatch
     } else if counts.supports > 0 && counts.opposes > 0 {
         ComparisonState::Disagreement
     } else if counts.mixed > 0 || counts.conditional > 0 || counts.underdetermined > 0 {
@@ -137,6 +162,16 @@ pub fn compare_assessments(assessments: &[FrameworkAssessment]) -> PluralEthicsC
     }
 }
 
+fn subjects_match(assessments: &[FrameworkAssessment]) -> bool {
+    let Some(first) = assessments.first() else {
+        return true;
+    };
+
+    assessments
+        .iter()
+        .all(|assessment| assessment.subject == first.subject)
+}
+
 fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
     let mut errors = Vec::new();
     let mut seen = HashSet::new();
@@ -153,8 +188,25 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
         if assessment.rationale.iter().all(|reason| reason.trim().is_empty()) {
             errors.push(format!("{prefix}: rationale must contain a non-empty explanation"));
         }
-        if assessment.premise_refs.iter().all(|premise| premise.trim().is_empty()) {
-            errors.push(format!("{prefix}: premise_refs must contain a non-empty premise/rule ID"));
+        if assessment.premise_refs.is_empty() {
+            errors.push(format!("{prefix}: premise_refs must contain at least one premise/rule ID"));
+        }
+        for (ref_index, premise_ref) in assessment.premise_refs.iter().enumerate() {
+            if premise_ref.trim().is_empty() {
+                errors.push(format!(
+                    "{prefix}: premise_refs[{ref_index}] must not be empty"
+                ));
+            }
+        }
+        for (field, value) in [
+            ("subject.scenario_ref", assessment.subject.scenario_ref.as_str()),
+            ("subject.scenario_digest", assessment.subject.scenario_digest.as_str()),
+            ("subject.candidate_action_ref", assessment.subject.candidate_action_ref.as_str()),
+            ("subject.candidate_action_digest", assessment.subject.candidate_action_digest.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                errors.push(format!("{prefix}: {field} must not be empty"));
+            }
         }
         if let Some(confidence) = assessment.confidence
             && (!confidence.is_finite() || !(0.0..=1.0).contains(&confidence))
@@ -199,6 +251,12 @@ mod tests {
         FrameworkAssessment {
             framework_id: framework_id.to_owned(),
             framework_version: "1.0.0".to_owned(),
+            subject: AssessmentSubject {
+                scenario_ref: "scenario:case-001".to_owned(),
+                scenario_digest: "fixture-digest:scenario-case-001".to_owned(),
+                candidate_action_ref: "action:case-001:candidate-a".to_owned(),
+                candidate_action_digest: "fixture-digest:candidate-action-a".to_owned(),
+            },
             stance,
             confidence: Some(0.8),
             rationale: vec!["The conclusion follows from the declared profile premises.".to_owned()],
@@ -269,6 +327,62 @@ mod tests {
         assert_eq!(forward.state, reverse.state);
         assert_eq!(forward.counts, reverse.counts);
         assert_eq!(forward.state, ComparisonState::Disagreement);
+    }
+
+    #[test]
+    fn different_scenarios_cannot_create_false_agreement() {
+        let a = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let mut b = assessment("rights_ethics", FrameworkStance::SupportsAction);
+        b.subject.scenario_ref = "scenario:case-002".to_owned();
+        b.subject.scenario_digest = "fixture-digest:scenario-case-002".to_owned();
+
+        let result = compare_assessments(&[a, b]);
+        assert_eq!(result.state, ComparisonState::SubjectMismatch);
+        assert!(result.validation_errors.is_empty());
+    }
+
+    #[test]
+    fn same_scenario_reference_with_different_context_digest_is_not_comparable() {
+        let a = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let mut b = assessment("rights_ethics", FrameworkStance::SupportsAction);
+        b.subject.scenario_digest = "fixture-digest:changed-context".to_owned();
+
+        let result = compare_assessments(&[a, b]);
+        assert_eq!(result.state, ComparisonState::SubjectMismatch);
+    }
+
+    #[test]
+    fn different_candidate_actions_cannot_create_false_agreement() {
+        let a = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let mut b = assessment("rights_ethics", FrameworkStance::SupportsAction);
+        b.subject.candidate_action_ref = "action:case-001:candidate-b".to_owned();
+        b.subject.candidate_action_digest = "fixture-digest:candidate-action-b".to_owned();
+
+        let result = compare_assessments(&[a, b]);
+        assert_eq!(result.state, ComparisonState::SubjectMismatch);
+    }
+
+    #[test]
+    fn blank_subject_binding_invalidates_comparison() {
+        let mut malformed = assessment("care_ethics", FrameworkStance::SupportsAction);
+        malformed.subject.candidate_action_digest.clear();
+
+        let result = compare_assessments(&[malformed]);
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|e| e.contains("candidate_action_digest")));
+    }
+
+    #[test]
+    fn partially_blank_premise_references_are_rejected() {
+        let mut malformed = assessment("care_ethics", FrameworkStance::SupportsAction);
+        malformed.premise_refs = vec![
+            "premise:declared-principle-1".to_owned(),
+            "  ".to_owned(),
+        ];
+
+        let result = compare_assessments(&[malformed]);
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|e| e.contains("premise_refs[1]")));
     }
 
     #[test]
