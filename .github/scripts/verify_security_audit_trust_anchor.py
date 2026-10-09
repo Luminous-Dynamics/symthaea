@@ -406,6 +406,8 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
                 if total_size > 50 * 1024 * 1024:
                     raise VerificationError("artifact ZIP uncompressed size exceeds 50 MiB")
                 if not entry.is_dir() and parts[-1] == "verdict.json":
+                    if entry.filename != "verdict.json":
+                        raise VerificationError("verdict.json must be stored at the artifact ZIP root")
                     verdict_names.append(entry.filename)
             if len(verdict_names) != 1:
                 raise VerificationError("artifact does not contain exactly one verdict.json")
@@ -421,6 +423,13 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
     except Exception as exc:
         raise VerificationError(f"verdict artifact ZIP/JSON is invalid: {type(exc).__name__}: {exc}") from exc
     validate_verdict(verdict, repo, policy, run, expected_pr_number)
+
+
+def should_publish_pending_status(mode: str, activity: str, run: dict[str, Any]) -> bool:
+    """Prevent a delayed start event from overwriting the final status."""
+    return (mode == "workflow_run"
+            and activity in {"requested", "in_progress"}
+            and run.get("status") != "completed")
 
 
 def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: str,
@@ -455,7 +464,7 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
                     f"Independent verifier self-tests did not pass: {self_test_outcome}", target)
         print("FAIL: independent verifier self-tests did not pass", file=sys.stderr)
         return 1
-    if mode == "workflow_run" and activity in {"requested", "in_progress"}:
+    if should_publish_pending_status(mode, activity, run):
         post_status(repo, subject, token, "pending", "Exact-head security audit is running; no pass is implied.", target)
         print(f"PENDING: {repo}@{subject} run {run_id}.")
         return 0
