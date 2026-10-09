@@ -16,20 +16,23 @@
 //! - whether a confidence report is actually bound to the current episode.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v2";
+pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v3";
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
-const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = "IID evaluation episodes; frozen scoring and selection rule; supplied threshold set predeclared before correctness outcomes; no distribution-shift guarantee";
+const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = "IID evaluation episodes; frozen scoring and selection rule; supplied threshold set predeclared before correctness outcomes; task-family taxonomy predeclared and outcome-independent; simultaneous bounds cover pooled and observed task-family by threshold comparisons; no distribution-shift guarantee";
 
 /// One pre-outcome prediction of whether the subject's answer is correct.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CorrectnessPrediction {
     /// Episode whose correctness is being evaluated.
     pub episode_id: String,
+    /// Stable task-family identifier from a taxonomy frozen before outcomes are inspected.
+    /// Do not assign or revise this label using correctness outcomes.
+    pub task_family_id: String,
     /// Episode the confidence value claims to describe. A mismatch exposes stale/cross-episode
     /// confidence rather than silently attributing it to the current episode.
     pub confidence_target_episode_id: String,
@@ -99,6 +102,27 @@ pub struct BinaryDetectionReport {
     pub accuracy: Option<f64>,
 }
 
+/// Calibration report scoped to one predeclared task family.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskFamilyCalibrationReport {
+    pub task_family_id: String,
+    pub episodes: usize,
+    pub empirical_accuracy: Option<f64>,
+    pub mean_confidence: Option<f64>,
+    pub brier_score: Option<f64>,
+    pub log_loss: Option<f64>,
+    pub expected_calibration_error: Option<f64>,
+    pub maximum_calibration_error: Option<f64>,
+    /// Mean confidence minus accuracy; positive means overconfidence in this family.
+    pub confidence_bias: Option<f64>,
+    pub correctness_auroc: Option<f64>,
+    pub current_episode_binding_rate: Option<f64>,
+    pub assertion_rate: Option<f64>,
+    pub asserted_risk: Option<f64>,
+    /// Group-local coverage and risk; upper bounds share family-wise correction with pooled results.
+    pub selective_risk: Vec<SelectiveRiskPoint>,
+}
+
 /// Decomposed RQ-006 measurement report. There is intentionally no single "metacognition score".
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetacognitionReport {
@@ -128,6 +152,8 @@ pub struct MetacognitionReport {
     pub selective_risk_bound_method: String,
     /// Explicit assumptions/limitations shipped with the report for downstream consumers.
     pub selective_risk_bound_assumptions: String,
+    /// Deterministically sorted, group-local calibration results; never averaged into a scalar.
+    pub task_family_calibration: Vec<TaskFamilyCalibrationReport>,
     pub selective_risk: Vec<SelectiveRiskPoint>,
     pub weak_assumption_detection: BinaryDetectionReport,
     pub confidence_revisions: usize,
@@ -142,6 +168,7 @@ pub enum MetacognitionEvaluationError {
     InvalidBinCount(usize),
     EmptyEpisodeId(&'static str),
     DuplicatePredictionEpisode(String),
+    EmptyTaskFamilyId { episode_id: String },
     DuplicateAssumptionEpisode(String),
     DuplicateRevisionPair(String),
     InvalidProbability { field: &'static str, value: f64 },
@@ -156,6 +183,9 @@ impl fmt::Display for MetacognitionEvaluationError {
             Self::EmptyEpisodeId(field) => write!(f, "required episode identifier `{field}` is empty"),
             Self::DuplicatePredictionEpisode(id) => {
                 write!(f, "episode `{id}` has more than one correctness prediction")
+            }
+            Self::EmptyTaskFamilyId { episode_id } => {
+                write!(f, "episode `{episode_id}` has an empty task-family identifier")
             }
             Self::DuplicateAssumptionEpisode(id) => {
                 write!(f, "episode `{id}` has more than one weak-assumption observation")
@@ -196,6 +226,19 @@ pub fn evaluate_metacognition(
     }
 
     let n = predictions.len();
+    let mut task_family_members: BTreeMap<String, Vec<CorrectnessPrediction>> = BTreeMap::new();
+    for prediction in predictions {
+        task_family_members
+            .entry(prediction.task_family_id.clone())
+            .or_default()
+            .push(prediction.clone());
+    }
+    // Correct across pooled + every observed task family, for each predeclared threshold.
+    // Task-family labels themselves must come from a frozen, outcome-independent taxonomy.
+    let family_comparison_count = selective_thresholds
+        .len()
+        .saturating_mul(task_family_members.len().saturating_add(1));
+
     let empirical_accuracy = mean_bool(predictions.iter().map(|p| p.correct));
     let mean_confidence = mean_f64(predictions.iter().map(|p| p.confidence));
 
@@ -235,9 +278,8 @@ pub fn evaluate_metacognition(
     let abstention_opportunity_cost =
         conditional_rate(predictions.iter().filter(|p| !p.asserted), |p| p.correct);
 
-    // Freeze the threshold family before inspecting correctness outcomes. Bonferroni correction
-    // bounds simultaneous failure probability over this exact supplied list.
-    let selective_threshold_count = selective_thresholds.len();
+    // Freeze thresholds and group taxonomy before inspecting correctness outcomes. Bonferroni
+    // covers every pooled and task-family x threshold bound reported below.
     let selective_risk = selective_thresholds
         .iter()
         .map(|&threshold| {
@@ -258,10 +300,23 @@ pub fn evaluate_metacognition(
                 risk_upper_bound_95: hoeffding_familywise_risk_upper_bound(
                     errors,
                     selected_n,
-                    selective_threshold_count,
+                    family_comparison_count,
                 ),
                 selected: selected_n,
             }
+        })
+        .collect();
+
+    let task_family_calibration = task_family_members
+        .iter()
+        .map(|(task_family_id, members)| {
+            task_family_report(
+                task_family_id,
+                members,
+                calibration_bins,
+                selective_thresholds,
+                family_comparison_count,
+            )
         })
         .collect();
 
@@ -285,6 +340,7 @@ pub fn evaluate_metacognition(
         abstention_opportunity_cost,
         selective_risk_bound_method: SELECTIVE_RISK_BOUND_METHOD.into(),
         selective_risk_bound_assumptions: SELECTIVE_RISK_BOUND_ASSUMPTIONS.into(),
+        task_family_calibration,
         selective_risk,
         weak_assumption_detection,
         confidence_revisions: revisions.len(),
@@ -303,6 +359,11 @@ fn validate_predictions(predictions: &[CorrectnessPrediction]) -> Result<(), Met
             return Err(MetacognitionEvaluationError::EmptyEpisodeId(
                 "confidence_target_episode_id",
             ));
+        }
+        if prediction.task_family_id.trim().is_empty() {
+            return Err(MetacognitionEvaluationError::EmptyTaskFamilyId {
+                episode_id: prediction.episode_id.clone(),
+            });
         }
         validate_probability("confidence", prediction.confidence)?;
         if !seen.insert(prediction.episode_id.as_str()) {
@@ -390,6 +451,84 @@ fn hoeffding_familywise_risk_upper_bound(
     let per_threshold_alpha = SELECTIVE_RISK_FAMILYWISE_ALPHA / threshold_count as f64;
     let radius = ((1.0 / per_threshold_alpha).ln() / (2.0 * selected as f64)).sqrt();
     Some((empirical_risk + radius).min(1.0))
+}
+
+fn task_family_report(
+    task_family_id: &str,
+    predictions: &[CorrectnessPrediction],
+    calibration_bins: usize,
+    selective_thresholds: &[f64],
+    family_comparison_count: usize,
+) -> TaskFamilyCalibrationReport {
+    let n = predictions.len();
+    let empirical_accuracy = mean_bool(predictions.iter().map(|p| p.correct));
+    let mean_confidence = mean_f64(predictions.iter().map(|p| p.confidence));
+    let (brier_score, log_loss) = if predictions.is_empty() {
+        (None, None)
+    } else {
+        let mut brier = 0.0;
+        let mut log = 0.0;
+        for prediction in predictions {
+            let target = if prediction.correct { 1.0 } else { 0.0 };
+            brier += (prediction.confidence - target).powi(2);
+            let p_correct = if prediction.correct {
+                prediction.confidence
+            } else {
+                1.0 - prediction.confidence
+            };
+            log += -p_correct.clamp(LOG_LOSS_EPSILON, 1.0 - LOG_LOSS_EPSILON).ln();
+        }
+        (Some(brier / n as f64), Some(log / n as f64))
+    };
+    let (ece, mce) = calibration_errors(predictions, calibration_bins);
+    let confidence_bias = match (mean_confidence, empirical_accuracy) {
+        (Some(confidence), Some(accuracy)) => Some(confidence - accuracy),
+        _ => None,
+    };
+    let current_episode_binding_rate = mean_bool(
+        predictions.iter().map(|p| p.episode_id == p.confidence_target_episode_id),
+    );
+    let assertion_rate = mean_bool(predictions.iter().map(|p| p.asserted));
+    let asserted_risk = conditional_rate(predictions.iter().filter(|p| p.asserted), |p| !p.correct);
+    let selective_risk = selective_thresholds
+        .iter()
+        .map(|&threshold| {
+            let selected: Vec<&CorrectnessPrediction> = predictions
+                .iter()
+                .filter(|p| p.asserted && p.confidence >= threshold)
+                .collect();
+            let selected_n = selected.len();
+            let errors = selected.iter().filter(|p| !p.correct).count();
+            SelectiveRiskPoint {
+                threshold,
+                coverage: if n == 0 { 0.0 } else { selected_n as f64 / n as f64 },
+                risk: ratio(errors, selected_n),
+                risk_upper_bound_95: hoeffding_familywise_risk_upper_bound(
+                    errors,
+                    selected_n,
+                    family_comparison_count,
+                ),
+                selected: selected_n,
+            }
+        })
+        .collect();
+
+    TaskFamilyCalibrationReport {
+        task_family_id: task_family_id.to_string(),
+        episodes: n,
+        empirical_accuracy,
+        mean_confidence,
+        brier_score,
+        log_loss,
+        expected_calibration_error: ece,
+        maximum_calibration_error: mce,
+        confidence_bias,
+        correctness_auroc: auroc(predictions),
+        current_episode_binding_rate,
+        assertion_rate,
+        asserted_risk,
+        selective_risk,
+    }
 }
 
 fn calibration_errors(
@@ -560,6 +699,7 @@ mod tests {
     fn prediction(id: &str, confidence: f64, correct: bool, asserted: bool) -> CorrectnessPrediction {
         CorrectnessPrediction {
             episode_id: id.into(),
+            task_family_id: "general".into(),
             confidence_target_episode_id: id.into(),
             confidence,
             correct,
@@ -681,6 +821,7 @@ mod tests {
         assert_eq!(report.selective_risk_bound_method, "hoeffding-familywise-95-v1");
         assert!(report.selective_risk_bound_assumptions.contains("IID evaluation episodes"));
         assert!(report.selective_risk_bound_assumptions.contains("no distribution-shift guarantee"));
+        assert!(report.selective_risk_bound_assumptions.contains("task-family taxonomy predeclared"));
         assert_eq!(report.selective_risk[0].selected, 3);
         assert_eq!(report.selective_risk[0].coverage, 0.75);
         assert!((report.selective_risk[0].risk.unwrap_or_default() - 1.0 / 3.0).abs() < 1.0e-12);
@@ -710,6 +851,49 @@ mod tests {
             hoeffding_familywise_risk_upper_bound(errors, 100, 5)
                 .is_some_and(|bound| (errors as f64 / 100.0) <= bound && bound <= 1.0)
         }));
+    }
+
+    #[test]
+    fn task_family_reports_expose_pooled_calibration_cancellation() {
+        let mut observations = Vec::new();
+        for index in 0..5 {
+            let mut p = prediction(&format!("reasoning-{index}"), 0.9, true, true);
+            p.task_family_id = "reasoning".into();
+            observations.push(p);
+        }
+        for index in 0..5 {
+            let mut p = prediction(&format!("retrieval-{index}"), 0.9, index != 0, true);
+            p.task_family_id = "retrieval".into();
+            observations.push(p);
+        }
+
+        let report = evaluate_metacognition(&observations, &[], &[], 10, &[0.5, 0.9])
+            .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"));
+        assert_eq!(report.empirical_accuracy, Some(0.9));
+        assert_eq!(report.mean_confidence, Some(0.9));
+        assert_eq!(report.expected_calibration_error, Some(0.0));
+        assert_eq!(report.task_family_calibration.len(), 2);
+        assert_eq!(report.task_family_calibration[0].task_family_id, "reasoning");
+        assert_eq!(report.task_family_calibration[0].expected_calibration_error, Some(0.0));
+        assert_eq!(report.task_family_calibration[1].task_family_id, "retrieval");
+        assert!((report.task_family_calibration[1].expected_calibration_error.unwrap_or_default() - 0.1).abs() < 1.0e-12);
+        assert!(report.task_family_calibration.iter().all(|family| {
+            family.selective_risk.iter().all(|point| {
+                point.risk_upper_bound_95.unwrap_or_default() >= point.risk.unwrap_or_default()
+            })
+        }));
+        assert!(report.task_family_calibration[0].selective_risk[0].risk_upper_bound_95
+            < report.selective_risk[0].risk_upper_bound_95);
+    }
+
+    #[test]
+    fn empty_task_family_id_fails_closed() {
+        let mut observation = prediction("p1", 0.5, true, true);
+        observation.task_family_id.clear();
+        assert!(matches!(
+            evaluate_metacognition(&[observation], &[], &[], 10, &[]),
+            Err(MetacognitionEvaluationError::EmptyTaskFamilyId { .. })
+        ));
     }
 
     #[test]
