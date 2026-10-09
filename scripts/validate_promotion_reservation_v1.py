@@ -564,7 +564,7 @@ class ProviderTopologyCasTrustPolicyCheckpointV1:
         # Exact equality also rejects same-generation policy forks.
         return (
             self.structurally_valid()
-            and policy is not None
+            and isinstance(policy, ProviderTopologyCasTrustPolicyV1)
             and policy.structurally_valid()
             and isinstance(expected_policy_digest, str)
             and bool(expected_policy_digest)
@@ -1828,6 +1828,8 @@ def test_provider_topology_trust_checkpoint_matches_only_exact_policy():
     checkpoint = _test_trust_policy_checkpoint(policy)
     assert checkpoint.structurally_valid()
     assert checkpoint.matches(policy, policy.digest(), policy.generation)
+    assert not checkpoint.matches(None, policy.digest(), policy.generation)
+    assert not checkpoint.matches("not-a-policy", policy.digest(), policy.generation)
     assert not checkpoint.matches(policy, "0" * 64, policy.generation)
     assert not checkpoint.matches(policy, policy.digest(), policy.generation + 1)
     corrupted = ProviderTopologyCasTrustPolicyCheckpointV1(
