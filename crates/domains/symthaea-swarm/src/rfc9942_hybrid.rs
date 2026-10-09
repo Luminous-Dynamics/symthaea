@@ -22,6 +22,8 @@ pub const CLASSICAL_COSE_ALGORITHM_ID: i64 = COSE_ES256_ALGORITHM_ID;
 pub const ML_DSA_65_COSE_ALGORITHM_ID: i64 = -49;
 pub const ML_DSA_65_PUBLIC_KEY_BYTES: usize = 1952;
 pub const ML_DSA_65_SIGNATURE_BYTES: usize = 3309;
+/// RFC 9964 requires an empty ML-DSA context for the COSE algorithm profile.
+pub const ML_DSA_65_CONTEXT: &[u8] = b"";
 pub const MAX_HYBRID_RECEIPT_WIRE_BYTES: usize =
     MAX_RFC9942_RECEIPT_ENCODED_BYTES;
 
@@ -32,8 +34,11 @@ pub const HYBRID_TRANSCRIPT_DOMAIN: &[u8] =
 ///
 /// A provider may be a software implementation, HSM, KMS, remote signer, or
 /// independent verification oracle. The semantic module never assumes which.
+/// Implementations MUST perform FIPS 204 ML-DSA.Verify on the supplied message
+/// using RFC 9964's required empty context ([`ML_DSA_65_CONTEXT`]). They MUST
+/// not silently switch to a pre-hashed mode or add a provider-specific context.
 pub trait MlDsa65Verifier {
-    fn verify(
+    fn verify_with_empty_context(
         &self,
         verifying_key: &[u8],
         message: &[u8],
@@ -377,7 +382,11 @@ impl Rfc9942HybridVerifiedReceipt {
         )?;
 
         verifier
-            .verify(verifying_key, &transcript.signing_bytes(), signature)
+            .verify_with_empty_context(
+                verifying_key,
+                &transcript.signing_bytes(),
+                signature,
+            )
             .map_err(Rfc9942HybridError::from_provider)?;
 
         let pq_attestation = Rfc9942PqAttestation {
@@ -787,7 +796,7 @@ mod tests {
     }
 
     impl MlDsa65Verifier for CountingVerifier {
-        fn verify(
+        fn verify_with_empty_context(
             &self,
             _verifying_key: &[u8],
             _message: &[u8],
@@ -1051,5 +1060,10 @@ mod tests {
     fn exact_sizes_match_fips_204_ml_dsa_65_profile() {
         assert_eq!(ML_DSA_65_PUBLIC_KEY_BYTES, 1952);
         assert_eq!(ML_DSA_65_SIGNATURE_BYTES, 3309);
+    }
+
+    #[test]
+    fn rfc9964_profile_requires_an_empty_mldsa_context() {
+        assert!(ML_DSA_65_CONTEXT.is_empty());
     }
 }
