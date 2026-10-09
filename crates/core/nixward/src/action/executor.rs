@@ -1113,7 +1113,7 @@ impl NixOSExecutor {
                     return (
                         ExecutionResult::Blocked {
                             reason: format!(
-                                "unit-file Service authority has invalid pre-state identity: {error}"
+                                "unit-file authority has invalid pre-state identity: {error}"
                             ),
                             safety_level: safety,
                         },
@@ -1125,7 +1125,7 @@ impl NixOSExecutor {
             return (
                 ExecutionResult::Blocked {
                     reason: format!(
-                        "unit-file Service unit differs from approved pre-state: approved={} current={}",
+                        "approved unit differs from requested unit: approved={} requested={}",
                         authorized_unit, unit
                     ),
                     safety_level: safety,
@@ -1280,7 +1280,7 @@ impl NixOSExecutor {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "unit-file mutation returned no epoch-qualified result; outcome is indeterminate: {error}"
+                            "unit-file RPC returned no epoch-qualified result; outcome indeterminate: {error}"
                         ),
                         rollback_error: None,
                     },
@@ -1301,7 +1301,7 @@ impl NixOSExecutor {
         {
             return (
                 ExecutionResult::FailedNoRollback {
-                    error: "native unit-file result lineage does not match the dispatched Service operation"
+                    error: "unit-file result lineage does not match the request"
                         .to_string(),
                     rollback_error: None,
                 },
@@ -1315,7 +1315,7 @@ impl NixOSExecutor {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "unit-file mutation returned, but current NixOS generation could not be observed: {error}"
+                            "unit-file RPC returned, but generation read failed: {error}"
                         ),
                         rollback_error: None,
                     },
@@ -1327,7 +1327,7 @@ impl NixOSExecutor {
             return (
                 ExecutionResult::FailedNoRollback {
                     error: format!(
-                        "unit-file mutation returned but NixOS generation changed: approved={} current={}",
+                        "NixOS generation changed after unit-file RPC: approved={} current={}",
                         authorized_generation, generation_after
                     ),
                     rollback_error: None,
@@ -1345,7 +1345,7 @@ impl NixOSExecutor {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "unit-file mutation returned but post-state could not be observed: {error}"
+                            "unit-file RPC returned, but post-state read failed: {error}"
                         ),
                         rollback_error: None,
                     },
@@ -1365,7 +1365,7 @@ impl NixOSExecutor {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "unit-file mutation returned but observed definition identity is invalid: {error}"
+                            "observed definition identity is invalid: {error}"
                         ),
                         rollback_error: None,
                     },
@@ -1382,7 +1382,7 @@ impl NixOSExecutor {
         {
             return (
                 ExecutionResult::FailedNoRollback {
-                    error: "unit-file mutation returned but post-state provenance differs from the approved definition/manager epoch"
+                    error: "unit-file post-state provenance differs from approved evidence"
                         .to_string(),
                     rollback_error: None,
                 },
@@ -1393,7 +1393,7 @@ impl NixOSExecutor {
             return (
                 ExecutionResult::FailedNoRollback {
                     error: format!(
-                        "unit-file mutation returned but observed UnitFileState does not satisfy the operation: operation={operation:?} observed={:?}",
+                        "unit-file postcondition not satisfied: operation={operation:?}, state={:?}",
                         observed.unit_file_state
                     ),
                     rollback_error: None,
@@ -1411,7 +1411,7 @@ impl NixOSExecutor {
             return (
                 ExecutionResult::FailedNoRollback {
                     error: format!(
-                        "unit-file mutation post-state was observed, but final definition revalidation failed: {error}"
+                        "post-state observed, final definition revalidation failed: {error}"
                     ),
                     rollback_error: None,
                 },
@@ -1424,7 +1424,7 @@ impl NixOSExecutor {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "unit-file mutation post-state was observed, but final generation revalidation failed: {error}"
+                            "post-state observed, final generation read failed: {error}"
                         ),
                         rollback_error: None,
                     },
@@ -1436,7 +1436,7 @@ impl NixOSExecutor {
             return (
                 ExecutionResult::FailedNoRollback {
                     error: format!(
-                        "unit-file mutation post-state was observed, but NixOS generation changed afterward: approved={} current={}",
+                        "NixOS generation changed after post-state: approved={} current={}",
                         authorized_generation, generation_final
                     ),
                     rollback_error: None,
@@ -1457,7 +1457,7 @@ impl NixOSExecutor {
             .unwrap_or_else(|| "not-returned-by-method".to_string());
         let result = ExecutionResult::Success {
             stdout: format!(
-                "{operation_label} returned for {unit}; observed UnitFileState={:?}; change_records={}; carries_install_info={install_info}",
+                "{operation_label} for {unit}; UnitFileState={:?}; changes={}; install_info={install_info}",
                 observed.unit_file_state,
                 unit_file_result.changes().len(),
             ),
