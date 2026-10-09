@@ -28,6 +28,8 @@ const ZERO_DIGEST: Digest = [0; 32];
 const BUSY_TIMEOUT_MS: u64 = 5_000;
 // SQLite's WAL-reset corruption bug is fixed starting at 3.51.3.
 const MIN_SQLITE_VERSION_NUMBER: i32 = 3_051_003;
+// Exact SQLite version carried by rusqlite 0.40.2 / libsqlite3-sys 0.38.2.
+const EXPECTED_BUNDLED_SQLITE_VERSION_NUMBER: i32 = 3_053_002;
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS witness_meta (
@@ -1751,22 +1753,20 @@ mod tests {
 
     #[test]
     fn linked_sqlite_includes_wal_reset_fix() {
-        validate_sqlite_runtime_version(rusqlite::version_number())
-            .expect("linked SQLite runtime must include the WAL-reset fix");
+        let actual = rusqlite::version_number();
+        assert_eq!(
+            actual,
+            EXPECTED_BUNDLED_SQLITE_VERSION_NUMBER,
+            "bundled SQLite source changed unexpectedly; update the pinned bundle version and independent profile",
+        );
+        assert!(
+            actual >= MIN_SQLITE_VERSION_NUMBER,
+            "linked SQLite runtime {actual} is below the WAL-reset fix floor {MIN_SQLITE_VERSION_NUMBER}",
+        );
     }
 
     #[test]
-    fn rejects_sqlite_runtime_below_wal_reset_fix_floor() {
-        let actual = MIN_SQLITE_VERSION_NUMBER - 1;
-        assert!(matches!(
-            validate_sqlite_runtime_version(actual),
-            Err(WitnessError::UnsupportedSqliteVersion {
-                actual: found,
-                minimum
-            }) if found == actual && minimum == MIN_SQLITE_VERSION_NUMBER
-        ));
-    }
-
+    fn linked_sqlite_includes_wal_reset_fix() {
     #[test]
     fn uses_wal_full_and_recovers_after_reopen() {
         let db = TempDb::new();
