@@ -1,0 +1,1373 @@
+//! Durable local witness journal for CIV governance checkpoints.
+//!
+//! This crate persists accepted history and prepared transitions in SQLite.
+//! Anti-rollback requires an independently operated implementation of
+//! IndependentAnchor; this crate intentionally does not provide one.
+//!
+//! The store uses WAL + synchronous=FULL and verifies its runtime PRAGMAs on
+//! every opened connection. This profile depends on SQLite's VFS and the
+//! underlying filesystem honoring sync requests. It is not a claim against an
+//! attacker who can roll back both this database and the external anchor.
+
+use rusqlite::{
+    params, Connection, OptionalExtension, Transaction, TransactionBehavior,
+};
+use sha2::{Digest as ShaDigest, Sha256};
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+pub type Digest = [u8; 32];
+
+const PROTOCOL_VERSION: u16 = 1;
+const SCHEMA_VERSION: i64 = 1;
+const RECORD_DOMAIN: &[u8] = b"mycelix-civ013-durable-record-v1\0";
+const FORK_DOMAIN: &[u8] = b"mycelix-civ013-durable-fork-v1\0";
+const ZERO_DIGEST: Digest = [0; 32];
+const BUSY_TIMEOUT_MS: u64 = 5_000;
+
+const SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS witness_meta (
+    log_id TEXT PRIMARY KEY NOT NULL,
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+    generation INTEGER NOT NULL CHECK (generation > 0),
+    record_digest BLOB NOT NULL CHECK (length(record_digest) = 32)
+);
+CREATE TABLE IF NOT EXISTS witness_records (
+    log_id TEXT NOT NULL,
+    generation INTEGER NOT NULL CHECK (generation > 0),
+    record_digest BLOB NOT NULL CHECK (length(record_digest) = 32),
+    protocol_version INTEGER NOT NULL,
+    policy_version TEXT NOT NULL,
+    anchor_digest BLOB NOT NULL CHECK (length(anchor_digest) = 32),
+    receipt_sequence INTEGER NOT NULL CHECK (receipt_sequence >= 0),
+    receipt_digest BLOB,
+    previous_record_digest BLOB,
+    status INTEGER NOT NULL CHECK (status IN (0, 1)),
+    PRIMARY KEY (log_id, generation),
+    UNIQUE (log_id, record_digest),
+    CHECK ((receipt_sequence = 0 AND receipt_digest IS NULL)
+        OR (receipt_sequence > 0 AND receipt_digest IS NOT NULL)),
+    CHECK (receipt_digest IS NULL OR length(receipt_digest) = 32),
+    CHECK (previous_record_digest IS NULL OR length(previous_record_digest) = 32)
+);
+CREATE TABLE IF NOT EXISTS witness_fork_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    log_id TEXT NOT NULL,
+    generation INTEGER NOT NULL CHECK (generation > 0),
+    first_record_digest BLOB NOT NULL CHECK (length(first_record_digest) = 32),
+    conflicting_record_digest BLOB NOT NULL CHECK (length(conflicting_record_digest) = 32),
+    previous_evidence_digest BLOB,
+    digest BLOB NOT NULL CHECK (length(digest) = 32),
+    CHECK (first_record_digest != conflicting_record_digest),
+    CHECK (previous_evidence_digest IS NULL OR length(previous_evidence_digest) = 32),
+    UNIQUE (log_id, digest)
+);
+CREATE INDEX IF NOT EXISTS witness_records_status_idx
+    ON witness_records(log_id, status, generation);
+";
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Record {
+    pub protocol_version: u16,
+    pub generation: u64,
+    pub log_id: String,
+    pub policy_version: String,
+    pub anchor_digest: Digest,
+    pub receipt_sequence: u64,
+    pub receipt_digest: Option<Digest>,
+    pub previous_record_digest: Option<Digest>,
+    pub digest: Digest,
+}
+
+impl Record {
+    fn build(
+        generation: u64,
+        log_id: &str,
+        policy_version: &str,
+        anchor_digest: Digest,
+        receipt_sequence: u64,
+        receipt_digest: Option<Digest>,
+        previous_record_digest: Option<Digest>,
+    ) -> Self {
+        let digest = record_digest(
+            PROTOCOL_VERSION,
+            generation,
+            log_id,
+            policy_version,
+            anchor_digest,
+            receipt_sequence,
+            receipt_digest,
+            previous_record_digest,
+        );
+        Self {
+            protocol_version: PROTOCOL_VERSION,
+            generation,
+            log_id: log_id.to_owned(),
+            policy_version: policy_version.to_owned(),
+            anchor_digest,
+            receipt_sequence,
+            receipt_digest,
+            previous_record_digest,
+            digest,
+        }
+    }
+
+    fn is_self_consistent(&self) -> bool {
+        self.protocol_version == PROTOCOL_VERSION
+            && !self.log_id.is_empty()
+            && !self.policy_version.is_empty()
+            && valid_receipt_tail(self.receipt_sequence, self.receipt_digest)
+            && self.digest
+                == record_digest(
+                    self.protocol_version,
+                    self.generation,
+                    &self.log_id,
+                    &self.policy_version,
+                    self.anchor_digest,
+                    self.receipt_sequence,
+                    self.receipt_digest,
+                    self.previous_record_digest,
+                )
+    }
+}
+
+/// Externally retained anchor position. Generation zero with a zero digest is
+/// the provisioned, empty-log bootstrap state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnchorState {
+    pub log_id: String,
+    pub generation: u64,
+    pub record_digest: Digest,
+}
+
+impl AnchorState {
+    pub fn genesis(log_id: impl Into<String>) -> Self {
+        Self {
+            log_id: log_id.into(),
+            generation: 0,
+            record_digest: ZERO_DIGEST,
+        }
+    }
+
+    fn from_record(record: &Record) -> Self {
+        Self {
+            log_id: record.log_id.clone(),
+            generation: record.generation,
+            record_digest: record.digest,
+        }
+    }
+}
+
+/// Implement this interface in a separate trust/failure domain.
+/// Implementations must provide durable reads and a linearizable CAS. Do not
+/// point this interface back at the same SQLite database.
+pub trait IndependentAnchor: Send + Sync {
+    fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError>;
+
+    fn compare_and_advance(
+        &self,
+        expected: &AnchorState,
+        next: &AnchorState,
+    ) -> Result<(), AnchorError>;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AnchorError {
+    Unavailable,
+    CompareFailed,
+    Other(String),
+}
+
+impl fmt::Display for AnchorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unavailable => write!(f, "independent anchor unavailable"),
+            Self::CompareFailed => write!(f, "independent anchor compare-and-advance failed"),
+            Self::Other(message) => write!(f, "independent anchor error: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for AnchorError {}
+
+#[derive(Debug)]
+pub enum WitnessError {
+    Sqlite(rusqlite::Error),
+    Io(std::io::Error),
+    Anchor(AnchorError),
+    InvalidInput(&'static str),
+    RuntimeConfigurationMismatch,
+    CorruptStore(&'static str),
+    CorruptForkEvidence,
+    StalePredecessor,
+    ReceiptRollback,
+    ReceiptTailEquivocation,
+    ExternalAnchorMismatch,
+    RollbackDetected,
+    PreparedCandidateConflict,
+    GenerationOverflow,
+    InjectedCrash(FaultPoint),
+}
+
+impl fmt::Display for WitnessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Sqlite(error) => write!(f, "SQLite error: {error}"),
+            Self::Io(error) => write!(f, "I/O error: {error}"),
+            Self::Anchor(error) => write!(f, "{error}"),
+            Self::InvalidInput(message) => write!(f, "invalid input: {message}"),
+            Self::RuntimeConfigurationMismatch => {
+                write!(f, "SQLite durability PRAGMAs do not match the required profile")
+            }
+            Self::CorruptStore(message) => write!(f, "corrupt witness store: {message}"),
+            Self::CorruptForkEvidence => write!(f, "corrupt witness fork-evidence chain"),
+            Self::StalePredecessor => write!(f, "stale predecessor"),
+            Self::ReceiptRollback => write!(f, "receipt sequence rollback"),
+            Self::ReceiptTailEquivocation => {
+                write!(f, "receipt digest changed without a sequence advance")
+            }
+            Self::ExternalAnchorMismatch => write!(f, "external anchor disagrees with local history"),
+            Self::RollbackDetected => write!(f, "external anchor proves local rollback or missing history"),
+            Self::PreparedCandidateConflict => {
+                write!(f, "a different candidate is already prepared for this generation")
+            }
+            Self::GenerationOverflow => write!(f, "witness generation overflow"),
+            Self::InjectedCrash(point) => write!(f, "injected crash at {point:?}"),
+        }
+    }
+}
+
+impl std::error::Error for WitnessError {}
+
+impl From<rusqlite::Error> for WitnessError {
+    fn from(value: rusqlite::Error) -> Self {
+        Self::Sqlite(value)
+    }
+}
+
+impl From<std::io::Error> for WitnessError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl From<AnchorError> for WitnessError {
+    fn from(value: AnchorError) -> Self {
+        Self::Anchor(value)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FaultPoint {
+    AfterPrepare,
+    AfterExternalAnchorAdvance,
+}
+
+#[derive(Clone, Debug)]
+struct History {
+    accepted: Option<Record>,
+    prepared: Option<Record>,
+}
+
+pub struct SqliteWitnessStore {
+    path: PathBuf,
+}
+
+impl SqliteWitnessStore {
+    /// Open or initialize an on-disk journal with WAL + FULL durability.
+    /// In-memory SQLite is unsupported because operations open independent
+    /// connections for cross-connection serialization tests.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, WitnessError> {
+        let path = path.as_ref().to_path_buf();
+        if path.as_os_str().is_empty() {
+            return Err(WitnessError::InvalidInput("database path is empty"));
+        }
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+        let store = Self { path };
+        let conn = store.open_connection()?;
+        conn.execute_batch(SCHEMA)?;
+        store.integrity_check()?;
+        Ok(store)
+    }
+
+    fn open_connection(&self) -> Result<Connection, WitnessError> {
+        let conn = Connection::open(&self.path)?;
+        conn.busy_timeout(Duration::from_millis(BUSY_TIMEOUT_MS))?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=FULL;
+             PRAGMA foreign_keys=ON;
+             PRAGMA busy_timeout=5000;",
+        )?;
+
+        let journal_mode: String =
+            conn.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
+        let synchronous: i64 =
+            conn.query_row("PRAGMA synchronous", [], |row| row.get(0))?;
+        let foreign_keys: i64 =
+            conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
+        let busy_timeout: i64 =
+            conn.query_row("PRAGMA busy_timeout", [], |row| row.get(0))?;
+        if !journal_mode.eq_ignore_ascii_case("wal")
+            || synchronous != 2
+            || foreign_keys != 1
+            || busy_timeout != BUSY_TIMEOUT_MS as i64
+        {
+            return Err(WitnessError::RuntimeConfigurationMismatch);
+        }
+        Ok(conn)
+    }
+
+    /// Initialize from the trusted genesis anchor (generation zero, zero
+    /// digest). Generation one is externally anchored before local acceptance.
+    /// Repeated identical requests are idempotent.
+    pub fn initialize(
+        &self,
+        log_id: &str,
+        policy_version: &str,
+        anchor_digest: Digest,
+        receipt_sequence: u64,
+        receipt_digest: Option<Digest>,
+        anchor: &dyn IndependentAnchor,
+    ) -> Result<Record, WitnessError> {
+        self.transition_inner(
+            log_id,
+            0,
+            ZERO_DIGEST,
+            Some(policy_version),
+            anchor_digest,
+            receipt_sequence,
+            receipt_digest,
+            anchor,
+            None,
+        )
+    }
+
+    /// Propose, prepare, externally anchor, and locally accept the next record.
+    /// The returned record is not a digital signature or witness quorum proof.
+    pub fn advance(
+        &self,
+        log_id: &str,
+        expected_generation: u64,
+        expected_digest: Digest,
+        proposed_anchor_digest: Digest,
+        receipt_sequence: u64,
+        receipt_digest: Option<Digest>,
+        anchor: &dyn IndependentAnchor,
+    ) -> Result<Record, WitnessError> {
+        self.transition_inner(
+            log_id,
+            expected_generation,
+            expected_digest,
+            None,
+            proposed_anchor_digest,
+            receipt_sequence,
+            receipt_digest,
+            anchor,
+            None,
+        )
+    }
+
+    fn transition_inner(
+        &self,
+        log_id: &str,
+        expected_generation: u64,
+        expected_digest: Digest,
+        initial_policy: Option<&str>,
+        proposed_anchor_digest: Digest,
+        receipt_sequence: u64,
+        receipt_digest: Option<Digest>,
+        anchor: &dyn IndependentAnchor,
+        fault: Option<FaultPoint>,
+    ) -> Result<Record, WitnessError> {
+        validate_input(log_id, initial_policy, receipt_sequence, receipt_digest)?;
+        let current = self.recover(log_id, anchor)?;
+
+        if let Some(current) = current.as_ref() {
+            let next_generation = expected_generation
+                .checked_add(1)
+                .ok_or(WitnessError::GenerationOverflow)?;
+            if current.generation == next_generation
+                && current.previous_record_digest == Some(expected_digest)
+                && current.anchor_digest == proposed_anchor_digest
+                && current.receipt_sequence == receipt_sequence
+                && current.receipt_digest == receipt_digest
+            {
+                return Ok(current.clone());
+            }
+            if current.generation != expected_generation || current.digest != expected_digest {
+                return Err(WitnessError::StalePredecessor);
+            }
+        } else if expected_generation != 0 || expected_digest != ZERO_DIGEST {
+            return Err(WitnessError::StalePredecessor);
+        }
+
+        let policy_version = current
+            .as_ref()
+            .map(|record| record.policy_version.as_str())
+            .or(initial_policy)
+            .ok_or(WitnessError::InvalidInput(
+                "first transition requires a policy version",
+            ))?;
+        if let Some(previous) = current.as_ref() {
+            if receipt_sequence < previous.receipt_sequence {
+                return Err(WitnessError::ReceiptRollback);
+            }
+            if receipt_sequence == previous.receipt_sequence
+                && receipt_digest != previous.receipt_digest
+            {
+                return Err(WitnessError::ReceiptTailEquivocation);
+            }
+        }
+        let generation = expected_generation
+            .checked_add(1)
+            .ok_or(WitnessError::GenerationOverflow)?;
+        if generation > i64::MAX as u64 {
+            return Err(WitnessError::GenerationOverflow);
+        }
+        let candidate = Record::build(
+            generation,
+            log_id,
+            policy_version,
+            proposed_anchor_digest,
+            receipt_sequence,
+            receipt_digest,
+            (expected_generation > 0).then_some(expected_digest),
+        );
+        let expected_anchor = if let Some(previous) = current.as_ref() {
+            AnchorState::from_record(previous)
+        } else {
+            AnchorState::genesis(log_id)
+        };
+        let observed = anchor.current(log_id)?;
+        if observed != expected_anchor && observed != AnchorState::from_record(&candidate) {
+            self.record_fork(log_id, generation, observed.record_digest, candidate.digest)?;
+            return Err(WitnessError::ExternalAnchorMismatch);
+        }
+
+        self.prepare(&candidate, expected_generation, expected_digest)?;
+        if fault == Some(FaultPoint::AfterPrepare) {
+            return Err(WitnessError::InjectedCrash(FaultPoint::AfterPrepare));
+        }
+
+        let observed_after_prepare = anchor.current(log_id)?;
+        if observed_after_prepare == expected_anchor {
+            let next_anchor = AnchorState::from_record(&candidate);
+            if let Err(cas_error) = anchor.compare_and_advance(&expected_anchor, &next_anchor) {
+                let observed_after_cas = anchor.current(log_id)?;
+                if observed_after_cas != next_anchor {
+                    if observed_after_cas.generation == generation
+                        && observed_after_cas.record_digest != candidate.digest
+                    {
+                        self.record_fork(
+                            log_id,
+                            generation,
+                            observed_after_cas.record_digest,
+                            candidate.digest,
+                        )?;
+                        return Err(WitnessError::ExternalAnchorMismatch);
+                    }
+                    return Err(WitnessError::Anchor(cas_error));
+                }
+            }
+        } else if observed_after_prepare != AnchorState::from_record(&candidate) {
+            self.record_fork(
+                log_id,
+                generation,
+                observed_after_prepare.record_digest,
+                candidate.digest,
+            )?;
+            return Err(WitnessError::ExternalAnchorMismatch);
+        }
+        if fault == Some(FaultPoint::AfterExternalAnchorAdvance) {
+            return Err(WitnessError::InjectedCrash(
+                FaultPoint::AfterExternalAnchorAdvance,
+            ));
+        }
+
+        self.finalize(&candidate, expected_generation, expected_digest)?;
+        Ok(candidate)
+    }
+
+    /// Recover only when local accepted history agrees with the independent
+    /// anchor, or when the anchor matches an exact prepared one-step successor.
+    pub fn recover(
+        &self,
+        log_id: &str,
+        anchor: &dyn IndependentAnchor,
+    ) -> Result<Option<Record>, WitnessError> {
+        if log_id.is_empty() {
+            return Err(WitnessError::InvalidInput("log ID is empty"));
+        }
+        let history = self.load_history(log_id)?;
+        let external = anchor.current(log_id)?;
+        if external.log_id != log_id {
+            return Err(WitnessError::ExternalAnchorMismatch);
+        }
+
+        let accepted = history.accepted.as_ref();
+        let expected = accepted
+            .map(AnchorState::from_record)
+            .unwrap_or_else(|| AnchorState::genesis(log_id));
+
+        if external == expected {
+            return Ok(history.accepted);
+        }
+        if external.generation < expected.generation {
+            return Err(WitnessError::RollbackDetected);
+        }
+        if external.generation == expected.generation {
+            return Err(WitnessError::ExternalAnchorMismatch);
+        }
+
+        if let Some(prepared) = history.prepared.as_ref() {
+            let is_exact_successor = prepared.generation == expected.generation + 1
+                && prepared.previous_record_digest
+                    == (expected.generation > 0).then_some(expected.record_digest)
+                && external == AnchorState::from_record(prepared);
+            if is_exact_successor {
+                self.finalize(
+                    prepared,
+                    expected.generation,
+                    expected.record_digest,
+                )?;
+                return Ok(Some(prepared.clone()));
+            }
+        }
+        Err(WitnessError::RollbackDetected)
+    }
+
+    fn prepare(
+        &self,
+        candidate: &Record,
+        expected_generation: u64,
+        expected_digest: Digest,
+    ) -> Result<(), WitnessError> {
+        let mut conn = self.open_connection()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let meta: Option<(i64, Vec<u8>)> = tx
+            .query_row(
+                "SELECT generation, record_digest FROM witness_meta WHERE log_id=?1",
+                params![candidate.log_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+
+        match (expected_generation, meta) {
+            (0, None) => {}
+            (generation, Some((stored_generation, stored_digest)))
+                if stored_generation == generation as i64
+                    && blob_digest(&stored_digest)? == expected_digest => {}
+            _ => return Err(WitnessError::StalePredecessor),
+        }
+
+        let existing: Option<(Vec<u8>, i64)> = tx
+            .query_row(
+                "SELECT record_digest, status FROM witness_records
+                 WHERE log_id=?1 AND generation=?2",
+                params![candidate.log_id, candidate.generation as i64],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if let Some((stored_digest, status)) = existing {
+            let stored_digest = blob_digest(&stored_digest)?;
+            if stored_digest == candidate.digest && status == 0 {
+                tx.commit()?;
+                return Ok(());
+            }
+            if stored_digest != candidate.digest {
+                append_fork_evidence(
+                    &tx,
+                    &candidate.log_id,
+                    candidate.generation,
+                    stored_digest,
+                    candidate.digest,
+                )?;
+                tx.commit()?;
+                return Err(WitnessError::PreparedCandidateConflict);
+            }
+            return Err(WitnessError::CorruptStore(
+                "candidate digest exists with an invalid status",
+            ));
+        }
+
+        tx.execute(
+            "INSERT INTO witness_records (
+                log_id, generation, record_digest, protocol_version, policy_version,
+                anchor_digest, receipt_sequence, receipt_digest, previous_record_digest, status
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0)",
+            params![
+                candidate.log_id,
+                candidate.generation as i64,
+                candidate.digest.as_slice(),
+                candidate.protocol_version as i64,
+                candidate.policy_version,
+                candidate.anchor_digest.as_slice(),
+                candidate.receipt_sequence as i64,
+                candidate.receipt_digest.map(|digest| digest.to_vec()),
+                candidate.previous_record_digest.map(|digest| digest.to_vec()),
+            ],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn finalize(
+        &self,
+        candidate: &Record,
+        expected_generation: u64,
+        expected_digest: Digest,
+    ) -> Result<(), WitnessError> {
+        let mut conn = self.open_connection()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let meta: Option<(i64, Vec<u8>)> = tx
+            .query_row(
+                "SELECT generation, record_digest FROM witness_meta WHERE log_id=?1",
+                params![candidate.log_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+
+        if let Some((generation, digest)) = meta.as_ref() {
+            if *generation == candidate.generation as i64
+                && blob_digest(digest)? == candidate.digest
+            {
+                let status: i64 = tx.query_row(
+                    "SELECT status FROM witness_records
+                     WHERE log_id=?1 AND generation=?2 AND record_digest=?3",
+                    params![
+                        candidate.log_id,
+                        candidate.generation as i64,
+                        candidate.digest.as_slice()
+                    ],
+                    |row| row.get(0),
+                )?;
+                if status == 1 {
+                    tx.commit()?;
+                    return Ok(());
+                }
+            }
+        }
+
+        match (expected_generation, meta) {
+            (0, None) if candidate.generation == 1 => {}
+            (generation, Some((stored_generation, stored_digest)))
+                if stored_generation == generation as i64
+                    && blob_digest(&stored_digest)? == expected_digest => {}
+            _ => return Err(WitnessError::StalePredecessor),
+        }
+
+        let affected = tx.execute(
+            "UPDATE witness_records SET status=1
+             WHERE log_id=?1 AND generation=?2 AND record_digest=?3 AND status=0",
+            params![
+                candidate.log_id,
+                candidate.generation as i64,
+                candidate.digest.as_slice()
+            ],
+        )?;
+        if affected != 1 {
+            return Err(WitnessError::CorruptStore(
+                "prepared candidate missing during finalization",
+            ));
+        }
+        if expected_generation == 0 {
+            tx.execute(
+                "INSERT INTO witness_meta (log_id, schema_version, generation, record_digest)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    candidate.log_id,
+                    SCHEMA_VERSION,
+                    candidate.generation as i64,
+                    candidate.digest.as_slice()
+                ],
+            )?;
+        } else {
+            let affected = tx.execute(
+                "UPDATE witness_meta SET generation=?1, record_digest=?2
+                 WHERE log_id=?3 AND generation=?4 AND record_digest=?5",
+                params![
+                    candidate.generation as i64,
+                    candidate.digest.as_slice(),
+                    candidate.log_id,
+                    expected_generation as i64,
+                    expected_digest.as_slice()
+                ],
+            )?;
+            if affected != 1 {
+                return Err(WitnessError::StalePredecessor);
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn record_fork(
+        &self,
+        log_id: &str,
+        generation: u64,
+        first_digest: Digest,
+        conflicting_digest: Digest,
+    ) -> Result<(), WitnessError> {
+        if first_digest == conflicting_digest {
+            return Err(WitnessError::InvalidInput(
+                "fork evidence must contain distinct record digests",
+            ));
+        }
+        let mut conn = self.open_connection()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        append_fork_evidence(
+            &tx,
+            log_id,
+            generation,
+            first_digest,
+            conflicting_digest,
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn load_history(&self, log_id: &str) -> Result<History, WitnessError> {
+        let mut conn = self.open_connection()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        validate_fork_history(&tx, log_id)?;
+
+        let mut statement = tx.prepare(
+            "SELECT generation, record_digest, protocol_version, policy_version,
+                    anchor_digest, receipt_sequence, receipt_digest,
+                    previous_record_digest, status
+             FROM witness_records WHERE log_id=?1 ORDER BY generation ASC",
+        )?;
+        let raw_rows = statement
+            .query_map(params![log_id], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, Vec<u8>>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, Option<Vec<u8>>>(6)?,
+                    row.get::<_, Option<Vec<u8>>>(7)?,
+                    row.get::<_, i64>(8)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+
+        let meta: Option<(i64, Vec<u8>, i64)> = tx
+            .query_row(
+                "SELECT generation, record_digest, schema_version
+                 FROM witness_meta WHERE log_id=?1",
+                params![log_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+
+        let mut records = Vec::with_capacity(raw_rows.len());
+        let mut statuses = Vec::with_capacity(raw_rows.len());
+        let mut previous: Option<Record> = None;
+        for raw in raw_rows {
+            let (generation, digest, protocol_version, policy_version, anchor_digest, sequence,
+                receipt_digest, previous_digest, status) = raw;
+            if generation <= 0 || sequence < 0 || !(status == 0 || status == 1) {
+                return Err(WitnessError::CorruptStore("invalid numeric record field"));
+            }
+            let record = Record {
+                protocol_version: u16::try_from(protocol_version)
+                    .map_err(|_| WitnessError::CorruptStore("invalid protocol version"))?,
+                generation: generation as u64,
+                log_id: log_id.to_owned(),
+                policy_version,
+                anchor_digest: blob_digest(&anchor_digest)?,
+                receipt_sequence: sequence as u64,
+                receipt_digest: receipt_digest.as_deref().map(blob_digest).transpose()?,
+                previous_record_digest: previous_digest
+                    .as_deref()
+                    .map(blob_digest)
+                    .transpose()?,
+                digest: blob_digest(&digest)?,
+            };
+            let expected_generation = records.len() as u64 + 1;
+            let expected_previous = previous.as_ref().map(|record| record.digest);
+            if record.generation != expected_generation
+                || record.previous_record_digest != expected_previous
+                || !record.is_self_consistent()
+                || previous.as_ref().is_some_and(|prior| {
+                    prior.policy_version != record.policy_version
+                        || record.receipt_sequence < prior.receipt_sequence
+                        || (record.receipt_sequence == prior.receipt_sequence
+                            && record.receipt_digest != prior.receipt_digest)
+                })
+            {
+                return Err(WitnessError::CorruptStore(
+                    "record chain, policy, or receipt history is invalid",
+                ));
+            }
+            previous = Some(record.clone());
+            records.push(record);
+            statuses.push(status);
+        }
+
+        let accepted_count = statuses.iter().filter(|status| **status == 1).count();
+        let prepared_count = statuses.iter().filter(|status| **status == 0).count();
+        if prepared_count > 1 {
+            return Err(WitnessError::CorruptStore(
+                "more than one prepared candidate exists",
+            ));
+        }
+        if let Some(position) = statuses.iter().position(|status| *status == 0) {
+            if position + 1 != statuses.len()
+                || statuses[..position].iter().any(|status| *status != 1)
+            {
+                return Err(WitnessError::CorruptStore(
+                    "prepared candidate is not the final record",
+                ));
+            }
+        }
+        if statuses.iter().skip(accepted_count).any(|status| *status != 0) {
+            return Err(WitnessError::CorruptStore("accepted record appears after prepared state"));
+        }
+
+        let accepted = match meta {
+            Some((generation, digest, schema_version)) => {
+                if schema_version != SCHEMA_VERSION
+                    || generation <= 0
+                    || generation as usize != accepted_count
+                    || accepted_count == 0
+                    || blob_digest(&digest)? != records[accepted_count - 1].digest
+                {
+                    return Err(WitnessError::CorruptStore("metadata does not match accepted history"));
+                }
+                Some(records[accepted_count - 1].clone())
+            }
+            None if accepted_count == 0 => None,
+            None => return Err(WitnessError::CorruptStore("accepted records lack metadata")),
+        };
+        let prepared = records
+            .get(accepted_count)
+            .filter(|_| prepared_count == 1)
+            .cloned();
+
+        if records.len() != accepted_count + prepared_count {
+            return Err(WitnessError::CorruptStore("record status accounting mismatch"));
+        }
+
+        tx.commit()?;
+        Ok(History { accepted, prepared })
+    }
+
+    /// Run SQLite integrity checks and return "ok" on success. This does not
+    /// validate the external anchor.
+    pub fn integrity_check(&self) -> Result<String, WitnessError> {
+        let conn = self.open_connection()?;
+        let result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+        if result != "ok" {
+            return Err(WitnessError::CorruptStore("SQLite integrity_check failed"));
+        }
+        let foreign_key_violation: Option<String> = conn
+            .query_row("PRAGMA foreign_key_check", [], |row| row.get(0))
+            .optional()?;
+        if foreign_key_violation.is_some() {
+            return Err(WitnessError::CorruptStore("SQLite foreign_key_check failed"));
+        }
+        Ok(result)
+    }
+}
+
+fn append_fork_evidence(
+    tx: &Transaction<'_>,
+    log_id: &str,
+    generation: u64,
+    first_digest: Digest,
+    conflicting_digest: Digest,
+) -> Result<(), WitnessError> {
+    if first_digest == conflicting_digest {
+        return Err(WitnessError::InvalidInput(
+            "fork evidence must contain distinct record digests",
+        ));
+    }
+    let previous_blob: Option<Vec<u8>> = tx
+        .query_row(
+            "SELECT digest FROM witness_fork_evidence
+             WHERE log_id=?1 ORDER BY id DESC LIMIT 1",
+            params![log_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let previous = previous_blob.as_deref().map(blob_digest).transpose()?;
+    let digest = fork_digest(generation, first_digest, conflicting_digest, previous);
+    tx.execute(
+        "INSERT OR IGNORE INTO witness_fork_evidence (
+            log_id, generation, first_record_digest, conflicting_record_digest,
+            previous_evidence_digest, digest
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            log_id,
+            generation as i64,
+            first_digest.as_slice(),
+            conflicting_digest.as_slice(),
+            previous.map(|value| value.to_vec()),
+            digest.as_slice()
+        ],
+    )?;
+    Ok(())
+}
+
+fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessError> {
+    let mut statement = conn.prepare(
+        "SELECT generation, first_record_digest, conflicting_record_digest,
+                previous_evidence_digest, digest
+         FROM witness_fork_evidence WHERE log_id=?1 ORDER BY id ASC",
+    )?;
+    let rows = statement
+        .query_map(params![log_id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Vec<u8>>(2)?,
+                row.get::<_, Option<Vec<u8>>>(3)?,
+                row.get::<_, Vec<u8>>(4)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut previous: Option<Digest> = None;
+    for (generation, first, conflicting, prev, digest) in rows {
+        if generation <= 0 {
+            return Err(WitnessError::CorruptForkEvidence);
+        }
+        let first = blob_digest(&first).map_err(|_| WitnessError::CorruptForkEvidence)?;
+        let conflicting =
+            blob_digest(&conflicting).map_err(|_| WitnessError::CorruptForkEvidence)?;
+        let stored_previous = prev
+            .as_deref()
+            .map(blob_digest)
+            .transpose()
+            .map_err(|_| WitnessError::CorruptForkEvidence)?;
+        let stored_digest =
+            blob_digest(&digest).map_err(|_| WitnessError::CorruptForkEvidence)?;
+        if first == conflicting || stored_previous != previous
+            || stored_digest != fork_digest(generation as u64, first, conflicting, previous)
+        {
+            return Err(WitnessError::CorruptForkEvidence);
+        }
+        previous = Some(stored_digest);
+    }
+    Ok(())
+}
+
+fn valid_receipt_tail(sequence: u64, digest: Option<Digest>) -> bool {
+    (sequence == 0) == digest.is_none()
+}
+
+fn validate_input(
+    log_id: &str,
+    policy: Option<&str>,
+    sequence: u64,
+    digest: Option<Digest>,
+) -> Result<(), WitnessError> {
+    if log_id.is_empty() {
+        return Err(WitnessError::InvalidInput("log ID is empty"));
+    }
+    if policy.is_some_and(str::is_empty) {
+        return Err(WitnessError::InvalidInput("policy version is empty"));
+    }
+    if !valid_receipt_tail(sequence, digest) {
+        return Err(WitnessError::InvalidInput("receipt sequence/digest shape is invalid"));
+    }
+    if sequence > i64::MAX as u64 {
+        return Err(WitnessError::InvalidInput("receipt sequence exceeds SQLite INTEGER range"));
+    }
+    Ok(())
+}
+
+fn encode_field(out: &mut Vec<u8>, value: &[u8]) {
+    out.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    out.extend_from_slice(value);
+}
+
+fn option_digest(out: &mut Vec<u8>, value: Option<Digest>) {
+    match value {
+        Some(digest) => {
+            out.push(1);
+            out.extend_from_slice(&digest);
+        }
+        None => out.push(0),
+    }
+}
+
+fn record_digest(
+    protocol_version: u16,
+    generation: u64,
+    log_id: &str,
+    policy_version: &str,
+    anchor_digest: Digest,
+    receipt_sequence: u64,
+    receipt_digest: Option<Digest>,
+    previous_record_digest: Option<Digest>,
+) -> Digest {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(RECORD_DOMAIN);
+    bytes.extend_from_slice(&protocol_version.to_be_bytes());
+    bytes.extend_from_slice(&generation.to_be_bytes());
+    encode_field(&mut bytes, log_id.as_bytes());
+    encode_field(&mut bytes, policy_version.as_bytes());
+    bytes.extend_from_slice(&anchor_digest);
+    bytes.extend_from_slice(&receipt_sequence.to_be_bytes());
+    option_digest(&mut bytes, receipt_digest);
+    option_digest(&mut bytes, previous_record_digest);
+    Sha256::digest(bytes).into()
+}
+
+fn fork_digest(
+    generation: u64,
+    first: Digest,
+    conflicting: Digest,
+    previous: Option<Digest>,
+) -> Digest {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(FORK_DOMAIN);
+    bytes.extend_from_slice(&generation.to_be_bytes());
+    bytes.extend_from_slice(&first);
+    bytes.extend_from_slice(&conflicting);
+    option_digest(&mut bytes, previous);
+    Sha256::digest(bytes).into()
+}
+
+fn blob_digest(bytes: &[u8]) -> Result<Digest, WitnessError> {
+    bytes
+        .try_into()
+        .map_err(|_| WitnessError::CorruptStore("digest blob is not 32 bytes"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+
+    static NEXT_DB: AtomicU64 = AtomicU64::new(1);
+
+    struct TempDb(PathBuf);
+
+    impl TempDb {
+        fn new() -> Self {
+            let id = NEXT_DB.fetch_add(1, Ordering::Relaxed);
+            Self(std::env::temp_dir().join(format!(
+                "symthaea-civ-witness-{}-{id}.sqlite",
+                std::process::id()
+            )))
+        }
+
+        fn open(&self) -> SqliteWitnessStore {
+            SqliteWitnessStore::open(&self.0).expect("open SQLite witness store")
+        }
+    }
+
+    impl Drop for TempDb {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+            let _ = std::fs::remove_file(self.0.with_extension("sqlite-wal"));
+            let _ = std::fs::remove_file(self.0.with_extension("sqlite-shm"));
+        }
+    }
+
+    #[derive(Default)]
+    struct MemoryAnchor {
+        states: Mutex<HashMap<String, AnchorState>>,
+    }
+
+    impl MemoryAnchor {
+        fn provision(&self, log_id: &str) {
+            self.states
+                .lock()
+                .expect("anchor lock")
+                .insert(log_id.to_owned(), AnchorState::genesis(log_id));
+        }
+    }
+
+    impl IndependentAnchor for MemoryAnchor {
+        fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
+            self.states
+                .lock()
+                .map_err(|_| AnchorError::Other("anchor mutex poisoned".into()))?
+                .get(log_id)
+                .cloned()
+                .ok_or(AnchorError::Unavailable)
+        }
+
+        fn compare_and_advance(
+            &self,
+            expected: &AnchorState,
+            next: &AnchorState,
+        ) -> Result<(), AnchorError> {
+            let mut states = self
+                .states
+                .lock()
+                .map_err(|_| AnchorError::Other("anchor mutex poisoned".into()))?;
+            let current = states
+                .get(&expected.log_id)
+                .ok_or(AnchorError::Unavailable)?;
+            if current != expected
+                || next.log_id != expected.log_id
+                || next.generation != expected.generation + 1
+            {
+                return Err(AnchorError::CompareFailed);
+            }
+            states.insert(next.log_id.clone(), next.clone());
+            Ok(())
+        }
+    }
+
+    fn h(value: &[u8]) -> Digest {
+        Sha256::digest(value).into()
+    }
+
+    fn initialize(
+        store: &SqliteWitnessStore,
+        anchor: &MemoryAnchor,
+        log_id: &str,
+    ) -> Record {
+        anchor.provision(log_id);
+        store
+            .initialize(log_id, "policy-v1", h(b"genesis-checkpoint"), 0, None, anchor)
+            .expect("initialize trusted witness")
+    }
+
+    #[test]
+    fn uses_wal_full_and_recovers_after_reopen() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let first = initialize(&store, &anchor, "log-a");
+        let next = store
+            .advance(
+                "log-a",
+                first.generation,
+                first.digest,
+                h(b"checkpoint-two"),
+                1,
+                Some(h(b"receipt-one")),
+                &anchor,
+            )
+            .expect("advance witness");
+        assert_eq!(next.generation, 2);
+        assert_eq!(store.integrity_check().expect("integrity"), "ok");
+
+        drop(store);
+        let reopened = db.open();
+        assert_eq!(reopened.recover("log-a", &anchor).expect("recovery"), Some(next));
+    }
+
+    #[test]
+    fn receipt_tail_cannot_regress_or_equivocate() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let first = initialize(&store, &anchor, "log-tail");
+        let second = store
+            .advance(
+                "log-tail",
+                first.generation,
+                first.digest,
+                h(b"checkpoint-two"),
+                2,
+                Some(h(b"receipt-two")),
+                &anchor,
+            )
+            .expect("second record");
+
+        assert!(matches!(
+            store.advance(
+                "log-tail",
+                second.generation,
+                second.digest,
+                h(b"checkpoint-three"),
+                1,
+                Some(h(b"receipt-old")),
+                &anchor,
+            ),
+            Err(WitnessError::ReceiptRollback)
+        ));
+        assert!(matches!(
+            store.advance(
+                "log-tail",
+                second.generation,
+                second.digest,
+                h(b"checkpoint-three"),
+                2,
+                Some(h(b"equivocated-receipt")),
+                &anchor,
+            ),
+            Err(WitnessError::ReceiptTailEquivocation)
+        ));
+        assert_eq!(store.recover("log-tail", &anchor).expect("unchanged history"), Some(second));
+    }
+
+    #[test]
+    fn crash_after_external_advance_is_reconciled_from_prepared_record() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let first = initialize(&store, &anchor, "log-reconcile");
+        let result = store.transition_inner(
+            "log-reconcile",
+            first.generation,
+            first.digest,
+            None,
+            h(b"checkpoint-two"),
+            1,
+            Some(h(b"receipt-one")),
+            &anchor,
+            Some(FaultPoint::AfterExternalAnchorAdvance),
+        );
+        assert!(matches!(
+            result,
+            Err(WitnessError::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance))
+        ));
+        drop(store);
+
+        let reopened = db.open();
+        let recovered = reopened.recover("log-reconcile", &anchor)
+            .expect("prepared candidate recovery")
+            .expect("accepted recovery");
+        assert_eq!(recovered.generation, 2);
+        assert_eq!(recovered.previous_record_digest, Some(first.digest));
+    }
+
+    #[test]
+    fn prepared_candidate_is_reused_after_restart_when_anchor_is_unchanged() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let first = initialize(&store, &anchor, "log-retry");
+        let checkpoint = h(b"checkpoint-two");
+        let receipt = h(b"receipt-one");
+        assert!(matches!(
+            store.transition_inner(
+                "log-retry",
+                first.generation,
+                first.digest,
+                None,
+                checkpoint,
+                1,
+                Some(receipt),
+                &anchor,
+                Some(FaultPoint::AfterPrepare),
+            ),
+            Err(WitnessError::InjectedCrash(FaultPoint::AfterPrepare))
+        ));
+        drop(store);
+
+        let reopened = db.open();
+        assert_eq!(reopened.recover("log-retry", &anchor).expect("prior state"), Some(first.clone()));
+        let second = reopened.advance(
+            "log-retry",
+            first.generation,
+            first.digest,
+            checkpoint,
+            1,
+            Some(receipt),
+            &anchor,
+        ).expect("retry prepared candidate");
+        assert_eq!(second.generation, 2);
+    }
+
+    #[test]
+    fn competing_prepared_candidates_preserve_fork_evidence() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let first = initialize(&store, &anchor, "log-fork");
+
+        let result_one = store.transition_inner(
+            "log-fork",
+            first.generation,
+            first.digest,
+            None,
+            h(b"candidate-one"),
+            1,
+            Some(h(b"receipt-one")),
+            &anchor,
+            Some(FaultPoint::AfterPrepare),
+        );
+        assert!(matches!(result_one, Err(WitnessError::InjectedCrash(_))));
+
+        assert!(matches!(
+            store.advance(
+                "log-fork",
+                first.generation,
+                first.digest,
+                h(b"candidate-two"),
+                1,
+                Some(h(b"receipt-two")),
+                &anchor,
+            ),
+            Err(WitnessError::PreparedCandidateConflict)
+        ));
+        assert_eq!(store.integrity_check().expect("SQLite integrity"), "ok");
+        assert!(matches!(
+            store.load_history("log-fork"),
+            Ok(History { accepted: Some(_), prepared: Some(_) })
+        ));
+    }
+
+    #[test]
+    fn two_store_instances_cannot_both_advance_one_predecessor() {
+        let db = TempDb::new();
+        let anchor = Arc::new(MemoryAnchor::default());
+        let store = db.open();
+        let first = initialize(&store, anchor.as_ref(), "log-race");
+        drop(store);
+
+        let one = db.open();
+        let two = db.open();
+        let a1 = Arc::clone(&anchor);
+        let a2 = Arc::clone(&anchor);
+        let predecessor = first.clone();
+        let handle_one = thread::spawn(move || {
+            one.advance(
+                "log-race",
+                predecessor.generation,
+                predecessor.digest,
+                h(b"race-one"),
+                1,
+                Some(h(b"receipt-one")),
+                a1.as_ref(),
+            )
+        });
+        let predecessor = first.clone();
+        let handle_two = thread::spawn(move || {
+            two.advance(
+                "log-race",
+                predecessor.generation,
+                predecessor.digest,
+                h(b"race-two"),
+                1,
+                Some(h(b"receipt-two")),
+                a2.as_ref(),
+            )
+        });
+
+        let outcomes = [
+            handle_one.join().expect("thread one"),
+            handle_two.join().expect("thread two"),
+        ];
+        assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
+        assert_eq!(storeless_recover(&db, anchor.as_ref(), "log-race").generation, 2);
+    }
+
+    fn storeless_recover(db: &TempDb, anchor: &MemoryAnchor, log_id: &str) -> Record {
+        db.open()
+            .recover(log_id, anchor)
+            .expect("recover after raced advances")
+            .expect("accepted state after raced advances")
+    }
+}

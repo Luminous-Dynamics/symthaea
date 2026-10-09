@@ -18427,6 +18427,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-civ-witness"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-clime"
 version = "0.1.0"
 dependencies = [
