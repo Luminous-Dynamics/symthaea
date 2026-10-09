@@ -256,18 +256,62 @@ impl MusicalStateTrajectory {
         self.recurrence_pairs(threshold).len() as f64 / possible
     }
 
-    /// Return frame indices whose best-prior novelty exceeds the threshold.
+    /// Return local maxima of best-prior novelty above the threshold.
+    ///
+    /// Consecutive equal-valued maxima form one plateau and produce its
+    /// lower-middle index. Missing novelty values split runs; non-finite values
+    /// are ignored. A plateau with no strictly lower neighbor is not a peak.
     pub fn novelty_peaks(&self, minimum_novelty: f64) -> Vec<usize> {
-        self.frames
+        let values: Vec<Option<f64>> = self
+            .frames
             .iter()
-            .enumerate()
-            .filter_map(|(i, frame)| {
-                frame
-                    .novelty
-                    .filter(|&n| n >= minimum_novelty)
-                    .map(|_| i)
-            })
-            .collect()
+            .map(|frame| frame.novelty.filter(|value| value.is_finite()))
+            .collect();
+        let mut peaks = Vec::new();
+        let mut run_start = 0usize;
+
+        while run_start < values.len() {
+            while run_start < values.len() && values[run_start].is_none() {
+                run_start += 1;
+            }
+            if run_start == values.len() {
+                break;
+            }
+
+            let mut run_end = run_start;
+            while run_end + 1 < values.len() && values[run_end + 1].is_some() {
+                run_end += 1;
+            }
+
+            let mut group_start = run_start;
+            while group_start <= run_end {
+                let value = values[group_start].expect("run contains only finite values");
+                let mut group_end = group_start;
+                while group_end < run_end && values[group_end + 1] == Some(value) {
+                    group_end += 1;
+                }
+
+                let left = (group_start > run_start)
+                    .then(|| values[group_start - 1].expect("within finite run"));
+                let right = (group_end < run_end)
+                    .then(|| values[group_end + 1].expect("within finite run"));
+                let not_below_neighbor =
+                    left.is_none_or(|neighbor| value >= neighbor)
+                        && right.is_none_or(|neighbor| value >= neighbor);
+                let strictly_above_neighbor =
+                    left.is_some_and(|neighbor| value > neighbor)
+                        || right.is_some_and(|neighbor| value > neighbor);
+
+                if value >= minimum_novelty && not_below_neighbor && strictly_above_neighbor {
+                    peaks.push((group_start + group_end) / 2);
+                }
+                group_start = group_end + 1;
+            }
+
+            run_start = run_end + 1;
+        }
+
+        peaks
     }
 }
 
@@ -654,6 +698,43 @@ mod tests {
         let trajectory = MusicalStateTrajectory::from_score(&s, 0.1, 1.0)
             .expect("4096 possible window starts are within the fixed frame budget");
         assert_eq!(trajectory.frames.len(), 2);
+    }
+
+    #[test]
+    fn novelty_peaks_select_local_maxima_and_collapse_plateaus() {
+        let notes: Vec<_> = (0..6).map(|onset| note(onset % 12, 4, onset)).collect();
+        let mut trajectory =
+            MusicalStateTrajectory::from_score(&score(&notes, 0), 1.0, 1.0).unwrap();
+        for (frame, novelty) in trajectory.frames.iter_mut().zip([
+            None,
+            Some(0.2),
+            Some(0.8),
+            Some(0.8),
+            Some(0.3),
+            Some(0.9),
+        ]) {
+            frame.novelty = novelty;
+        }
+
+        assert_eq!(trajectory.novelty_peaks(0.5), vec![2, 5]);
+        assert_eq!(trajectory.novelty_peaks(0.95), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn flat_novelty_run_is_not_reported_as_a_peak() {
+        let notes: Vec<_> = (0..4).map(|onset| note(onset % 12, 4, onset)).collect();
+        let mut trajectory =
+            MusicalStateTrajectory::from_score(&score(&notes, 0), 1.0, 1.0).unwrap();
+        for (frame, novelty) in trajectory.frames.iter_mut().zip([
+            None,
+            Some(0.7),
+            Some(0.7),
+            Some(0.7),
+        ]) {
+            frame.novelty = novelty;
+        }
+
+        assert!(trajectory.novelty_peaks(0.5).is_empty());
     }
 
     #[test]
