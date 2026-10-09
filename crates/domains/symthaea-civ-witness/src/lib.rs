@@ -1585,8 +1585,18 @@ mod tests {
             Ok(Self(path))
         }
 
+        fn connection(&self) -> Result<Connection, AnchorError> {
+            let conn = Connection::open(&self.0)
+                .map_err(|error| AnchorError::Other(format!("open test anchor: {error}")))?;
+            conn.busy_timeout(Duration::from_millis(BUSY_TIMEOUT_MS))
+                .map_err(|error| AnchorError::Other(format!("configure test anchor: {error}")))?;
+            conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
+                .map_err(|error| AnchorError::Other(format!("configure test anchor: {error}")))?;
+            Ok(conn)
+        }
+
         fn provision(&self, log_id: &str) {
-            let conn = Connection::open(&self.0).expect("open process-test anchor");
+            let conn = self.connection().expect("open process-test anchor");
             conn.execute(
                 "INSERT INTO test_anchor_state (log_id, generation, record_digest)
                  VALUES (?1, 0, ?2)
@@ -1625,8 +1635,7 @@ mod tests {
 
     impl IndependentAnchor for PersistentTestAnchor {
         fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
-            let conn = Connection::open(&self.0)
-                .map_err(|error| AnchorError::Other(format!("open test anchor: {error}")))?;
+            let conn = self.connection()?;
             Self::read_state(&conn, log_id)
         }
 
@@ -1635,8 +1644,7 @@ mod tests {
             expected: &AnchorState,
             next: &AnchorState,
         ) -> Result<(), AnchorError> {
-            let mut conn = Connection::open(&self.0)
-                .map_err(|error| AnchorError::Other(format!("open test anchor: {error}")))?;
+            let mut conn = self.connection()?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(|error| AnchorError::Other(format!("lock test anchor: {error}")))?;
