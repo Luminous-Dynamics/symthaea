@@ -8,8 +8,8 @@
 //! boundaries, wave speed c = 1, and spacing h = 1/(n+1). The state layout is
 //! [u_0, ..., u_(n-1), v_0, ..., v_(n-1)].
 //!
-//! This is a semi-discrete spatial operator and energy oracle. It does not yet
-//! provide a full space-time convergence study or claim continuum-level proof.
+//! This is a semi-discrete spatial operator and energy oracle. Its tests include
+//! a single-mode space-time convergence study, not a general continuum-level proof.
 
 /// Return the number of interior sites encoded by the state length.
 pub fn interior_points_for_state_len(state_len: usize) -> Option<usize> {
@@ -271,11 +271,14 @@ mod tests {
     #[test]
     fn full_space_time_solution_error_converges_at_second_order() {
         // Exact continuum solution: u(x,t)=sin(pi*x) cos(pi*t), c=1.
-        // At T=1 it has u=-sin(pi*x), v=0. Choosing dt <= h^2 makes the
-        // fourth-order RK4 error subordinate to the second-order spatial error.
-        let final_time: f64 = 1.0;
+        // Use a non-special phase (T=3/4) so both displacement and velocity
+        // respond at leading order to the discrete-frequency error. Choosing
+        // dt <= h^2 keeps fourth-order RK4 error subordinate to spatial error.
+        let final_time: f64 = 0.75;
         let resolutions = [8, 16, 32, 64];
-        let mut errors = Vec::with_capacity(resolutions.len());
+        let mut combined_errors = Vec::with_capacity(resolutions.len());
+        let mut displacement_errors = Vec::with_capacity(resolutions.len());
+        let mut velocity_errors = Vec::with_capacity(resolutions.len());
         let mut spacings = Vec::with_capacity(resolutions.len());
 
         for n in resolutions {
@@ -283,35 +286,61 @@ mod tests {
             let max_dt = h * h;
             let steps = (final_time / max_dt).ceil() as usize;
             let dt = final_time / steps as f64;
+            assert!(dt <= max_dt, "n={n}, dt={dt}, h^2={max_dt}");
+
             let initial = fundamental_mode_state(n);
             let numerical = wave_1d_integrate_rk4(&initial, steps, dt).unwrap();
-            let mut squared_l2_error = 0.0;
+            let mut squared_displacement_error = 0.0;
+            let mut squared_velocity_error = 0.0;
 
             for i in 0..n {
                 let x = (i + 1) as f64 * h;
-                let exact_u = -(std::f64::consts::PI * x).sin();
+                let mode = (std::f64::consts::PI * x).sin();
+                let exact_u = mode * (std::f64::consts::PI * final_time).cos();
+                let exact_v = -std::f64::consts::PI
+                    * mode
+                    * (std::f64::consts::PI * final_time).sin();
                 let du = numerical[i] - exact_u;
-                let dv_scaled = numerical[n + i] / std::f64::consts::PI;
-                squared_l2_error += du * du + dv_scaled * dv_scaled;
+                let dv_scaled = (numerical[n + i] - exact_v) / std::f64::consts::PI;
+                squared_displacement_error += du * du;
+                squared_velocity_error += dv_scaled * dv_scaled;
             }
 
+            let displacement_error = (h * squared_displacement_error).sqrt();
+            let velocity_error = (h * squared_velocity_error).sqrt();
             spacings.push(h);
-            errors.push((h * squared_l2_error).sqrt());
-        }
-
-        for pair in errors.windows(2) {
-            assert!(
-                pair[1] < pair[0],
-                "space-time L2 error must decrease under refinement: {errors:?}"
+            displacement_errors.push(displacement_error);
+            velocity_errors.push(velocity_error);
+            combined_errors.push(
+                (displacement_error * displacement_error
+                    + velocity_error * velocity_error)
+                    .sqrt(),
             );
         }
-        let coarse = errors[1];
-        let fine = errors[2];
-        let observed_order = (coarse / fine).ln() / (spacings[1] / spacings[2]).ln();
-        assert!(
-            observed_order > 1.7 && observed_order < 2.2,
-            "observed order={observed_order:.4}; h={spacings:?}; errors={errors:?}"
-        );
+
+        for (name, errors) in [
+            ("combined", &combined_errors),
+            ("displacement", &displacement_errors),
+            ("velocity", &velocity_errors),
+        ] {
+            for pair in errors.windows(2) {
+                assert!(
+                    pair[1] < pair[0],
+                    "{name} L2 error must decrease under refinement: {errors:?}"
+                );
+            }
+
+            // Check every adjacent grid pair, including the coarsest and finest
+            // intervals, rather than inferring order from only one middle pair.
+            for i in 0..errors.len() - 1 {
+                let observed_order =
+                    (errors[i] / errors[i + 1]).ln() / (spacings[i] / spacings[i + 1]).ln();
+                assert!(
+                    observed_order > 1.7 && observed_order < 2.2,
+                    "{name} observed order={observed_order:.4}; h={spacings:?}; errors={errors:?}"
+                );
+            }
+        }
     }
 
     #[test]
