@@ -339,7 +339,8 @@ fn notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
         .copied()
         .filter(|note| {
             let onset = note.onset.beats();
-            onset >= start && onset < end
+            let note_end = (note.onset + note.duration).beats();
+            note_end > onset && onset >= start && onset < end
         })
         .collect();
     notes.sort_by(|a, b| {
@@ -707,6 +708,44 @@ mod tests {
             .all(|frame| frame.pitch_class_hist[0] == 1.0));
         assert!((trajectory.frames[2].nearest_prior_similarity.unwrap() - 1.0).abs() < 1e-9);
         assert!(trajectory.frames[2].novelty.unwrap() < 1e-9);
+    }
+
+    #[test]
+    fn invalid_duration_attacks_do_not_contaminate_sustain_frames() {
+        let mut held = note(0, 4, 0);
+        held.duration = Duration::new(4, 1);
+        held.part = PartId(7);
+
+        let mut zero_duration = note(2, 4, 1);
+        zero_duration.duration = Duration::zero();
+        zero_duration.part = PartId(7);
+
+        let mut negative_duration = note(4, 4, 2);
+        negative_duration.duration = Duration::new(-1, 1);
+        negative_duration.part = PartId(7);
+
+        let piece = score(&[held, zero_duration, negative_duration], 0);
+        let frame = MusicalStateFrame::from_region(
+            &piece,
+            Duration::new(1, 1),
+            Duration::new(3, 1),
+        )
+        .expect("the held note makes the interval musically active");
+
+        assert_eq!(frame.event_count, 0);
+        assert_eq!(frame.onset_density, 0.0);
+        assert!(frame.rhythm_hist.iter().all(|value| *value == 0.0));
+        assert_eq!(frame.line_transition_count, 0);
+        assert!(frame.line_interval_hist.iter().all(|value| *value == 0.0));
+        assert!(frame.line_contour_hist.iter().all(|value| *value == 0.0));
+        assert!(frame.part_identity_available);
+        assert!((frame.pitch_class_hist[0] - 1.0).abs() < 1e-9);
+
+        let trajectory = MusicalStateTrajectory::from_score(&piece, 2.0, 2.0).unwrap();
+        assert_eq!(trajectory.frames.len(), 2);
+        assert_eq!(trajectory.frames[0].event_count, 1);
+        assert_eq!(trajectory.frames[1].event_count, 0);
+        assert_eq!(trajectory.frames[1].line_transition_count, 0);
     }
 
     #[test]
