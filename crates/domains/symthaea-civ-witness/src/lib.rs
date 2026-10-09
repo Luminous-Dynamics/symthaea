@@ -2779,6 +2779,46 @@ mod tests {
             String::from_utf8_lossy(&crashed.stderr)
         );
 
+        // Inspect the exact crash seam before launching recovery: the
+        // independent test anchor must already be at generation two while the
+        // local metadata still accepts generation one and retains generation two
+        // only as a prepared record.
+        let expected_second = Record::build(
+            2,
+            log_id,
+            "policy-v1",
+            h(b"subprocess-checkpoint-two"),
+            1,
+            Some(h(b"subprocess-receipt-two")),
+            Some(first.digest),
+        );
+        let local = Connection::open(&db.0).expect("inspect pre-recovery witness database");
+        let (local_generation, local_digest): (i64, Vec<u8>) = local
+            .query_row(
+                "SELECT generation, record_digest FROM witness_meta WHERE log_id=?1",
+                params![log_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("accepted metadata survives process exit");
+        assert_eq!(local_generation, 1);
+        assert_eq!(blob_digest(&local_digest).expect("local digest shape"), first.digest);
+        let (prepared_digest, prepared_status): (Vec<u8>, i64) = local
+            .query_row(
+                "SELECT record_digest, status FROM witness_records
+                 WHERE log_id=?1 AND generation=2",
+                params![log_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("prepared record survives process exit");
+        assert_eq!(blob_digest(&prepared_digest).expect("prepared digest shape"), expected_second.digest);
+        assert_eq!(prepared_status, 0, "successor must remain prepared before recovery");
+        drop(local);
+        let observed_anchor = PersistentTestAnchor::open(&anchor_db.0)
+            .expect("reopen external test anchor")
+            .current(log_id)
+            .expect("read external test anchor after child exit");
+        assert_eq!(observed_anchor, AnchorState::from_record(&expected_second));
+
         let recovered = run_helper("recover", &db, &anchor_db);
         assert!(
             recovered.status.success(),
