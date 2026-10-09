@@ -17,11 +17,10 @@
 
 use serde::{Deserialize, Serialize};
 
-
 /// Validation failures from the solar, wind, and synthetic-weather models.
 ///
 /// Callers that consume telemetry or forecast data should use the checked
-/// \`try_*\` methods so malformed observations remain distinguishable from a
+/// `try_*` methods so malformed observations remain distinguishable from a
 /// genuine zero-generation result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GenerationModelError {
@@ -86,7 +85,12 @@ impl SolarArray {
 
         // NOCT cell-temperature model.
         let cell_temp_c = ambient_temp_c + (self.noct_c - 20.0) / 800.0 * irradiance_w_per_m2;
-        let temp_derate = (1.0 + self.temp_coefficient_per_c * (cell_temp_c - 25.0)).max(0.0);
+        let raw_temp_derate =
+            1.0 + self.temp_coefficient_per_c * (cell_temp_c - 25.0);
+        if !raw_temp_derate.is_finite() {
+            return Err(GenerationModelError::NonFiniteOutput);
+        }
+        let temp_derate = raw_temp_derate.max(0.0);
         let dc_power_kw = self.rated_capacity_kw * (irradiance_w_per_m2 / 1000.0) * temp_derate;
         let ac_power_kw =
             (dc_power_kw * (1.0 - self.system_losses) * self.inverter_efficiency).max(0.0);
@@ -104,7 +108,7 @@ impl SolarArray {
     ///
     /// Invalid data maps to zero generation so malformed input cannot
     /// manufacture a positive estimate. New ingestion/qualification code
-    /// should call \`try_ac_power_kw\` and retain the explicit error.
+    /// should call `try_ac_power_kw` and retain the explicit error.
     pub fn ac_power_kw(&self, irradiance_w_per_m2: f64, ambient_temp_c: f64) -> f64 {
         self.try_ac_power_kw(irradiance_w_per_m2, ambient_temp_c)
             .unwrap_or(0.0)
@@ -169,7 +173,7 @@ impl WindTurbine {
     /// Backwards-compatible conservative wrapper.
     ///
     /// Invalid data maps to zero power so malformed weather cannot create
-    /// fictitious generation. Use \`try_power_kw\` when validation errors
+    /// fictitious generation. Use `try_power_kw` when validation errors
     /// must remain observable.
     pub fn power_kw(&self, wind_speed_m_s: f64) -> f64 {
         self.try_power_kw(wind_speed_m_s).unwrap_or(0.0)
@@ -211,7 +215,9 @@ pub fn try_synthetic_irradiance_w_per_m2(
         return Ok(0.0);
     }
     let day_fraction = (time_of_day_hours - sunrise_hour) / (sunset_hour - sunrise_hour);
-    let irradiance = (peak_irradiance_w_per_m2 * (std::f64::consts::PI * day_fraction).sin()).max(0.0);
+    let irradiance = (peak_irradiance_w_per_m2
+        * (std::f64::consts::PI * day_fraction).sin())
+    .max(0.0);
     if irradiance.is_finite() {
         Ok(irradiance)
     } else {
