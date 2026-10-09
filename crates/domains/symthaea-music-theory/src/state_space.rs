@@ -56,7 +56,7 @@ pub struct MusicalStateFrame {
     pub line_contour_hist: [f64; CONTOUR_BINS],
     /// Duration-weighted MIDI register occupancy within the frame in eight bins.
     pub register_hist: [f64; REGISTER_BINS],
-    /// True only when every note in this frame has a real PartId.
+    /// True only when every attack used for line-motion analysis has a real PartId.
     pub part_identity_available: bool,
     /// Number of verified transitions between adjacent singleton onsets within a part.
     pub line_transition_count: usize,
@@ -163,10 +163,13 @@ impl MusicalStateTrajectory {
             });
         }
 
-        // Number of starts before the trailing window reaches the score end.
-        // A window covering the whole score is one frame even with a tiny hop.
-        let uncovered = (total - window_beats).max(0.0);
-        let estimated_frames = (uncovered / hop_beats).ceil() + 1.0;
+        // Bound both possible stop conditions: the next hop can reach the score
+        // end before a short window does, or a wide window can cover the tail.
+        // Taking the minimum avoids rejecting an exact-limit trajectory when
+        // hop > window and the window-based estimate overcounts one start.
+        let hop_limited = (total / hop_beats).ceil();
+        let window_limited = ((total - window_beats).max(0.0) / hop_beats).ceil() + 1.0;
+        let estimated_frames = hop_limited.min(window_limited);
         if !estimated_frames.is_finite() || estimated_frames > MAX_TRAJECTORY_FRAMES as f64 {
             return Err(format!(
                 "hop_beats would produce more than {MAX_TRAJECTORY_FRAMES} trajectory frames"
@@ -631,6 +634,14 @@ mod tests {
         assert!(MusicalStateTrajectory::from_score(&s, 1.0, 1e-9).is_err());
         let full_window = MusicalStateTrajectory::from_score(&s, 3.0, 1e-9).unwrap();
         assert_eq!(full_window.frames.len(), 1);
+    }
+
+    #[test]
+    fn frame_budget_allows_exact_limit_with_short_windows() {
+        let s = score(&[note(0, 4, 0), note(7, 4, 4095)], 0);
+        let trajectory = MusicalStateTrajectory::from_score(&s, 0.1, 1.0)
+            .expect("4096 possible window starts are within the fixed frame budget");
+        assert_eq!(trajectory.frames.len(), 2);
     }
 
     #[test]
