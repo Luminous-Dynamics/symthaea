@@ -38,10 +38,10 @@ jobs:
         env:
           EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          mkdir -p .ci/vulkan-sync-qualification
           ACTUAL_QUALIFICATION_SHA="$(git rev-parse HEAD)"
           test "$ACTUAL_QUALIFICATION_SHA" = "$EXPECTED_QUALIFICATION_SHA"
           echo "qualification_head=$ACTUAL_QUALIFICATION_SHA"
-          mkdir -p .ci/vulkan-sync-qualification
 
       - name: Install Vulkan runtime and validation
         run: |
