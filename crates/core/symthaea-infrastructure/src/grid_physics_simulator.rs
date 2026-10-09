@@ -134,6 +134,10 @@ pub struct GridPhysicsInfrastructureSimulator {
     abnormal_voltage_elapsed_s: f64,
     prev_frequency_hz: f64,
     elapsed_s: f64,
+    /// Outcome of the most recent call through the compatibility trait API.
+    /// Checked `try_step` reports directly through its Result and remains
+    /// mutation-free when it rejects an input.
+    last_trait_step_accepted: bool,
 }
 
 impl GridPhysicsInfrastructureSimulator {
@@ -166,6 +170,7 @@ impl GridPhysicsInfrastructureSimulator {
             abnormal_voltage_elapsed_s: 0.0,
             prev_frequency_hz: NOMINAL_FREQUENCY_HZ,
             elapsed_s: 0.0,
+            last_trait_step_accepted: true,
         }
     }
 
@@ -525,9 +530,17 @@ impl GridPhysicsInfrastructureSimulator {
 
 impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
     fn step(&mut self, cmd: &InfrastructureCommand, dt: f64) {
-        if let Err(error) = self.try_step(cmd, dt) {
-            warn!(?error, "rejected grid-physics simulator step; state unchanged");
+        match self.try_step(cmd, dt) {
+            Ok(()) => self.last_trait_step_accepted = true,
+            Err(error) => {
+                self.last_trait_step_accepted = false;
+                warn!(?error, "rejected grid-physics simulator step; state unchanged");
+            }
         }
+    }
+
+    fn last_step_succeeded(&self) -> bool {
+        self.last_trait_step_accepted
     }
 
     fn state(&self) -> &InfrastructureState {
@@ -545,6 +558,7 @@ impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
         self.abnormal_voltage_elapsed_s = 0.0;
         self.prev_frequency_hz = NOMINAL_FREQUENCY_HZ;
         self.elapsed_s = 0.0;
+        self.last_trait_step_accepted = true;
     }
 
     fn backend_name(&self) -> &'static str {
@@ -756,6 +770,10 @@ mod failure_mode_tests {
             before.abnormal_voltage_elapsed_s
         );
         assert_eq!(sim.prev_frequency_hz, before.prev_frequency_hz);
+        assert_eq!(
+            sim.last_trait_step_accepted,
+            before.last_trait_step_accepted
+        );
     }
 
     #[test]
@@ -858,6 +876,22 @@ mod failure_mode_tests {
         assert_eq!(checked.state.channels, compatibility.state.channels);
         assert_eq!(checked.battery.soc(), compatibility.battery.soc());
         assert_eq!(checked.elapsed_s, compatibility.elapsed_s);
+        assert!(compatibility.last_step_succeeded());
+    }
+
+    #[test]
+    fn compatibility_step_reports_rejection_without_changing_plant_state() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let before = sim.clone();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[0] = f32::NAN;
+
+        sim.step(&cmd, 0.005);
+
+        assert!(!sim.last_step_succeeded());
+        assert_eq!(sim.state.channels, before.state.channels);
+        assert_eq!(sim.battery.soc(), before.battery.soc());
+        assert_eq!(sim.elapsed_s, before.elapsed_s);
     }
 
     #[test]
@@ -884,6 +918,10 @@ mod failure_mode_tests {
             before.abnormal_voltage_elapsed_s
         );
         assert_eq!(sim.prev_frequency_hz, before.prev_frequency_hz);
+        assert_eq!(
+            sim.last_trait_step_accepted,
+            before.last_trait_step_accepted
+        );
     }
 
     #[test]
