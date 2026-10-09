@@ -120,6 +120,9 @@ pub enum NixSystemdObserverErrorV1 {
     #[error("systemd invocation ID changed during definition capture")]
     InvocationIdChanged,
 
+    #[error("post InvocationID resolved to a different Unit object")]
+    InvocationIdUnitObjectMismatch,
+
     #[error("invalid verified post-state observation: {0}")]
     InvalidPostState(String),
 
@@ -880,6 +883,44 @@ impl NixSystemdReadOnlyObserverV1 {
         Ok(path)
     }
 
+    /// Resolve a post InvocationID and bind it to the exact observed Unit object
+    /// while requiring the same systemd manager owner and D-Bus daemon incarnation.
+    pub async fn resolve_invocation_id_for_observed_unit(
+        &self,
+        invocation_id: &[u8],
+        expected_unit: &str,
+        expected_unit_object_path: &OwnedObjectPath,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<(), NixSystemdObserverErrorV1> {
+        let before_owner = self.systemd_manager_owner().await?;
+        let before_bus_id = self.dbus_bus_id().await?;
+        if before_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if before_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        let resolved = self
+            .resolve_invocation_id(invocation_id, expected_unit)
+            .await?;
+        if resolved.as_str() != expected_unit_object_path.as_str() {
+            return Err(NixSystemdObserverErrorV1::InvocationIdUnitObjectMismatch);
+        }
+
+        let after_owner = self.systemd_manager_owner().await?;
+        let after_bus_id = self.dbus_bus_id().await?;
+        if after_owner != expected_manager_owner {
+            return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
+        }
+        if after_bus_id != expected_bus_id {
+            return Err(NixSystemdObserverErrorV1::WatcherBusIncarnationMismatch);
+        }
+
+        Ok(())
+    }
+
     async fn observe_service_post_state_internal(
         &self,
         operation: NixServiceOperationKindV1,
@@ -946,6 +987,7 @@ impl NixSystemdReadOnlyObserverV1 {
             &unit_properties,
             &definition_content_digest,
             &definition_bus_id,
+            post_invocation_binding_digest,
             job,
         )?;
 
@@ -1507,6 +1549,7 @@ fn build_observation_from_properties(
     properties: &HashMap<String, OwnedValue>,
     definition_content_digest: &str,
     definition_bus_id: &str,
+    post_invocation_binding_digest: Option<String>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1569,6 +1612,30 @@ fn build_observation_from_properties(
         "StateChangeTimestampMonotonic",
     )?;
     let invocation_id = required_invocation_id(properties)?;
+    let post_invocation_binding_digest = if let Some(invocation_id) = invocation_id.as_deref() {
+        let invocation_bytes = hex::decode(invocation_id)
+            .map_err(|_| NixSystemdObserverErrorV1::InvalidInvocationId)?;
+        self.resolve_invocation_id_for_observed_unit(
+            &invocation_bytes,
+            &expected_unit,
+            unit_object_path,
+            manager_owner,
+            definition_bus_id,
+        )
+        .await?;
+
+        Some(
+            super::post_state::invocation_binding_digest(
+                Some(invocation_id),
+                unit_object_path.as_str(),
+                Some(manager_owner),
+                Some(definition_bus_id),
+            )
+            .map_err(|error| NixSystemdObserverErrorV1::InvalidPostState(error.to_string()))?,
+        )
+    } else {
+        None
+    };
     let observed_at_monotonic_us = monotonic_now_us()?;
 
     let definition_identity = NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
@@ -1598,6 +1665,7 @@ fn build_observation_from_properties(
         systemd_manager_owner: Some(manager_owner.to_string()),
         systemd_bus_id: Some(definition_bus_id.to_string()),
         invocation_id,
+        post_invocation_binding_digest,
         state_change_at_monotonic_us,
         observed_at_monotonic_us,
     })
