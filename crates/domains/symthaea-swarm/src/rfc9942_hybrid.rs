@@ -11,11 +11,12 @@ use sha2::{Digest, Sha256};
 
 use crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection;
 use crate::semantic_evidence_vds::{
-    Rfc9942VerifiedReceipt, MAX_RFC9942_RECEIPT_ENCODED_BYTES,
+    Rfc9942VerifiedReceipt, COSE_ES256_ALGORITHM_ID,
+    MAX_RFC9942_RECEIPT_ENCODED_BYTES,
 };
 
 pub const HYBRID_POLICY_ID: &str =
-    "symthaea-swarm/rfc9942-pq-bound-mldsa65-v1";
+    "symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-v1";
 pub const HYBRID_POLICY_VERSION: u16 = 1;
 pub const ML_DSA_65_COSE_ALGORITHM_ID: i64 = -49;
 pub const ML_DSA_65_PUBLIC_KEY_BYTES: usize = 1952;
@@ -24,7 +25,7 @@ pub const MAX_HYBRID_RECEIPT_WIRE_BYTES: usize =
     MAX_RFC9942_RECEIPT_ENCODED_BYTES;
 
 pub const HYBRID_TRANSCRIPT_DOMAIN: &[u8] =
-    b"symthaea-swarm/rfc9942-pq-bound-mldsa65-transcript-v1";
+    b"symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-transcript-v1";
 
 /// Provider boundary for the actual ML-DSA-65 implementation.
 ///
@@ -108,11 +109,16 @@ impl MlDsa65KeyAuthorization {
             return Err(MlDsa65KeyAuthorizationError::InvalidPolicyDigest);
         }
         Ok(Self {
+            classical_algorithm_id,
             policy_digest_sha256,
             key_id,
             verifying_key_sha256,
             evaluation_time_unix_seconds,
         })
+    }
+
+    pub const fn classical_algorithm_id(&self) -> i64 {
+        self.classical_algorithm_id
     }
 
     pub const fn policy_digest_sha256(&self) -> [u8; 32] {
@@ -151,6 +157,7 @@ pub enum MlDsa65VerifyError {
 /// Parsed Rust structures are not serialized into this transcript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rfc9942HybridTranscript {
+    classical_algorithm_id: i64,
     policy_digest_sha256: [u8; 32],
     key_id: Rfc9942PqKeyId,
     verifying_key_sha256: [u8; 32],
@@ -167,6 +174,9 @@ impl Rfc9942HybridTranscript {
         verifying_key_sha256: [u8; 32],
         policy_digest_sha256: [u8; 32],
     ) -> Result<Self, Rfc9942HybridError> {
+        if verified_classical.algorithm_id() != COSE_ES256_ALGORITHM_ID {
+            return Err(Rfc9942HybridError::ClassicalAlgorithmMismatch);
+        }
         let receipt_sha256 =
             validate_exact_receipt_wire(verified_classical, exact_receipt_wire)?;
         Self::from_receipt_digest(
@@ -185,6 +195,9 @@ impl Rfc9942HybridTranscript {
         policy_digest_sha256: [u8; 32],
         receipt_sha256: [u8; 32],
     ) -> Result<Self, Rfc9942HybridError> {
+        if verified_classical.algorithm_id() != COSE_ES256_ALGORITHM_ID {
+            return Err(Rfc9942HybridError::ClassicalAlgorithmMismatch);
+        }
         if policy_digest_sha256 == [0; 32] {
             return Err(Rfc9942HybridError::PqKeyPolicyInvalid);
         }
@@ -194,8 +207,10 @@ impl Rfc9942HybridTranscript {
             return Err(Rfc9942HybridError::ReceiptWireIdentityMismatch);
         }
 
+        let classical_algorithm_id = verified_classical.algorithm_id();
         let classical_capability_sha256 = verified_classical.capability_sha256();
         let transcript_sha256 = digest_transcript(
+            classical_algorithm_id,
             policy_digest_sha256,
             key_id,
             verifying_key_sha256,
@@ -242,16 +257,17 @@ impl Rfc9942HybridTranscript {
     /// Domain separation is included in transcript_sha256. These bytes carry
     /// the explicit policy/version and the three fixed identities needed by
     /// the verifier.
-    pub fn signing_bytes(&self) -> [u8; 186] {
-        let mut out = [0u8; 186];
+    pub fn signing_bytes(&self) -> [u8; 194] {
+        let mut out = [0u8; 194];
         out[0..2].copy_from_slice(&HYBRID_POLICY_VERSION.to_be_bytes());
         out[2..10].copy_from_slice(&ML_DSA_65_COSE_ALGORITHM_ID.to_be_bytes());
-        out[10..42].copy_from_slice(&self.policy_digest_sha256);
-        out[42..58].copy_from_slice(&self.key_id.0);
-        out[58..90].copy_from_slice(&self.verifying_key_sha256);
-        out[90..122].copy_from_slice(&self.receipt_sha256);
-        out[122..154].copy_from_slice(&self.classical_capability_sha256);
-        out[154..186].copy_from_slice(&self.transcript_sha256);
+        out[10..18].copy_from_slice(&self.classical_algorithm_id.to_be_bytes());
+        out[18..50].copy_from_slice(&self.policy_digest_sha256);
+        out[50..66].copy_from_slice(&self.key_id.0);
+        out[66..98].copy_from_slice(&self.verifying_key_sha256);
+        out[98..130].copy_from_slice(&self.receipt_sha256);
+        out[130..162].copy_from_slice(&self.classical_capability_sha256);
+        out[162..194].copy_from_slice(&self.transcript_sha256);
         out
     }
 }
@@ -311,6 +327,9 @@ impl Rfc9942HybridVerifiedReceipt {
         key_policy: &impl MlDsa65KeyPolicy,
         verifier: &impl MlDsa65Verifier,
     ) -> Result<Self, Rfc9942HybridError> {
+        if verified_classical.algorithm_id() != COSE_ES256_ALGORITHM_ID {
+            return Err(Rfc9942HybridError::ClassicalAlgorithmMismatch);
+        }
         if verifying_key.len() != ML_DSA_65_PUBLIC_KEY_BYTES {
             return Err(Rfc9942HybridError::PqPublicKeyWrongLength);
         }
@@ -504,6 +523,7 @@ impl Rfc9942SelectionAssuranceAdmission {
 pub enum Rfc9942HybridError {
     ReceiptWireTooLarge,
     ReceiptWireIdentityMismatch,
+    ClassicalAlgorithmMismatch,
     PqKeyIdInvalid,
     PqKeyPolicyInvalid,
     PqKeyAuthorizationBindingMismatch,
@@ -582,6 +602,7 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
 }
 
 fn digest_transcript(
+    classical_algorithm_id: i64,
     policy_digest_sha256: [u8; 32],
     key_id: Rfc9942PqKeyId,
     verifying_key_sha256: [u8; 32],
@@ -592,6 +613,7 @@ fn digest_transcript(
     hasher.update(HYBRID_TRANSCRIPT_DOMAIN);
     hasher.update(HYBRID_POLICY_VERSION.to_be_bytes());
     hasher.update(ML_DSA_65_COSE_ALGORITHM_ID.to_be_bytes());
+    hasher.update(classical_algorithm_id.to_be_bytes());
     hasher.update(policy_digest_sha256);
     hasher.update(key_id.0);
     hasher.update(verifying_key_sha256);
@@ -613,6 +635,7 @@ fn digest_hybrid_capability(
         b"symthaea-swarm/rfc9942-hybrid-verified-receipt-capability-v1",
     );
     hasher.update(HYBRID_POLICY_VERSION.to_be_bytes());
+    hasher.update(pq_attestation.transcript.classical_algorithm_id.to_be_bytes());
     hasher.update(classical_capability_sha256);
     hasher.update(policy_digest_sha256);
     hasher.update(evaluation_time_unix_seconds.to_be_bytes());
@@ -805,12 +828,14 @@ mod tests {
         let verifying_key_sha256 = [8; 32];
         let policy_digest_sha256 = [7; 32];
         Rfc9942HybridTranscript {
+            classical_algorithm_id: COSE_ES256_ALGORITHM_ID,
             policy_digest_sha256,
             key_id,
             verifying_key_sha256,
             receipt_sha256,
             classical_capability_sha256,
             transcript_sha256: digest_transcript(
+                COSE_ES256_ALGORITHM_ID,
                 policy_digest_sha256,
                 key_id,
                 verifying_key_sha256,
@@ -823,7 +848,8 @@ mod tests {
     #[test]
     fn transcript_is_fixed_width_and_domain_separated() {
         let t = transcript(1, 2);
-        assert_eq!(t.signing_bytes().len(), 186);
+        assert_eq!(t.signing_bytes().len(), 194);
+        assert_eq!(t.classical_algorithm_id(), COSE_ES256_ALGORITHM_ID);
 
         let mut second_domain = HYBRID_TRANSCRIPT_DOMAIN.to_vec();
         second_domain.push(0);
@@ -831,6 +857,7 @@ mod tests {
         hasher.update(&second_domain);
         hasher.update(HYBRID_POLICY_VERSION.to_be_bytes());
         hasher.update(ML_DSA_65_COSE_ALGORITHM_ID.to_be_bytes());
+        hasher.update(COSE_ES256_ALGORITHM_ID.to_be_bytes());
         hasher.update([7u8; 32]);
         hasher.update([9u8; 16]);
         hasher.update([8u8; 32]);
@@ -848,6 +875,7 @@ mod tests {
         let mut b = a;
         b.policy_digest_sha256 = [6; 32];
         b.transcript_sha256 = digest_transcript(
+            b.classical_algorithm_id,
             b.policy_digest_sha256,
             b.key_id,
             b.verifying_key_sha256,
