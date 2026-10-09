@@ -616,5 +616,5 @@ fn main() {
         Err(Failure::EmptyLogId)
     );
     println!("SYM-CIV-013 PASS: crash, stale-writer, and external rollback model cases exercised.");
-    println!("Claim ceiling: simulated persistence only; no filesystem durability or real signatures.");
+    println!("Claim ceiling: simulated persistence; no real storage or signatures.");
 }
