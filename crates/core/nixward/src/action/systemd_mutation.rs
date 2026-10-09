@@ -60,9 +60,14 @@ pub struct NixSystemdLifecycleMutationTransportV1 {
 /// Enable/Disable are configuration mutations, not lifecycle jobs; their
 /// return value is deliberately kept distinct from JobRemoved evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NixSystemdUnitFileOperationResultV1 {
-    pub carries_install_info: Option<bool>,
-    pub changes: Vec<NixSystemdUnitFileChangeV1>,
+pub enum NixSystemdUnitFileOperationResultV1 {
+    Enabled {
+        carries_install_info: bool,
+        changes: Vec<NixSystemdUnitFileChangeV1>,
+    },
+    Disabled {
+        changes: Vec<NixSystemdUnitFileChangeV1>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,8 +241,8 @@ impl NixSystemdLifecycleMutationTransportV1 {
         self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
         let changes = validate_unit_file_changes(changes)?;
 
-        Ok(NixSystemdUnitFileOperationResultV1 {
-            carries_install_info: Some(carries_install_info),
+        Ok(NixSystemdUnitFileOperationResultV1::Enabled {
+            carries_install_info,
             changes,
         })
     }
@@ -269,10 +274,7 @@ impl NixSystemdLifecycleMutationTransportV1 {
         self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
         let changes = validate_unit_file_changes(changes)?;
 
-        Ok(NixSystemdUnitFileOperationResultV1 {
-            carries_install_info: None,
-            changes,
-        })
+        Ok(NixSystemdUnitFileOperationResultV1::Disabled { changes })
     }
 
     async fn verify_manager_epoch(
