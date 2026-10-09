@@ -52,14 +52,18 @@ pub use reasoning_evaluator_policy::{
     REASONING_EVALUATOR_OUTCOME_SEMANTIC_VERSION,
 };
 pub use reasoning_metacognition::{
-    evaluate_frozen_correctness_forecasts, evaluate_metacognition, freeze_correctness_forecasts,
+    evaluate_frozen_correctness_forecasts, evaluate_frozen_forecasts_with_baselines,
+    evaluate_metacognition, freeze_correctness_forecasts, freeze_correctness_forecasts_for_split,
     BinaryDetectionReport, CalibrationBinReport, ConfidenceRevisionDirection,
     ConfidenceRevisionObservation, CorrectnessForecastV1, CorrectnessOutcomeV1,
-    CorrectnessPrediction, ForecastOutcomeBindingReport, FrozenCorrectnessForecastSet,
-    MetacognitionEvaluationError, MetacognitionReport, SelectiveRiskPoint,
-    TaskFamilyCalibrationReport, WeakAssumptionObservation,
-    CORRECTNESS_FORECAST_SCHEMA_VERSION, CORRECTNESS_OUTCOME_SCHEMA_VERSION,
-    FROZEN_FORECAST_SET_SCHEMA_VERSION, METACOGNITION_EVALUATOR_VERSION,
+    CorrectnessPrediction, ForecastBaselineComparisonReport, ForecastBaselineMethod,
+    ForecastBaselineScoreReport, ForecastBaselineV1, ForecastOutcomeBindingReport,
+    FrozenCorrectnessForecastSet, MetacognitionEvaluationError, MetacognitionReport,
+    SelectiveRiskPoint, TaskFamilyCalibrationReport, TaskFamilyForecastBaselineComparison,
+    WeakAssumptionObservation, CORRECTNESS_FORECAST_SCHEMA_VERSION,
+    CORRECTNESS_OUTCOME_SCHEMA_VERSION, FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION,
+    FORECAST_BASELINE_SCHEMA_VERSION, FROZEN_FORECAST_SET_SCHEMA_VERSION,
+    METACOGNITION_EVALUATOR_VERSION,
 };
 pub use reasoning_qualification::{
     AbstentionReason, AssumptionRecord, EvidenceRef, QualificationMetric,
