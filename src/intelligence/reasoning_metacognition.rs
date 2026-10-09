@@ -1319,6 +1319,14 @@ mod tests {
         assert_eq!(decoded, frozen);
         assert_eq!(decoded.calibration_bins(), 7);
         assert_eq!(decoded.selective_thresholds(), &[0.6]);
+
+        let mut tampered: serde_json::Value =
+            serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse JSON: {e}"));
+        tampered["calibration_bins"] = serde_json::json!(0);
+        assert!(
+            serde_json::from_value::<FrozenCorrectnessForecastSet>(tampered).is_err(),
+            "deserialization must reject policy values that could not be frozen"
+        );
     }
 
     #[test]
