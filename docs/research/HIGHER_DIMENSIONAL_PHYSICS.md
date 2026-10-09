@@ -41,14 +41,14 @@ This expression counts each interior bond once and includes one fixed-zero bound
 - Generic RHS, discrete Hamiltonian, and analytic *dH/dt* evaluation.
 - Fixed-step RK4 trajectories for conservation-drift checks.
 - Tests comparing the one-dimensional RHS with Stage A, evaluating *dH/dt* through six spatial dimensions, and measuring RK4 energy drift for dimensions 1–3.
-- A deterministic discovery runner that does **not** seed the known Hamiltonian into the search. It reports training and independent-initial-condition Lie-derivative variance, the existing informativeness guard, and correlation with the known Hamiltonian.
+- A deterministic discovery runner that does **not** seed the known Hamiltonian into the search. It uses five paired search seeds (`42, 1337, 2718, 7919, 31415`) for each dimension while holding train and holdout trajectories fixed, and reports candidate counts, screened candidates, `symbolically_proven` metadata, and elapsed time.
 
 ## Run and interpret
 
     cargo test -p symthaea-physics-bridge pde_hypercubic_wave
     cargo run -p symthaea-physics-bridge --example higher_dimensional_wave_discovery -- 2
 
-The optional example argument is the maximum spatial dimension (1–4). The discovery run is deliberately a *measurement harness*, not a CI assertion that the search must succeed. It may report zero accepted candidates. That is an honest result and should not be converted to a pass by loosening the thresholds after observing results.
+The optional example argument is the maximum spatial dimension (1–4). The runner uses five deterministic paired search seeds and prints elapsed time per seed and dimension. The discovery run is deliberately a *measurement harness*, not a CI assertion that the search must succeed. It may report zero accepted candidates. That is an honest result and should not be converted to a pass by loosening the thresholds after observing results.
 
 The example's screening rule is predeclared:
 
@@ -64,9 +64,9 @@ The benchmark should keep separate records for:
 
 - **Oracle correctness:** analytic *dH/dt* residual and finite/nonnegative Hamiltonian.
 - **Integrator behavior:** maximum relative Hamiltonian drift under the stated RK4 step size.
-- **Discovery recall:** number of candidates passing the predeclared screening gates, per spatial dimension and seed.
-- **Generalization:** holdout initial conditions and, later, larger grid resolutions not used to tune candidate search.
-- **Search cost:** elapsed time, candidate count, seed, configuration, and candidate expressions.
+- **Discovery recall:** number of candidates passing the predeclared screening gates, per spatial dimension and seed, plus the number of seeds with at least one screened candidate.
+- **Generalization:** fixed independent holdout initial conditions and, later, larger grid resolutions not used to tune candidate search.
+- **Search cost:** elapsed time per seed/dimension, candidate count, seed, configuration, and candidate expressions.
 
 A correct oracle does not imply the search found it. A candidate with low training variance does not imply it is conserved. A conserved quantity does not imply it is the Hamiltonian. A result from this finite-dimensional semidiscrete model does not establish a continuum theorem.
 
