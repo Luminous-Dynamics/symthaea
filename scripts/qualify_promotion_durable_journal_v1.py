@@ -246,6 +246,26 @@ class DurablePromotionJournalV1:
         "reservation_supersede_storage_fence_guard",
     }
 
+    REQUIRED_TRIGGER_SQL_FRAGMENTS = {
+        "journal_events_no_update": ("raise(abort, 'promotion journal is append-only')",),
+        "journal_events_no_delete": ("raise(abort, 'promotion journal is append-only')",),
+        "ledger_state_fence_monotonicity_guard": (
+            "new.revision <> old.revision + 1",
+            "new.fencing_token < old.fencing_token",
+            "ledger authority state monotonicity violated",
+        ),
+        "reservation_insert_authority_guard": ("reservation storage fence rejected",),
+        "reservation_identity_immutable": ("reservation identity is immutable",),
+        "reservation_state_transition_guard": ("invalid reservation state transition",),
+        "reservation_prepare_storage_fence_guard": (
+            "storage-enforced promotion fence rejected",
+            "new.revision = reservations.created_revision + 1",
+        ),
+        "reservation_supersede_storage_fence_guard": (
+            "supersession requires a newer storage fence",
+        ),
+    }
+
     def __init__(self, path: str | Path):
         if str(path) == ":memory:":
             raise ValueError("durable journal requires a file-backed SQLite database")
@@ -779,13 +799,19 @@ class DurablePromotionJournalV1:
                 return False
             if connection.execute("PRAGMA foreign_key_check").fetchall():
                 return False
-            triggers = {
-                row[0] for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'trigger'"
-                ).fetchall()
+            trigger_rows = connection.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type = 'trigger'"
+            ).fetchall()
+            trigger_sql = {
+                row["name"]: " ".join((row["sql"] or "").lower().split())
+                for row in trigger_rows
             }
-            if not self.REQUIRED_TRIGGERS <= triggers:
+            if not self.REQUIRED_TRIGGERS <= set(trigger_sql):
                 return False
+            for name, fragments in self.REQUIRED_TRIGGER_SQL_FRAGMENTS.items():
+                stored_sql = trigger_sql.get(name, "")
+                if any(fragment not in stored_sql for fragment in fragments):
+                    return False
 
             events = [
                 dict(row) for row in connection.execute(
@@ -1210,6 +1236,22 @@ class DurablePromotionJournalTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertTrue(journal.verify_journal())
+
+    def test_journal_audit_rejects_same_name_weakened_trigger(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        connection = sqlite3.connect(journal.path)
+        try:
+            connection.execute("DROP TRIGGER journal_events_no_update")
+            connection.execute(
+                """CREATE TRIGGER journal_events_no_update
+                   BEFORE UPDATE ON journal_events
+                   BEGIN SELECT 1; END"""
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        self.assertFalse(journal.verify_journal())
 
     def test_chain_audit_detects_mutated_event_payload(self) -> None:
         journal = self.make_journal()
