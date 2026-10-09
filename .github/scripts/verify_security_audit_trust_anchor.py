@@ -409,11 +409,10 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
             info = zf.getinfo(verdict_names[0])
             if info.file_size > 1024 * 1024:
                 raise VerificationError("verdict.json exceeds the 1 MiB parsing limit")
-            verdict_bytes = zf.read(info)
-        verdict = json.loads(verdict_bytes, object_pairs_hook=reject_duplicate_object_keys)
-        if not isinstance(verdict, dict):
-            raise VerificationError("verdict artifact is not a JSON object")
-        validate_evidence_manifest(zf, entries, verdict)
+            verdict = json.loads(zf.read(info), object_pairs_hook=reject_duplicate_object_keys)
+            if not isinstance(verdict, dict):
+                raise VerificationError("verdict artifact is not a JSON object")
+            validate_evidence_manifest(zf, entries, verdict)
     except VerificationError:
         raise
     except Exception as exc:
