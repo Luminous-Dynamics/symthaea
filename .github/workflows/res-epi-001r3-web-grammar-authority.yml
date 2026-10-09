@@ -1,0 +1,106 @@
+name: RES-EPI-001R3 Web Grammar Authority
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'patches/science/res-epi-001r3-web-grammar-authority-v2.patch'
+      - '.github/workflows/res-epi-001r3-web-grammar-authority.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze exact current-main parent and qualification-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_parent=adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "${{ github.event.pull_request.base.sha }}" = "$expected_parent"
+          fi
+          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          changed="$(git diff --name-only "$expected_parent"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/science/res-epi-001r3-web-grammar-authority-v2\.patch|\.github/workflows/res-epi-001r3-web-grammar-authority\.yml)$' || true)"
+          test -z "$unexpected" || {
+            echo 'unexpected RES-EPI-001R3 scope:'
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Freeze current heuristic web-status authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          feed=src/web_research/conjecture_feed.rs
+          types=src/web_research/types.rs
+          grep -F 'self.epistemic_status.is_trustworthy()' "$feed"
+          grep -F 'matches!(self, Self::HighConfidence | Self::ModerateConfidence)' "$types"
+          grep -F 'if !prov.allows_macro_promotion()' "$feed"
+          echo 'negative control: current heuristic web status can grant macro-promotion eligibility'
+
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/science/res-epi-001r3-web-grammar-authority-v2.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet fail-closed web grammar authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          feed=src/web_research/conjecture_feed.rs
+          grep -F 'pub fn allows_macro_promotion(&self) -> bool {' "$feed"
+          grep -A2 -F 'pub fn allows_macro_promotion(&self) -> bool {' "$feed" | grep -F 'false'
+          grep -F 'future evidence-plane-backed' "$feed"
+          grep -F 'conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;' "$feed"
+          ! grep -Fq 'self.epistemic_status.is_trustworthy()' "$feed"
+          ! grep -Fq 'if !prov.allows_macro_promotion()' "$feed"
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Focused grammar-authority regressions
+        run: |
+          cargo +1.96.0 test --locked -p symthaea --lib --features web_research_module \
+            test_web_status_alone_never_grants_macro_authority -- --nocapture
+          cargo +1.96.0 test --locked -p symthaea --lib --features web_research_module \
+            test_trustworthy_web_provenance_is_still_macro_quarantined -- --nocapture
+          cargo +1.96.0 test --locked -p symthaea --lib --features web_research_module \
+            test_unverified_provenance_forces_quarantine -- --nocapture
+
+      - name: Compile web-research feature
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features web_research_module
+
+      - name: Strict Clippy
+        run: cargo +1.96.0 clippy --locked -p symthaea --lib --features web_research_module -- -D warnings
+
+      - name: Restore product tree and prove qualification-only subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- src/web_research/conjecture_feed.rs
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Qualification statement
+        run: |
+          echo 'PASS establishes only that web-research status alone cannot grant persistent Conjecture Engine grammar eligibility in this exact candidate.'
+          echo 'PASS does not establish web unreliability, scientific verification, source independence, safe future grammar admission, or action authority.'
