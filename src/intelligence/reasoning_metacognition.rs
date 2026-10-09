@@ -830,6 +830,250 @@ pub fn evaluate_frozen_correctness_forecasts(
 }
 
 
+/// Evaluate the candidate and two simple probability baselines on the same held-out outcomes.
+///
+/// Every task family must have both baseline methods, estimated from a non-matching calibration
+/// split. The caller must ensure the training-corpus manifests are disjoint from the holdout;
+/// this function checks identity/split separation but cannot prove manifest lineage itself.
+pub fn evaluate_frozen_forecasts_with_baselines(
+    frozen: &FrozenCorrectnessForecastSet,
+    outcomes: &[CorrectnessOutcomeV1],
+    assumptions: &[WeakAssumptionObservation],
+    revisions: &[ConfidenceRevisionObservation],
+    baselines: &[ForecastBaselineV1],
+) -> Result<MetacognitionReport, MetacognitionEvaluationError> {
+    let evaluation_split_id = frozen
+        .evaluation_split_id
+        .as_deref()
+        .filter(|id| !id.trim().is_empty())
+        .ok_or(MetacognitionEvaluationError::MissingEvaluationSplit)?;
+
+    // Reuse the strict forecast/outcome join. No baseline gets to change the candidate's
+    // predictions, outcome bindings, confidence thresholds, or reliability-bin policy.
+    let mut report =
+        evaluate_frozen_correctness_forecasts(frozen, outcomes, assumptions, revisions)?;
+    let first = &frozen.forecasts[0];
+    let forecast_ids: BTreeMap<&str, &CorrectnessForecastV1> = frozen
+        .forecasts
+        .iter()
+        .map(|p| (p.forecast_id.as_str(), p))
+        .collect();
+    let outcomes_by_id: BTreeMap<&str, &CorrectnessOutcomeV1> = outcomes
+        .iter()
+        .map(|o| (o.forecast_id.as_str(), o))
+        .collect();
+
+    let mut by_family: BTreeMap<String, Vec<&CorrectnessForecastV1>> = BTreeMap::new();
+    for forecast in &frozen.forecasts {
+        by_family
+            .entry(forecast.task_family_id.clone())
+            .or_default()
+            .push(forecast);
+    }
+
+    let mut baseline_index: BTreeMap<(String, ForecastBaselineMethod), &ForecastBaselineV1> =
+        BTreeMap::new();
+    let mut baseline_ids = HashSet::new();
+    for baseline in baselines {
+        if baseline.schema_version != FORECAST_BASELINE_SCHEMA_VERSION {
+            return Err(
+                MetacognitionEvaluationError::UnsupportedForecastSchemaVersion(
+                    baseline.schema_version,
+                ),
+            );
+        }
+        for (field, value) in [
+            ("baseline_id", baseline.baseline_id.as_str()),
+            ("task_family_id", baseline.task_family_id.as_str()),
+            ("task_taxonomy_id", baseline.task_taxonomy_id.as_str()),
+            ("outcome_profile_id", baseline.outcome_profile_id.as_str()),
+            ("training_split_id", baseline.training_split_id.as_str()),
+            (
+                "training_corpus_manifest_ref",
+                baseline.training_corpus_manifest_ref.as_str(),
+            ),
+        ] {
+            if value.trim().is_empty() {
+                return Err(MetacognitionEvaluationError::EmptyBaselineField {
+                    baseline_id: baseline.baseline_id.clone(),
+                    field,
+                });
+            }
+        }
+        if baseline.training_sample_count == 0 {
+            return Err(MetacognitionEvaluationError::InvalidBaselineSampleCount {
+                baseline_id: baseline.baseline_id.clone(),
+            });
+        }
+        validate_probability("baseline_probability", baseline.predicted_probability)?;
+        if baseline.training_split_id == evaluation_split_id {
+            return Err(
+                MetacognitionEvaluationError::BaselineTrainingSplitEqualsEvaluation {
+                    baseline_id: baseline.baseline_id.clone(),
+                    split_id: evaluation_split_id.to_owned(),
+                },
+            );
+        }
+        if baseline.task_taxonomy_id != first.task_taxonomy_id {
+            return Err(MetacognitionEvaluationError::BaselineTaxonomyMismatch {
+                baseline_id: baseline.baseline_id.clone(),
+                expected: first.task_taxonomy_id.clone(),
+                found: baseline.task_taxonomy_id.clone(),
+            });
+        }
+        if baseline.outcome_profile_id != first.outcome_profile_id {
+            return Err(
+                MetacognitionEvaluationError::BaselineOutcomeProfileMismatch {
+                    baseline_id: baseline.baseline_id.clone(),
+                    expected: first.outcome_profile_id.clone(),
+                    found: baseline.outcome_profile_id.clone(),
+                },
+            );
+        }
+        if !by_family.contains_key(&baseline.task_family_id) {
+            return Err(MetacognitionEvaluationError::EmptyBaselineField {
+                baseline_id: baseline.baseline_id.clone(),
+                field: "task_family_id_not_in_evaluation_set",
+            });
+        }
+        if !baseline_ids.insert(baseline.baseline_id.as_str()) {
+            return Err(MetacognitionEvaluationError::DuplicateBaselineId(
+                baseline.baseline_id.clone(),
+            ));
+        }
+        let key = (baseline.task_family_id.clone(), baseline.method);
+        if baseline_index.insert(key, baseline).is_some() {
+            return Err(
+                MetacognitionEvaluationError::DuplicateBaselineMethodForTaskFamily {
+                    method: baseline.method,
+                    task_family_id: baseline.task_family_id.clone(),
+                },
+            );
+        }
+    }
+
+    for task_family_id in by_family.keys() {
+        for method in [
+            ForecastBaselineMethod::ConstantBaseRate,
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+        ] {
+            if !baseline_index.contains_key(&(task_family_id.clone(), method)) {
+                return Err(
+                    MetacognitionEvaluationError::MissingBaselineForTaskFamily {
+                        method,
+                        task_family_id: task_family_id.clone(),
+                    },
+                );
+            }
+        }
+    }
+
+    let candidate_by_family: BTreeMap<&str, &TaskFamilyCalibrationReport> = report
+        .task_family_calibration
+        .iter()
+        .map(|r| (r.task_family_id.as_str(), r))
+        .collect();
+    let mut family_reports = Vec::with_capacity(by_family.len());
+    for (task_family_id, family_forecasts) in by_family {
+        let candidate = candidate_by_family
+            .get(task_family_id.as_str())
+            .ok_or_else(|| MetacognitionEvaluationError::MissingBaselineForTaskFamily {
+                method: ForecastBaselineMethod::ConstantBaseRate,
+                task_family_id: task_family_id.clone(),
+            })?;
+        let observed: Vec<bool> = family_forecasts
+            .iter()
+            .map(|p| {
+                outcomes_by_id
+                    .get(p.forecast_id.as_str())
+                    .map(|o| o.correct)
+                    .unwrap_or(false)
+            })
+            .collect();
+        // The strict join above already rejected missing outcomes. This explicit count keeps
+        // a future accidental change to that join from silently shortening baseline samples.
+        if observed.len() != family_forecasts.len()
+            || family_forecasts.iter().any(|p| !outcomes_by_id.contains_key(p.forecast_id.as_str()))
+        {
+            return Err(MetacognitionEvaluationError::MissingOutcomeForForecast(
+                family_forecasts[0].forecast_id.clone(),
+            ));
+        }
+        let accuracy = mean_bool(observed.iter().copied());
+        let mut family_baselines = Vec::with_capacity(2);
+        for method in [
+            ForecastBaselineMethod::ConstantBaseRate,
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+        ] {
+            let baseline = baseline_index
+                .get(&(task_family_id.clone(), method))
+                .expect("baseline coverage checked above");
+            let n = observed.len();
+            let mut brier = 0.0;
+            let mut log_loss = 0.0;
+            for &correct in &observed {
+                let target = if correct { 1.0 } else { 0.0 };
+                brier += (baseline.predicted_probability - target).powi(2);
+                let p_correct = if correct {
+                    baseline.predicted_probability
+                } else {
+                    1.0 - baseline.predicted_probability
+                };
+                log_loss += -p_correct
+                    .clamp(LOG_LOSS_EPSILON, 1.0 - LOG_LOSS_EPSILON)
+                    .ln();
+            }
+            let baseline_brier = brier / n as f64;
+            let baseline_log_loss = log_loss / n as f64;
+            let baseline_ece = accuracy.map(|a| (baseline.predicted_probability - a).abs());
+            family_baselines.push(ForecastBaselineScoreReport {
+                baseline_id: baseline.baseline_id.clone(),
+                method,
+                task_family_id: task_family_id.clone(),
+                training_split_id: baseline.training_split_id.clone(),
+                training_corpus_manifest_ref: baseline.training_corpus_manifest_ref.clone(),
+                training_sample_count: baseline.training_sample_count,
+                evaluation_split_id: evaluation_split_id.to_owned(),
+                evaluation_sample_count: n,
+                predicted_probability: baseline.predicted_probability,
+                empirical_accuracy: accuracy,
+                brier_score: Some(baseline_brier),
+                log_loss: Some(baseline_log_loss),
+                expected_calibration_error: baseline_ece,
+                candidate_brier_delta: candidate
+                    .brier_score
+                    .map(|score| score - baseline_brier),
+                candidate_log_loss_delta: candidate
+                    .log_loss
+                    .map(|score| score - baseline_log_loss),
+            });
+        }
+        family_reports.push(TaskFamilyForecastBaselineComparison {
+            task_family_id,
+            evaluation_episodes: family_forecasts.len(),
+            candidate_brier_score: candidate.brier_score,
+            candidate_log_loss: candidate.log_loss,
+            candidate_expected_calibration_error: candidate.expected_calibration_error,
+            baselines: family_baselines,
+        });
+    }
+
+    report.baseline_comparison = Some(ForecastBaselineComparisonReport {
+        schema_version: FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION,
+        outcome_profile_id: first.outcome_profile_id.clone(),
+        task_taxonomy_id: first.task_taxonomy_id.clone(),
+        evaluation_split_id: evaluation_split_id.to_owned(),
+        baseline_methods: vec![
+            ForecastBaselineMethod::ConstantBaseRate,
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+        ],
+        family_reports,
+    });
+    // Keep the lookup live to make it explicit that all scoring rows are keyed by frozen IDs.
+    let _validated_forecast_count = forecast_ids.len();
+    Ok(report)
+}
+
 /// Evaluate a frozen set of metacognitive observations.
 pub fn evaluate_metacognition(
     predictions: &[CorrectnessPrediction],
