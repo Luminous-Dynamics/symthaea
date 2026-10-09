@@ -36,7 +36,7 @@ For every task family in the frozen evaluation set, provide both methods:
 1. **Constant base rate:** the empirical correctness rate estimated on the disjoint calibration corpus.
 2. **Recent empirical accuracy:** the empirical correctness rate from a predeclared, trailing calibration window that ends before evaluation begins.
 
-Each baseline record must include a stable ID, family, task taxonomy, exact outcome profile, probability, positive calibration sample count, training split ID, and calibration corpus manifest reference. Freeze these profiles before the evaluation outcomes are observed. The evaluator fails closed if either method is missing for any family, if split IDs match, or if target/taxonomy identities disagree.
+Each baseline record must include a stable ID, family, task taxonomy, exact outcome profile, probability, positive calibration sample count, training split ID, and calibration corpus manifest reference. Freeze these profiles before the evaluation outcomes are observed. The evaluator fails closed if either method is missing for any family, if training/evaluation split IDs match, if the training manifest reference is identical to the evaluation manifest reference, or if target/taxonomy identities disagree.
 
 Different split IDs are necessary but not sufficient: a trusted manifest verifier must prove that calibration and holdout membership are disjoint and that a recent-accuracy window does not extend into the holdout.
 
