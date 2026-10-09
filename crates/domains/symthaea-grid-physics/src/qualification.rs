@@ -8,6 +8,8 @@
 //! increment are never collapsed into one score. Scenario hashes establish
 //! deterministic input identity, not source authenticity or field truth.
 
+use std::cell::Cell;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -239,20 +241,28 @@ impl FrozenEnergyScenario {
         .with_soc(self.battery.initial_soc)
         .with_degradation_per_cycle(self.battery.degradation_per_cycle);
 
-        let dt_hours = self.dt_hours;
-        let start_hour = self.start_hour;
-        let input_len = self.load_profile_kw.len();
-        let load_profile = |time: f64| {
-            let index = sample_index(time, start_hour, dt_hours, input_len);
-            self.load_profile_kw[index]
+        // Advance each frozen time series by step ordinal rather than
+        // recovering an index from floating-point absolute clock values.
+        // This avoids profile drift when elapsed-hour arithmetic accumulates
+        // rounding error. Each profile closure is sampled exactly once per
+        // simulation step by the runner.
+        let load_index = Cell::new(0usize);
+        let generation_index = Cell::new(0usize);
+        let grid_index = Cell::new(0usize);
+        let load_profile = |_time: f64| {
+            let index = load_index.get();
+            load_index.set(index + 1);
+            self.load_profile_kw.get(index).copied().unwrap_or(f64::NAN)
         };
-        let generation_profile = |time: f64| {
-            let index = sample_index(time, start_hour, dt_hours, input_len);
-            self.generation_profile_kw[index]
+        let generation_profile = |_time: f64| {
+            let index = generation_index.get();
+            generation_index.set(index + 1);
+            self.generation_profile_kw.get(index).copied().unwrap_or(f64::NAN)
         };
-        let grid_profile = |time: f64| {
-            let index = sample_index(time, start_hour, dt_hours, input_len);
-            self.grid_available_by_step[index]
+        let grid_profile = |_time: f64| {
+            let index = grid_index.get();
+            grid_index.set(index + 1);
+            self.grid_available_by_step.get(index).copied().unwrap_or(false)
         };
 
         let trace = try_run_scenario_with_receipt_profiles(
@@ -577,12 +587,6 @@ fn valid_label(value: &str) -> bool {
 fn valid_source_revision(value: &str) -> bool {
     value.len() == POLICY_SOURCE_REVISION_LENGTH
         && value.bytes().all(|byte| byte.is_ascii_hexdigit())
-}
-
-fn sample_index(time: f64, start_hour: f64, dt_hours: f64, len: usize) -> usize {
-    // Rounded indexing prevents tiny floating-point subtraction error at
-    // timestep boundaries from selecting the preceding profile sample.
-    (((time - start_hour) / dt_hours).round().max(0.0) as usize).min(len - 1)
 }
 
 fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
