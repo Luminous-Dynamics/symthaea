@@ -192,7 +192,7 @@ impl Battery {
             && self.equivalent_full_cycles.is_finite()
             && self.equivalent_full_cycles >= 0.0
             && self.degradation_per_cycle.is_finite()
-            && self.degradation_per_cycle >= 0.0
+            && (0.0..=1.0).contains(&self.degradation_per_cycle)
     }
 
     /// One-way (charge or discharge) efficiency: sqrt of round-trip efficiency,
@@ -483,6 +483,27 @@ mod tests {
         assert_eq!(legacy.degradation_per_cycle, 1.0);
         assert!(legacy.soc().is_finite());
         assert!(legacy.degradation_per_cycle.is_finite());
+    }
+
+    #[test]
+    fn test_out_of_range_degradation_mutation_is_rejected_without_state_change() {
+        let mut battery = Battery::new(100.0, 50.0, 0.9).with_soc(0.5);
+        battery.degradation_per_cycle = 1.01;
+        let before_soc = battery.soc();
+        let before_soh = battery.state_of_health();
+        let before_cycles = battery.equivalent_full_cycles();
+
+        assert_eq!(
+            battery.charge(10.0, 1.0),
+            Err(BatteryError::InvalidConfiguration)
+        );
+        assert_eq!(
+            battery.discharge(10.0, 1.0),
+            Err(BatteryError::InvalidConfiguration)
+        );
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.state_of_health(), before_soh);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
     }
 
     #[test]
