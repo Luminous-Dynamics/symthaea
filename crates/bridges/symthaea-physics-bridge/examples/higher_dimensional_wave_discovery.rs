@@ -15,8 +15,8 @@ use std::env;
 use std::time::Instant;
 
 use symthaea_core::hdc::conjecture_engine::{
-    RegressorConfig, discover_invariants_autonomous, is_informatively_conserved,
-    lie_derivative_variance,
+    RegressorConfig, discover_invariants_autonomous, gradient_informativeness_fraction,
+    is_informatively_conserved, lie_derivative_variance,
 };
 use symthaea_physics_bridge::{
     hypercubic_wave_energy, hypercubic_wave_rhs, hypercubic_wave_trajectory,
@@ -24,6 +24,7 @@ use symthaea_physics_bridge::{
 
 const CONSERVATION_TOLERANCE: f64 = 1e-6;
 const ENERGY_ALIGNMENT_CORRELATION: f64 = 0.995;
+const MIN_INFORMATIVE_FRACTION: f64 = 0.5;
 const SEARCH_SEEDS: [u64; 5] = [42, 1337, 2718, 7919, 31415];
 const CANDIDATES_TO_SCREEN_PER_SEED: usize = 10;
 
@@ -159,13 +160,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                     &holdout_trajectory,
                     &variable_names,
                 );
-                let informative = is_informatively_conserved(
+                let informative_train = is_informatively_conserved(
                     &candidate.formula,
                     hypercubic_wave_rhs,
                     &train_trajectory,
                     &variable_names,
                     CONSERVATION_TOLERANCE,
                 );
+                // Apply the same non-degeneracy idea to the independent
+                // holdout. Low normalized Lie-derivative variance alone can
+                // be misleading when gradients are near-flat at most samples.
+                let holdout_informative_fraction = gradient_informativeness_fraction(
+                    &candidate.formula,
+                    &holdout_trajectory,
+                    &variable_names,
+                );
+                let informative_holdout =
+                    holdout_informative_fraction >= MIN_INFORMATIVE_FRACTION;
                 let train_correlation = correlation_with_hamiltonian(
                     &candidate.formula,
                     &train_trajectory,
@@ -184,17 +195,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .is_some_and(|r| r.abs() >= ENERGY_ALIGNMENT_CORRELATION)
                     && holdout_correlation
                         .is_some_and(|r| r.abs() >= ENERGY_ALIGNMENT_CORRELATION);
-                let accepted = train_ok && holdout_ok && informative && aligned;
+                let accepted =
+                    train_ok && holdout_ok && informative_train && informative_holdout && aligned;
                 if accepted {
                     screened_for_seed += 1;
                 }
                 println!(
-                    "  seed={seed} {} {} | train={:.3e} holdout={:.3e} informative={} symbolic={} r_train={} r_holdout={} | {}",
+                    "  seed={seed} {} {} | train={:.3e} holdout={:.3e} informative_train={} holdout_gradient_fraction={:.3} symbolic={} r_train={} r_holdout={} | {}",
                     if accepted { "[SCREENED]" } else { "[candidate]" },
                     candidate.formula_str,
                     train_variance,
                     holdout_variance,
-                    informative,
+                    informative_train,
+                    holdout_informative_fraction,
                     candidate.symbolically_proven,
                     format_correlation(train_correlation),
                     format_correlation(holdout_correlation),
