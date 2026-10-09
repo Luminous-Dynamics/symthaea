@@ -1,0 +1,29 @@
+name: VIS-EVAL-000A Tracker State Export
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-vision-manifold/**'
+      - '.github/workflows/vis-eval-000a-tracker-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check vision manifold
+        run: cargo check -p symthaea-vision-manifold --all-targets
+      - name: Test tracker export
+        run: cargo test -p symthaea-vision-manifold tracker_export
+      - name: Strict Clippy vision manifold
+        run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings
