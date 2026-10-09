@@ -329,3 +329,19 @@ This follows the general model of [W3C PROV-DM](https://www.w3.org/TR/prov-dm/) 
 The current comparison module still does not know an expected registry of every framework unless the caller supplies an explicit unavailable row for the framework. Adapter integration must preserve coverage information and must not silently omit a framework that did not run. The comparator does not calculate moral truth or grant execution permission.
 
 Tests in this draft are authored but not run; the workflow records for the latest checked head are skipped, not passing. Next qualification requires exact-head Rust tests in the pinned Nix environment and cadence-boundary tests across the 7-cycle and 19-cycle evaluation schedules. The existing EthicsEngine and action gate remain unchanged.
+
+
+### Declared framework-roster coverage — 2026-10-09
+
+The comparison now has a strict roster-based entry point in [draft PR #7279](https://github.com/Luminous-Dynamics/symthaea/pull/7279), stacked on the provenance work in [#7278](https://github.com/Luminous-Dynamics/symthaea/pull/7278). Callers provide a versioned list of required framework identities along with the exact subject/action under comparison.
+
+- A missing required framework is reported via `missing_frameworks` and makes the result `Incomplete`, even if all supplied assessments support the action.
+- A framework/version outside the declared roster is reported via `unexpected_frameworks` and yields `FrameworkSetMismatch`.
+- An explicit `Unavailable` row represents the expected framework without pretending it evaluated the case; it keeps the result incomplete and cannot claim confidence, premise, or evidence references.
+- Empty, malformed, or duplicate rosters fail closed. Coverage arrays are sorted for deterministic output, and a roster mismatch must not hide subject/provenance/freshness failures.
+
+This is evaluation **coverage**, not proof of moral adequacy. A caller can still define an incomplete or biased roster; the API cannot decide which frameworks a domain morally requires. The roster should be declared, versioned, justified for the deployment context, and reviewable by affected parties—not inferred silently by the evaluator.
+
+That distinction is consistent with the current research gap described in [“Position: Evaluations of AI Moral Reasoning Still Miss Half of the Picture”](https://arxiv.org/abs/2608.14566) (2026): values-level alignment and norm identification/application are different evaluation targets, and moral competence also depends on identifying relevant contextual features. Therefore later Symthaea qualification should assess both value representation and context-sensitive norm application, rather than scoring only multi-framework agreement.
+
+The [NIST AI RMF Measure guidance](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/) calls for documented test sets, metrics, uncertainty and evaluation methods, and recommends independent review and consideration of external stakeholders. The [AI Standards Lab's June 2026 endorsement of the Evals-Consensus recommendations](https://aistandardslab.org/we-have-endorsed-the-recommendations-coming-out-of-the-evals-consensus-project/) further supports treating evaluation coverage, documentation, execution, and reporting as part of the contract, not informal assumptions. Symthaea's current tests are authored but remain unexecuted; these sources motivate the design and do not validate the implementation.
