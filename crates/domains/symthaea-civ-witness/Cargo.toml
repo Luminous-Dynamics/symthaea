@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-civ-witness"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+description = "SQLite durability adapter for CIV witness state with an external-anchor contract"
+
+[dependencies]
+rusqlite = { workspace = true }
+sha2 = { workspace = true }
