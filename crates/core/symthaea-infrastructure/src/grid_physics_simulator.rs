@@ -296,8 +296,16 @@ impl GridPhysicsInfrastructureSimulator {
         self.elapsed_s += dt;
         let dt_hours = dt / 3600.0;
 
-        let charge_frac = cmd.charge_bus().clamp(0.0, 1.0) as f64;
-        let discharge_frac = cmd.discharge_bus().clamp(0.0, 1.0) as f64;
+        // Charge/discharge are independent controller outputs, but a real
+        // battery cannot charge and discharge at once. Convert the pair to a
+        // signed net dispatch first, then execute at most one direction. This
+        // avoids phantom equivalent cycles and double-counted conversion loss
+        // when both learned outputs are positive.
+        let charge_command_frac = cmd.charge_bus().clamp(0.0, 1.0) as f64;
+        let discharge_command_frac = cmd.discharge_bus().clamp(0.0, 1.0) as f64;
+        let net_storage_command_frac = discharge_command_frac - charge_command_frac;
+        let charge_frac = (-net_storage_command_frac).max(0.0);
+        let discharge_frac = net_storage_command_frac.max(0.0);
         let cooling_frac = cmd.cooling_loop().clamp(0.0, 1.0) as f64;
         let heating_frac = cmd.heating_loop().clamp(0.0, 1.0) as f64;
         let north = cmd.torques[4].abs() as f64;
@@ -858,6 +866,47 @@ mod failure_mode_tests {
         assert_eq!(sim.state.channels, before.state.channels);
         assert_eq!(sim.elapsed_s, before.elapsed_s);
         assert_eq!(sim.battery.power_rating_kw, before.battery.power_rating_kw);
+    }
+
+    #[test]
+    fn simultaneous_equal_charge_and_discharge_net_to_idle_without_cycle_wear() {
+        let mut netted = GridPhysicsInfrastructureSimulator::new();
+        let mut idle = GridPhysicsInfrastructureSimulator::new();
+        let mut conflicting = InfrastructureCommand::zero();
+        conflicting.torques[0] = 0.75;
+        conflicting.torques[1] = 0.75;
+
+        assert_eq!(netted.try_step(&conflicting, 0.005), Ok(()));
+        assert_eq!(
+            idle.try_step(&InfrastructureCommand::zero(), 0.005),
+            Ok(())
+        );
+        assert_eq!(netted.battery.soc(), idle.battery.soc());
+        assert_eq!(
+            netted.battery.equivalent_full_cycles(),
+            idle.battery.equivalent_full_cycles()
+        );
+        assert_eq!(netted.state.channels, idle.state.channels);
+    }
+
+    #[test]
+    fn simultaneous_opposing_storage_commands_reduce_to_one_net_direction() {
+        let mut netted = GridPhysicsInfrastructureSimulator::new();
+        let mut equivalent = GridPhysicsInfrastructureSimulator::new();
+        let mut opposing = InfrastructureCommand::zero();
+        opposing.torques[0] = 0.75;
+        opposing.torques[1] = 0.25;
+        let mut charge_only = InfrastructureCommand::zero();
+        charge_only.torques[0] = 0.5;
+
+        assert_eq!(netted.try_step(&opposing, 0.005), Ok(()));
+        assert_eq!(equivalent.try_step(&charge_only, 0.005), Ok(()));
+        assert_eq!(netted.battery.soc(), equivalent.battery.soc());
+        assert_eq!(
+            netted.battery.equivalent_full_cycles(),
+            equivalent.battery.equivalent_full_cycles()
+        );
+        assert_eq!(netted.state.channels, equivalent.state.channels);
     }
 
     #[test]
