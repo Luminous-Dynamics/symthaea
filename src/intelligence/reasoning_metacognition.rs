@@ -19,14 +19,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v6";
+pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v7";
 pub const CORRECTNESS_FORECAST_SCHEMA_VERSION: u32 = 1;
 pub const CORRECTNESS_OUTCOME_SCHEMA_VERSION: u32 = 1;
 pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 2;
 pub const FORECAST_BASELINE_SCHEMA_VERSION: u32 = 1;
-pub const FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION: u32 = 1;
+pub const FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION: u32 = 2;
 pub const FORECAST_OUTCOME_BINDING_REPORT_SCHEMA_VERSION: u32 = 1;
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
+const BASELINE_BRIER_DELTA_FAMILYWISE_ALPHA: f64 = 0.05;
+const BASELINE_BRIER_DELTA_BOUND_METHOD: &str = "paired-hoeffding-familywise-95-v1";
+const BASELINE_BRIER_DELTA_BOUND_ASSUMPTIONS: &str = concat!(
+    "IID evaluation episodes within each task family; fixed candidate forecasts and baseline ",
+    "probabilities before outcome access; paired per-episode Brier loss differences lie in [-1, 1]; ",
+    "Bonferroni covers all observed task-family x baseline comparisons; ",
+    "no distribution-shift guarantee; split disjointness requires external verification",
+);
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
 const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = concat!(
@@ -503,6 +511,11 @@ pub struct ForecastBaselineScoreReport {
     pub candidate_brier_delta: Option<f64>,
     /// Candidate log loss minus baseline loss; negative favors the candidate.
     pub candidate_log_loss_delta: Option<f64>,
+    /// Simultaneous conservative lower bound for expected candidate-minus-baseline Brier loss.
+    /// Negative favors the candidate; bounded to the possible range [-1, 1].
+    pub candidate_brier_delta_lower_95: Option<f64>,
+    /// Simultaneous conservative upper bound for expected candidate-minus-baseline Brier loss.
+    pub candidate_brier_delta_upper_95: Option<f64>,
 }
 
 /// Baselines and the candidate scored against the exact same family-local holdout outcomes.
@@ -525,6 +538,10 @@ pub struct ForecastBaselineComparisonReport {
     pub evaluation_split_id: String,
     pub evaluation_corpus_manifest_ref: String,
     pub baseline_methods: Vec<ForecastBaselineMethod>,
+    /// Method identity for the simultaneous paired Brier-delta intervals.
+    pub brier_delta_bound_method: String,
+    /// Sampling/policy assumptions and limits of the Brier-delta intervals.
+    pub brier_delta_bound_assumptions: String,
     pub family_reports: Vec<TaskFamilyForecastBaselineComparison>,
 }
 
@@ -901,6 +918,32 @@ pub fn evaluate_frozen_correctness_forecasts(
 }
 
 
+/// Conservative paired, two-sided Hoeffding interval for candidate-minus-baseline Brier loss.
+///
+/// Each per-episode difference is in [-1, 1]. Bonferroni correction is applied to the
+/// predeclared family-by-baseline comparisons. The interval is valid only under the documented
+/// sampling assumptions; it does not address distribution shift or prove split disjointness.
+fn paired_brier_delta_interval_95(
+    observed_delta: Option<f64>,
+    sample_count: usize,
+    familywise_comparison_count: usize,
+) -> (Option<f64>, Option<f64>) {
+    let (Some(delta), true, true) = (
+        observed_delta,
+        sample_count > 0,
+        familywise_comparison_count > 0,
+    ) else {
+        return (None, None);
+    };
+    let per_comparison_alpha =
+        BASELINE_BRIER_DELTA_FAMILYWISE_ALPHA / familywise_comparison_count as f64;
+    let radius = (2.0 * (2.0 / per_comparison_alpha).ln() / sample_count as f64).sqrt();
+    (
+        Some((delta - radius).max(-1.0)),
+        Some((delta + radius).min(1.0)),
+    )
+}
+
 /// Evaluate the candidate and two simple probability baselines on the same held-out outcomes.
 ///
 /// Every task family must have both baseline methods, estimated from a non-matching calibration
@@ -1058,6 +1101,8 @@ pub fn evaluate_frozen_forecasts_with_baselines(
         .iter()
         .map(|r| (r.task_family_id.as_str(), r))
         .collect();
+    // Two predeclared baselines per task family; correct the full family-by-method comparison set.
+    let familywise_comparison_count = by_family.len().saturating_mul(2);
     let mut family_reports = Vec::with_capacity(by_family.len());
     for (task_family_id, family_forecasts) in by_family {
         let candidate = candidate_by_family
@@ -1111,6 +1156,14 @@ pub fn evaluate_frozen_forecasts_with_baselines(
             let baseline_brier = brier / n as f64;
             let baseline_log_loss = log_loss / n as f64;
             let baseline_ece = accuracy.map(|a| (baseline.predicted_probability - a).abs());
+            let candidate_brier_delta =
+                candidate.brier_score.map(|score| score - baseline_brier);
+            let (candidate_brier_delta_lower_95, candidate_brier_delta_upper_95) =
+                paired_brier_delta_interval_95(
+                    candidate_brier_delta,
+                    n,
+                    familywise_comparison_count,
+                );
             family_baselines.push(ForecastBaselineScoreReport {
                 baseline_id: baseline.baseline_id.clone(),
                 method,
@@ -1126,12 +1179,12 @@ pub fn evaluate_frozen_forecasts_with_baselines(
                 brier_score: Some(baseline_brier),
                 log_loss: Some(baseline_log_loss),
                 expected_calibration_error: baseline_ece,
-                candidate_brier_delta: candidate
-                    .brier_score
-                    .map(|score| score - baseline_brier),
+                candidate_brier_delta,
                 candidate_log_loss_delta: candidate
                     .log_loss
                     .map(|score| score - baseline_log_loss),
+                candidate_brier_delta_lower_95,
+                candidate_brier_delta_upper_95,
             });
         }
         family_reports.push(TaskFamilyForecastBaselineComparison {
@@ -1154,6 +1207,8 @@ pub fn evaluate_frozen_forecasts_with_baselines(
             ForecastBaselineMethod::ConstantBaseRate,
             ForecastBaselineMethod::RecentEmpiricalAccuracy,
         ],
+        brier_delta_bound_method: BASELINE_BRIER_DELTA_BOUND_METHOD.into(),
+        brier_delta_bound_assumptions: BASELINE_BRIER_DELTA_BOUND_ASSUMPTIONS.into(),
         family_reports,
     });
     Ok(report)
@@ -1884,11 +1939,52 @@ mod tests {
             .iter()
             .all(|b| b.candidate_brier_delta.unwrap_or(0.0) > 0.0));
         assert_eq!(
+            comparison.brier_delta_bound_method,
+            "paired-hoeffding-familywise-95-v1"
+        );
+        assert!(comparison
+            .brier_delta_bound_assumptions
+            .contains("Bonferroni covers all observed task-family"));
+        assert_eq!(
+            comparison.schema_version,
+            FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION
+        );
+        assert!(reasoning.baselines.iter().all(|baseline| {
+            let delta = baseline.candidate_brier_delta.unwrap_or_default();
+            let lower = baseline.candidate_brier_delta_lower_95.unwrap_or(2.0);
+            let upper = baseline.candidate_brier_delta_upper_95.unwrap_or(-2.0);
+            lower <= delta && delta <= upper && lower >= -1.0 && upper <= 1.0
+        }));
+        assert_eq!(
             reasoning.baselines.iter().map(|b| b.method).collect::<Vec<_>>(),
             vec![
                 ForecastBaselineMethod::ConstantBaseRate,
                 ForecastBaselineMethod::RecentEmpiricalAccuracy
             ]
+        );
+    }
+
+    #[test]
+    fn paired_brier_delta_interval_is_bounded_and_widens_for_familywise_correction() {
+        assert_eq!(paired_brier_delta_interval_95(Some(-0.1), 0, 1), (None, None));
+        assert_eq!(
+            paired_brier_delta_interval_95(Some(-0.1), 10, 0),
+            (None, None)
+        );
+
+        let unadjusted = paired_brier_delta_interval_95(Some(-0.1), 100, 1);
+        let simultaneous = paired_brier_delta_interval_95(Some(-0.1), 100, 4);
+        let (Some(unadjusted_lower), Some(unadjusted_upper)) = unadjusted else {
+            panic!("non-empty comparison must have interval");
+        };
+        let (Some(simultaneous_lower), Some(simultaneous_upper)) = simultaneous else {
+            panic!("non-empty comparison must have simultaneous interval");
+        };
+        assert!(simultaneous_lower <= -0.1 && simultaneous_upper >= -0.1);
+        assert!(simultaneous_lower >= -1.0 && simultaneous_upper <= 1.0);
+        assert!(
+            simultaneous_upper - simultaneous_lower > unadjusted_upper - unadjusted_lower,
+            "additional familywise comparisons must widen the conservative interval"
         );
     }
 
