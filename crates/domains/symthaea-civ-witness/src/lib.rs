@@ -2275,8 +2275,10 @@ mod tests {
             )
             .expect("truncate last evidence row");
         }
-        let conn = store.open_connection().expect("reopen fork store");
-        assert!(matches!(validate_fork_history(&conn, log_id), Err(WitnessError::CorruptForkEvidence)));
+        assert!(matches!(
+            store.load_history(log_id),
+            Err(WitnessError::CorruptForkEvidence)
+        ));
     }
 
     #[test]
@@ -2293,7 +2295,11 @@ mod tests {
             params![h(b"wrong-tail-pointer").as_slice(), log_id],
         )
         .expect("tamper fork tail pointer");
-        assert!(matches!(validate_fork_history(&conn, log_id), Err(WitnessError::CorruptForkEvidence)));
+        drop(conn);
+        assert!(matches!(
+            store.load_history(log_id),
+            Err(WitnessError::CorruptForkEvidence)
+        ));
     }
 
     #[test]
