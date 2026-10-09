@@ -242,6 +242,7 @@ pub enum MetacognitionEvaluationError {
         found: String,
     },
     MissingEvaluationSplit,
+    MissingEvaluationManifest,
     EmptyBaselineField { baseline_id: String, field: &'static str },
     InvalidBaselineSampleCount { baseline_id: String },
     DuplicateBaselineId(String),
@@ -256,6 +257,10 @@ pub enum MetacognitionEvaluationError {
     BaselineTrainingSplitEqualsEvaluation {
         baseline_id: String,
         split_id: String,
+    },
+    BaselineTrainingManifestEqualsEvaluation {
+        baseline_id: String,
+        manifest_ref: String,
     },
     BaselineTaxonomyMismatch {
         baseline_id: String,
@@ -342,6 +347,9 @@ impl fmt::Display for MetacognitionEvaluationError {
             Self::MissingEvaluationSplit => {
                 write!(f, "baseline comparison requires an explicit evaluation split ID")
             }
+            Self::MissingEvaluationManifest => {
+                write!(f, "baseline comparison requires an evaluation corpus manifest reference")
+            }
             Self::EmptyBaselineField { baseline_id, field } => {
                 write!(f, "baseline '{baseline_id}' has empty required field '{field}'")
             }
@@ -367,6 +375,15 @@ impl fmt::Display for MetacognitionEvaluationError {
                 write!(
                     f,
                     "baseline '{baseline_id}' training split '{split_id}' equals evaluation split"
+                )
+            }
+            Self::BaselineTrainingManifestEqualsEvaluation {
+                baseline_id,
+                manifest_ref,
+            } => {
+                write!(
+                    f,
+                    "baseline '{baseline_id}' training manifest '{manifest_ref}' equals evaluation manifest"
                 )
             }
             Self::BaselineTaxonomyMismatch { baseline_id, expected, found } => {
@@ -473,6 +490,7 @@ pub struct ForecastBaselineScoreReport {
     pub training_corpus_manifest_ref: String,
     pub training_sample_count: usize,
     pub evaluation_split_id: String,
+    pub evaluation_corpus_manifest_ref: String,
     pub evaluation_sample_count: usize,
     pub predicted_probability: f64,
     pub empirical_accuracy: Option<f64>,
@@ -503,6 +521,7 @@ pub struct ForecastBaselineComparisonReport {
     pub outcome_profile_id: String,
     pub task_taxonomy_id: String,
     pub evaluation_split_id: String,
+    pub evaluation_corpus_manifest_ref: String,
     pub baseline_methods: Vec<ForecastBaselineMethod>,
     pub family_reports: Vec<TaskFamilyForecastBaselineComparison>,
 }
@@ -518,6 +537,7 @@ pub struct FrozenCorrectnessForecastSet {
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: Option<String>,
+    evaluation_corpus_manifest_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -528,6 +548,8 @@ struct FrozenCorrectnessForecastSetWire {
     selective_thresholds: Vec<f64>,
     #[serde(default)]
     evaluation_split_id: Option<String>,
+    #[serde(default)]
+    evaluation_corpus_manifest_ref: Option<String>,
 }
 
 impl FrozenCorrectnessForecastSet {
@@ -550,6 +572,10 @@ impl FrozenCorrectnessForecastSet {
     pub fn evaluation_split_id(&self) -> Option<&str> {
         self.evaluation_split_id.as_deref()
     }
+
+    pub fn evaluation_corpus_manifest_ref(&self) -> Option<&str> {
+        self.evaluation_corpus_manifest_ref.as_deref()
+    }
 }
 
 impl TryFrom<FrozenCorrectnessForecastSetWire> for FrozenCorrectnessForecastSet {
@@ -564,12 +590,17 @@ impl TryFrom<FrozenCorrectnessForecastSetWire> for FrozenCorrectnessForecastSet 
             );
         }
         validate_forecast_set(&w.forecasts, w.calibration_bins, &w.selective_thresholds)?;
+        validate_evaluation_scope(
+            w.evaluation_split_id.as_deref(),
+            w.evaluation_corpus_manifest_ref.as_deref(),
+        )?;
         Ok(Self {
             schema_version: w.schema_version,
             forecasts: w.forecasts,
             calibration_bins: w.calibration_bins,
             selective_thresholds: w.selective_thresholds,
             evaluation_split_id: w.evaluation_split_id,
+            evaluation_corpus_manifest_ref: w.evaluation_corpus_manifest_ref,
         })
     }
 }
@@ -587,6 +618,7 @@ pub fn freeze_correctness_forecasts(
         calibration_bins,
         selective_thresholds,
         None,
+        None,
     )
 }
 
@@ -600,17 +632,24 @@ pub fn freeze_correctness_forecasts_for_split(
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
+    evaluation_corpus_manifest_ref: String,
 ) -> Result<FrozenCorrectnessForecastSet, MetacognitionEvaluationError> {
     if evaluation_split_id.trim().is_empty()
         || evaluation_split_id.trim() != evaluation_split_id
     {
         return Err(MetacognitionEvaluationError::MissingEvaluationSplit);
     }
+    if evaluation_corpus_manifest_ref.trim().is_empty()
+        || evaluation_corpus_manifest_ref.trim() != evaluation_corpus_manifest_ref
+    {
+        return Err(MetacognitionEvaluationError::MissingEvaluationManifest);
+    }
     freeze_correctness_forecasts_internal(
         forecasts,
         calibration_bins,
         selective_thresholds,
         Some(evaluation_split_id),
+        Some(evaluation_corpus_manifest_ref),
     )
 }
 
@@ -619,6 +658,7 @@ fn freeze_correctness_forecasts_internal(
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: Option<String>,
+    evaluation_corpus_manifest_ref: Option<String>,
 ) -> Result<FrozenCorrectnessForecastSet, MetacognitionEvaluationError> {
     FrozenCorrectnessForecastSet::try_from(FrozenCorrectnessForecastSetWire {
         schema_version: FROZEN_FORECAST_SET_SCHEMA_VERSION,
@@ -626,7 +666,28 @@ fn freeze_correctness_forecasts_internal(
         calibration_bins,
         selective_thresholds,
         evaluation_split_id,
+        evaluation_corpus_manifest_ref,
     })
+}
+
+fn validate_evaluation_scope(
+    split_id: Option<&str>,
+    manifest_ref: Option<&str>,
+) -> Result<(), MetacognitionEvaluationError> {
+    match (split_id, manifest_ref) {
+        (None, None) => Ok(()),
+        (Some(split), Some(manifest))
+            if !split.trim().is_empty()
+                && split.trim() == split
+                && !manifest.trim().is_empty()
+                && manifest.trim() == manifest =>
+        {
+            Ok(())
+        }
+        (None, Some(_)) => Err(MetacognitionEvaluationError::MissingEvaluationSplit),
+        (Some(_), None) => Err(MetacognitionEvaluationError::MissingEvaluationManifest),
+        _ => Err(MetacognitionEvaluationError::MissingEvaluationManifest),
+    }
 }
 
 fn require_forecast_field(
