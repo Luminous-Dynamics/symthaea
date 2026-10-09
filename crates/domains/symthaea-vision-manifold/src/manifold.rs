@@ -11030,7 +11030,7 @@ mod tests {
     #[test]
     fn path_coherence_is_unavailable_without_a_transition() {
         let manifold = test_manifold();
-        let state = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0001);
+        let state = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0001);
 
         assert_eq!(manifold.measure_path_coherence(&[]), None);
         assert_eq!(manifold.measure_path_coherence(std::slice::from_ref(&state)), None);
@@ -11039,9 +11039,9 @@ mod tests {
     #[test]
     fn path_coherence_is_the_mean_of_local_transition_scores() {
         let manifold = test_manifold();
-        let a = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0002);
-        let b = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0003);
-        let c = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0004);
+        let a = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0002);
+        let b = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0003);
+        let c = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0004);
         let path = [a.clone(), b.clone(), c.clone()];
 
         let expected = (manifold.compute_local_coherence(&a, &b)
