@@ -74,26 +74,52 @@ impl MusicalStateFrame {
     /// or later HDC/VSA encoding.
     pub fn vector(&self) -> [f64; STATE_DIMS] {
         let mut v = [0.0; STATE_DIMS];
-        // Bound scalar magnitudes so density cannot overwhelm distributional
-        // features merely because its natural unit is unbounded attacks/beat.
-        v[0] = (self.onset_density / 4.0).clamp(0.0, 1.0);
-        v[1] = self.pitch_entropy;
-        v[2] = self.rhythm_entropy;
-        v[3] = self.mean_interval;
-        v[4] = self.contour_asymmetry;
-        v[5] = self.structural_intensity;
+        // Frames are public and deserializable, so do not assume caller-supplied
+        // values obey extraction invariants. Every vector dimension must remain
+        // finite and bounded or one NaN can poison all later cosine similarities.
+        v[0] = bounded_unit_feature(self.onset_density / 4.0);
+        v[1] = bounded_unit_feature(self.pitch_entropy);
+        v[2] = bounded_unit_feature(self.rhythm_entropy);
+        v[3] = bounded_unit_feature(self.mean_interval);
+        v[4] = bounded_unit_feature(self.contour_asymmetry);
+        v[5] = bounded_unit_feature(self.structural_intensity);
         v[6] = if self.part_identity_available { 1.0 } else { 0.0 };
 
         let mut offset = 7;
-        v[offset..offset + PITCH_CLASS_BINS].copy_from_slice(&self.pitch_class_hist);
+        for (target, value) in v[offset..offset + PITCH_CLASS_BINS]
+            .iter_mut()
+            .zip(self.pitch_class_hist)
+        {
+            *target = bounded_unit_feature(value);
+        }
         offset += PITCH_CLASS_BINS;
-        v[offset..offset + RHYTHM_BINS].copy_from_slice(&self.rhythm_hist);
+        for (target, value) in v[offset..offset + RHYTHM_BINS]
+            .iter_mut()
+            .zip(self.rhythm_hist)
+        {
+            *target = bounded_unit_feature(value);
+        }
         offset += RHYTHM_BINS;
-        v[offset..offset + INTERVAL_BINS].copy_from_slice(&self.line_interval_hist);
+        for (target, value) in v[offset..offset + INTERVAL_BINS]
+            .iter_mut()
+            .zip(self.line_interval_hist)
+        {
+            *target = bounded_unit_feature(value);
+        }
         offset += INTERVAL_BINS;
-        v[offset..offset + CONTOUR_BINS].copy_from_slice(&self.line_contour_hist);
+        for (target, value) in v[offset..offset + CONTOUR_BINS]
+            .iter_mut()
+            .zip(self.line_contour_hist)
+        {
+            *target = bounded_unit_feature(value);
+        }
         offset += CONTOUR_BINS;
-        v[offset..offset + REGISTER_BINS].copy_from_slice(&self.register_hist);
+        for (target, value) in v[offset..offset + REGISTER_BINS]
+            .iter_mut()
+            .zip(self.register_hist)
+        {
+            *target = bounded_unit_feature(value);
+        }
         v
     }
 
@@ -237,6 +263,9 @@ impl MusicalStateTrajectory {
     /// recurrence plot or inspect it as a graph without storing an N x N
     /// matrix.
     pub fn recurrence_pairs(&self, threshold: f64) -> Vec<(usize, usize, f64)> {
+        if !threshold.is_finite() {
+            return Vec::new();
+        }
         let threshold = threshold.clamp(-1.0, 1.0);
         let mut pairs = Vec::new();
         for i in 0..self.frames.len() {
@@ -266,6 +295,9 @@ impl MusicalStateTrajectory {
     /// lower-middle index. Missing novelty values split runs; non-finite values
     /// are ignored. A plateau with no strictly lower neighbor is not a peak.
     pub fn novelty_peaks(&self, minimum_novelty: f64) -> Vec<usize> {
+        if !minimum_novelty.is_finite() {
+            return Vec::new();
+        }
         let values: Vec<Option<f64>> = self
             .frames
             .iter()
@@ -497,6 +529,15 @@ fn frame_from_notes(
         structural_intensity: (intensity_sum / active_notes.len().max(1) as f64).clamp(0.0, 1.0),
         nearest_prior_similarity: None,
         novelty: None,
+    }
+}
+
+/// Sanitize an externally constructed feature to the canonical [0, 1] interval.
+fn bounded_unit_feature(value: f64) -> f64 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
     }
 }
 
@@ -791,6 +832,53 @@ mod tests {
                 && frame.novelty.is_none_or(f64::is_finite)
         }));
         assert!(trajectory.frames[1].novelty.unwrap().is_finite());
+    }
+
+    #[test]
+    fn deserialized_non_finite_frame_features_cannot_poison_similarity() {
+        let valid_score = score(&[note(0, 4, 0), note(2, 4, 1)], 0);
+        let valid = MusicalStateTrajectory::from_score(&valid_score, 2.0, 2.0)
+            .unwrap()
+            .frames[0]
+            .clone();
+
+        let mut malformed = valid.clone();
+        malformed.onset_density = f64::NAN;
+        malformed.pitch_entropy = f64::INFINITY;
+        malformed.rhythm_entropy = f64::NEG_INFINITY;
+        malformed.mean_interval = f64::MAX;
+        malformed.contour_asymmetry = f64::NAN;
+        malformed.structural_intensity = f64::INFINITY;
+        malformed.pitch_class_hist[0] = f64::NAN;
+        malformed.pitch_class_hist[1] = f64::INFINITY;
+        malformed.rhythm_hist[0] = -f64::MAX;
+        malformed.line_interval_hist[0] = f64::NAN;
+        malformed.line_contour_hist[0] = f64::INFINITY;
+        malformed.register_hist[0] = f64::NEG_INFINITY;
+
+        let vector = malformed.vector();
+        assert!(vector.iter().all(|value| value.is_finite()));
+        assert!(vector.iter().all(|value| (0.0..=1.0).contains(value)));
+
+        let similarity = malformed.similarity(&valid);
+        assert!(similarity.is_finite());
+        assert!((0.0..=1.0).contains(&similarity));
+        assert!(valid.similarity(&malformed).is_finite());
+
+        let trajectory = MusicalStateTrajectory {
+            schema_version: MUSICAL_STATE_SPACE_V1.into(),
+            window_beats: 2.0,
+            hop_beats: 1.0,
+            frames: vec![valid, malformed],
+        };
+        assert!(trajectory.recurrence_pairs(f64::NAN).is_empty());
+        assert!(trajectory.recurrence_pairs(f64::INFINITY).is_empty());
+        assert!(trajectory.novelty_peaks(f64::NAN).is_empty());
+        assert!(trajectory.novelty_peaks(f64::INFINITY).is_empty());
+        assert!(trajectory
+            .recurrence_pairs(0.0)
+            .iter()
+            .all(|(_, _, similarity)| similarity.is_finite()));
     }
 
     #[test]
