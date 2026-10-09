@@ -139,7 +139,7 @@ jobs:
       - name: Seal qualification evidence
         if: always()
         env:
-          EXPECTED_QUALIFICATION_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           EVIDENCE_DIR=.ci/vulkan-sync-qualification
           test -d "$EVIDENCE_DIR" || mkdir -p "$EVIDENCE_DIR"
@@ -159,8 +159,8 @@ jobs:
             printf 'syncval_hazard_probe=not_reached\n' > "$EVIDENCE_DIR/syncval-hazard.log"
           test -s "$EVIDENCE_DIR/syncval-safe.log" || \
             printf 'syncval_safe_control=not_reached\n' > "$EVIDENCE_DIR/syncval-safe.log"
-          HAZARD_OUTCOME='\${{ steps.syncval_hazard.outcome }}'
-          SAFE_OUTCOME='\${{ steps.syncval_safe.outcome }}'
+          HAZARD_OUTCOME='${{ steps.syncval_hazard.outcome }}'
+          SAFE_OUTCOME='${{ steps.syncval_safe.outcome }}'
           SYNCVAL_ACTIVATION=not_proven_without_hazard_sentinel
           if [[ "$HAZARD_OUTCOME" == success && "$SAFE_OUTCOME" == success ]] \
             && grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$EVIDENCE_DIR/syncval-hazard.log" \
@@ -171,8 +171,8 @@ jobs:
           fi
           {
             echo "qualification_commit=$EXPECTED_QUALIFICATION_SHA"
-            echo "compile_outcome=\${{ steps.compile.outcome }}"
-            echo "runtime_outcome=\${{ steps.runtime.outcome }}"
+            echo "compile_outcome=${{ steps.compile.outcome }}"
+            echo "runtime_outcome=${{ steps.runtime.outcome }}"
             echo "syncval_hazard_outcome=$HAZARD_OUTCOME"
             echo "syncval_safe_outcome=$SAFE_OUTCOME"
             echo "syncval_activation=$SYNCVAL_ACTIVATION"
