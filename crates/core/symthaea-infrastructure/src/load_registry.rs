@@ -182,29 +182,13 @@ impl LoadRegistry {
         ordered
     }
 
-    /// Verify a ledger against this exact registry, not just its self-reported
-    /// totals. Recomputes the canonical allocation from the recorded demand
-    /// inputs and rejects metadata changes or allocations that violate
-    /// priority ordering. This still does not authenticate the registry itself.
+    /// Verify a ledger against this exact registry with the separate checker.
+    /// The checker does not call this method or reuse the allocator, avoiding
+    /// a circular "verification" that would simply trust producer logic.
+    /// Success establishes internal consistency only; it does not authenticate
+    /// the registry, provenance claims, demand inputs, or physical plant state.
     pub fn verify_ledger(&self, ledger: &LoadServiceLedger) -> bool {
-        if ledger.registry_version != self.version || !ledger.is_valid() {
-            return false;
-        }
-        let demands: Vec<LoadDemand> = ledger
-            .records
-            .iter()
-            .map(|record| LoadDemand {
-                load_id: record.load_id.clone(),
-                requested_power_kw: record.requested_power_kw,
-            })
-            .collect();
-        self.allocate(
-            &demands,
-            ledger.step_duration_hours,
-            ledger.available_energy_kwh,
-        )
-        .map(|expected| expected == *ledger)
-        .unwrap_or(false)
+        crate::load_registry_verifier::verify_load_service_ledger(self, ledger).is_ok()
     }
 
     /// Allocate a finite energy budget to a complete snapshot of load demands.
