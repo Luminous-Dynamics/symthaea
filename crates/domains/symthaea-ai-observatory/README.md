@@ -31,7 +31,7 @@ That command is a run instruction, not a claim that tests passed in this change.
 - independent replication based solely on distinct IDs;
 - integrity of event chronology, signatures, or artifact custody.
 
-The module validates sequence ordering and digest syntax, but caller-supplied sequence numbers do not authenticate chronology. BLAKE3 digests identify bytes; they do not prove who produced the bytes or that they were captured honestly. The current kernel also does not collect internal telemetry, invoke provider APIs, calculate statistical evidence from continuous outcomes, or integrate with a trusted external event log.
+The evaluator requires a separate `RegistryFreezeAnchor` and rejects a registry whose content digest, registry identity, or declared freeze sequence differs from that anchor. The anchor itself is caller-supplied; this module does not authenticate its event log or signer. The module validates sequence ordering and digest syntax, but caller-supplied sequence numbers do not authenticate chronology. BLAKE3 digests identify bytes; they do not prove who produced the bytes or that they were captured honestly. The current kernel also does not collect internal telemetry, invoke provider APIs, calculate statistical evidence from continuous outcomes, or integrate with a trusted external event log.
 
 ## Architecture boundary
 
