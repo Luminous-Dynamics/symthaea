@@ -383,7 +383,8 @@ impl fmt::Display for MetacognitionEvaluationError {
             } => {
                 write!(
                     f,
-                    "baseline '{baseline_id}' training manifest '{manifest_ref}' equals evaluation manifest"
+                    "baseline '{baseline_id}' training manifest '{manifest_ref}'",
+                    "equals evaluation manifest"
                 )
             }
             Self::BaselineTaxonomyMismatch { baseline_id, expected, found } => {
