@@ -31,7 +31,8 @@ const BASELINE_BRIER_DELTA_FAMILYWISE_ALPHA: f64 = 0.05;
 const BASELINE_BRIER_DELTA_BOUND_METHOD: &str = "paired-hoeffding-familywise-95-v1";
 const BASELINE_BRIER_DELTA_BOUND_ASSUMPTIONS: &str = concat!(
     "IID evaluation episodes within each task family; fixed candidate forecasts and baseline ",
-    "probabilities before outcome access; paired per-episode Brier loss differences lie in [-1, 1]; ",
+    "probabilities before outcome access; paired per-episode Brier loss differences ",
+    "lie in [-1, 1]; ",
     "Bonferroni covers all observed task-family x baseline comparisons; ",
     "no distribution-shift guarantee; split disjointness requires external verification",
 );
