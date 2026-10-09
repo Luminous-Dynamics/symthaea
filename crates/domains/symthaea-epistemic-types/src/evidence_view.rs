@@ -103,6 +103,24 @@ impl EvidenceView {
         if groups.iter().any(|group| group.representations.is_empty()) {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
+        // The retrieval group carries a per-claim family set as well as family
+        // metadata on every representation. They must agree; comparing only the
+        // receipt's global family set would miss a reassignment between claims.
+        for group in groups {
+            let mut observed_families = group.representations.iter()
+                .filter_map(|candidate| candidate.provenance.provenance_identity().map(str::to_owned))
+                .collect::<Vec<_>>();
+            observed_families.sort();
+            observed_families.dedup();
+
+            let mut declared_families = group.provenance_families.clone();
+            declared_families.sort();
+            if declared_families.windows(2).any(|pair| pair[0] == pair[1])
+                || declared_families != observed_families
+            {
+                return Err(EvidenceViewError::ReceiptMismatch);
+            }
+        }
         let mut items = groups.iter().map(|group| {
             let mut representations = group.representations.iter().map(|candidate| {
                 EvidenceViewRepresentation {
@@ -277,6 +295,28 @@ mod tests {
         receipt.selected = vec!["claim:other".into()];
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn provenance_family_swap_between_selected_claims_is_rejected() {
+        let (mut groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![
+                candidate("claim:a", 0.8, "family:a"),
+                candidate("claim:b", 0.7, "family:b"),
+            ],
+        );
+        assert_eq!(groups.len(), 2);
+        let verified = receipt.verify().unwrap();
+
+        // The global family set remains {family:a, family:b}; only the mapping
+        // from each selected claim to its source family has been altered.
+        groups[0].representations[0].provenance.provenance_family = Some("family:b".into());
+        groups[1].representations[0].provenance.provenance_family = Some("family:a".into());
+        assert_eq!(
+            EvidenceView::from_verified_retrieval(&groups, &verified),
             Err(EvidenceViewError::ReceiptMismatch)
         );
     }
