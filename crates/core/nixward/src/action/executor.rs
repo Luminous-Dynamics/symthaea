@@ -1393,7 +1393,7 @@ impl NixOSExecutor {
             return (
                 ExecutionResult::FailedNoRollback {
                     error: format!(
-                        "unit-file postcondition not satisfied: operation={operation:?}, state={:?}",
+                        "unit-file postcondition failed: op={operation:?}, state={:?}",
                         observed.unit_file_state
                     ),
                     rollback_error: None,
@@ -1457,7 +1457,7 @@ impl NixOSExecutor {
             .unwrap_or_else(|| "not-returned-by-method".to_string());
         let result = ExecutionResult::Success {
             stdout: format!(
-                "{operation_label} for {unit}; UnitFileState={:?}; changes={}; install_info={install_info}",
+                "{operation_label} {unit}: state={:?}; changes={}; install_info={install_info}",
                 observed.unit_file_state,
                 unit_file_result.changes().len(),
             ),
