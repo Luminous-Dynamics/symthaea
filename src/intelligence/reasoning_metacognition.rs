@@ -25,6 +25,7 @@ pub const CORRECTNESS_OUTCOME_SCHEMA_VERSION: u32 = 1;
 pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 2;
 pub const FORECAST_BASELINE_SCHEMA_VERSION: u32 = 1;
 pub const FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION: u32 = 1;
+pub const FORECAST_OUTCOME_BINDING_REPORT_SCHEMA_VERSION: u32 = 1;
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
@@ -818,7 +819,7 @@ pub fn evaluate_frozen_correctness_forecasts(
     )?;
     let p = &frozen.forecasts[0];
     report.forecast_outcome_binding = Some(ForecastOutcomeBindingReport {
-        schema_version: FROZEN_FORECAST_SET_SCHEMA_VERSION,
+        schema_version: FORECAST_OUTCOME_BINDING_REPORT_SCHEMA_VERSION,
         binding_method: "exact-forecast-id-episode-target-profile-v1".into(),
         outcome_profile_id: p.outcome_profile_id.clone(),
         subject_id: p.subject_id.clone(),
