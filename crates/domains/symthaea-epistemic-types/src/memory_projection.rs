@@ -1,3 +1,7 @@
+use crate::typed_refs::{
+    CanonicalArtifactRef, ClaimCeilingRef, DerivationRef, EpistemicStateRef, FrontierRef, ModelRef,
+    ProvenanceFamilyRef, RefValidationError, RetrievalIndexRef, SourceEventRef, StatementRef,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
