@@ -113,10 +113,18 @@ jobs:
             cargo test --locked -p symthaea-gpu-fabric --features vulkan --lib \
               -- --ignored --nocapture --test-threads=1 real_vulkan_syncval_activation_probe 2>&1 \
             | tee .ci/vulkan-sync-qualification/syncval-hazard.log
-          grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' \
-            .ci/vulkan-sync-qualification/syncval-hazard.log
-          grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' \
-            .ci/vulkan-sync-qualification/syncval-hazard.log
+          HAZARD_LOG=.ci/vulkan-sync-qualification/syncval-hazard.log
+          EXPECTED_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$HAZARD_LOG" || true)"
+          ALL_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$HAZARD_LOG" || true)"
+          test "$EXPECTED_HAZARD_COUNT" -eq 1 || {
+            echo "Expected exactly one READ-AFTER-WRITE sentinel diagnostic, found $EXPECTED_HAZARD_COUNT" >&2
+            exit 1
+          }
+          test "$ALL_HAZARD_COUNT" -eq 1 || {
+            echo "Expected exactly one total SyncVal hazard diagnostic, found $ALL_HAZARD_COUNT" >&2
+            exit 1
+          }
+          grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' "$HAZARD_LOG"
 
       - name: SyncVal safe negative control
         id: syncval_safe
@@ -161,12 +169,14 @@ jobs:
             printf 'syncval_safe_control=not_reached\n' > "$EVIDENCE_DIR/syncval-safe.log"
           HAZARD_OUTCOME='${{ steps.syncval_hazard.outcome }}'
           SAFE_OUTCOME='${{ steps.syncval_safe.outcome }}'
+          EXPECTED_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$EVIDENCE_DIR/syncval-hazard.log" || true)"
+          ALL_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$EVIDENCE_DIR/syncval-hazard.log" || true)"
+          SAFE_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$EVIDENCE_DIR/syncval-safe.log" || true)"
           SYNCVAL_ACTIVATION=not_proven_without_hazard_sentinel
           if [[ "$HAZARD_OUTCOME" == success && "$SAFE_OUTCOME" == success ]] \
-            && grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$EVIDENCE_DIR/syncval-hazard.log" \
+            && [[ "$EXPECTED_HAZARD_COUNT" -eq 1 && "$ALL_HAZARD_COUNT" -eq 1 && "$SAFE_HAZARD_COUNT" -eq 0 ]] \
             && grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' "$EVIDENCE_DIR/syncval-hazard.log" \
-            && grep -Fq 'SYNCVAL_SENTINEL_END case=safe result=completed' "$EVIDENCE_DIR/syncval-safe.log" \
-            && ! grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$EVIDENCE_DIR/syncval-safe.log"; then
+            && grep -Fq 'SYNCVAL_SENTINEL_END case=safe result=completed' "$EVIDENCE_DIR/syncval-safe.log"; then
             SYNCVAL_ACTIVATION=confirmed_by_positive_and_negative_controls
           fi
           {
@@ -175,6 +185,9 @@ jobs:
             echo "runtime_outcome=${{ steps.runtime.outcome }}"
             echo "syncval_hazard_outcome=$HAZARD_OUTCOME"
             echo "syncval_safe_outcome=$SAFE_OUTCOME"
+            echo "syncval_hazard_expected_diagnostic_count=$EXPECTED_HAZARD_COUNT"
+            echo "syncval_hazard_total_diagnostic_count=$ALL_HAZARD_COUNT"
+            echo "syncval_safe_hazard_diagnostic_count=$SAFE_HAZARD_COUNT"
             echo "syncval_activation=$SYNCVAL_ACTIVATION"
           } > "$EVIDENCE_DIR/qualification-status.txt"
           (cd "$EVIDENCE_DIR" && sha256sum \
