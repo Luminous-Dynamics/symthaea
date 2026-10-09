@@ -128,9 +128,16 @@ impl MusicalStateFrame {
     /// A region containing only carried-in sustains is still a valid frame; its
     /// event_count is zero while occupancy features describe the sounding notes.
     pub fn from_region(score: &Score, start: Duration, end: Duration) -> Option<Self> {
-        let start_beat = start.beats();
-        let end_beat = end.beats();
-        let total = score.total_beats.beats();
+        // Duration is deserializable public data. Reject invalid rational
+        // denominators before arithmetic can reach Duration::Add cross-products;
+        // compute note ends in f64 below to avoid i64 overflow.
+        let (Some(start_beat), Some(end_beat), Some(total)) = (
+            finite_duration_beats(start),
+            finite_duration_beats(end),
+            finite_duration_beats(score.total_beats),
+        ) else {
+            return None;
+        };
         if start_beat < 0.0 || end_beat <= start_beat || end_beat > total + 1e-9 {
             return None;
         }
@@ -181,7 +188,8 @@ impl MusicalStateTrajectory {
             return Err("hop_beats must be finite and > 0".into());
         }
 
-        let total = score.total_beats.beats();
+        let total = finite_duration_beats(score.total_beats)
+            .ok_or_else(|| "score total_beats must be a finite rational with positive denominator".to_owned())?;
         if total <= 0.0 {
             return Ok(Self {
                 schema_version: MUSICAL_STATE_SPACE_V1.into(),
@@ -364,14 +372,35 @@ impl MusicalStateTrajectory {
     }
 }
 
+/// Convert a wire-facing rational duration only when its denominator obeys
+/// the representation invariant. Derived Serde deserialization otherwise
+/// permits zero/negative denominators despite the constructor's assertion.
+fn finite_duration_beats(duration: Duration) -> Option<f64> {
+    if duration.den() <= 0 {
+        return None;
+    }
+    let beats = duration.num() as f64 / duration.den() as f64;
+    beats.is_finite().then_some(beats)
+}
+
+/// Compute an end point without Duration::Add's potentially overflowing
+/// i64 cross-products. Invalid timing is treated as absent score evidence.
+fn note_timing(note: &ScoreNote) -> Option<(f64, f64)> {
+    let onset = finite_duration_beats(note.onset)?;
+    let duration = finite_duration_beats(note.duration)?;
+    let end = onset + duration;
+    end.is_finite().then_some((onset, end))
+}
+
 fn overlapping_notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
     score
         .notes
         .iter()
         .copied()
         .filter(|note| {
-            let onset = note.onset.beats();
-            let note_end = (note.onset + note.duration).beats();
+            let Some((onset, note_end)) = note_timing(note) else {
+                return false;
+            };
             (note_end.min(end) - onset.max(start)) > 0.0
         })
         .collect()
@@ -383,8 +412,9 @@ fn notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
         .iter()
         .copied()
         .filter(|note| {
-            let onset = note.onset.beats();
-            let note_end = (note.onset + note.duration).beats();
+            let Some((onset, note_end)) = note_timing(note) else {
+                return false;
+            };
             note_end > onset && onset >= start && onset < end
         })
         .collect();
@@ -415,7 +445,7 @@ fn frame_from_notes(
         && active_notes.iter().all(|note| note.part.is_assigned());
 
     for note in notes {
-        let duration = note.duration.beats().max(0.0);
+        let duration = finite_duration_beats(note.duration).unwrap_or(0.0).max(0.0);
 
         let duration_bin = RHYTHM_THRESHOLDS
             .iter()
@@ -445,8 +475,9 @@ fn frame_from_notes(
     // not the full notated duration of attacks. Include notes carried in from
     // earlier windows and clip every contribution to the current interval.
     for note in active_notes {
-        let onset = note.onset.beats();
-        let note_end = (note.onset + note.duration).beats();
+        let Some((onset, note_end)) = note_timing(note) else {
+            continue;
+        };
         let overlap = (note_end.min(end) - onset.max(start)).max(0.0);
         if overlap <= 0.0 {
             continue;
@@ -976,6 +1007,51 @@ mod tests {
         }
 
         assert!(trajectory.novelty_peaks(0.5).is_empty());
+    }
+
+    #[test]
+    fn malformed_or_extreme_wire_durations_cannot_panic_temporal_extraction() {
+        // Serde's derived Duration deserializer accepts wire states that the
+        // public constructor would reject. The observation boundary must fail
+        // closed instead of dividing by zero or using overflowing i64 addition.
+        let zero_denominator: Duration =
+            serde_json::from_str(r#"{"num":1,"den":0}"#).unwrap();
+        let negative_denominator: Duration =
+            serde_json::from_str(r#"{"num":1,"den":-1}"#).unwrap();
+
+        let mut s = score(&[note(0, 4, 0)], 0);
+        let mut invalid_onset = note(7, 4, 0);
+        invalid_onset.onset = zero_denominator;
+        s.notes.push(invalid_onset);
+
+        let mut invalid_duration = note(5, 4, 0);
+        invalid_duration.duration = zero_denominator;
+        s.notes.push(invalid_duration);
+
+        let mut negative_denominator_note = note(9, 4, 0);
+        negative_denominator_note.duration = negative_denominator;
+        s.notes.push(negative_denominator_note);
+
+        // This valid rational is too large for onset + duration's i64
+        // cross-products at onset=1, even though its f64 beat value is finite.
+        let mut overflowing_sum = note(4, 4, 1);
+        overflowing_sum.duration = Duration::new(i64::MAX, 1);
+        s.notes.push(overflowing_sum);
+
+        let trajectory =
+            MusicalStateTrajectory::from_score(&s, 1.0, 1.0).expect("valid score bound");
+        assert_eq!(trajectory.frames.len(), 1);
+        assert_eq!(trajectory.frames[0].event_count, 1);
+        assert!(MusicalStateFrame::from_region(
+            &s,
+            zero_denominator,
+            Duration::new(1, 1)
+        )
+        .is_none());
+
+        let mut invalid_total = s.clone();
+        invalid_total.total_beats = zero_denominator;
+        assert!(MusicalStateTrajectory::from_score(&invalid_total, 1.0, 1.0).is_err());
     }
 
     #[test]
