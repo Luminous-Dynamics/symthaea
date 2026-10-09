@@ -25,7 +25,7 @@ const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
 const GPU_FABRIC_DESCRIPTOR_TYPE: vk::DescriptorType = vk::DescriptorType::STORAGE_BUFFER;
 const GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS: vk::ShaderStageFlags = vk::ShaderStageFlags::COMPUTE;
 const GPU_FABRIC_PIPELINE_BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
-const RECEIPT_VERSION: u16 = 11;
+const RECEIPT_VERSION: u16 = 12;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
@@ -171,6 +171,10 @@ pub enum VulkanBarrierReceiptError {
     ResourceMemoryProfile(ResourceId),
     #[error("receipt memory-lowering digest mismatch")]
     MemoryLoweringDigest,
+    #[error("receipt Vulkan memory topology is missing, malformed, or inconsistent")]
+    MemoryTopology,
+    #[error("receipt Vulkan memory topology does not match the execution runtime")]
+    MemoryTopologyBinding,
     #[error("receipt observed timeline value {observed} does not equal expected {expected}")]
     TimelineCompletion { expected: u64, observed: u64 },
 }
@@ -243,6 +247,139 @@ fn synchronization_feature_profile_from_device_create(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanMemoryTypeRecord {
+    pub index: u32,
+    pub property_flags: u32,
+    pub heap_index: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanMemoryHeapRecord {
+    pub index: u32,
+    pub flags: u32,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanMemoryTopologyProfile {
+    pub memory_type_count: u32,
+    pub memory_heap_count: u32,
+    pub memory_types: Vec<VulkanMemoryTypeRecord>,
+    pub memory_heaps: Vec<VulkanMemoryHeapRecord>,
+    pub identity_digest: String,
+}
+
+impl VulkanMemoryTopologyProfile {
+    fn from_vulkan(properties: &vk::PhysicalDeviceMemoryProperties) -> Self {
+        let memory_types = properties.memory_types
+            .iter()
+            .take(properties.memory_type_count as usize)
+            .enumerate()
+            .map(|(index, record)| VulkanMemoryTypeRecord {
+                index: index as u32,
+                property_flags: record.property_flags.as_raw(),
+                heap_index: record.heap_index,
+            })
+            .collect::<Vec<_>>();
+        let memory_heaps = properties.memory_heaps
+            .iter()
+            .take(properties.memory_heap_count as usize)
+            .enumerate()
+            .map(|(index, record)| VulkanMemoryHeapRecord {
+                index: index as u32,
+                flags: record.flags.as_raw(),
+                size: record.size,
+            })
+            .collect::<Vec<_>>();
+        let identity_digest = memory_topology_identity_digest(
+            properties.memory_type_count,
+            properties.memory_heap_count,
+            &memory_types,
+            &memory_heaps,
+        );
+        Self {
+            memory_type_count: properties.memory_type_count,
+            memory_heap_count: properties.memory_heap_count,
+            memory_types,
+            memory_heaps,
+            identity_digest,
+        }
+    }
+
+    fn verify(&self) -> Result<(), VulkanBarrierReceiptError> {
+        if self.memory_type_count == 0
+            || self.memory_type_count > 32
+            || self.memory_heap_count == 0
+            || self.memory_heap_count > 16
+            || self.memory_types.len() != self.memory_type_count as usize
+            || self.memory_heaps.len() != self.memory_heap_count as usize
+        {
+            return Err(VulkanBarrierReceiptError::MemoryTopology);
+        }
+        for (index, record) in self.memory_types.iter().enumerate() {
+            if record.index != index as u32 || record.heap_index >= self.memory_heap_count {
+                return Err(VulkanBarrierReceiptError::MemoryTopology);
+            }
+        }
+        for (index, record) in self.memory_heaps.iter().enumerate() {
+            if record.index != index as u32 {
+                return Err(VulkanBarrierReceiptError::MemoryTopology);
+            }
+        }
+        if !is_sha256_hex(&self.identity_digest)
+            || self.identity_digest
+                != memory_topology_identity_digest(
+                    self.memory_type_count,
+                    self.memory_heap_count,
+                    &self.memory_types,
+                    &self.memory_heaps,
+                )
+        {
+            return Err(VulkanBarrierReceiptError::MemoryTopology);
+        }
+        Ok(())
+    }
+}
+
+fn memory_topology_identity_digest(
+    memory_type_count: u32,
+    memory_heap_count: u32,
+    memory_types: &[VulkanMemoryTypeRecord],
+    memory_heaps: &[VulkanMemoryHeapRecord],
+) -> String {
+    let mut fields = vec![
+        "topology_version=1".to_owned(),
+        format!("memory_type_count={memory_type_count}"),
+        format!("memory_heap_count={memory_heap_count}"),
+    ];
+    for record in memory_types {
+        fields.extend([
+            "memory_type".to_owned(),
+            format!("index={}", record.index),
+            format!("property_flags={}", record.property_flags),
+            format!("heap_index={}", record.heap_index),
+        ]);
+    }
+    for record in memory_heaps {
+        fields.extend([
+            "memory_heap".to_owned(),
+            format!("index={}", record.index),
+            format!("flags={}", record.flags),
+            format!("size={}", record.size),
+        ]);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-memory-topology.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VulkanResourceMemoryProfile {
     pub memory_type_index: u32,
     pub memory_type_bits: u32,
@@ -268,6 +405,25 @@ pub struct VulkanResourceMemoryProfile {
 }
 
 impl VulkanResourceMemoryProfile {
+    fn is_consistent_with_topology(&self, topology: &VulkanMemoryTopologyProfile) -> bool {
+        let Some(memory_type) = topology.memory_types.get(self.memory_type_index as usize) else {
+            return false;
+        };
+        let Some(memory_heap) = topology.memory_heaps.get(memory_type.heap_index as usize) else {
+            return false;
+        };
+        let valid_type_mask = if topology.memory_type_count == 32 {
+            u32::MAX
+        } else {
+            (1_u32 << topology.memory_type_count) - 1
+        };
+        self.memory_type_bits & !valid_type_mask == 0
+            && self.memory_property_flags == memory_type.property_flags
+            && self.memory_heap_index == memory_type.heap_index
+            && self.memory_heap_flags == memory_heap.flags
+            && self.memory_heap_size == memory_heap.size
+    }
+
     fn is_consistent_with_storage_size(&self, expected_storage_size: u64) -> bool {
         let host_visible = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
         let host_coherent = vk::MemoryPropertyFlags::HOST_COHERENT.as_raw();
@@ -382,6 +538,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub resource_storage_sizes: BTreeMap<ResourceId, u64>,
     pub resource_memory_profiles: BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
     pub memory_lowering_digest: String,
+    pub memory_topology: VulkanMemoryTopologyProfile,
     pub completion_expected: u64,
     pub completion_observed: u64,
     pub vulkan_api_version: u32,
@@ -524,13 +681,16 @@ impl VulkanBarrierExecutionReceipt {
         {
             return Err(VulkanBarrierReceiptError::ExecutionLoweringDigest);
         }
+        self.memory_topology.verify()?;
         if self.resource_memory_profiles.len() != expected_storage_sizes.len() {
             return Err(VulkanBarrierReceiptError::ResourceCount);
         }
         for (resource, expected_size) in &expected_storage_sizes {
             let profile = self.resource_memory_profiles.get(resource)
                 .ok_or_else(|| VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()))?;
-            if !profile.is_consistent_with_storage_size(*expected_size) {
+            if !profile.is_consistent_with_storage_size(*expected_size)
+                || !profile.is_consistent_with_topology(&self.memory_topology)
+            {
                 return Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()));
             }
         }
@@ -563,6 +723,7 @@ impl VulkanBarrierExecutionReceipt {
         queue_family_queue_count: u32,
         queue_family_timestamp_valid_bits: u32,
         queue_family_min_image_transfer_granularity: [u32; 3],
+        memory_topology: &VulkanMemoryTopologyProfile,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
@@ -601,6 +762,10 @@ impl VulkanBarrierExecutionReceipt {
                 != queue_family_min_image_transfer_granularity
         {
             return Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding);
+        }
+        memory_topology.verify()?;
+        if self.memory_topology != *memory_topology {
+            return Err(VulkanBarrierReceiptError::MemoryTopologyBinding);
         }
         Ok(())
     }
@@ -1214,6 +1379,7 @@ impl VulkanBarrierWorkloadRuntime {
             digests.insert(resource.clone(), resource_digest(value));
             storage_sizes.insert(resource.clone(), buffers[resource].storage_size);
         }
+        let memory_topology = VulkanMemoryTopologyProfile::from_vulkan(&self.memory_properties);
         let resource_memory_profiles = buffers
             .iter()
             .map(|(resource, buffer)| (resource.clone(), buffer.memory_profile()))
@@ -1234,6 +1400,7 @@ impl VulkanBarrierWorkloadRuntime {
             ),
             resource_memory_profiles,
             memory_lowering_digest,
+            memory_topology: memory_topology.clone(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -1274,6 +1441,7 @@ impl VulkanBarrierWorkloadRuntime {
                 self.queue_family_queue_count,
                 self.queue_family_timestamp_valid_bits,
                 self.queue_family_min_image_transfer_granularity,
+                &memory_topology,
             )
             .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
@@ -2888,6 +3056,7 @@ mod tests {
             completion_lowering_digest: String::new(),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
@@ -2946,6 +3115,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3008,6 +3178,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3067,6 +3238,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3128,6 +3300,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3191,6 +3364,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3257,6 +3431,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3394,6 +3569,7 @@ mod tests {
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3464,6 +3640,7 @@ mod tests {
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
@@ -3522,6 +3699,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3616,7 +3794,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ).is_ok());
+            ,
+                &test_memory_topology()).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
         assert!(matches!(
@@ -3635,7 +3814,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
 
@@ -3657,7 +3837,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
     }
@@ -3681,7 +3862,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            )
+            ,
+                &test_memory_topology())
             .is_ok());
 
         assert!(matches!(
@@ -3700,7 +3882,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::ImplementationIdentityBinding)
         ));
 
@@ -3720,7 +3903,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding)
         ));
 
@@ -3741,7 +3925,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::DeviceUuidBinding)
         ));
 
@@ -3762,7 +3947,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::DriverUuidBinding)
         ));
 
@@ -3782,7 +3968,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::DriverIdBinding)
         ));
 
@@ -3810,7 +3997,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentityBinding)
         ));
 
@@ -3830,7 +4018,8 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
         ));
 
@@ -3850,7 +4039,8 @@ mod tests {
                 2,
                 0,
                 [1, 1, 1],
-            ),
+            ,
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
         ));
     }
@@ -3884,6 +4074,7 @@ mod tests {
             ),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
@@ -3917,6 +4108,34 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
         ));
+    }
+
+    fn test_memory_topology() -> VulkanMemoryTopologyProfile {
+        let memory_types = vec![VulkanMemoryTypeRecord {
+            index: 0,
+            property_flags: (
+                vk::MemoryPropertyFlags::HOST_VISIBLE
+                    | vk::MemoryPropertyFlags::HOST_COHERENT
+            ).as_raw(),
+            heap_index: 0,
+        }];
+        let memory_heaps = vec![VulkanMemoryHeapRecord {
+            index: 0,
+            flags: vk::MemoryHeapFlags::DEVICE_LOCAL.as_raw(),
+            size: 1024,
+        }];
+        VulkanMemoryTopologyProfile {
+            memory_type_count: memory_types.len() as u32,
+            memory_heap_count: memory_heaps.len() as u32,
+            identity_digest: memory_topology_identity_digest(
+                memory_types.len() as u32,
+                memory_heaps.len() as u32,
+                &memory_types,
+                &memory_heaps,
+            ),
+            memory_types,
+            memory_heaps,
+        }
     }
 
     fn test_resource_memory_profiles(
@@ -3971,6 +4190,7 @@ mod tests {
             completion_lowering_digest: String::new(),
             execution_lowering_digest: String::new(),
             resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
             memory_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
@@ -4015,6 +4235,16 @@ mod tests {
         println!("completion_lowering_digest={}", receipt.completion_lowering_digest);
         println!("execution_lowering_digest={}", receipt.execution_lowering_digest);
         println!("memory_lowering_digest={}", receipt.memory_lowering_digest);
+        println!("memory_topology_version=1");
+        println!("memory_topology_identity_sha256={}", receipt.memory_topology.identity_digest);
+        println!("memory_type_count={}", receipt.memory_topology.memory_type_count);
+        println!("memory_heap_count={}", receipt.memory_topology.memory_heap_count);
+        for record in &receipt.memory_topology.memory_types {
+            println!("memory_type_record={}:{}:{}", record.index, record.property_flags, record.heap_index);
+        }
+        for record in &receipt.memory_topology.memory_heaps {
+            println!("memory_heap_record={}:{}:{}", record.index, record.flags, record.size);
+        }
         for (resource, profile) in &receipt.resource_memory_profiles {
             println!(
                 "resource_memory_profile={}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
