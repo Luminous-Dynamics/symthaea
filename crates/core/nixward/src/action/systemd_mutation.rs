@@ -281,7 +281,7 @@ impl NixSystemdLifecycleMutationTransportV1 {
         .await?;
 
         let (carries_install_info, changes): (bool, Vec<(String, String, String)>) = manager
-            .call("EnableUnitFiles", &(vec![unit], false, false))
+            .call("EnableUnitFiles", &(vec![unit.clone()], false, false))
             .await?;
 
         // A successful RPC is not qualifying evidence if systemd or the bus
@@ -320,7 +320,7 @@ impl NixSystemdLifecycleMutationTransportV1 {
         .await?;
 
         let changes: Vec<(String, String, String)> = manager
-            .call("DisableUnitFiles", &(vec![unit], false))
+            .call("DisableUnitFiles", &(vec![unit.clone()], false))
             .await?;
 
         self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
