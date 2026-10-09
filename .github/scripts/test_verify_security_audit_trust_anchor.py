@@ -116,6 +116,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             },
             "status": "PASS", "failure_reasons": [],
             "non_blocking_findings_present": False, "non_blocking_finding_sources": [],
+            "evidence_files": [{"path": "workflows/test.txt", "sha256": hashlib.sha256(b"evidence").hexdigest()}],
         }, {"id": run_id, "run_attempt": attempt, "head_sha": subject})
 
     def test_verdict_accepts_only_exact_subject_and_required_lanes(self):
@@ -155,6 +156,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("verdict.json", json.dumps(payload))
+            archive.writestr("workflows/test.txt", b"evidence")
         archive_bytes = buffer.getvalue()
         digest = "sha256:" + hashlib.sha256(archive_bytes).hexdigest()
         artifact = {"id": 77, "name": f"security-audit-mycelix-{run['head_sha']}-verdict",
@@ -165,6 +167,36 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
         altered = dict(artifact, digest="sha256:" + "0" * 64)
         with patch.object(module, "api", return_value={"artifacts": [altered]}), \
+             patch.object(module, "download_artifact_zip", return_value=archive_bytes):
+            with self.assertRaises(module.VerificationError):
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
+
+    def test_artifact_evidence_file_digest_mismatch_is_rejected(self):
+        payload, run = self.make_verdict()
+        payload["evidence_files"][0]["sha256"] = "0" * 64
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("verdict.json", json.dumps(payload))
+            archive.writestr("workflows/test.txt", b"evidence")
+        archive_bytes = buffer.getvalue()
+        artifact = {"id": 77, "name": f"security-audit-mycelix-{run['head_sha']}-verdict",
+                    "expired": False, "digest": "sha256:" + hashlib.sha256(archive_bytes).hexdigest(),
+                    "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
+        with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
+             patch.object(module, "download_artifact_zip", return_value=archive_bytes):
+            with self.assertRaises(module.VerificationError):
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
+
+    def test_artifact_missing_manifest_file_is_rejected(self):
+        payload, run = self.make_verdict()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("verdict.json", json.dumps(payload))
+        archive_bytes = buffer.getvalue()
+        artifact = {"id": 77, "name": f"security-audit-mycelix-{run['head_sha']}-verdict",
+                    "expired": False, "digest": "sha256:" + hashlib.sha256(archive_bytes).hexdigest(),
+                    "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
+        with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
                 module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
