@@ -22,7 +22,9 @@ use std::fmt;
 pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v5";
 pub const CORRECTNESS_FORECAST_SCHEMA_VERSION: u32 = 1;
 pub const CORRECTNESS_OUTCOME_SCHEMA_VERSION: u32 = 1;
-pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 1;
+pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 2;
+pub const FORECAST_BASELINE_SCHEMA_VERSION: u32 = 1;
+pub const FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION: u32 = 1;
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
@@ -195,6 +197,9 @@ pub struct MetacognitionReport {
     /// Present only when the two-phase forecast/outcome binding API was used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forecast_outcome_binding: Option<ForecastOutcomeBindingReport>,
+    /// Present only when baselines were frozen on a separate calibration split.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_comparison: Option<ForecastBaselineComparisonReport>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -366,6 +371,7 @@ pub struct FrozenCorrectnessForecastSet {
     forecasts: Vec<CorrectnessForecastV1>,
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
+    evaluation_split_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -374,6 +380,8 @@ struct FrozenCorrectnessForecastSetWire {
     forecasts: Vec<CorrectnessForecastV1>,
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
+    #[serde(default)]
+    evaluation_split_id: Option<String>,
 }
 
 impl FrozenCorrectnessForecastSet {
@@ -391,6 +399,10 @@ impl FrozenCorrectnessForecastSet {
 
     pub fn selective_thresholds(&self) -> &[f64] {
         &self.selective_thresholds
+    }
+
+    pub fn evaluation_split_id(&self) -> Option<&str> {
+        self.evaluation_split_id.as_deref()
     }
 }
 
@@ -411,6 +423,7 @@ impl TryFrom<FrozenCorrectnessForecastSetWire> for FrozenCorrectnessForecastSet 
             forecasts: w.forecasts,
             calibration_bins: w.calibration_bins,
             selective_thresholds: w.selective_thresholds,
+            evaluation_split_id: w.evaluation_split_id,
         })
     }
 }
@@ -423,11 +436,48 @@ pub fn freeze_correctness_forecasts(
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
 ) -> Result<FrozenCorrectnessForecastSet, MetacognitionEvaluationError> {
+    freeze_correctness_forecasts_internal(
+        forecasts,
+        calibration_bins,
+        selective_thresholds,
+        None,
+    )
+}
+
+/// Freeze a qualification batch explicitly tagged with its held-out evaluation split.
+///
+/// Use this constructor for all baseline comparisons. Baseline profiles must name a distinct
+/// calibration split and manifest reference; matching IDs are rejected, and the manifest
+/// verifier must independently establish that the split artifacts are actually disjoint.
+pub fn freeze_correctness_forecasts_for_split(
+    forecasts: Vec<CorrectnessForecastV1>,
+    calibration_bins: usize,
+    selective_thresholds: Vec<f64>,
+    evaluation_split_id: String,
+) -> Result<FrozenCorrectnessForecastSet, MetacognitionEvaluationError> {
+    if evaluation_split_id.trim().is_empty() {
+        return Err(MetacognitionEvaluationError::MissingEvaluationSplit);
+    }
+    freeze_correctness_forecasts_internal(
+        forecasts,
+        calibration_bins,
+        selective_thresholds,
+        Some(evaluation_split_id),
+    )
+}
+
+fn freeze_correctness_forecasts_internal(
+    forecasts: Vec<CorrectnessForecastV1>,
+    calibration_bins: usize,
+    selective_thresholds: Vec<f64>,
+    evaluation_split_id: Option<String>,
+) -> Result<FrozenCorrectnessForecastSet, MetacognitionEvaluationError> {
     FrozenCorrectnessForecastSet::try_from(FrozenCorrectnessForecastSetWire {
         schema_version: FROZEN_FORECAST_SET_SCHEMA_VERSION,
         forecasts,
         calibration_bins,
         selective_thresholds,
+        evaluation_split_id,
     })
 }
 
@@ -787,6 +837,7 @@ pub fn evaluate_metacognition(
         revision_direction_accuracy,
         mean_expected_revision_delta,
         forecast_outcome_binding: None,
+        baseline_comparison: None,
     })
 }
 
