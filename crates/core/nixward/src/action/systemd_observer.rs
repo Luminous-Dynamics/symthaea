@@ -855,9 +855,6 @@ impl NixSystemdReadOnlyObserverV1 {
         object_path: &OwnedObjectPath,
     ) -> Result<Option<String>, NixSystemdObserverErrorV1> {
         validate_unit_object_path(object_path)?;
-        let properties =
-            PropertiesProxy::new(&self.connection, SYSTEMD_DESTINATION, object_path.clone())
-                .await?;
         let unit_proxy = Proxy::new(
             &self.connection,
             SYSTEMD_DESTINATION,
