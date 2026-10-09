@@ -381,9 +381,19 @@ fn frame_from_notes(
 
     // Structural intensity follows the notes actually sounding in this window,
     // including carry-ins, rather than dropping to zero in a sustain-only frame.
+    // ScoreNote is publicly constructible/deserializable: treat malformed
+    // intensity as absent evidence instead of allowing NaN to poison recurrence
+    // vectors, and constrain finite values to the documented [0, 1] range.
     let intensity_sum = active_notes
         .iter()
-        .map(|note| note.section_intensity as f64)
+        .map(|note| {
+            let intensity = note.section_intensity;
+            if intensity.is_finite() {
+                (intensity as f64).clamp(0.0, 1.0)
+            } else {
+                0.0
+            }
+        })
         .sum::<f64>();
 
     // Pitch-class and register features describe occupancy *inside* the frame,
@@ -746,6 +756,41 @@ mod tests {
         assert_eq!(trajectory.frames[0].event_count, 1);
         assert_eq!(trajectory.frames[1].event_count, 0);
         assert_eq!(trajectory.frames[1].line_transition_count, 0);
+    }
+
+    #[test]
+    fn non_finite_intensity_cannot_poison_frames_or_recurrence() {
+        let mut nan_intensity = note(0, 4, 0);
+        nan_intensity.duration = Duration::new(4, 1);
+        nan_intensity.part = PartId(7);
+        nan_intensity.section_intensity = f32::NAN;
+
+        let mut infinite_intensity = note(7, 4, 0);
+        infinite_intensity.duration = Duration::new(4, 1);
+        infinite_intensity.part = PartId(8);
+        infinite_intensity.section_intensity = f32::INFINITY;
+
+        let mut negative_infinite_intensity = note(4, 3, 0);
+        negative_infinite_intensity.duration = Duration::new(4, 1);
+        negative_infinite_intensity.part = PartId(9);
+        negative_infinite_intensity.section_intensity = f32::NEG_INFINITY;
+
+        let piece = score(
+            &[nan_intensity, infinite_intensity, negative_infinite_intensity],
+            0,
+        );
+        let trajectory = MusicalStateTrajectory::from_score(&piece, 1.0, 1.0).unwrap();
+
+        assert_eq!(trajectory.frames.len(), 4);
+        assert!(trajectory.frames.iter().all(|frame| {
+            frame.structural_intensity == 0.0
+                && frame.vector().iter().all(|value| value.is_finite())
+        }));
+        assert!(trajectory.frames.iter().all(|frame| {
+            frame.nearest_prior_similarity.is_none_or(f64::is_finite)
+                && frame.novelty.is_none_or(f64::is_finite)
+        }));
+        assert!(trajectory.frames[1].novelty.unwrap().is_finite());
     }
 
     #[test]
