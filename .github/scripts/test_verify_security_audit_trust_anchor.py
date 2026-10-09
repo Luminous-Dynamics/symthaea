@@ -223,6 +223,30 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             with self.assertRaises(module.VerificationError):
                 module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
 
+    def test_best_effort_failure_status_clears_same_head_success(self):
+        with patch.object(module, "post_status") as post:
+            result = module.best_effort_failure_status("Luminous-Dynamics/mycelix", "a" * 40,
+                                                       "token", "API unavailable", "https://github.com/run/1")
+        self.assertTrue(result)
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[3], "failure")
+
+    def test_best_effort_failure_status_rejects_untrusted_or_invalid_identity(self):
+        cases = [
+            ("unknown/repo", "a" * 40, "token"),
+            ("Luminous-Dynamics/mycelix", "not-a-sha", "token"),
+            ("Luminous-Dynamics/mycelix", "a" * 40, ""),
+        ]
+        for repo, subject, token in cases:
+            with self.subTest(repo=repo, subject=subject), patch.object(module, "post_status") as post:
+                self.assertFalse(module.best_effort_failure_status(repo, subject, token, "failure"))
+                post.assert_not_called()
+
+    def test_best_effort_failure_status_survives_status_api_failure(self):
+        with patch.object(module, "post_status", side_effect=module.VerificationError("forbidden")):
+            self.assertFalse(module.best_effort_failure_status("Luminous-Dynamics/mycelix", "a" * 40,
+                                                               "token", "API unavailable"))
+
     def test_api_rejects_bad_json(self):
         class Response:
             def __enter__(self): return self
