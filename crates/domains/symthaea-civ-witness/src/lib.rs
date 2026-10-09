@@ -1103,6 +1103,60 @@ mod tests {
         }
     }
 
+
+    struct RacingAnchor {
+        inner: MemoryAnchor,
+        race_next: Mutex<bool>,
+    }
+
+    impl RacingAnchor {
+        fn new(log_id: &str) -> Self {
+            let anchor = Self {
+                inner: MemoryAnchor::default(),
+                race_next: Mutex::new(false),
+            };
+            anchor.inner.provision(log_id);
+            anchor
+        }
+
+        fn arm_race(&self) {
+            *self.race_next.lock().expect("race flag lock") = true;
+        }
+    }
+
+    impl IndependentAnchor for RacingAnchor {
+        fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
+            self.inner.current(log_id)
+        }
+
+        fn compare_and_advance(
+            &self,
+            expected: &AnchorState,
+            next: &AnchorState,
+        ) -> Result<(), AnchorError> {
+            let mut race = self
+                .race_next
+                .lock()
+                .map_err(|_| AnchorError::Other("race flag poisoned".into()))?;
+            if *race {
+                *race = false;
+                drop(race);
+                let competitor = AnchorState {
+                    log_id: next.log_id.clone(),
+                    generation: next.generation,
+                    record_digest: h(b"competing-external-record"),
+                };
+                self.inner
+                    .states
+                    .lock()
+                    .map_err(|_| AnchorError::Other("anchor mutex poisoned".into()))?
+                    .insert(competitor.log_id.clone(), competitor);
+                return Err(AnchorError::CompareFailed);
+            }
+            self.inner.compare_and_advance(expected, next)
+        }
+    }
+
     impl IndependentAnchor for MemoryAnchor {
         fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
             self.states
@@ -1386,6 +1440,92 @@ mod tests {
         ];
         assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
         assert_eq!(storeless_recover(&db, anchor.as_ref(), "log-race").generation, 2);
+    }
+
+    #[test]
+    fn external_anchor_race_fails_closed_and_fork_hash_is_log_scoped() {
+        let db = TempDb::new();
+        let anchor = RacingAnchor::new("log-external-race");
+        let store = db.open();
+        let first = store
+            .initialize(
+                "log-external-race",
+                "policy-v1",
+                h(b"genesis"),
+                0,
+                None,
+                &anchor,
+            )
+            .expect("initialize before injecting race");
+
+        anchor.arm_race();
+        assert!(matches!(
+            store.advance(
+                "log-external-race",
+                first.generation,
+                first.digest,
+                h(b"candidate-local"),
+                1,
+                Some(h(b"receipt-local")),
+                &anchor,
+            ),
+            Err(WitnessError::ExternalAnchorMismatch)
+        ));
+        assert!(matches!(
+            store.recover("log-external-race", &anchor),
+            Err(WitnessError::RollbackDetected)
+        ));
+        assert!(matches!(
+            store.load_history("log-external-race"),
+            Ok(History { accepted: Some(_), prepared: Some(_) })
+        ));
+
+        let conn = store.open_connection().expect("open database for tamper test");
+        conn.execute(
+            "UPDATE witness_fork_evidence SET log_id=?1 WHERE log_id=?2",
+            params!["replayed-as-another-log", "log-external-race"],
+        )
+        .expect("simulate cross-log evidence replay");
+        assert!(matches!(
+            store.load_history("replayed-as-another-log"),
+            Err(WitnessError::CorruptForkEvidence)
+        ));
+    }
+
+    #[test]
+    fn restoring_old_local_history_is_detected_by_external_anchor() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let first = initialize(&store, &anchor, "log-snapshot-rollback");
+        store
+            .advance(
+                "log-snapshot-rollback",
+                first.generation,
+                first.digest,
+                h(b"checkpoint-two"),
+                1,
+                Some(h(b"receipt-one")),
+                &anchor,
+            )
+            .expect("advance external and local history");
+
+        let conn = store.open_connection().expect("open database to simulate snapshot restore");
+        conn.execute(
+            "DELETE FROM witness_records WHERE log_id=?1 AND generation=2",
+            params!["log-snapshot-rollback"],
+        )
+        .expect("remove newer local history");
+        conn.execute(
+            "UPDATE witness_meta SET generation=1, record_digest=?1 WHERE log_id=?2",
+            params![first.digest.as_slice(), "log-snapshot-rollback"],
+        )
+        .expect("restore older metadata pointer");
+
+        assert!(matches!(
+            store.recover("log-snapshot-rollback", &anchor),
+            Err(WitnessError::RollbackDetected)
+        ));
     }
 
     fn storeless_recover(db: &TempDb, anchor: &MemoryAnchor, log_id: &str) -> Record {
