@@ -398,16 +398,17 @@ impl WitnessModel {
             external.compare_and_advance(expected_generation, expected_digest, candidate)
         };
         if compare_result.is_err() {
-            if let Some(external) = self.external.as_ref() {
-                if external.generation == candidate.generation
-                    && external.record_digest != candidate.digest
-                {
-                    self.record_fork(
-                        candidate.generation,
-                        external.record_digest,
-                        candidate.digest,
-                    )?;
-                }
+            let conflicting_digest = self.external.as_ref().and_then(|external| {
+                (external.generation == candidate.generation
+                    && external.record_digest != candidate.digest)
+                    .then_some(external.record_digest)
+            });
+            if let Some(conflicting_digest) = conflicting_digest {
+                self.record_fork(
+                    candidate.generation,
+                    conflicting_digest,
+                    candidate.digest,
+                )?;
             }
         }
         compare_result
@@ -506,17 +507,17 @@ impl WitnessModel {
 
     fn record_fork(
         &mut self,
-        tree_size: u64,
-        first_root: Hash,
-        conflicting_root: Hash,
+        generation: u64,
+        first_record_digest: Hash,
+        conflicting_record_digest: Hash,
     ) -> Result<(), Failure> {
-        if first_root == conflicting_root {
+        if first_record_digest == conflicting_record_digest {
             return Err(Failure::InvalidForkEvidence);
         }
         self.disk.fork_evidence.push(ForkEvidence {
-            generation: tree_size,
-            first_record_digest: first_root,
-            conflicting_record_digest: conflicting_root,
+            generation,
+            first_record_digest,
+            conflicting_record_digest,
         });
         Ok(())
     }
