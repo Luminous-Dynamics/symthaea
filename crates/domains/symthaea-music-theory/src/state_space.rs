@@ -1012,7 +1012,7 @@ mod tests {
 
     #[test]
     fn malformed_or_extreme_wire_durations_cannot_panic_temporal_extraction() {
-        // The Duration wire boundary itself rejects non-positive denominators.
+        // The Duration wire boundary rejects zero denominators and normalizes legacy signs.
         // This separate score test ensures a valid but extremely large note end
         // cannot overflow the old i64 addition path inside temporal extraction.
         assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":0}"#).is_err());
