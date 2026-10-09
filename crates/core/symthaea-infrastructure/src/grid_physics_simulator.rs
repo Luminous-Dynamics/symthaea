@@ -834,6 +834,32 @@ mod failure_mode_tests {
     }
 
     #[test]
+    fn checked_step_discards_candidate_when_derived_physics_becomes_non_finite() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        // This finite accumulated time makes the sinusoid argument overflow,
+        // producing a non-finite candidate demand. The candidate must be
+        // rejected without committing its elapsed-time or channel changes.
+        sim.elapsed_s = f64::MAX / 2.0;
+        let before = sim.clone();
+        assert_eq!(
+            sim.try_step(&InfrastructureCommand::zero(), 1.0),
+            Err(GridPhysicsStepError::InvalidDerivedPhysics)
+        );
+        assert_eq!(sim.state.channels, before.state.channels);
+        assert_eq!(sim.battery.soc(), before.battery.soc());
+        assert_eq!(
+            sim.battery.equivalent_full_cycles(),
+            before.battery.equivalent_full_cycles()
+        );
+        assert_eq!(sim.elapsed_s, before.elapsed_s);
+        assert_eq!(
+            sim.abnormal_voltage_elapsed_s,
+            before.abnormal_voltage_elapsed_s
+        );
+        assert_eq!(sim.prev_frequency_hz, before.prev_frequency_hz);
+    }
+
+    #[test]
     fn checked_step_rejects_overflow_sized_finite_actuator_without_mutation() {
         let mut sim = GridPhysicsInfrastructureSimulator::new();
         let mut cmd = InfrastructureCommand::zero();
