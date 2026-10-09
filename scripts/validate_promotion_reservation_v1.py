@@ -537,11 +537,19 @@ class ProviderTopologyCasTrustPolicyCheckpointV1:
 
     def structurally_valid(self) -> bool:
         return (
-            bool(self.checkpoint_id)
+            isinstance(self.checkpoint_id, str)
+            and bool(self.checkpoint_id)
+            and isinstance(self.repository, str)
             and bool(self.repository)
+            and isinstance(self.policy_id, str)
             and bool(self.policy_id)
+            and isinstance(self.policy_generation, int)
+            and not isinstance(self.policy_generation, bool)
             and self.policy_generation > 0
+            and isinstance(self.sequence, int)
+            and not isinstance(self.sequence, bool)
             and self.sequence > 0
+            and isinstance(self.policy_digest, str)
             and len(self.policy_digest) == 64
             and all(character in "0123456789abcdef" for character in self.policy_digest)
         )
@@ -558,8 +566,11 @@ class ProviderTopologyCasTrustPolicyCheckpointV1:
             self.structurally_valid()
             and policy is not None
             and policy.structurally_valid()
+            and isinstance(expected_policy_digest, str)
             and bool(expected_policy_digest)
-            and expected_policy_generation is not None
+            and isinstance(expected_policy_generation, int)
+            and not isinstance(expected_policy_generation, bool)
+            and expected_policy_generation > 0
             and self.repository == policy.repository
             and self.policy_id == policy.policy_id
             and self.policy_generation == policy.generation
@@ -573,7 +584,11 @@ class ProviderTopologyCasTrustPolicyCheckpointV1:
         next_policy: ProviderTopologyCasTrustPolicyV1,
     ) -> "ProviderTopologyCasTrustPolicyCheckpointV1 | None":
         """Propose N -> N+1 only; caller must persist via external durable CAS."""
-        if not self.structurally_valid() or not next_policy.structurally_valid():
+        if (
+            not self.structurally_valid()
+            or not isinstance(next_policy, ProviderTopologyCasTrustPolicyV1)
+            or not next_policy.structurally_valid()
+        ):
             return None
         if (
             next_policy.repository != self.repository
@@ -1820,6 +1835,11 @@ def test_provider_topology_trust_checkpoint_matches_only_exact_policy():
     )
     assert not corrupted.structurally_valid()
     assert not corrupted.matches(policy, policy.digest(), policy.generation)
+    missing_digest = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**checkpoint.__dict__, "policy_digest": None}
+    )
+    assert not missing_digest.structurally_valid()
+    assert not missing_digest.matches(policy, policy.digest(), policy.generation)
     cross_repository = ProviderTopologyCasTrustPolicyCheckpointV1(
         **{**checkpoint.__dict__, "repository": "other/repository"}
     )
@@ -1883,6 +1903,13 @@ def test_provider_topology_binding_rejects_policy_rollback_after_checkpoint_adva
         **{**binding.__dict__, "attestation_trust_checkpoint": stale}
     )
     assert stale_binding.classify(identity) == "observed-not-cas"
+    malformed_checkpoint = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**binding.attestation_trust_checkpoint.__dict__, "policy_digest": None}
+    )
+    malformed_binding = ProviderTopologyBindingV1(
+        **{**binding.__dict__, "attestation_trust_checkpoint": malformed_checkpoint}
+    )
+    assert malformed_binding.classify(identity) == "observed-not-cas"
 
 
 def test_provider_topology_trust_policy_digest_is_canonical_and_pinned():
