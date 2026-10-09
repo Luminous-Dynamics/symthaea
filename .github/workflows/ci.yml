@@ -1758,7 +1758,7 @@ jobs:
       - name: Format standalone CIV smoke controls
         run: cargo fmt --manifest-path crates/domains/symthaea-lab/Cargo.toml -- --check
 
-      - name: Execute CIV-CORE-003 through CIV-CORE-011 smoke controls
+      - name: Execute CIV-CORE-003 through CIV-CORE-012 smoke controls
         shell: bash
         run: |
           set -euo pipefail
@@ -1771,3 +1771,4 @@ jobs:
           cargo run --manifest-path "$manifest" --bin civ_merkle_governance_checkpoint_smoke
           cargo run --manifest-path "$manifest" --bin civ_signed_tree_head_witness_smoke
           cargo run --manifest-path "$manifest" --bin civ_monotonic_checkpoint_acceptance_smoke
+          cargo run --manifest-path "$manifest" --bin civ_independent_receipt_tail_anchor_smoke
