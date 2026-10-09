@@ -767,7 +767,6 @@ impl VulkanBarrierWorkloadRuntime {
             max_storage_buffer_range: u64::from(props.limits.max_storage_buffer_range),
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
-            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: family,
             synchronization_features,
             queue_family_identity_digest,
