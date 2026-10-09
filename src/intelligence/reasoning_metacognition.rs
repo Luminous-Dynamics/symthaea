@@ -1951,9 +1951,15 @@ mod tests {
             FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION
         );
         assert!(reasoning.baselines.iter().all(|baseline| {
-            let delta = baseline.candidate_brier_delta.unwrap_or_default();
-            let lower = baseline.candidate_brier_delta_lower_95.unwrap_or(2.0);
-            let upper = baseline.candidate_brier_delta_upper_95.unwrap_or(-2.0);
+            let delta = baseline
+                .candidate_brier_delta
+                .expect("candidate Brier delta must be reported");
+            let lower = baseline
+                .candidate_brier_delta_lower_95
+                .expect("lower Brier-delta interval bound must be reported");
+            let upper = baseline
+                .candidate_brier_delta_upper_95
+                .expect("upper Brier-delta interval bound must be reported");
             lower <= delta && delta <= upper && lower >= -1.0 && upper <= 1.0
         }));
         assert_eq!(
@@ -1981,6 +1987,9 @@ mod tests {
         let (Some(simultaneous_lower), Some(simultaneous_upper)) = simultaneous else {
             panic!("non-empty comparison must have simultaneous interval");
         };
+        let expected_radius = (2.0_f64 * (2.0 / 0.0125).ln() / 100.0).sqrt();
+        assert!((simultaneous_lower - (-0.1 - expected_radius).max(-1.0)).abs() < 1.0e-12);
+        assert!((simultaneous_upper - (-0.1 + expected_radius).min(1.0)).abs() < 1.0e-12);
         assert!(simultaneous_lower <= -0.1 && simultaneous_upper >= -0.1);
         assert!(simultaneous_lower >= -1.0 && simultaneous_upper <= 1.0);
         assert!(
