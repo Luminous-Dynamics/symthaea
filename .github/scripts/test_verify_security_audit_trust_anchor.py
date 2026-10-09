@@ -223,29 +223,45 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             with self.assertRaises(module.VerificationError):
                 module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
 
+    def event_meta(self, repo):
+        return {
+            "workflow_id": module.POLICY[repo]["workflow_id"],
+            "event_name": "pull_request",
+            "repository_id": "12345",
+            "head_repository_id": "12345",
+        }
+
     def test_best_effort_failure_status_clears_same_head_success(self):
+        repo = "Luminous-Dynamics/mycelix"
         with patch.object(module, "post_status") as post:
-            result = module.best_effort_failure_status("Luminous-Dynamics/mycelix", "a" * 40,
-                                                       "token", "API unavailable", "https://github.com/run/1")
+            result = module.best_effort_failure_status(repo, "a" * 40, "token",
+                                                       "API unavailable", "https://github.com/run/1",
+                                                       **self.event_meta(repo))
         self.assertTrue(result)
         post.assert_called_once()
         self.assertEqual(post.call_args.args[3], "failure")
 
     def test_best_effort_failure_status_rejects_untrusted_or_invalid_identity(self):
+        repo = "Luminous-Dynamics/mycelix"
         cases = [
-            ("unknown/repo", "a" * 40, "token"),
-            ("Luminous-Dynamics/mycelix", "not-a-sha", "token"),
-            ("Luminous-Dynamics/mycelix", "a" * 40, ""),
+            ("unknown/repo", "a" * 40, "token", self.event_meta(repo)),
+            (repo, "not-a-sha", "token", self.event_meta(repo)),
+            (repo, "a" * 40, "", self.event_meta(repo)),
+            (repo, "a" * 40, "token", {**self.event_meta(repo), "workflow_id": 1}),
+            (repo, "a" * 40, "token", {**self.event_meta(repo), "event_name": "push"}),
+            (repo, "a" * 40, "token", {**self.event_meta(repo), "head_repository_id": "54321"}),
         ]
-        for repo, subject, token in cases:
-            with self.subTest(repo=repo, subject=subject), patch.object(module, "post_status") as post:
-                self.assertFalse(module.best_effort_failure_status(repo, subject, token, "failure"))
+        for target_repo, subject, token, event_meta in cases:
+            with self.subTest(repo=target_repo, subject=subject, event_meta=event_meta), patch.object(module, "post_status") as post:
+                self.assertFalse(module.best_effort_failure_status(target_repo, subject, token,
+                                                                    "failure", **event_meta))
                 post.assert_not_called()
 
     def test_best_effort_failure_status_survives_status_api_failure(self):
+        repo = "Luminous-Dynamics/mycelix"
         with patch.object(module, "post_status", side_effect=module.VerificationError("forbidden")):
-            self.assertFalse(module.best_effort_failure_status("Luminous-Dynamics/mycelix", "a" * 40,
-                                                               "token", "API unavailable"))
+            self.assertFalse(module.best_effort_failure_status(repo, "a" * 40, "token",
+                                                               "API unavailable", **self.event_meta(repo)))
 
     def test_api_rejects_bad_json(self):
         class Response:
