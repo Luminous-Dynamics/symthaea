@@ -85,7 +85,10 @@ fn from_i128_rational(num: i128, den: i128) -> Option<Duration> {
 }
 
 impl Duration {
-    /// Construct from a rational `num/den` beats (reduced; `den` must be > 0).
+    /// Construct from a rational `num/den` beats and reduce it exactly.
+    ///
+    /// The input denominator must be non-zero. The stored denominator is always
+    /// positive, and the reduced result must fit the i64 wire representation.
     pub fn new(num: i64, den: i64) -> Self {
         assert!(den != 0, "duration denominator must be non-zero");
         from_i128_rational(num as i128, den as i128)
@@ -188,7 +191,15 @@ impl Duration {
         let Some(den) = i128::from(self.den).checked_mul(i128::from(other.den)) else {
             return Duration::zero();
         };
-        from_i128_rational(num, den).unwrap_or_else(|| Duration::new(i64::MAX, 1))
+        from_i128_rational(num, den).unwrap_or_else(|| {
+            if num > i128::from(i64::MAX) * den {
+                Duration::new(i64::MAX, 1)
+            } else {
+                // A positive but unrepresentable sub-beat fraction cannot be
+                // preserved exactly; do not turn it into a fabricated maximum.
+                Duration::zero()
+            }
+        })
     }
 }
 
