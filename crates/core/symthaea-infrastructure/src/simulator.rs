@@ -19,6 +19,14 @@ use tracing;
 // regardless of whether every concrete implementor happens to be.
 pub trait InfrastructurePhysicsSimulator: Send + Sync {
     fn step(&mut self, cmd: &InfrastructureCommand, dt: f64);
+
+    /// Whether the most recent compatibility `step` call was accepted.
+    /// Legacy backends retain the historical default; checked backends can
+    /// report a rejected command even when the preserved state stays finite.
+    fn last_step_succeeded(&self) -> bool {
+        true
+    }
+
     fn state(&self) -> &InfrastructureState;
     fn reset(&mut self);
     /// Which concrete backend this is — lets callers (and tests) confirm
