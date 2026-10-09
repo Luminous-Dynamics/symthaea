@@ -251,17 +251,19 @@ pub fn compare_assessments_with_roster(
     result.unexpected_frameworks = actual.difference(&expected).cloned().collect();
     result.unexpected_frameworks.sort();
 
-    if !result.unexpected_frameworks.is_empty() {
+    let subject_or_provenance_failure = matches!(
+        result.state,
+        ComparisonState::SubjectMismatch
+            | ComparisonState::SourceSubjectMismatch
+            | ComparisonState::StaleAssessment
+            | ComparisonState::InvalidInput
+    );
+
+    // Coverage issues must never hide a more fundamental subject/provenance
+    // failure. Preserve those diagnoses even when the roster is also wrong.
+    if !subject_or_provenance_failure && !result.unexpected_frameworks.is_empty() {
         result.state = ComparisonState::FrameworkSetMismatch;
-    } else if !result.missing_frameworks.is_empty()
-        && !matches!(
-            result.state,
-            ComparisonState::SubjectMismatch
-                | ComparisonState::SourceSubjectMismatch
-                | ComparisonState::StaleAssessment
-                | ComparisonState::InvalidInput
-        )
-    {
+    } else if !subject_or_provenance_failure && !result.missing_frameworks.is_empty() {
         // In particular, a single positive result cannot be called unanimous
         // when the declared roster includes a missing evaluator.
         result.state = ComparisonState::Incomplete;
@@ -459,6 +461,9 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
                 if !assessment.evidence_refs.is_empty() {
                     errors.push(format!("{prefix}: unavailable result must not claim assessment evidence_refs"));
                 }
+                if assessment.confidence.is_some() {
+                    errors.push(format!("{prefix}: unavailable result must not claim confidence"));
+                }
             }
         }
         if assessment.provenance.evaluator_build_id.trim().is_empty() {
@@ -538,6 +543,16 @@ mod tests {
     }
 
     #[test]
+    fn empty_required_roster_is_invalid() {
+        let care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let expected_subject = care.subject.clone();
+        let result = compare_assessments_with_roster(&expected_subject, &[], &[care]);
+
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|error| error.contains("must not be empty")));
+    }
+
+    #[test]
     fn roster_prevents_false_unanimity_when_framework_is_missing() {
         let result = compare_assessments_with_roster(
             &assessment("care_ethics", FrameworkStance::SupportsAction).subject,
@@ -562,6 +577,7 @@ mod tests {
         unavailable.provenance.source_subject = None;
         unavailable.provenance.evaluation_cycle = None;
         unavailable.provenance.freshness = AssessmentFreshness::Unavailable;
+        unavailable.confidence = None;
         unavailable.premise_refs.clear();
         unavailable.evidence_refs.clear();
         unavailable.rationale = vec!["Framework did not produce a fresh assessment.".to_owned()];
@@ -617,6 +633,20 @@ mod tests {
         );
         assert_eq!(result.state, ComparisonState::InvalidInput);
         assert!(result.validation_errors.iter().any(|error| error.contains("duplicates")));
+    }
+
+    #[test]
+    fn roster_mismatch_does_not_mask_subject_mismatch() {
+        let care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let mut rights = assessment("rights_ethics", FrameworkStance::SupportsAction);
+        rights.subject.scenario_digest = "fixture-digest:different-context".to_owned();
+
+        let result = compare_assessments_with_roster(
+            &care.subject,
+            &[identity("care_ethics", "1.0.0")],
+            &[care, rights],
+        );
+        assert_eq!(result.state, ComparisonState::SubjectMismatch);
     }
 
     #[test]
@@ -820,6 +850,7 @@ mod tests {
         let result = compare_assessments(&[malformed]);
         assert_eq!(result.state, ComparisonState::InvalidInput);
         assert!(result.validation_errors.iter().any(|e| e.contains("unavailable result must not claim a source_subject")));
+        assert!(result.validation_errors.iter().any(|e| e.contains("unavailable result must not claim confidence")));
     }
 
     #[test]
