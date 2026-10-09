@@ -366,7 +366,8 @@ class DurablePromotionJournalV1:
                     f"unsupported promotion journal schema version {user_version}; "
                     f"expected {SCHEMA_VERSION}; explicit migration required"
                 )
-            if user_version == 0 and "ledger_state" in existing_tables:
+            journal_tables = {"ledger_state", "reservations", "journal_events"}
+            if user_version == 0 and existing_tables.intersection(journal_tables):
                 raise RuntimeError(
                     "unversioned existing promotion journal refused; explicit migration required"
                 )
@@ -1748,6 +1749,19 @@ class DurablePromotionJournalTests(unittest.TestCase):
             connection.close()
         with self.assertRaisesRegex(RuntimeError, "unsupported promotion journal schema version"):
             DurablePromotionJournalV1(journal.path)
+
+    def test_partial_unversioned_journal_schema_fails_closed(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        path = Path(temporary.name) / "partial.sqlite3"
+        connection = sqlite3.connect(path)
+        try:
+            connection.execute("CREATE TABLE reservations (reservation_id TEXT)")
+            connection.commit()
+        finally:
+            connection.close()
+        with self.assertRaisesRegex(RuntimeError, "unversioned existing promotion journal refused"):
+            DurablePromotionJournalV1(path)
 
     def test_recovery_trigger_is_required_and_semantically_audited(self) -> None:
         journal = self.make_journal()
