@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{CStr, CString};
 use std::ptr;
@@ -24,7 +25,7 @@ const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
 const GPU_FABRIC_DESCRIPTOR_TYPE: vk::DescriptorType = vk::DescriptorType::STORAGE_BUFFER;
 const GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS: vk::ShaderStageFlags = vk::ShaderStageFlags::COMPUTE;
 const GPU_FABRIC_PIPELINE_BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
-const RECEIPT_VERSION: u16 = 10;
+const RECEIPT_VERSION: u16 = 11;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
@@ -166,6 +167,10 @@ pub enum VulkanBarrierReceiptError {
     CompletionLoweringDigest,
     #[error("receipt descriptor/dispatch lowering digest mismatch")]
     ExecutionLoweringDigest,
+    #[error("receipt resource memory profile is missing or inconsistent for {0}")]
+    ResourceMemoryProfile(ResourceId),
+    #[error("receipt memory-lowering digest mismatch")]
+    MemoryLoweringDigest,
     #[error("receipt observed timeline value {observed} does not equal expected {expected}")]
     TimelineCompletion { expected: u64, observed: u64 },
 }
@@ -237,6 +242,104 @@ fn synchronization_feature_profile_from_device_create(
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanResourceMemoryProfile {
+    pub memory_type_index: u32,
+    pub memory_type_bits: u32,
+    pub memory_property_flags: u32,
+    pub memory_heap_index: u32,
+    pub memory_heap_flags: u32,
+    pub memory_heap_size: u64,
+    pub memory_requirement_alignment: u64,
+    pub memory_requirement_size: u64,
+    pub allocation_size: u64,
+    pub storage_size: u64,
+    pub buffer_usage_flags: u32,
+    pub sharing_mode_raw: i32,
+    pub binding_offset: u64,
+    pub map_offset: u64,
+    pub map_size: u64,
+    pub write_flush_performed: bool,
+    pub write_flush_offset: u64,
+    pub write_flush_size: u64,
+    pub read_invalidate_performed: bool,
+    pub read_invalidate_offset: u64,
+    pub read_invalidate_size: u64,
+}
+
+impl VulkanResourceMemoryProfile {
+    fn is_consistent_with_storage_size(&self, expected_storage_size: u64) -> bool {
+        let host_visible = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        let host_coherent = vk::MemoryPropertyFlags::HOST_COHERENT.as_raw();
+        let coherent = self.memory_property_flags & host_coherent != 0;
+        let selected_type_bit = 1_u32.checked_shl(self.memory_type_index).unwrap_or(0);
+        let expected_flush_size = if coherent { 0 } else { vk::WHOLE_SIZE };
+        self.memory_type_index < 32
+            && selected_type_bit != 0
+            && self.memory_type_bits & selected_type_bit != 0
+            && self.memory_property_flags & host_visible != 0
+            && self.memory_heap_index < 16
+            && self.memory_heap_size > 0
+            && self.memory_requirement_alignment > 0
+            && self.memory_requirement_size == self.allocation_size
+            && self.allocation_size >= expected_storage_size
+            && self.storage_size == expected_storage_size
+            && self.buffer_usage_flags == vk::BufferUsageFlags::STORAGE_BUFFER.as_raw()
+            && self.sharing_mode_raw == vk::SharingMode::EXCLUSIVE.as_raw()
+            && self.binding_offset == 0
+            && self.map_offset == 0
+            && self.map_size == self.allocation_size
+            && self.write_flush_performed == !coherent
+            && self.write_flush_offset == 0
+            && self.write_flush_size == expected_flush_size
+            && self.read_invalidate_performed == !coherent
+            && self.read_invalidate_offset == 0
+            && self.read_invalidate_size == expected_flush_size
+    }
+}
+
+fn resource_memory_profiles_digest(
+    profiles: &BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
+) -> String {
+    let mut fields = vec![format!("resource_profile_count:{}", profiles.len())];
+    for (resource, profile) in profiles {
+        fields.extend([
+            "resource_profile".to_owned(),
+            format!("resource={}", resource.as_str()),
+            format!("memory_type_index={}", profile.memory_type_index),
+            format!("memory_type_bits={}", profile.memory_type_bits),
+            format!("memory_property_flags={}", profile.memory_property_flags),
+            format!("memory_heap_index={}", profile.memory_heap_index),
+            format!("memory_heap_flags={}", profile.memory_heap_flags),
+            format!("memory_heap_size={}", profile.memory_heap_size),
+            format!("memory_requirement_alignment={}", profile.memory_requirement_alignment),
+            format!("memory_requirement_size={}", profile.memory_requirement_size),
+            format!("allocation_size={}", profile.allocation_size),
+            format!("storage_size={}", profile.storage_size),
+            format!("buffer_usage_flags={}", profile.buffer_usage_flags),
+            format!("sharing_mode_raw={}", profile.sharing_mode_raw),
+            format!("binding_offset={}", profile.binding_offset),
+            format!("map_offset={}", profile.map_offset),
+            format!("map_size={}", profile.map_size),
+            format!("write_flush_performed={}", u8::from(profile.write_flush_performed)),
+            format!("write_flush_offset={}", profile.write_flush_offset),
+            format!("write_flush_size={}", profile.write_flush_size),
+            format!("read_invalidate_performed={}", u8::from(profile.read_invalidate_performed)),
+            format!("read_invalidate_offset={}", profile.read_invalidate_offset),
+            format!("read_invalidate_size={}", profile.read_invalidate_size),
+        ]);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-memory-lowering.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
+}
+
 pub struct VulkanBarrierExecutionReceipt {
     pub version: u16,
     pub graph_digest: String,
@@ -250,6 +353,8 @@ pub struct VulkanBarrierExecutionReceipt {
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
     pub resource_storage_sizes: BTreeMap<ResourceId, u64>,
+    pub resource_memory_profiles: BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
+    pub memory_lowering_digest: String,
     pub completion_expected: u64,
     pub completion_observed: u64,
     pub vulkan_api_version: u32,
@@ -391,6 +496,21 @@ impl VulkanBarrierExecutionReceipt {
             != materialized_dispatch_records_digest(&expected_dispatch_records)
         {
             return Err(VulkanBarrierReceiptError::ExecutionLoweringDigest);
+        }
+        if self.resource_memory_profiles.len() != expected_storage_sizes.len() {
+            return Err(VulkanBarrierReceiptError::ResourceCount);
+        }
+        for (resource, expected_size) in &expected_storage_sizes {
+            let profile = self.resource_memory_profiles.get(resource)
+                .ok_or_else(|| VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()))?;
+            if !profile.is_consistent_with_storage_size(*expected_size) {
+                return Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()));
+            }
+        }
+        if !is_sha256_hex(&self.memory_lowering_digest)
+            || self.memory_lowering_digest != resource_memory_profiles_digest(&self.resource_memory_profiles)
+        {
+            return Err(VulkanBarrierReceiptError::MemoryLoweringDigest);
         }
         Ok(())
     }
@@ -1062,6 +1182,11 @@ impl VulkanBarrierWorkloadRuntime {
             digests.insert(resource.clone(), resource_digest(value));
             storage_sizes.insert(resource.clone(), buffers[resource].storage_size);
         }
+        let resource_memory_profiles = buffers
+            .iter()
+            .map(|(resource, buffer)| (resource.clone(), buffer.memory_profile()))
+            .collect::<BTreeMap<_, _>>();
+        let memory_lowering_digest = resource_memory_profiles_digest(&resource_memory_profiles);
         let receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
             graph_digest: graph.digest_hex().map_err(VulkanBarrierError::Graph)?,
@@ -1075,6 +1200,8 @@ impl VulkanBarrierWorkloadRuntime {
             execution_lowering_digest: materialized_dispatch_records_digest(
                 &materialized_dispatch_records,
             ),
+            resource_memory_profiles,
+            memory_lowering_digest,
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -1610,6 +1737,15 @@ struct WorkloadBuffer {
     allocation_size: vk::DeviceSize,
     storage_size: vk::DeviceSize,
     coherent: bool,
+    memory_type_index: u32,
+    memory_type_bits: u32,
+    memory_property_flags: u32,
+    memory_heap_index: u32,
+    memory_heap_flags: u32,
+    memory_heap_size: u64,
+    memory_requirement_alignment: u64,
+    write_flush_completed: Cell<bool>,
+    read_invalidate_completed: Cell<bool>,
 }
 
 impl WorkloadBuffer {
@@ -1635,6 +1771,9 @@ impl WorkloadBuffer {
                 return Err(VulkanBarrierError::NoHostVisibleMemory);
             }
         };
+        let memory_type = props.memory_types[index as usize];
+        let memory_heap_index = memory_type.heap_index;
+        let memory_heap = props.memory_heaps[memory_heap_index as usize];
         let alloc = vk::MemoryAllocateInfo::default().allocation_size(req.size).memory_type_index(index);
         let memory = match unsafe { device.allocate_memory(&alloc, None) } {
             Ok(m) => m,
@@ -1644,7 +1783,51 @@ impl WorkloadBuffer {
             unsafe { device.free_memory(memory, None); device.destroy_buffer(buffer, None); }
             return Err(VulkanBarrierError::Vk(error));
         }
-        Ok(Self { device: device.clone(), buffer, memory, allocation_size: req.size, storage_size: size, coherent })
+        Ok(Self {
+            device: device.clone(),
+            buffer,
+            memory,
+            allocation_size: req.size,
+            storage_size: size,
+            coherent,
+            memory_type_index: index,
+            memory_type_bits: req.memory_type_bits,
+            memory_property_flags: memory_type.property_flags.as_raw(),
+            memory_heap_index,
+            memory_heap_flags: memory_heap.flags.as_raw(),
+            memory_heap_size: memory_heap.size,
+            memory_requirement_alignment: req.alignment,
+            write_flush_completed: Cell::new(false),
+            read_invalidate_completed: Cell::new(false),
+        })
+    }
+
+    fn memory_profile(&self) -> VulkanResourceMemoryProfile {
+        let flush_performed = self.write_flush_completed.get();
+        let invalidate_performed = self.read_invalidate_completed.get();
+        VulkanResourceMemoryProfile {
+            memory_type_index: self.memory_type_index,
+            memory_type_bits: self.memory_type_bits,
+            memory_property_flags: self.memory_property_flags,
+            memory_heap_index: self.memory_heap_index,
+            memory_heap_flags: self.memory_heap_flags,
+            memory_heap_size: self.memory_heap_size,
+            memory_requirement_alignment: self.memory_requirement_alignment,
+            memory_requirement_size: self.allocation_size,
+            allocation_size: self.allocation_size,
+            storage_size: self.storage_size,
+            buffer_usage_flags: vk::BufferUsageFlags::STORAGE_BUFFER.as_raw(),
+            sharing_mode_raw: vk::SharingMode::EXCLUSIVE.as_raw(),
+            binding_offset: 0,
+            map_offset: 0,
+            map_size: self.allocation_size,
+            write_flush_performed: flush_performed,
+            write_flush_offset: 0,
+            write_flush_size: if flush_performed { vk::WHOLE_SIZE } else { 0 },
+            read_invalidate_performed: invalidate_performed,
+            read_invalidate_offset: 0,
+            read_invalidate_size: if invalidate_performed { vk::WHOLE_SIZE } else { 0 },
+        }
     }
 
     fn write(&self, device: &Device, bytes: &[u8]) -> Result<(), VulkanBarrierError> {
@@ -1659,6 +1842,7 @@ impl WorkloadBuffer {
                     device.unmap_memory(self.memory);
                     return Err(VulkanBarrierError::Vk(error));
                 }
+                self.write_flush_completed.set(true);
             }
             device.unmap_memory(self.memory);
         }
@@ -1674,6 +1858,7 @@ impl WorkloadBuffer {
                 unsafe { device.unmap_memory(self.memory); }
                 return Err(VulkanBarrierError::Vk(error));
             }
+            self.read_invalidate_completed.set(true);
         }
         let mut bytes = vec![0_u8; len];
         unsafe { ptr::copy_nonoverlapping(mapped.cast::<u8>(), bytes.as_mut_ptr(), len); device.unmap_memory(self.memory); }
@@ -2317,6 +2502,37 @@ mod tests {
     }
 
     #[test]
+    fn memory_profile_digest_binds_selection_and_cache_maintenance() {
+        let (_, _, _, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut profiles = test_resource_memory_profiles(&storage_sizes);
+        let baseline = resource_memory_profiles_digest(&profiles);
+        let lhs = ResourceId::new("lhs").unwrap();
+        let profile = profiles.get_mut(&lhs).unwrap();
+        profile.memory_type_index = 1;
+        profile.memory_type_bits = 2;
+        assert_ne!(baseline, resource_memory_profiles_digest(&profiles));
+        profile.memory_type_index = 0;
+        profile.memory_type_bits = 1;
+        assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        profile.memory_property_flags = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        profile.write_flush_performed = true;
+        profile.write_flush_size = vk::WHOLE_SIZE;
+        profile.read_invalidate_performed = true;
+        profile.read_invalidate_size = vk::WHOLE_SIZE;
+        assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        profile.write_flush_size = 4;
+        assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+    }
+
+    #[test]
     fn dispatch_group_count_rejects_u64_to_u32_truncation() {
         let range = (u64::from(u32::MAX) + 1)
             .saturating_mul(u64::from(WORKGROUP_SIZE))
@@ -2550,6 +2766,8 @@ mod tests {
             barrier_lowering_digest: String::new(),
             completion_lowering_digest: String::new(),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
             resource_digests: BTreeMap::new(),
@@ -2606,6 +2824,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2666,6 +2886,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2723,6 +2945,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2782,6 +3006,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2843,6 +3069,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2907,6 +3135,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -3042,6 +3272,8 @@ mod tests {
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -3110,6 +3342,8 @@ mod tests {
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -3166,6 +3400,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -3188,6 +3424,9 @@ mod tests {
             driver_uuid: [2; 16],
             driver_id: 1,
         };
+        receipt.resource_memory_profiles = test_resource_memory_profiles(&receipt.resource_storage_sizes);
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
         let expected_dispatch_records = materialized_dispatch_records_from_graph(
             &graph,
             &schedule,
@@ -3206,6 +3445,13 @@ mod tests {
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
+        ));
+        receipt.completion_lowering_digest =
+            completion_lowering_digest(&plan, expected_final_timeline_value(&plan), 0);
+        receipt.memory_lowering_digest = String::from("tampered");
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::MemoryLoweringDigest)
         ));
     }
 
@@ -3494,6 +3740,8 @@ mod tests {
                 0,
             ),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -3528,6 +3776,43 @@ mod tests {
         ));
     }
 
+    fn test_resource_memory_profiles(
+        storage_sizes: &BTreeMap<ResourceId, u64>,
+    ) -> BTreeMap<ResourceId, VulkanResourceMemoryProfile> {
+        storage_sizes
+            .iter()
+            .map(|(resource, size)| (
+                resource.clone(),
+                VulkanResourceMemoryProfile {
+                    memory_type_index: 0,
+                    memory_type_bits: 1,
+                    memory_property_flags: (
+                        vk::MemoryPropertyFlags::HOST_VISIBLE
+                            | vk::MemoryPropertyFlags::HOST_COHERENT
+                    ).as_raw(),
+                    memory_heap_index: 0,
+                    memory_heap_flags: vk::MemoryHeapFlags::DEVICE_LOCAL.as_raw(),
+                    memory_heap_size: 1024,
+                    memory_requirement_alignment: 4,
+                    memory_requirement_size: *size,
+                    allocation_size: *size,
+                    storage_size: *size,
+                    buffer_usage_flags: vk::BufferUsageFlags::STORAGE_BUFFER.as_raw(),
+                    sharing_mode_raw: vk::SharingMode::EXCLUSIVE.as_raw(),
+                    binding_offset: 0,
+                    map_offset: 0,
+                    map_size: *size,
+                    write_flush_performed: false,
+                    write_flush_offset: 0,
+                    write_flush_size: 0,
+                    read_invalidate_performed: false,
+                    read_invalidate_offset: 0,
+                    read_invalidate_size: 0,
+                },
+            ))
+            .collect()
+    }
+
     fn test_synchronization_feature_profile() -> VulkanSynchronizationFeatureProfile {
         VulkanSynchronizationFeatureProfile::new(true, true, true, true)
     }
@@ -3542,6 +3827,8 @@ mod tests {
             barrier_lowering_digest: String::new(),
             completion_lowering_digest: String::new(),
             execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
             resource_digests: BTreeMap::new(),
@@ -3584,6 +3871,34 @@ mod tests {
         println!("barrier_lowering_digest={}", receipt.barrier_lowering_digest);
         println!("completion_lowering_digest={}", receipt.completion_lowering_digest);
         println!("execution_lowering_digest={}", receipt.execution_lowering_digest);
+        println!("memory_lowering_digest={}", receipt.memory_lowering_digest);
+        for (resource, profile) in &receipt.resource_memory_profiles {
+            println!(
+                "resource_memory_profile={}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+                resource.as_str(),
+                profile.memory_type_index,
+                profile.memory_type_bits,
+                profile.memory_property_flags,
+                profile.memory_heap_index,
+                profile.memory_heap_flags,
+                profile.memory_heap_size,
+                profile.memory_requirement_alignment,
+                profile.memory_requirement_size,
+                profile.allocation_size,
+                profile.storage_size,
+                profile.buffer_usage_flags,
+                profile.sharing_mode_raw,
+                profile.binding_offset,
+                profile.map_offset,
+                profile.map_size,
+                u8::from(profile.write_flush_performed),
+                profile.write_flush_offset,
+                profile.write_flush_size,
+                u8::from(profile.read_invalidate_performed),
+                profile.read_invalidate_offset,
+                profile.read_invalidate_size,
+            );
+        }
         println!("node_count={}", receipt.node_count);
         println!("barrier_count={}", receipt.barrier_count);
         println!("resource_storage_sizes={:?}", receipt.resource_storage_sizes);
