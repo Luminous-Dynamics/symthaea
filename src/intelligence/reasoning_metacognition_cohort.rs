@@ -14,14 +14,14 @@ use super::reasoning_metacognition::{
     WeakAssumptionObservation, FORECAST_BASELINE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
 
-pub const DECISION_FORECAST_SCHEMA_VERSION: u32 = 1;
+pub const DECISION_FORECAST_SCHEMA_VERSION: u32 = 2;
 pub const DECISION_OUTCOME_SCHEMA_VERSION: u32 = 1;
-pub const FROZEN_DECISION_COHORT_SCHEMA_VERSION: u32 = 1;
-pub const DECISION_COHORT_REPORT_SCHEMA_VERSION: u32 = 1;
-pub const DECISION_COHORT_EVALUATOR_VERSION: &str = "rq-006-decision-cohort-v1";
+pub const FROZEN_DECISION_COHORT_SCHEMA_VERSION: u32 = 2;
+pub const DECISION_COHORT_REPORT_SCHEMA_VERSION: u32 = 2;
+pub const DECISION_COHORT_EVALUATOR_VERSION: &str = "rq-006-decision-cohort-v2";
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 
 /// One pre-outcome decision and its correctness probability.
@@ -30,7 +30,7 @@ const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 /// a separately identified counterfactual_answer_ref if the subject actually generated a candidate
 /// answer before choosing to abstain. Such a reference is not counterfactual evidence by itself.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionForecastV1 {
+pub struct DecisionForecastV2 {
     pub schema_version: u32,
     pub forecast_id: String,
     pub episode_id: String,
@@ -40,7 +40,9 @@ pub struct DecisionForecastV1 {
     pub subject_id: String,
     pub model_profile_id: String,
     pub input_snapshot_ref: String,
-    pub predicted_probability: f64,
+    /// Probability that the referenced asserted/counterfactual answer is correct.
+    /// Absent for an abstention with no frozen counterfactual answer.
+    pub predicted_probability: Option<f64>,
     pub asserted: bool,
     pub answer_ref: Option<String>,
     pub counterfactual_answer_ref: Option<String>,
@@ -80,7 +82,7 @@ pub struct DecisionSelectiveRiskPoint {
 
 /// Baseline comparison on the same scoreable asserted-answer cohort as the candidate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionBaselineScoreV1 {
+pub struct DecisionBaselineScoreV2 {
     pub baseline_id: String,
     pub method: ForecastBaselineMethod,
     pub task_family_id: String,
@@ -104,7 +106,7 @@ pub struct DecisionBaselineScoreV1 {
 
 /// Family report includes families that have zero asserted answers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionCohortFamilyReportV1 {
+pub struct DecisionCohortFamilyReportV2 {
     pub task_family_id: String,
     pub total_decisions: usize,
     pub asserted_decisions: usize,
@@ -118,8 +120,8 @@ pub struct DecisionCohortFamilyReportV1 {
     pub selective_risk: Vec<DecisionSelectiveRiskPoint>,
     pub counterfactual_adjudications: usize,
     /// Fraction of adjudicated counterfactual candidate answers that would have been correct.
-    pub counterfactual_answerable_rate: Option<f64>,
-    pub baselines: Vec<DecisionBaselineScoreV1>,
+    pub counterfactual_answer_correct_rate: Option<f64>,
+    pub baselines: Vec<DecisionBaselineScoreV2>,
 }
 
 /// Receipt linkage retained in deterministic forecast order. External verification is still needed.
@@ -135,7 +137,7 @@ pub struct DecisionCohortBindingV1 {
 /// Decomposed score: all decisions are accounted for, but correctness is calibrated only on answers
 /// that were asserted and independently scored. No scalar metacognition score is defined.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionCohortReportV1 {
+pub struct DecisionCohortReportV2 {
     pub schema_version: u32,
     pub evaluator_version: String,
     pub outcome_profile_id: String,
@@ -154,8 +156,8 @@ pub struct DecisionCohortReportV1 {
     /// Selective risk and coverage over the full decision cohort.
     pub selective_risk: Vec<DecisionSelectiveRiskPoint>,
     pub counterfactual_adjudications: usize,
-    pub counterfactual_answerable_rate: Option<f64>,
-    pub family_reports: Vec<DecisionCohortFamilyReportV1>,
+    pub counterfactual_answer_correct_rate: Option<f64>,
+    pub family_reports: Vec<DecisionCohortFamilyReportV2>,
     pub binding: DecisionCohortBindingV1,
 }
 
@@ -179,10 +181,11 @@ impl fmt::Display for DecisionCohortError {
 impl std::error::Error for DecisionCohortError {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "FrozenDecisionCohortWireV1")]
-pub struct FrozenDecisionCohortV1 {
+#[serde(try_from = "FrozenDecisionCohortWireV2")]
+pub struct FrozenDecisionCohortV2 {
     schema_version: u32,
-    forecasts: Vec<DecisionForecastV1>,
+    forecasts: Vec<DecisionForecastV2>,
+    baselines: Vec<ForecastBaselineV1>,
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
@@ -190,19 +193,20 @@ pub struct FrozenDecisionCohortV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct FrozenDecisionCohortWireV1 {
+struct FrozenDecisionCohortWireV2 {
     schema_version: u32,
-    forecasts: Vec<DecisionForecastV1>,
+    forecasts: Vec<DecisionForecastV2>,
+    baselines: Vec<ForecastBaselineV1>,
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
     evaluation_corpus_manifest_ref: String,
 }
 
-impl TryFrom<FrozenDecisionCohortWireV1> for FrozenDecisionCohortV1 {
+impl TryFrom<FrozenDecisionCohortWireV2> for FrozenDecisionCohortV2 {
     type Error = DecisionCohortError;
 
-    fn try_from(w: FrozenDecisionCohortWireV1) -> Result<Self, Self::Error> {
+    fn try_from(w: FrozenDecisionCohortWireV2) -> Result<Self, Self::Error> {
         if w.schema_version != FROZEN_DECISION_COHORT_SCHEMA_VERSION {
             return Err(DecisionCohortError::new(format!(
                 "unsupported decision-cohort schema version {}",
@@ -212,9 +216,25 @@ impl TryFrom<FrozenDecisionCohortWireV1> for FrozenDecisionCohortV1 {
         validate_forecasts(&w.forecasts, w.calibration_bins, &w.selective_thresholds)?;
         require_nonempty("evaluation_split_id", &w.evaluation_split_id)?;
         require_nonempty("evaluation_corpus_manifest_ref", &w.evaluation_corpus_manifest_ref)?;
+        validate_frozen_baselines(
+            &w.baselines,
+            &w.forecasts,
+            &w.evaluation_split_id,
+            &w.evaluation_corpus_manifest_ref,
+        )?;
+        if w.forecasts.windows(2).any(|pair| pair[0].forecast_id > pair[1].forecast_id) {
+            return Err(DecisionCohortError::new("frozen forecasts are not in canonical order"));
+        }
+        if w.baselines.windows(2).any(|pair| {
+            (&pair[0].task_family_id, pair[0].method)
+                > (&pair[1].task_family_id, pair[1].method)
+        }) {
+            return Err(DecisionCohortError::new("frozen baselines are not in canonical order"));
+        }
         Ok(Self {
             schema_version: w.schema_version,
             forecasts: w.forecasts,
+            baselines: w.baselines,
             calibration_bins: w.calibration_bins,
             selective_thresholds: w.selective_thresholds,
             evaluation_split_id: w.evaluation_split_id,
@@ -223,9 +243,13 @@ impl TryFrom<FrozenDecisionCohortWireV1> for FrozenDecisionCohortV1 {
     }
 }
 
-impl FrozenDecisionCohortV1 {
-    pub fn forecasts(&self) -> &[DecisionForecastV1] {
+impl FrozenDecisionCohortV2 {
+    pub fn forecasts(&self) -> &[DecisionForecastV2] {
         &self.forecasts
+    }
+
+    pub fn baselines(&self) -> &[ForecastBaselineV1] {
+        &self.baselines
     }
 
     pub fn calibration_bins(&self) -> usize {
@@ -247,12 +271,13 @@ impl FrozenDecisionCohortV1 {
 
 /// Freeze a mixed decision cohort before any correctness outcomes are exposed.
 pub fn freeze_decision_cohort_for_split(
-    mut forecasts: Vec<DecisionForecastV1>,
+    mut forecasts: Vec<DecisionForecastV2>,
+    mut baselines: Vec<ForecastBaselineV1>,
     calibration_bins: usize,
     mut selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
     evaluation_corpus_manifest_ref: String,
-) -> Result<FrozenDecisionCohortV1, DecisionCohortError> {
+) -> Result<FrozenDecisionCohortV2, DecisionCohortError> {
     // Canonicalize threshold ordering and reject duplicates so the policy is deterministic.
     for threshold in &selective_thresholds {
         validate_probability("selective threshold", *threshold)?;
@@ -262,9 +287,13 @@ pub fn freeze_decision_cohort_for_split(
         return Err(DecisionCohortError::new("duplicate selective-risk threshold"));
     }
     forecasts.sort_by(|a, b| a.forecast_id.cmp(&b.forecast_id));
-    FrozenDecisionCohortV1::try_from(FrozenDecisionCohortWireV1 {
+    baselines.sort_by(|a, b| {
+        (&a.task_family_id, a.method).cmp(&(&b.task_family_id, b.method))
+    });
+    FrozenDecisionCohortV2::try_from(FrozenDecisionCohortWireV2 {
         schema_version: FROZEN_DECISION_COHORT_SCHEMA_VERSION,
         forecasts,
+        baselines,
         calibration_bins,
         selective_thresholds,
         evaluation_split_id,
@@ -297,8 +326,102 @@ fn validate_optional_ref(field: &str, value: Option<&str>) -> Result<(), Decisio
     Ok(())
 }
 
+fn validate_frozen_baselines(
+    baselines: &[ForecastBaselineV1],
+    forecasts: &[DecisionForecastV2],
+    evaluation_split_id: &str,
+    evaluation_manifest: &str,
+) -> Result<(), DecisionCohortError> {
+    let first = forecasts
+        .first()
+        .ok_or_else(|| DecisionCohortError::new("baseline validation requires forecasts"))?;
+    let families: BTreeSet<&str> = forecasts
+        .iter()
+        .map(|forecast| forecast.task_family_id.as_str())
+        .collect();
+    let mut baseline_ids = HashSet::new();
+    let mut family_methods = BTreeSet::new();
+
+    for baseline in baselines {
+        if baseline.schema_version != FORECAST_BASELINE_SCHEMA_VERSION {
+            return Err(DecisionCohortError::new(format!(
+                "unsupported baseline schema version {}",
+                baseline.schema_version
+            )));
+        }
+        for (name, value) in [
+            ("baseline_id", baseline.baseline_id.as_str()),
+            ("task_family_id", baseline.task_family_id.as_str()),
+            ("task_taxonomy_id", baseline.task_taxonomy_id.as_str()),
+            ("outcome_profile_id", baseline.outcome_profile_id.as_str()),
+            ("training_split_id", baseline.training_split_id.as_str()),
+            ("training_corpus_manifest_ref", baseline.training_corpus_manifest_ref.as_str()),
+        ] {
+            require_nonempty(name, value)?;
+        }
+        if baseline.training_sample_count == 0 {
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} has no calibration samples",
+                baseline.baseline_id
+            )));
+        }
+        validate_probability("baseline probability", baseline.predicted_probability)?;
+        if baseline.training_split_id == evaluation_split_id
+            || baseline.training_corpus_manifest_ref == evaluation_manifest
+        {
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} reuses evaluation split or manifest",
+                baseline.baseline_id
+            )));
+        }
+        if baseline.task_taxonomy_id != first.task_taxonomy_id
+            || baseline.outcome_profile_id != first.outcome_profile_id
+        {
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} has a mismatched taxonomy or outcome profile",
+                baseline.baseline_id
+            )));
+        }
+        if !families.contains(baseline.task_family_id.as_str()) {
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} belongs to an unknown evaluation family",
+                baseline.baseline_id
+            )));
+        }
+        if !baseline_ids.insert(baseline.baseline_id.as_str()) {
+            return Err(DecisionCohortError::new(format!(
+                "duplicate baseline id {}",
+                baseline.baseline_id
+            )));
+        }
+        if !family_methods.insert((baseline.task_family_id.as_str(), baseline.method)) {
+            return Err(DecisionCohortError::new(format!(
+                "duplicate baseline method {:?} for {}",
+                baseline.method,
+                baseline.task_family_id
+            )));
+        }
+    }
+
+    for family in &families {
+        for method in [
+            ForecastBaselineMethod::ConstantBaseRate,
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+        ] {
+            if !family_methods.contains(&(*family, method)) {
+                return Err(DecisionCohortError::new(format!(
+                    "missing baseline {:?} for family {}",
+                    method,
+                    family
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_forecasts(
-    forecasts: &[DecisionForecastV1],
+    forecasts: &[DecisionForecastV2],
     bins: usize,
     thresholds: &[f64],
 ) -> Result<(), DecisionCohortError> {
@@ -347,7 +470,18 @@ fn validate_forecasts(
         }
         validate_optional_ref("answer_ref", f.answer_ref.as_deref())?;
         validate_optional_ref("counterfactual_answer_ref", f.counterfactual_answer_ref.as_deref())?;
-        validate_probability("predicted_probability", f.predicted_probability)?;
+        match (f.asserted || f.counterfactual_answer_ref.is_some(), f.predicted_probability) {
+            (true, Some(probability)) => validate_probability("predicted_probability", probability)?,
+            (true, None) => return Err(DecisionCohortError::new(format!(
+                "forecast {} references an answer but has no correctness probability",
+                f.forecast_id
+            ))),
+            (false, None) => {}
+            (false, Some(_)) => return Err(DecisionCohortError::new(format!(
+                "abstention {} has a probability but no frozen answer target",
+                f.forecast_id
+            ))),
+        }
         if !forecast_ids.insert(f.forecast_id.as_str()) {
             return Err(DecisionCohortError::new(format!(
                 "duplicate forecast id {}",
@@ -391,7 +525,7 @@ fn validate_forecasts(
 }
 
 fn validate_outcome_for_forecast(
-    f: &DecisionForecastV1,
+    f: &DecisionForecastV2,
     o: &DecisionOutcomeV1,
 ) -> Result<(), DecisionCohortError> {
     if o.schema_version != DECISION_OUTCOME_SCHEMA_VERSION {
@@ -458,13 +592,13 @@ fn validate_outcome_for_forecast(
 
 fn risk_point(
     threshold: f64,
-    rows: &[(&DecisionForecastV1, &DecisionOutcomeV1)],
+    rows: &[(&DecisionForecastV2, &DecisionOutcomeV1)],
     total_decisions: usize,
     familywise_comparison_count: usize,
 ) -> DecisionSelectiveRiskPoint {
     let selected: Vec<_> = rows
         .iter()
-        .filter(|(f, _)| f.asserted && f.predicted_probability >= threshold)
+        .filter(|(f, _)| f.asserted && f.predicted_probability.is_some_and(|probability| probability >= threshold))
         .collect();
     let n = selected.len();
     let errors = selected.iter().filter(|(_, o)| o.asserted_answer_correct == Some(false)).count();
@@ -491,23 +625,25 @@ fn risk_point(
 }
 
 fn score_predictions(
-    rows: &[(&DecisionForecastV1, &DecisionOutcomeV1)],
+    rows: &[(&DecisionForecastV2, &DecisionOutcomeV1)],
 ) -> Vec<CorrectnessPrediction> {
     rows.iter()
         .filter_map(|(f, o)| {
-            o.asserted_answer_correct.map(|correct| CorrectnessPrediction {
-                episode_id: f.episode_id.clone(),
-                task_family_id: f.task_family_id.clone(),
-                confidence_target_episode_id: f.episode_id.clone(),
-                confidence: f.predicted_probability,
-                correct,
-                asserted: true,
-            })
+            o.asserted_answer_correct
+                .zip(f.predicted_probability)
+                .map(|(correct, confidence)| CorrectnessPrediction {
+                    episode_id: f.episode_id.clone(),
+                    task_family_id: f.task_family_id.clone(),
+                    confidence_target_episode_id: f.episode_id.clone(),
+                    confidence,
+                    correct,
+                    asserted: true,
+                })
         })
         .collect()
 }
 
-fn counterfactual_rate(rows: &[(&DecisionForecastV1, &DecisionOutcomeV1)]) -> (usize, Option<f64>) {
+fn counterfactual_rate(rows: &[(&DecisionForecastV2, &DecisionOutcomeV1)]) -> (usize, Option<f64>) {
     let observed: Vec<bool> = rows
         .iter()
         .filter(|(f, o)| {
@@ -538,11 +674,11 @@ fn paired_brier_delta_interval(
 
 fn baseline_score(
     baseline: &ForecastBaselineV1,
-    rows: &[(&DecisionForecastV1, &DecisionOutcomeV1)],
+    rows: &[(&DecisionForecastV2, &DecisionOutcomeV1)],
     evaluation_split_id: &str,
     evaluation_manifest: &str,
     familywise_comparison_count: usize,
-) -> DecisionBaselineScoreV1 {
+) -> DecisionBaselineScoreV2 {
     let scored: Vec<_> = rows
         .iter()
         .filter(|(f, o)| f.asserted && o.asserted_answer_correct.is_some())
@@ -594,7 +730,7 @@ fn baseline_score(
     };
     let delta = candidate_brier.zip(brier).map(|(c, b)| c - b);
     let (lower, upper) = paired_brier_delta_interval(delta, n, familywise_comparison_count);
-    DecisionBaselineScoreV1 {
+    DecisionBaselineScoreV2 {
         baseline_id: baseline.baseline_id.clone(),
         method: baseline.method,
         task_family_id: baseline.task_family_id.clone(),
@@ -620,14 +756,13 @@ fn baseline_score(
 /// Correctness calibration and baseline comparison use asserted answers only, while threshold
 /// coverage divides by all decisions. Baselines must be frozen from a separately verified corpus.
 pub fn evaluate_decision_cohort(
-    frozen: &FrozenDecisionCohortV1,
+    frozen: &FrozenDecisionCohortV2,
     outcomes: &[DecisionOutcomeV1],
     assumptions: &[WeakAssumptionObservation],
     revisions: &[ConfidenceRevisionObservation],
-    baselines: &[ForecastBaselineV1],
-) -> Result<DecisionCohortReportV1, DecisionCohortError> {
+) -> Result<DecisionCohortReportV2, DecisionCohortError> {
     validate_forecasts(&frozen.forecasts, frozen.calibration_bins, &frozen.selective_thresholds)?;
-    let forecast_by_id: BTreeMap<&str, &DecisionForecastV1> = frozen
+    let forecast_by_id: BTreeMap<&str, &DecisionForecastV2> = frozen
         .forecasts
         .iter()
         .map(|f| (f.forecast_id.as_str(), f))
@@ -667,7 +802,7 @@ pub fn evaluate_decision_cohort(
             missing.map(|f| f.forecast_id.as_str()).unwrap_or("unknown forecast")
         )));
     }
-    let rows: Vec<(&DecisionForecastV1, &DecisionOutcomeV1)> = frozen.forecasts.iter().map(|f| {
+    let rows: Vec<(&DecisionForecastV2, &DecisionOutcomeV1)> = frozen.forecasts.iter().map(|f| {
         let o = outcome_by_id
             .get(f.forecast_id.as_str())
             .copied()
@@ -676,90 +811,28 @@ pub fn evaluate_decision_cohort(
     }).collect::<Result<_, DecisionCohortError>>()?;
     let mut family_rows: BTreeMap<
         String,
-        Vec<(&DecisionForecastV1, &DecisionOutcomeV1)>,
+        Vec<(&DecisionForecastV2, &DecisionOutcomeV1)>,
     > = BTreeMap::new();
     for (f, o) in &rows {
         family_rows.entry(f.task_family_id.clone()).or_default().push((*f, *o));
     }
 
-    let mut baseline_index: BTreeMap<
-        (String, ForecastBaselineMethod),
-        &ForecastBaselineV1,
-    > = BTreeMap::new();
-    let mut baseline_ids = HashSet::new();
-    let first = &frozen.forecasts[0];
-    for b in baselines {
-        if b.schema_version != FORECAST_BASELINE_SCHEMA_VERSION {
-            return Err(DecisionCohortError::new(format!(
-                "unsupported baseline schema version {}",
-                b.schema_version
-            )));
-        }
-        for (name, value) in [
-            ("baseline_id", b.baseline_id.as_str()),
-            ("task_family_id", b.task_family_id.as_str()),
-            ("task_taxonomy_id", b.task_taxonomy_id.as_str()),
-            ("outcome_profile_id", b.outcome_profile_id.as_str()),
-            ("training_split_id", b.training_split_id.as_str()),
-            ("training_corpus_manifest_ref", b.training_corpus_manifest_ref.as_str()),
-        ] { require_nonempty(name, value)?; }
-        if b.training_sample_count == 0 {
-            return Err(DecisionCohortError::new(format!(
-                "baseline {} has no calibration samples",
-                b.baseline_id
-            )));
-        }
-        validate_probability("baseline probability", b.predicted_probability)?;
-        if b.training_split_id == frozen.evaluation_split_id
-            || b.training_corpus_manifest_ref == frozen.evaluation_corpus_manifest_ref
-        {
-            return Err(DecisionCohortError::new(format!(
-                "baseline {} reuses evaluation split or manifest",
-                b.baseline_id
-            )));
-        }
-        if b.task_taxonomy_id != first.task_taxonomy_id
-            || b.outcome_profile_id != first.outcome_profile_id
-        {
-            return Err(DecisionCohortError::new(format!(
-                "baseline {} has a mismatched taxonomy or outcome profile",
-                b.baseline_id
-            )));
-        }
-        if !family_rows.contains_key(&b.task_family_id) {
-            return Err(DecisionCohortError::new(format!(
-                "baseline {} belongs to an unknown evaluation family",
-                b.baseline_id
-            )));
-        }
-        if !baseline_ids.insert(b.baseline_id.as_str()) {
-            return Err(DecisionCohortError::new(format!(
-                "duplicate baseline id {}",
-                b.baseline_id
-            )));
-        }
-        if baseline_index.insert((b.task_family_id.clone(), b.method), b).is_some() {
-            return Err(DecisionCohortError::new(format!(
-                "duplicate baseline method {:?} for {}",
-                b.method,
-                b.task_family_id
-            )));
-        }
-    }
-    for family in family_rows.keys() {
-        for method in [
-            ForecastBaselineMethod::ConstantBaseRate,
-            ForecastBaselineMethod::RecentEmpiricalAccuracy,
-        ] {
-            if !baseline_index.contains_key(&(family.clone(), method)) {
-                return Err(DecisionCohortError::new(format!(
-                    "missing baseline {:?} for family {}",
-                    method,
-                    family
-                )));
-            }
-        }
-    }
+    validate_frozen_baselines(
+        &frozen.baselines,
+        &frozen.forecasts,
+        &frozen.evaluation_split_id,
+        &frozen.evaluation_corpus_manifest_ref,
+    )?;
+    let baseline_index: BTreeMap<(String, ForecastBaselineMethod), &ForecastBaselineV1> = frozen
+        .baselines
+        .iter()
+        .map(|baseline| {
+            (
+                (baseline.task_family_id.clone(), baseline.method),
+                baseline,
+            )
+        })
+        .collect();
 
     let scored = score_predictions(&rows);
     let pooled_metrics = evaluate_metacognition(
@@ -844,7 +917,7 @@ pub fn evaluate_decision_cohort(
                 familywise_baseline_comparisons,
             ));
         }
-        family_reports.push(DecisionCohortFamilyReportV1 {
+        family_reports.push(DecisionCohortFamilyReportV2 {
             task_family_id: family,
             total_decisions: frows.len(),
             asserted_decisions: asserted,
@@ -854,7 +927,7 @@ pub fn evaluate_decision_cohort(
             correctness_metrics: metrics,
             selective_risk,
             counterfactual_adjudications: cf_n,
-            counterfactual_answerable_rate: cf_rate,
+            counterfactual_answer_correct_rate: cf_rate,
             baselines: family_baselines,
         });
     }
@@ -862,7 +935,7 @@ pub fn evaluate_decision_cohort(
     let asserted = rows.iter().filter(|(f, _)| f.asserted).count();
     let cf_n = total_cf_adjudications;
     let cf_rate = (cf_n > 0).then(|| total_cf_correct as f64 / cf_n as f64);
-    Ok(DecisionCohortReportV1 {
+    Ok(DecisionCohortReportV2 {
         schema_version: DECISION_COHORT_REPORT_SCHEMA_VERSION,
         evaluator_version: DECISION_COHORT_EVALUATOR_VERSION.into(),
         outcome_profile_id: first.outcome_profile_id.clone(),
@@ -879,7 +952,7 @@ pub fn evaluate_decision_cohort(
         correctness_metrics: pooled_metrics,
         selective_risk: pooled_risk,
         counterfactual_adjudications: cf_n,
-        counterfactual_answerable_rate: cf_rate,
+        counterfactual_answer_correct_rate: cf_rate,
         family_reports,
         binding: DecisionCohortBindingV1 {
             schema_version: 1,
@@ -908,8 +981,8 @@ mod tests {
         probability: f64,
         asserted: bool,
         cf: Option<&str>,
-    ) -> DecisionForecastV1 {
-        DecisionForecastV1 {
+    ) -> DecisionForecastV2 {
+        DecisionForecastV2 {
             schema_version: DECISION_FORECAST_SCHEMA_VERSION,
             forecast_id: id.into(),
             episode_id: episode.into(),
@@ -919,7 +992,7 @@ mod tests {
             subject_id: "subject-sha:test".into(),
             model_profile_id: "profile-sha:test".into(),
             input_snapshot_ref: format!("input:{episode}"),
-            predicted_probability: probability,
+            predicted_probability: (asserted || cf.is_some()).then_some(probability),
             asserted,
             answer_ref: asserted.then(|| format!("answer:{episode}")),
             counterfactual_answer_ref: cf.map(str::to_owned),
@@ -927,7 +1000,7 @@ mod tests {
     }
 
     fn outcome(
-        f: &DecisionForecastV1,
+        f: &DecisionForecastV2,
         correct: Option<bool>,
         cf_correct: Option<bool>,
     ) -> DecisionOutcomeV1 {
@@ -965,6 +1038,23 @@ mod tests {
         }
     }
 
+    fn family_baselines(family: &str) -> Vec<ForecastBaselineV1> {
+        vec![
+            baseline(
+                &format!("{family}-constant"),
+                ForecastBaselineMethod::ConstantBaseRate,
+                family,
+                0.6,
+            ),
+            baseline(
+                &format!("{family}-recent"),
+                ForecastBaselineMethod::RecentEmpiricalAccuracy,
+                family,
+                0.5,
+            ),
+        ]
+    }
+
     #[test]
     fn mixed_decision_cohort_separates_calibration_coverage_and_counterfactual_cost() {
         let fs = vec![
@@ -972,26 +1062,27 @@ mod tests {
             forecast("f2", "e2", "reasoning", 0.9, false, Some("hidden-answer:e2")),
             forecast("f3", "e3", "retrieval", 0.7, false, None),
         ];
-        let frozen = freeze_decision_cohort_for_split(
-            fs.clone(),
-            5,
-            vec![0.9, 0.5],
-            "holdout-v1".into(),
-            "holdout-manifest-v1".into(),
-        )
-            .unwrap_or_else(|e| panic!("freeze: {e}"));
-        let outcomes = vec![
-            outcome(&fs[0], Some(true), None),
-            outcome(&fs[1], None, Some(true)),
-            outcome(&fs[2], None, None),
-        ];
         let baselines = vec![
             baseline("r-base", ForecastBaselineMethod::ConstantBaseRate, "reasoning", 0.6),
             baseline("r-recent", ForecastBaselineMethod::RecentEmpiricalAccuracy, "reasoning", 0.5),
             baseline("q-base", ForecastBaselineMethod::ConstantBaseRate, "retrieval", 0.4),
             baseline("q-recent", ForecastBaselineMethod::RecentEmpiricalAccuracy, "retrieval", 0.3),
         ];
-        let report = evaluate_decision_cohort(&frozen, &outcomes, &[], &[], &baselines)
+        let frozen = freeze_decision_cohort_for_split(
+            fs.clone(),
+            baselines,
+            5,
+            vec![0.9, 0.5],
+            "holdout-v1".into(),
+            "holdout-manifest-v1".into(),
+        )
+        .unwrap_or_else(|e| panic!("freeze: {e}"));
+        let outcomes = vec![
+            outcome(&fs[0], Some(true), None),
+            outcome(&fs[1], None, Some(true)),
+            outcome(&fs[2], None, None),
+        ];
+        let report = evaluate_decision_cohort(&frozen, &outcomes, &[], &[])
             .unwrap_or_else(|e| panic!("evaluate: {e}"));
         assert_eq!(report.total_decisions, 3);
         assert_eq!(report.asserted_decisions, 1);
@@ -1005,7 +1096,7 @@ mod tests {
         assert_eq!(report.selective_risk[0].threshold, 0.5);
         assert_eq!(report.selective_risk[0].coverage_all_decisions, 1.0 / 3.0);
         assert_eq!(report.counterfactual_adjudications, 1);
-        assert_eq!(report.counterfactual_answerable_rate, Some(1.0));
+        assert_eq!(report.counterfactual_answer_correct_rate, Some(1.0));
         assert_eq!(report.family_reports.len(), 2);
         let reasoning = report
             .family_reports
@@ -1031,7 +1122,7 @@ mod tests {
         assert_eq!(retrieval.baselines.len(), 2);
         assert_eq!(retrieval.baselines[0].candidate_scored_assertions, 0);
         assert_eq!(retrieval.baselines[0].baseline_brier_score, None);
-        assert_eq!(retrieval.counterfactual_answerable_rate, None);
+        assert_eq!(retrieval.counterfactual_answer_correct_rate, None);
     }
 
     #[test]
@@ -1041,13 +1132,14 @@ mod tests {
         o.asserted_answer_correct = Some(true);
         let frozen = freeze_decision_cohort_for_split(
             vec![f],
+            family_baselines("reasoning"),
             5,
             vec![0.5],
             "holdout".into(),
             "manifest".into(),
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
-        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[]).is_err());
     }
 
     #[test]
@@ -1056,13 +1148,14 @@ mod tests {
         let o = outcome(&f, None, None);
         let frozen = freeze_decision_cohort_for_split(
             vec![f],
+            family_baselines("reasoning"),
             5,
             vec![0.5],
             "holdout".into(),
             "manifest".into(),
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
-        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[]).is_err());
     }
 
     #[test]
@@ -1073,13 +1166,29 @@ mod tests {
         // Deliberately omit counterfactual_evidence_ref.
         let frozen = freeze_decision_cohort_for_split(
             vec![f],
+            family_baselines("reasoning"),
             5,
             vec![0.5],
             "holdout".into(),
             "manifest".into(),
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
-        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[]).is_err());
+    }
+
+    #[test]
+    fn abstention_without_candidate_answer_must_not_claim_correctness_probability() {
+        let mut f = forecast("f1", "e1", "reasoning", 0.5, false, None);
+        f.predicted_probability = Some(0.5);
+        assert!(freeze_decision_cohort_for_split(
+            vec![f],
+            family_baselines("reasoning"),
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
+        .is_err());
     }
 
     #[test]
@@ -1087,6 +1196,7 @@ mod tests {
         let f = forecast("f1", "e1", "reasoning", 0.5, true, None);
         let frozen = freeze_decision_cohort_for_split(
             vec![f],
+            family_baselines("reasoning"),
             5,
             vec![0.5],
             "holdout".into(),
@@ -1097,6 +1207,6 @@ mod tests {
         let mut tampered: serde_json::Value = serde_json::from_str(&encoded)
             .unwrap_or_else(|e| panic!("parse: {e}"));
         tampered["calibration_bins"] = serde_json::json!(0);
-        assert!(serde_json::from_value::<FrozenDecisionCohortV1>(tampered).is_err());
+        assert!(serde_json::from_value::<FrozenDecisionCohortV2>(tampered).is_err());
     }
 }
