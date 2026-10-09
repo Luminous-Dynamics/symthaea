@@ -393,7 +393,9 @@ impl SqliteWitnessStore {
                 .checked_add(1)
                 .ok_or(WitnessError::GenerationOverflow)?;
             if current.generation == next_generation
-                && current.previous_record_digest == Some(expected_digest)
+                && current.previous_record_digest
+                    == (expected_generation > 0).then_some(expected_digest)
+                && initial_policy.map_or(true, |policy| current.policy_version == policy)
                 && current.anchor_digest == proposed_anchor_digest
                 && current.receipt_sequence == receipt_sequence
                 && current.receipt_digest == receipt_digest
@@ -1147,6 +1149,17 @@ mod tests {
         let anchor = MemoryAnchor::default();
         let store = db.open();
         let first = initialize(&store, &anchor, "log-a");
+        let repeated_initialization = store
+            .initialize(
+                "log-a",
+                "policy-v1",
+                h(b"genesis-checkpoint"),
+                0,
+                None,
+                &anchor,
+            )
+            .expect("identical initialization is idempotent");
+        assert_eq!(repeated_initialization, first);
         let next = store
             .advance(
                 "log-a",

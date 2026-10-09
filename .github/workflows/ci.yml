@@ -1773,3 +1773,5 @@ jobs:
           cargo run --locked --manifest-path "$manifest" --bin civ_monotonic_checkpoint_acceptance_smoke
           cargo run --locked --manifest-path "$manifest" --bin civ_independent_receipt_tail_anchor_smoke
           cargo run --locked --manifest-path "$manifest" --bin civ_durable_witness_recovery_smoke
+          cargo fmt --package symthaea-civ-witness -- --check
+          cargo test --locked --package symthaea-civ-witness --lib

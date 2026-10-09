@@ -4,14 +4,18 @@ on:
   push:
     paths:
       - 'Cargo.toml'
+      - 'Cargo.lock'
       - 'crates/domains/symthaea-lab/**'
+      - 'crates/domains/symthaea-civ-witness/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/civ-governance-smokes.yml'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'Cargo.toml'
+      - 'Cargo.lock'
       - 'crates/domains/symthaea-lab/**'
+      - 'crates/domains/symthaea-civ-witness/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/civ-governance-smokes.yml'
   workflow_dispatch:
@@ -36,6 +40,12 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
+
+      - name: Format durable SQLite witness crate
+        run: cargo fmt --package symthaea-civ-witness -- --check
+
+      - name: Test durable SQLite witness crate
+        run: cargo test --locked --package symthaea-civ-witness --lib
 
       # symthaea-lab is explicitly excluded from the workspace, so root-level
       # cargo fmt/test does not qualify these binaries. Format the exact smoke
