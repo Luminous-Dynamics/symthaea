@@ -1085,13 +1085,13 @@ impl SqliteWitnessStore {
         // explicit read transaction, a concurrent writer could commit between
         // these statements and make a healthy store look internally inconsistent.
         let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
-        let result = Self::integrity_check_from_connection(&tx)?;
+        let result = Self::integrity_check_from_transaction(&tx)?;
         tx.commit()?;
         Ok(result)
     }
 
-    fn integrity_check_from_connection(conn: &Connection) -> Result<String, WitnessError> {
-        let result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    fn integrity_check_from_transaction(tx: &Transaction<'_>) -> Result<String, WitnessError> {
+        let result: String = tx.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
         if result != "ok" {
             return Err(WitnessError::CorruptStore("SQLite integrity_check failed"));
         }
@@ -1102,7 +1102,7 @@ impl SqliteWitnessStore {
             return Err(WitnessError::CorruptStore("SQLite foreign_key_check failed"));
         }
 
-        let mut statement = conn.prepare(
+        let mut statement = tx.prepare(
             "SELECT log_id FROM witness_meta
              UNION SELECT log_id FROM witness_records
              UNION SELECT log_id FROM witness_fork_evidence
@@ -1114,7 +1114,7 @@ impl SqliteWitnessStore {
             .collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         for log_id in log_ids {
-            Self::load_history_from_connection(conn, &log_id)?;
+            Self::load_history_from_connection(tx, &log_id)?;
         }
         Ok(result)
     }
@@ -2850,7 +2850,7 @@ mod tests {
         assert_eq!(second.generation, 2);
 
         assert_eq!(
-            Self::integrity_check_from_connection(&tx).expect("validate stable read snapshot"),
+            Self::integrity_check_from_transaction(&tx).expect("validate stable read snapshot"),
             "ok"
         );
         let rows_in_snapshot: i64 = tx
