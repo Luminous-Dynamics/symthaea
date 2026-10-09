@@ -26,7 +26,7 @@ The unprivileged `.github/workflows/security-audit-verifier-tests.yml` workflow 
 
 A verifier exception can otherwise leave a previous green commit status visible, but unconditionally writing `failure` is also unsafe: another workflow with the same display name could trigger the receiver and poison the status. The verifier now only attempts an exception-path failure update when the authenticated-event fields identify the exact policy-pinned workflow ID, a `pull_request` run, and matching base/head repository IDs. Once the run has been authenticated through the API, failures in its result or evidence still publish a failure. An inability to reach GitHub is reported as incomplete; no software can guarantee a remote status update while the status API itself is unavailable.
 
-The Python test file currently contains 20 test methods. The corresponding hosted runs have not completed yet, so their result remains unverified.
+The Python test file currently contains 23 test methods. The corresponding hosted runs have not completed yet, so their result remains unverified.
 
 ## Enforcement verification snapshot (2026-10-09)
 
