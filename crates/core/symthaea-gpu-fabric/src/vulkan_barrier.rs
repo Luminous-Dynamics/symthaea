@@ -21,7 +21,7 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 8;
+const RECEIPT_VERSION: u16 = 9;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
@@ -810,6 +810,12 @@ impl VulkanBarrierWorkloadRuntime {
 
         let _resources = validate_initial_resources(graph, initial)?;
         let expected = simulate(graph, schedule, initial)?;
+        let completion_expected = expected_final_timeline_value(plan);
+        let submission_contract = MaterializedSubmissionContract::from_plan(
+            plan,
+            completion_expected,
+            self.queue_family_index,
+        );
         let mut buffers = BTreeMap::new();
         for (resource, value) in initial {
             let physical = rounded_storage_bytes(value.as_bytes().len() as u64);
@@ -914,7 +920,11 @@ impl VulkanBarrierWorkloadRuntime {
             qualification_stage(&format!("node_{}_dispatch_recorded", node.id));
         }
 
-        record_host_readback_barrier(&self.device, command_guard.command());
+        record_host_readback_barrier(
+            &self.device,
+            command_guard.command(),
+            &submission_contract,
+        );
         qualification_stage("host_readback_barrier_recorded");
 
         unsafe {
@@ -923,12 +933,13 @@ impl VulkanBarrierWorkloadRuntime {
                 .map_err(VulkanBarrierError::Vk)?;
         }
         qualification_stage("command_buffer_ended");
-        let completion_expected = expected_final_timeline_value(plan);
 
         let mut timeline_info = vk::SemaphoreTypeCreateInfo::default()
-            .semaphore_type(vk::SemaphoreType::TIMELINE)
-            .initial_value(0);
-        let semaphore_info = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_info);
+            .semaphore_type(submission_contract.semaphore_type)
+            .initial_value(submission_contract.timeline_initial_value);
+        let semaphore_info = vk::SemaphoreCreateInfo::default()
+            .flags(submission_contract.semaphore_create_flags)
+            .push_next(&mut timeline_info);
         let semaphore = unsafe {
             self.device
                 .create_semaphore(&semaphore_info, None)
@@ -939,13 +950,15 @@ impl VulkanBarrierWorkloadRuntime {
 
         let command_buffer_info = vk::CommandBufferSubmitInfo::default()
             .command_buffer(command_guard.command())
-            .device_mask(1);
+            .device_mask(submission_contract.command_buffer_device_mask);
         let signal_info = vk::SemaphoreSubmitInfo::default()
             .semaphore(semaphore)
-            .value(completion_expected)
-            .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
-            .device_index(0);
+            .value(submission_contract.signal_value)
+            .stage_mask(submission_contract.signal_stage_mask)
+            .device_index(submission_contract.semaphore_device_index);
         let submit = vk::SubmitInfo2::default()
+            .flags(submission_contract.submit_flags)
+            .wait_semaphore_infos(&[])
             .command_buffer_infos(std::slice::from_ref(&command_buffer_info))
             .signal_semaphore_infos(std::slice::from_ref(&signal_info));
 
@@ -958,11 +971,12 @@ impl VulkanBarrierWorkloadRuntime {
         semaphore_guard.mark_submitted();
 
         let wait_info = vk::SemaphoreWaitInfo::default()
+            .flags(submission_contract.semaphore_wait_flags)
             .semaphores(std::slice::from_ref(&semaphore))
-            .values(std::slice::from_ref(&completion_expected));
+            .values(std::slice::from_ref(&submission_contract.signal_value));
         unsafe {
             self.device
-                .wait_semaphores(&wait_info, VULKAN_TIMELINE_TIMEOUT_NS)
+                .wait_semaphores(&wait_info, submission_contract.timeout_ns)
                 .map_err(VulkanBarrierError::TimelineWait)?;
         }
         qualification_stage("timeline_wait_completed");
@@ -1007,11 +1021,7 @@ impl VulkanBarrierWorkloadRuntime {
             barrier_lowering_digest: materialized_barrier_batches_digest(
                 &materialized_barrier_batches,
             ),
-            completion_lowering_digest: completion_lowering_digest(
-                plan,
-                completion_expected,
-                self.queue_family_index,
-            ),
+            completion_lowering_digest: submission_contract.digest(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -1137,13 +1147,19 @@ fn simulate(
     Ok(state)
 }
 
-fn record_host_readback_barrier(device: &Device, command: vk::CommandBuffer) {
+fn record_host_readback_barrier(
+    device: &Device,
+    command: vk::CommandBuffer,
+    contract: &MaterializedSubmissionContract,
+) {
     let barrier = vk::MemoryBarrier2::default()
-        .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-        .src_access_mask(vk::AccessFlags2::SHADER_STORAGE_WRITE)
-        .dst_stage_mask(vk::PipelineStageFlags2::HOST)
-        .dst_access_mask(vk::AccessFlags2::HOST_READ);
-    let dependency = vk::DependencyInfo::default().memory_barriers(std::slice::from_ref(&barrier));
+        .src_stage_mask(contract.host_readback_src_stage_mask)
+        .src_access_mask(contract.host_readback_src_access_mask)
+        .dst_stage_mask(contract.host_readback_dst_stage_mask)
+        .dst_access_mask(contract.host_readback_dst_access_mask);
+    let dependency = vk::DependencyInfo::default()
+        .dependency_flags(vk::DependencyFlags::empty())
+        .memory_barriers(std::slice::from_ref(&barrier));
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
 }
 
@@ -1704,47 +1720,152 @@ fn expected_final_timeline_value(plan: &VulkanSyncPlan) -> u64 {
         .unwrap_or(0)
 }
 
+#[derive(Debug, Clone)]
+struct PlannedSubmissionRecord {
+    node_id: u32,
+    ordinal: u32,
+    queue_index: u32,
+    signal_value: u64,
+}
+
+struct MaterializedSubmissionContract {
+    queue_family_index: u32,
+    queue_index: u32,
+    semaphore_type: vk::SemaphoreType,
+    semaphore_create_flags: vk::SemaphoreCreateFlags,
+    timeline_initial_value: u64,
+    command_buffer_device_mask: u32,
+    submit_flags: vk::SubmitFlags,
+    signal_value: u64,
+    signal_stage_mask: vk::PipelineStageFlags2,
+    semaphore_device_index: u32,
+    semaphore_wait_flags: vk::SemaphoreWaitFlags,
+    timeout_ns: u64,
+    host_readback_src_stage_mask: vk::PipelineStageFlags2,
+    host_readback_src_access_mask: vk::AccessFlags2,
+    host_readback_dst_stage_mask: vk::PipelineStageFlags2,
+    host_readback_dst_access_mask: vk::AccessFlags2,
+    planned_submissions: Vec<PlannedSubmissionRecord>,
+}
+
+impl MaterializedSubmissionContract {
+    fn from_plan(
+        plan: &VulkanSyncPlan,
+        signal_value: u64,
+        queue_family_index: u32,
+    ) -> Self {
+        Self {
+            queue_family_index,
+            queue_index: 0,
+            semaphore_type: vk::SemaphoreType::TIMELINE,
+            semaphore_create_flags: vk::SemaphoreCreateFlags::empty(),
+            timeline_initial_value: 0,
+            command_buffer_device_mask: 1,
+            submit_flags: vk::SubmitFlags::empty(),
+            signal_value,
+            signal_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
+            semaphore_device_index: 0,
+            semaphore_wait_flags: vk::SemaphoreWaitFlags::empty(),
+            timeout_ns: VULKAN_TIMELINE_TIMEOUT_NS,
+            host_readback_src_stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
+            host_readback_src_access_mask: vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            host_readback_dst_stage_mask: vk::PipelineStageFlags2::HOST,
+            host_readback_dst_access_mask: vk::AccessFlags2::HOST_READ,
+            planned_submissions: plan
+                .submissions
+                .iter()
+                .map(|submission| PlannedSubmissionRecord {
+                    node_id: submission.node_id,
+                    ordinal: submission.ordinal,
+                    queue_index: submission.queue.get() as u32,
+                    signal_value: submission.signal.value,
+                })
+                .collect(),
+        }
+    }
+
+    fn digest(&self) -> String {
+        let mut fields = vec![
+            "contract_version=v1".to_owned(),
+            format!("queue_family_index={}", self.queue_family_index),
+            format!("queue_index={}", self.queue_index),
+            "semaphore_create_structure=VkSemaphoreCreateInfo".to_owned(),
+            format!("semaphore_create_flags={}", self.semaphore_create_flags.as_raw()),
+            "semaphore_create_pnext=VkSemaphoreTypeCreateInfo".to_owned(),
+            format!("semaphore_type_raw={}", self.semaphore_type.as_raw()),
+            "semaphore_type=timeline".to_owned(),
+            format!("timeline_initial_value={}", self.timeline_initial_value),
+            "host_readback_dependency_structure=VkDependencyInfo".to_owned(),
+            "host_readback_dependency_pnext=null".to_owned(),
+            "host_readback_dependency_flags=0".to_owned(),
+            "host_readback_memory_barrier_count=1".to_owned(),
+            "host_readback_buffer_memory_barrier_count=0".to_owned(),
+            "host_readback_image_memory_barrier_count=0".to_owned(),
+            "host_readback_barrier_structure=VkMemoryBarrier2".to_owned(),
+            "host_readback_barrier_pnext=null".to_owned(),
+            "host_readback_src_stage=compute_shader".to_owned(),
+            format!("host_readback_src_stage_mask={}", self.host_readback_src_stage_mask.as_raw()),
+            "host_readback_src_access=shader_storage_write".to_owned(),
+            format!("host_readback_src_access_mask={}", self.host_readback_src_access_mask.as_raw()),
+            "host_readback_dst_stage=host".to_owned(),
+            format!("host_readback_dst_stage_mask={}", self.host_readback_dst_stage_mask.as_raw()),
+            "host_readback_dst_access=host_read".to_owned(),
+            format!("host_readback_dst_access_mask={}", self.host_readback_dst_access_mask.as_raw()),
+            "host_readback_queue_family_indices=not_applicable".to_owned(),
+            "host_readback_offset=0".to_owned(),
+            "host_readback_size=0".to_owned(),
+            "submit_structure=VkSubmitInfo2".to_owned(),
+            "submit_pnext=null".to_owned(),
+            format!("submit_flags={}", self.submit_flags.as_raw()),
+            "wait_semaphore_count=0".to_owned(),
+            "command_buffer_count=1".to_owned(),
+            "signal_semaphore_count=1".to_owned(),
+            "command_buffer_structure=VkCommandBufferSubmitInfo".to_owned(),
+            "command_buffer_pnext=null".to_owned(),
+            format!("command_buffer_device_mask={}", self.command_buffer_device_mask),
+            "signal_structure=VkSemaphoreSubmitInfo".to_owned(),
+            "signal_pnext=null".to_owned(),
+            format!("signal_value={}", self.signal_value),
+            "signal_stage=all_commands".to_owned(),
+            format!("signal_stage_mask={}", self.signal_stage_mask.as_raw()),
+            format!("signal_device_index={}", self.semaphore_device_index),
+            "wait_structure=VkSemaphoreWaitInfo".to_owned(),
+            "wait_pnext=null".to_owned(),
+            format!("wait_flags={}", self.semaphore_wait_flags.as_raw()),
+            "wait_semaphore_count=1".to_owned(),
+            format!("wait_value={}", self.signal_value),
+            format!("timeout_ns={}", self.timeout_ns),
+            "counter_query=vkGetSemaphoreCounterValue".to_owned(),
+            format!("planned_submission_count={}", self.planned_submissions.len()),
+        ];
+        for submission in &self.planned_submissions {
+            fields.extend([
+                "planned_submission".to_owned(),
+                format!("node_id={}", submission.node_id),
+                format!("ordinal={}", submission.ordinal),
+                format!("queue_index={}", submission.queue_index),
+                format!("signal_value={}", submission.signal_value),
+            ]);
+        }
+
+        let mut digest = Sha256::new();
+        digest.update(b"symthaea.gpu-fabric.vulkan-materialized-submission.v1");
+        digest.update([0]);
+        for field in fields {
+            let bytes = field.as_bytes();
+            digest.update((bytes.len() as u64).to_le_bytes());
+            digest.update(bytes);
+        }
+        format!("{:x}", digest.finalize())
+    }
+}
+
 fn completion_lowering_digest(
     plan: &VulkanSyncPlan,
     completion_expected: u64,
     queue_family_index: u32,
 ) -> String {
-    let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v4\0");
-    h.update(b"semaphore-type:timeline\0");
-    h.update(b"initial-value:0\0");
-    h.update(b"recording-policy:single-primary-command-buffer\0");
-    h.update(b"submission-policy:single-vkQueueSubmit2-batch\0");
-    h.update(b"signal-policy:single-final-signal\0");
-    h.update(b"completion-policy:max-plan-signal-value\0");
-    h.update(b"submit-api:vkQueueSubmit2\0");
-    h.update(b"signal-api:VkSemaphoreSubmitInfo\0");
-    h.update(b"signal-scope:all-commands-after-host-readback-barrier\0");
-    h.update(&vk::PipelineStageFlags2::ALL_COMMANDS.as_raw().to_le_bytes());
-    h.update(b"host-readback-barrier:compute-shader-storage-write-to-host-read\0");
-    h.update(&vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw().to_le_bytes());
-    h.update(&vk::AccessFlags2::SHADER_STORAGE_WRITE.as_raw().to_le_bytes());
-    h.update(&vk::PipelineStageFlags2::HOST.as_raw().to_le_bytes());
-    h.update(&vk::AccessFlags2::HOST_READ.as_raw().to_le_bytes());
-    h.update(b"wait-api:vkWaitSemaphores\0");
-    h.update(b"counter-api:vkGetSemaphoreCounterValue\0");
-    h.update(&VULKAN_TIMELINE_TIMEOUT_NS.to_le_bytes());
-    h.update(&queue_family_index.to_le_bytes());
-    h.update(&0_u32.to_le_bytes()); // queue index within selected family
-    h.update(&0_u32.to_le_bytes()); // semaphore device index
-    h.update(&1_u32.to_le_bytes()); // command-buffer device mask
-    h.update(&completion_expected.to_le_bytes());
-    h.update(&(plan.submissions.len() as u32).to_le_bytes());
-    for submission in &plan.submissions {
-        h.update(&submission.node_id.to_le_bytes());
-        h.update(&submission.ordinal.to_le_bytes());
-        h.update(&submission.queue.get().to_le_bytes());
-        h.update(&submission.signal.value.to_le_bytes());
-    }
-    h.update(&1_u32.to_le_bytes()); // command-buffer count
-    h.update(&1_u32.to_le_bytes()); // queue-submit batch count
-    h.update(&1_u32.to_le_bytes()); // final signal count
-    h.finalize().to_hex().to_string()
+    MaterializedSubmissionContract::from_plan(plan, completion_expected, queue_family_index).digest()
 }
 
 fn barrier_lowering_digest(
