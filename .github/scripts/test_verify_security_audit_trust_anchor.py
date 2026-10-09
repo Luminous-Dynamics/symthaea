@@ -4,6 +4,7 @@ import io
 import json
 from pathlib import Path
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 import zipfile
 
@@ -97,13 +98,18 @@ class TrustAnchorPolicyTests(unittest.TestCase):
 
     def make_verdict(self, repo="Luminous-Dynamics/mycelix", run_id=123, attempt=2):
         policy = module.POLICY[repo]
-        is_platform = repo == "Luminous-Dynamics/luminous-platform"
         subject = "a" * 40
-        engine_sha = "b" * 40 if is_platform else module.ENGINE_SHA
-        return ({
+        engine_sha = "b" * 40 if repo == "Luminous-Dynamics/luminous-platform" else module.ENGINE_SHA
+        workflow_url = f"https://github.com/{repo}/actions/runs/{run_id}"
+        payload = {
             "schema": "luminous.security-audit.verdict.v1",
             "repository": repo, "subject_sha": subject,
             "audit_engine_sha": engine_sha,
+            "workflow_ref": f"{repo}/{policy['workflow_path']}@refs/pull/12/merge",
+            "workflow_sha": "c" * 40,
+            "workflow_run_url": workflow_url,
+            "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "aggregate_artifact_retention_days": 30,
             "run_id": str(run_id), "run_attempt": str(attempt),
             "workflow_job_result": "success",
             "rustsec_job_result": "success" if policy["audit_rust"] else "skipped",
@@ -117,7 +123,9 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             "status": "PASS", "failure_reasons": [],
             "non_blocking_findings_present": False, "non_blocking_finding_sources": [],
             "evidence_files": [{"path": "workflows/test.txt", "sha256": hashlib.sha256(b"evidence").hexdigest()}],
-        }, {"id": run_id, "run_attempt": attempt, "head_sha": subject})
+        }
+        run = {"id": run_id, "run_attempt": attempt, "head_sha": subject, "html_url": workflow_url}
+        return payload, run
 
     def test_verdict_accepts_only_exact_subject_and_required_lanes(self):
         payload, run = self.make_verdict()
@@ -141,6 +149,33 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         payload["audit_engine_sha"] = "c" * 40
         with self.assertRaises(module.VerificationError):
             module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run)
+
+    def test_verdict_freshness_rejects_stale_and_future_timestamps(self):
+        repo = "Luminous-Dynamics/mycelix"
+        policy = module.POLICY[repo]
+        payload, run = self.make_verdict(repo)
+        payload["generated_at_utc"] = (datetime.now(timezone.utc) - timedelta(days=8)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        with self.assertRaises(module.VerificationError):
+            module.validate_verdict(payload, repo, policy, run)
+        payload, run = self.make_verdict(repo)
+        payload["generated_at_utc"] = (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        with self.assertRaises(module.VerificationError):
+            module.validate_verdict(payload, repo, policy, run)
+
+    def test_verdict_rejects_wrong_workflow_ref_url_and_unknown_fields(self):
+        repo = "Luminous-Dynamics/mycelix"
+        policy = module.POLICY[repo]
+        for mutate in (
+            lambda x: x.update({"workflow_ref": "attacker/repo/.github/workflows/security-audit.yml@refs/pull/12/merge"}),
+            lambda x: x.update({"workflow_run_url": "https://example.invalid/fake-run"}),
+            lambda x: x.update({"unexpected": "ignored by consumer"}),
+            lambda x: x.update({"workflow_sha": "unknown"}),
+        ):
+            payload, run = self.make_verdict(repo)
+            mutate(payload)
+            with self.subTest(payload=payload):
+                with self.assertRaises(module.VerificationError):
+                    module.validate_verdict(payload, repo, policy, run)
 
     def test_pass_with_findings_is_distinct_and_consistent(self):
         payload, run = self.make_verdict()
@@ -206,6 +241,22 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         artifact = {"id": 77, "name": f"security-audit-mycelix-{run['head_sha']}-verdict",
                     "expired": True, "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
         with patch.object(module, "api", return_value={"artifacts": [artifact]}):
+            with self.assertRaises(module.VerificationError):
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
+
+    def test_duplicate_json_keys_are_rejected_even_when_artifact_digest_matches(self):
+        payload, run = self.make_verdict()
+        raw = json.dumps(payload).replace('"status": "PASS"', '"status": "FAIL", "status": "PASS"', 1)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("verdict.json", raw)
+            archive.writestr("workflows/test.txt", b"evidence")
+        archive_bytes = buffer.getvalue()
+        artifact = {"id": 77, "name": f"security-audit-mycelix-{run['head_sha']}-verdict",
+                    "expired": False, "digest": "sha256:" + hashlib.sha256(archive_bytes).hexdigest(),
+                    "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
+        with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
+             patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
                 module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token")
 
