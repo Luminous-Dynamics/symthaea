@@ -35,6 +35,7 @@ FIXTURES = {
             "out": "00000000",
         },
         "ops": [("mid", "lhs", "rhs"), ("out", "mid", "rhs")],
+        "barriers": [(1, 2, "mid", "read_after_write")],
     },
     "hazard": {
         "node_count": 3,
@@ -46,6 +47,11 @@ FIXTURES = {
             "mid": "00000000",
         },
         "ops": [("mid", "lhs", "rhs"), ("rhs", "mid", "lhs"), ("rhs", "lhs", "mid")],
+        "barriers": [
+            (1, 2, "mid", "read_after_write"),
+            (1, 2, "rhs", "write_after_read"),
+            (2, 3, "rhs", "write_after_write"),
+        ],
     },
 }
 
@@ -319,6 +325,69 @@ def verify_driver_provenance(values: dict[str, str]) -> tuple[str, bytes, int]:
     return expected, driver_uuid, driver_id
 
 
+def verify_materialized_barrier_lowering(values: dict[str, str], spec: dict, name: str) -> None:
+    """Reconstruct the concrete barrier-call contract independently from fixture edges."""
+    semantic_barriers = spec.get("barriers")
+    if semantic_barriers is None:
+        fail(f"{name}: independent semantic barrier fixture is missing")
+
+    by_target: dict[int, list[tuple[int, int, str, str]]] = {}
+    for source, target, resource, kind in semantic_barriers:
+        if kind not in {"read_after_write", "write_after_read", "write_after_write"}:
+            fail(f"{name}: unsupported expected barrier kind: {kind}")
+        if resource not in spec["initial"]:
+            fail(f"{name}: expected barrier references unknown resource {resource}")
+        by_target.setdefault(target, []).append((source, target, resource, kind))
+
+    parts = [f"batch_count:{sum(bool(by_target.get(node_id)) for node_id in range(1, spec['node_count'] + 1))}"]
+    for node_id in range(1, spec["node_count"] + 1):
+        barriers = by_target.get(node_id, [])
+        if not barriers:
+            continue
+        buffer_barrier_count = sum(kind != "write_after_read" for _, _, _, kind in barriers)
+        memory_barrier_count = len(barriers) - buffer_barrier_count
+        parts.extend([
+            "batch",
+            f"node_id={node_id}",
+            "dependency_flags=0",
+            f"memory_barrier_count={memory_barrier_count}",
+            f"buffer_barrier_count={buffer_barrier_count}",
+            "image_barrier_count=0",
+        ])
+        for ordinal, (source, target, resource, kind) in enumerate(barriers):
+            buffer_memory = kind != "write_after_read"
+            if kind == "read_after_write":
+                src_access, dst_access = "shader_storage_write", "shader_storage_read"
+            elif kind == "write_after_read":
+                src_access, dst_access = "empty", "empty"
+            else:
+                src_access, dst_access = "shader_storage_write", "shader_storage_write"
+            size = ((len(bytes.fromhex(spec["initial"][resource])) + 3) // 4) * 4 if buffer_memory else 0
+            parts.extend([
+                "barrier",
+                f"ordinal={ordinal}",
+                f"from={source}",
+                f"to={target}",
+                f"resource={resource}",
+                f"kind={kind}",
+                f"type={'buffer_memory' if buffer_memory else 'execution_memory'}",
+                "src_stage=compute_shader",
+                f"src_access={src_access}",
+                "dst_stage=compute_shader",
+                f"dst_access={dst_access}",
+                f"queue_family={'ignored' if buffer_memory else 'not_applicable'}",
+                "offset=0",
+                f"size={size}",
+            ])
+
+    expected = sha256_len_prefixed(
+        [part.encode("utf-8") for part in parts],
+        b"symthaea.gpu-fabric.vulkan-materialized-barriers.v1",
+    )
+    if values.get("barrier_lowering_digest") != expected:
+        fail(f"{name}: materialized Vulkan barrier digest mismatch")
+
+
 def verify_runtime(path: Path) -> None:
     blocks = parse_runtime(path)
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
@@ -346,12 +415,13 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "7":
+        if values.get("receipt_version") != "8":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
         if int(values.get("barrier_count", "-1")) != spec["barrier_count"]:
             fail(f"{name}: barrier count mismatch")
+        verify_materialized_barrier_lowering(values, spec, name)
         if int(values.get("completion_expected", "-1")) != spec["completion"]:
             fail(f"{name}: completion expected mismatch")
         if int(values.get("completion_observed", "-1")) != spec["completion"]:
