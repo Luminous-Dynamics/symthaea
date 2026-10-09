@@ -59,6 +59,11 @@ pub enum AssessmentFreshness {
     /// Strict comparison will not treat carried-forward assessments as fresh
     /// evidence of agreement.
     CarriedForward,
+    /// The evaluator did not produce an assessment for this requested subject.
+    ///
+    /// Preserve this as an explicit unavailable slot rather than silently
+    /// omitting the framework or manufacturing a neutral result.
+    Unavailable,
 }
 
 /// Provenance for an ethical-framework assessment.
@@ -69,11 +74,15 @@ pub enum AssessmentFreshness {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssessmentProvenance {
     /// Exact subject that the evaluator actually processed.
-    pub source_subject: AssessmentSubject,
+    ///
+    /// Must be present for Fresh and CarriedForward, and absent for Unavailable.
+    pub source_subject: Option<AssessmentSubject>,
     /// Build/revision identity of the evaluator implementation.
     pub evaluator_build_id: String,
     /// Cycle or monotonic evaluation sequence assigned by the producer.
-    pub evaluation_cycle: u64,
+    ///
+    /// Must be present for Fresh and CarriedForward, and absent for Unavailable.
+    pub evaluation_cycle: Option<u64>,
     /// Whether the result was computed on the subject or carried forward.
     pub freshness: AssessmentFreshness,
 }
@@ -208,17 +217,27 @@ fn compare_assessments_inner(
         // Never report agreement between different inputs or a subject other
         // than the caller's explicit target.
         ComparisonState::SubjectMismatch
-    } else if assessments
-        .iter()
-        .any(|assessment| assessment.provenance.source_subject != assessment.subject)
-    {
+    } else if assessments.iter().any(|assessment| {
+        match assessment.provenance.freshness {
+            AssessmentFreshness::Fresh | AssessmentFreshness::CarriedForward => {
+                assessment.provenance.source_subject.as_ref() != Some(&assessment.subject)
+            }
+            AssessmentFreshness::Unavailable => false,
+        }
+    }) {
         // Never let a cached result inherit the identity of the current input.
         ComparisonState::SourceSubjectMismatch
     } else if assessments
         .iter()
-        .any(|assessment| assessment.provenance.freshness != AssessmentFreshness::Fresh)
+        .any(|assessment| assessment.provenance.freshness == AssessmentFreshness::CarriedForward)
     {
         ComparisonState::StaleAssessment
+    } else if assessments
+        .iter()
+        .any(|assessment| assessment.provenance.freshness == AssessmentFreshness::Unavailable)
+    {
+        // One or more requested framework results are explicitly unavailable.
+        ComparisonState::Incomplete
     } else if counts.supports > 0 && counts.opposes > 0 {
         ComparisonState::Disagreement
     } else if counts.mixed > 0 || counts.conditional > 0 || counts.underdetermined > 0 {
@@ -267,8 +286,10 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
         if assessment.rationale.iter().all(|reason| reason.trim().is_empty()) {
             errors.push(format!("{prefix}: rationale must contain a non-empty explanation"));
         }
-        if assessment.premise_refs.is_empty() {
-            errors.push(format!("{prefix}: premise_refs must contain at least one premise/rule ID"));
+        if assessment.premise_refs.is_empty()
+            && assessment.provenance.freshness != AssessmentFreshness::Unavailable
+        {
+            errors.push(format!("{prefix}: premise_refs must contain at least one premise/rule ID for an evaluated result"));
         }
         for (ref_index, premise_ref) in assessment.premise_refs.iter().enumerate() {
             if premise_ref.trim().is_empty() {
@@ -282,13 +303,48 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
             ("subject.scenario_digest", assessment.subject.scenario_digest.as_str()),
             ("subject.candidate_action_ref", assessment.subject.candidate_action_ref.as_str()),
             ("subject.candidate_action_digest", assessment.subject.candidate_action_digest.as_str()),
-            ("provenance.source_subject.scenario_ref", assessment.provenance.source_subject.scenario_ref.as_str()),
-            ("provenance.source_subject.scenario_digest", assessment.provenance.source_subject.scenario_digest.as_str()),
-            ("provenance.source_subject.candidate_action_ref", assessment.provenance.source_subject.candidate_action_ref.as_str()),
-            ("provenance.source_subject.candidate_action_digest", assessment.provenance.source_subject.candidate_action_digest.as_str()),
         ] {
             if value.trim().is_empty() {
                 errors.push(format!("{prefix}: {field} must not be empty"));
+            }
+        }
+
+        match assessment.provenance.freshness {
+            AssessmentFreshness::Fresh | AssessmentFreshness::CarriedForward => {
+                let Some(source_subject) = assessment.provenance.source_subject.as_ref() else {
+                    errors.push(format!("{prefix}: provenance.source_subject is required for an evaluated result"));
+                    continue;
+                };
+                for (field, value) in [
+                    ("provenance.source_subject.scenario_ref", source_subject.scenario_ref.as_str()),
+                    ("provenance.source_subject.scenario_digest", source_subject.scenario_digest.as_str()),
+                    ("provenance.source_subject.candidate_action_ref", source_subject.candidate_action_ref.as_str()),
+                    ("provenance.source_subject.candidate_action_digest", source_subject.candidate_action_digest.as_str()),
+                ] {
+                    if value.trim().is_empty() {
+                        errors.push(format!("{prefix}: {field} must not be empty"));
+                    }
+                }
+                if assessment.provenance.evaluation_cycle.is_none() {
+                    errors.push(format!("{prefix}: provenance.evaluation_cycle is required for an evaluated result"));
+                }
+            }
+            AssessmentFreshness::Unavailable => {
+                if assessment.provenance.source_subject.is_some() {
+                    errors.push(format!("{prefix}: unavailable result must not claim a source_subject"));
+                }
+                if assessment.provenance.evaluation_cycle.is_some() {
+                    errors.push(format!("{prefix}: unavailable result must not claim an evaluation_cycle"));
+                }
+                if assessment.stance != FrameworkStance::Underdetermined {
+                    errors.push(format!("{prefix}: unavailable result must use Underdetermined stance"));
+                }
+                if !assessment.premise_refs.is_empty() {
+                    errors.push(format!("{prefix}: unavailable result must not claim used premise_refs"));
+                }
+                if !assessment.evidence_refs.is_empty() {
+                    errors.push(format!("{prefix}: unavailable result must not claim assessment evidence_refs"));
+                }
             }
         }
         if assessment.provenance.evaluator_build_id.trim().is_empty() {
@@ -344,14 +400,14 @@ mod tests {
                 candidate_action_digest: "fixture-digest:candidate-action-a".to_owned(),
             },
             provenance: AssessmentProvenance {
-                source_subject: AssessmentSubject {
+                source_subject: Some(AssessmentSubject {
                     scenario_ref: "scenario:case-001".to_owned(),
                     scenario_digest: "fixture-digest:scenario-case-001".to_owned(),
                     candidate_action_ref: "action:case-001:candidate-a".to_owned(),
                     candidate_action_digest: "fixture-digest:candidate-action-a".to_owned(),
-                },
+                }),
                 evaluator_build_id: "symthaea-test-build:abc123".to_owned(),
-                evaluation_cycle: 7,
+                evaluation_cycle: Some(7),
                 freshness: AssessmentFreshness::Fresh,
             },
             stance,
@@ -508,11 +564,40 @@ mod tests {
     #[test]
     fn source_subject_mismatch_cannot_be_relabelled_as_current() {
         let mut relabelled = assessment("care_ethics", FrameworkStance::SupportsAction);
-        relabelled.provenance.source_subject.scenario_digest =
+        relabelled.provenance.source_subject.as_mut().unwrap().scenario_digest =
             "fixture-digest:old-source-context".to_owned();
 
         let result = compare_assessments(&[relabelled]);
         assert_eq!(result.state, ComparisonState::SourceSubjectMismatch);
+    }
+
+    #[test]
+    fn unavailable_framework_is_incomplete_without_fake_premises() {
+        let mut unavailable = assessment("eight_harmonies", FrameworkStance::Underdetermined);
+        unavailable.provenance.source_subject = None;
+        unavailable.provenance.evaluation_cycle = None;
+        unavailable.provenance.freshness = AssessmentFreshness::Unavailable;
+        unavailable.premise_refs.clear();
+        unavailable.evidence_refs.clear();
+        unavailable.rationale = vec!["No fresh evaluation was produced on this cycle.".to_owned()];
+
+        let result = compare_assessments(&[
+            assessment("care_ethics", FrameworkStance::SupportsAction),
+            unavailable,
+        ]);
+        assert_eq!(result.state, ComparisonState::Incomplete);
+        assert_eq!(result.counts.underdetermined, 1);
+        assert!(result.validation_errors.is_empty());
+    }
+
+    #[test]
+    fn unavailable_framework_must_not_claim_a_source_or_cycle() {
+        let mut malformed = assessment("eight_harmonies", FrameworkStance::Underdetermined);
+        malformed.provenance.freshness = AssessmentFreshness::Unavailable;
+
+        let result = compare_assessments(&[malformed]);
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|e| e.contains("unavailable result must not claim a source_subject")));
     }
 
     #[test]
