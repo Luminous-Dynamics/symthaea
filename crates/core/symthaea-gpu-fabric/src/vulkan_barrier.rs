@@ -21,6 +21,9 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
+const GPU_FABRIC_DESCRIPTOR_TYPE: vk::DescriptorType = vk::DescriptorType::STORAGE_BUFFER;
+const GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS: vk::ShaderStageFlags = vk::ShaderStageFlags::COMPUTE;
+const GPU_FABRIC_PIPELINE_BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
 const RECEIPT_VERSION: u16 = 10;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
@@ -661,9 +664,9 @@ impl VulkanBarrierWorkloadRuntime {
         };
         qualification_stage("shader_module_created");
         let bindings = [
-            vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
-            vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
-            vk::DescriptorSetLayoutBinding::default().binding(2).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
+            vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(GPU_FABRIC_DESCRIPTOR_TYPE).descriptor_count(1).stage_flags(GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS),
+            vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(GPU_FABRIC_DESCRIPTOR_TYPE).descriptor_count(1).stage_flags(GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS),
+            vk::DescriptorSetLayoutBinding::default().binding(2).descriptor_type(GPU_FABRIC_DESCRIPTOR_TYPE).descriptor_count(1).stage_flags(GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS),
         ];
         let layout_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
         let descriptor_layout = match unsafe {
@@ -907,7 +910,11 @@ impl VulkanBarrierWorkloadRuntime {
                     reads[1].resource.clone(),
                     writes[0].resource.clone(),
                 ],
-                range,
+                [
+                    buffers[&reads[0].resource].storage_size,
+                    buffers[&reads[1].resource].storage_size,
+                    buffers[&writes[0].resource].storage_size,
+                ],
                 [groups, 1, 1],
             );
             let descriptor_buffers = [
@@ -1236,7 +1243,7 @@ impl MaterializedDispatchRecord {
         node_id: u32,
         schedule_ordinal: u32,
         resources: [ResourceId; 3],
-        range: u64,
+        ranges: [u64; 3],
         dispatch_groups: [u32; 3],
     ) -> Self {
         let descriptor_bindings = resources
@@ -1246,15 +1253,15 @@ impl MaterializedDispatchRecord {
                 binding: binding as u32,
                 resource,
                 offset: 0,
-                range,
-                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-                stage_flags: vk::ShaderStageFlags::COMPUTE,
+                range: ranges[binding],
+                descriptor_type: GPU_FABRIC_DESCRIPTOR_TYPE,
+                stage_flags: GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS,
             })
             .collect();
         Self {
             node_id,
             schedule_ordinal,
-            pipeline_bind_point: vk::PipelineBindPoint::COMPUTE,
+            pipeline_bind_point: GPU_FABRIC_PIPELINE_BIND_POINT,
             pipeline_layout_set_index: 0,
             descriptor_set_count: 1,
             dynamic_offset_count: 0,
@@ -1276,8 +1283,12 @@ fn materialized_dispatch_records_from_graph(
         if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 {
             return None;
         }
-        let range = *resource_storage_sizes.get(&writes[0].resource)?;
-        let groups = dispatch_group_count(range, u32::MAX)?.max(1);
+        let ranges = [
+            *resource_storage_sizes.get(&reads[0].resource)?,
+            *resource_storage_sizes.get(&reads[1].resource)?,
+            *resource_storage_sizes.get(&writes[0].resource)?,
+        ];
+        let groups = dispatch_group_count(ranges[2], u32::MAX)?.max(1);
         records.push(MaterializedDispatchRecord::new(
             node.id,
             scheduled.ordinal,
@@ -1286,7 +1297,7 @@ fn materialized_dispatch_records_from_graph(
                 reads[1].resource.clone(),
                 writes[0].resource.clone(),
             ],
-            range,
+            ranges,
             [groups, 1, 1],
         ));
     }
@@ -3525,6 +3536,7 @@ mod tests {
         println!("barrier_digest={}", receipt.barrier_digest);
         println!("barrier_lowering_digest={}", receipt.barrier_lowering_digest);
         println!("completion_lowering_digest={}", receipt.completion_lowering_digest);
+        println!("execution_lowering_digest={}", receipt.execution_lowering_digest);
         println!("node_count={}", receipt.node_count);
         println!("barrier_count={}", receipt.barrier_count);
         println!("resource_storage_sizes={:?}", receipt.resource_storage_sizes);
