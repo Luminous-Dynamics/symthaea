@@ -44,6 +44,19 @@ enum AttemptOutcome {
     ForkDetected,
 }
 
+impl AttemptOutcome {
+    fn id(self) -> &'static [u8] {
+        match self {
+            Self::TrustedAnchorInstalled => b"trusted-anchor-installed",
+            Self::AcceptedGrowth => b"accepted-growth",
+            Self::AcceptedRefresh => b"accepted-refresh",
+            Self::IdempotentReplay => b"idempotent-replay",
+            Self::Rejected => b"rejected",
+            Self::ForkDetected => b"fork-detected",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AcceptanceDecision {
     AcceptedGrowth,
@@ -137,7 +150,7 @@ impl CheckpointStore {
             None => encoded.push(0),
         }
         encoded.extend_from_slice(&candidate_checkpoint_id);
-        encoded.push(outcome as u8);
+        encode_field(&mut encoded, outcome.id());
         encode_field(&mut encoded, reason.as_bytes());
         let event_digest = Sha256::digest(encoded).into();
         self.events.push(AcceptanceEvent {
