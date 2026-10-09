@@ -71,6 +71,7 @@ enum FaultPoint {
     BeforeDurableWrite,
     AfterRecordSync,
     AfterCommitMarkerSync,
+    ExternalAnchorRace,
     AfterExternalAnchorAdvance,
 }
 
@@ -86,6 +87,7 @@ enum Failure {
     RollbackDetected,
     PendingExternalAnchor,
     ExternalAnchorGap,
+    ExternalAnchorCompareFailed,
     InjectedCrash(FaultPoint),
     InvalidForkEvidence,
 }
@@ -95,6 +97,35 @@ struct WitnessModel {
     witness_id: String,
     disk: DiskSnapshot,
     external: IndependentAnchor,
+}
+
+impl IndependentAnchor {
+    /// Model a single atomic compare-and-advance at the external trust anchor.
+    /// A real backend must supply an actual cross-process atomic primitive.
+    fn compare_and_advance(
+        &mut self,
+        expected_generation: u64,
+        expected_digest: Hash,
+        candidate: &Record,
+    ) -> Result<(), Failure> {
+        if self.log_id != candidate.log_id
+            || self.generation != expected_generation
+            || self.record_digest != expected_digest
+        {
+            return Err(Failure::ExternalAnchorCompareFailed);
+        }
+        let next_generation = expected_generation
+            .checked_add(1)
+            .ok_or(Failure::GenerationOverflow)?;
+        if candidate.generation != next_generation
+            || candidate.previous_record_digest != Some(expected_digest)
+        {
+            return Err(Failure::ExternalAnchorGap);
+        }
+        self.generation = candidate.generation;
+        self.record_digest = candidate.digest;
+        Ok(())
+    }
 }
 
 fn hash_bytes(bytes: &[u8]) -> Hash {
@@ -324,9 +355,13 @@ impl WitnessModel {
         {
             return Err(Failure::ExternalAnchorGap);
         }
-        self.external.generation = accepted.generation;
-        self.external.record_digest = accepted.digest;
-        Ok(())
+        let expected_generation = self.external.generation;
+        let expected_digest = self.external.record_digest;
+        self.external.compare_and_advance(
+            expected_generation,
+            expected_digest,
+            &accepted,
+        )
     }
 
     fn fixture_receipt(&self, record: &Record) -> WitnessReceipt {
@@ -403,9 +438,20 @@ impl WitnessModel {
         if fault == Some(FaultPoint::AfterCommitMarkerSync) {
             return Err(Failure::InjectedCrash(FaultPoint::AfterCommitMarkerSync));
         }
-        // Boundary 3: independent rollback anchor acknowledges the record.
-        self.external.generation = candidate.generation;
-        self.external.record_digest = candidate.digest;
+        if fault == Some(FaultPoint::ExternalAnchorRace) {
+            // A competing writer wins the external CAS after this local record
+            // is committed. Preserve that state and refuse to overwrite it.
+            self.external.generation = candidate.generation;
+            self.external.record_digest = hash_bytes(b"competing-anchor-transition");
+            return Err(Failure::ExternalAnchorCompareFailed);
+        }
+        // Boundary 3: the external store must atomically compare the exact
+        // previously retained generation/digest before it advances.
+        self.external.compare_and_advance(
+            current.generation,
+            current.digest,
+            &candidate,
+        )?;
         if fault == Some(FaultPoint::AfterExternalAnchorAdvance) {
             return Err(Failure::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance));
         }
@@ -441,6 +487,7 @@ fn main() {
         FaultPoint::BeforeDurableWrite,
         FaultPoint::AfterRecordSync,
         FaultPoint::AfterCommitMarkerSync,
+        FaultPoint::ExternalAnchorRace,
         FaultPoint::AfterExternalAnchorAdvance,
     ] {
         let mut witness = WitnessModel::bootstrap(
@@ -452,17 +499,22 @@ fn main() {
         )
         .expect("trusted bootstrap");
         let initial = witness.recover().expect("recover bootstrap");
-        assert!(matches!(
-            witness.advance(
-                initial.generation,
-                initial.digest,
-                proposed_anchor,
-                5,
-                proposed_tail,
-                Some(fault),
-            ),
-            Err(Failure::InjectedCrash(actual)) if actual == fault
-        ));
+        let outcome = witness.advance(
+            initial.generation,
+            initial.digest,
+            proposed_anchor,
+            5,
+            proposed_tail,
+            Some(fault),
+        );
+        if fault == FaultPoint::ExternalAnchorRace {
+            assert_eq!(outcome, Err(Failure::ExternalAnchorCompareFailed));
+        } else {
+            assert!(matches!(
+                outcome,
+                Err(Failure::InjectedCrash(actual)) if actual == fault
+            ));
+        }
 
         match fault {
             FaultPoint::BeforeDurableWrite | FaultPoint::AfterRecordSync => {
@@ -514,6 +566,13 @@ fn main() {
                     )
                     .expect("idempotent retry after confirmed commit");
                 assert_eq!(receipt.record_digest, recovered.digest);
+            }
+            FaultPoint::ExternalAnchorRace => {
+                assert_eq!(witness.recover(), Err(Failure::ExternalAnchorMismatch));
+                assert_ne!(
+                    witness.external.record_digest,
+                    witness.disk.records.last().expect("local candidate retained").digest
+                );
             }
         }
     }
