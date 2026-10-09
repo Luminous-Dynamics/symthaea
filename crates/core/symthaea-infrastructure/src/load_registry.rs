@@ -775,6 +775,17 @@ mod tests {
     }
 
     #[test]
+    fn registry_digest_matches_frozen_canonical_encoding_vector() {
+        // Freeze the output of the domain-separated, length-prefixed v1
+        // encoding. Update this vector only with an intentional digest-schema
+        // version change, not as a routine test refresh.
+        assert_eq!(
+            registry().registry_digest(),
+            "cf1307aae761807138f968dde5b55124702a4ef5470730ba0c447e3e43b1bf8f"
+        );
+    }
+
+    #[test]
     fn ledger_rejects_malformed_registry_digest() {
         let mut ledger = registry().allocate(&demands(), 1.0, 3.0).unwrap();
         ledger.registry_digest = "not-a-digest".into();
