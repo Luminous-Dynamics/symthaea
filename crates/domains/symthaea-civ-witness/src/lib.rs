@@ -1079,7 +1079,18 @@ impl SqliteWitnessStore {
     /// only when every log's records, fork chain, metadata head, and local fork-tail
     /// commitment validate. This does not validate the external anchor.
     pub fn integrity_check(&self) -> Result<String, WitnessError> {
-        let conn = self.open_connection()?;
+        let mut conn = self.open_connection()?;
+        // Keep SQLite's structural checks, foreign-key checks, log enumeration,
+        // and per-log semantic validation on one database snapshot. Without an
+        // explicit read transaction, a concurrent writer could commit between
+        // these statements and make a healthy store look internally inconsistent.
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let result = Self::integrity_check_from_connection(&tx)?;
+        tx.commit()?;
+        Ok(result)
+    }
+
+    fn integrity_check_from_connection(conn: &Connection) -> Result<String, WitnessError> {
         let result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
         if result != "ok" {
             return Err(WitnessError::CorruptStore("SQLite integrity_check failed"));
@@ -1103,7 +1114,7 @@ impl SqliteWitnessStore {
             .collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         for log_id in log_ids {
-            Self::load_history_from_connection(&conn, &log_id)?;
+            Self::load_history_from_connection(conn, &log_id)?;
         }
         Ok(result)
     }
@@ -2799,6 +2810,62 @@ mod tests {
             store.load_history("replayed-as-another-log"),
             Err(WitnessError::CorruptForkEvidence)
         ));
+    }
+
+    #[test]
+    fn integrity_check_uses_a_consistent_snapshot_during_concurrent_advance() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let log_id = "log-integrity-check-snapshot";
+        let first = initialize(&store, &anchor, log_id);
+
+        let mut reader = store.open_connection().expect("open integrity reader");
+        let tx = reader
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .expect("begin integrity snapshot");
+        let initial_generation: i64 = tx
+            .query_row(
+                "SELECT generation FROM witness_meta WHERE log_id=?1",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("establish integrity snapshot");
+        assert_eq!(initial_generation, 1);
+
+        // WAL allows a writer to commit while this reader retains its snapshot.
+        // The integrity helper must validate one coherent old state, then a fresh
+        // public check must validate the newly committed state.
+        let second = store
+            .advance(
+                log_id,
+                first.generation,
+                first.digest,
+                h(b"integrity-snapshot-checkpoint-two"),
+                1,
+                Some(h(b"integrity-snapshot-receipt-two")),
+                &anchor,
+            )
+            .expect("advance using independent writer connection");
+        assert_eq!(second.generation, 2);
+
+        assert_eq!(
+            Self::integrity_check_from_connection(&tx).expect("validate stable read snapshot"),
+            "ok"
+        );
+        let rows_in_snapshot: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM witness_records WHERE log_id=?1",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("read consistent record snapshot");
+        assert_eq!(rows_in_snapshot, 1, "snapshot must not mix in generation two");
+        tx.commit().expect("release integrity snapshot");
+        assert_eq!(
+            store.integrity_check().expect("validate latest database snapshot"),
+            "ok"
+        );
     }
 
     #[test]
