@@ -37,4 +37,4 @@ The module validates sequence ordering and digest syntax, but caller-supplied se
 
 The generic `symthaea-evidence-plane` remains responsible for declared-vs-measured mechanism-counter integrity. This crate owns only the domain-specific semantics for comparing frozen theory predictions and operational outcomes. It does not fork generic provenance, authorization, or evidence-ledger infrastructure.
 
-See [AI-OBS-011 issue #7255](https://github.com/Luminous-Dynamics/symthaea/issues/7255) and [protocol contract audit](https://github.com/Luminous-Dynamics/symthaea/blob/research/ai-obs-011-contract-audit-v1/docs/research/AI_OBS_011_THEORY_INDEXED_CONSCIOUSNESS_PROTOCOL_V1.md).
+See [AI-OBS-011 issue #7255](https://github.com/Luminous-Dynamics/symthaea/issues/7255) and [protocol contract audit](https://github.com/Luminous-Dynamics/symthaea/pull/7258).
