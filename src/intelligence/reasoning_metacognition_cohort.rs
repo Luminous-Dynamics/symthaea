@@ -306,7 +306,9 @@ fn validate_forecasts(
         return Err(DecisionCohortError::new("decision cohort must not be empty"));
     }
     if !(1..=100).contains(&bins) {
-        return Err(DecisionCohortError::new(format!("calibration bin count must be 1..=100, got {bins}")));
+        return Err(DecisionCohortError::new(format!(
+            "calibration bin count must be 1..=100, got {bins}"
+        )));
     }
     if thresholds.is_empty() {
         return Err(DecisionCohortError::new("at least one selective-risk threshold is required"));
@@ -318,7 +320,9 @@ fn validate_forecasts(
     for threshold in thresholds {
         validate_probability("selective threshold", *threshold)?;
         if previous_threshold.is_some_and(|previous| *threshold <= previous) {
-            return Err(DecisionCohortError::new("selective thresholds must be strictly increasing"));
+            return Err(DecisionCohortError::new(
+                "selective thresholds must be strictly increasing",
+            ));
         }
         previous_threshold = Some(*threshold);
     }
@@ -345,7 +349,10 @@ fn validate_forecasts(
         validate_optional_ref("counterfactual_answer_ref", f.counterfactual_answer_ref.as_deref())?;
         validate_probability("predicted_probability", f.predicted_probability)?;
         if !forecast_ids.insert(f.forecast_id.as_str()) {
-            return Err(DecisionCohortError::new(format!("duplicate forecast id {}", f.forecast_id)));
+            return Err(DecisionCohortError::new(format!(
+                "duplicate forecast id {}",
+                f.forecast_id
+            )));
         }
         if !episode_ids.insert(f.episode_id.as_str()) {
             return Err(DecisionCohortError::new(format!("duplicate episode id {}", f.episode_id)));
@@ -365,7 +372,11 @@ fn validate_forecasts(
         }
         for (field, expected, found) in [
             ("task_taxonomy_id", first.task_taxonomy_id.as_str(), f.task_taxonomy_id.as_str()),
-            ("outcome_profile_id", first.outcome_profile_id.as_str(), f.outcome_profile_id.as_str()),
+            (
+                "outcome_profile_id",
+                first.outcome_profile_id.as_str(),
+                f.outcome_profile_id.as_str(),
+            ),
             ("subject_id", first.subject_id.as_str(), f.subject_id.as_str()),
             ("model_profile_id", first.model_profile_id.as_str(), f.model_profile_id.as_str()),
         ] {
@@ -398,7 +409,10 @@ fn validate_outcome_for_forecast(
     ] {
         require_nonempty(name, value)?;
     }
-    if o.forecast_id != f.forecast_id || o.episode_id != f.episode_id || o.outcome_profile_id != f.outcome_profile_id {
+    if o.forecast_id != f.forecast_id
+        || o.episode_id != f.episode_id
+        || o.outcome_profile_id != f.outcome_profile_id
+    {
         return Err(DecisionCohortError::new(format!(
             "outcome binding mismatch for forecast {}",
             f.forecast_id
@@ -448,7 +462,10 @@ fn risk_point(
     total_decisions: usize,
     familywise_comparison_count: usize,
 ) -> DecisionSelectiveRiskPoint {
-    let selected: Vec<_> = rows.iter().filter(|(f, _)| f.asserted && f.predicted_probability >= threshold).collect();
+    let selected: Vec<_> = rows
+        .iter()
+        .filter(|(f, _)| f.asserted && f.predicted_probability >= threshold)
+        .collect();
     let n = selected.len();
     let errors = selected.iter().filter(|(_, o)| o.asserted_answer_correct == Some(false)).count();
     let risk = (n > 0).then(|| errors as f64 / n as f64);
@@ -463,7 +480,11 @@ fn risk_point(
         threshold,
         total_decisions,
         selected_assertions: n,
-        coverage_all_decisions: if total_decisions == 0 { 0.0 } else { n as f64 / total_decisions as f64 },
+        coverage_all_decisions: if total_decisions == 0 {
+            0.0
+        } else {
+            n as f64 / total_decisions as f64
+        },
         risk,
         risk_upper_bound_95: bound,
     }
@@ -489,7 +510,11 @@ fn score_predictions(
 fn counterfactual_rate(rows: &[(&DecisionForecastV1, &DecisionOutcomeV1)]) -> (usize, Option<f64>) {
     let observed: Vec<bool> = rows
         .iter()
-        .filter(|(f, o)| !f.asserted && f.counterfactual_answer_ref.is_some() && o.counterfactual_answer_correct.is_some())
+        .filter(|(f, o)| {
+            !f.asserted
+                && f.counterfactual_answer_ref.is_some()
+                && o.counterfactual_answer_correct.is_some()
+        })
         .filter_map(|(_, o)| o.counterfactual_answer_correct)
         .collect();
     let rate = (!observed.is_empty()).then(|| {
@@ -518,7 +543,10 @@ fn baseline_score(
     evaluation_manifest: &str,
     familywise_comparison_count: usize,
 ) -> DecisionBaselineScoreV1 {
-    let scored: Vec<_> = rows.iter().filter(|(f, o)| f.asserted && o.asserted_answer_correct.is_some()).collect();
+    let scored: Vec<_> = rows
+        .iter()
+        .filter(|(f, o)| f.asserted && o.asserted_answer_correct.is_some())
+        .collect();
     let n = scored.len();
     let (brier, log_loss, accuracy) = if n == 0 {
         (None, None, None)
@@ -530,17 +558,31 @@ fn baseline_score(
             let correct = outcome.asserted_answer_correct.unwrap_or(false);
             let target = if correct { 1.0 } else { 0.0 };
             brier_sum += (baseline.predicted_probability - target).powi(2);
-            let p_target = if correct { baseline.predicted_probability } else { 1.0 - baseline.predicted_probability };
+            let p_target = if correct {
+                baseline.predicted_probability
+            } else {
+                1.0 - baseline.predicted_probability
+            };
             loss_sum += -p_target.clamp(LOG_LOSS_EPSILON, 1.0 - LOG_LOSS_EPSILON).ln();
             correct_count += usize::from(correct);
         }
-        (Some(brier_sum / n as f64), Some(loss_sum / n as f64), Some(correct_count as f64 / n as f64))
+        (
+            Some(brier_sum / n as f64),
+            Some(loss_sum / n as f64),
+            Some(correct_count as f64 / n as f64),
+        )
     };
     let predictions = score_predictions(rows);
     let candidate_brier = if predictions.is_empty() {
         None
     } else {
-        Some(predictions.iter().map(|p| (p.confidence - if p.correct { 1.0 } else { 0.0 }).powi(2)).sum::<f64>() / predictions.len() as f64)
+        Some(
+            predictions
+                .iter()
+                .map(|p| (p.confidence - if p.correct { 1.0 } else { 0.0 }).powi(2))
+                .sum::<f64>()
+                / predictions.len() as f64,
+        )
     };
     let candidate_log_loss = if predictions.is_empty() {
         None
@@ -585,41 +627,73 @@ pub fn evaluate_decision_cohort(
     baselines: &[ForecastBaselineV1],
 ) -> Result<DecisionCohortReportV1, DecisionCohortError> {
     validate_forecasts(&frozen.forecasts, frozen.calibration_bins, &frozen.selective_thresholds)?;
-    let forecast_by_id: BTreeMap<&str, &DecisionForecastV1> = frozen.forecasts.iter().map(|f| (f.forecast_id.as_str(), f)).collect();
+    let forecast_by_id: BTreeMap<&str, &DecisionForecastV1> = frozen
+        .forecasts
+        .iter()
+        .map(|f| (f.forecast_id.as_str(), f))
+        .collect();
     let mut outcome_by_id: BTreeMap<&str, &DecisionOutcomeV1> = BTreeMap::new();
     let mut receipt_ids = HashSet::new();
     for o in outcomes {
-        let f = forecast_by_id.get(o.forecast_id.as_str()).ok_or_else(|| DecisionCohortError::new(format!("outcome references unknown forecast {}", o.forecast_id)))?;
+        let f = forecast_by_id
+            .get(o.forecast_id.as_str())
+            .ok_or_else(|| {
+                DecisionCohortError::new(format!(
+                    "outcome references unknown forecast {}",
+                    o.forecast_id
+                ))
+            })?;
         validate_outcome_for_forecast(f, o)?;
         if !receipt_ids.insert(o.outcome_receipt_id.as_str()) {
-            return Err(DecisionCohortError::new(format!("duplicate outcome receipt {}", o.outcome_receipt_id)));
+            return Err(DecisionCohortError::new(format!(
+                "duplicate outcome receipt {}",
+                o.outcome_receipt_id
+            )));
         }
         if outcome_by_id.insert(o.forecast_id.as_str(), o).is_some() {
-            return Err(DecisionCohortError::new(format!("duplicate outcome for forecast {}", o.forecast_id)));
+            return Err(DecisionCohortError::new(format!(
+                "duplicate outcome for forecast {}",
+                o.forecast_id
+            )));
         }
     }
     if outcome_by_id.len() != frozen.forecasts.len() {
-        let missing = frozen.forecasts.iter().find(|f| !outcome_by_id.contains_key(f.forecast_id.as_str()));
+        let missing = frozen
+            .forecasts
+            .iter()
+            .find(|f| !outcome_by_id.contains_key(f.forecast_id.as_str()));
         return Err(DecisionCohortError::new(format!(
             "outcome set must bind every forecast exactly once; missing {}",
             missing.map(|f| f.forecast_id.as_str()).unwrap_or("unknown forecast")
         )));
     }
     let rows: Vec<(&DecisionForecastV1, &DecisionOutcomeV1)> = frozen.forecasts.iter().map(|f| {
-        let o = outcome_by_id.get(f.forecast_id.as_str()).copied().ok_or_else(|| DecisionCohortError::new(format!("missing outcome {}", f.forecast_id)))?;
+        let o = outcome_by_id
+            .get(f.forecast_id.as_str())
+            .copied()
+            .ok_or_else(|| DecisionCohortError::new(format!("missing outcome {}", f.forecast_id)))?;
         Ok((f, o))
     }).collect::<Result<_, DecisionCohortError>>()?;
-    let mut family_rows: BTreeMap<String, Vec<(&DecisionForecastV1, &DecisionOutcomeV1)>> = BTreeMap::new();
+    let mut family_rows: BTreeMap<
+        String,
+        Vec<(&DecisionForecastV1, &DecisionOutcomeV1)>,
+    > = BTreeMap::new();
     for (f, o) in &rows {
         family_rows.entry(f.task_family_id.clone()).or_default().push((*f, *o));
     }
 
-    let mut baseline_index: BTreeMap<(String, ForecastBaselineMethod), &ForecastBaselineV1> = BTreeMap::new();
+    let mut baseline_index: BTreeMap<
+        (String, ForecastBaselineMethod),
+        &ForecastBaselineV1,
+    > = BTreeMap::new();
     let mut baseline_ids = HashSet::new();
     let first = &frozen.forecasts[0];
     for b in baselines {
         if b.schema_version != FORECAST_BASELINE_SCHEMA_VERSION {
-            return Err(DecisionCohortError::new(format!("unsupported baseline schema version {}", b.schema_version)));
+            return Err(DecisionCohortError::new(format!(
+                "unsupported baseline schema version {}",
+                b.schema_version
+            )));
         }
         for (name, value) in [
             ("baseline_id", b.baseline_id.as_str()),
@@ -630,37 +704,76 @@ pub fn evaluate_decision_cohort(
             ("training_corpus_manifest_ref", b.training_corpus_manifest_ref.as_str()),
         ] { require_nonempty(name, value)?; }
         if b.training_sample_count == 0 {
-            return Err(DecisionCohortError::new(format!("baseline {} has no calibration samples", b.baseline_id)));
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} has no calibration samples",
+                b.baseline_id
+            )));
         }
         validate_probability("baseline probability", b.predicted_probability)?;
-        if b.training_split_id == frozen.evaluation_split_id || b.training_corpus_manifest_ref == frozen.evaluation_corpus_manifest_ref {
-            return Err(DecisionCohortError::new(format!("baseline {} reuses evaluation split or manifest", b.baseline_id)));
+        if b.training_split_id == frozen.evaluation_split_id
+            || b.training_corpus_manifest_ref == frozen.evaluation_corpus_manifest_ref
+        {
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} reuses evaluation split or manifest",
+                b.baseline_id
+            )));
         }
-        if b.task_taxonomy_id != first.task_taxonomy_id || b.outcome_profile_id != first.outcome_profile_id {
-            return Err(DecisionCohortError::new(format!("baseline {} has a mismatched taxonomy or outcome profile", b.baseline_id)));
+        if b.task_taxonomy_id != first.task_taxonomy_id
+            || b.outcome_profile_id != first.outcome_profile_id
+        {
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} has a mismatched taxonomy or outcome profile",
+                b.baseline_id
+            )));
         }
         if !family_rows.contains_key(&b.task_family_id) {
-            return Err(DecisionCohortError::new(format!("baseline {} belongs to an unknown evaluation family", b.baseline_id)));
+            return Err(DecisionCohortError::new(format!(
+                "baseline {} belongs to an unknown evaluation family",
+                b.baseline_id
+            )));
         }
         if !baseline_ids.insert(b.baseline_id.as_str()) {
-            return Err(DecisionCohortError::new(format!("duplicate baseline id {}", b.baseline_id)));
+            return Err(DecisionCohortError::new(format!(
+                "duplicate baseline id {}",
+                b.baseline_id
+            )));
         }
         if baseline_index.insert((b.task_family_id.clone(), b.method), b).is_some() {
-            return Err(DecisionCohortError::new(format!("duplicate baseline method {:?} for {}", b.method, b.task_family_id)));
+            return Err(DecisionCohortError::new(format!(
+                "duplicate baseline method {:?} for {}",
+                b.method,
+                b.task_family_id
+            )));
         }
     }
     for family in family_rows.keys() {
-        for method in [ForecastBaselineMethod::ConstantBaseRate, ForecastBaselineMethod::RecentEmpiricalAccuracy] {
+        for method in [
+            ForecastBaselineMethod::ConstantBaseRate,
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+        ] {
             if !baseline_index.contains_key(&(family.clone(), method)) {
-                return Err(DecisionCohortError::new(format!("missing baseline {:?} for family {}", method, family)));
+                return Err(DecisionCohortError::new(format!(
+                    "missing baseline {:?} for family {}",
+                    method,
+                    family
+                )));
             }
         }
     }
 
     let scored = score_predictions(&rows);
-    let pooled_metrics = evaluate_metacognition(&scored, assumptions, revisions, frozen.calibration_bins, &frozen.selective_thresholds)
+    let pooled_metrics = evaluate_metacognition(
+        &scored,
+        assumptions,
+        revisions,
+        frozen.calibration_bins,
+        &frozen.selective_thresholds,
+    )
         .map_err(|e: MetacognitionEvaluationError| DecisionCohortError::new(e.to_string()))?;
-    let familywise_risk_comparisons = frozen.selective_thresholds.len().saturating_mul(family_rows.len().saturating_add(1));
+    let familywise_risk_comparisons = frozen
+        .selective_thresholds
+        .len()
+        .saturating_mul(family_rows.len().saturating_add(1));
     let familywise_baseline_comparisons = family_rows.len().saturating_mul(2);
     let pooled_risk: Vec<DecisionSelectiveRiskPoint> = frozen
         .selective_thresholds
@@ -673,21 +786,63 @@ pub fn evaluate_decision_cohort(
     let mut total_cf_correct = 0usize;
     for (family, frows) in family_rows {
         let family_predictions = score_predictions(&frows);
-        let family_episode_ids: HashSet<&str> = frows.iter().map(|(f, _)| f.episode_id.as_str()).collect();
-        let family_assumptions: Vec<_> = assumptions.iter().filter(|a| family_episode_ids.contains(a.episode_id.as_str())).cloned().collect();
-        let family_revisions: Vec<_> = revisions.iter().filter(|r| family_episode_ids.contains(r.before_episode_id.as_str()) && family_episode_ids.contains(r.after_episode_id.as_str())).cloned().collect();
-        let metrics = evaluate_metacognition(&family_predictions, &family_assumptions, &family_revisions, frozen.calibration_bins, &frozen.selective_thresholds)
+        let family_episode_ids: HashSet<&str> = frows
+            .iter()
+            .map(|(f, _)| f.episode_id.as_str())
+            .collect();
+        let family_assumptions: Vec<_> = assumptions
+            .iter()
+            .filter(|a| family_episode_ids.contains(a.episode_id.as_str()))
+            .cloned()
+            .collect();
+        let family_revisions: Vec<_> = revisions
+            .iter()
+            .filter(|r| {
+                family_episode_ids.contains(r.before_episode_id.as_str())
+                    && family_episode_ids.contains(r.after_episode_id.as_str())
+            })
+            .cloned()
+            .collect();
+        let metrics = evaluate_metacognition(
+            &family_predictions,
+            &family_assumptions,
+            &family_revisions,
+            frozen.calibration_bins,
+            &frozen.selective_thresholds,
+        )
             .map_err(|e| DecisionCohortError::new(e.to_string()))?;
         let asserted = frows.iter().filter(|(f, _)| f.asserted).count();
         let abstained = frows.len() - asserted;
         let (cf_n, cf_rate) = counterfactual_rate(&frows);
         total_cf_adjudications += cf_n;
-        total_cf_correct += frows.iter().filter(|(f, o)| !f.asserted && f.counterfactual_answer_ref.is_some() && o.counterfactual_answer_correct == Some(true)).count();
-        let selective_risk = frozen.selective_thresholds.iter().map(|t| risk_point(*t, &frows, frows.len(), familywise_risk_comparisons)).collect();
+        total_cf_correct += frows
+            .iter()
+            .filter(|(f, o)| {
+                !f.asserted
+                    && f.counterfactual_answer_ref.is_some()
+                    && o.counterfactual_answer_correct == Some(true)
+            })
+            .count();
+        let selective_risk = frozen
+            .selective_thresholds
+            .iter()
+            .map(|t| risk_point(*t, &frows, frows.len(), familywise_risk_comparisons))
+            .collect();
         let mut family_baselines = Vec::new();
-        for method in [ForecastBaselineMethod::ConstantBaseRate, ForecastBaselineMethod::RecentEmpiricalAccuracy] {
-            let baseline = baseline_index.get(&(family.clone(), method)).ok_or_else(|| DecisionCohortError::new(format!("missing baseline for {family}")))?;
-            family_baselines.push(baseline_score(baseline, &frows, &frozen.evaluation_split_id, &frozen.evaluation_corpus_manifest_ref, familywise_baseline_comparisons));
+        for method in [
+            ForecastBaselineMethod::ConstantBaseRate,
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+        ] {
+            let baseline = baseline_index
+                .get(&(family.clone(), method))
+                .ok_or_else(|| DecisionCohortError::new(format!("missing baseline for {family}")))?;
+            family_baselines.push(baseline_score(
+                baseline,
+                &frows,
+                &frozen.evaluation_split_id,
+                &frozen.evaluation_corpus_manifest_ref,
+                familywise_baseline_comparisons,
+            ));
         }
         family_reports.push(DecisionCohortFamilyReportV1 {
             task_family_id: family,
@@ -705,7 +860,8 @@ pub fn evaluate_decision_cohort(
     }
     let total = rows.len();
     let asserted = rows.iter().filter(|(f, _)| f.asserted).count();
-    let (cf_n, cf_rate) = (total_cf_adjudications, (total_cf_adjudications > 0).then(|| total_cf_correct as f64 / total_cf_adjudications as f64));
+    let cf_n = total_cf_adjudications;
+    let cf_rate = (cf_n > 0).then(|| total_cf_correct as f64 / cf_n as f64);
     Ok(DecisionCohortReportV1 {
         schema_version: DECISION_COHORT_REPORT_SCHEMA_VERSION,
         evaluator_version: DECISION_COHORT_EVALUATOR_VERSION.into(),
@@ -729,8 +885,14 @@ pub fn evaluate_decision_cohort(
             schema_version: 1,
             forecast_ids: rows.iter().map(|(f, _)| f.forecast_id.clone()).collect(),
             outcome_receipt_ids: rows.iter().map(|(_, o)| o.outcome_receipt_id.clone()).collect(),
-            outcome_evidence_refs: rows.iter().map(|(_, o)| o.outcome_evidence_ref.clone()).collect(),
-            counterfactual_evidence_refs: rows.iter().map(|(_, o)| o.counterfactual_evidence_ref.clone()).collect(),
+            outcome_evidence_refs: rows
+                .iter()
+                .map(|(_, o)| o.outcome_evidence_ref.clone())
+                .collect(),
+            counterfactual_evidence_refs: rows
+                .iter()
+                .map(|(_, o)| o.counterfactual_evidence_ref.clone())
+                .collect(),
         },
     })
 }
@@ -739,7 +901,14 @@ pub fn evaluate_decision_cohort(
 mod tests {
     use super::*;
 
-    fn forecast(id: &str, episode: &str, family: &str, probability: f64, asserted: bool, cf: Option<&str>) -> DecisionForecastV1 {
+    fn forecast(
+        id: &str,
+        episode: &str,
+        family: &str,
+        probability: f64,
+        asserted: bool,
+        cf: Option<&str>,
+    ) -> DecisionForecastV1 {
         DecisionForecastV1 {
             schema_version: DECISION_FORECAST_SCHEMA_VERSION,
             forecast_id: id.into(),
@@ -757,7 +926,11 @@ mod tests {
         }
     }
 
-    fn outcome(f: &DecisionForecastV1, correct: Option<bool>, cf_correct: Option<bool>) -> DecisionOutcomeV1 {
+    fn outcome(
+        f: &DecisionForecastV1,
+        correct: Option<bool>,
+        cf_correct: Option<bool>,
+    ) -> DecisionOutcomeV1 {
         DecisionOutcomeV1 {
             schema_version: DECISION_OUTCOME_SCHEMA_VERSION,
             forecast_id: f.forecast_id.clone(),
@@ -767,11 +940,17 @@ mod tests {
             outcome_evidence_ref: format!("outcome-evidence:{}", f.episode_id),
             asserted_answer_correct: correct,
             counterfactual_answer_correct: cf_correct,
-            counterfactual_evidence_ref: cf_correct.map(|_| format!("counterfactual-evidence:{}", f.episode_id)),
+            counterfactual_evidence_ref: cf_correct
+                .map(|_| format!("counterfactual-evidence:{}", f.episode_id)),
         }
     }
 
-    fn baseline(id: &str, method: ForecastBaselineMethod, family: &str, p: f64) -> ForecastBaselineV1 {
+    fn baseline(
+        id: &str,
+        method: ForecastBaselineMethod,
+        family: &str,
+        p: f64,
+    ) -> ForecastBaselineV1 {
         ForecastBaselineV1 {
             schema_version: FORECAST_BASELINE_SCHEMA_VERSION,
             baseline_id: id.into(),
@@ -793,7 +972,13 @@ mod tests {
             forecast("f2", "e2", "reasoning", 0.9, false, Some("hidden-answer:e2")),
             forecast("f3", "e3", "retrieval", 0.7, false, None),
         ];
-        let frozen = freeze_decision_cohort_for_split(fs.clone(), 5, vec![0.9, 0.5], "holdout-v1".into(), "holdout-manifest-v1".into())
+        let frozen = freeze_decision_cohort_for_split(
+            fs.clone(),
+            5,
+            vec![0.9, 0.5],
+            "holdout-v1".into(),
+            "holdout-manifest-v1".into(),
+        )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         let outcomes = vec![
             outcome(&fs[0], Some(true), None),
@@ -813,19 +998,33 @@ mod tests {
         assert_eq!(report.abstained_decisions, 2);
         assert_eq!(report.decision_coverage, 1.0 / 3.0);
         assert_eq!(report.correctness_metrics.predictions, 1);
-        assert!((report.correctness_metrics.brier_score.unwrap_or(f64::NAN) - 0.04).abs() < 1.0e-12);
+        assert!(
+            (report.correctness_metrics.brier_score.unwrap_or(f64::NAN) - 0.04).abs()
+                < 1.0e-12
+        );
         assert_eq!(report.selective_risk[0].threshold, 0.5);
         assert_eq!(report.selective_risk[0].coverage_all_decisions, 1.0 / 3.0);
         assert_eq!(report.counterfactual_adjudications, 1);
         assert_eq!(report.counterfactual_answerable_rate, Some(1.0));
         assert_eq!(report.family_reports.len(), 2);
-        let reasoning = report.family_reports.iter().find(|r| r.task_family_id == "reasoning").expect("reasoning family retained");
+        let reasoning = report
+            .family_reports
+            .iter()
+            .find(|r| r.task_family_id == "reasoning")
+            .expect("reasoning family retained");
         assert_eq!(reasoning.total_decisions, 2);
         assert_eq!(reasoning.scoreable_assertions, 1);
         assert_eq!(reasoning.baselines[0].candidate_scored_assertions, 1);
-        assert!((reasoning.baselines[0].baseline_brier_score.unwrap_or(f64::NAN) - 0.16).abs() < 1.0e-12);
+        assert!(
+            (reasoning.baselines[0].baseline_brier_score.unwrap_or(f64::NAN) - 0.16).abs()
+                < 1.0e-12
+        );
         assert_eq!(reasoning.baselines[0].evaluation_decisions, 2);
-        let retrieval = report.family_reports.iter().find(|r| r.task_family_id == "retrieval").expect("abstain-only family retained");
+        let retrieval = report
+            .family_reports
+            .iter()
+            .find(|r| r.task_family_id == "retrieval")
+            .expect("abstain-only family retained");
         assert_eq!(retrieval.total_decisions, 1);
         assert_eq!(retrieval.scoreable_assertions, 0);
         assert_eq!(retrieval.correctness_metrics.brier_score, None);
@@ -840,7 +1039,13 @@ mod tests {
         let f = forecast("f1", "e1", "reasoning", 0.5, false, None);
         let mut o = outcome(&f, None, None);
         o.asserted_answer_correct = Some(true);
-        let frozen = freeze_decision_cohort_for_split(vec![f], 5, vec![0.5], "holdout".into(), "manifest".into())
+        let frozen = freeze_decision_cohort_for_split(
+            vec![f],
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
     }
@@ -849,7 +1054,13 @@ mod tests {
     fn asserted_answer_requires_a_scored_outcome() {
         let f = forecast("f1", "e1", "reasoning", 0.5, true, None);
         let o = outcome(&f, None, None);
-        let frozen = freeze_decision_cohort_for_split(vec![f], 5, vec![0.5], "holdout".into(), "manifest".into())
+        let frozen = freeze_decision_cohort_for_split(
+            vec![f],
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
     }
@@ -860,7 +1071,13 @@ mod tests {
         let mut o = outcome(&f, None, None);
         o.counterfactual_answer_correct = Some(true);
         // Deliberately omit counterfactual_evidence_ref.
-        let frozen = freeze_decision_cohort_for_split(vec![f], 5, vec![0.5], "holdout".into(), "manifest".into())
+        let frozen = freeze_decision_cohort_for_split(
+            vec![f],
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
     }
@@ -868,10 +1085,17 @@ mod tests {
     #[test]
     fn frozen_cohort_deserialization_rejects_tampered_policy() {
         let f = forecast("f1", "e1", "reasoning", 0.5, true, None);
-        let frozen = freeze_decision_cohort_for_split(vec![f], 5, vec![0.5], "holdout".into(), "manifest".into())
+        let frozen = freeze_decision_cohort_for_split(
+            vec![f],
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         let encoded = serde_json::to_string(&frozen).unwrap_or_else(|e| panic!("serialize: {e}"));
-        let mut tampered: serde_json::Value = serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
+        let mut tampered: serde_json::Value = serde_json::from_str(&encoded)
+            .unwrap_or_else(|e| panic!("parse: {e}"));
         tampered["calibration_bins"] = serde_json::json!(0);
         assert!(serde_json::from_value::<FrozenDecisionCohortV1>(tampered).is_err());
     }
