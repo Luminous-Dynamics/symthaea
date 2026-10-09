@@ -302,6 +302,9 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         self.assertTrue(module.should_publish_pending_status("workflow_run", "in_progress", {"status": "in_progress"}))
         self.assertFalse(module.should_publish_pending_status("workflow_run", "in_progress", {"status": "completed"}))
         self.assertFalse(module.should_publish_pending_status("workflow_run", "completed", {"status": "completed"}))
+        self.assertFalse(module.should_publish_pending_status("workflow_run", "in_progress", {"status": "unexpected"}))
+        self.assertFalse(module.should_publish_pending_status("workflow_run", "in_progress", {}))
+        self.assertFalse(module.should_publish_pending_status("workflow_run", "in_progress", {"status": "in_progress", "conclusion": "success"}))
         self.assertFalse(module.should_publish_pending_status("workflow_dispatch", "requested", {"status": "queued"}))
 
     def event_meta(self, repo):
