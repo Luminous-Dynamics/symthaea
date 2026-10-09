@@ -1884,7 +1884,11 @@ impl WorkloadBuffer {
 
     fn read(&self, device: &Device, len: usize) -> Result<Vec<u8>, VulkanBarrierError> {
         if len as u64 > self.allocation_size { return Err(VulkanBarrierError::AllocationOverflow); }
-        let mapped = unsafe { device.map_memory(self.memory, 0, self.allocation_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        let map_offset = 0_u64;
+        let map_size = self.allocation_size;
+        let mapped = unsafe { device.map_memory(self.memory, map_offset, map_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        self.map_offset.set(map_offset);
+        self.map_size.set(map_size);
         if !self.coherent {
             let range_offset = 0_u64;
             let range_size = vk::WHOLE_SIZE;
