@@ -162,6 +162,43 @@ Build this as a research component next to the plural-ethics evaluator, not as a
 
 The engine must not use an opaque scalar such as “moral free energy” or a high HDC similarity as proof that a conclusion is ethically correct. Those may be research indicators or search aids, but the inference and its limits must be independently inspectable.
 
+
+## 5A. Critical architecture decision: extend the existing ethics engine
+
+The proposed Moral Derivation Engine must **not become a duplicate orchestrator** and must not displace the current ethics pipeline. It should be a research subcomponent called by the existing `EthicsEngine` only in read-only evaluation mode until its derivations are qualified.
+
+The repository already includes:
+
+- `src/cognitive_loop/ethics_engine.rs`: orchestrates the current multi-stage moral/value pipeline and returns a unified evaluation.
+- `src/cognitive_loop/moral.rs`: delegates input evaluation to that engine.
+- `src/hdc/moral_parser.rs`: a lightweight pattern/keyword-based parser. Its output is an interpretation with uncertainty, not authoritative ground truth about intent, consent, or causal facts.
+- `src/hdc/moral_algebra/`: HDC prototypes and explicit moral/deontological judgments that can provide baseline observations. A prototype similarity must not be treated as a formal proof.
+- `src/consciousness/unified_value_evaluator/`: Eight Harmonies-based evaluation, useful as an existing named normative/value profile.
+- `HarmoniesIntegrator`, `MoralTopology`, and the institutional-compliance checker: retain their existing roles; topology is diagnostic, and similarity-based compliance matches are signals rather than legal determinations.
+- `src/cognitive_loop/ethics_values_manager.rs`: contextual harmony weights and state ownership that must be considered before adding another adaptation or feedback loop.
+
+### Additive integration boundary
+
+Use the existing parser and engine context as a starting point, but separate four data types:
+
+1. `ObservedFact`: source, timestamp/version where applicable, confidence, and distinction between directly observed and inferred.
+2. `NormativePremise`: explicit value commitment, origin/rationale, scope, objections, and profile/version.
+3. `InferenceStep`: rule identifier, premises used, derived conclusion, and checker result.
+4. `ConditionalMoralConclusion`: the conclusion plus assumptions, empirical dependencies, unresolved uncertainty, and the conditions under which it would change.
+
+The derivation module should consume these typed records and return a proof/argument trace. It must not mutate the Eight Harmonies weights, reclassify its own outputs as facts, control the action gate, or automatically promote a conditional conclusion into an executable command.
+
+### Staged reuse
+
+- Preserve the existing `EthicsEngine` and current baseline results.
+- First implement a pure/read-only derivation API and a simple independent reference checker for a small, explicitly documented logic.
+- Use tiny deterministic worlds to verify valid derivations, necessary premises, countermodels, inconsistent premise sets, and underdetermined cases.
+- Invoke existing HDC moral evaluations as evidence or proposed interpretation only where justified; keep their scores distinct from logical proof status.
+- Share context and evidence records with MORAL-PLURALISM-001 so the two research tracks compare frameworks on the same scenario rather than maintain separate competing scenario models.
+- Add tests to existing ethics/derivation integration suites; do not introduce duplicate safety/action-authority layers.
+
+This first step improves the current engine by adding traceable conditional derivations around it—not by asserting that the current heuristics already derive morality from first principles.
+
 ## 6. Research program and falsifiable milestones
 
 ### Phase 0 — Literature and claim ledger
