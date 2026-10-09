@@ -174,6 +174,31 @@ impl LoadRegistry {
         ordered
     }
 
+    /// Verify a ledger against this exact registry, not just its self-reported
+    /// totals. Recomputes the canonical allocation from the recorded demand
+    /// inputs and rejects metadata changes or allocations that violate
+    /// priority ordering. This still does not authenticate the registry itself.
+    pub fn verify_ledger(&self, ledger: &LoadServiceLedger) -> bool {
+        if ledger.registry_version != self.version || !ledger.is_valid() {
+            return false;
+        }
+        let demands: Vec<LoadDemand> = ledger
+            .records
+            .iter()
+            .map(|record| LoadDemand {
+                load_id: record.load_id.clone(),
+                requested_power_kw: record.requested_power_kw,
+            })
+            .collect();
+        self.allocate(
+            &demands,
+            ledger.step_duration_hours,
+            ledger.available_energy_kwh,
+        )
+        .map(|expected| expected == *ledger)
+        .unwrap_or(false)
+    }
+
     /// Allocate a finite energy budget to a complete snapshot of load demands.
     ///
     /// Every registered load must appear exactly once, even if its requested
@@ -215,8 +240,9 @@ impl LoadRegistry {
             if !demand.requested_power_kw.is_finite() || demand.requested_power_kw < 0.0 {
                 return Err(LoadRegistryError::InvalidRequestedPower(demand.load_id.clone()));
             }
-            let entry = self.entries.iter().find(|entry| entry.load_id == demand.load_id)
-                .expect("membership was checked above");
+            let Some(entry) = self.entries.iter().find(|entry| entry.load_id == demand.load_id) else {
+                return Err(LoadRegistryError::UnknownDemandLoad(demand.load_id.clone()));
+            };
             if demand.requested_power_kw > entry.rated_power_kw {
                 return Err(LoadRegistryError::RequestedPowerExceedsRating(
                     demand.load_id.clone(),
@@ -242,9 +268,9 @@ impl LoadRegistry {
         let mut remaining_kwh = available_energy_kwh;
         let mut records = Vec::with_capacity(ordered.len());
         for entry in ordered {
-            let requested_power_kw = *demand_by_id
-                .get(&entry.load_id)
-                .expect("complete demand set checked above");
+            let Some(requested_power_kw) = demand_by_id.get(&entry.load_id).copied() else {
+                return Err(LoadRegistryError::MissingDemand(entry.load_id.clone()));
+            };
             let requested_kwh = requested_power_kw * step_duration_hours;
             if !requested_kwh.is_finite() {
                 return Err(LoadRegistryError::InvalidRequestedPower(entry.load_id.clone()));
@@ -263,6 +289,7 @@ impl LoadRegistry {
                 load_id: entry.load_id.clone(),
                 class: entry.class,
                 provenance: entry.provenance.clone(),
+                rated_power_kw: entry.rated_power_kw,
                 shed_priority: entry.shed_priority,
                 restore_priority: entry.restore_priority,
                 requested_power_kw,
@@ -308,6 +335,7 @@ pub struct LoadServiceRecord {
     pub load_id: String,
     pub class: LoadClass,
     pub provenance: ClassificationProvenance,
+    pub rated_power_kw: f64,
     pub shed_priority: u16,
     pub restore_priority: u16,
     pub requested_power_kw: f64,
@@ -374,6 +402,7 @@ impl LoadServiceLedger {
                 return false;
             }
             let values = [
+                record.rated_power_kw,
                 record.requested_power_kw,
                 record.requested_kwh,
                 record.served_kwh,
@@ -383,10 +412,13 @@ impl LoadServiceLedger {
             if values.iter().any(|value| !value.is_finite() || *value < 0.0) {
                 return false;
             }
-            if !close_enough(
-                record.requested_power_kw * self.step_duration_hours,
-                record.requested_kwh,
-            ) || !close_enough(
+            if record.rated_power_kw <= 0.0
+                || record.requested_power_kw > record.rated_power_kw
+                || !close_enough(
+                    record.requested_power_kw * self.step_duration_hours,
+                    record.requested_kwh,
+                )
+                || !close_enough(
                 record.requested_kwh,
                 record.served_kwh + record.intentional_shed_kwh + record.unserved_kwh,
             ) {
@@ -525,7 +557,9 @@ impl LoadRestorationGate {
 }
 
 fn valid_label(value: &str) -> bool {
-    !value.trim().is_empty() && !value.chars().any(char::is_control)
+    !value.trim().is_empty()
+        && value.trim() == value
+        && !value.chars().any(char::is_control)
 }
 
 fn tolerance(value: f64) -> f64 {
@@ -828,10 +862,22 @@ mod tests {
     }
 
     #[test]
-    fn ledger_validator_recomputes_and_rejects_forged_summary() {
-        let mut ledger = registry().allocate(&demands(), 1.0, 3.0).unwrap();
+    fn ledger_validator_recomputes_and_rejects_forged_summary_and_metadata() {
+        let reg = registry();
+        let mut ledger = reg.allocate(&demands(), 1.0, 3.0).unwrap();
         assert!(ledger.is_valid());
+        assert!(reg.verify_ledger(&ledger));
+
         ledger.total_served_kwh += 1.0;
         assert!(!ledger.is_valid());
+        assert!(!reg.verify_ledger(&ledger));
+
+        let mut relabeled = reg.allocate(&demands(), 1.0, 3.0).unwrap();
+        let record = relabeled.records.iter_mut()
+            .find(|record| record.load_id == "deferrable-comms")
+            .unwrap();
+        record.class = LoadClass::Auxiliary;
+        assert!(relabeled.is_valid(), "the internal ledger may still balance after a classification claim changes");
+        assert!(!reg.verify_ledger(&relabeled), "the exact registry must reject the changed classification");
     }
 }
