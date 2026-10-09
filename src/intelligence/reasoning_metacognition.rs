@@ -915,6 +915,11 @@ pub fn evaluate_frozen_forecasts_with_baselines(
         .as_deref()
         .filter(|id| !id.trim().is_empty())
         .ok_or(MetacognitionEvaluationError::MissingEvaluationSplit)?;
+    let evaluation_corpus_manifest_ref = frozen
+        .evaluation_corpus_manifest_ref
+        .as_deref()
+        .filter(|reference| !reference.trim().is_empty())
+        .ok_or(MetacognitionEvaluationError::MissingEvaluationManifest)?;
 
     // Reuse the strict forecast/outcome join. No baseline gets to change the candidate's
     // predictions, outcome bindings, confidence thresholds, or reliability-bin policy.
@@ -980,6 +985,14 @@ pub fn evaluate_frozen_forecasts_with_baselines(
                 MetacognitionEvaluationError::BaselineTrainingSplitEqualsEvaluation {
                     baseline_id: baseline.baseline_id.clone(),
                     split_id: evaluation_split_id.to_owned(),
+                },
+            );
+        }
+        if baseline.training_corpus_manifest_ref == evaluation_corpus_manifest_ref {
+            return Err(
+                MetacognitionEvaluationError::BaselineTrainingManifestEqualsEvaluation {
+                    baseline_id: baseline.baseline_id.clone(),
+                    manifest_ref: evaluation_corpus_manifest_ref.to_owned(),
                 },
             );
         }
@@ -1103,6 +1116,7 @@ pub fn evaluate_frozen_forecasts_with_baselines(
                 training_corpus_manifest_ref: baseline.training_corpus_manifest_ref.clone(),
                 training_sample_count: baseline.training_sample_count,
                 evaluation_split_id: evaluation_split_id.to_owned(),
+                evaluation_corpus_manifest_ref: evaluation_corpus_manifest_ref.to_owned(),
                 evaluation_sample_count: n,
                 predicted_probability: baseline.predicted_probability,
                 empirical_accuracy: accuracy,
@@ -1132,6 +1146,7 @@ pub fn evaluate_frozen_forecasts_with_baselines(
         outcome_profile_id: first.outcome_profile_id.clone(),
         task_taxonomy_id: first.task_taxonomy_id.clone(),
         evaluation_split_id: evaluation_split_id.to_owned(),
+        evaluation_corpus_manifest_ref: evaluation_corpus_manifest_ref.to_owned(),
         baseline_methods: vec![
             ForecastBaselineMethod::ConstantBaseRate,
             ForecastBaselineMethod::RecentEmpiricalAccuracy,
