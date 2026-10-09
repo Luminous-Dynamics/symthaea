@@ -43,7 +43,8 @@ A matching digest establishes byte-level integrity under this encoding. It does 
 - altered canonical bytes;
 - selected identities missing representation or projection-identity bindings;
 - unequal per-identity representation/projection binding counts;
-- historical receipts missing their required frontier.
+- historical receipts missing their required frontier;
+- empty, whitespace-only, and control-character selected identities.
 
 Run `python3 scripts/verify_epf010_negative_vectors.py` to verify the negative fixtures independently. A conforming implementation should reject these cases for the stated reason rather than normalize them into a different valid receipt.
 
