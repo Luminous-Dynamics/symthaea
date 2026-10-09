@@ -56,7 +56,7 @@ pub struct MusicalStateFrame {
     pub line_contour_hist: [f64; CONTOUR_BINS],
     /// Duration-weighted MIDI register occupancy within the frame in eight bins.
     pub register_hist: [f64; REGISTER_BINS],
-    /// True only when every attack used for line-motion analysis has a real PartId.
+    /// True only when every sounding note contributing to the frame has a real PartId.
     pub part_identity_available: bool,
     /// Number of verified transitions between adjacent singleton onsets within a part.
     pub line_transition_count: usize,
@@ -98,7 +98,9 @@ impl MusicalStateFrame {
     }
 
     /// Build one deterministic frame for a caller-selected region.
-    /// Returns None for empty, reversed, negative, out-of-score, or silent regions.
+    /// Returns None for empty, reversed, negative, out-of-score, or truly silent regions.
+    /// A region containing only carried-in sustains is still a valid frame; its
+    /// event_count is zero while occupancy features describe the sounding notes.
     pub fn from_region(score: &Score, start: Duration, end: Duration) -> Option<Self> {
         let start_beat = start.beats();
         let end_beat = end.beats();
@@ -107,10 +109,10 @@ impl MusicalStateFrame {
             return None;
         }
         let notes = notes_in_window(score, start_beat, end_beat);
-        if notes.is_empty() {
+        let active_notes = overlapping_notes_in_window(score, start_beat, end_beat);
+        if active_notes.is_empty() {
             return None;
         }
-        let active_notes = overlapping_notes_in_window(score, start_beat, end_beat);
         Some(frame_from_notes(
             score,
             start_beat,
@@ -138,9 +140,9 @@ pub struct MusicalStateTrajectory {
 impl MusicalStateTrajectory {
     /// Build a trajectory using fixed-size windows and hops.
     ///
-    /// The final partial window is included when it contains at least one
-    /// onset. Empty trailing windows are omitted so silence outside a score
-    /// does not create artificial recurrence.
+    /// Windows are emitted whenever at least one note sounds, including
+    /// sustain-only windows with no new attacks. Truly silent windows are
+    /// omitted so silence outside a score does not create artificial recurrence.
     pub fn from_score(
         score: &Score,
         window_beats: f64,
@@ -193,8 +195,8 @@ impl MusicalStateTrajectory {
             }
             let end = (start + window_beats).min(total);
             let notes = notes_in_window(score, start, end);
-            if !notes.is_empty() {
-                let active_notes = overlapping_notes_in_window(score, start, end);
+            let active_notes = overlapping_notes_in_window(score, start, end);
+            if !active_notes.is_empty() {
                 frames.push(frame_from_notes(
                     score,
                     start,
@@ -361,8 +363,8 @@ fn frame_from_notes(
     let mut register_hist = [0.0; REGISTER_BINS];
 
     let tonic = score.key.tonic.value() as i32;
-    let part_identity_available =
-        !notes.is_empty() && notes.iter().all(|note| note.part.is_assigned());
+    let part_identity_available = !active_notes.is_empty()
+        && active_notes.iter().all(|note| note.part.is_assigned());
 
     let mut intensity_sum = 0.0;
     for note in notes {
@@ -666,6 +668,34 @@ mod tests {
         assert!((frame.pitch_class_hist[7] - 0.5).abs() < 1e-9);
         assert!((frame.register_hist[3] - 0.5).abs() < 1e-9);
         assert!((frame.register_hist[4] - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn sustain_only_windows_are_kept_with_zero_attacks() {
+        let mut held = note(0, 4, 0);
+        held.duration = Duration::new(4, 1);
+        held.part = PartId(7);
+        let piece = score(&[held], 0);
+
+        let sustain = MusicalStateFrame::from_region(
+            &piece,
+            Duration::new(1, 1),
+            Duration::new(2, 1),
+        )
+        .expect("the sustained note sounds inside the frame");
+        assert_eq!(sustain.event_count, 0);
+        assert_eq!(sustain.onset_density, 0.0);
+        assert!(sustain.part_identity_available);
+        assert!((sustain.pitch_class_hist[0] - 1.0).abs() < 1e-9);
+        assert!((sustain.register_hist[3] - 1.0).abs() < 1e-9);
+
+        let trajectory = MusicalStateTrajectory::from_score(&piece, 1.0, 1.0).unwrap();
+        assert_eq!(trajectory.frames.len(), 4);
+        assert_eq!(trajectory.frames[0].event_count, 1);
+        assert!(trajectory.frames[1..].iter().all(|frame| frame.event_count == 0));
+        assert!(trajectory.frames[1..]
+            .iter()
+            .all(|frame| frame.pitch_class_hist[0] == 1.0));
     }
 
     #[test]
