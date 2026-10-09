@@ -47,6 +47,20 @@ fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
         .map_err(|_| format!("invalid generation pre-state identity: {identity}"))
 }
 
+fn unit_file_operation_postcondition_satisfied(
+    operation: NixServiceOperationKindV1,
+    observed_state: ServiceUnitFileStateV1,
+) -> bool {
+    match operation {
+        NixServiceOperationKindV1::Enable => observed_state == ServiceUnitFileStateV1::Enabled,
+        NixServiceOperationKindV1::Disable => observed_state == ServiceUnitFileStateV1::Disabled,
+        NixServiceOperationKindV1::Start
+        | NixServiceOperationKindV1::Stop
+        | NixServiceOperationKindV1::Restart
+        | NixServiceOperationKindV1::Reload => false,
+    }
+}
+
 fn parse_service_pre_state_identity(identity: &str) -> Result<(u64, String, String), String> {
     let mut parts = identity.split('|');
     if parts.next() != Some(SERVICE_PRE_STATE_IDENTITY_PREFIX_V1) || parts.clone().count() != 3 {
@@ -1354,11 +1368,6 @@ impl NixOSExecutor {
             }
         };
         let observed = observation.as_ref();
-        let expected_unit_file_state = match operation {
-            NixServiceOperationKindV1::Enable => ServiceUnitFileStateV1::Enabled,
-            NixServiceOperationKindV1::Disable => ServiceUnitFileStateV1::Disabled,
-            _ => unreachable!("lifecycle operations return before unit-file observation"),
-        };
         let observed_source_digest = match observed.definition_identity.digest(unit) {
             Ok(digest) => digest,
             Err(error) => {
@@ -1389,7 +1398,7 @@ impl NixOSExecutor {
                 Some(witness),
             );
         }
-        if observed.unit_file_state != expected_unit_file_state {
+        if !unit_file_operation_postcondition_satisfied(operation, observed.unit_file_state) {
             return (
                 ExecutionResult::FailedNoRollback {
                     error: format!(
@@ -2196,6 +2205,37 @@ mod tests {
         let error = validate_service_pre_state_observation(&identity, "sshd.service", 42, &nginx)
             .unwrap_err();
         assert!(error.contains("unit mismatch"));
+    }
+
+    #[test]
+    fn unit_file_execution_requires_persistent_enabled_or_disabled_state() {
+        assert!(unit_file_operation_postcondition_satisfied(
+            NixServiceOperationKindV1::Enable,
+            ServiceUnitFileStateV1::Enabled,
+        ));
+        assert!(unit_file_operation_postcondition_satisfied(
+            NixServiceOperationKindV1::Disable,
+            ServiceUnitFileStateV1::Disabled,
+        ));
+        for state in [
+            ServiceUnitFileStateV1::EnabledRuntime,
+            ServiceUnitFileStateV1::Linked,
+            ServiceUnitFileStateV1::Masked,
+            ServiceUnitFileStateV1::Static,
+        ] {
+            assert!(!unit_file_operation_postcondition_satisfied(
+                NixServiceOperationKindV1::Enable,
+                state,
+            ));
+            assert!(!unit_file_operation_postcondition_satisfied(
+                NixServiceOperationKindV1::Disable,
+                state,
+            ));
+        }
+        assert!(!unit_file_operation_postcondition_satisfied(
+            NixServiceOperationKindV1::Restart,
+            ServiceUnitFileStateV1::Enabled,
+        ));
     }
 
     #[test]
