@@ -157,8 +157,8 @@ pub struct MusicalWorldStateV1 {
     /// Score-level declared key. This is not a local modulation estimate.
     pub declared_tonic: PitchClass,
     pub declared_tonality: Tonality,
-    /// Attack-based temporal state, absent for a silent region. The existing
-    /// cognitive profile separately handles notes carried into a region.
+    /// Temporal structural state, absent only for a truly silent region.
+    /// Sustains carried into a region are represented with `event_count = 0`.
     pub temporal_state: Option<MusicalStateFrame>,
     pub active_voice_roles: Vec<VoiceRole>,
     /// True only when every note overlapping this observed region has an assigned PartId.
@@ -174,9 +174,9 @@ impl MusicalWorldStateV1 {
     /// Observe a region using exact rational beat boundaries.
     ///
     /// Returns None for negative, empty, reversed, or out-of-score regions.
-    /// Carry-in notes are handled by profile_score_region exactly as in the
-    /// existing cognitive analysis contract; temporal_state uses onsets in the
-    /// region only and is None when the region has no attacks.
+    /// The cognitive profile and temporal state both preserve carry-in notes,
+    /// while `onset_count` / `event_count` remain zero when the region contains
+    /// no new attacks. `temporal_state` is None only when the interval is silent.
     pub fn observe_region(
         score: &Score,
         start: Duration,
@@ -486,6 +486,37 @@ mod tests {
             state.context.performance_dialect,
             Some(PerformanceDialect::ClassicalRubato)
         );
+    }
+
+    #[test]
+    fn sustain_only_region_keeps_world_state_without_fabricating_attacks() {
+        let mut held = note(
+            PitchClass::C,
+            4,
+            0,
+            VoiceRole::Melody,
+            PartId(7),
+        );
+        held.duration = Duration::new(4, 1);
+        let mut piece = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        piece.push(held);
+
+        let state = MusicalWorldStateV1::observe_region(
+            &piece,
+            Duration::new(1, 1),
+            Duration::new(2, 1),
+            MusicalWorldStateContext::default(),
+        )
+        .expect("the held note overlaps the observation region");
+
+        let temporal = state.temporal_state.expect("a sounding sustain is a state");
+        assert_eq!(temporal.event_count, 0);
+        assert_eq!(temporal.onset_density, 0.0);
+        assert!((temporal.pitch_class_hist[0] - 1.0).abs() < 1e-9);
+        assert_eq!(state.cognitive_profile.note_count, 1);
+        assert_eq!(state.cognitive_profile.onset_count, 0);
+        assert!(state.part_identity_available);
+        assert_eq!(state.active_voice_roles, vec![VoiceRole::Melody]);
     }
 
     #[test]
