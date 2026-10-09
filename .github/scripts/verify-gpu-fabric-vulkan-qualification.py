@@ -537,6 +537,141 @@ def verify_materialized_dispatch_contract(values: dict[str, str], spec: dict, na
         fail(f"{name}: materialized descriptor/dispatch digest mismatch")
 
 
+def verify_memory_lowering_contract(values: dict[str, str], lines: list[str], spec: dict, name: str) -> None:
+    """Independently verify selected Vulkan memory types and cache-maintenance evidence."""
+    profiles: dict[str, dict[str, int]] = {}
+    for line in lines:
+        if not line.startswith("resource_memory_profile="):
+            continue
+        parts = line.split("=", 1)[1].split(":")
+        if len(parts) != 22:
+            fail(f"{name}: malformed resource memory profile field count")
+        resource = parts[0]
+        try:
+            numbers = [int(value) for value in parts[1:]]
+        except ValueError as exc:
+            fail(f"{name}: malformed resource memory profile for {resource}: {exc}")
+        if resource in profiles:
+            fail(f"{name}: duplicate resource memory profile: {resource}")
+        if resource not in spec["initial"]:
+            fail(f"{name}: unexpected memory profile resource: {resource}")
+        (
+            memory_type_index,
+            memory_type_bits,
+            memory_property_flags,
+            memory_heap_index,
+            memory_heap_flags,
+            memory_heap_size,
+            memory_requirement_alignment,
+            memory_requirement_size,
+            allocation_size,
+            storage_size,
+            buffer_usage_flags,
+            sharing_mode_raw,
+            binding_offset,
+            map_offset,
+            map_size,
+            write_flush_performed,
+            write_flush_offset,
+            write_flush_size,
+            read_invalidate_performed,
+            read_invalidate_offset,
+            read_invalidate_size,
+        ) = numbers
+        expected_storage_size = ((len(bytes.fromhex(spec["initial"][resource])) + 3) // 4) * 4
+        if not 0 <= memory_type_index < 32 or not (memory_type_bits & (1 << memory_type_index)):
+            fail(f"{name}: selected memory type is not in the buffer's allowed memory type mask for {resource}")
+        if not (memory_property_flags & 0x2):
+            fail(f"{name}: selected memory type is not host-visible for {resource}")
+        if not 0 <= memory_heap_index < 16 or memory_heap_size <= 0 or memory_requirement_alignment <= 0:
+            fail(f"{name}: invalid memory heap or allocation alignment for {resource}")
+        if (
+            memory_requirement_size != allocation_size
+            or allocation_size < expected_storage_size
+            or storage_size != expected_storage_size
+        ):
+            fail(f"{name}: memory requirements/allocation/storage sizes disagree for {resource}")
+        if buffer_usage_flags != 0x20 or sharing_mode_raw != 0:
+            fail(f"{name}: unexpected buffer usage or sharing mode for {resource}")
+        if binding_offset != 0 or map_offset != 0 or map_size != allocation_size:
+            fail(f"{name}: buffer binding or mapped range mismatch for {resource}")
+        coherent = bool(memory_property_flags & 0x4)
+        expected_performed = 0 if coherent else 1
+        expected_size = 0 if coherent else 0xFFFFFFFFFFFFFFFF
+        if (
+            write_flush_performed != expected_performed
+            or write_flush_offset != 0
+            or write_flush_size != expected_size
+        ):
+            fail(f"{name}: write flush evidence conflicts with memory coherency for {resource}")
+        if (
+            read_invalidate_performed != expected_performed
+            or read_invalidate_offset != 0
+            or read_invalidate_size != expected_size
+        ):
+            fail(f"{name}: read invalidate evidence conflicts with memory coherency for {resource}")
+        profiles[resource] = {
+            "memory_type_index": memory_type_index,
+            "memory_type_bits": memory_type_bits,
+            "memory_property_flags": memory_property_flags,
+            "memory_heap_index": memory_heap_index,
+            "memory_heap_flags": memory_heap_flags,
+            "memory_heap_size": memory_heap_size,
+            "memory_requirement_alignment": memory_requirement_alignment,
+            "memory_requirement_size": memory_requirement_size,
+            "allocation_size": allocation_size,
+            "storage_size": storage_size,
+            "buffer_usage_flags": buffer_usage_flags,
+            "sharing_mode_raw": sharing_mode_raw,
+            "binding_offset": binding_offset,
+            "map_offset": map_offset,
+            "map_size": map_size,
+            "write_flush_performed": write_flush_performed,
+            "write_flush_offset": write_flush_offset,
+            "write_flush_size": write_flush_size,
+            "read_invalidate_performed": read_invalidate_performed,
+            "read_invalidate_offset": read_invalidate_offset,
+            "read_invalidate_size": read_invalidate_size,
+        }
+
+    if set(profiles) != set(spec["initial"]):
+        fail(f"{name}: resource memory profile set does not match fixture resources")
+    fields = [f"resource_profile_count:{len(profiles)}"]
+    names = [
+        "memory_type_index",
+        "memory_type_bits",
+        "memory_property_flags",
+        "memory_heap_index",
+        "memory_heap_flags",
+        "memory_heap_size",
+        "memory_requirement_alignment",
+        "memory_requirement_size",
+        "allocation_size",
+        "storage_size",
+        "buffer_usage_flags",
+        "sharing_mode_raw",
+        "binding_offset",
+        "map_offset",
+        "map_size",
+        "write_flush_performed",
+        "write_flush_offset",
+        "write_flush_size",
+        "read_invalidate_performed",
+        "read_invalidate_offset",
+        "read_invalidate_size",
+    ]
+    for resource in sorted(profiles):
+        fields.append("resource_profile")
+        fields.append(f"resource={resource}")
+        fields.extend(f"{field}={profiles[resource][field]}" for field in names)
+    expected = sha256_len_prefixed(
+        [field.encode("utf-8") for field in fields],
+        b"symthaea.gpu-fabric.vulkan-memory-lowering.v1",
+    )
+    if values.get("memory_lowering_digest") != expected:
+        fail(f"{name}: materialized Vulkan memory-lowering digest mismatch")
+
+
 def verify_runtime(path: Path) -> None:
     blocks = parse_runtime(path)
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
@@ -564,7 +699,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "10":
+        if values.get("receipt_version") != "11":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -573,6 +708,7 @@ def verify_runtime(path: Path) -> None:
         verify_materialized_barrier_lowering(values, spec, name)
         verify_materialized_submission_contract(values, spec, name)
         verify_materialized_dispatch_contract(values, spec, name)
+        verify_memory_lowering_contract(values, lines, spec, name)
         if int(values.get("completion_expected", "-1")) != spec["completion"]:
             fail(f"{name}: completion expected mismatch")
         if int(values.get("completion_observed", "-1")) != spec["completion"]:
