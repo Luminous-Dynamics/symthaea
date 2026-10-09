@@ -193,6 +193,26 @@ BEGIN
     SELECT RAISE(ABORT, 'invalid reservation state transition');
 END;
 
+CREATE TRIGGER IF NOT EXISTS reservation_terminal_evidence_immutable
+BEFORE UPDATE OF
+    dispatch_attempt_id, dispatch_attempt_sequence, dispatch_wall_time_ms,
+    dispatch_monotonic_ns, dispatch_clock_id, attempt_identity_digest,
+    superseded_by_fence
+ON reservations
+WHEN OLD.state <> 'PromotionReserved'
+ AND (
+    NEW.dispatch_attempt_id IS NOT OLD.dispatch_attempt_id
+    OR NEW.dispatch_attempt_sequence IS NOT OLD.dispatch_attempt_sequence
+    OR NEW.dispatch_wall_time_ms IS NOT OLD.dispatch_wall_time_ms
+    OR NEW.dispatch_monotonic_ns IS NOT OLD.dispatch_monotonic_ns
+    OR NEW.dispatch_clock_id IS NOT OLD.dispatch_clock_id
+    OR NEW.attempt_identity_digest IS NOT OLD.attempt_identity_digest
+    OR NEW.superseded_by_fence IS NOT OLD.superseded_by_fence
+ )
+BEGIN
+    SELECT RAISE(ABORT, 'terminal reservation evidence is immutable');
+END;
+
 CREATE TRIGGER IF NOT EXISTS reservation_prepare_storage_fence_guard
 BEFORE UPDATE OF state ON reservations
 WHEN NEW.state = 'PromotionDispatchPrepared'
@@ -242,6 +262,7 @@ class DurablePromotionJournalV1:
         "reservation_insert_authority_guard",
         "reservation_identity_immutable",
         "reservation_state_transition_guard",
+        "reservation_terminal_evidence_immutable",
         "reservation_prepare_storage_fence_guard",
         "reservation_supersede_storage_fence_guard",
     }
@@ -257,6 +278,10 @@ class DurablePromotionJournalV1:
         "reservation_insert_authority_guard": ("reservation storage fence rejected",),
         "reservation_identity_immutable": ("reservation identity is immutable",),
         "reservation_state_transition_guard": ("invalid reservation state transition",),
+        "reservation_terminal_evidence_immutable": (
+            "old.state <> 'promotionreserved'",
+            "terminal reservation evidence is immutable",
+        ),
         "reservation_prepare_storage_fence_guard": (
             "storage-enforced promotion fence rejected",
             "l.revision = new.created_revision + 1",
@@ -1252,6 +1277,33 @@ class DurablePromotionJournalTests(unittest.TestCase):
         finally:
             connection.close()
         self.assertFalse(journal.verify_journal())
+
+    def test_prepared_attempt_evidence_is_immutable_at_storage_boundary(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        self.assertTrue(self.prepare_one(journal, sequence=9))
+        before = journal.get_reservation("RES-1")
+        connection = sqlite3.connect(journal.path)
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    """UPDATE reservations
+                       SET dispatch_attempt_sequence = 10
+                       WHERE reservation_id = 'RES-1'"""
+                )
+            connection.rollback()
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    """UPDATE reservations
+                       SET attempt_identity_digest = ?
+                       WHERE reservation_id = 'RES-1'""",
+                    ("f" * 64,),
+                )
+            connection.rollback()
+        finally:
+            connection.close()
+        self.assertEqual(journal.get_reservation("RES-1"), before)
+        self.assertTrue(journal.verify_journal())
 
     def test_chain_audit_detects_mutated_event_payload(self) -> None:
         journal = self.make_journal()
