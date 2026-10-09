@@ -58,7 +58,9 @@ pub struct NixSystemdLifecycleMutationTransportV1 {
 /// Closed operation vocabulary for unit-file configuration changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NixSystemdUnitFileMutationKindV1 {
+    /// Persistent enablement via systemd's EnableUnitFiles method.
     Enable,
+    /// Persistent disablement via systemd's DisableUnitFiles method.
     Disable,
 }
 
@@ -78,26 +80,32 @@ pub struct NixSystemdUnitFileOperationResultV1 {
 }
 
 impl NixSystemdUnitFileOperationResultV1 {
+    /// Operation whose native D-Bus method returned this result.
     pub fn operation(&self) -> NixSystemdUnitFileMutationKindV1 {
         self.operation
     }
 
+    /// Canonical unit passed to systemd for the mutation.
     pub fn unit(&self) -> &str {
         &self.unit
     }
 
+    /// Expected systemd manager unique owner checked before and after the RPC.
     pub fn manager_owner(&self) -> &str {
         &self.manager_owner
     }
 
+    /// Expected D-Bus daemon incarnation checked before and after the RPC.
     pub fn bus_id(&self) -> &str {
         &self.bus_id
     }
 
+    /// EnableUnitFiles install-information result; absent for DisableUnitFiles.
     pub fn carries_install_info(&self) -> Option<bool> {
         self.carries_install_info
     }
 
+    /// Validated change records returned by systemd; the list may be empty for a no-op.
     pub fn changes(&self) -> &[NixSystemdUnitFileChangeV1] {
         &self.changes
     }
@@ -118,14 +126,17 @@ pub struct NixSystemdUnitFileChangeV1 {
 }
 
 impl NixSystemdUnitFileChangeV1 {
+    /// Closed systemd change vocabulary: symlink creation or removal.
     pub fn change_type(&self) -> NixSystemdUnitFileChangeKindV1 {
         self.change_type
     }
 
+    /// Symlink path reported by systemd.
     pub fn filename(&self) -> &str {
         &self.filename
     }
 
+    /// Link destination reported by systemd.
     pub fn destination(&self) -> &str {
         &self.destination
     }
@@ -260,9 +271,12 @@ impl NixSystemdLifecycleMutationTransportV1 {
         Ok(job_path)
     }
 
-    /// Enable the canonical unit through the exact approved systemd manager epoch.
+    /// Dispatch EnableUnitFiles to the expected systemd manager epoch.
     ///
-    /// This returns unit-file change evidence, not a lifecycle Job handle.
+    /// The caller must source `manager_owner` and `expected_bus_id` from the
+    /// governed Service context. This low-level transport checks them against live
+    /// D-Bus state but does not authorize the operation. The result is unit-file
+    /// change evidence, not a lifecycle Job handle.
     pub async fn enable_unit_file_for_manager_owner_and_bus_id(
         &self,
         unit: &str,
@@ -299,9 +313,12 @@ impl NixSystemdLifecycleMutationTransportV1 {
         })
     }
 
-    /// Disable the canonical unit through the exact approved systemd manager epoch.
+    /// Dispatch DisableUnitFiles to the expected systemd manager epoch.
     ///
-    /// This returns unit-file change evidence, not a lifecycle Job handle.
+    /// The caller must source `manager_owner` and `expected_bus_id` from the
+    /// governed Service context. This low-level transport checks them against live
+    /// D-Bus state but does not authorize the operation. The result is unit-file
+    /// change evidence, not a lifecycle Job handle.
     pub async fn disable_unit_file_for_manager_owner_and_bus_id(
         &self,
         unit: &str,
