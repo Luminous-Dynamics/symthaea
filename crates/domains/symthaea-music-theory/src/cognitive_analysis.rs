@@ -79,10 +79,18 @@ impl ScoreCognitiveProfile {
 
 /// Observe the complete symbolic score.
 pub fn profile_score(score: &Score) -> ScoreCognitiveProfile {
+    // A score is a public data structure and can contain records that bypass
+    // generator invariants. Zero- or negative-duration notes never sound.
+    let notes: Vec<_> = score
+        .notes
+        .iter()
+        .copied()
+        .filter(|note| note.duration.beats() > 0.0)
+        .collect();
     profile_notes(
         score,
-        &score.notes,
-        score.notes.len(),
+        &notes,
+        notes.len(),
         0.0,
         score.total_beats.beats(),
     )
@@ -488,6 +496,10 @@ mod tests {
         assert_eq!(profile.onset_count, 0);
         assert_eq!(profile.active_voice_count, 0);
         assert_eq!(profile.notes_per_beat, 0.0);
+
+        let whole_score = profile_score(&score);
+        assert_eq!(whole_score.note_count, 1);
+        assert_eq!(whole_score.onset_count, 1);
     }
 
     #[test]
