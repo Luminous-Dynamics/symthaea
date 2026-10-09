@@ -188,8 +188,9 @@ impl MusicalStateTrajectory {
             return Err("hop_beats must be finite and > 0".into());
         }
 
-        let total = finite_duration_beats(score.total_beats)
-            .ok_or_else(|| "score total_beats must be a finite rational with positive denominator".to_owned())?;
+        let total = finite_duration_beats(score.total_beats).ok_or_else(|| {
+            "score total_beats must be a finite rational with positive denominator".to_owned()
+        })?;
         if total <= 0.0 {
             return Ok(Self {
                 schema_version: MUSICAL_STATE_SPACE_V1.into(),
