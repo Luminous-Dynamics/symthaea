@@ -2304,6 +2304,16 @@ mod tests {
             store.record_fork(log_id, 3, h(b"next-fork-first"), h(b"next-fork-conflict")),
             Err(WitnessError::CorruptForkEvidence)
         ), "do not append to a corrupted evidence chain");
+        let after_attempt = store.open_connection().expect("open after rejected append");
+        let row_count: i64 = after_attempt
+            .query_row(
+                "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("count evidence after rejected append");
+        assert_eq!(row_count, 1, "rejected append must not add another evidence row");
+        drop(after_attempt);
         assert!(matches!(
             store.load_history(log_id),
             Err(WitnessError::CorruptForkEvidence)
