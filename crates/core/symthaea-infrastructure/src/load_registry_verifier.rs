@@ -13,9 +13,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::load_registry::{
-    ClassificationProvenance, LoadClass, LoadRegistry, LoadServiceLedger,
-};
+use crate::load_registry::{LoadClass, LoadRegistry, LoadServiceLedger};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoadLedgerVerificationError {
@@ -298,9 +296,7 @@ fn close(left: f64, right: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::load_registry::{
-        ClassificationProvenance, LoadDemand, LoadRegistryEntry, LoadServiceLedger,
-    };
+    use crate::load_registry::{ClassificationProvenance, LoadDemand, LoadRegistryEntry};
 
     fn provenance() -> ClassificationProvenance {
         ClassificationProvenance::SyntheticScenario {
