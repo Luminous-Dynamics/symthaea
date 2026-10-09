@@ -457,7 +457,17 @@ impl SqliteWitnessStore {
         };
         let observed = anchor.current(log_id)?;
         if observed != expected_anchor && observed != AnchorState::from_record(&candidate) {
-            self.record_fork(log_id, generation, observed.record_digest, candidate.digest)?;
+            // Fork evidence is only valid for two competing records in the same
+            // log and generation. A later anchor position proves that this local
+            // candidate is stale/missing from accepted history; its digest must
+            // never be mislabeled as a same-generation competitor.
+            if observed.log_id == log_id && observed.generation == generation {
+                self.record_fork(log_id, generation, observed.record_digest, candidate.digest)?;
+                return Err(WitnessError::ExternalAnchorMismatch);
+            }
+            if observed.log_id == log_id && observed.generation > generation {
+                return Err(WitnessError::RollbackDetected);
+            }
             return Err(WitnessError::ExternalAnchorMismatch);
         }
 
@@ -472,7 +482,8 @@ impl SqliteWitnessStore {
             if let Err(cas_error) = anchor.compare_and_advance(&expected_anchor, &next_anchor) {
                 let observed_after_cas = anchor.current(log_id)?;
                 if observed_after_cas != next_anchor {
-                    if observed_after_cas.generation == generation
+                    if observed_after_cas.log_id == log_id
+                        && observed_after_cas.generation == generation
                         && observed_after_cas.record_digest != candidate.digest
                     {
                         self.record_fork(
@@ -483,16 +494,32 @@ impl SqliteWitnessStore {
                         )?;
                         return Err(WitnessError::ExternalAnchorMismatch);
                     }
+                    if observed_after_cas.log_id != log_id {
+                        return Err(WitnessError::ExternalAnchorMismatch);
+                    }
+                    if observed_after_cas.generation > generation {
+                        return Err(WitnessError::RollbackDetected);
+                    }
                     return Err(WitnessError::Anchor(cas_error));
                 }
             }
         } else if observed_after_prepare != AnchorState::from_record(&candidate) {
-            self.record_fork(
-                log_id,
-                generation,
-                observed_after_prepare.record_digest,
-                candidate.digest,
-            )?;
+            if observed_after_prepare.log_id == log_id
+                && observed_after_prepare.generation == generation
+            {
+                self.record_fork(
+                    log_id,
+                    generation,
+                    observed_after_prepare.record_digest,
+                    candidate.digest,
+                )?;
+                return Err(WitnessError::ExternalAnchorMismatch);
+            }
+            if observed_after_prepare.log_id == log_id
+                && observed_after_prepare.generation > generation
+            {
+                return Err(WitnessError::RollbackDetected);
+            }
             return Err(WitnessError::ExternalAnchorMismatch);
         }
         if fault == Some(FaultPoint::AfterExternalAnchorAdvance) {
@@ -1267,6 +1294,36 @@ mod tests {
     }
 
 
+    struct AdvanceDuringReadAnchor {
+        inner: MemoryAnchor,
+        calls: AtomicU64,
+        advance_on_call: u64,
+        advanced_state: AnchorState,
+    }
+
+    impl AdvanceDuringReadAnchor {
+        fn new(log_id: &str, initial: AnchorState, advance_on_call: u64, advanced_state: AnchorState) -> Self {
+            let inner = MemoryAnchor::default();
+            inner.states.lock().expect("anchor lock").insert(log_id.to_owned(), initial);
+            Self { inner, calls: AtomicU64::new(0), advance_on_call, advanced_state }
+        }
+    }
+
+    impl IndependentAnchor for AdvanceDuringReadAnchor {
+        fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if call == self.advance_on_call {
+                self.inner.states.lock().map_err(|_| AnchorError::Other("anchor mutex poisoned".into()))?
+                    .insert(log_id.to_owned(), self.advanced_state.clone());
+            }
+            self.inner.current(log_id)
+        }
+
+        fn compare_and_advance(&self, expected: &AnchorState, next: &AnchorState) -> Result<(), AnchorError> {
+            self.inner.compare_and_advance(expected, next)
+        }
+    }
+
     struct OneShotUnavailableAnchor {
         inner: MemoryAnchor,
         calls: AtomicU64,
@@ -1970,6 +2027,60 @@ mod tests {
         ];
         assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
         assert_eq!(storeless_recover(&db, anchor.as_ref(), "log-race").generation, 2);
+    }
+
+    #[test]
+    fn anchor_that_advances_past_candidate_is_not_recorded_as_same_generation_fork() {
+        let db = TempDb::new();
+        let store = db.open();
+        let log_id = "log-anchor-ahead-during-transition";
+        let initial_anchor = MemoryAnchor::default();
+        let first = store.initialize(
+            log_id,
+            "policy-v1",
+            h(b"checkpoint-one"),
+            0,
+            None,
+            &initial_anchor,
+        ).expect("initialize first record");
+
+        // transition_inner reads anchor.current() three times: recovery,
+        // pre-prepare comparison, and post-prepare comparison. Simulate another
+        // actor moving the independent anchor beyond our candidate at read 3.
+        let advanced = AnchorState {
+            log_id: log_id.to_owned(),
+            generation: 3,
+            record_digest: h(b"later-external-generation-three"),
+        };
+        let racing = AdvanceDuringReadAnchor::new(
+            log_id,
+            AnchorState::from_record(&first),
+            3,
+            advanced,
+        );
+        assert!(matches!(
+            store.advance(
+                log_id,
+                first.generation,
+                first.digest,
+                h(b"candidate-generation-two"),
+                1,
+                Some(h(b"receipt-one")),
+                &racing,
+            ),
+            Err(WitnessError::RollbackDetected)
+        ));
+
+        let history = store.load_history(log_id).expect("history remains inspectable");
+        assert_eq!(history.accepted.as_ref(), Some(&first));
+        assert_eq!(history.prepared.as_ref().map(|record| record.generation), Some(2));
+        let conn = store.open_connection().expect("open fork evidence query");
+        let fork_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
+            params![log_id],
+            |row| row.get(0),
+        ).expect("count fork evidence");
+        assert_eq!(fork_count, 0, "cross-generation anchor state is not fork evidence");
     }
 
     #[test]
