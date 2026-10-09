@@ -54,7 +54,8 @@ pub use reasoning_evaluator_policy::{
 pub use reasoning_metacognition::{
     evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionDirection,
     ConfidenceRevisionObservation, CorrectnessPrediction, MetacognitionEvaluationError,
-    MetacognitionReport, SelectiveRiskPoint, WeakAssumptionObservation,
+    MetacognitionReport, SelectiveRiskPoint, TaskFamilyCalibrationReport,
+    WeakAssumptionObservation,
     METACOGNITION_EVALUATOR_VERSION,
 };
 pub use reasoning_qualification::{
