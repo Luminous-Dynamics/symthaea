@@ -416,6 +416,9 @@ pub struct CycleMetadata {
 
     /// Meta-cognitive reasoning confidence (0.0–1.0, 0.5 when off or not evaluated).
     pub meta_reasoning_confidence: f64,
+    /// Counterfactual legacy LR boost for RQ-006 qualification; never applied to live learning.
+    #[serde(default)]
+    pub meta_reasoning_counterfactual_lr_boost: f32,
     /// Number of meta-learning insights discovered this cycle.
     pub meta_reasoning_insights: usize,
     /// Number of code-tier primitives selected (0 when input is non-code).
