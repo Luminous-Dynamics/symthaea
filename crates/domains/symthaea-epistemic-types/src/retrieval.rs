@@ -1,6 +1,6 @@
 //! Frontier-aware retrieval primitives. Retrieval ranks representations; it never
 //! upgrades epistemic state or creates canonical evidence.
-use crate::{sha256_hex, MemoryKind, MemoryProjectionRef, MemoryProvenance};
+use crate::{sha256_hex, CanonicalArtifactRef, MemoryKind, MemoryProjectionRef, MemoryProvenance, RefValidationError};
 
 const RETRIEVAL_RECEIPT_DOMAIN: &[u8] = b"epistemic-retrieval-receipt:v1\0";
 
@@ -87,6 +87,7 @@ pub enum ReceiptVerificationError {
     MissingProjectionIdentityBinding,
     BindingCountMismatch,
     InvalidRequest(RetrievalRequestError),
+    InvalidSelectedIdentity(RefValidationError),
 }
 
 /// A receipt whose canonical digest and internal selection bindings were checked.
@@ -122,6 +123,10 @@ impl MemoryRetrievalReceipt {
         selected.dedup();
         if selected.len() != self.selected.len() {
             return Err(ReceiptVerificationError::DuplicateSelectedIdentity);
+        }
+        for identity in &selected {
+            CanonicalArtifactRef::try_from(identity.as_str())
+                .map_err(ReceiptVerificationError::InvalidSelectedIdentity)?;
         }
         let mut projection_bindings = self.selected_projection_identity_digests.clone();
         projection_bindings.sort();
@@ -561,6 +566,42 @@ mod tests {
         assert_eq!(
             malformed.verify(),
             Err(ReceiptVerificationError::BindingCountMismatch)
+        );
+    }
+
+    #[test]
+    fn empty_selected_identity_is_rejected() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        assert_eq!(
+            receipt.verify(),
+            Err(ReceiptVerificationError::InvalidSelectedIdentity(RefValidationError::Empty))
+        );
+    }
+
+    #[test]
+    fn whitespace_only_selected_identity_is_rejected() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate(" \t\n", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        assert_eq!(
+            receipt.verify(),
+            Err(ReceiptVerificationError::InvalidSelectedIdentity(RefValidationError::WhitespaceOnly))
+        );
+    }
+
+    #[test]
+    fn control_character_selected_identity_is_rejected() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("claim:\ninvalid", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        assert_eq!(
+            receipt.verify(),
+            Err(ReceiptVerificationError::InvalidSelectedIdentity(RefValidationError::ControlCharacter))
         );
     }
 
