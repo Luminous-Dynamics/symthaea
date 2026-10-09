@@ -64,6 +64,8 @@ jobs:
           TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
           TRIGGER_RUN_REPOSITORY_ID: ${{ github.event.workflow_run.repository.id }}
           TRIGGER_RUN_HEAD_REPOSITORY_ID: ${{ github.event.workflow_run.head_repository.id }}
+          TRIGGER_RUN_PR_BASE_REF: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+          CURRENT_REPOSITORY_ID: ${{ github.event.repository.id }}
           MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
           VERIFIER_TEST_OUTCOME: ${{ steps.self_tests.outcome }}
         shell: bash
