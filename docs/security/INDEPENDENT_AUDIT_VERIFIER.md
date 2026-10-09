@@ -12,3 +12,8 @@ The verifier publishes `Security Audit / Independent Verifier`. The status and w
 4. Changes to the caller workflow or engine pin require a separate trusted policy update. Do not let a PR update both the audited source and the trusted expectation that authorizes it.
 
 The workflow is privilege-separated from PR code, but the repository's default branch and rules remain the local trust root. A truly external trust root requires a separately governed verifier or GitHub App.
+
+
+## Enforcement verification snapshot (2026-10-09)
+
+The repository-level rulesets API returned an empty list for this repository during implementation. Reading branch-protection settings was denied to the connected integration, so that result does **not** prove that no organization-level ruleset or branch protection applies. Before claiming merge enforcement, a repository administrator must verify in GitHub that the exact commit status `Security Audit / Independent Verifier` and the verifier job check are required, bypasses are controlled, and the policy applies to the default branch.
