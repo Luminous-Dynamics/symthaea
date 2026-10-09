@@ -281,3 +281,19 @@ Implication for Symthaea: profile metadata must distinguish a framework's princi
 A new study, [AMULED: Addressing Moral Uncertainty using Large language models for Ethical Decision-making](https://doi.org/10.3389/frai.2026.1754973), is another recent multi-theory proposal. It reinforces that multi-framework ethics is an active area of research, not a unique invention of this project. Symthaea's contribution must therefore be demonstrated through exact-head integration, faithful framework implementation, meaningful held-out tests, and clear evidence—not the mere presence of several labels.
 
 The code-level comparison primitive's order-invariance test checks only that the **aggregation of already-produced assessments** does not depend on input order. It does not prove that framework evaluators or their internal priority rules are order-invariant; those require separate tests.
+
+
+### Exact subject binding before comparison — 2026-10-09
+
+The first comparison API exposed a correctness seam: it could compare rows from different scenarios or different candidate actions and still report apparent agreement. The follow-on draft [PR #7273](https://github.com/Luminous-Dynamics/symthaea/pull/7273), stacked on [PR #7264](https://github.com/Luminous-Dynamics/symthaea/pull/7264), adds an explicit subject tuple to each assessment:
+
+- `scenario_ref` and `scenario_digest` bind the assessment to the normalized scenario/context.
+- `candidate_action_ref` and `candidate_action_digest` bind it to the exact action under evaluation.
+- Comparisons with different subject tuples return `SubjectMismatch`; empty binding fields invalidate the input.
+- Each premise reference is checked individually, so a blank ID cannot hide beside a valid ID.
+
+**Integrity boundary:** the comparison module checks that supplied IDs/digests are non-empty and exactly equal across rows. It does not compute a digest, authenticate the producer, or prove that the digest corresponds to source bytes. An upstream context constructor must canonicalize and hash the scenario and action; higher-integrity deployments should retain the canonical bytes and their independent verification receipt.
+
+The follow-on tests are authored but have not been executed in this workflow. Workflow metadata for the new head currently reports completed-but-skipped checks, not successful tests. Do not treat this draft contract as qualified until exact-head tests and independent subject-binding checks have run.
+
+This is also aligned with current literature: a September 2026 study argues that case-by-case agreement metrics miss the relational structure of moral judgments, and that structural alignment does not itself prove a model genuinely holds a value ([Tang, 2026](https://link.springer.com/article/10.1007/s43681-026-01368-w)). For Symthaea, this supports both exact case/action binding and later cross-case structural consistency tests. It does not validate this implementation by itself.
