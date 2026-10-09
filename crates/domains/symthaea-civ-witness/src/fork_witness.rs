@@ -7,6 +7,8 @@
 //! separate step; until that exists, no external fork-audit guarantee is claimed.
 
 use crate::Digest;
+use super::{append_fork_evidence, SqliteWitnessStore, WitnessError};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::fmt;
 
@@ -319,6 +321,10 @@ pub enum ForkWitnessError {
     InvalidInput(&'static str),
     InvalidReceipt(&'static str),
     InvalidReceiptDigest,
+    LocalStore(String),
+    LocalJournalCorrupt,
+    RemoteHistoryIncomplete,
+    AmbiguousAppend(String),
     Other(String),
 }
 
@@ -335,6 +341,10 @@ impl fmt::Display for ForkWitnessError {
             Self::InvalidInput(message) => write!(f, "invalid fork-witness input: {message}"),
             Self::InvalidReceipt(message) => write!(f, "invalid fork-witness receipt: {message}"),
             Self::InvalidReceiptDigest => write!(f, "fork-witness receipt digest mismatch"),
+            Self::LocalStore(message) => write!(f, "local fork-witness journal error: {message}"),
+            Self::LocalJournalCorrupt => write!(f, "local fork-witness journal is corrupt"),
+            Self::RemoteHistoryIncomplete => write!(f, "remote fork-witness history is incomplete or inconsistent"),
+            Self::AmbiguousAppend(message) => write!(f, "remote fork-witness append outcome is ambiguous: {message}"),
             Self::Other(message) => write!(f, "independent fork-witness error: {message}"),
         }
     }
@@ -344,7 +354,603 @@ impl std::error::Error for ForkWitnessError {}
 
 fn encode_field(out: &mut Vec<u8>, value: &[u8]) {
     out.extend_from_slice(&(value.len() as u64).to_be_bytes());
-    out.extend_from_slice(value);
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StoredForkEvent {
+    event: ForkEvent,
+    state: i64,
+    receipt: Option<ForkAppendReceipt>,
+}
+
+type RawForkEventRow = (
+    String,
+    i64,
+    Vec<u8>,
+    i64,
+    i64,
+    Vec<u8>,
+    i64,
+    Vec<u8>,
+    i64,
+    Vec<u8>,
+    Vec<u8>,
+    i64,
+    Option<Vec<u8>>,
+    Option<i64>,
+    Option<Vec<u8>>,
+);
+
+fn local_store_error(error: impl fmt::Display) -> ForkWitnessError {
+    ForkWitnessError::LocalStore(error.to_string())
+}
+
+fn digest_column(bytes: Vec<u8>) -> Result<Digest, ForkWitnessError> {
+    bytes
+        .try_into()
+        .map_err(|_| ForkWitnessError::LocalJournalCorrupt)
+}
+
+fn sqlite_u64(value: u64, field: &'static str) -> Result<i64, ForkWitnessError> {
+    i64::try_from(value).map_err(|_| {
+        ForkWitnessError::InvalidInput(match field {
+            "witness_epoch" => "witness epoch exceeds SQLite INTEGER range",
+            "previous_event_count" => "fork frontier count exceeds SQLite INTEGER range",
+            "accepted_generation" => "accepted generation exceeds SQLite INTEGER range",
+            "fork_generation" => "fork generation exceeds SQLite INTEGER range",
+            "receipt_event_count" => "receipt frontier count exceeds SQLite INTEGER range",
+            _ => "integer field exceeds SQLite INTEGER range",
+        })
+    })
+}
+
+fn checked_u64(value: i64) -> Result<u64, ForkWitnessError> {
+    u64::try_from(value).map_err(|_| ForkWitnessError::LocalJournalCorrupt)
+}
+
+fn decode_fork_event_row(raw: RawForkEventRow) -> Result<StoredForkEvent, ForkWitnessError> {
+    let (
+        log_id,
+        epoch,
+        event_digest,
+        schema_version,
+        previous_event_count,
+        previous_event_digest,
+        accepted_generation,
+        accepted_head_digest,
+        fork_generation,
+        first_record_digest,
+        conflicting_record_digest,
+        state,
+        receipt_digest,
+        receipt_event_count,
+        receipt_tail_digest,
+    ) = raw;
+    if epoch < 0 || schema_version < 0 || previous_event_count < 0
+        || accepted_generation < 0 || fork_generation <= 0
+    {
+        return Err(ForkWitnessError::LocalJournalCorrupt);
+    }
+    let event = ForkEvent {
+        schema_version: u16::try_from(schema_version)
+            .map_err(|_| ForkWitnessError::LocalJournalCorrupt)?,
+        log_id,
+        witness_epoch: checked_u64(epoch)?,
+        previous_event_count: checked_u64(previous_event_count)?,
+        previous_event_digest: digest_column(previous_event_digest)?,
+        accepted_generation: checked_u64(accepted_generation)?,
+        accepted_head_digest: digest_column(accepted_head_digest)?,
+        fork_generation: checked_u64(fork_generation)?,
+        first_record_digest: digest_column(first_record_digest)?,
+        conflicting_record_digest: digest_column(conflicting_record_digest)?,
+        event_digest: digest_column(event_digest)?,
+    };
+    event.validate().map_err(|_| ForkWitnessError::LocalJournalCorrupt)?;
+    match state {
+        0 if receipt_digest.is_none()
+            && receipt_event_count.is_none()
+            && receipt_tail_digest.is_none() =>
+        {
+            Ok(StoredForkEvent { event, state, receipt: None })
+        }
+        1 => {
+            let receipt_digest = digest_column(
+                receipt_digest.ok_or(ForkWitnessError::LocalJournalCorrupt)?,
+            )?;
+            let receipt_event_count = checked_u64(
+                receipt_event_count.ok_or(ForkWitnessError::LocalJournalCorrupt)?,
+            )?;
+            let receipt_tail_digest = digest_column(
+                receipt_tail_digest.ok_or(ForkWitnessError::LocalJournalCorrupt)?,
+            )?;
+            let previous_frontier = ForkFrontier {
+                log_id: event.log_id.clone(),
+                witness_epoch: event.witness_epoch,
+                event_count: event.previous_event_count,
+                tail_digest: event.previous_event_digest,
+            };
+            let frontier_after = ForkFrontier {
+                log_id: event.log_id.clone(),
+                witness_epoch: event.witness_epoch,
+                event_count: receipt_event_count,
+                tail_digest: receipt_tail_digest,
+            };
+            let receipt = ForkAppendReceipt {
+                event: event.clone(),
+                previous_frontier,
+                frontier_after,
+                receipt_digest,
+            };
+            receipt.validate().map_err(|_| ForkWitnessError::LocalJournalCorrupt)?;
+            Ok(StoredForkEvent { event, state, receipt: Some(receipt) })
+        }
+        _ => Err(ForkWitnessError::LocalJournalCorrupt),
+    }
+}
+
+const SELECT_STORED_FORK_EVENT: &str =
+    "SELECT log_id, witness_epoch, event_digest, schema_version,
+            previous_event_count, previous_event_digest, accepted_generation,
+            accepted_head_digest, fork_generation, first_record_digest,
+            conflicting_record_digest, state, receipt_digest, receipt_event_count,
+            receipt_tail_digest
+     FROM witness_external_fork_events";
+
+fn load_fork_event(
+    conn: &Connection,
+    log_id: &str,
+    epoch: u64,
+    event_digest: Digest,
+) -> Result<Option<StoredForkEvent>, ForkWitnessError> {
+    let epoch = sqlite_u64(epoch, "witness_epoch")?;
+    let sql = format!(
+        "{SELECT_STORED_FORK_EVENT}
+         WHERE log_id=?1 AND witness_epoch=?2 AND event_digest=?3"
+    );
+    let raw: Option<RawForkEventRow> = conn
+        .query_row(
+            &sql,
+            params![log_id, epoch, event_digest.as_slice()],
+            |row| {
+                Ok((
+                    row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?,
+                    row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?,
+                    row.get(10)?, row.get(11)?, row.get(12)?, row.get(13)?, row.get(14)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(local_store_error)?;
+    raw.map(decode_fork_event_row).transpose()
+}
+
+fn find_fork_event_by_conflict(
+    conn: &Connection,
+    log_id: &str,
+    epoch: u64,
+    accepted_generation: u64,
+    accepted_head_digest: Digest,
+    fork_generation: u64,
+    first_record_digest: Digest,
+    conflicting_record_digest: Digest,
+) -> Result<Option<StoredForkEvent>, ForkWitnessError> {
+    let (epoch, accepted_generation, fork_generation) = (
+        sqlite_u64(epoch, "witness_epoch")?,
+        sqlite_u64(accepted_generation, "accepted_generation")?,
+        sqlite_u64(fork_generation, "fork_generation")?,
+    );
+    let sql = format!(
+        "{SELECT_STORED_FORK_EVENT}
+         WHERE log_id=?1 AND witness_epoch=?2 AND accepted_generation=?3
+           AND accepted_head_digest=?4 AND fork_generation=?5
+           AND first_record_digest=?6 AND conflicting_record_digest=?7
+         ORDER BY previous_event_count ASC LIMIT 1"
+    );
+    let raw: Option<RawForkEventRow> = conn
+        .query_row(
+            &sql,
+            params![
+                log_id, epoch, accepted_generation, accepted_head_digest.as_slice(),
+                fork_generation, first_record_digest.as_slice(),
+                conflicting_record_digest.as_slice()
+            ],
+            |row| {
+                Ok((
+                    row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?,
+                    row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?,
+                    row.get(10)?, row.get(11)?, row.get(12)?, row.get(13)?, row.get(14)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(local_store_error)?;
+    raw.map(decode_fork_event_row).transpose()
+}
+
+fn persist_pending_fork_event(
+    store: &SqliteWitnessStore,
+    frontier: &ForkFrontier,
+    event: &ForkEvent,
+) -> Result<(), ForkWitnessError> {
+    event.validate_for(frontier)?;
+    sqlite_u64(frontier.witness_epoch, "witness_epoch")?;
+    sqlite_u64(frontier.event_count, "previous_event_count")?;
+    sqlite_u64(event.accepted_generation, "accepted_generation")?;
+    sqlite_u64(event.fork_generation, "fork_generation")?;
+
+    let mut conn = store.open_connection().map_err(local_store_error)?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(local_store_error)?;
+    if let Some(existing) =
+        load_fork_event(&tx, &event.log_id, event.witness_epoch, event.event_digest)?
+    {
+        if existing.event != *event {
+            return Err(ForkWitnessError::EventIdentityConflict);
+        }
+        tx.commit().map_err(local_store_error)?;
+        return Ok(());
+    }
+
+    tx.execute(
+        "INSERT INTO witness_external_fork_events (
+            log_id, witness_epoch, event_digest, schema_version,
+            previous_event_count, previous_event_digest, accepted_generation,
+            accepted_head_digest, fork_generation, first_record_digest,
+            conflicting_record_digest, state, receipt_digest, receipt_event_count,
+            receipt_tail_digest
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, NULL, NULL, NULL)",
+        params![
+            event.log_id,
+            sqlite_u64(event.witness_epoch, "witness_epoch")?,
+            event.event_digest.as_slice(),
+            event.schema_version as i64,
+            sqlite_u64(event.previous_event_count, "previous_event_count")?,
+            event.previous_event_digest.as_slice(),
+            sqlite_u64(event.accepted_generation, "accepted_generation")?,
+            event.accepted_head_digest.as_slice(),
+            sqlite_u64(event.fork_generation, "fork_generation")?,
+            event.first_record_digest.as_slice(),
+            event.conflicting_record_digest.as_slice(),
+        ],
+    )
+    .map_err(local_store_error)?;
+    tx.commit().map_err(local_store_error)?;
+    Ok(())
+}
+
+fn local_fork_pair_exists(
+    conn: &Connection,
+    event: &ForkEvent,
+) -> Result<bool, ForkWitnessError> {
+    conn.query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM witness_fork_evidence
+            WHERE log_id=?1 AND generation=?2
+              AND ((first_record_digest=?3 AND conflicting_record_digest=?4)
+                OR (first_record_digest=?4 AND conflicting_record_digest=?3))
+         )",
+        params![
+            event.log_id,
+            sqlite_u64(event.fork_generation, "fork_generation")?,
+            event.first_record_digest.as_slice(),
+            event.conflicting_record_digest.as_slice()
+        ],
+        |row| row.get(0),
+    )
+    .map_err(local_store_error)
+}
+
+fn finalize_local_fork_receipt(
+    store: &SqliteWitnessStore,
+    receipt: &ForkAppendReceipt,
+) -> Result<(), ForkWitnessError> {
+    receipt.validate()?;
+    let event = &receipt.event;
+    let mut conn = store.open_connection().map_err(local_store_error)?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(local_store_error)?;
+    let stored = load_fork_event(&tx, &event.log_id, event.witness_epoch, event.event_digest)?
+        .ok_or(ForkWitnessError::LocalJournalCorrupt)?;
+    if stored.event != *event {
+        return Err(ForkWitnessError::EventIdentityConflict);
+    }
+    if stored.receipt.as_ref().is_some_and(|existing| existing != receipt) {
+        return Err(ForkWitnessError::InvalidReceipt(
+            "receipt differs from the previously anchored receipt",
+        ));
+    }
+
+    // Do not append the local evidence twice on retry. First validate the
+    // existing chain; a fully erased (rows + tail metadata absent) local chain
+    // can be rebuilt from the remote witness, while partial/corrupt local state
+    // fails closed instead of being silently repaired.
+    super::validate_fork_history(&tx, &event.log_id)
+        .map_err(|_| ForkWitnessError::LocalJournalCorrupt)?;
+    if !local_fork_pair_exists(&tx, event)? {
+        append_fork_evidence(
+            &tx,
+            &event.log_id,
+            event.fork_generation,
+            event.first_record_digest,
+            event.conflicting_record_digest,
+        )
+        .map_err(local_store_error)?;
+    }
+    if stored.state == 0 {
+        tx.execute(
+            "UPDATE witness_external_fork_events
+             SET state=1, receipt_digest=?1, receipt_event_count=?2, receipt_tail_digest=?3
+             WHERE log_id=?4 AND witness_epoch=?5 AND event_digest=?6 AND state=0",
+            params![
+                receipt.receipt_digest.as_slice(),
+                sqlite_u64(receipt.frontier_after.event_count, "receipt_event_count")?,
+                receipt.frontier_after.tail_digest.as_slice(),
+                event.log_id,
+                sqlite_u64(event.witness_epoch, "witness_epoch")?,
+                event.event_digest.as_slice()
+            ],
+        )
+        .map_err(local_store_error)?;
+    }
+    tx.commit().map_err(local_store_error)?;
+    Ok(())
+}
+
+fn resolve_remote_append(
+    witness: &dyn IndependentForkWitness,
+    frontier: &ForkFrontier,
+    event: &ForkEvent,
+) -> Result<ForkAppendReceipt, ForkWitnessError> {
+    let receipt = match witness.append_event(frontier, event) {
+        Ok(receipt) => receipt,
+        Err(append_error) => match witness.find_event(
+            &event.log_id,
+            event.witness_epoch,
+            event.event_digest,
+        ) {
+            Ok(Some(receipt)) => receipt,
+            Ok(None) => return Err(append_error),
+            Err(read_error) => {
+                return Err(ForkWitnessError::AmbiguousAppend(format!(
+                    "append error: {append_error}; event lookup error: {read_error}"
+                )));
+            }
+        },
+    };
+    receipt.validate()?;
+    if receipt.event != *event || receipt.previous_frontier != *frontier {
+        return Err(ForkWitnessError::InvalidReceipt(
+            "remote receipt is not bound to the pending event and prior frontier",
+        ));
+    }
+    Ok(receipt)
+}
+
+fn reconcile_stored_fork_event(
+    store: &SqliteWitnessStore,
+    stored: StoredForkEvent,
+    witness: &dyn IndependentForkWitness,
+) -> Result<ForkAppendReceipt, ForkWitnessError> {
+    if let Some(receipt) = stored.receipt {
+        finalize_local_fork_receipt(store, &receipt)?;
+        return Ok(receipt);
+    }
+    let event = stored.event;
+    match witness.find_event(&event.log_id, event.witness_epoch, event.event_digest)? {
+        Some(receipt) => {
+            receipt.validate()?;
+            if receipt.event != event {
+                return Err(ForkWitnessError::EventIdentityConflict);
+            }
+            finalize_local_fork_receipt(store, &receipt)?;
+            Ok(receipt)
+        }
+        None => {
+            let current = witness.current_frontier(&event.log_id, event.witness_epoch)?;
+            let expected = ForkFrontier {
+                log_id: event.log_id.clone(),
+                witness_epoch: event.witness_epoch,
+                event_count: event.previous_event_count,
+                tail_digest: event.previous_event_digest,
+            };
+            if current != expected {
+                if current.event_count > expected.event_count {
+                    return Err(ForkWitnessError::RemoteHistoryIncomplete);
+                }
+                return Err(ForkWitnessError::FrontierConflict);
+            }
+            let receipt = resolve_remote_append(witness, &expected, &event)?;
+            finalize_local_fork_receipt(store, &receipt)?;
+            Ok(receipt)
+        }
+    }
+}
+
+impl SqliteWitnessStore {
+    /// Persist a local pending event first, then append it to the independent
+    /// witness, verify the exact receipt, and atomically finalize local fork
+    /// evidence plus the journal state. This is an opt-in API; legacy transition
+    /// calls still use the local-only fork-evidence path.
+    pub fn record_fork_remotely(
+        &self,
+        accepted_generation: u64,
+        accepted_head_digest: Digest,
+        fork_generation: u64,
+        first_record_digest: Digest,
+        conflicting_record_digest: Digest,
+        witness_epoch: u64,
+        witness: &dyn IndependentForkWitness,
+    ) -> Result<ForkAppendReceipt, ForkWitnessError> {
+        let existing = {
+            let conn = self.open_connection().map_err(local_store_error)?;
+            find_fork_event_by_conflict(
+                &conn,
+                "",
+                witness_epoch,
+                accepted_generation,
+                accepted_head_digest,
+                fork_generation,
+                first_record_digest,
+                conflicting_record_digest,
+            )?
+        };
+        // The log ID is derived from a provisioned remote frontier. A semantic
+        // retry needs that same log ID, so read it from the caller's requested
+        // conflict scope through the witness first when no local row is found.
+        if let Some(stored) = existing {
+            return reconcile_stored_fork_event(self, stored, witness);
+        }
+
+        // Probe the frontier before choosing the stable event identity.
+        // Unknown log/epoch returns Unavailable; it is not silently provisioned.
+        let frontier = witness.current_frontier("", witness_epoch)?;
+        let event = ForkEvent::build(
+            &frontier,
+            accepted_generation,
+            accepted_head_digest,
+            fork_generation,
+            first_record_digest,
+            conflicting_record_digest,
+        )?;
+        persist_pending_fork_event(self, &frontier, &event)?;
+        let receipt = resolve_remote_append(witness, &frontier, &event)?;
+        finalize_local_fork_receipt(self, &receipt)?;
+        Ok(receipt)
+    }
+
+    /// Reconcile every locally pending event in one log/epoch. Remote append
+    /// ambiguity is resolved by stable event identity; if the witness frontier
+    /// advanced but cannot return the pending payload/receipt, the method fails
+    /// closed and leaves the local intent pending.
+    pub fn reconcile_pending_fork_events(
+        &self,
+        log_id: &str,
+        witness_epoch: u64,
+        witness: &dyn IndependentForkWitness,
+    ) -> Result<usize, ForkWitnessError> {
+        let epoch = sqlite_u64(witness_epoch, "witness_epoch")?;
+        let conn = self.open_connection().map_err(local_store_error)?;
+        let digests: Vec<Vec<u8>> = {
+            let mut statement = conn.prepare(
+                "SELECT event_digest FROM witness_external_fork_events
+                 WHERE log_id=?1 AND witness_epoch=?2 AND state=0
+                 ORDER BY previous_event_count ASC, event_digest ASC",
+            ).map_err(local_store_error)?;
+            statement
+                .query_map(params![log_id, epoch], |row| row.get(0))
+                .map_err(local_store_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(local_store_error)?
+        };
+        drop(conn);
+        let mut completed = 0usize;
+        for raw_digest in digests {
+            let event_digest = digest_column(raw_digest)?;
+            let conn = self.open_connection().map_err(local_store_error)?;
+            let stored = load_fork_event(&conn, log_id, witness_epoch, event_digest)?
+                .ok_or(ForkWitnessError::LocalJournalCorrupt)?;
+            drop(conn);
+            if stored.state == 0 {
+                reconcile_stored_fork_event(self, stored, witness)?;
+                completed = completed.checked_add(1).ok_or(ForkWitnessError::FrontierOverflow)?;
+            }
+        }
+        Ok(completed)
+    }
+
+    /// Rebuild a missing local fork log from the separately retained full event
+    /// payloads. This operation refuses partial/corrupt local chains; only an
+    /// entirely absent local fork chain is reconstructable by this version.
+    pub fn restore_fork_history_from_witness(
+        &self,
+        log_id: &str,
+        witness_epoch: u64,
+        witness: &dyn IndependentForkWitness,
+    ) -> Result<usize, ForkWitnessError> {
+        let frontier = witness.current_frontier(log_id, witness_epoch)?;
+        frontier.validate()?;
+        if frontier.event_count > i64::MAX as u64 {
+            return Err(ForkWitnessError::FrontierOverflow);
+        }
+        {
+            let conn = self.open_connection().map_err(local_store_error)?;
+            let (row_count, meta_present): (i64, i64) = conn.query_row(
+                "SELECT (SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1),
+                        (SELECT COUNT(*) FROM witness_fork_meta WHERE log_id=?1)",
+                params![log_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            ).map_err(local_store_error)?;
+            if row_count != 0 || meta_present != 0 {
+                super::validate_fork_history(&conn, log_id)
+                    .map_err(|_| ForkWitnessError::LocalJournalCorrupt)?;
+            }
+        }
+
+        let mut expected = ForkFrontier::empty(log_id, witness_epoch);
+        let mut restored = 0usize;
+        for sequence in 1..=frontier.event_count {
+            let event = witness
+                .read_event(log_id, witness_epoch, sequence)?
+                .ok_or(ForkWitnessError::RemoteHistoryIncomplete)?;
+            event.validate_for(&expected)?;
+            let receipt = witness
+                .find_event(log_id, witness_epoch, event.event_digest)?
+                .ok_or(ForkWitnessError::RemoteHistoryIncomplete)?;
+            receipt.validate()?;
+            let expected_receipt = ForkAppendReceipt::build(expected.clone(), event.clone())?;
+            if receipt != expected_receipt {
+                return Err(ForkWitnessError::RemoteHistoryIncomplete);
+            }
+            persist_pending_fork_event(self, &expected, &event)?;
+            finalize_local_fork_receipt(self, &receipt)?;
+            expected = receipt.frontier_after.clone();
+            restored = restored.checked_add(1).ok_or(ForkWitnessError::FrontierOverflow)?;
+        }
+        if expected != frontier {
+            return Err(ForkWitnessError::RemoteHistoryIncomplete);
+        }
+        Ok(restored)
+    }
+}
+
+pub(crate) fn validate_external_fork_journal(
+    conn: &Connection,
+    log_id: &str,
+) -> Result<(), &'static str> {
+    let mut statement = conn
+        .prepare(
+            "SELECT event_digest FROM witness_external_fork_events
+             WHERE log_id=?1 ORDER BY witness_epoch ASC, previous_event_count ASC",
+        )
+        .map_err(|_| "external fork journal query failed")?;
+    let raw = statement
+        .query_map(params![log_id], |row| row.get::<_, Vec<u8>>(0))
+        .map_err(|_| "external fork journal query failed")?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| "external fork journal row read failed")?;
+    drop(statement);
+    for bytes in raw {
+        let digest = digest_column(bytes).map_err(|_| "external fork journal digest malformed")?;
+        let stored = load_fork_event(conn, log_id, {
+            let row: i64 = conn
+                .query_row(
+                    "SELECT witness_epoch FROM witness_external_fork_events
+                     WHERE log_id=?1 AND event_digest=?2",
+                    params![log_id, digest.as_slice()],
+                    |row| row.get(0),
+                )
+                .map_err(|_| "external fork journal scope malformed")?;
+            checked_u64(row).map_err(|_| "external fork journal scope malformed")?
+        }, digest)
+        .map_err(|_| "external fork journal row malformed")?
+        .ok_or("external fork journal row missing")?;
+        if stored.event.event_digest != digest {
+            return Err("external fork journal identity mismatch");
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
