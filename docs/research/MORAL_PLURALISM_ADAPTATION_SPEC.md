@@ -262,3 +262,22 @@ Symthaea should become capable of reasoning across moral traditions without pret
 - Reconcile the stale 91.1% care-classification claim against the README's corrected 56.2% headline before using either as qualified evidence.
 
 This decision makes pluralism an extension of Symthaea's existing engine, not a parallel moral authority.
+
+
+## 11. Implementation and current research update — 2026-10-09
+
+### First additive code seam
+
+A separate draft implementation now exists in [PR #7264](https://github.com/Luminous-Dynamics/symthaea/pull/7264), adding `src/cognitive_loop/ethical_pluralism.rs`. This is deliberately a **comparison contract**, not a complete evaluator or replacement engine. It validates versioned assessment identity, rationale, premise references, optional confidence, and evidence references, then reports agreement, disagreement, incompleteness, or invalid input. It has no tool permission or execution field.
+
+The initial unit tests cover empty input, unanimous support/opposition, explicit disagreement, conditional judgments, duplicate framework/version records, invalid confidence, missing traceability, blank source references, and order-independent aggregate status. They have been authored but not run in this workflow. The module is not yet wired to generate assessments from MoralAlgebra or UnifiedValueEvaluator; those adapters and integration gates remain future work.
+
+### Principle-priority robustness is now a required test dimension
+
+A 2026 study in *Computers in Human Behavior Reports* reports that changing the priority order of ethical principles can reverse model decisions, while transparent ethical-priority policies are often underspecified. See [“What is (More) ethical in AI when ethical principles compete?”](https://doi.org/10.1016/j.chbr.2026.101182).
+
+Implication for Symthaea: profile metadata must distinguish a framework's principles from its conflict-resolution/prioritization rule. The engine must not accidentally treat list order, map iteration order, HDC bundle order, or whichever adapter ran first as moral priority. If a framework specifies priorities, encode and version that rule explicitly. If priority is unspecified and materially affects the answer, return a conflict/underdetermined result and expose a sensitivity analysis.
+
+A new study, [AMULED: Addressing Moral Uncertainty using Large language models for Ethical Decision-making](https://doi.org/10.3389/frai.2026.1754973), is another recent multi-theory proposal. It reinforces that multi-framework ethics is an active area of research, not a unique invention of this project. Symthaea's contribution must therefore be demonstrated through exact-head integration, faithful framework implementation, meaningful held-out tests, and clear evidence—not the mere presence of several labels.
+
+The code-level comparison primitive's order-invariance test checks only that the **aggregation of already-produced assessments** does not depend on input order. It does not prove that framework evaluators or their internal priority rules are order-invariant; those require separate tests.
