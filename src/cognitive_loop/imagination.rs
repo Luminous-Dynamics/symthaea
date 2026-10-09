@@ -126,7 +126,6 @@ impl CognitiveLoopService {
 
         let manifold = bridge.manifold_mut();
         let current = manifold.state().clone();
-        let compute_cost_before = manifold.geodesic_compute_cost;
 
         // Prefer a recognized scene only when its stored encoding is valid.
         // Otherwise, seed goal-directed refinement from the endpoint of the
@@ -137,6 +136,26 @@ impl CognitiveLoopService {
             .filter(|goal| {
                 !goal.values.is_empty() && goal.values.iter().all(|value| value.is_finite())
             });
+
+        // Preflight the deterministic work budget before running either rollout.
+        // Keep these rates aligned with dream_ahead (0.008 per step) and
+        // select_best_geodesic (0.012 per step-candidate evaluation).
+        let candidate_count = 4usize;
+        let Some(candidate_evaluations) = steps.checked_mul(candidate_count) else {
+            return Err(ImagineFutureError::ThermodynamicOverload(f32::INFINITY));
+        };
+        let geodesic_cost = candidate_evaluations as f32 * 0.012;
+        let rollout_cost = if remembered_goal.is_some() {
+            0.0
+        } else {
+            steps as f32 * 0.008
+        };
+        let estimated_cost = geodesic_cost + rollout_cost;
+        let projected_load = self.thermodynamic_load + estimated_cost;
+        if !estimated_cost.is_finite() || !projected_load.is_finite() || projected_load > 0.95 {
+            return Err(ImagineFutureError::ThermodynamicOverload(projected_load));
+        }
+
         let (goal, goal_source) = if let Some(goal) = remembered_goal {
             (goal, "remembered_scene")
         } else {
@@ -158,15 +177,9 @@ impl CognitiveLoopService {
             return Err(ImagineFutureError::NoGeodesic);
         }
 
-        // Charge only the work performed by this call, not the manifold's lifetime
-        // accumulated compute cost from previous imagination requests.
-        let cost = (manifold.geodesic_compute_cost - compute_cost_before).max(0.0);
-        if self.thermodynamic_load + cost > 0.95 {
-            return Err(ImagineFutureError::ThermodynamicOverload(
-                self.thermodynamic_load + cost,
-            ));
-        }
-        self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
+        // Charge only this call's deterministic work estimate. Never charge the
+        // manifold's lifetime accumulated telemetry as though it were per-call cost.
+        self.thermodynamic_load = (self.thermodynamic_load + estimated_cost).min(1.0);
 
         // Decode the path into a viewable mental movie
         let frames = manifold.decode_geodesic_to_frames_improved(&path);
