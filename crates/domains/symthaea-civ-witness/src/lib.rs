@@ -973,42 +973,86 @@ impl SqliteWitnessStore {
         event: &fork_witness::ForkEvent,
         witness: &dyn fork_witness::IndependentForkWitness,
     ) -> Result<fork_witness::ForkAppendReceipt, WitnessError> {
-        use fork_witness::{ForkWitnessError, ForkAppendReceipt};
+        use fork_witness::{ForkAppendReceipt, ForkFrontier, ForkWitnessError};
 
         event.validate()?;
-        if let Some(receipt) = witness
-            .find_event(&event.log_id, event.witness_epoch, event.event_digest)?
-        {
-            receipt.validate()?;
-            if receipt.event != *event {
+        let predecessor = ForkFrontier {
+            log_id: event.log_id.clone(),
+            witness_epoch: event.witness_epoch,
+            event_count: event.previous_event_count,
+            tail_digest: event.previous_event_digest,
+        };
+        predecessor.validate()?;
+        event.validate_for(&predecessor)?;
+
+        // Persist the exact event before the first witness request. If the
+        // witness is unavailable even for readback, the pending payload remains
+        // available for an exact retry after the process or connection recovers.
+        let next_count = event
+            .previous_event_count
+            .checked_add(1)
+            .ok_or(ForkWitnessError::FrontierOverflow)?;
+        let sequence = i64::try_from(next_count)
+            .map_err(|_| ForkWitnessError::FrontierOverflow)?;
+        let epoch_sql = i64::try_from(event.witness_epoch)
+            .map_err(|_| WitnessError::InvalidInput("witness epoch exceeds SQLite INTEGER range"))?;
+        let conn = self.open_connection()?;
+        validate_fork_witness_journal(&conn, &event.log_id, epoch_sql)?;
+        let existing = load_fork_witness_event(
+            &conn,
+            &event.log_id,
+            event.witness_epoch,
+            sequence,
+        )?;
+        if let Some(row) = existing.as_ref() {
+            if row.event != *event {
                 return Err(ForkWitnessError::EventIdentityConflict.into());
             }
-            verify_remote_fork_witness_receipt(&receipt, witness)?;
-            self.finalize_fork_witness_event(&receipt)?;
-            return Ok(receipt);
+        }
+        let already_anchored = existing.as_ref().is_some_and(|row| row.status == 1);
+        drop(conn);
+        if !already_anchored {
+            self.prepare_fork_witness_event(event, &predecessor)?;
         }
 
-        let frontier = witness.current_frontier(&event.log_id, event.witness_epoch)?;
-        event.validate_for(&frontier)?;
-        self.prepare_fork_witness_event(event, &frontier)?;
-
-        let receipt: ForkAppendReceipt = match witness.append_event(&frontier, event) {
-            Ok(receipt) => receipt,
-            Err(ForkWitnessError::AppendIndeterminate) => {
-                match witness.find_event(&event.log_id, event.witness_epoch, event.event_digest)? {
-                    Some(receipt) => receipt,
-                    None => {
-                        // Do not delete the pending row or invent a success. A
-                        // later exact retry can resolve the stable event identity.
-                        return Err(ForkWitnessError::AppendIndeterminate.into());
+        // The stable identity lookup comes only after local pending persistence.
+        // An existing remote append can therefore be reconciled by exact receipt
+        // readback without producing another remote event.
+        let receipt: ForkAppendReceipt = match witness.find_event(
+            &event.log_id,
+            event.witness_epoch,
+            event.event_digest,
+        )? {
+            Some(receipt) => receipt,
+            None => {
+                let current = witness.current_frontier(&event.log_id, event.witness_epoch)?;
+                current.validate()?;
+                if current != predecessor {
+                    return Err(ForkWitnessError::FrontierConflict.into());
+                }
+                match witness.append_event(&predecessor, event) {
+                    Ok(receipt) => receipt,
+                    Err(ForkWitnessError::AppendIndeterminate) => {
+                        match witness.find_event(
+                            &event.log_id,
+                            event.witness_epoch,
+                            event.event_digest,
+                        )? {
+                            Some(receipt) => receipt,
+                            None => {
+                                // Keep the local row pending: this response is
+                                // explicitly indeterminate, never false success.
+                                return Err(ForkWitnessError::AppendIndeterminate.into());
+                            }
+                        }
                     }
+                    Err(error) => return Err(error.into()),
                 }
             }
-            Err(error) => return Err(error.into()),
         };
 
         receipt.validate()?;
-        if receipt.event != *event || receipt.previous_frontier != frontier {
+        if receipt.event != *event || receipt.previous_frontier != predecessor {
             return Err(ForkWitnessError::FrontierConflict.into());
         }
         verify_remote_fork_witness_receipt(&receipt, witness)?;
@@ -2272,6 +2316,7 @@ mod tests {
     struct MemoryForkWitness {
         events: Mutex<HashMap<(String, u64), Vec<fork_witness::ForkAppendReceipt>>>,
         lose_next_reply: Mutex<bool>,
+        fail_next_find: Mutex<bool>,
         forced_frontier: Mutex<Option<fork_witness::ForkFrontier>>,
     }
 
@@ -2286,6 +2331,10 @@ mod tests {
 
         fn lose_next_append_reply(&self) {
             *self.lose_next_reply.lock().expect("fork witness response-loss lock") = true;
+        }
+
+        fn fail_next_event_lookup(&self) {
+            *self.fail_next_find.lock().expect("fork witness lookup-failure lock") = true;
         }
 
         fn force_frontier(&self, frontier: fork_witness::ForkFrontier) {
@@ -2383,6 +2432,14 @@ mod tests {
             witness_epoch: u64,
             event_digest: Digest,
         ) -> Result<Option<fork_witness::ForkAppendReceipt>, fork_witness::ForkWitnessError> {
+            let mut fail = self.fail_next_find.lock().map_err(|_| {
+                fork_witness::ForkWitnessError::Other("fork witness lookup-failure lock poisoned".into())
+            })?;
+            if *fail {
+                *fail = false;
+                return Err(fork_witness::ForkWitnessError::Unavailable);
+            }
+            drop(fail);
             let events = self.events.lock().map_err(|_| {
                 fork_witness::ForkWitnessError::Other("fork witness lock poisoned".into())
             })?;
@@ -2805,6 +2862,54 @@ mod tests {
             1,
         );
         assert_eq!(reopened.integrity_check().expect("store integrity"), "ok");
+    }
+
+    #[test]
+    fn witness_unavailable_before_readback_preserves_local_pending_event() {
+        let db = TempDb::new();
+        let store = db.open();
+        let witness = MemoryForkWitness::default();
+        let log_id = "log-witness-unavailable-before-readback";
+        let epoch = 10;
+        witness.provision(log_id, epoch);
+        let frontier = witness.current_frontier(log_id, epoch).expect("provisioned frontier");
+        let event = fork_witness::ForkEvent::build(
+            &frontier,
+            1,
+            h(b"accepted-head-unavailable-first-read"),
+            1,
+            h(b"fork-first-unavailable-first-read"),
+            h(b"fork-conflict-unavailable-first-read"),
+        )
+        .expect("build event");
+        witness.fail_next_event_lookup();
+
+        assert!(matches!(
+            store.append_fork_witness_event(&event, &witness),
+            Err(WitnessError::ForkWitness(fork_witness::ForkWitnessError::Unavailable)),
+        ));
+        let conn = store.open_connection().expect("inspect retained pending row");
+        let (count, status, receipt): (i64, i64, Option<Vec<u8>>) = conn.query_row(
+            "SELECT m.event_count, e.status, e.receipt_digest
+             FROM witness_fork_witness_meta m
+             JOIN witness_fork_witness_events e
+               ON e.log_id=m.log_id AND e.witness_epoch=m.witness_epoch
+             WHERE m.log_id=?1 AND m.witness_epoch=?2 AND e.sequence=1",
+            params![log_id, epoch],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).expect("pending row exists even though first remote lookup failed");
+        assert_eq!(count, 0, "local frontier must not advance on lookup failure");
+        assert_eq!(status, 0, "event remains pending");
+        assert!(receipt.is_none(), "pending event has no receipt");
+        drop(conn);
+
+        assert_eq!(store.integrity_check().expect("pending journal integrity"), "ok");
+        let recovered = store.retry_pending_fork_witness_event(log_id, epoch, &witness)
+            .expect("retry exact pending payload")
+            .expect("pending event eventually finalized");
+        assert_eq!(recovered.event, event);
+        assert_eq!(witness.current_frontier(log_id, epoch).expect("remote frontier").event_count, 1);
+        assert_eq!(store.integrity_check().expect("final journal integrity"), "ok");
     }
 
     #[test]
