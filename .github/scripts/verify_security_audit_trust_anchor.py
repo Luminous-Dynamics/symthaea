@@ -430,13 +430,17 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
 def best_effort_failure_status(repo: str, subject: str, token: str, reason: str,
                                 target: str | None = None, *, workflow_id: int | None = None,
                                 event_name: str | None = None, repository_id: str | None = None,
-                                head_repository_id: str | None = None) -> bool:
+                                head_repository_id: str | None = None, current_repository_id: str | None = None,
+                                pull_request_base_ref: str | None = None, default_branch: str = "main") -> bool:
     """Clear stale success only for an event matching the expected same-repo audit source."""
     if repo not in POLICY or not token or not re.fullmatch(r"[0-9a-f]{40}", subject):
         return False
     if workflow_id != POLICY[repo]["workflow_id"] or event_name != "pull_request":
         return False
-    if not repository_id or not head_repository_id or repository_id != head_repository_id:
+    if pull_request_base_ref != default_branch:
+        return False
+    if (not repository_id or not head_repository_id or not current_repository_id
+            or repository_id != head_repository_id or repository_id != current_repository_id):
         return False
     try:
         post_status(repo, subject, token, "failure",
@@ -496,6 +500,9 @@ def main() -> int:
                 event_name=os.environ.get("TRIGGER_RUN_EVENT", "").strip(),
                 repository_id=os.environ.get("TRIGGER_RUN_REPOSITORY_ID", "").strip(),
                 head_repository_id=os.environ.get("TRIGGER_RUN_HEAD_REPOSITORY_ID", "").strip(),
+                current_repository_id=os.environ.get("CURRENT_REPOSITORY_ID", "").strip(),
+                pull_request_base_ref=os.environ.get("TRIGGER_RUN_PR_BASE_REF", "").strip(),
+                default_branch=default_branch,
             )
         if isinstance(exc, VerificationError):
             raise
