@@ -760,6 +760,17 @@ fn main() {
         .expect("preserve conflicting view");
     assert_eq!(fork_store.recover(), Ok(before_fork.clone()));
     assert_eq!(fork_store.disk.fork_evidence.len(), 1);
+
+    // A validly hashed history becomes invalid if conflict evidence is reordered.
+    let mut reordered_forks = fork_store.clone();
+    reordered_forks
+        .record_fork(6, hash_bytes(b"root-c"), hash_bytes(b"root-d"))
+        .expect("append second conflict record");
+    reordered_forks.disk.fork_evidence.swap(0, 1);
+    assert_eq!(
+        reordered_forks.recover(),
+        Err(Failure::ForkEvidenceCorrupt)
+    );
     assert_eq!(
         fork_store.record_fork(5, hash_bytes(b"same"), hash_bytes(b"same")),
         Err(Failure::InvalidForkEvidence)
