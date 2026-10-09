@@ -23,7 +23,7 @@ pub type Digest = [u8; 32];
 
 const PROTOCOL_VERSION: u16 = 1;
 const SCHEMA_VERSION: i64 = 1;
-const DB_SCHEMA_VERSION: i64 = 2;
+const DB_SCHEMA_VERSION: i64 = 3;
 const RECORD_DOMAIN: &[u8] = b"mycelix-civ013-durable-record-v1\0";
 const FORK_DOMAIN: &[u8] = b"mycelix-civ013-durable-fork-v1\0";
 const ZERO_DIGEST: Digest = [0; 32];
@@ -75,6 +75,33 @@ CREATE TABLE IF NOT EXISTS witness_fork_meta (
     evidence_count INTEGER NOT NULL CHECK (evidence_count > 0),
     tail_digest BLOB NOT NULL CHECK (length(tail_digest) = 32)
 );
+CREATE TABLE IF NOT EXISTS witness_external_fork_events (
+    log_id TEXT NOT NULL,
+    witness_epoch INTEGER NOT NULL CHECK (witness_epoch >= 0),
+    event_digest BLOB NOT NULL CHECK (length(event_digest) = 32),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+    previous_event_count INTEGER NOT NULL CHECK (previous_event_count >= 0),
+    previous_event_digest BLOB NOT NULL CHECK (length(previous_event_digest) = 32),
+    accepted_generation INTEGER NOT NULL CHECK (accepted_generation >= 0),
+    accepted_head_digest BLOB NOT NULL CHECK (length(accepted_head_digest) = 32),
+    fork_generation INTEGER NOT NULL CHECK (fork_generation > 0),
+    first_record_digest BLOB NOT NULL CHECK (length(first_record_digest) = 32),
+    conflicting_record_digest BLOB NOT NULL CHECK (length(conflicting_record_digest) = 32),
+    state INTEGER NOT NULL CHECK (state IN (0, 1)),
+    receipt_digest BLOB,
+    receipt_event_count INTEGER,
+    receipt_tail_digest BLOB,
+    PRIMARY KEY (log_id, witness_epoch, event_digest),
+    CHECK (first_record_digest != conflicting_record_digest),
+    CHECK (
+      (state = 0 AND receipt_digest IS NULL AND receipt_event_count IS NULL AND receipt_tail_digest IS NULL)
+      OR
+      (state = 1 AND length(receipt_digest) = 32 AND receipt_event_count > previous_event_count
+          AND length(receipt_tail_digest) = 32 AND receipt_tail_digest = event_digest)
+    )
+);
+CREATE INDEX IF NOT EXISTS witness_external_fork_pending_idx
+    ON witness_external_fork_events(log_id, witness_epoch, state, previous_event_count);
 CREATE INDEX IF NOT EXISTS witness_records_status_idx
     ON witness_records(log_id, status, generation);
 ";
@@ -327,11 +354,12 @@ impl SqliteWitnessStore {
         )?;
         conn.execute_batch(SCHEMA)?;
 
-        // Databases created before user_version 2 have the original fork rows
-        // but not the tail-commitment table. Validate each legacy chain before
-        // atomically backfilling its count/tail commitment. New databases need
-        // no backfill. Once version 2 is recorded, missing commitments are
-        // treated as corruption rather than silently reconstructed.
+        // Databases created before user_version 2 have fork rows but no local
+        // tail commitment. Validate each legacy chain before backfilling it.
+        // Schema version 3 adds the local pending/anchored journal for the
+        // independent fork-witness protocol. The table is created above before
+        // the schema version is advanced; an unavailable remote witness never
+        // causes a pending event to be treated as committed.
         if previous_schema_version < DB_SCHEMA_VERSION {
             if had_adapter_schema != 0 {
                 migrate_legacy_fork_metadata(&mut conn)?;
