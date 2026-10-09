@@ -177,6 +177,12 @@ pub struct LoadServiceReport {
     /// deterministic guard; this remains explicit for consumers needing the
     /// conventional critical/noncritical accounting split.
     pub noncritical_unserved_kwh: f64,
+    /// True when an islanded command requested net charging but the plant has
+    /// no modeled generation source to supply it.
+    pub islanded_charge_inhibited: bool,
+    /// True when the requested islanded battery discharge exceeded the
+    /// currently modeled local load and was bounded to avoid unmodeled export.
+    pub islanded_discharge_capped: bool,
 }
 
 impl LoadServiceReport {
@@ -327,9 +333,48 @@ impl LoadServiceReport {
             self.unused_storage_supply_kwh, self.battery_charge_input_kwh,
             self.noncritical_unserved_kwh,
         ];
+        let close = |left: f64, right: f64| {
+            (left - right).abs() <= 1e-9 * self.total_demand_kwh.max(1.0)
+        };
         values.iter().all(|value| value.is_finite() && *value >= 0.0)
-            && (self.energy_balance_residual_kwh().abs()
-                <= 1e-9 * self.total_demand_kwh.max(1.0))
+            && close(
+                self.total_served_kwh + self.intentional_shed_kwh + self.total_unserved_kwh,
+                self.total_demand_kwh,
+            )
+            && close(
+                self.critical_served_kwh + self.critical_unserved_kwh,
+                self.critical_demand_kwh,
+            )
+            && close(
+                self.deferrable_served_kwh + self.deferrable_shed_kwh,
+                self.deferrable_demand_kwh,
+            )
+            && close(
+                self.community_auxiliary_served_kwh + self.community_auxiliary_shed_kwh,
+                self.community_auxiliary_demand_kwh,
+            )
+            && close(
+                self.cooling_served_kwh + self.cooling_shed_kwh
+                    + self.protected_cooling_unserved_kwh,
+                self.cooling_demand_kwh,
+            )
+            && close(
+                self.heating_served_kwh + self.heating_shed_kwh,
+                self.heating_demand_kwh,
+            )
+            && close(
+                self.auxiliary_served_kwh + self.auxiliary_shed_kwh
+                    + self.protected_cooling_unserved_kwh,
+                self.auxiliary_demand_kwh,
+            )
+            && close(
+                self.storage_supply_to_load_kwh + self.grid_supply_to_load_kwh,
+                self.total_served_kwh,
+            )
+            && close(
+                self.energy_balance_residual_kwh(),
+                0.0,
+            )
     }
 }
 
@@ -580,7 +625,7 @@ impl GridPhysicsInfrastructureSimulator {
         // Account each load bucket independently. In islanded mode the report
         // is also the deterministic guard's explicit shed decision and service
         // receipt. In grid-tied mode the idealized infinite bus serves demand.
-        let load_report = LoadServiceReport::allocate(
+        let mut load_report = LoadServiceReport::allocate(
             community_load_kw,
             cooling_load_kw,
             heating_load_kw,
@@ -590,6 +635,10 @@ impl GridPhysicsInfrastructureSimulator {
             discharge_delivered_ac_kwh,
             battery_charge_input_kwh,
         );
+        load_report.islanded_charge_inhibited =
+            is_islanded && net_storage_command_frac < 0.0;
+        load_report.islanded_discharge_capped =
+            is_islanded && requested_discharge_power_kw > total_requested_load_kw;
         if !load_report.is_valid() {
             return Err(GridPhysicsStepError::InvalidDerivedPhysics);
         }
@@ -1147,6 +1196,79 @@ mod failure_mode_tests {
                 BatteryError::InvalidConfiguration
             ))
         );
+    }
+
+    #[test]
+    fn load_guard_serves_critical_demand_before_shedding_eligible_buckets() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.5; // enough for critical demand, not the whole load
+        cmd.torques[2] = 0.2; // ordinary cooling is shed-able below thermal threshold
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        let report = sim.load_service_report();
+        assert!(report.critical_demand_kwh > 0.0);
+        assert_eq!(report.critical_unserved_kwh, 0.0);
+        assert!((report.critical_served_kwh - report.critical_demand_kwh).abs() < 1e-12);
+        assert!(report.intentional_shed_kwh > 0.0);
+        assert_eq!(report.total_unserved_kwh, 0.0);
+        assert_eq!(sim.state().unserved_demand_ratio(), 0.0);
+        assert!(sim.state().shed_load_ratio() > 0.0);
+        assert!(report.energy_balance_residual_kwh().abs() < 1e-12);
+        assert!(report.is_valid());
+    }
+
+    #[test]
+    fn load_guard_reports_critical_shortfall_when_storage_cannot_cover_it() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.1; // materially below the critical load bucket
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        let report = sim.load_service_report();
+        assert!(report.critical_unserved_kwh > 0.0);
+        assert!(report.total_unserved_kwh >= report.critical_unserved_kwh);
+        assert!(report.intentional_shed_kwh > 0.0);
+        assert_eq!(report.noncritical_unserved_kwh, 0.0);
+        assert!(sim.state().unserved_demand_ratio() > 0.0);
+        assert!(sim.state().shed_load_ratio() > 0.0);
+        assert!(report.energy_balance_residual_kwh().abs() < 1e-12);
+    }
+
+    #[test]
+    fn thermally_protected_cooling_is_reported_unserved_not_shed() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        sim.state.channels[THERMAL_RUNAWAY_RISK] = 0.5;
+        sim.state.channels[COOLANT_TEMP_C] = 70.0;
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.35;
+        cmd.torques[2] = 1.0;
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        let report = sim.load_service_report();
+        assert!(report.protected_cooling_demand_kwh > 0.0);
+        assert!(report.protected_cooling_unserved_kwh > 0.0);
+        assert_eq!(report.cooling_shed_kwh, 0.0);
+        assert!(report.total_unserved_kwh > 0.0);
+        assert!(report.energy_balance_residual_kwh().abs() < 1e-12);
+    }
+
+    #[test]
+    fn islanded_guard_disables_unfunded_charging_and_caps_excess_discharge() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let soc_before = sim.battery.soc();
+        let mut charge = InfrastructureCommand::zero();
+        charge.torques[0] = 1.0;
+        assert_eq!(sim.try_step(&charge, 0.005), Ok(()));
+        assert!(sim.load_service_report().islanded_charge_inhibited);
+        assert_eq!(sim.load_service_report().battery_charge_input_kwh, 0.0);
+        assert_eq!(sim.battery.soc(), soc_before);
+
+        let mut excess = InfrastructureCommand::zero();
+        excess.torques[1] = 1.0;
+        assert_eq!(sim.try_step(&excess, 0.005), Ok(()));
+        assert!(sim.load_service_report().islanded_discharge_capped);
+        assert!(sim.load_service_report().unused_storage_supply_kwh < 1e-12);
     }
 
     #[test]
