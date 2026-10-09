@@ -13,11 +13,15 @@ type Hash = [u8; 32];
 const RECORD_DOMAIN: &[u8] = b"mycelix-civ013-witness-record-v1\0";
 const COMMIT_DOMAIN: &[u8] = b"mycelix-civ013-commit-marker-v1\0";
 const RECEIPT_DOMAIN: &[u8] = b"TEST-ONLY-NOT-A-WITNESS-SIGNATURE-civ013-v1\0";
+const SUPPORTED_PROTOCOL_VERSION: u16 = 1;
+const DEFAULT_POLICY_VERSION: &str = "policy-v1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Record {
+    protocol_version: u16,
     generation: u64,
     log_id: String,
+    policy_version: String,
     anchor_digest: Hash,
     receipt_sequence: u64,
     receipt_digest: Option<Hash>,
@@ -113,8 +117,10 @@ fn option_hash(out: &mut Vec<u8>, value: Option<Hash>) {
 }
 
 fn record_digest(
+    protocol_version: u16,
     generation: u64,
     log_id: &str,
+    policy_version: &str,
     anchor_digest: Hash,
     receipt_sequence: u64,
     receipt_digest: Option<Hash>,
@@ -122,8 +128,10 @@ fn record_digest(
 ) -> Hash {
     let mut encoded = Vec::new();
     encoded.extend_from_slice(RECORD_DOMAIN);
+    encoded.extend_from_slice(&protocol_version.to_be_bytes());
     encoded.extend_from_slice(&generation.to_be_bytes());
     encode_field(&mut encoded, log_id.as_bytes());
+    encode_field(&mut encoded, policy_version.as_bytes());
     encoded.extend_from_slice(&anchor_digest);
     encoded.extend_from_slice(&receipt_sequence.to_be_bytes());
     option_hash(&mut encoded, receipt_digest);
@@ -134,22 +142,27 @@ fn record_digest(
 fn make_record(
     generation: u64,
     log_id: &str,
+    policy_version: &str,
     anchor_digest: Hash,
     receipt_sequence: u64,
     receipt_digest: Option<Hash>,
     previous_record_digest: Option<Hash>,
 ) -> Record {
     let digest = record_digest(
+        SUPPORTED_PROTOCOL_VERSION,
         generation,
         log_id,
+        policy_version,
         anchor_digest,
         receipt_sequence,
         receipt_digest,
         previous_record_digest,
     );
     Record {
+        protocol_version: SUPPORTED_PROTOCOL_VERSION,
         generation,
         log_id: log_id.to_owned(),
+        policy_version: policy_version.to_owned(),
         anchor_digest,
         receipt_sequence,
         receipt_digest,
@@ -196,6 +209,7 @@ impl WitnessModel {
         let initial = make_record(
             1,
             log_id,
+            DEFAULT_POLICY_VERSION,
             trusted_anchor_digest,
             receipt_sequence,
             receipt_digest,
@@ -233,12 +247,16 @@ impl WitnessModel {
             let expected_generation =
                 u64::try_from(index).map_err(|_| Failure::JournalCorrupt)? + 1;
             let expected_previous = previous.as_ref().map(|value| value.digest);
-            if record.generation != expected_generation
+            if record.protocol_version != SUPPORTED_PROTOCOL_VERSION
+                || record.policy_version.is_empty()
+                || record.generation != expected_generation
                 || record.previous_record_digest != expected_previous
                 || record.digest
                     != record_digest(
+                        record.protocol_version,
                         record.generation,
                         &record.log_id,
+                        &record.policy_version,
                         record.anchor_digest,
                         record.receipt_sequence,
                         record.receipt_digest,
@@ -364,6 +382,7 @@ impl WitnessModel {
         let candidate = make_record(
             generation,
             &current.log_id,
+            &current.policy_version,
             proposed_anchor_digest,
             receipt_sequence,
             receipt_digest,
@@ -590,6 +609,26 @@ fn main() {
     .expect("trusted bootstrap");
     corrupt.disk.markers[0].digest[0] ^= 1;
     assert_eq!(corrupt.recover(), Err(Failure::JournalCorrupt));
+    let mut unsupported_version = WitnessModel::bootstrap(
+        "witness-version",
+        "civ-log-v1",
+        initial_anchor,
+        4,
+        initial_tail,
+    )
+    .expect("trusted bootstrap");
+    unsupported_version.disk.records[0].protocol_version = 2;
+    assert_eq!(unsupported_version.recover(), Err(Failure::JournalCorrupt));
+    let mut changed_policy = WitnessModel::bootstrap(
+        "witness-policy",
+        "civ-log-v1",
+        initial_anchor,
+        4,
+        initial_tail,
+    )
+    .expect("trusted bootstrap");
+    changed_policy.disk.records[0].policy_version = "policy-v2".to_owned();
+    assert_eq!(changed_policy.recover(), Err(Failure::JournalCorrupt));
     let mut receipt_rollback = WitnessModel::bootstrap(
         "witness-receipt-rollback",
         "civ-log-v1",
