@@ -23,6 +23,8 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             with self.subTest(repo=repo):
                 self.assertRegex(policy["workflow_blob"], r"^[0-9a-f]{40}$")
                 self.assertGreater(policy["workflow_id"], 0)
+                if policy.get("engine_sha") is not None:
+                    self.assertEqual(policy["engine_sha"], module.ENGINE_SHA)
         self.assertRegex(module.ENGINE_SHA, r"^[0-9a-f]{40}$")
         self.assertRegex(module.ENGINE_BLOB, r"^[0-9a-f]{40}$")
 
@@ -132,6 +134,12 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             with self.subTest(broken=broken):
                 with self.assertRaises(module.VerificationError):
                     module.validate_verdict(broken, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run)
+
+    def test_verdict_engine_commit_is_policy_bound(self):
+        payload, run = self.make_verdict()
+        payload["audit_engine_sha"] = "c" * 40
+        with self.assertRaises(module.VerificationError):
+            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run)
 
     def test_pass_with_findings_is_distinct_and_consistent(self):
         payload, run = self.make_verdict()
