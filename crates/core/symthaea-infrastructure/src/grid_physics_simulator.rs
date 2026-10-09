@@ -27,14 +27,15 @@
 //! `VoltageDroop`/reactive-power machinery is intentionally unused here;
 //! islanded-mode voltage droop is instead approximated by a simple linear
 //! inverter-output-impedance term keyed to real power, documented inline.
-//! **Load-service contract**: the illustrative demand profile is divided into
-//! 35% protected community demand, 55% deferrable community demand, and 10%
-//! ordinary community auxiliary demand. In islanded mode a deterministic
+//! **Load-service contract**: the default illustrative demand profile is
+//! divided into 35% protected community demand, 55% deferrable community
+//! demand, and 10% ordinary community auxiliary demand. A validated per-sim
+//! policy can override these synthetic ratios. In islanded mode a deterministic
 //! local guard allocates storage output by priority and reports demand/served/
-//! intentional-shed/unserved energy independently. Cooling becomes a protected
-//! auxiliary only above a documented thermal-risk threshold. These ratios are
-//! synthetic scaffolding, not metered community criticality or a deployable
-//! load-control policy; local interlocks are simulation behavior only.
+//! intentional-shed/unserved energy independently. Cooling becomes protected
+//! only above a configured thermal-risk threshold. Defaults are scaffolding,
+//! not metered community criticality or a deployable load-control policy;
+//! local interlocks are simulation behavior only.
 
 use symthaea_grid_physics::battery::{Battery, BatteryError};
 use symthaea_grid_physics::droop::FrequencyDroop;
@@ -1348,6 +1349,70 @@ mod failure_mode_tests {
             Err(GridPhysicsStepError::BatteryOperation(
                 BatteryError::InvalidConfiguration
             ))
+        );
+    }
+
+    #[test]
+    fn load_service_policy_rejects_invalid_fractions_and_thresholds() {
+        let invalid_policies = [
+            LoadServicePolicy {
+                critical_community_fraction: 0.0,
+                deferrable_community_fraction: 0.9,
+                auxiliary_community_fraction: 0.1,
+                ..LoadServicePolicy::default()
+            },
+            LoadServicePolicy {
+                critical_community_fraction: 0.4,
+                deferrable_community_fraction: 0.4,
+                auxiliary_community_fraction: 0.4,
+                ..LoadServicePolicy::default()
+            },
+            LoadServicePolicy {
+                protected_cooling_thermal_risk_threshold: f64::NAN,
+                ..LoadServicePolicy::default()
+            },
+            LoadServicePolicy {
+                protected_cooling_thermal_risk_threshold: 1.01,
+                ..LoadServicePolicy::default()
+            },
+        ];
+
+        for policy in invalid_policies {
+            assert!(matches!(
+                GridPhysicsInfrastructureSimulator::try_new_with_load_service_policy(policy),
+                Err(GridPhysicsStepError::InvalidLoadServicePolicy)
+            ));
+        }
+    }
+
+    #[test]
+    fn simulator_uses_validated_custom_criticality_policy() {
+        let policy = LoadServicePolicy {
+            critical_community_fraction: 0.60,
+            deferrable_community_fraction: 0.30,
+            auxiliary_community_fraction: 0.10,
+            protected_cooling_thermal_risk_threshold: 0.50,
+        };
+        let mut sim = GridPhysicsInfrastructureSimulator::try_new_with_load_service_policy(policy)
+            .expect("finite fractions summing to one should be accepted");
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.5;
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        assert_eq!(sim.load_service_policy(), policy);
+        assert!(
+            (sim.state().channels[CRITICAL_LOAD_FRACTION] - 0.60).abs() < 1e-9,
+            "state channel must reflect configured critical fraction: {}",
+            sim.state().channels[CRITICAL_LOAD_FRACTION]
+        );
+        let report = sim.load_service_report();
+        assert!(
+            (report.critical_demand_kwh
+                / (report.critical_demand_kwh + report.deferrable_demand_kwh
+                    + report.community_auxiliary_demand_kwh)
+                - 0.60)
+                .abs()
+                < 1e-9
         );
     }
 
