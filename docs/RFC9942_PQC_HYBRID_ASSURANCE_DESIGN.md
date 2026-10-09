@@ -157,6 +157,34 @@ Run these through the actual provider adapter with the RFC 9964 empty context, n
 
 Research reference: [usnistgov/ACVP-Server issue #470](https://github.com/usnistgov/ACVP-Server/issues/470).
 
+## Cross-project crypto reuse decision: Mycelix
+
+**Decision: consolidate the cryptographic implementation in Mycelix over time, but do not treat the current `mycelix-crypto` high-level hybrid API as a drop-in implementation or as qualified evidence for this RFC 9942 profile.** Reuse the primitive implementation through a narrow provider adapter once the packaging and verification gates below are met.
+
+Inspection was performed against the pinned Mycelix `main` commit [`445a84abdaa64f3d05e2d5c51115e4d060b78ec7`](https://github.com/Luminous-Dynamics/mycelix/tree/445a84abdaa64f3d05e2d5c51115e4d060b78ec7):
+
+- Mycelix already has `mycelix-identity/crates/mycelix-crypto`, its `AlgorithmId` registry, tagged key/signature types, and a RustCrypto `hybrid-rc` backend. The manifest pins `ml-dsa = 0.1.1`; the same feature pins `ml-kem = 0.3.0-rc.2`. The manifest explicitly labels the hybrid backend experimental and pending crypto audit. The crate docs for the ML-DSA implementation also warn that it has not been independently audited.
+- The separate `native` backend still uses `pqcrypto-dilithium` and other pqcrypto crates. Do not silently treat these backends as interchangeable: each needs its own exact version, corpus, target, and conformance receipts.
+- Mycelix's current `hybrid_sig.rs` API signs the **same message** with Ed25519 and ML-DSA-65 and requires both signatures to verify. Symthaea's current profile instead verifies an RFC 9942 **ES256** Receipt and then checks an ML-DSA-65 attestation over the separate 194-byte transcript binding the exact Receipt and verified ES256 capability. These are different protocol constructions; the Mycelix high-level `HybridSigner` is not the correct API to call from this verifier.
+
+There is also a packaging blocker: the Mycelix repository has no root `Cargo.toml`; `mycelix-identity/Cargo.toml` is the workspace manifest that owns the `mycelix-crypto` member. The current crate therefore is not yet a clean, root-addressable shared dependency for an unrelated repository. The Mycelix PQC roadmap itself lists promotion of this crate to a shared workspace/root package as deferred structural work. Do not add an unpinned path assumption, duplicate the entire Mycelix identity workspace, or add another crypto implementation simply to bypass that packaging seam.
+
+### Intended reuse boundary
+
+1. Keep the RFC 9942 Receipt parsing/proof checks, ES256 capability, 194-byte transcript, key-policy authorization, `HybridRequired` admission, and Holochain projection in Symthaea. These are protocol-specific policy and provenance semantics.
+2. Make `mycelix-crypto` the long-term shared home for algorithm-tagged key types and vetted primitive adapters. First publish/extract a versioned package from a real root workspace or standalone repository, with its dependency graph and target support pinned.
+3. Add a small adapter that implements Symthaea's `MlDsa65Verifier::verify_with_empty_context` by invoking only the ML-DSA-65 primitive over the exact provided transcript bytes. The adapter must not reinterpret the Receipt, make key authorization decisions, or construct a second transcript.
+4. Qualify that adapter with exact RFC 9964/empty-context vectors, pinned ACVP and Project Wycheproof negative/positive boundary corpora (including the Algorithm 21 hint-padding case described above), and cross-implementation checks against OpenSSL's ML-DSA provider. Store corpus revisions and file digests in the qualification receipt. Passing a simple sign/verify round trip is not enough.
+5. Until the package extraction, provider tests, and independent corpus gate pass, retain the current trait-only boundary and make **no production-provider or hybrid-qualified claim**.
+
+This gives Mycelix one crypto-agility control point and prevents Symthaea from forking duplicate cryptographic primitives, while keeping the application-specific transcript and admission rules independently reviewable.
+
+Pinned implementation references:
+- [Mycelix crypto manifest](https://github.com/Luminous-Dynamics/mycelix/blob/445a84abdaa64f3d05e2d5c51115e4d060b78ec7/mycelix-identity/crates/mycelix-crypto/Cargo.toml)
+- [Mycelix RustCrypto hybrid signature implementation](https://github.com/Luminous-Dynamics/mycelix/blob/445a84abdaa64f3d05e2d5c51115e4d060b78ec7/mycelix-identity/crates/mycelix-crypto/src/hybrid_sig.rs)
+- [Mycelix PQC roadmap](https://github.com/Luminous-Dynamics/mycelix/blob/445a84abdaa64f3d05e2d5c51115e4d060b78ec7/mycelix-workspace/PQC_ROADMAP_2026-07-07.md)
+- [OpenSSL ML-DSA provider documentation](https://docs.openssl.org/3.5/man7/EVP_PKEY-ML-DSA/)
+
 ## Capability model
 
 Add a private capability layer, conceptually:
