@@ -692,6 +692,19 @@ impl SqliteWitnessStore {
                         "metadata record digest does not match current accepted head",
                     ));
                 }
+                // The metadata pointer can match its row digest while the record
+                // fields themselves have been corrupted. Validate full history in
+                // the same transaction snapshot before allowing late-finalize success.
+                let validated_history =
+                    Self::load_history_from_connection(&tx, &candidate.log_id)?;
+                if !validated_history.accepted.as_ref().is_some_and(|head| {
+                    head.generation == *generation as u64 && head.digest == current_head_digest
+                }) {
+                    return Err(WitnessError::CorruptStore(
+                        "metadata does not match accepted history",
+                    ));
+                }
+
                 // Return idempotent success only if this exact candidate is still a
                 // committed historical record, is self-consistent, and is the exact
                 // successor named by the caller's predecessor. Never move the head
@@ -803,12 +816,13 @@ impl SqliteWitnessStore {
         Ok(())
     }
 
-    fn load_history(&self, log_id: &str) -> Result<History, WitnessError> {
-        let mut conn = self.open_connection()?;
-        let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
-        validate_fork_history(&tx, log_id)?;
+    fn load_history_from_connection(
+        conn: &Connection,
+        log_id: &str,
+    ) -> Result<History, WitnessError> {
+        validate_fork_history(conn, log_id)?;
 
-        let mut statement = tx.prepare(
+        let mut statement = conn.prepare(
             "SELECT generation, record_digest, protocol_version, policy_version,
                     anchor_digest, receipt_sequence, receipt_digest,
                     previous_record_digest, status
@@ -831,7 +845,7 @@ impl SqliteWitnessStore {
             .collect::<Result<Vec<_>, _>>()?;
         drop(statement);
 
-        let meta: Option<(i64, Vec<u8>, i64)> = tx
+        let meta: Option<(i64, Vec<u8>, i64)> = conn
             .query_row(
                 "SELECT generation, record_digest, schema_version
                  FROM witness_meta WHERE log_id=?1",
@@ -931,8 +945,15 @@ impl SqliteWitnessStore {
             return Err(WitnessError::CorruptStore("record status accounting mismatch"));
         }
 
-        tx.commit()?;
         Ok(History { accepted, prepared })
+    }
+
+    fn load_history(&self, log_id: &str) -> Result<History, WitnessError> {
+        let mut conn = self.open_connection()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let history = Self::load_history_from_connection(&tx, log_id)?;
+        tx.commit()?;
+        Ok(history)
     }
 
     /// Run SQLite integrity checks and return "ok" on success. This does not
@@ -1632,6 +1653,78 @@ mod tests {
             ))
         ));
     }
+    #[test]
+    fn late_finalize_rejects_tampered_current_head_record() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let original_store = db.open();
+        let log_id = "log-late-finalize-tampered-row";
+        let first = initialize(&original_store, &anchor, log_id);
+        let checkpoint_two = h(b"tampered-row-checkpoint-two");
+        let receipt_two = h(b"tampered-row-receipt-two");
+        let candidate_two = Record::build(
+            2,
+            log_id,
+            "policy-v1",
+            checkpoint_two,
+            1,
+            Some(receipt_two),
+            Some(first.digest),
+        );
+
+        assert!(matches!(
+            original_store.transition_inner(
+                log_id,
+                first.generation,
+                first.digest,
+                None,
+                checkpoint_two,
+                1,
+                Some(receipt_two),
+                &anchor,
+                Some(FaultPoint::AfterExternalAnchorAdvance),
+            ),
+            Err(WitnessError::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance))
+        ));
+
+        let recovery_store = db.open();
+        let recovered_two = recovery_store
+            .recover(log_id, &anchor)
+            .expect("recover prepared candidate")
+            .expect("accepted generation two");
+        assert_eq!(recovered_two, candidate_two);
+        recovery_store
+            .advance(
+                log_id,
+                recovered_two.generation,
+                recovered_two.digest,
+                h(b"tampered-row-checkpoint-three"),
+                2,
+                Some(h(b"tampered-row-receipt-three")),
+                &anchor,
+            )
+            .expect("advance after recovery");
+
+        // Preserve the stored digest column and metadata pointer, but mutate
+        // a committed field so the current row no longer hashes to that digest.
+        let conn = original_store
+            .open_connection()
+            .expect("open connection for corruption injection");
+        conn.execute(
+            "UPDATE witness_records SET anchor_digest=?1 WHERE log_id=?2 AND generation=3",
+            params![h(b"tampered-current-head-anchor").as_slice(), log_id],
+        )
+        .expect("tamper accepted current-head field");
+        drop(conn);
+
+        assert!(matches!(
+            original_store.finalize(&candidate_two, first.generation, first.digest),
+            Err(WitnessError::CorruptStore(
+                "record chain, policy, or receipt history is invalid"
+            ))
+        ));
+    }
+
     #[test]
     fn anchor_unavailable_after_prepare_leaves_candidate_unaccepted_then_retry_recovers() {
         let db = TempDb::new();
