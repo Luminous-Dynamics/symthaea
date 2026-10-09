@@ -26,6 +26,7 @@ struct Checkpoint {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct AcceptanceEvent {
     sequence: u64,
+    previous_event_digest: Option<Hash>,
     prior_checkpoint_id: Option<Hash>,
     candidate_checkpoint_id: Hash,
     outcome: AttemptOutcome,
@@ -116,10 +117,18 @@ impl CheckpointStore {
             .expect("acceptance event count fits u64")
             .checked_add(1)
             .expect("acceptance sequence cannot wrap");
+        let previous_event_digest = self.events.last().map(|event| event.event_digest);
         let candidate_checkpoint_id = checkpoint_id(candidate);
         let mut encoded = Vec::new();
         encoded.extend_from_slice(ACCEPTANCE_EVENT_DOMAIN);
         encoded.extend_from_slice(&sequence.to_be_bytes());
+        match previous_event_digest {
+            Some(digest) => {
+                encoded.push(1);
+                encoded.extend_from_slice(&digest);
+            }
+            None => encoded.push(0),
+        }
         match prior_checkpoint_id {
             Some(id) => {
                 encoded.push(1);
@@ -133,6 +142,7 @@ impl CheckpointStore {
         let event_digest = Sha256::digest(encoded).into();
         self.events.push(AcceptanceEvent {
             sequence,
+            previous_event_digest,
             prior_checkpoint_id,
             candidate_checkpoint_id,
             outcome,
@@ -219,6 +229,36 @@ impl CheckpointStore {
             );
         };
 
+        if candidate.tree_size < previous.tree_size {
+            return self.reject(
+                Some(&previous),
+                &candidate,
+                AcceptanceFailure::RollbackDetected,
+                "tree-size-rollback",
+            );
+        }
+
+        // Conflicting same-size roots are retained before timestamp policy is
+        // considered; an older or future timestamp must not choose a winner.
+        if candidate.tree_size == previous.tree_size
+            && candidate.root_hash != previous.root_hash
+        {
+            let sequence = self.append_event(
+                Some(checkpoint_id(&previous)),
+                &candidate,
+                AttemptOutcome::ForkDetected,
+                "same-log-same-size-conflicting-root",
+            );
+            self.forks.push(ForkEvidence {
+                log_id: candidate.log_id.clone(),
+                tree_size: candidate.tree_size,
+                first_checkpoint: previous,
+                conflicting_checkpoint: candidate,
+                acceptance_event_sequence: sequence,
+            });
+            return Err(AcceptanceFailure::ForkDetected);
+        }
+
         if candidate.timestamp_epoch > now_epoch {
             return self.reject(
                 Some(&previous),
@@ -235,14 +275,6 @@ impl CheckpointStore {
                 "checkpoint-exceeds-freshness-window",
             );
         }
-        if candidate.tree_size < previous.tree_size {
-            return self.reject(
-                Some(&previous),
-                &candidate,
-                AcceptanceFailure::RollbackDetected,
-                "tree-size-rollback",
-            );
-        }
         if candidate.timestamp_epoch < previous.timestamp_epoch {
             return self.reject(
                 Some(&previous),
@@ -253,23 +285,6 @@ impl CheckpointStore {
         }
 
         if candidate.tree_size == previous.tree_size {
-            if candidate.root_hash != previous.root_hash {
-                let sequence = self.append_event(
-                    Some(checkpoint_id(&previous)),
-                    &candidate,
-                    AttemptOutcome::ForkDetected,
-                    "same-log-same-size-conflicting-root",
-                );
-                self.forks.push(ForkEvidence {
-                    log_id: candidate.log_id.clone(),
-                    tree_size: candidate.tree_size,
-                    first_checkpoint: previous,
-                    conflicting_checkpoint: candidate,
-                    acceptance_event_sequence: sequence,
-                });
-                return Err(AcceptanceFailure::ForkDetected);
-            }
-
             if candidate.timestamp_epoch == previous.timestamp_epoch
                 && candidate.policy_version != previous.policy_version
             {
@@ -602,7 +617,7 @@ fn main() {
     // Conflicting same-size roots are retained as evidence; no root is selected.
     let mut fork_entries = entries.clone();
     fork_entries[2].push(0xA5);
-    let fork = checkpoint("civ-log-v1", &fork_entries[..3], 101, "policy-v1");
+    let fork = checkpoint("civ-log-v1", &fork_entries[..3], 99, "policy-v1");
     assert_ne!(old.root_hash, fork.root_hash);
     assert_eq!(
         store.accept(fork.clone(), None, 102, 10),
@@ -671,6 +686,10 @@ fn main() {
     // and every accepted/rejected result. Failed attempts never change current.
     for (index, event) in store.events.iter().enumerate() {
         assert_eq!(event.sequence, index as u64 + 1);
+        let expected_previous_event_digest = index
+            .checked_sub(1)
+            .map(|previous_index| store.events[previous_index].event_digest);
+        assert_eq!(event.previous_event_digest, expected_previous_event_digest);
         assert_ne!(event.candidate_checkpoint_id, [0_u8; 32]);
         assert_ne!(event.event_digest, [0_u8; 32]);
         assert!(!event.reason.is_empty());
