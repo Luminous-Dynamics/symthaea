@@ -507,6 +507,110 @@ class ProviderTopologyCasTrustPolicyV1:
 
 
 @dataclass(frozen=True)
+class ProviderTopologyCasTrustPolicyCheckpointV1:
+    """Immutable high-water checkpoint; durable storage is an external dependency."""
+    checkpoint_id: str
+    repository: str
+    policy_id: str
+    policy_generation: int
+    policy_digest: str
+    sequence: int
+
+    def canonical_bytes(self) -> bytes:
+        return json.dumps(
+            {
+                "checkpoint": "provider-topology-cas-trust-policy-checkpoint-v1",
+                "checkpoint_id": self.checkpoint_id,
+                "repository": self.repository,
+                "policy_id": self.policy_id,
+                "policy_generation": self.policy_generation,
+                "policy_digest": self.policy_digest,
+                "sequence": self.sequence,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def structurally_valid(self) -> bool:
+        return (
+            isinstance(self.checkpoint_id, str)
+            and bool(self.checkpoint_id)
+            and isinstance(self.repository, str)
+            and bool(self.repository)
+            and isinstance(self.policy_id, str)
+            and bool(self.policy_id)
+            and isinstance(self.policy_generation, int)
+            and not isinstance(self.policy_generation, bool)
+            and self.policy_generation > 0
+            and isinstance(self.sequence, int)
+            and not isinstance(self.sequence, bool)
+            and self.sequence > 0
+            and isinstance(self.policy_digest, str)
+            and len(self.policy_digest) == 64
+            and all(character in "0123456789abcdef" for character in self.policy_digest)
+        )
+
+    def matches(
+        self,
+        policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_policy_digest: str | None,
+        expected_policy_generation: int | None,
+    ) -> bool:
+        # A valid signature under an older policy is not current-policy evidence.
+        # Exact equality also rejects same-generation policy forks.
+        return (
+            self.structurally_valid()
+            and isinstance(policy, ProviderTopologyCasTrustPolicyV1)
+            and policy.structurally_valid()
+            and isinstance(expected_policy_digest, str)
+            and bool(expected_policy_digest)
+            and isinstance(expected_policy_generation, int)
+            and not isinstance(expected_policy_generation, bool)
+            and expected_policy_generation > 0
+            and self.repository == policy.repository
+            and self.policy_id == policy.policy_id
+            and self.policy_generation == policy.generation
+            and self.policy_digest == policy.digest()
+            and self.policy_digest == expected_policy_digest
+            and self.policy_generation == expected_policy_generation
+        )
+
+    def propose_advance(
+        self,
+        next_policy: ProviderTopologyCasTrustPolicyV1,
+    ) -> "ProviderTopologyCasTrustPolicyCheckpointV1 | None":
+        """Propose N -> N+1 only; caller must persist via external durable CAS."""
+        if (
+            not self.structurally_valid()
+            or not isinstance(next_policy, ProviderTopologyCasTrustPolicyV1)
+            or not next_policy.structurally_valid()
+        ):
+            return None
+        if (
+            next_policy.repository != self.repository
+            or next_policy.policy_id != self.policy_id
+            or next_policy.generation != self.policy_generation + 1
+        ):
+            return None
+        next_digest = next_policy.digest()
+        if next_digest == self.policy_digest:
+            return None
+        return ProviderTopologyCasTrustPolicyCheckpointV1(
+            checkpoint_id=self.checkpoint_id,
+            repository=self.repository,
+            policy_id=self.policy_id,
+            policy_generation=next_policy.generation,
+            policy_digest=next_digest,
+            sequence=self.sequence + 1,
+        )
+
+
+
+@dataclass(frozen=True)
 class ProviderTopologyCasAttestationV1:
     """DSSE envelope containing a signed in-toto statement for topology enforcement."""
     envelope: ProviderTopologyCasDsseEnvelopeV1
@@ -947,6 +1051,7 @@ class ProviderTopologyBindingV1:
     attestation_trust_policy: ProviderTopologyCasTrustPolicyV1 | None = None
     expected_trust_policy_digest: str | None = None
     expected_trust_policy_generation: int | None = None
+    attestation_trust_checkpoint: ProviderTopologyCasTrustPolicyCheckpointV1 | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
         if not identity.provider_constraints_valid():
@@ -964,6 +1069,14 @@ class ProviderTopologyBindingV1:
         if not self.pre_submit_observation.matches_reserved(identity):
             return "stale-before-submit"
         if self.provider_topology_cas_evidence is None:
+            return "observed-not-cas"
+        # Strong classification requires the independently loaded checkpoint to
+        # match the exact currently authorised policy and its separate pins.
+        if self.attestation_trust_checkpoint is None or not self.attestation_trust_checkpoint.matches(
+            self.attestation_trust_policy,
+            self.expected_trust_policy_digest,
+            self.expected_trust_policy_generation,
+        ):
             return "observed-not-cas"
         if not self.provider_topology_cas_evidence.validates(
             identity,
@@ -1419,6 +1532,11 @@ def topology_binding_fixture(
             if provider_topology_cas_evidence is not None
             else None
         ),
+        attestation_trust_checkpoint=(
+            _test_trust_policy_checkpoint(_test_trust_policy(identity))
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
     )
 
 
@@ -1579,6 +1697,20 @@ def _test_trust_policy(
     )
 
 
+def _test_trust_policy_checkpoint(
+    policy: ProviderTopologyCasTrustPolicyV1,
+) -> ProviderTopologyCasTrustPolicyCheckpointV1:
+    """Synthetic fixture only; production must load durable state independently."""
+    return ProviderTopologyCasTrustPolicyCheckpointV1(
+        checkpoint_id="test-only-trust-policy-high-water-v1",
+        repository=policy.repository,
+        policy_id=policy.policy_id,
+        policy_generation=policy.generation,
+        policy_digest=policy.digest(),
+        sequence=policy.generation,
+    )
+
+
 def _test_sign_dsse_payload(
     payload: bytes,
     payload_type: str = "application/vnd.in-toto+json",
@@ -1688,6 +1820,98 @@ def _verify_fixture_under_policy(
         expected_digest if expected_digest is not None else policy.digest(),
         expected_generation if expected_generation is not None else policy.generation,
     )
+
+
+def test_provider_topology_trust_checkpoint_matches_only_exact_policy():
+    identity = stack_identity_fixture()
+    policy = _test_trust_policy(identity)
+    checkpoint = _test_trust_policy_checkpoint(policy)
+    assert checkpoint.structurally_valid()
+    assert checkpoint.matches(policy, policy.digest(), policy.generation)
+    assert not checkpoint.matches(None, policy.digest(), policy.generation)
+    assert not checkpoint.matches("not-a-policy", policy.digest(), policy.generation)
+    assert not checkpoint.matches(policy, "0" * 64, policy.generation)
+    assert not checkpoint.matches(policy, policy.digest(), policy.generation + 1)
+    corrupted = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**checkpoint.__dict__, "policy_digest": "not-a-sha256-digest"}
+    )
+    assert not corrupted.structurally_valid()
+    assert not corrupted.matches(policy, policy.digest(), policy.generation)
+    missing_digest = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**checkpoint.__dict__, "policy_digest": None}
+    )
+    assert not missing_digest.structurally_valid()
+    assert not missing_digest.matches(policy, policy.digest(), policy.generation)
+    cross_repository = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**checkpoint.__dict__, "repository": "other/repository"}
+    )
+    assert not cross_repository.matches(policy, policy.digest(), policy.generation)
+    fork = _test_trust_policy(identity, revoked_signer_identities=("revoked-signer",))
+    assert fork.generation == policy.generation
+    assert fork.digest() != checkpoint.policy_digest
+    assert not checkpoint.matches(fork, fork.digest(), fork.generation)
+
+
+def test_provider_topology_trust_checkpoint_advance_requires_next_generation():
+    identity = stack_identity_fixture()
+    current = _test_trust_policy(identity)
+    checkpoint = _test_trust_policy_checkpoint(current)
+    next_policy = _test_trust_policy(identity, generation=current.generation + 1)
+    proposed = checkpoint.propose_advance(next_policy)
+    assert proposed is not None
+    assert proposed.sequence == checkpoint.sequence + 1
+    assert proposed.matches(next_policy, next_policy.digest(), next_policy.generation)
+    skipped = _test_trust_policy(identity, generation=current.generation + 2)
+    assert checkpoint.propose_advance(skipped) is None
+    same_generation_fork = _test_trust_policy(
+        identity,
+        revoked_signer_identities=("forked-policy",),
+    )
+    assert checkpoint.propose_advance(same_generation_fork) is None
+    wrong_repository = _test_trust_policy(
+        identity,
+        generation=current.generation + 1,
+        repository="other/repository",
+    )
+    assert checkpoint.propose_advance(wrong_repository) is None
+
+
+def test_provider_topology_binding_without_trust_checkpoint_fails_closed():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=evidence)
+    missing = ProviderTopologyBindingV1(
+        **{**binding.__dict__, "attestation_trust_checkpoint": None}
+    )
+    assert missing.classify(identity) == "observed-not-cas"
+
+
+def test_provider_topology_binding_rejects_policy_rollback_after_checkpoint_advance():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    binding = topology_binding_fixture(identity, provider_topology_cas_evidence=evidence)
+    current_policy = binding.attestation_trust_policy
+    assert current_policy is not None
+    future_policy = _test_trust_policy(identity, generation=current_policy.generation + 1)
+    stale = ProviderTopologyCasTrustPolicyCheckpointV1(
+        checkpoint_id="test-only-trust-policy-high-water-v1",
+        repository=future_policy.repository,
+        policy_id=future_policy.policy_id,
+        policy_generation=future_policy.generation,
+        policy_digest=future_policy.digest(),
+        sequence=future_policy.generation,
+    )
+    stale_binding = ProviderTopologyBindingV1(
+        **{**binding.__dict__, "attestation_trust_checkpoint": stale}
+    )
+    assert stale_binding.classify(identity) == "observed-not-cas"
+    malformed_checkpoint = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**binding.attestation_trust_checkpoint.__dict__, "policy_digest": None}
+    )
+    malformed_binding = ProviderTopologyBindingV1(
+        **{**binding.__dict__, "attestation_trust_checkpoint": malformed_checkpoint}
+    )
+    assert malformed_binding.classify(identity) == "observed-not-cas"
 
 
 def test_provider_topology_trust_policy_digest_is_canonical_and_pinned():
@@ -3364,6 +3588,10 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_topology_trust_checkpoint_matches_only_exact_policy,
+    test_provider_topology_trust_checkpoint_advance_requires_next_generation,
+    test_provider_topology_binding_without_trust_checkpoint_fails_closed,
+    test_provider_topology_binding_rejects_policy_rollback_after_checkpoint_advance,
     test_provider_topology_trust_policy_digest_is_canonical_and_pinned,
     test_provider_topology_trust_policy_generation_rollback_rejects,
     test_provider_topology_trust_policy_revoked_key_rejects,
