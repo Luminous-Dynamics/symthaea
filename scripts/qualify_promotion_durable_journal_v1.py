@@ -259,7 +259,7 @@ class DurablePromotionJournalV1:
         "reservation_state_transition_guard": ("invalid reservation state transition",),
         "reservation_prepare_storage_fence_guard": (
             "storage-enforced promotion fence rejected",
-            "new.revision = reservations.created_revision + 1",
+            "l.revision = new.created_revision + 1",
         ),
         "reservation_supersede_storage_fence_guard": (
             "supersession requires a newer storage fence",
