@@ -28,7 +28,7 @@
 //! islanded-mode voltage droop is instead approximated by a simple linear
 //! inverter-output-impedance term keyed to real power, documented inline.
 
-use symthaea_grid_physics::battery::Battery;
+use symthaea_grid_physics::battery::{Battery, BatteryError};
 use symthaea_grid_physics::droop::FrequencyDroop;
 use symthaea_grid_physics::feeder::{Feeder, Line, Node};
 use symthaea_grid_physics::islanding::{
@@ -115,12 +115,14 @@ const RELAY_DECAY_PER_THERMAL_RISK_S: f64 = 0.001;
 /// interval (0.005 s); this remains a simulation model, not a plant controller.
 const MAX_INTEGRATION_STEP_SECONDS: f64 = 1.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GridPhysicsStepError {
     InvalidDuration,
     NonFiniteActuator { index: usize },
     ActuatorOutOfRange { index: usize },
     InvalidBatteryConfiguration,
+    /// A battery operation rejected its input or configuration.
+    BatteryOperation(BatteryError),
     InvalidDerivedPhysics,
 }
 
@@ -321,11 +323,11 @@ impl GridPhysicsInfrastructureSimulator {
         let charge_accepted_dc_kwh = self
             .battery
             .charge(charge_power_kw, dt_hours)
-            .unwrap_or(0.0);
+            .map_err(GridPhysicsStepError::BatteryOperation)?;
         let discharge_delivered_ac_kwh = self
             .battery
             .discharge(discharge_power_kw, dt_hours)
-            .unwrap_or(0.0);
+            .map_err(GridPhysicsStepError::BatteryOperation)?;
         let one_way_eff = self.battery.round_trip_efficiency.sqrt();
         let actual_ac_kw_for_charge = if dt_hours > 0.0 && one_way_eff > 0.0 {
             (charge_accepted_dc_kwh / one_way_eff) / dt_hours
@@ -866,6 +868,22 @@ mod failure_mode_tests {
         assert_eq!(sim.state.channels, before.state.channels);
         assert_eq!(sim.elapsed_s, before.elapsed_s);
         assert_eq!(sim.battery.power_rating_kw, before.battery.power_rating_kw);
+    }
+
+    #[test]
+    fn candidate_step_preserves_battery_operation_errors() {
+        // The public checked entry point rejects this malformed configuration
+        // during preflight. Exercise the candidate layer directly as a guard
+        // against regressing to `unwrap_or(0.0)` and masking battery failures.
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        sim.battery_mut().round_trip_efficiency = f64::NAN;
+
+        assert_eq!(
+            sim.step_candidate(&InfrastructureCommand::zero(), 0.005),
+            Err(GridPhysicsStepError::BatteryOperation(
+                BatteryError::InvalidConfiguration
+            ))
+        );
     }
 
     #[test]
