@@ -32,13 +32,18 @@ pub struct Battery {
     pub degradation_per_cycle: f64,
 }
 
-/// Errors from an attempted battery operation.
+/// Errors from battery operations and checked configuration.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BatteryError {
+    /// Capacity must be finite and positive.
     InvalidCapacity,
+    /// Power rating must be finite and positive.
     InvalidPowerRating,
+    /// Round-trip efficiency must be finite and in [0, 1].
     InvalidRoundTripEfficiency,
+    /// State of charge must be finite and in [0, 1].
     InvalidStateOfCharge,
+    /// Per-cycle degradation must be finite and in [0, 1].
     InvalidDegradationRate,
     /// Public configuration/state was mutated into an invalid state.
     InvalidConfiguration,
@@ -442,6 +447,14 @@ mod tests {
         assert_eq!(
             battery.discharge(f64::INFINITY, 1.0),
             Err(BatteryError::NonFinitePower)
+        );
+        assert_eq!(
+            battery.discharge(f64::NEG_INFINITY, 1.0),
+            Err(BatteryError::NonFinitePower)
+        );
+        assert_eq!(
+            battery.charge(10.0, f64::NAN),
+            Err(BatteryError::InvalidDuration)
         );
         assert_eq!(battery.soc(), before_soc);
         assert_eq!(battery.equivalent_full_cycles(), before_cycles);
