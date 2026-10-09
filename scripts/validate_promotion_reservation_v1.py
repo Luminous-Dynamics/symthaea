@@ -418,6 +418,95 @@ class ProviderTopologyCasTrustRootV1:
 
 
 @dataclass(frozen=True)
+class ProviderTopologyCasTrustPolicyV1:
+    """Versioned signer authorization policy whose digest is pinned out of band."""
+    policy_id: str
+    generation: int
+    repository: str
+    authorized_roots: tuple[ProviderTopologyCasTrustRootV1, ...]
+    revoked_key_ids: tuple[str, ...] = ()
+    revoked_signer_identities: tuple[str, ...] = ()
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "policy": "provider-topology-cas-trust-policy-v1",
+            "policy_id": self.policy_id,
+            "generation": self.generation,
+            "repository": self.repository,
+            "authorized_roots": [
+                {
+                    "trust_root_id": root.trust_root_id,
+                    "generation": root.generation,
+                    "repository": root.repository,
+                    "signer_identity": root.signer_identity,
+                    "key_id": root.key_id,
+                    "public_key_pem": root.public_key_pem,
+                }
+                for root in sorted(
+                    self.authorized_roots,
+                    key=lambda candidate: (candidate.key_id, candidate.trust_root_id),
+                )
+            ],
+            "revoked_key_ids": sorted(self.revoked_key_ids),
+            "revoked_signer_identities": sorted(self.revoked_signer_identities),
+        }
+        return json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def structurally_valid(self) -> bool:
+        if not self.policy_id or self.generation <= 0 or not self.repository:
+            return False
+        keys = [root.key_id for root in self.authorized_roots]
+        root_ids = [root.trust_root_id for root in self.authorized_roots]
+        if len(keys) != len(set(keys)) or len(root_ids) != len(set(root_ids)):
+            return False
+        if len(self.revoked_key_ids) != len(set(self.revoked_key_ids)):
+            return False
+        if len(self.revoked_signer_identities) != len(set(self.revoked_signer_identities)):
+            return False
+        return all(
+            root.repository == self.repository
+            and root.generation > 0
+            and bool(root.signer_identity)
+            and bool(root.key_id)
+            and bool(root.public_key_pem)
+            for root in self.authorized_roots
+        )
+
+    def authorizes(
+        self,
+        root: ProviderTopologyCasTrustRootV1,
+        identity: PromotionOperationIdentityV1,
+        expected_policy_digest: str | None,
+        expected_policy_generation: int | None,
+    ) -> bool:
+        if not self.structurally_valid():
+            return False
+        if not expected_policy_digest or self.digest() != expected_policy_digest:
+            return False
+        if expected_policy_generation is None or expected_policy_generation <= 0:
+            return False
+        if self.generation != expected_policy_generation:
+            return False
+        if self.repository != identity.repository or root.repository != self.repository:
+            return False
+        if root.generation != identity.trust_root_generation:
+            return False
+        if root.key_id in self.revoked_key_ids or root.signer_identity in self.revoked_signer_identities:
+            return False
+        if root not in self.authorized_roots:
+            return False
+        return _public_key_fingerprint(root.public_key_pem) == root.key_id
+
+
+@dataclass(frozen=True)
 class ProviderTopologyCasAttestationV1:
     """DSSE envelope containing a signed in-toto statement for topology enforcement."""
     envelope: ProviderTopologyCasDsseEnvelopeV1
@@ -451,6 +540,9 @@ class ProviderTopologyCasVerificationV1:
     subject_repository: str
     operation_identity_digest: str
     key_id: str
+    trust_policy_id: str
+    trust_policy_generation: int
+    trust_policy_digest: str
 
     def canonical_bytes(self) -> bytes:
         return json.dumps(
@@ -466,6 +558,9 @@ class ProviderTopologyCasVerificationV1:
                 "subject_repository": self.subject_repository,
                 "operation_identity_digest": self.operation_identity_digest,
                 "key_id": self.key_id,
+                "trust_policy_id": self.trust_policy_id,
+                "trust_policy_generation": self.trust_policy_generation,
+                "trust_policy_digest": self.trust_policy_digest,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -485,6 +580,9 @@ class ProviderTopologyCasVerificationV1:
         request: ProviderTopologyCasRequestV1,
         submission: ProviderTopologyCasSubmissionV1,
         execution: ProviderTopologyCasExecutionV1,
+        trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_trust_policy_digest: str | None,
+        expected_trust_policy_generation: int | None,
     ) -> bool:
         verified = verify_provider_topology_cas_attestation(
             attestation,
@@ -495,6 +593,9 @@ class ProviderTopologyCasVerificationV1:
             request,
             submission,
             execution,
+            trust_policy,
+            expected_trust_policy_digest,
+            expected_trust_policy_generation,
         )
         return verified is not None and self == verified
 
@@ -545,6 +646,9 @@ class ProviderTopologyCasProviderResultV1:
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
         trust_root: ProviderTopologyCasTrustRootV1,
+        trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_trust_policy_digest: str | None,
+        expected_trust_policy_generation: int | None,
     ) -> bool:
         if (
             self.result_source != "provider-operation-result"
@@ -576,6 +680,9 @@ class ProviderTopologyCasProviderResultV1:
             request,
             submission,
             execution,
+            trust_policy,
+            expected_trust_policy_digest,
+            expected_trust_policy_generation,
         )
 
 
@@ -596,6 +703,7 @@ def _provider_topology_statement(
     submission: ProviderTopologyCasSubmissionV1,
     execution: ProviderTopologyCasExecutionV1,
     trust_root: ProviderTopologyCasTrustRootV1,
+    trust_policy: ProviderTopologyCasTrustPolicyV1,
 ) -> dict:
     return {
         "_type": "https://in-toto.io/Statement/v1",
@@ -621,6 +729,9 @@ def _provider_topology_statement(
             "pre_submit_sequence": pre_submit_sequence,
             "trust_root_id": trust_root.trust_root_id,
             "trust_root_generation": trust_root.generation,
+            "trust_policy_id": trust_policy.policy_id,
+            "trust_policy_generation": trust_policy.generation,
+            "trust_policy_digest": trust_policy.digest(),
             "governance_generation": identity.governance_generation,
         },
     }
@@ -666,12 +777,23 @@ def verify_provider_topology_cas_attestation(
     request: ProviderTopologyCasRequestV1,
     submission: ProviderTopologyCasSubmissionV1,
     execution: ProviderTopologyCasExecutionV1,
+    trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+    expected_trust_policy_digest: str | None,
+    expected_trust_policy_generation: int | None,
 ) -> ProviderTopologyCasVerificationV1 | None:
     """Cryptographically verify DSSE PAE with Ed25519 and then enforce exact claims.
 
-    The trusted key and signer/repository policy are supplied out-of-band. This is
-    intentionally not a GitHub-topology-CAS adapter; it only verifies evidence.
+    The trust policy digest and generation are supplied as independent pins.
+    The policy cannot authenticate itself and is not loaded from the attestation.
+    This is not a GitHub-topology-CAS adapter; it only verifies evidence.
     """
+    if trust_policy is None or not trust_policy.authorizes(
+        trust_root,
+        identity,
+        expected_trust_policy_digest,
+        expected_trust_policy_generation,
+    ):
+        return None
     if (
         trust_root.generation != identity.trust_root_generation
         or trust_root.repository != identity.repository
@@ -706,6 +828,7 @@ def verify_provider_topology_cas_attestation(
             submission,
             execution,
             trust_root,
+            trust_policy,
         )
         if parsed != expected:
             return None
@@ -756,6 +879,9 @@ def verify_provider_topology_cas_attestation(
         subject_repository=identity.repository,
         operation_identity_digest=identity.digest(),
         key_id=trust_root.key_id,
+        trust_policy_id=trust_policy.policy_id,
+        trust_policy_generation=trust_policy.generation,
+        trust_policy_digest=trust_policy.digest(),
     )
 
 
@@ -773,8 +899,11 @@ class ProviderTopologyCasEvidenceV1:
         observation: ProviderStackObservationV1,
         pre_submit_sequence: int,
         trust_root: ProviderTopologyCasTrustRootV1 | None,
+        trust_policy: ProviderTopologyCasTrustPolicyV1 | None,
+        expected_trust_policy_digest: str | None,
+        expected_trust_policy_generation: int | None,
     ) -> bool:
-        if trust_root is None:
+        if trust_root is None or trust_policy is None:
             return False
         if self.evidence_source != "provider-result-capture":
             return False
@@ -800,6 +929,9 @@ class ProviderTopologyCasEvidenceV1:
                 observation,
                 pre_submit_sequence,
                 trust_root,
+                trust_policy,
+                expected_trust_policy_digest,
+                expected_trust_policy_generation,
             )
         )
 
@@ -812,6 +944,9 @@ class ProviderTopologyBindingV1:
     pre_submit_sequence: int | None
     provider_topology_cas_evidence: ProviderTopologyCasEvidenceV1 | None = None
     attestation_trust_root: ProviderTopologyCasTrustRootV1 | None = None
+    attestation_trust_policy: ProviderTopologyCasTrustPolicyV1 | None = None
+    expected_trust_policy_digest: str | None = None
+    expected_trust_policy_generation: int | None = None
 
     def classify(self, identity: PromotionOperationIdentityV1) -> str:
         if not identity.provider_constraints_valid():
@@ -835,6 +970,9 @@ class ProviderTopologyBindingV1:
             self.pre_submit_observation,
             self.pre_submit_sequence,
             self.attestation_trust_root,
+            self.attestation_trust_policy,
+            self.expected_trust_policy_digest,
+            self.expected_trust_policy_generation,
         ):
             return "observed-not-cas"
         return "provider-topology-cas"
@@ -1266,6 +1404,21 @@ def topology_binding_fixture(
             if provider_topology_cas_evidence is not None
             else None
         ),
+        attestation_trust_policy=(
+            _test_trust_policy(identity)
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
+        expected_trust_policy_digest=(
+            _test_trust_policy(identity).digest()
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
+        expected_trust_policy_generation=(
+            _test_trust_policy(identity).generation
+            if provider_topology_cas_evidence is not None
+            else None
+        ),
     )
 
 
@@ -1303,6 +1456,8 @@ def provider_topology_cas_evidence_fixture(
         predicate_digest=predicate.digest(),
         enforcement_result=enforcement_result,
     )
+    trust_root = _test_trust_root(identity)
+    trust_policy = _test_trust_policy(identity, trust_root)
     attestation = _test_sign_topology_statement(
         identity,
         observation,
@@ -1310,8 +1465,9 @@ def provider_topology_cas_evidence_fixture(
         request,
         submission,
         execution,
+        trust_root,
+        trust_policy,
     )
-    trust_root = _test_trust_root(identity)
     verification = verify_provider_topology_cas_attestation(
         attestation,
         trust_root,
@@ -1321,6 +1477,9 @@ def provider_topology_cas_evidence_fixture(
         request,
         submission,
         execution,
+        trust_policy,
+        trust_policy.digest(),
+        trust_policy.generation,
     )
     if verification is None:
         raise RuntimeError("test DSSE attestation did not verify")
@@ -1346,10 +1505,10 @@ def provider_topology_cas_evidence_fixture(
     )
 
 
-@lru_cache(maxsize=1)
-def _test_signer_material() -> tuple[str, str, str]:
-    """Create one ephemeral Ed25519 key for executable verifier tests only."""
-    with tempfile.TemporaryDirectory(prefix="topology-cas-test-key-") as temp:
+@lru_cache(maxsize=4)
+def _test_signer_material_named(name: str) -> tuple[str, str, str]:
+    """Create ephemeral Ed25519 test keys; never use them as production trust roots."""
+    with tempfile.TemporaryDirectory(prefix=f"topology-cas-test-key-{name}-") as temp:
         private_path = Path(temp) / "private.pem"
         public_path = Path(temp) / "public.pem"
         generated = subprocess.run(
@@ -1376,6 +1535,14 @@ def _test_signer_material() -> tuple[str, str, str]:
         return private_pem, public_pem, fingerprint
 
 
+def _test_signer_material() -> tuple[str, str, str]:
+    return _test_signer_material_named("primary")
+
+
+def _test_rotated_signer_material() -> tuple[str, str, str]:
+    return _test_signer_material_named("rotated")
+
+
 def _test_trust_root(identity: PromotionOperationIdentityV1) -> ProviderTopologyCasTrustRootV1:
     _, public_pem, key_id = _test_signer_material()
     return ProviderTopologyCasTrustRootV1(
@@ -1391,8 +1558,37 @@ def _test_trust_root(identity: PromotionOperationIdentityV1) -> ProviderTopology
     )
 
 
-def _test_sign_dsse_payload(payload: bytes, payload_type: str = "application/vnd.in-toto+json") -> ProviderTopologyCasAttestationV1:
-    private_pem, _, key_id = _test_signer_material()
+def _test_trust_policy(
+    identity: PromotionOperationIdentityV1,
+    trust_root: ProviderTopologyCasTrustRootV1 | None = None,
+    *,
+    generation: int = 1,
+    repository: str | None = None,
+    revoked_key_ids: tuple[str, ...] = (),
+    revoked_signer_identities: tuple[str, ...] = (),
+    authorized_roots: tuple[ProviderTopologyCasTrustRootV1, ...] | None = None,
+) -> ProviderTopologyCasTrustPolicyV1:
+    root = trust_root or _test_trust_root(identity)
+    return ProviderTopologyCasTrustPolicyV1(
+        policy_id="test-only-topology-trust-policy-v1",
+        generation=generation,
+        repository=repository or identity.repository,
+        authorized_roots=authorized_roots if authorized_roots is not None else (root,),
+        revoked_key_ids=revoked_key_ids,
+        revoked_signer_identities=revoked_signer_identities,
+    )
+
+
+def _test_sign_dsse_payload(
+    payload: bytes,
+    payload_type: str = "application/vnd.in-toto+json",
+    *,
+    signer_private_pem: str | None = None,
+    signer_key_id: str | None = None,
+) -> ProviderTopologyCasAttestationV1:
+    default_private_pem, _, default_key_id = _test_signer_material()
+    private_pem = signer_private_pem or default_private_pem
+    key_id = signer_key_id or default_key_id
     unsigned = ProviderTopologyCasDsseEnvelopeV1(
         payload_type=payload_type,
         payload_base64=base64.b64encode(payload).decode("ascii"),
@@ -1442,8 +1638,10 @@ def _test_sign_topology_statement(
     request: ProviderTopologyCasRequestV1,
     submission: ProviderTopologyCasSubmissionV1,
     execution: ProviderTopologyCasExecutionV1,
+    trust_root: ProviderTopologyCasTrustRootV1,
+    trust_policy: ProviderTopologyCasTrustPolicyV1,
+    signer_private_pem: str | None = None,
 ) -> ProviderTopologyCasAttestationV1:
-    trust_root = _test_trust_root(identity)
     payload = _canonical_json_bytes(
         _provider_topology_statement(
             identity,
@@ -1453,9 +1651,211 @@ def _test_sign_topology_statement(
             submission,
             execution,
             trust_root,
+            trust_policy,
         )
     )
-    return _test_sign_dsse_payload(payload)
+    return _test_sign_dsse_payload(
+        payload,
+        signer_private_pem=signer_private_pem,
+        signer_key_id=trust_root.key_id,
+    )
+
+
+def _verify_fixture_under_policy(
+    identity: PromotionOperationIdentityV1,
+    evidence: ProviderTopologyCasEvidenceV1,
+    policy: ProviderTopologyCasTrustPolicyV1,
+    *,
+    expected_digest: str | None = None,
+    expected_generation: int | None = None,
+    trust_root: ProviderTopologyCasTrustRootV1 | None = None,
+) -> ProviderTopologyCasVerificationV1 | None:
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    if evidence.provider_result.attestation is None or evidence.provider_result.execution is None:
+        return None
+    return verify_provider_topology_cas_attestation(
+        evidence.provider_result.attestation,
+        trust_root or _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+        policy,
+        expected_digest if expected_digest is not None else policy.digest(),
+        expected_generation if expected_generation is not None else policy.generation,
+    )
+
+
+def test_provider_topology_trust_policy_digest_is_canonical_and_pinned():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    policy = _test_trust_policy(identity)
+    assert policy.digest() == _test_trust_policy(identity).digest()
+    assert _verify_fixture_under_policy(identity, evidence, policy) is not None
+    assert _verify_fixture_under_policy(
+        identity,
+        evidence,
+        policy,
+        expected_digest="sha256:" + ("0" * 64),
+    ) is None
+
+
+def test_provider_topology_trust_policy_generation_rollback_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    policy = _test_trust_policy(identity)
+    assert _verify_fixture_under_policy(
+        identity,
+        evidence,
+        policy,
+        expected_generation=policy.generation + 1,
+    ) is None
+
+
+def test_provider_topology_trust_policy_revoked_key_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(identity, root, revoked_key_ids=(root.key_id,))
+    assert not policy.authorizes(root, identity, policy.digest(), policy.generation)
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_revoked_signer_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(
+        identity,
+        root,
+        revoked_signer_identities=(root.signer_identity,),
+    )
+    assert not policy.authorizes(root, identity, policy.digest(), policy.generation)
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_unauthorized_root_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    policy = _test_trust_policy(identity, authorized_roots=())
+    root = _test_trust_root(identity)
+    assert policy.structurally_valid()
+    assert not policy.authorizes(root, identity, policy.digest(), policy.generation)
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_duplicate_key_rejects():
+    identity = stack_identity_fixture()
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(identity, authorized_roots=(root, root))
+    assert not policy.structurally_valid()
+    assert _verify_fixture_under_policy(
+        identity,
+        provider_topology_cas_evidence_fixture(identity),
+        policy,
+    ) is None
+
+
+def test_provider_topology_trust_policy_repository_scope_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(
+        identity,
+        root,
+        repository="other/repository",
+        authorized_roots=(root,),
+    )
+    assert not policy.structurally_valid()
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_rotation_accepts_new_pinned_key():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    private_pem, public_pem, key_id = _test_rotated_signer_material()
+    previous_root = _test_trust_root(identity)
+    rotated_root = ProviderTopologyCasTrustRootV1(
+        trust_root_id="test-only-rotated-ed25519-root-v2",
+        generation=identity.trust_root_generation,
+        repository=identity.repository,
+        signer_identity=previous_root.signer_identity,
+        key_id=key_id,
+        public_key_pem=public_pem,
+    )
+    rotated_policy = _test_trust_policy(
+        identity,
+        rotated_root,
+        generation=2,
+        authorized_roots=(rotated_root,),
+    )
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    execution = evidence.provider_result.execution
+    assert execution is not None
+    rotated_attestation = _test_sign_topology_statement(
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        execution,
+        rotated_root,
+        rotated_policy,
+        signer_private_pem=private_pem,
+    )
+    verification = verify_provider_topology_cas_attestation(
+        rotated_attestation,
+        rotated_root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        execution,
+        rotated_policy,
+        rotated_policy.digest(),
+        rotated_policy.generation,
+    )
+    assert verification is not None
+    assert verification.trust_policy_generation == 2
+    assert verification.trust_policy_digest == rotated_policy.digest()
+    assert verify_provider_topology_cas_attestation(
+        rotated_attestation,
+        previous_root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        execution,
+        rotated_policy,
+        rotated_policy.digest(),
+        rotated_policy.generation,
+    ) is None
+
+
+def test_provider_topology_trust_policy_mutation_requires_new_pin():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    original = _test_trust_policy(identity)
+    changed = _test_trust_policy(
+        identity,
+        revoked_signer_identities=("some-other-signer",),
+    )
+    assert original.digest() != changed.digest()
+    assert _verify_fixture_under_policy(
+        identity,
+        evidence,
+        changed,
+        expected_digest=original.digest(),
+    ) is None
+
 
 
 def test_provider_topology_binding_requires_an_initial_observation():
@@ -1649,6 +2049,9 @@ def test_provider_topology_cas_verification_factory_is_deterministic():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     )
     assert verified == evidence.provider_result.verification
 
@@ -1683,6 +2086,9 @@ def test_provider_topology_cas_attestation_digest_binds_execution():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1791,6 +2197,9 @@ def test_provider_topology_cas_attestation_rejects_wrong_source():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1818,6 +2227,9 @@ def test_provider_topology_cas_verification_rejects_wrong_source():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     )
 
 
@@ -1849,6 +2261,9 @@ def test_provider_topology_cas_signature_tampering_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1880,6 +2295,9 @@ def test_provider_topology_cas_payload_size_limit_fails_closed():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1909,6 +2327,9 @@ def test_provider_topology_cas_signature_length_mismatch_fails_closed():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1932,6 +2353,9 @@ def test_provider_topology_cas_trust_root_key_id_mismatch_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1976,6 +2400,9 @@ def test_provider_topology_cas_trust_root_generation_mismatch_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -1999,6 +2426,9 @@ def test_provider_topology_cas_trust_root_repository_scope_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2029,6 +2459,9 @@ def test_provider_topology_cas_signed_duplicate_json_keys_rejects():
         request,
         evidence.submission,
         evidence.provider_result.execution,
+        _test_trust_policy(identity),
+        _test_trust_policy(identity).digest(),
+        _test_trust_policy(identity).generation,
     ) is None
 
 
@@ -2931,6 +3364,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_topology_trust_policy_digest_is_canonical_and_pinned,
+    test_provider_topology_trust_policy_generation_rollback_rejects,
+    test_provider_topology_trust_policy_revoked_key_rejects,
+    test_provider_topology_trust_policy_revoked_signer_rejects,
+    test_provider_topology_trust_policy_unauthorized_root_rejects,
+    test_provider_topology_trust_policy_duplicate_key_rejects,
+    test_provider_topology_trust_policy_repository_scope_rejects,
+    test_provider_topology_trust_policy_rotation_accepts_new_pinned_key,
+    test_provider_topology_trust_policy_mutation_requires_new_pin,
     test_provider_topology_binding_requires_an_initial_observation,
     test_provider_topology_binding_rejects_initial_topology_mismatch,
     test_provider_topology_binding_requires_pre_submit_revalidation,
