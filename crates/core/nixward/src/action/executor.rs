@@ -1187,6 +1187,25 @@ impl NixOSExecutor {
             );
         }
 
+        // Close the stale-definition window after the JobRemoved watcher is armed.
+        // The subsequent mutation transport independently rechecks the exact manager
+        // owner and bus epoch immediately before dispatch. This is bounded currentness
+        // evidence, not an atomic filesystem-vs-systemd-loaded-definition proof.
+        if let Err(error) = self
+            .validate_authorized_service_definition_content(authority, *operation, unit)
+            .await
+        {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "final Service definition revalidation failed after watcher arm: {error}"
+                    ),
+                    safety_level: command.safety_level(),
+                },
+                None,
+            );
+        }
+
         let transport = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
             Ok(transport) => transport,
             Err(error) => {
