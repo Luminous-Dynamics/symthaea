@@ -437,33 +437,30 @@ mod tests {
         let bus_id = "0123456789abcdef0123456789abcdef";
 
         assert!(validate_manager_epoch_observation(owner, bus_id, owner, bus_id, owner).is_ok());
-        assert_eq!(
+        assert!(matches!(
             validate_manager_epoch_observation(
                 owner,
                 bus_id,
                 ":1.43",
                 bus_id,
                 ":1.43",
-            )
-            .unwrap_err(),
-            NixSystemdMutationTransportErrorV1::ManagerOwnerChanged
-        );
-        assert_eq!(
+            ),
+            Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged)
+        ));
+        assert!(matches!(
             validate_manager_epoch_observation(
                 owner,
                 bus_id,
                 owner,
                 "fedcba9876543210fedcba9876543210",
                 owner,
-            )
-            .unwrap_err(),
-            NixSystemdMutationTransportErrorV1::BusIncarnationChanged
-        );
-        assert_eq!(
-            validate_manager_epoch_observation(owner, bus_id, owner, bus_id, ":1.43")
-                .unwrap_err(),
-            NixSystemdMutationTransportErrorV1::ManagerOwnerChanged
-        );
+            ),
+            Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged)
+        ));
+        assert!(matches!(
+            validate_manager_epoch_observation(owner, bus_id, owner, bus_id, ":1.43"),
+            Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged)
+        ));
     }
 
     #[test]
