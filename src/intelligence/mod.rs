@@ -52,12 +52,14 @@ pub use reasoning_evaluator_policy::{
     REASONING_EVALUATOR_OUTCOME_SEMANTIC_VERSION,
 };
 pub use reasoning_metacognition::{
-    evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionDirection,
-    ConfidenceRevisionObservation, CorrectnessPrediction, MetacognitionEvaluationError,
-    CalibrationBinReport, MetacognitionReport, SelectiveRiskPoint,
-    TaskFamilyCalibrationReport,
-    WeakAssumptionObservation,
-    METACOGNITION_EVALUATOR_VERSION,
+    evaluate_frozen_correctness_forecasts, evaluate_metacognition, freeze_correctness_forecasts,
+    BinaryDetectionReport, CalibrationBinReport, ConfidenceRevisionDirection,
+    ConfidenceRevisionObservation, CorrectnessForecastV1, CorrectnessOutcomeV1,
+    CorrectnessPrediction, ForecastOutcomeBindingReport, FrozenCorrectnessForecastSet,
+    MetacognitionEvaluationError, MetacognitionReport, SelectiveRiskPoint,
+    TaskFamilyCalibrationReport, WeakAssumptionObservation,
+    CORRECTNESS_FORECAST_SCHEMA_VERSION, CORRECTNESS_OUTCOME_SCHEMA_VERSION,
+    FROZEN_FORECAST_SET_SCHEMA_VERSION, METACOGNITION_EVALUATOR_VERSION,
 };
 pub use reasoning_qualification::{
     AbstentionReason, AssumptionRecord, EvidenceRef, QualificationMetric,
