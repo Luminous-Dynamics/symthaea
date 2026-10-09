@@ -245,10 +245,16 @@ mod tests {
                 state[sites + i] = 0.3 * ((i + 1) as f64 * 0.61).cos();
             }
             let flow = hypercubic_wave_rhs(&state, 0.0);
-            let plus: Vec<f64> = state.iter().zip(&flow)
-                .map(|(x, dx)| x + epsilon * dx).collect();
-            let minus: Vec<f64> = state.iter().zip(&flow)
-                .map(|(x, dx)| x - epsilon * dx).collect();
+            let plus: Vec<f64> = state
+                .iter()
+                .zip(&flow)
+                .map(|(x, dx)| x + epsilon * dx)
+                .collect();
+            let minus: Vec<f64> = state
+                .iter()
+                .zip(&flow)
+                .map(|(x, dx)| x - epsilon * dx)
+                .collect();
             let directional_derivative =
                 (hypercubic_wave_energy(&plus) - hypercubic_wave_energy(&minus))
                     / (2.0 * epsilon);
