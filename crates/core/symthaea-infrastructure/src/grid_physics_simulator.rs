@@ -870,6 +870,4 @@ mod failure_mode_tests {
             0.005,
             GridPhysicsStepError::ActuatorOutOfRange { index: 0 },
         );
-    }
-
-}
+    }}
