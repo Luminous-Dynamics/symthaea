@@ -738,6 +738,25 @@ fn main() {
     );
     assert_eq!(gap_store.current.get("civ-log-v1"), Some(&previous));
 
+    let mut malformed_suffix = suffix.clone();
+    malformed_suffix[1] = malformed_suffix[0].clone();
+    let mut malformed_suffix_store = WitnessStore::new("witness-malformed-suffix", "lineage-malformed-suffix");
+    malformed_suffix_store.seed_trusted(previous.clone()).expect("seed anchor");
+    assert_eq!(
+        malformed_suffix_store.observe(
+            candidate.clone(),
+            Some(&proof),
+            &malformed_suffix,
+            102,
+            10,
+        ),
+        Err(Failure::ReceiptSuffixInvalid)
+    );
+    assert_eq!(
+        malformed_suffix_store.current.get("civ-log-v1"),
+        Some(&previous)
+    );
+
     let wrong_tail = CheckpointAnchor {
         receipt_digest: Some(events[5].digest),
         ..candidate.clone()
@@ -827,6 +846,63 @@ fn main() {
     assert_eq!(
         time_store.observe(stale, Some(&proof), &suffix, 103, 10),
         Err(Failure::StaleCheckpoint)
+    );
+    let regressed = CheckpointAnchor {
+        timestamp_epoch: 99,
+        ..previous.clone()
+    };
+    assert_eq!(
+        time_store.observe(regressed, None, &[], 102, 10),
+        Err(Failure::TimestampRegression)
+    );
+
+    // Receipt rollback, wrong prior-anchor link, and unsupported anchor metadata
+    // are independent failures and must not advance witness state.
+    let receipt_rollback = make_anchor(
+        "civ-log-v1",
+        previous_entries,
+        101,
+        "policy-v1",
+        3,
+        Some(events[2].digest),
+        Some(anchor_identity(&previous)),
+    );
+    assert_eq!(
+        time_store.observe(receipt_rollback, None, &[], 102, 10),
+        Err(Failure::ReceiptRollback)
+    );
+    let bad_link = CheckpointAnchor {
+        previous_anchor_digest: Some([0x55; 32]),
+        ..candidate.clone()
+    };
+    assert_eq!(
+        time_store.observe(bad_link, Some(&proof), &suffix, 102, 10),
+        Err(Failure::MissingAnchorLink)
+    );
+    let bad_protocol = CheckpointAnchor {
+        protocol_version: 2,
+        ..candidate.clone()
+    };
+    assert_eq!(
+        time_store.observe(bad_protocol, Some(&proof), &suffix, 102, 10),
+        Err(Failure::UnsupportedProtocolVersion)
+    );
+    let empty_log = CheckpointAnchor {
+        log_id: String::new(),
+        ..candidate.clone()
+    };
+    assert_eq!(
+        time_store.observe(empty_log, Some(&proof), &suffix, 102, 10),
+        Err(Failure::EmptyLogId)
+    );
+    let malformed_tail = CheckpointAnchor {
+        receipt_sequence: 0,
+        receipt_digest: Some(events[0].digest),
+        ..candidate.clone()
+    };
+    assert_eq!(
+        time_store.observe(malformed_tail, Some(&proof), &suffix, 102, 10),
+        Err(Failure::InvalidReceiptTailShape)
     );
     assert_eq!(time_store.current.get("civ-log-v1"), Some(&previous));
 
