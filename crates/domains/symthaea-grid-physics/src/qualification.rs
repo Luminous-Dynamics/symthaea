@@ -86,6 +86,7 @@ pub enum QualificationError {
     ReceiptProfileMismatch,
     InvalidReceiptValue,
     PowerBalanceMismatch,
+    BatteryTransitionMismatch,
     StepMetricMismatch,
     AggregateMetricMismatch,
     EvidenceSerializationFailed,
@@ -381,6 +382,80 @@ impl FrozenEnergyScenario {
             {
                 return Err(QualificationError::InvalidReceiptValue);
             }
+            // Independently reconstruct the expected battery transition from
+            // the frozen battery configuration and the previous state. This
+            // catches a forged discharge/SoC receipt even if a producer also
+            // edits net power and costs to keep aggregate sums consistent.
+            let capacity_kwh = self.battery.capacity_kwh;
+            let efficiency = self.battery.round_trip_efficiency.sqrt();
+            let health_before = (1.0
+                - step.battery_cycles_before * self.battery.degradation_per_cycle)
+                .clamp(0.0, 1.0);
+            let effective_capacity_kwh = capacity_kwh * health_before;
+            let mut expected_soc_after = step.battery_soc_before;
+            let mut expected_cycles_after = step.battery_cycles_before;
+            let mut expected_charge_input_kw = 0.0;
+            let mut expected_discharge_output_kw = 0.0;
+
+            if step.charge_setpoint_kw > 0.0 {
+                let requested_dc_kwh = step.charge_setpoint_kw
+                    * step.step_duration_hours
+                    * efficiency;
+                let headroom_kwh =
+                    (1.0 - step.battery_soc_before) * effective_capacity_kwh;
+                let accepted_dc_kwh = requested_dc_kwh.min(headroom_kwh);
+                if effective_capacity_kwh > 0.0 {
+                    expected_soc_after = (step.battery_soc_before
+                        + accepted_dc_kwh / effective_capacity_kwh)
+                        .clamp(0.0, 1.0);
+                }
+                if capacity_kwh > 0.0 {
+                    expected_cycles_after += accepted_dc_kwh / (2.0 * capacity_kwh);
+                }
+                expected_charge_input_kw = if efficiency > 0.0 {
+                    accepted_dc_kwh / efficiency / step.step_duration_hours
+                } else if effective_capacity_kwh > 0.0
+                    && expected_soc_after < 1.0
+                {
+                    // With zero efficiency the battery stores nothing, but
+                    // requested input is still consumed while headroom exists.
+                    step.charge_setpoint_kw
+                } else {
+                    0.0
+                };
+            } else if step.discharge_setpoint_kw > 0.0 {
+                let requested_dc_kwh = if efficiency > 0.0 {
+                    step.discharge_setpoint_kw * step.step_duration_hours / efficiency
+                } else {
+                    0.0
+                };
+                let available_dc_kwh =
+                    step.battery_soc_before * effective_capacity_kwh;
+                let delivered_dc_kwh = requested_dc_kwh.min(available_dc_kwh);
+                let delivered_ac_kwh = delivered_dc_kwh * efficiency;
+                if effective_capacity_kwh > 0.0 {
+                    expected_soc_after = (step.battery_soc_before
+                        - delivered_dc_kwh / effective_capacity_kwh)
+                        .clamp(0.0, 1.0);
+                }
+                if capacity_kwh > 0.0 {
+                    expected_cycles_after += delivered_dc_kwh / (2.0 * capacity_kwh);
+                }
+                expected_discharge_output_kw =
+                    delivered_ac_kwh / step.step_duration_hours;
+            }
+
+            if !close(step.battery_soc_after, expected_soc_after)
+                || !close(step.battery_cycles_after, expected_cycles_after)
+                || !close(step.battery_charge_input_kw, expected_charge_input_kw)
+                || !close(
+                    step.battery_discharge_output_kw,
+                    expected_discharge_output_kw,
+                )
+            {
+                return Err(QualificationError::BatteryTransitionMismatch);
+            }
+
             if let Some(previous) = previous_soc_after {
                 if !close(step.battery_soc_before, previous) {
                     return Err(QualificationError::InvalidReceiptValue);
@@ -761,6 +836,16 @@ mod tests {
         assert_eq!(
             scenario.verify_receipt(&tampered_step),
             Err(QualificationError::StepMetricMismatch)
+        );
+
+        let mut forged_battery = receipt.clone();
+        let first = &mut forged_battery.trace.steps[0];
+        first.battery_discharge_output_kw += 1.0;
+        first.net_kw = first.load_kw + first.battery_charge_input_kw
+            - first.generation_kw - first.battery_discharge_output_kw;
+        assert_eq!(
+            scenario.verify_receipt(&forged_battery),
+            Err(QualificationError::BatteryTransitionMismatch)
         );
 
         let mut tampered_total = receipt;
