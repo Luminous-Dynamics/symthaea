@@ -239,6 +239,32 @@ pub enum MetacognitionEvaluationError {
         expected: String,
         found: String,
     },
+    MissingEvaluationSplit,
+    EmptyBaselineField { baseline_id: String, field: &'static str },
+    InvalidBaselineSampleCount { baseline_id: String },
+    DuplicateBaselineId(String),
+    DuplicateBaselineMethodForTaskFamily {
+        method: ForecastBaselineMethod,
+        task_family_id: String,
+    },
+    MissingBaselineForTaskFamily {
+        method: ForecastBaselineMethod,
+        task_family_id: String,
+    },
+    BaselineTrainingSplitEqualsEvaluation {
+        baseline_id: String,
+        split_id: String,
+    },
+    BaselineTaxonomyMismatch {
+        baseline_id: String,
+        expected: String,
+        found: String,
+    },
+    BaselineOutcomeProfileMismatch {
+        baseline_id: String,
+        expected: String,
+        found: String,
+    },
 }
 
 impl fmt::Display for MetacognitionEvaluationError {
@@ -305,8 +331,51 @@ impl fmt::Display for MetacognitionEvaluationError {
                 f, "outcome for '{forecast_id}' has profile '{found}', expected '{expected}'"
             ),
             Self::MixedForecastScope { field, expected, found } => write!(
-                f, "forecast batch mixes '{field}': expected '{expected}', found '{found}'"
+                f,
+                "forecast batch mixes '{field}': expected '{expected}', found '{found}'"
             ),
+            Self::MissingEvaluationSplit => {
+                write!(f, "baseline comparison requires an explicit evaluation split ID")
+            }
+            Self::EmptyBaselineField { baseline_id, field } => {
+                write!(f, "baseline '{baseline_id}' has empty required field '{field}'")
+            }
+            Self::InvalidBaselineSampleCount { baseline_id } => {
+                write!(f, "baseline '{baseline_id}' needs at least one calibration sample")
+            }
+            Self::DuplicateBaselineId(id) => {
+                write!(f, "baseline ID '{id}' appears more than once")
+            }
+            Self::DuplicateBaselineMethodForTaskFamily { method, task_family_id } => {
+                write!(
+                    f,
+                    "baseline method {method:?} appears twice for task family '{task_family_id}'"
+                )
+            }
+            Self::MissingBaselineForTaskFamily { method, task_family_id } => {
+                write!(
+                    f,
+                    "baseline method {method:?} is missing for task family '{task_family_id}'"
+                )
+            }
+            Self::BaselineTrainingSplitEqualsEvaluation { baseline_id, split_id } => {
+                write!(
+                    f,
+                    "baseline '{baseline_id}' training split '{split_id}' equals evaluation split"
+                )
+            }
+            Self::BaselineTaxonomyMismatch { baseline_id, expected, found } => {
+                write!(
+                    f,
+                    "baseline '{baseline_id}' taxonomy '{found}' does not match '{expected}'"
+                )
+            }
+            Self::BaselineOutcomeProfileMismatch { baseline_id, expected, found } => {
+                write!(
+                    f,
+                    "baseline '{baseline_id}' outcome '{found}' does not match '{expected}'"
+                )
+            }
         }
     }
 }
@@ -359,6 +428,78 @@ pub struct ForecastOutcomeBindingReport {
     pub forecast_ids: Vec<String>,
     pub outcome_receipt_ids: Vec<String>,
     pub outcome_evidence_refs: Vec<String>,
+}
+
+/// Baseline family used for prospective probability comparisons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ForecastBaselineMethod {
+    /// Constant probability estimated from a disjoint calibration split's base rate.
+    ConstantBaseRate,
+    /// Trailing-window empirical correctness rate estimated before the holdout split.
+    RecentEmpiricalAccuracy,
+}
+
+/// Pre-estimated baseline probability captured using calibration data only.
+///
+/// The manifest reference must identify the exact calibration corpus and the split ID must
+/// differ from the held-out split. This does not prove that those artifacts are disjoint; an
+/// external manifest verifier remains responsible for that property.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ForecastBaselineV1 {
+    pub schema_version: u32,
+    pub baseline_id: String,
+    pub method: ForecastBaselineMethod,
+    pub task_family_id: String,
+    pub task_taxonomy_id: String,
+    pub outcome_profile_id: String,
+    pub predicted_probability: f64,
+    pub training_sample_count: usize,
+    pub training_split_id: String,
+    pub training_corpus_manifest_ref: String,
+}
+
+/// One frozen baseline's metrics on the same held-out outcomes as the candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ForecastBaselineScoreReport {
+    pub baseline_id: String,
+    pub method: ForecastBaselineMethod,
+    pub task_family_id: String,
+    pub training_split_id: String,
+    pub training_corpus_manifest_ref: String,
+    pub training_sample_count: usize,
+    pub evaluation_split_id: String,
+    pub evaluation_sample_count: usize,
+    pub predicted_probability: f64,
+    pub empirical_accuracy: Option<f64>,
+    pub brier_score: Option<f64>,
+    pub log_loss: Option<f64>,
+    pub expected_calibration_error: Option<f64>,
+    /// Candidate Brier score minus baseline score; negative favors the candidate.
+    pub candidate_brier_delta: Option<f64>,
+    /// Candidate log loss minus baseline loss; negative favors the candidate.
+    pub candidate_log_loss_delta: Option<f64>,
+}
+
+/// Baselines and the candidate scored against the exact same family-local holdout outcomes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskFamilyForecastBaselineComparison {
+    pub task_family_id: String,
+    pub evaluation_episodes: usize,
+    pub candidate_brier_score: Option<f64>,
+    pub candidate_log_loss: Option<f64>,
+    pub candidate_expected_calibration_error: Option<f64>,
+    pub baselines: Vec<ForecastBaselineScoreReport>,
+}
+
+/// Split-aware, strictly comparative report. It selects no winner and grants no authority.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ForecastBaselineComparisonReport {
+    pub schema_version: u32,
+    pub outcome_profile_id: String,
+    pub task_taxonomy_id: String,
+    pub evaluation_split_id: String,
+    pub baseline_methods: Vec<ForecastBaselineMethod>,
+    pub family_reports: Vec<TaskFamilyForecastBaselineComparison>,
 }
 
 /// Forecasts and scoring policy fixed before outcomes are attached. Private fields prevent
