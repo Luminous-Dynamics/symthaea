@@ -499,8 +499,14 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         object_path: &OwnedObjectPath,
         expected_unit: &str,
-    ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool, Option<String>), NixSystemdObserverErrorV1>
-    {
+    ) -> Result<
+        (
+            NixSystemdUnitDefinitionIdentityV1,
+            bool,
+            Option<String>,
+        ),
+        NixSystemdObserverErrorV1,
+    > {
         validate_unit_object_path(object_path)?;
         let properties = self
             .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
