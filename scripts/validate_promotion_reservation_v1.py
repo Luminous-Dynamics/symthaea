@@ -1661,6 +1661,203 @@ def _test_sign_topology_statement(
     )
 
 
+def _verify_fixture_under_policy(
+    identity: PromotionOperationIdentityV1,
+    evidence: ProviderTopologyCasEvidenceV1,
+    policy: ProviderTopologyCasTrustPolicyV1,
+    *,
+    expected_digest: str | None = None,
+    expected_generation: int | None = None,
+    trust_root: ProviderTopologyCasTrustRootV1 | None = None,
+) -> ProviderTopologyCasVerificationV1 | None:
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    if evidence.provider_result.attestation is None or evidence.provider_result.execution is None:
+        return None
+    return verify_provider_topology_cas_attestation(
+        evidence.provider_result.attestation,
+        trust_root or _test_trust_root(identity),
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        evidence.provider_result.execution,
+        policy,
+        expected_digest if expected_digest is not None else policy.digest(),
+        expected_generation if expected_generation is not None else policy.generation,
+    )
+
+
+def test_provider_topology_trust_policy_digest_is_canonical_and_pinned():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    policy = _test_trust_policy(identity)
+    assert policy.digest() == _test_trust_policy(identity).digest()
+    assert _verify_fixture_under_policy(identity, evidence, policy) is not None
+    assert _verify_fixture_under_policy(
+        identity,
+        evidence,
+        policy,
+        expected_digest="sha256:" + ("0" * 64),
+    ) is None
+
+
+def test_provider_topology_trust_policy_generation_rollback_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    policy = _test_trust_policy(identity)
+    assert _verify_fixture_under_policy(
+        identity,
+        evidence,
+        policy,
+        expected_generation=policy.generation + 1,
+    ) is None
+
+
+def test_provider_topology_trust_policy_revoked_key_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(identity, root, revoked_key_ids=(root.key_id,))
+    assert not policy.authorizes(root, identity, policy.digest(), policy.generation)
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_revoked_signer_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(
+        identity,
+        root,
+        revoked_signer_identities=(root.signer_identity,),
+    )
+    assert not policy.authorizes(root, identity, policy.digest(), policy.generation)
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_unauthorized_root_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    policy = _test_trust_policy(identity, authorized_roots=())
+    root = _test_trust_root(identity)
+    assert policy.structurally_valid()
+    assert not policy.authorizes(root, identity, policy.digest(), policy.generation)
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_duplicate_key_rejects():
+    identity = stack_identity_fixture()
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(identity, authorized_roots=(root, root))
+    assert not policy.structurally_valid()
+    assert _verify_fixture_under_policy(
+        identity,
+        provider_topology_cas_evidence_fixture(identity),
+        policy,
+    ) is None
+
+
+def test_provider_topology_trust_policy_repository_scope_rejects():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    root = _test_trust_root(identity)
+    policy = _test_trust_policy(
+        identity,
+        root,
+        repository="other/repository",
+        authorized_roots=(root,),
+    )
+    assert not policy.structurally_valid()
+    assert _verify_fixture_under_policy(identity, evidence, policy) is None
+
+
+def test_provider_topology_trust_policy_rotation_accepts_new_pinned_key():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    private_pem, public_pem, key_id = _test_rotated_signer_material()
+    previous_root = _test_trust_root(identity)
+    rotated_root = ProviderTopologyCasTrustRootV1(
+        trust_root_id="test-only-rotated-ed25519-root-v2",
+        generation=identity.trust_root_generation,
+        repository=identity.repository,
+        signer_identity=previous_root.signer_identity,
+        key_id=key_id,
+        public_key_pem=public_pem,
+    )
+    rotated_policy = _test_trust_policy(
+        identity,
+        rotated_root,
+        generation=2,
+        authorized_roots=(rotated_root,),
+    )
+    observation = provider_stack_observation_fixture(identity)
+    predicate = ProviderTopologyCasPredicateV1.from_binding(identity, observation, 2)
+    request = ProviderTopologyCasRequestV1.from_identity_predicate(identity, predicate)
+    execution = evidence.provider_result.execution
+    assert execution is not None
+    rotated_attestation = _test_sign_topology_statement(
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        execution,
+        rotated_root,
+        rotated_policy,
+        signer_private_pem=private_pem,
+    )
+    verification = verify_provider_topology_cas_attestation(
+        rotated_attestation,
+        rotated_root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        execution,
+        rotated_policy,
+        rotated_policy.digest(),
+        rotated_policy.generation,
+    )
+    assert verification is not None
+    assert verification.trust_policy_generation == 2
+    assert verification.trust_policy_digest == rotated_policy.digest()
+    assert verify_provider_topology_cas_attestation(
+        rotated_attestation,
+        previous_root,
+        identity,
+        observation,
+        2,
+        request,
+        evidence.submission,
+        execution,
+        rotated_policy,
+        rotated_policy.digest(),
+        rotated_policy.generation,
+    ) is None
+
+
+def test_provider_topology_trust_policy_mutation_requires_new_pin():
+    identity = stack_identity_fixture()
+    evidence = provider_topology_cas_evidence_fixture(identity)
+    original = _test_trust_policy(identity)
+    changed = _test_trust_policy(
+        identity,
+        revoked_signer_identities=("some-other-signer",),
+    )
+    assert original.digest() != changed.digest()
+    assert _verify_fixture_under_policy(
+        identity,
+        evidence,
+        changed,
+        expected_digest=original.digest(),
+    ) is None
+
+
+
 def test_provider_topology_binding_requires_an_initial_observation():
     identity = stack_identity_fixture()
     binding = ProviderTopologyBindingV1(None, None, 1, None)
@@ -3167,6 +3364,15 @@ def test_unrelated_ledger_transition_rejects_stale_dispatch_fence():
 
 
 TESTS = [
+    test_provider_topology_trust_policy_digest_is_canonical_and_pinned,
+    test_provider_topology_trust_policy_generation_rollback_rejects,
+    test_provider_topology_trust_policy_revoked_key_rejects,
+    test_provider_topology_trust_policy_revoked_signer_rejects,
+    test_provider_topology_trust_policy_unauthorized_root_rejects,
+    test_provider_topology_trust_policy_duplicate_key_rejects,
+    test_provider_topology_trust_policy_repository_scope_rejects,
+    test_provider_topology_trust_policy_rotation_accepts_new_pinned_key,
+    test_provider_topology_trust_policy_mutation_requires_new_pin,
     test_provider_topology_binding_requires_an_initial_observation,
     test_provider_topology_binding_rejects_initial_topology_mismatch,
     test_provider_topology_binding_requires_pre_submit_revalidation,
