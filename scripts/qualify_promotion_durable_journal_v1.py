@@ -19,7 +19,7 @@ from typing import Any, Iterator
 from validate_promotion_reservation_v1 import PromotionTemporalAttemptIdentityV1
 
 GENESIS_HASH = hashlib.sha256(b"").hexdigest()
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def canonical_json(value: Any) -> str:
@@ -299,13 +299,39 @@ class DurablePromotionJournalV1:
         "ledger_state_fence_monotonicity_guard": (
             "new.revision <> old.revision + 1",
             "new.fencing_token < old.fencing_token",
+            "new.fencing_token > old.fencing_token + 1",
+            "new.trust_root_generation < old.trust_root_generation",
+            "new.governance_generation < old.governance_generation",
+            "new.active_lease <> old.active_lease",
+            "new.head <> old.head",
             "ledger authority state monotonicity violated",
         ),
-        "reservation_insert_authority_guard": ("reservation storage fence rejected",),
+        "reservation_insert_authority_guard": (
+            "l.head = new.reservation_head",
+            "l.active_lease = new.lease_id",
+            "l.fencing_token = new.fencing_token",
+            "l.trust_root_generation = new.trust_root_generation",
+            "l.governance_generation = new.governance_generation",
+            "l.revision = new.created_revision",
+            "reservation storage fence rejected",
+        ),
         "reservation_identity_immutable": ("reservation identity is immutable",),
-        "reservation_state_transition_guard": ("invalid reservation state transition",),
+        "reservation_state_transition_guard": (
+            "old.state = 'promotionreserved'",
+            "new.state in ('promotiondispatchprepared', 'promotionsuperseded')",
+            "old.state = 'promotiondispatchprepared'",
+            "new.state = 'promotionreconciliationrequired'",
+            "invalid reservation state transition",
+        ),
         "reservation_terminal_evidence_immutable": (
             "old.state <> 'promotionreserved'",
+            "new.dispatch_attempt_id is not old.dispatch_attempt_id",
+            "new.dispatch_attempt_sequence is not old.dispatch_attempt_sequence",
+            "new.dispatch_wall_time_ms is not old.dispatch_wall_time_ms",
+            "new.dispatch_monotonic_ns is not old.dispatch_monotonic_ns",
+            "new.dispatch_clock_id is not old.dispatch_clock_id",
+            "new.attempt_identity_digest is not old.attempt_identity_digest",
+            "new.superseded_by_fence is not old.superseded_by_fence",
             "terminal reservation evidence is immutable",
         ),
         "reservation_prepare_storage_fence_guard": (
@@ -1735,6 +1761,22 @@ class DurablePromotionJournalTests(unittest.TestCase):
                    BEFORE UPDATE OF state ON reservations
                    WHEN NEW.state = 'PromotionReconciliationRequired'
                    BEGIN SELECT 1; END"""
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        self.assertFalse(journal.verify_journal())
+
+    def test_state_transition_trigger_must_encode_reconciliation_edge(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        connection = sqlite3.connect(journal.path)
+        try:
+            connection.execute("DROP TRIGGER reservation_state_transition_guard")
+            connection.execute(
+                """CREATE TRIGGER reservation_state_transition_guard
+                   BEFORE UPDATE OF state ON reservations
+                   BEGIN SELECT RAISE(ABORT, 'invalid reservation state transition'); END"""
             )
             connection.commit()
         finally:
