@@ -815,6 +815,12 @@ mod tests {
         assert_eq!(report.counterfactual_adjudications, 1);
         assert_eq!(report.counterfactual_answerable_rate, Some(1.0));
         assert_eq!(report.family_reports.len(), 2);
+        let reasoning = report.family_reports.iter().find(|r| r.task_family_id == "reasoning").expect("reasoning family retained");
+        assert_eq!(reasoning.total_decisions, 2);
+        assert_eq!(reasoning.scoreable_assertions, 1);
+        assert_eq!(reasoning.baselines[0].candidate_scored_assertions, 1);
+        assert_eq!(reasoning.baselines[0].baseline_brier_score, Some(0.16));
+        assert_eq!(reasoning.baselines[0].evaluation_decisions, 2);
         let retrieval = report.family_reports.iter().find(|r| r.task_family_id == "retrieval").expect("abstain-only family retained");
         assert_eq!(retrieval.total_decisions, 1);
         assert_eq!(retrieval.scoreable_assertions, 0);
@@ -822,6 +828,7 @@ mod tests {
         assert_eq!(retrieval.baselines.len(), 2);
         assert_eq!(retrieval.baselines[0].candidate_scored_assertions, 0);
         assert_eq!(retrieval.baselines[0].baseline_brier_score, None);
+        assert_eq!(retrieval.counterfactual_answerable_rate, None);
     }
 
     #[test]
@@ -838,6 +845,17 @@ mod tests {
     fn asserted_answer_requires_a_scored_outcome() {
         let f = forecast("f1", "e1", "reasoning", 0.5, true, None);
         let o = outcome(&f, None, None);
+        let frozen = freeze_decision_cohort_for_split(vec![f], 5, vec![0.5], "holdout".into(), "manifest".into())
+            .unwrap_or_else(|e| panic!("freeze: {e}"));
+        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
+    }
+
+    #[test]
+    fn counterfactual_correctness_requires_a_predeclared_answer_and_separate_evidence() {
+        let f = forecast("f1", "e1", "reasoning", 0.5, false, Some("hidden-answer:e1"));
+        let mut o = outcome(&f, None, None);
+        o.counterfactual_answer_correct = Some(true);
+        // Deliberately omit counterfactual_evidence_ref.
         let frozen = freeze_decision_cohort_for_split(vec![f], 5, vec![0.5], "holdout".into(), "manifest".into())
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[], &[]).is_err());
