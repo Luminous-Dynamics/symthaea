@@ -269,6 +269,20 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             with self.assertRaises(module.VerificationError):
                 module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
 
+    def test_nested_verdict_path_is_rejected(self):
+        payload, run = self.make_verdict()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("nested/verdict.json", json.dumps(payload))
+            archive.writestr("workflows/test.txt", b"evidence")
+        archive_bytes = buffer.getvalue()
+        artifact = {"id": 77, "name": f"security-audit-mycelix-{run['head_sha']}-verdict",
+                    "expired": False, "digest": "sha256:" + hashlib.sha256(archive_bytes).hexdigest(),
+                    "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
+        with patch.object(module, "api", return_value={"artifacts": [artifact]}), patch.object(module, "download_artifact_zip", return_value=archive_bytes):
+            with self.assertRaises(module.VerificationError):
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+
     def test_artifact_zip_path_traversal_is_rejected(self):
         payload, run = self.make_verdict()
         buffer = io.BytesIO()
@@ -282,6 +296,13 @@ class TrustAnchorPolicyTests(unittest.TestCase):
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
                 module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+
+    def test_pending_status_only_for_uncompleted_runs(self):
+        self.assertTrue(module.should_publish_pending_status("workflow_run", "requested", {"status": "queued"}))
+        self.assertTrue(module.should_publish_pending_status("workflow_run", "in_progress", {"status": "in_progress"}))
+        self.assertFalse(module.should_publish_pending_status("workflow_run", "in_progress", {"status": "completed"}))
+        self.assertFalse(module.should_publish_pending_status("workflow_run", "completed", {"status": "completed"}))
+        self.assertFalse(module.should_publish_pending_status("workflow_dispatch", "requested", {"status": "queued"}))
 
     def event_meta(self, repo):
         return {
