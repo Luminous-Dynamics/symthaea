@@ -2423,6 +2423,100 @@ mod tests {
     }
 
     #[test]
+    fn legacy_fork_history_is_validated_and_migrated_with_tail_commitment() {
+        let db = TempDb::new();
+        let log_id = "log-legacy-fork-meta-migration";
+        let legacy_schema = SCHEMA.replace(
+            "CREATE TABLE IF NOT EXISTS witness_fork_meta (
+    log_id TEXT PRIMARY KEY NOT NULL,
+    evidence_count INTEGER NOT NULL CHECK (evidence_count > 0),
+    tail_digest BLOB NOT NULL CHECK (length(tail_digest) = 32)
+);
+",
+            "",
+        );
+        assert!(!legacy_schema.contains("witness_fork_meta"));
+        let conn = Connection::open(&db.0).expect("open legacy database");
+        conn.execute_batch(&legacy_schema).expect("create legacy schema");
+
+        let first = h(b"legacy-fork-first");
+        let conflict = h(b"legacy-fork-conflict");
+        let first_tail = fork_digest(log_id, 2, first, conflict, None);
+        conn.execute(
+            "INSERT INTO witness_fork_evidence (
+                log_id, generation, first_record_digest, conflicting_record_digest,
+                previous_evidence_digest, digest
+             ) VALUES (?1, ?2, ?3, ?4, NULL, ?5)",
+            params![log_id, 2_i64, first.as_slice(), conflict.as_slice(), first_tail.as_slice()],
+        ).expect("insert legacy first fork event");
+        let second_first = h(b"legacy-fork-second-first");
+        let second_conflict = h(b"legacy-fork-second-conflict");
+        let second_tail = fork_digest(
+            log_id, 3, second_first, second_conflict, Some(first_tail),
+        );
+        conn.execute(
+            "INSERT INTO witness_fork_evidence (
+                log_id, generation, first_record_digest, conflicting_record_digest,
+                previous_evidence_digest, digest
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                log_id, 3_i64, second_first.as_slice(), second_conflict.as_slice(),
+                Some(first_tail.to_vec()), second_tail.as_slice(),
+            ],
+        ).expect("insert legacy second fork event");
+        drop(conn);
+
+        let migrated = db.open();
+        assert!(migrated.integrity_check().is_ok());
+        let conn = migrated.open_connection().expect("open migrated database");
+        let commitment: (i64, Vec<u8>) = conn.query_row(
+            "SELECT evidence_count, tail_digest FROM witness_fork_meta WHERE log_id=?1",
+            params![log_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).expect("migrated tail commitment");
+        assert_eq!(commitment.0, 2);
+        assert_eq!(blob_digest(&commitment.1).expect("32-byte tail"), second_tail);
+        let db_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+            .expect("database schema version");
+        assert_eq!(db_version, DB_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn corrupt_legacy_fork_history_is_not_migrated() {
+        let db = TempDb::new();
+        let log_id = "log-corrupt-legacy-fork-meta";
+        let legacy_schema = SCHEMA.replace(
+            "CREATE TABLE IF NOT EXISTS witness_fork_meta (
+    log_id TEXT PRIMARY KEY NOT NULL,
+    evidence_count INTEGER NOT NULL CHECK (evidence_count > 0),
+    tail_digest BLOB NOT NULL CHECK (length(tail_digest) = 32)
+);
+",
+            "",
+        );
+        let conn = Connection::open(&db.0).expect("open legacy database");
+        conn.execute_batch(&legacy_schema).expect("create legacy schema");
+        let first = h(b"corrupt-legacy-first");
+        let conflict = h(b"corrupt-legacy-conflict");
+        conn.execute(
+            "INSERT INTO witness_fork_evidence (
+                log_id, generation, first_record_digest, conflicting_record_digest,
+                previous_evidence_digest, digest
+             ) VALUES (?1, ?2, ?3, ?4, NULL, ?5)",
+            params![log_id, 2_i64, first.as_slice(), conflict.as_slice(), h(b"wrong-tail").as_slice()],
+        ).expect("insert corrupt legacy fork event");
+        drop(conn);
+        assert!(matches!(
+            SqliteWitnessStore::open(&db.0),
+            Err(WitnessError::CorruptForkEvidence)
+        ), "do not silently bless an invalid legacy fork chain");
+        let conn = Connection::open(&db.0).expect("inspect failed migration");
+        let db_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+            .expect("database schema version");
+        assert_eq!(db_version, 0, "failed migration must not publish the new schema version");
+    }
+
+    #[test]
     fn restoring_old_local_history_is_detected_by_external_anchor() {
         let db = TempDb::new();
         let anchor = MemoryAnchor::default();
