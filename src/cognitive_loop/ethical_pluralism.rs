@@ -30,6 +30,15 @@ pub enum FrameworkStance {
     Underdetermined,
 }
 
+/// Error returned when constructing or checking a canonical assessment subject.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssessmentSubjectError {
+    EmptyScenarioReference,
+    EmptyActionReference,
+    EmptyScenarioBytes,
+    EmptyActionBytes,
+}
+
 /// Exact subject binding shared by assessments that may be compared.
 ///
 /// The producer should compute each digest from a canonical serialization of
@@ -40,12 +49,91 @@ pub enum FrameworkStance {
 pub struct AssessmentSubject {
     /// Stable reference to the normalized scenario/context.
     pub scenario_ref: String,
-    /// Opaque digest/fingerprint of the canonical scenario/context.
+    /// Domain-separated BLAKE3 fingerprint of canonical scenario bytes.
+    ///
+    /// Construct this value with from_canonical_bytes rather than supplying an
+    /// arbitrary string. Canonicalization itself remains the caller's job.
     pub scenario_digest: String,
     /// Stable reference to the candidate action being assessed.
     pub candidate_action_ref: String,
-    /// Opaque digest/fingerprint of the canonical candidate action.
+    /// Domain-separated BLAKE3 fingerprint of canonical candidate-action bytes.
     pub candidate_action_digest: String,
+}
+
+impl AssessmentSubject {
+    /// Construct a subject by hashing caller-supplied canonical bytes.
+    ///
+    /// Scenario and action use distinct domain tags so identical byte strings
+    /// cannot share fingerprints across the two semantic domains. The method
+    /// does not canonicalize JSON/CBOR or prove the caller's bytes are canonical.
+    pub fn from_canonical_bytes(
+        scenario_ref: impl Into<String>,
+        scenario_bytes: &[u8],
+        candidate_action_ref: impl Into<String>,
+        candidate_action_bytes: &[u8],
+    ) -> Result<Self, AssessmentSubjectError> {
+        let scenario_ref = scenario_ref.into();
+        let candidate_action_ref = candidate_action_ref.into();
+
+        if scenario_ref.trim().is_empty() {
+            return Err(AssessmentSubjectError::EmptyScenarioReference);
+        }
+        if candidate_action_ref.trim().is_empty() {
+            return Err(AssessmentSubjectError::EmptyActionReference);
+        }
+        if scenario_bytes.is_empty() {
+            return Err(AssessmentSubjectError::EmptyScenarioBytes);
+        }
+        if candidate_action_bytes.is_empty() {
+            return Err(AssessmentSubjectError::EmptyActionBytes);
+        }
+
+        Ok(Self {
+            scenario_ref,
+            scenario_digest: domain_separated_digest(
+                b"symthaea.ethics.subject.scenario.v1",
+                scenario_bytes,
+            ),
+            candidate_action_ref,
+            candidate_action_digest: domain_separated_digest(
+                b"symthaea.ethics.subject.candidate-action.v1",
+                candidate_action_bytes,
+            ),
+        })
+    }
+
+    /// Check that these fingerprints match the provided canonical bytes.
+    ///
+    /// This verifies byte-to-digest binding, not canonicalization, producer
+    /// identity, or proof that a framework evaluator actually consumed them.
+    pub fn matches_canonical_bytes(
+        &self,
+        scenario_bytes: &[u8],
+        candidate_action_bytes: &[u8],
+    ) -> bool {
+        !scenario_bytes.is_empty()
+            && !candidate_action_bytes.is_empty()
+            && self.scenario_digest
+                == domain_separated_digest(
+                    b"symthaea.ethics.subject.scenario.v1",
+                    scenario_bytes,
+                )
+            && self.candidate_action_digest
+                == domain_separated_digest(
+                    b"symthaea.ethics.subject.candidate-action.v1",
+                    candidate_action_bytes,
+                )
+    }
+}
+
+/// Domain-separated, versioned BLAKE3 fingerprint encoded as a lowercase hex string.
+fn domain_separated_digest(domain: &[u8], bytes: &[u8]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(&[0]);
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+    format!("blake3:v1:{}", hasher.finalize().to_hex())
 }
 
 /// Freshness of the evaluator result for the reported subject.
@@ -555,6 +643,106 @@ mod tests {
 
     fn identity(id: &str, version: &str) -> FrameworkIdentity {
         FrameworkIdentity::new(id, version)
+    }
+
+    #[test]
+    fn canonical_subject_construction_is_deterministic() {
+        let a = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            br#"{"facts":["a","b"]}"#,
+            "action:one",
+            br#"{"type":"notify","recipient":"owner"}"#,
+        )
+        .unwrap();
+        let b = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            br#"{"facts":["a","b"]}"#,
+            "action:one",
+            br#"{"type":"notify","recipient":"owner"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(a, b);
+        assert!(a.scenario_digest.starts_with("blake3:v1:"));
+        assert!(a.candidate_action_digest.starts_with("blake3:v1:"));
+        assert!(a.matches_canonical_bytes(
+            br#"{"facts":["a","b"]}"#,
+            br#"{"type":"notify","recipient":"owner"}"#,
+        ));
+    }
+
+    #[test]
+    fn canonical_subject_changes_when_scenario_or_action_bytes_change() {
+        let original = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            b"scenario-v1",
+            "action:one",
+            b"action-v1",
+        )
+        .unwrap();
+        let changed_scenario = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            b"scenario-v2",
+            "action:one",
+            b"action-v1",
+        )
+        .unwrap();
+        let changed_action = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            b"scenario-v1",
+            "action:one",
+            b"action-v2",
+        )
+        .unwrap();
+
+        assert_ne!(original.scenario_digest, changed_scenario.scenario_digest);
+        assert_ne!(original.candidate_action_digest, changed_action.candidate_action_digest);
+    }
+
+    #[test]
+    fn canonical_subject_digest_is_domain_separated() {
+        let subject = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            b"same bytes",
+            "action:one",
+            b"same bytes",
+        )
+        .unwrap();
+        assert_ne!(subject.scenario_digest, subject.candidate_action_digest);
+    }
+
+    #[test]
+    fn canonical_subject_verification_detects_changed_bytes() {
+        let subject = AssessmentSubject::from_canonical_bytes(
+            "scenario:one",
+            b"scenario-v1",
+            "action:one",
+            b"action-v1",
+        )
+        .unwrap();
+        assert!(!subject.matches_canonical_bytes(b"scenario-v2", b"action-v1"));
+        assert!(!subject.matches_canonical_bytes(b"scenario-v1", b"action-v2"));
+        assert!(!subject.matches_canonical_bytes(b"", b"action-v1"));
+    }
+
+    #[test]
+    fn canonical_subject_rejects_empty_references_and_payloads() {
+        assert_eq!(
+            AssessmentSubject::from_canonical_bytes("", b"scenario", "action:one", b"action"),
+            Err(AssessmentSubjectError::EmptyScenarioReference)
+        );
+        assert_eq!(
+            AssessmentSubject::from_canonical_bytes("scenario:one", b"scenario", " ", b"action"),
+            Err(AssessmentSubjectError::EmptyActionReference)
+        );
+        assert_eq!(
+            AssessmentSubject::from_canonical_bytes("scenario:one", b"", "action:one", b"action"),
+            Err(AssessmentSubjectError::EmptyScenarioBytes)
+        );
+        assert_eq!(
+            AssessmentSubject::from_canonical_bytes("scenario:one", b"scenario", "action:one", b""),
+            Err(AssessmentSubjectError::EmptyActionBytes)
+        );
     }
 
     #[test]
