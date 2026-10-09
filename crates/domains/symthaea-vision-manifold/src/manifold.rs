@@ -2075,6 +2075,11 @@ impl VisionManifold {
 
         let mut total = 0.0f32;
         for pair in path.windows(2) {
+            // Similarity requires dimension equality; reject malformed paths
+            // rather than letting a public measurement API panic.
+            if pair[0].dim() != pair[1].dim() {
+                return None;
+            }
             let score = self.compute_local_coherence(&pair[0], &pair[1]);
             if !score.is_finite() {
                 return None;
@@ -11035,6 +11040,25 @@ mod tests {
 
         assert_eq!(manifold.measure_path_coherence(&[]), None);
         assert_eq!(manifold.measure_path_coherence(std::slice::from_ref(&state)), None);
+    }
+
+    #[test]
+    fn path_coherence_fails_closed_on_mismatched_dimensions() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(8, 0xC0DE_0010);
+        let b = ContinuousHV::random(9, 0xC0DE_0011);
+
+        assert_eq!(manifold.measure_path_coherence(&[a, b]), None);
+    }
+
+    #[test]
+    fn path_coherence_fails_closed_on_non_finite_transition_scores() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(8, 0xC0DE_0012);
+        let mut b = ContinuousHV::random(8, 0xC0DE_0013);
+        b.values[0] = f32::NAN;
+
+        assert_eq!(manifold.measure_path_coherence(&[a, b]), None);
     }
 
     #[test]
