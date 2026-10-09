@@ -48,6 +48,36 @@ pub struct AssessmentSubject {
     pub candidate_action_digest: String,
 }
 
+/// Freshness of the evaluator result for the reported subject.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssessmentFreshness {
+    /// The evaluator ran on the reported subject for this assessment.
+    Fresh,
+    /// The result was carried forward from an earlier evaluation.
+    ///
+    /// The source subject must remain bound to its original scenario/action.
+    /// Strict comparison will not treat carried-forward assessments as fresh
+    /// evidence of agreement.
+    CarriedForward,
+}
+
+/// Provenance for an ethical-framework assessment.
+///
+/// These fields are caller-supplied metadata. This module validates their
+/// shape and consistency, but does not attest the build identity or prove that
+/// the evaluator actually processed the declared source subject.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssessmentProvenance {
+    /// Exact subject that the evaluator actually processed.
+    pub source_subject: AssessmentSubject,
+    /// Build/revision identity of the evaluator implementation.
+    pub evaluator_build_id: String,
+    /// Cycle or monotonic evaluation sequence assigned by the producer.
+    pub evaluation_cycle: u64,
+    /// Whether the result was computed on the subject or carried forward.
+    pub freshness: AssessmentFreshness,
+}
+
 /// A single result from one versioned ethical framework.
 ///
 /// `premise_refs` identify normative premises/rules used in the assessment.
@@ -59,8 +89,14 @@ pub struct FrameworkAssessment {
     pub framework_id: String,
     /// Exact version of the framework that produced this assessment.
     pub framework_version: String,
-    /// Scenario and candidate action this assessment actually evaluated.
+    /// Scenario and candidate action this assessment claims to describe.
+    ///
+    /// Must equal provenance.source_subject for a fresh, comparable result.
+    /// For carried-forward results, retain the old source subject in provenance
+    /// rather than relabeling it to the current input.
     pub subject: AssessmentSubject,
+    /// Producer-supplied origin and freshness information.
+    pub provenance: AssessmentProvenance,
     /// Framework-relative position; never an execution authorization.
     pub stance: FrameworkStance,
     /// Optional calibrated confidence in this assessment, if defined by the caller.
@@ -99,8 +135,13 @@ pub enum ComparisonState {
     /// At least one result is mixed, conditional, or underdetermined, so agreement
     /// cannot be asserted from the supplied results.
     Incomplete,
-    /// Valid assessments refer to different scenarios or candidate actions.
+    /// Valid assessments refer to different scenarios or candidate actions, or
+    /// do not match the explicit subject requested by the caller.
     SubjectMismatch,
+    /// The reported subject differs from the subject the evaluator actually ran.
+    SourceSubjectMismatch,
+    /// At least one assessment is carried forward rather than freshly evaluated.
+    StaleAssessment,
     /// An assessment is malformed or the same framework/version appears twice.
     InvalidInput,
 }
@@ -124,6 +165,28 @@ pub struct PluralEthicsComparison {
 /// disagreement. A malformed assessment invalidates the comparison rather than
 /// silently dropping the bad row.
 pub fn compare_assessments(assessments: &[FrameworkAssessment]) -> PluralEthicsComparison {
+    let expected_subject = assessments.first().map(|assessment| &assessment.subject);
+    compare_assessments_inner(expected_subject, assessments)
+}
+
+/// Compare assessments for an explicitly requested subject.
+///
+/// Unlike compare_assessments, this form lets the caller state which exact
+/// scenario/action is being compared. It refuses a result whose reported
+/// subject differs from that target, whose producer provenance points at a
+/// different source subject, or whose result was carried forward. It still
+/// does not authenticate provenance metadata or authorize any action.
+pub fn compare_assessments_for(
+    expected_subject: &AssessmentSubject,
+    assessments: &[FrameworkAssessment],
+) -> PluralEthicsComparison {
+    compare_assessments_inner(Some(expected_subject), assessments)
+}
+
+fn compare_assessments_inner(
+    expected_subject: Option<&AssessmentSubject>,
+    assessments: &[FrameworkAssessment],
+) -> PluralEthicsComparison {
     let counts = AssessmentCounts {
         supports: assessments.iter().filter(|a| a.stance == FrameworkStance::SupportsAction).count(),
         opposes: assessments.iter().filter(|a| a.stance == FrameworkStance::OpposesAction).count(),
@@ -137,9 +200,25 @@ pub fn compare_assessments(assessments: &[FrameworkAssessment]) -> PluralEthicsC
         ComparisonState::InvalidInput
     } else if assessments.is_empty() {
         ComparisonState::NoAssessments
-    } else if !subjects_match(assessments) {
-        // Never report agreement between assessments of different inputs.
+    } else if !subjects_match(assessments)
+        || expected_subject.is_some_and(|expected| {
+            assessments.iter().any(|assessment| &assessment.subject != expected)
+        })
+    {
+        // Never report agreement between different inputs or a subject other
+        // than the caller's explicit target.
         ComparisonState::SubjectMismatch
+    } else if assessments
+        .iter()
+        .any(|assessment| assessment.provenance.source_subject != assessment.subject)
+    {
+        // Never let a cached result inherit the identity of the current input.
+        ComparisonState::SourceSubjectMismatch
+    } else if assessments
+        .iter()
+        .any(|assessment| assessment.provenance.freshness != AssessmentFreshness::Fresh)
+    {
+        ComparisonState::StaleAssessment
     } else if counts.supports > 0 && counts.opposes > 0 {
         ComparisonState::Disagreement
     } else if counts.mixed > 0 || counts.conditional > 0 || counts.underdetermined > 0 {
@@ -203,10 +282,17 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
             ("subject.scenario_digest", assessment.subject.scenario_digest.as_str()),
             ("subject.candidate_action_ref", assessment.subject.candidate_action_ref.as_str()),
             ("subject.candidate_action_digest", assessment.subject.candidate_action_digest.as_str()),
+            ("provenance.source_subject.scenario_ref", assessment.provenance.source_subject.scenario_ref.as_str()),
+            ("provenance.source_subject.scenario_digest", assessment.provenance.source_subject.scenario_digest.as_str()),
+            ("provenance.source_subject.candidate_action_ref", assessment.provenance.source_subject.candidate_action_ref.as_str()),
+            ("provenance.source_subject.candidate_action_digest", assessment.provenance.source_subject.candidate_action_digest.as_str()),
         ] {
             if value.trim().is_empty() {
                 errors.push(format!("{prefix}: {field} must not be empty"));
             }
+        }
+        if assessment.provenance.evaluator_build_id.trim().is_empty() {
+            errors.push(format!("{prefix}: provenance.evaluator_build_id must not be empty"));
         }
         if let Some(confidence) = assessment.confidence
             && (!confidence.is_finite() || !(0.0..=1.0).contains(&confidence))
@@ -256,6 +342,17 @@ mod tests {
                 scenario_digest: "fixture-digest:scenario-case-001".to_owned(),
                 candidate_action_ref: "action:case-001:candidate-a".to_owned(),
                 candidate_action_digest: "fixture-digest:candidate-action-a".to_owned(),
+            },
+            provenance: AssessmentProvenance {
+                source_subject: AssessmentSubject {
+                    scenario_ref: "scenario:case-001".to_owned(),
+                    scenario_digest: "fixture-digest:scenario-case-001".to_owned(),
+                    candidate_action_ref: "action:case-001:candidate-a".to_owned(),
+                    candidate_action_digest: "fixture-digest:candidate-action-a".to_owned(),
+                },
+                evaluator_build_id: "symthaea-test-build:abc123".to_owned(),
+                evaluation_cycle: 7,
+                freshness: AssessmentFreshness::Fresh,
             },
             stance,
             confidence: Some(0.8),
@@ -383,6 +480,49 @@ mod tests {
         let result = compare_assessments(&[malformed]);
         assert_eq!(result.state, ComparisonState::InvalidInput);
         assert!(result.validation_errors.iter().any(|e| e.contains("premise_refs[1]")));
+    }
+
+    #[test]
+    fn explicit_expected_subject_must_match_all_assessments() {
+        let result = compare_assessments_for(
+            &AssessmentSubject {
+                scenario_ref: "scenario:case-999".to_owned(),
+                scenario_digest: "fixture-digest:scenario-case-999".to_owned(),
+                candidate_action_ref: "action:case-999:candidate-a".to_owned(),
+                candidate_action_digest: "fixture-digest:candidate-action-a".to_owned(),
+            },
+            &[assessment("care_ethics", FrameworkStance::SupportsAction)],
+        );
+        assert_eq!(result.state, ComparisonState::SubjectMismatch);
+    }
+
+    #[test]
+    fn carried_forward_assessment_cannot_claim_fresh_agreement() {
+        let mut stale = assessment("care_ethics", FrameworkStance::SupportsAction);
+        stale.provenance.freshness = AssessmentFreshness::CarriedForward;
+
+        let result = compare_assessments(&[stale]);
+        assert_eq!(result.state, ComparisonState::StaleAssessment);
+    }
+
+    #[test]
+    fn source_subject_mismatch_cannot_be_relabelled_as_current() {
+        let mut relabelled = assessment("care_ethics", FrameworkStance::SupportsAction);
+        relabelled.provenance.source_subject.scenario_digest =
+            "fixture-digest:old-source-context".to_owned();
+
+        let result = compare_assessments(&[relabelled]);
+        assert_eq!(result.state, ComparisonState::SourceSubjectMismatch);
+    }
+
+    #[test]
+    fn missing_evaluator_build_identity_invalidates_comparison() {
+        let mut malformed = assessment("care_ethics", FrameworkStance::SupportsAction);
+        malformed.provenance.evaluator_build_id.clear();
+
+        let result = compare_assessments(&[malformed]);
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|e| e.contains("evaluator_build_id")));
     }
 
     #[test]
