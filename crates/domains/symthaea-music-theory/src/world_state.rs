@@ -116,6 +116,22 @@ impl MotifRelationObservationV1 {
             evidence,
         })
     }
+
+    /// Re-measure this serialized or caller-supplied claim against the current
+    /// score. Public fields and Serde make the V1 record a wire format, not
+    /// proof that its embedded similarity values were actually measured.
+    pub fn validates_against_score(&self, score: &Score) -> bool {
+        Self::from_score(
+            score,
+            self.source_start,
+            self.source_end,
+            self.target_start,
+            self.target_end,
+            self.evidence.expected_transformation.clone(),
+        )
+        .as_ref()
+            == Some(self)
+    }
 }
 
 /// Typed, renderer-independent symbolic observation of a musical region.
@@ -164,6 +180,15 @@ impl MusicalWorldStateV1 {
         let end_beats = end.beats();
         let score_end = score.total_beats.beats();
         if start_beats < 0.0 || end_beats <= start_beats || end_beats > score_end + 1e-9 {
+            return None;
+        }
+        // Context can cross a Serde/API boundary. Do not treat a structured
+        // motif claim as measured evidence until it reproduces from this score.
+        if context
+            .motif_relations
+            .iter()
+            .any(|relation| !relation.validates_against_score(score))
+        {
             return None;
         }
         let profile = profile_score_region(score, start, end)?;
@@ -324,6 +349,46 @@ mod tests {
             Duration::new(3, 1),
             crate::obligation::ReturnTransformation::Literal,
         ).is_none());
+    }
+
+    #[test]
+    fn motif_relation_wire_data_must_reproduce_from_the_score() {
+        let mut piece = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (pc, onset) in [(0, 0), (2, 1), (4, 2), (0, 3), (2, 4), (4, 5)] {
+            piece.push(note(
+                PitchClass::new(pc),
+                4,
+                onset,
+                VoiceRole::Melody,
+                PartId(1),
+            ));
+        }
+        let relation = MotifRelationObservationV1::from_score(
+            &piece,
+            Duration::new(0, 1),
+            Duration::new(3, 1),
+            Duration::new(3, 1),
+            Duration::new(6, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        )
+        .expect("both source regions contain one assigned melody part");
+        assert!(relation.validates_against_score(&piece));
+
+        let mut forged = relation;
+        forged.evidence.overall_similarity = 0.0;
+        assert!(!forged.validates_against_score(&piece));
+
+        let context = MusicalWorldStateContext {
+            motif_relations: vec![forged],
+            ..Default::default()
+        };
+        assert!(MusicalWorldStateV1::observe_region(
+            &piece,
+            Duration::new(0, 1),
+            Duration::new(3, 1),
+            context,
+        )
+        .is_none());
     }
 
     #[test]
