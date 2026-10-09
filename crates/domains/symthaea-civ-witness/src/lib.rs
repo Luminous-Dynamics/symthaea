@@ -1769,10 +1769,14 @@ mod tests {
     fn receipt_sequence_above_sqlite_integer_range_fails_without_state_mutation() {
         let db = TempDb::new();
         let store = db.open();
-        let anchor = MemoryAnchor::default();
         let log_id = "log-receipt-sequence-out-of-range";
-        anchor.provision(log_id);
-        let initial_anchor = anchor.current(log_id).expect("read provisioned genesis");
+        let genesis = AnchorState::genesis(log_id);
+        let anchor = AdvanceDuringReadAnchor::new(
+            log_id,
+            genesis.clone(),
+            u64::MAX,
+            genesis.clone(),
+        );
 
         assert!(matches!(
             store.initialize(
@@ -1787,11 +1791,15 @@ mod tests {
                 "receipt sequence exceeds SQLite INTEGER range"
             ))
         ));
-
         assert_eq!(
-            anchor.current(log_id).expect("anchor remains readable"),
-            initial_anchor,
-            "invalid sequence must be rejected before observing or advancing the anchor"
+            anchor.calls.load(Ordering::SeqCst),
+            0,
+            "invalid sequence must be rejected before any external-anchor read"
+        );
+        assert_eq!(
+            anchor.inner.current(log_id).expect("read provisioned genesis"),
+            genesis,
+            "invalid sequence must leave external-anchor state unchanged"
         );
         let history = store
             .load_history(log_id)
