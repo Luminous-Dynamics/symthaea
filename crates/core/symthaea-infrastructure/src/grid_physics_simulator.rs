@@ -218,10 +218,12 @@ impl GridPhysicsInfrastructureSimulator {
             if !value.is_finite() {
                 return Err(GridPhysicsStepError::NonFiniteActuator { index });
             }
-            // Charge/discharge/cooling/heating are nonnegative fractions.
-            // Routing is signed; the existing reflex uses negative routes.
-            let (min, max) = if index < 4 { (0.0, 1.0) } else { (-1.0, 1.0) };
-            if value < min || value > max {
+            // Controller outputs are tanh-bounded in [-1, 1]. The first
+            // four channels are magnitude controls: negative values preserve
+            // the established no-effort semantics (clamped to zero below).
+            // Routing controls remain signed, with magnitude interpreted by
+            // the plant. Values outside the controller's output domain reject.
+            if !(-1.0..=1.0).contains(&value) {
                 return Err(GridPhysicsStepError::ActuatorOutOfRange { index });
             }
         }
@@ -760,11 +762,11 @@ mod failure_mode_tests {
     }
 
     #[test]
-    fn checked_step_enforces_distinct_actuator_domains() {
+    fn checked_step_enforces_controller_domain_and_signed_routing() {
         for (index, value) in [
-            (0, -0.01),
+            (0, -1.01),
             (1, 1.01),
-            (2, -0.01),
+            (2, -1.01),
             (3, 1.01),
             (4, -1.01),
             (7, 1.01),
@@ -779,6 +781,18 @@ mod failure_mode_tests {
                 GridPhysicsStepError::ActuatorOutOfRange { index },
             );
         }
+
+        // Negative magnitude output preserves the legacy zero-effort mapping.
+        let mut zero = GridPhysicsInfrastructureSimulator::new();
+        let mut negative_magnitudes = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[0] = -0.3;
+        cmd.torques[1] = -0.2;
+        cmd.torques[2] = -0.5;
+        cmd.torques[3] = -0.1;
+        assert_eq!(negative_magnitudes.try_step(&cmd, 0.005), Ok(()));
+        zero.try_step(&InfrastructureCommand::zero(), 0.005).unwrap();
+        assert_eq!(negative_magnitudes.state.channels, zero.state.channels);
 
         // Signed routing remains valid: DeadlockRecovery uses a negative route.
         let mut sim = GridPhysicsInfrastructureSimulator::new();
