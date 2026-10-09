@@ -36,20 +36,110 @@ pub enum NixSystemdMutationTransportErrorV1 {
     UnsupportedOperation(&'static str),
     #[error("invalid systemd manager unique D-Bus owner")]
     InvalidManagerOwner,
-    #[error("systemd manager incarnation changed before lifecycle dispatch")]
+    #[error("systemd manager unique owner changed during governed mutation")]
     ManagerOwnerChanged,
-    #[error("D-Bus daemon incarnation changed before lifecycle dispatch")]
+    #[error("D-Bus daemon incarnation changed during governed mutation")]
     BusIncarnationChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
+    #[error("systemd returned an invalid unit-file change record")]
+    InvalidUnitFileChange,
 }
 
-/// Typed lifecycle mutation transport.
+/// Typed systemd mutation transport.
 ///
-/// The connection is private and the dispatch method accepts only the semantic
-/// service operation type. No free-form shell command can enter this boundary.
+/// Lifecycle operations and unit-file operations have distinct result types.
+/// The connection is private and mutation calls use typed semantic inputs rather
+/// than free-form shell commands.
 pub struct NixSystemdLifecycleMutationTransportV1 {
     connection: Connection,
+}
+
+/// Closed operation vocabulary for unit-file configuration changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixSystemdUnitFileMutationKindV1 {
+    /// Persistent enablement via systemd's EnableUnitFiles method.
+    Enable,
+    /// Persistent disablement via systemd's DisableUnitFiles method.
+    Disable,
+}
+
+/// Validated output from one manager- and bus-bound unit-file mutation RPC.
+///
+/// All fields are private so callers cannot manufacture a result that merely
+/// looks like transport-returned evidence. This is mutation-result evidence,
+/// not an authorization capability or post-state receipt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixSystemdUnitFileOperationResultV1 {
+    operation: NixSystemdUnitFileMutationKindV1,
+    unit: String,
+    manager_owner: String,
+    bus_id: String,
+    carries_install_info: Option<bool>,
+    changes: Vec<NixSystemdUnitFileChangeV1>,
+}
+
+impl NixSystemdUnitFileOperationResultV1 {
+    /// Operation whose native D-Bus method returned this result.
+    pub fn operation(&self) -> NixSystemdUnitFileMutationKindV1 {
+        self.operation
+    }
+
+    /// Canonical unit passed to systemd for the mutation.
+    pub fn unit(&self) -> &str {
+        &self.unit
+    }
+
+    /// Expected systemd manager unique owner checked before and after the RPC.
+    pub fn manager_owner(&self) -> &str {
+        &self.manager_owner
+    }
+
+    /// Expected D-Bus daemon incarnation checked before and after the RPC.
+    pub fn bus_id(&self) -> &str {
+        &self.bus_id
+    }
+
+    /// EnableUnitFiles install-information result; absent for DisableUnitFiles.
+    pub fn carries_install_info(&self) -> Option<bool> {
+        self.carries_install_info
+    }
+
+    /// Validated change records returned by systemd; the list may be empty for a no-op.
+    pub fn changes(&self) -> &[NixSystemdUnitFileChangeV1] {
+        &self.changes
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixSystemdUnitFileChangeKindV1 {
+    Symlink,
+    Unlink,
+}
+
+/// One validated systemd unit-file change record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NixSystemdUnitFileChangeV1 {
+    change_type: NixSystemdUnitFileChangeKindV1,
+    filename: String,
+    destination: String,
+}
+
+impl NixSystemdUnitFileChangeV1 {
+    /// Closed systemd change vocabulary: symlink creation or removal.
+    pub fn change_type(&self) -> NixSystemdUnitFileChangeKindV1 {
+        self.change_type
+    }
+
+    /// Symlink path reported by systemd.
+    pub fn filename(&self) -> &str {
+        &self.filename
+    }
+
+    /// Link destination reported by systemd.
+    pub fn destination(&self) -> &str {
+        &self.destination
+    }
 }
 
 impl NixSystemdLifecycleMutationTransportV1 {
@@ -140,6 +230,10 @@ impl NixSystemdLifecycleMutationTransportV1 {
         if current_bus_id != expected_bus_id {
             return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
         }
+        let confirmed_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        if confirmed_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
 
         let (method, _job_type) = method_and_job_type(operation.operation())?;
         let manager = Proxy::new(
@@ -167,9 +261,125 @@ impl NixSystemdLifecycleMutationTransportV1 {
         if final_bus_id != expected_bus_id {
             return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
         }
+        let confirmed_final_owner: String =
+            bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        if confirmed_final_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
 
         validate_job_object_path(&job_path)?;
         Ok(job_path)
+    }
+
+    /// Dispatch EnableUnitFiles to the expected systemd manager epoch.
+    ///
+    /// The caller must source `manager_owner` and `expected_bus_id` from the
+    /// governed Service context. This low-level transport checks them against live
+    /// D-Bus state but does not authorize the operation. The result is unit-file
+    /// change evidence, not a lifecycle Job handle.
+    pub async fn enable_unit_file_for_manager_owner_and_bus_id(
+        &self,
+        unit: &str,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<NixSystemdUnitFileOperationResultV1, NixSystemdMutationTransportErrorV1> {
+        let unit = validate_unit_file_name(unit)?;
+        self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
+
+        let manager = Proxy::new(
+            &self.connection,
+            manager_owner,
+            SYSTEMD_MANAGER_PATH,
+            SYSTEMD_MANAGER_INTERFACE,
+        )
+        .await?;
+
+        let (carries_install_info, changes): (bool, Vec<(String, String, String)>) = manager
+            .call("EnableUnitFiles", &(vec![unit.clone()], false, false))
+            .await?;
+
+        // A successful RPC is not qualifying evidence if systemd or the bus
+        // rolled over while it was executing.
+        self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
+        let changes = validate_unit_file_changes(changes)?;
+
+        Ok(NixSystemdUnitFileOperationResultV1 {
+            operation: NixSystemdUnitFileMutationKindV1::Enable,
+            unit,
+            manager_owner: manager_owner.to_string(),
+            bus_id: expected_bus_id.to_string(),
+            carries_install_info: Some(carries_install_info),
+            changes,
+        })
+    }
+
+    /// Dispatch DisableUnitFiles to the expected systemd manager epoch.
+    ///
+    /// The caller must source `manager_owner` and `expected_bus_id` from the
+    /// governed Service context. This low-level transport checks them against live
+    /// D-Bus state but does not authorize the operation. The result is unit-file
+    /// change evidence, not a lifecycle Job handle.
+    pub async fn disable_unit_file_for_manager_owner_and_bus_id(
+        &self,
+        unit: &str,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<NixSystemdUnitFileOperationResultV1, NixSystemdMutationTransportErrorV1> {
+        let unit = validate_unit_file_name(unit)?;
+        self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
+
+        let manager = Proxy::new(
+            &self.connection,
+            manager_owner,
+            SYSTEMD_MANAGER_PATH,
+            SYSTEMD_MANAGER_INTERFACE,
+        )
+        .await?;
+
+        let changes: Vec<(String, String, String)> = manager
+            .call("DisableUnitFiles", &(vec![unit.clone()], false))
+            .await?;
+
+        self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
+        let changes = validate_unit_file_changes(changes)?;
+
+        Ok(NixSystemdUnitFileOperationResultV1 {
+            operation: NixSystemdUnitFileMutationKindV1::Disable,
+            unit,
+            manager_owner: manager_owner.to_string(),
+            bus_id: expected_bus_id.to_string(),
+            carries_install_info: None,
+            changes,
+        })
+    }
+
+    async fn verify_manager_epoch(
+        &self,
+        manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> Result<(), NixSystemdMutationTransportErrorV1> {
+        validate_manager_owner(manager_owner)?;
+        validate_bus_id(expected_bus_id)?;
+
+        let bus = Proxy::new(
+            &self.connection,
+            DBUS_DESTINATION,
+            DBUS_PATH,
+            DBUS_INTERFACE,
+        )
+        .await?;
+
+        let first_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        let observed_bus_id: String = bus.call("GetId", &()).await?;
+        let confirmed_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+
+        validate_manager_epoch_observation(
+            manager_owner,
+            expected_bus_id,
+            &first_owner,
+            &observed_bus_id,
+            &confirmed_owner,
+        )
     }
 
     pub fn method_name(
@@ -220,6 +430,70 @@ fn validate_bus_id(bus_id: &str) -> Result<(), NixSystemdMutationTransportErrorV
     Ok(())
 }
 
+/// Validate a bounded owner/bus/owner observation around a bus-incarnation read.
+///
+/// This narrows manager rollover ambiguity, but it is not an atomic snapshot of
+/// external systemd state; consumers must retain the surrounding claim ceiling.
+fn validate_manager_epoch_observation(
+    expected_owner: &str,
+    expected_bus_id: &str,
+    first_owner: &str,
+    observed_bus_id: &str,
+    confirmed_owner: &str,
+) -> Result<(), NixSystemdMutationTransportErrorV1> {
+    validate_manager_owner(expected_owner)?;
+    validate_bus_id(expected_bus_id)?;
+    validate_manager_owner(first_owner)?;
+    if first_owner != expected_owner {
+        return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+    }
+    validate_bus_id(observed_bus_id)?;
+    if observed_bus_id != expected_bus_id {
+        return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+    }
+    validate_manager_owner(confirmed_owner)?;
+    if confirmed_owner != expected_owner {
+        return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+    }
+    Ok(())
+}
+
+fn validate_unit_file_name(
+    unit: &str,
+) -> Result<String, NixSystemdMutationTransportErrorV1> {
+    let operation = NixServiceOperationV1::new(
+        unit.to_string(),
+        NixServiceOperationKindV1::Start,
+    )
+    .map_err(|error| {
+        NixSystemdMutationTransportErrorV1::InvalidServiceOperation(error.to_string())
+    })?;
+    Ok(operation.unit().to_string())
+}
+
+fn validate_unit_file_changes(
+    changes: Vec<(String, String, String)>,
+) -> Result<Vec<NixSystemdUnitFileChangeV1>, NixSystemdMutationTransportErrorV1> {
+    changes
+        .into_iter()
+        .map(|(change_type, filename, destination)| {
+            let change_type = match change_type.as_str() {
+                "symlink" => NixSystemdUnitFileChangeKindV1::Symlink,
+                "unlink" => NixSystemdUnitFileChangeKindV1::Unlink,
+                _ => return Err(NixSystemdMutationTransportErrorV1::InvalidUnitFileChange),
+            };
+            if filename.is_empty() || destination.is_empty() {
+                return Err(NixSystemdMutationTransportErrorV1::InvalidUnitFileChange);
+            }
+            Ok(NixSystemdUnitFileChangeV1 {
+                change_type,
+                filename,
+                destination,
+            })
+        })
+        .collect()
+}
+
 fn validate_job_object_path(
     path: &OwnedObjectPath,
 ) -> Result<(), NixSystemdMutationTransportErrorV1> {
@@ -243,6 +517,83 @@ fn validate_job_object_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manager_epoch_validation_rejects_owner_and_bus_rollover() {
+        let owner = ":1.42";
+        let bus_id = "0123456789abcdef0123456789abcdef";
+
+        assert!(validate_manager_epoch_observation(owner, bus_id, owner, bus_id, owner).is_ok());
+        assert!(matches!(
+            validate_manager_epoch_observation(
+                owner,
+                bus_id,
+                ":1.43",
+                bus_id,
+                ":1.43",
+            ),
+            Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged)
+        ));
+        assert!(matches!(
+            validate_manager_epoch_observation(
+                owner,
+                bus_id,
+                owner,
+                "fedcba9876543210fedcba9876543210",
+                owner,
+            ),
+            Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged)
+        ));
+        assert!(matches!(
+            validate_manager_epoch_observation(owner, bus_id, owner, bus_id, ":1.43"),
+            Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged)
+        ));
+    }
+
+    #[test]
+    fn unit_file_change_records_are_strict() {
+        let changes = validate_unit_file_changes(vec![
+            (
+                "symlink".into(),
+                "/etc/systemd/system/multi-user.target.wants/nginx.service".into(),
+                "/nix/store/nginx.service".into(),
+            ),
+            (
+                "unlink".into(),
+                "/etc/systemd/system/multi-user.target.wants/nginx.service".into(),
+                "/nix/store/nginx.service".into(),
+            ),
+        ])
+        .unwrap();
+        assert_eq!(changes.len(), 2);
+        assert_eq!(
+            changes[0].change_type(),
+            NixSystemdUnitFileChangeKindV1::Symlink
+        );
+        assert_eq!(
+            changes[1].change_type(),
+            NixSystemdUnitFileChangeKindV1::Unlink
+        );
+        assert!(validate_unit_file_changes(vec![(
+            "unknown".into(),
+            "/etc/systemd/system/nginx.service".into(),
+            "/nix/store/nginx.service".into(),
+        )])
+        .is_err());
+        assert!(validate_unit_file_changes(vec![(
+            "symlink".into(),
+            String::new(),
+            "/nix/store/nginx.service".into(),
+        )])
+        .is_err());
+    }
+
+    #[test]
+    fn unit_file_name_reuses_typed_unit_validation() {
+        assert_eq!(validate_unit_file_name("nginx.service").unwrap(), "nginx.service");
+        assert!(validate_unit_file_name("nginx*.service").is_err());
+        assert!(validate_unit_file_name("").is_err());
+    }
 
     #[test]
     fn lifecycle_methods_are_exact() {
