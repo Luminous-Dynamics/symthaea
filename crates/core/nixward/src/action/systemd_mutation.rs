@@ -159,6 +159,10 @@ impl NixSystemdLifecycleMutationTransportV1 {
         if current_bus_id != expected_bus_id {
             return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
         }
+        let confirmed_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        if confirmed_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
+        }
 
         let (method, _job_type) = method_and_job_type(operation.operation())?;
         let manager = Proxy::new(
@@ -185,6 +189,11 @@ impl NixSystemdLifecycleMutationTransportV1 {
         validate_bus_id(&final_bus_id)?;
         if final_bus_id != expected_bus_id {
             return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+        }
+        let confirmed_final_owner: String =
+            bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        if confirmed_final_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
         }
 
         validate_job_object_path(&job_path)?;
@@ -284,6 +293,11 @@ impl NixSystemdLifecycleMutationTransportV1 {
         validate_bus_id(&current_bus_id)?;
         if current_bus_id != expected_bus_id {
             return Err(NixSystemdMutationTransportErrorV1::BusIncarnationChanged);
+        }
+
+        let confirmed_owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
+        if confirmed_owner != manager_owner {
+            return Err(NixSystemdMutationTransportErrorV1::ManagerOwnerChanged);
         }
         Ok(())
     }
