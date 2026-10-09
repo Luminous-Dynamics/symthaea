@@ -857,6 +857,42 @@ fn main() {
         verify_event_chain(&edited_receipt),
         Err(AuditChainFailure::EventDigestMismatch)
     );
+
+    let mut changed_candidate_identity = store.events.clone();
+    changed_candidate_identity[1].candidate_checkpoint_id[0] ^= 0x01;
+    assert_eq!(
+        verify_event_chain(&changed_candidate_identity),
+        Err(AuditChainFailure::EventDigestMismatch)
+    );
+
+    let mut changed_prior_identity = store.events.clone();
+    changed_prior_identity[1].prior_checkpoint_id = Some([0xC3; 32]);
+    assert_eq!(
+        verify_event_chain(&changed_prior_identity),
+        Err(AuditChainFailure::EventDigestMismatch)
+    );
+
+    let mut changed_outcome = store.events.clone();
+    changed_outcome[1].outcome = AttemptOutcome::AcceptedGrowth;
+    assert_eq!(
+        verify_event_chain(&changed_outcome),
+        Err(AuditChainFailure::EventDigestMismatch)
+    );
+
+    let mut changed_link = store.events.clone();
+    changed_link[1].previous_event_digest = Some([0x5A; 32]);
+    assert_eq!(
+        verify_event_chain(&changed_link),
+        Err(AuditChainFailure::PreviousDigestMismatch)
+    );
+
+    let mut changed_sequence = store.events.clone();
+    changed_sequence[1].sequence += 1;
+    assert_eq!(
+        verify_event_chain(&changed_sequence),
+        Err(AuditChainFailure::SequenceMismatch)
+    );
+
     let mut reordered_receipts = store.events.clone();
     reordered_receipts.swap(0, 1);
     assert_eq!(
