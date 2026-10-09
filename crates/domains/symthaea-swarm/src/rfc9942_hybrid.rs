@@ -986,6 +986,25 @@ mod tests {
     }
 
     #[test]
+    fn transcript_binds_the_classical_algorithm_identifier() {
+        let a = transcript(1, 2);
+        let mut b = a;
+        b.classical_algorithm_id = COSE_EDDSA_ALGORITHM_ID;
+        b.transcript_sha256 = digest_transcript(
+            b.classical_algorithm_id,
+            b.policy_digest_sha256,
+            b.key_id,
+            b.verifying_key_sha256,
+            b.receipt_sha256,
+            b.classical_capability_sha256,
+        );
+        assert_ne!(a.signing_bytes(), b.signing_bytes());
+        assert_ne!(a.transcript_sha256(), b.transcript_sha256());
+        assert_eq!(a.classical_algorithm_id(), COSE_ES256_ALGORITHM_ID);
+        assert_eq!(b.classical_algorithm_id(), COSE_EDDSA_ALGORITHM_ID);
+    }
+
+    #[test]
     fn transcript_changes_when_key_identity_changes() {
         let a = transcript(1, 2);
         let mut b = transcript(1, 2);
