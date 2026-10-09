@@ -2938,6 +2938,39 @@ mod tests {
     }
 
     #[test]
+    fn materialized_dispatch_digest_binds_descriptor_mapping_and_group_counts() {
+        let (graph, schedule, _, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut records =
+            materialized_dispatch_records_from_graph(&graph, &schedule, &storage_sizes).unwrap();
+        assert_eq!(records.len(), schedule.nodes.len());
+        assert_eq!(records[0].descriptor_bindings.len(), 3);
+        let baseline = materialized_dispatch_records_digest(&records);
+
+        records[0].descriptor_bindings[0].range += 4;
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+        records[0].descriptor_bindings[0].range -= 4;
+
+        records[0].descriptor_bindings[0].resource = ResourceId::new("rhs").unwrap();
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+        records[0].descriptor_bindings[0].resource = ResourceId::new("lhs").unwrap();
+
+        records[0].dispatch_groups[0] += 1;
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+        records[0].dispatch_groups[0] -= 1;
+
+        records[0].schedule_ordinal += 1;
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+    }
+
+    #[test]
     fn materialized_submission_digest_binds_concrete_call_fields() {
         let (_, _, plan, _) = fixture();
         let completion = expected_final_timeline_value(&plan);
@@ -3106,7 +3139,7 @@ mod tests {
     }
 
     #[test]
-    fn receipt_rejects_tampered_completion_lowering_digest() {
+    fn receipt_rejects_tampered_completion_and_execution_lowering_digests() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
         let digests = final_state
@@ -3155,6 +3188,20 @@ mod tests {
             driver_uuid: [2; 16],
             driver_id: 1,
         };
+        let expected_dispatch_records = materialized_dispatch_records_from_graph(
+            &graph,
+            &schedule,
+            &receipt.resource_storage_sizes,
+        )
+        .unwrap();
+        receipt.execution_lowering_digest = String::from("tampered");
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ExecutionLoweringDigest)
+        ));
+        receipt.execution_lowering_digest =
+            materialized_dispatch_records_digest(&expected_dispatch_records);
+
         receipt.completion_lowering_digest = String::from("tampered");
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
