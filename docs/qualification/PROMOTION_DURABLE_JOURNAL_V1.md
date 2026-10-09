@@ -11,6 +11,7 @@ The reference implementation is in **scripts/qualify_promotion_durable_journal_v
 - Reservation updates the materialized ledger state, inserts the reservation row, and appends its event in one BEGIN IMMEDIATE transaction.
 - Dispatch preparation conditionally advances the ledger revision, records the positive attempt sequence and wall/monotonic readings, changes the reservation state, and appends the prepared-dispatch event in one transaction.
 - A failed event append rolls back the ledger revision and reservation state as well as the journal write.
+- A silent reservation compare-and-swap miss after the ledger revision update is treated as an invariant violation and raises, forcing the surrounding transaction to roll back rather than accidentally committing a revision-only update.
 - A prepared attempt identity is reconstructed from the committed reservation row and its matching journal event. Caller-supplied fields alone cannot mint an identity through this API.
 - The storage trigger checks the current head, lease, fencing token, trust-root generation, governance generation, and expected revision during the reserved-to-prepared transition. The application also uses a compare-and-swap update under BEGIN IMMEDIATE.
 - An authority-fence rotation supersedes an unprepared reservation. A prepared reservation is not silently revoked by this reference model; it blocks rotation until a separate reconciliation/terminal-state protocol is specified.
@@ -29,7 +30,7 @@ Reservation and dispatch wall/monotonic readings are explicit inputs. The journa
 
 The dedicated workflow executes on pushes to the reference branch and on pull-request events. It explicitly checks out and compares against the PR head SHA (rather than silently testing only a trusted default-branch checkout), uses read-only repository permissions, disables persisted checkout credentials, and records the tested SHA in the workflow summary.
 
-The adversarial corpus covers durable reopen/reconstruction, single-use positive attempt sequences, rejected clock/order inputs, commit rollback after injected journal-write failure, SQL-trigger fencing, stale writers after authority rotation, concurrent dispatch races across two connections, append-only triggers, event-chain tampering, and materialized-state drift.
+The adversarial corpus covers durable reopen/reconstruction, single-use positive attempt sequences, rejected clock/order inputs, commit rollback after injected journal-write failure, rollback after a silently ignored compare-and-swap update, SQL-trigger fencing, stale writers after authority rotation, concurrent dispatch races across two connections, append-only triggers, event-chain tampering, and materialized-state drift.
 
 A workflow PASS would qualify only this reference model on the exact recorded Git head.
 
