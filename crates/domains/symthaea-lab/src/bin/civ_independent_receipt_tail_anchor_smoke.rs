@@ -740,7 +740,8 @@ fn main() {
 
     let mut malformed_suffix = suffix.clone();
     malformed_suffix[1] = malformed_suffix[0].clone();
-    let mut malformed_suffix_store = WitnessStore::new("witness-malformed-suffix", "lineage-malformed-suffix");
+    let mut malformed_suffix_store =
+        WitnessStore::new("witness-malformed-suffix", "lineage-malformed-suffix");
     malformed_suffix_store.seed_trusted(previous.clone()).expect("seed anchor");
     assert_eq!(
         malformed_suffix_store.observe(
