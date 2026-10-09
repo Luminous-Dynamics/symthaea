@@ -15,7 +15,7 @@ pub const VERSION: u16 = 2;
 pub const DOMAIN: &[u8] = b"symthaea-swarm/holochain-evidence-anchor-v2";
 /// Stable identifiers for the application-level PQ-bound assurance schema.
 pub const HYBRID_ASSURANCE_PROFILE_ID: &str =
-    "symthaea-swarm/rfc9942-pq-bound-mldsa65-v1";
+    "symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-v1";
 pub const HYBRID_ASSURANCE_PROFILE_VERSION: u16 = 1;
 pub const HYBRID_ASSURANCE_ML_DSA_65_ALGORITHM_ID: i64 = -49;
 pub const MAX_SELECTION_POLICY_BYTES: usize = 256;
