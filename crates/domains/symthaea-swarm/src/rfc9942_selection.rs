@@ -630,6 +630,60 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg(feature = "semantic-receipts")]
+    fn selection_witness_for_assurance_gate() -> Rfc9942VerifiedReceiptSelection {
+        let selected_receipt_sha256 = [3; 32];
+        let decision = ReceiptSelectionDecision {
+            collection_sha256: [2; 32],
+            collection_len: 1,
+            policy_id: POLICY_ID,
+            policy_version: POLICY_VERSION,
+            selected_index: Some(0),
+            selected_receipt_sha256: Some(selected_receipt_sha256),
+            candidates: vec![ReceiptSelectionCandidate {
+                index: 0,
+                receipt_sha256: selected_receipt_sha256,
+                status: ReceiptSelectionCandidateStatus::Selected,
+            }],
+        };
+        Rfc9942VerifiedReceiptSelection {
+            decision,
+            verified_capability_sha256: [4; 32],
+            verified_composition_capability_sha256: [5; 32],
+        }
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn hybrid_required_admission_rejects_classical_only_selection() {
+        let result = crate::rfc9942_hybrid::Rfc9942SelectionAssuranceAdmission::admit(
+            crate::rfc9942_hybrid::Rfc9942HybridRequirement::HybridRequired,
+            selection_witness_for_assurance_gate(),
+            None,
+        );
+        assert_eq!(
+            result,
+            Err(crate::rfc9942_hybrid::Rfc9942HybridError::HybridRequiredButMissing)
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn classical_allowed_admission_does_not_claim_hybrid_verification() {
+        let admission = crate::rfc9942_hybrid::Rfc9942SelectionAssuranceAdmission::admit(
+            crate::rfc9942_hybrid::Rfc9942HybridRequirement::ClassicalAllowed,
+            selection_witness_for_assurance_gate(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            admission.requirement(),
+            crate::rfc9942_hybrid::Rfc9942HybridRequirement::ClassicalAllowed
+        );
+        assert!(!admission.is_hybrid_verified());
+        assert_eq!(admission.hybrid_capability_sha256(), None);
+    }
+
     #[test]
     fn first_valid_selects_in_priority_order() {
         let collection = collection();

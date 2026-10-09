@@ -1,0 +1,36 @@
+name: RFC 9942 hybrid seam (locked)
+on:
+  push:
+    branches:
+      - hardening/rfc9942-pqc-hybrid-seam
+    paths:
+      - '.github/workflows/rfc9942-hybrid-seam.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/domains/symthaea-swarm/**'
+      - 'crates/domains/symthaea-fabrication-kernel/**'
+      - 'docs/RFC9942_PQC_HYBRID_ASSURANCE_DESIGN.md'
+      - 'patches/**'
+permissions:
+  contents: read
+concurrency:
+  group: rfc9942-hybrid-seam-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  semantic-receipts:
+    name: Locked semantic-receipts tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact pushed head
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: Record exact revision
+        run: |
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Test semantic-receipts without networking defaults
+        run: cargo test --locked -p symthaea-swarm --no-default-features --features semantic-receipts
