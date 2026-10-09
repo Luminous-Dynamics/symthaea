@@ -1815,6 +1815,15 @@ def test_provider_topology_trust_checkpoint_matches_only_exact_policy():
     assert checkpoint.matches(policy, policy.digest(), policy.generation)
     assert not checkpoint.matches(policy, "0" * 64, policy.generation)
     assert not checkpoint.matches(policy, policy.digest(), policy.generation + 1)
+    corrupted = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**checkpoint.__dict__, "policy_digest": "not-a-sha256-digest"}
+    )
+    assert not corrupted.structurally_valid()
+    assert not corrupted.matches(policy, policy.digest(), policy.generation)
+    cross_repository = ProviderTopologyCasTrustPolicyCheckpointV1(
+        **{**checkpoint.__dict__, "repository": "other/repository"}
+    )
+    assert not cross_repository.matches(policy, policy.digest(), policy.generation)
     fork = _test_trust_policy(identity, revoked_signer_identities=("revoked-signer",))
     assert fork.generation == policy.generation
     assert fork.digest() != checkpoint.policy_digest
@@ -1855,7 +1864,7 @@ def test_provider_topology_binding_without_trust_checkpoint_fails_closed():
     assert missing.classify(identity) == "observed-not-cas"
 
 
-def test_provider_topology_binding_rejects_stale_trust_checkpoint():
+def test_provider_topology_binding_rejects_policy_rollback_after_checkpoint_advance():
     identity = stack_identity_fixture()
     evidence = provider_topology_cas_evidence_fixture(identity)
     binding = topology_binding_fixture(identity, provider_topology_cas_evidence=evidence)
@@ -3553,7 +3562,7 @@ TESTS = [
     test_provider_topology_trust_checkpoint_matches_only_exact_policy,
     test_provider_topology_trust_checkpoint_advance_requires_next_generation,
     test_provider_topology_binding_without_trust_checkpoint_fails_closed,
-    test_provider_topology_binding_rejects_stale_trust_checkpoint,
+    test_provider_topology_binding_rejects_policy_rollback_after_checkpoint_advance,
     test_provider_topology_trust_policy_digest_is_canonical_and_pinned,
     test_provider_topology_trust_policy_generation_rollback_rejects,
     test_provider_topology_trust_policy_revoked_key_rejects,
