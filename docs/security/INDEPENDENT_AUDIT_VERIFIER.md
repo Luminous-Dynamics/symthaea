@@ -34,6 +34,10 @@ GitHub's `GET /repos/{owner}/{repo}/branches/main` response reports `protected: 
 
 
 
+
+
+The verifier's exception-path status update is additionally bound to the triggering event's expected workflow ID, `pull_request` event type, same base/head/current repository IDs, and default-branch PR target. Malformed API payloads or unexpected ordinary exceptions are normalized to a verifier failure, while status-write failures themselves are reported without recursively crashing. A failed or untrusted trigger cannot poison the authoritative status merely by sharing the workflow display name.
+
 ## Required-check semantics for reruns
 
 GitHub documents that `workflow_run: requested` is not emitted for a re-run; `in_progress` is the early invalidation event for reruns. If a rerun is queued, an older commit status might remain until the trusted receiver can publish its next state. Therefore a production ruleset must require the repository's **producer audit workflow check** as well as the `Security Audit / Independent Verifier` commit status, and must not treat the receiver's own default-branch job as a substitute for a PR-head check. The producer check holds the PR while a new audit attempt is queued/running; the custom status only turns green after independent verification. Test-run status on the PR head before authorizing merge.
