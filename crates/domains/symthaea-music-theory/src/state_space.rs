@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn novelty_peaks_select_local_maxima_and_collapse_plateaus() {
-        let notes: Vec<_> = (0..6).map(|onset| note(onset % 12, 4, onset)).collect();
+        let notes: Vec<_> = (0..6).map(|index| note(index, 4, index as i64)).collect();
         let mut trajectory =
             MusicalStateTrajectory::from_score(&score(&notes, 0), 1.0, 1.0).unwrap();
         for (frame, novelty) in trajectory.frames.iter_mut().zip([
@@ -722,7 +722,7 @@ mod tests {
 
     #[test]
     fn flat_novelty_run_is_not_reported_as_a_peak() {
-        let notes: Vec<_> = (0..4).map(|onset| note(onset % 12, 4, onset)).collect();
+        let notes: Vec<_> = (0..4).map(|index| note(index, 4, index as i64)).collect();
         let mut trajectory =
             MusicalStateTrajectory::from_score(&score(&notes, 0), 1.0, 1.0).unwrap();
         for (frame, novelty) in trajectory.frames.iter_mut().zip([
