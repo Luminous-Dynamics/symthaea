@@ -188,6 +188,11 @@ impl Default for LoadServicePolicy {
 /// reported as unserved, never hidden in the shed ratio.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct LoadServiceReport {
+    /// Operating mode for this receipt. This is required to validate that an
+    /// islanded step never attributes energy to the upstream grid, and that
+    /// a grid-tied step never reports a service deficit under the idealized
+    /// infinite-grid assumption.
+    pub is_islanded: bool,
     pub total_demand_kwh: f64,
     pub total_served_kwh: f64,
     pub intentional_shed_kwh: f64,
@@ -283,6 +288,7 @@ impl LoadServiceReport {
             let grid_to_load = (total_demand - storage_to_load).max(0.0);
             let storage_export_to_grid = (storage_discharge_kwh - total_demand).max(0.0);
             return Self {
+                is_islanded: false,
                 total_demand_kwh: total_demand,
                 total_served_kwh: total_demand,
                 critical_demand_kwh: critical,
@@ -347,6 +353,7 @@ impl LoadServiceReport {
         let total_unserved = critical_unserved + protected_cooling_unserved;
 
         Self {
+            is_islanded: true,
             total_demand_kwh: total_demand,
             total_served_kwh: total_served,
             intentional_shed_kwh: intentional_shed,
@@ -430,6 +437,32 @@ impl LoadServiceReport {
                 self.critical_served_kwh + self.critical_unserved_kwh,
                 self.critical_demand_kwh,
             )
+            // Cross-bucket checks are intentional: a receipt can balance in
+            // aggregate while silently overstating a protected sub-bucket.
+            && close(
+                self.protected_cooling_served_kwh + self.protected_cooling_unserved_kwh,
+                self.protected_cooling_demand_kwh,
+            )
+            && self.protected_cooling_demand_kwh <= self.cooling_demand_kwh + 1e-9
+            && self.protected_cooling_served_kwh <= self.cooling_served_kwh + 1e-9
+            && close(
+                self.grid_supply_to_battery_kwh,
+                self.battery_charge_input_kwh,
+            )
+            // Mode-specific checks close a provenance hole that aggregate
+            // source/sink equality alone cannot rule out.
+            && (!self.is_islanded
+                || (close(self.grid_supply_to_load_kwh, 0.0)
+                    && close(self.grid_supply_to_battery_kwh, 0.0)
+                    && close(self.battery_charge_input_kwh, 0.0)))
+            && (self.is_islanded
+                || (close(self.total_served_kwh, self.total_demand_kwh)
+                    && close(self.intentional_shed_kwh, 0.0)
+                    && close(self.total_unserved_kwh, 0.0)
+                    && close(
+                        self.protected_cooling_served_kwh,
+                        self.protected_cooling_demand_kwh,
+                    )))
             && close(
                 self.deferrable_served_kwh + self.deferrable_shed_kwh,
                 self.deferrable_demand_kwh,
@@ -1546,6 +1579,34 @@ mod failure_mode_tests {
                 assert!((grid_tied.total_served_kwh - demand_kwh).abs() < 1e-9);
             }
         }
+    }
+
+    #[test]
+    fn load_service_report_rejects_inconsistent_subbucket_and_mode_receipts() {
+        let policy = LoadServicePolicy::illustrative_default();
+        let valid_islanded = LoadServiceReport::allocate(
+            policy, 200.0, 20.0, 15.0, 0.5, 0.25, true, 0.1, 0.0, 0.0,
+        );
+        assert!(valid_islanded.is_valid(), "expected valid islanded receipt: {valid_islanded:?}");
+
+        let mut forged_cooling = valid_islanded;
+        forged_cooling.protected_cooling_served_kwh += 0.001;
+        assert!(
+            !forged_cooling.is_valid(),
+            "aggregate balance must not hide inconsistent protected-cooling accounting"
+        );
+
+        let valid_grid_tied = LoadServiceReport::allocate(
+            policy, 200.0, 20.0, 15.0, 0.5, 0.25, false, 0.0, 0.0, 0.0,
+        );
+        assert!(valid_grid_tied.is_valid(), "expected valid grid-tied receipt: {valid_grid_tied:?}");
+
+        let mut forged_mode = valid_grid_tied;
+        forged_mode.is_islanded = true;
+        assert!(
+            !forged_mode.is_valid(),
+            "a grid-sourced service receipt must not validate as islanded"
+        );
     }
 
     #[test]
