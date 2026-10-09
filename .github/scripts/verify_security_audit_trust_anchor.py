@@ -259,6 +259,47 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
         raise VerificationError("npm finding source is inconsistent with the npm lane")
 
 
+def validate_evidence_manifest(zf: zipfile.ZipFile, entries: list[zipfile.ZipInfo], verdict: dict[str, Any]) -> None:
+    records = verdict.get("evidence_files")
+    if not isinstance(records, list) or not records:
+        raise VerificationError("verdict evidence manifest is missing or empty")
+    expected: dict[str, str] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise VerificationError("evidence manifest entry is not an object")
+        path, digest = record.get("path"), record.get("sha256")
+        if (not isinstance(path, str) or not path or path.startswith("/")
+                or "\\" in path or any(part in {"", ".", ".."} for part in path.split("/"))
+                or path == "verdict.json"):
+            raise VerificationError("evidence manifest contains an unsafe or non-canonical path")
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise VerificationError(f"evidence manifest has an invalid digest for {path}")
+        if path in expected:
+            raise VerificationError(f"evidence manifest duplicates path {path}")
+        expected[path] = digest
+
+    actual: dict[str, zipfile.ZipInfo] = {}
+    for entry in entries:
+        if entry.is_dir():
+            continue
+        path = entry.filename.replace("\\", "/")
+        if path.startswith("audit-evidence/"):
+            path = path[len("audit-evidence/"):]
+        if path == "verdict.json":
+            continue
+        if path in actual:
+            raise VerificationError(f"artifact ZIP duplicates evidence path {path}")
+        actual[path] = entry
+    if set(actual) != set(expected):
+        missing = sorted(set(expected) - set(actual))[:5]
+        extra = sorted(set(actual) - set(expected))[:5]
+        raise VerificationError(f"evidence manifest coverage mismatch (missing={missing}, extra={extra})")
+    for path, expected_digest in expected.items():
+        actual_digest = hashlib.sha256(zf.read(actual[path])).hexdigest()
+        if actual_digest != expected_digest:
+            raise VerificationError(f"evidence file digest mismatch for {path}")
+
+
 def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, Any], token: str) -> None:
     owner, name = repo.split("/", 1)
     run_id = run["id"]
@@ -312,6 +353,9 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
                 raise VerificationError("verdict.json exceeds the 1 MiB parsing limit")
             verdict_bytes = zf.read(info)
         verdict = json.loads(verdict_bytes)
+        if not isinstance(verdict, dict):
+            raise VerificationError("verdict artifact is not a JSON object")
+        validate_evidence_manifest(zf, entries, verdict)
     except VerificationError:
         raise
     except Exception as exc:
