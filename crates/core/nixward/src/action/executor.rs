@@ -1280,7 +1280,7 @@ impl NixOSExecutor {
                 return (
                     ExecutionResult::FailedNoRollback {
                         error: format!(
-                            "unit-file RPC returned no epoch-qualified result; outcome indeterminate: {error}"
+                            "unit-file RPC result unqualified; outcome indeterminate: {error}"
                         ),
                         rollback_error: None,
                     },
