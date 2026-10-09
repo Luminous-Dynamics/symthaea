@@ -19491,6 +19491,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-openfoam-bridge"
 version = "0.1.0"
 dependencies = [
