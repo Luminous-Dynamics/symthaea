@@ -387,7 +387,6 @@
         "query": "x",
         "max_results": 10,
         "selected": [
-          "claim:x",
           "claim:x"
         ],
         "selected_representation_digests": [],
@@ -412,7 +411,6 @@
         "query": "x",
         "max_results": 10,
         "selected": [
-          "claim:x",
           "claim:x"
         ],
         "selected_representation_digests": [
@@ -437,7 +435,6 @@
         "query": "x",
         "max_results": 10,
         "selected": [
-          "claim:x",
           "claim:x"
         ],
         "selected_representation_digests": [
@@ -471,7 +468,6 @@
         "query": "x",
         "max_results": 10,
         "selected": [
-          "claim:x",
           "claim:x"
         ],
         "selected_representation_digests": [
