@@ -120,6 +120,22 @@ pub struct FrameworkAssessment {
     pub unresolved_questions: Vec<String>,
 }
 
+/// Stable identity/version pair for a framework required by a comparison.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FrameworkIdentity {
+    pub framework_id: String,
+    pub framework_version: String,
+}
+
+impl FrameworkIdentity {
+    pub fn new(framework_id: impl Into<String>, framework_version: impl Into<String>) -> Self {
+        Self {
+            framework_id: framework_id.into(),
+            framework_version: framework_version.into(),
+        }
+    }
+}
+
 /// Count of separately produced framework positions.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct AssessmentCounts {
@@ -151,7 +167,9 @@ pub enum ComparisonState {
     SourceSubjectMismatch,
     /// At least one assessment is carried forward rather than freshly evaluated.
     StaleAssessment,
-    /// An assessment is malformed or the same framework/version appears twice.
+    /// A result was supplied for a framework/version outside the declared roster.
+    FrameworkSetMismatch,
+    /// An assessment or roster is malformed, or a duplicate framework/version exists.
     InvalidInput,
 }
 
@@ -164,6 +182,10 @@ pub struct PluralEthicsComparison {
     pub state: ComparisonState,
     pub counts: AssessmentCounts,
     pub assessments: Vec<FrameworkAssessment>,
+    /// Required framework/version identities that had no corresponding result row.
+    pub missing_frameworks: Vec<FrameworkIdentity>,
+    /// Supplied framework/version identities that were not in the required roster.
+    pub unexpected_frameworks: Vec<FrameworkIdentity>,
     pub validation_errors: Vec<String>,
 }
 
@@ -190,6 +212,96 @@ pub fn compare_assessments_for(
     assessments: &[FrameworkAssessment],
 ) -> PluralEthicsComparison {
     compare_assessments_inner(Some(expected_subject), assessments)
+}
+
+/// Compare assessments against a declared roster of required framework versions.
+///
+/// The roster is part of the comparison contract: omitting a required framework
+/// results in Incomplete, while returning a framework not listed in the roster
+/// results in FrameworkSetMismatch. An explicit Unavailable row counts as
+/// represented coverage, but still makes the assessment outcome Incomplete.
+/// This does not determine which frameworks are ethically sufficient; callers
+/// must define and version the roster for their use case.
+pub fn compare_assessments_with_roster(
+    expected_subject: &AssessmentSubject,
+    expected_frameworks: &[FrameworkIdentity],
+    assessments: &[FrameworkAssessment],
+) -> PluralEthicsComparison {
+    let roster_errors = validate_framework_roster(expected_frameworks);
+    let mut result = compare_assessments_inner(Some(expected_subject), assessments);
+    result.validation_errors.extend(roster_errors);
+
+    if !result.validation_errors.is_empty() {
+        result.state = ComparisonState::InvalidInput;
+        return result;
+    }
+
+    let expected: HashSet<FrameworkIdentity> = expected_frameworks.iter().cloned().collect();
+    let actual: HashSet<FrameworkIdentity> = assessments
+        .iter()
+        .map(|assessment| FrameworkIdentity::new(
+            assessment.framework_id.trim(),
+            assessment.framework_version.trim(),
+        ))
+        .collect();
+
+    result.missing_frameworks = expected.difference(&actual).cloned().collect();
+    result.missing_frameworks.sort();
+
+    result.unexpected_frameworks = actual.difference(&expected).cloned().collect();
+    result.unexpected_frameworks.sort();
+
+    if !result.unexpected_frameworks.is_empty() {
+        result.state = ComparisonState::FrameworkSetMismatch;
+    } else if !result.missing_frameworks.is_empty()
+        && !matches!(
+            result.state,
+            ComparisonState::SubjectMismatch
+                | ComparisonState::SourceSubjectMismatch
+                | ComparisonState::StaleAssessment
+                | ComparisonState::InvalidInput
+        )
+    {
+        // In particular, a single positive result cannot be called unanimous
+        // when the declared roster includes a missing evaluator.
+        result.state = ComparisonState::Incomplete;
+    }
+
+    result
+}
+
+fn validate_framework_roster(roster: &[FrameworkIdentity]) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mut seen = HashSet::new();
+
+    if roster.is_empty() {
+        errors.push("expected_frameworks must not be empty".to_owned());
+        return errors;
+    }
+
+    for (index, framework) in roster.iter().enumerate() {
+        if framework.framework_id.trim().is_empty() {
+            errors.push(format!("expected_frameworks[{index}].framework_id must not be empty"));
+        }
+        if framework.framework_version.trim().is_empty() {
+            errors.push(format!("expected_frameworks[{index}].framework_version must not be empty"));
+        }
+        if !framework.framework_id.trim().is_empty()
+            && !framework.framework_version.trim().is_empty()
+            && !seen.insert(FrameworkIdentity::new(
+                framework.framework_id.trim(),
+                framework.framework_version.trim(),
+            ))
+        {
+            errors.push(format!(
+                "expected_frameworks[{index}] duplicates {}@{}",
+                framework.framework_id.trim(),
+                framework.framework_version.trim()
+            ));
+        }
+    }
+
+    errors
 }
 
 fn compare_assessments_inner(
@@ -256,6 +368,8 @@ fn compare_assessments_inner(
         state,
         counts,
         assessments: assessments.to_vec(),
+        missing_frameworks: Vec::new(),
+        unexpected_frameworks: Vec::new(),
         validation_errors,
     }
 }
@@ -417,6 +531,114 @@ mod tests {
             evidence_refs: vec!["scenario:case-001".to_owned()],
             unresolved_questions: Vec::new(),
         }
+    }
+
+    fn identity(id: &str, version: &str) -> FrameworkIdentity {
+        FrameworkIdentity::new(id, version)
+    }
+
+    #[test]
+    fn roster_prevents_false_unanimity_when_framework_is_missing() {
+        let result = compare_assessments_with_roster(
+            &assessment("care_ethics", FrameworkStance::SupportsAction).subject,
+            &[
+                identity("care_ethics", "1.0.0"),
+                identity("rights_ethics", "2.1.0"),
+            ],
+            &[assessment("care_ethics", FrameworkStance::SupportsAction)],
+        );
+
+        assert_eq!(result.state, ComparisonState::Incomplete);
+        assert_eq!(
+            result.missing_frameworks,
+            vec![identity("rights_ethics", "2.1.0")]
+        );
+        assert!(result.unexpected_frameworks.is_empty());
+    }
+
+    #[test]
+    fn roster_accepts_explicit_unavailable_row_without_inventing_coverage() {
+        let mut unavailable = assessment("rights_ethics", FrameworkStance::Underdetermined);
+        unavailable.provenance.source_subject = None;
+        unavailable.provenance.evaluation_cycle = None;
+        unavailable.provenance.freshness = AssessmentFreshness::Unavailable;
+        unavailable.premise_refs.clear();
+        unavailable.evidence_refs.clear();
+        unavailable.rationale = vec!["Framework did not produce a fresh assessment.".to_owned()];
+
+        let care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let expected_subject = care.subject.clone();
+        let result = compare_assessments_with_roster(
+            &expected_subject,
+            &[
+                identity("care_ethics", "1.0.0"),
+                identity("rights_ethics", "1.0.0"),
+            ],
+            &[care, unavailable],
+        );
+
+        assert_eq!(result.state, ComparisonState::Incomplete);
+        assert!(result.missing_frameworks.is_empty());
+        assert!(result.unexpected_frameworks.is_empty());
+        assert!(result.validation_errors.is_empty());
+    }
+
+    #[test]
+    fn roster_rejects_unexpected_framework_version() {
+        let care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let expected_subject = care.subject.clone();
+        let result = compare_assessments_with_roster(
+            &expected_subject,
+            &[identity("care_ethics", "1.0.0")],
+            &[
+                care,
+                assessment("rights_ethics", FrameworkStance::OpposesAction),
+            ],
+        );
+
+        assert_eq!(result.state, ComparisonState::FrameworkSetMismatch);
+        assert_eq!(
+            result.unexpected_frameworks,
+            vec![identity("rights_ethics", "1.0.0")]
+        );
+    }
+
+    #[test]
+    fn malformed_or_duplicate_roster_is_invalid() {
+        let care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let expected_subject = care.subject.clone();
+        let result = compare_assessments_with_roster(
+            &expected_subject,
+            &[
+                identity("care_ethics", "1.0.0"),
+                identity("care_ethics", "1.0.0"),
+            ],
+            &[care],
+        );
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|error| error.contains("duplicates")));
+    }
+
+    #[test]
+    fn roster_order_does_not_change_coverage_or_state() {
+        let care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let rights = assessment("rights_ethics", FrameworkStance::OpposesAction);
+        let subject = care.subject.clone();
+        let forward = compare_assessments_with_roster(
+            &subject,
+            &[identity("care_ethics", "1.0.0"), identity("rights_ethics", "1.0.0")],
+            &[care.clone(), rights.clone()],
+        );
+        let reversed = compare_assessments_with_roster(
+            &subject,
+            &[identity("rights_ethics", "1.0.0"), identity("care_ethics", "1.0.0")],
+            &[rights, care],
+        );
+
+        assert_eq!(forward.state, reversed.state);
+        assert_eq!(forward.counts, reversed.counts);
+        assert_eq!(forward.missing_frameworks, reversed.missing_frameworks);
+        assert_eq!(forward.unexpected_frameworks, reversed.unexpected_frameworks);
     }
 
     #[test]
