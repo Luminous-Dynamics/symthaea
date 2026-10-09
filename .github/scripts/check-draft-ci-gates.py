@@ -41,6 +41,7 @@ GOVERNANCE_DRAFT_GUARD = (
 )
 
 DIRECT_GENERIC = {
+    "civ-governance-smokes",
     "fmt",
     "cls-field-count",
     "workspace-targets",
