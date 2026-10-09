@@ -555,7 +555,12 @@ pub fn compare_predictions(
             first.theory_id.clone(),
         ));
     }
-    if first.observable_id != second.observable_id || first.condition_id != second.condition_id {
+    if first.observable_id != second.observable_id
+        || first.condition_id != second.condition_id
+        || first.intervention_id != second.intervention_id
+        || first.required_observability != second.required_observability
+        || first.requires_manipulation_check != second.requires_manipulation_check
+    {
         return Ok(PairwiseDiscrimination::NotComparable);
     }
     if first.expected == second.expected {
