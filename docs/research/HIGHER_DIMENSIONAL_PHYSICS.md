@@ -43,6 +43,22 @@ This expression counts each interior bond once and includes one fixed-zero bound
 - Tests comparing the one-dimensional RHS and Hamiltonian with Stage A, evaluating analytic and finite-difference *dH/dt* through six spatial dimensions, and measuring RK4 energy drift through six dimensions.
 - A deterministic discovery runner that does **not** seed the known Hamiltonian into the search. It uses five paired search seeds (`42, 1337, 2718, 7919, 31415`) for each dimension while holding train and holdout trajectories fixed, and reports candidate counts, screened candidates, `symbolically_proven` metadata, and elapsed time.
 
+## Resolution refinement (separate from dimensionality)
+
+The new `pde_grid_refinement` module adds a one-dimensional, arbitrary-resolution Dirichlet wave operator. This is deliberately separate from the small `2^d)-site dimensional sweep above, so increasing the number of points does not get confused with adding physical dimensions.
+
+For (n) interior sites on (0 < x < 1), the spacing is (h=1/(n+1)). The semi-discrete operator uses
+[
+ddot u_i = (u_{i-1}-2u_i+u_{i+1})/h^2,
+]
+with fixed-zero boundary values. A matching discrete energy is
+[
+H_h = \frac{h}{2}\sum_i v_i^2 + \frac{1}{2h}\sum_{i=0}^{n}(u_{i+1}-u_i)^2,
+]
+where (u_0=u_{n+1}=0).
+
+The new tests check (a) the fundamental sine mode is an eigenvector of the discrete operator, (b) the discrete fundamental frequency converges to the continuum frequency (pi) at approximately second order as resolution increases, and (c) the semi-discrete energy derivative cancels. This is a focused operator-consistency and dispersion check, not yet a full space-time solution-convergence experiment. It does not change or replace the multi-dimensional invariant-discovery benchmark.
+ 
 ## Run and interpret
 
     cargo test -p symthaea-physics-bridge pde_hypercubic_wave
