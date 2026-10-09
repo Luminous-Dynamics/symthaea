@@ -429,7 +429,8 @@ def should_publish_pending_status(mode: str, activity: str, run: dict[str, Any])
     """Prevent a delayed start event from overwriting the final status."""
     return (mode == "workflow_run"
             and activity in {"requested", "in_progress"}
-            and run.get("status") != "completed")
+            and run.get("status") in {"queued", "in_progress", "waiting", "pending", "requested"}
+            and run.get("conclusion") is None)
 
 
 def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: str,
