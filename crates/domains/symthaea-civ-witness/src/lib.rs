@@ -1011,8 +1011,9 @@ impl SqliteWitnessStore {
         Ok(history)
     }
 
-    /// Run SQLite integrity checks and return "ok" on success. This does not
-    /// validate the external anchor.
+    /// Run SQLite physical and semantic-history integrity checks, returning "ok"
+    /// only when every log's records, fork chain, metadata head, and local fork-tail
+    /// commitment validate. This does not validate the external anchor.
     pub fn integrity_check(&self) -> Result<String, WitnessError> {
         let conn = self.open_connection()?;
         let result: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
@@ -1024,6 +1025,21 @@ impl SqliteWitnessStore {
             .optional()?;
         if foreign_key_violation.is_some() {
             return Err(WitnessError::CorruptStore("SQLite foreign_key_check failed"));
+        }
+
+        let mut statement = conn.prepare(
+            "SELECT log_id FROM witness_meta
+             UNION SELECT log_id FROM witness_records
+             UNION SELECT log_id FROM witness_fork_evidence
+             UNION SELECT log_id FROM witness_fork_meta
+             ORDER BY log_id ASC",
+        )?;
+        let log_ids = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        for log_id in log_ids {
+            Self::load_history_from_connection(&conn, &log_id)?;
         }
         Ok(result)
     }
@@ -2283,6 +2299,10 @@ mod tests {
             store.load_history(log_id),
             Err(WitnessError::CorruptForkEvidence)
         ));
+        assert!(matches!(
+            store.integrity_check(),
+            Err(WitnessError::CorruptForkEvidence)
+        ), "startup-style integrity check must detect a truncated fork chain");
     }
 
     #[test]
@@ -2318,6 +2338,10 @@ mod tests {
             store.load_history(log_id),
             Err(WitnessError::CorruptForkEvidence)
         ));
+        assert!(matches!(
+            store.integrity_check(),
+            Err(WitnessError::CorruptForkEvidence)
+        ), "startup-style integrity check must detect a bad tail commitment");
     }
 
     #[test]
