@@ -11027,6 +11027,7 @@ mod tests {
         invalid.modality_contexts[0].next_track_id = 0;
         assert!(restored.validate_checkpoint_state(&invalid).is_err());
     }
+
     #[test]
     fn path_coherence_is_unavailable_without_a_transition() {
         let manifold = test_manifold();
