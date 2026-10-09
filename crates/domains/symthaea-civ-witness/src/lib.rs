@@ -659,6 +659,29 @@ impl SqliteWitnessStore {
                     |row| row.get(0),
                 )?;
                 if status == 1 {
+                    let expected_candidate_generation = expected_generation
+                        .checked_add(1)
+                        .ok_or(WitnessError::GenerationOverflow)?;
+                    if candidate.generation != expected_candidate_generation
+                        || candidate.previous_record_digest
+                            != (expected_generation > 0).then_some(expected_digest)
+                        || !candidate.is_self_consistent()
+                    {
+                        return Err(WitnessError::StalePredecessor);
+                    }
+                    // An equal metadata pointer and digest column do not prove the
+                    // current record fields are intact. Validate the complete
+                    // history before treating a retry as idempotent success.
+                    let validated_history =
+                        Self::load_history_from_connection(&tx, &candidate.log_id)?;
+                    if !validated_history.accepted.as_ref().is_some_and(|head| {
+                        head.generation == candidate.generation
+                            && head.digest == candidate.digest
+                    }) {
+                        return Err(WitnessError::CorruptStore(
+                            "current candidate does not match accepted history",
+                        ));
+                    }
                     tx.commit()?;
                     return Ok(());
                 }
@@ -1582,6 +1605,33 @@ mod tests {
         );
     }
 
+    #[test]
+    fn finalize_rejects_tampered_current_head_record_on_same_generation_retry() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let store = db.open();
+        let log_id = "log-same-head-tampered-row";
+        let first = initialize(&store, &anchor, log_id);
+
+        // The metadata digest and record-digest column remain unchanged, but
+        // a canonical record field is altered after acceptance.
+        let conn = store
+            .open_connection()
+            .expect("open connection for corruption injection");
+        conn.execute(
+            "UPDATE witness_records SET anchor_digest=?1 WHERE log_id=?2 AND generation=1",
+            params![h(b"tampered-current-head-anchor").as_slice(), log_id],
+        )
+        .expect("tamper accepted current-head field");
+        drop(conn);
+
+        assert!(matches!(
+            store.finalize(&first, 0, ZERO_DIGEST),
+            Err(WitnessError::CorruptStore(
+                "record chain, policy, or receipt history is invalid"
+            ))
+        ));
+    }
     #[test]
     fn late_finalize_rejects_corrupt_current_head_metadata_pointer() {
         let db = TempDb::new();
