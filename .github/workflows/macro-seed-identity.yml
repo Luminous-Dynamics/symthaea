@@ -1,0 +1,132 @@
+name: Macro Seed Identity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/macro-seed-identity.yml'
+      - 'patches/science/macro-seed-identity-v1.patch'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/regressor.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/gp_support.rs'
+      - 'crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/macro-seed-identity-v1.patch
+
+jobs:
+  qualify:
+    name: Prove reconstructed-ID loss and qualify identity-bearing seeds
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core/symthaea-core/src || {
+            echo 'macro-seed-identity qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove current EML-aware identity reconstruction gap
+        run: |
+          mkdir -p crates/core/symthaea-core/tests
+          cat > crates/core/symthaea-core/tests/macro_seed_identity_negative_control.rs <<'RS'
+          use symthaea_core::hdc::abstract_thought::{
+              dynamic_grammar::{DynamicGrammar, MacroOperator},
+              expr_canonical_string,
+          };
+          use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, MacroPromotionTier};
+          use symthaea_core::hdc::eml;
+
+          #[test]
+          fn current_reconstructed_usage_key_can_miss_promoted_operator_identity() {
+              let template = Expr::BinOp(
+                  BinOp::Mul,
+                  Box::new(Expr::Var("n".into())),
+                  Box::new(Expr::Var("n".into())),
+              );
+              let compiled = eml::compile_expr(&template).expect("square must compile to strict EML");
+              let promoted_identity = format!("eml:strict:{compiled}");
+              let reconstructed_usage_key = expr_canonical_string(&template);
+              assert_ne!(promoted_identity, reconstructed_usage_key);
+
+              let mut grammar = DynamicGrammar::new();
+              grammar.operators.push(MacroOperator {
+                  name: "fixture-square".into(),
+                  template,
+                  canonical: promoted_identity,
+                  arity: 0,
+                  promotion_tier: MacroPromotionTier::FastTrackVerified,
+                  source_conjectures: vec![],
+                  parent_formulas: vec![],
+                  vars_used: vec!["n".into()],
+                  var_count: 1,
+                  signature: "n".into(),
+                  source_count: 1,
+                  usage_count: 0,
+                  created_at: 0,
+              });
+
+              grammar.record_usage(&reconstructed_usage_key);
+              assert_eq!(
+                  grammar.operators[0].usage_count, 0,
+                  "current reconstructed key must demonstrate the attribution miss"
+              );
+          }
+          RS
+          cargo test --locked -p symthaea-core --features abstract_thought --test macro_seed_identity_negative_control
+          rm crates/core/symthaea-core/tests/macro_seed_identity_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet identity-preserving semantics
+        run: |
+          REG=crates/core/symthaea-core/src/hdc/conjecture_engine/regressor.rs
+          ENG=crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+          grep -F 'pub struct MacroSeed' "$REG"
+          grep -F 'pub fn set_seed_macros_with_identity' "$REG"
+          grep -F 'pub fn macro_dependencies_for_expr' "$REG"
+          grep -F 'self.macro_usage.entry(macro_seed.identity.clone()).or_insert(0)' "$REG"
+          grep -F 'MacroSeed::new(op.canonical.clone(), op.template.clone())' "$ENG"
+          grep -F 'regressor.set_seed_macros_with_identity(macro_seeds.clone())' "$ENG"
+          if sed -n '/fn compatible_macro_seeds_for_sequence/,/autonomous_macro_templates_for_vars/p' "$ENG" | grep -F '.map(|op| op.template.clone())'; then
+            echo 'sequence macro seed path still discards promoted operator identity'
+            exit 1
+          fi
+
+      - name: Run exact identity regressions
+        run: |
+          cargo fmt --check -p symthaea-core
+          cargo test --locked -p symthaea-core --features abstract_thought explicit_macro_seed_identity_survives_dependency_resolution -- --nocapture
+          cargo check --locked -p symthaea-core --features abstract_thought
+          cargo clippy --locked -p symthaea-core --features abstract_thought --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that the qualified univariate learned-macro seed path preserves the exact grammar-assigned operator identity through structural dependency lookup and usage attribution.'
+          echo 'It does not establish stable source ancestry, downstream conjecture dependency receipts, autonomous-invariant macro lineage, necessity/causality of macro use, evidence independence, replication, scientific truth, or authority.'
