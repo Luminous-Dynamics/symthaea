@@ -853,11 +853,6 @@ pub fn evaluate_frozen_forecasts_with_baselines(
     let mut report =
         evaluate_frozen_correctness_forecasts(frozen, outcomes, assumptions, revisions)?;
     let first = &frozen.forecasts[0];
-    let forecast_ids: BTreeMap<&str, &CorrectnessForecastV1> = frozen
-        .forecasts
-        .iter()
-        .map(|p| (p.forecast_id.as_str(), p))
-        .collect();
     let outcomes_by_id: BTreeMap<&str, &CorrectnessOutcomeV1> = outcomes
         .iter()
         .map(|o| (o.forecast_id.as_str(), o))
@@ -987,18 +982,13 @@ pub fn evaluate_frozen_forecasts_with_baselines(
                 outcomes_by_id
                     .get(p.forecast_id.as_str())
                     .map(|o| o.correct)
-                    .unwrap_or(false)
+                    .ok_or_else(|| {
+                        MetacognitionEvaluationError::MissingOutcomeForForecast(
+                            p.forecast_id.clone(),
+                        )
+                    })
             })
-            .collect();
-        // The strict join above already rejected missing outcomes. This explicit count keeps
-        // a future accidental change to that join from silently shortening baseline samples.
-        if observed.len() != family_forecasts.len()
-            || family_forecasts.iter().any(|p| !outcomes_by_id.contains_key(p.forecast_id.as_str()))
-        {
-            return Err(MetacognitionEvaluationError::MissingOutcomeForForecast(
-                family_forecasts[0].forecast_id.clone(),
-            ));
-        }
+            .collect::<Result<_, _>>()?;
         let accuracy = mean_bool(observed.iter().copied());
         let mut family_baselines = Vec::with_capacity(2);
         for method in [
@@ -1007,7 +997,12 @@ pub fn evaluate_frozen_forecasts_with_baselines(
         ] {
             let baseline = baseline_index
                 .get(&(task_family_id.clone(), method))
-                .expect("baseline coverage checked above");
+                .ok_or_else(|| {
+                    MetacognitionEvaluationError::MissingBaselineForTaskFamily {
+                        method,
+                        task_family_id: task_family_id.clone(),
+                    }
+                })?;
             let n = observed.len();
             let mut brier = 0.0;
             let mut log_loss = 0.0;
@@ -1069,8 +1064,6 @@ pub fn evaluate_frozen_forecasts_with_baselines(
         ],
         family_reports,
     });
-    // Keep the lookup live to make it explicit that all scoring rows are keyed by frozen IDs.
-    let _validated_forecast_count = forecast_ids.len();
     Ok(report)
 }
 
