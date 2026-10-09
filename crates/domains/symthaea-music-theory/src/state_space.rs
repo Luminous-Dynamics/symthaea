@@ -47,13 +47,14 @@ pub struct MusicalStateFrame {
     pub end_beat: f64,
     pub event_count: usize,
     pub onset_density: f64,
+    /// Duration-weighted pitch-class occupancy relative to the score-level tonic.
     pub pitch_class_hist: [f64; PITCH_CLASS_BINS],
     pub rhythm_hist: [f64; RHYTHM_BINS],
     /// Per-part interval magnitudes; zeroed when persistent part identity is unavailable.
     pub line_interval_hist: [f64; INTERVAL_BINS],
     /// Per-part contour distribution; zeroed when persistent part identity is unavailable.
     pub line_contour_hist: [f64; CONTOUR_BINS],
-    /// Duration-weighted MIDI register occupancy in eight bins.
+    /// Duration-weighted MIDI register occupancy within the frame in eight bins.
     pub register_hist: [f64; REGISTER_BINS],
     /// True only when every note in this frame has a real PartId.
     pub part_identity_available: bool,
@@ -109,7 +110,14 @@ impl MusicalStateFrame {
         if notes.is_empty() {
             return None;
         }
-        Some(frame_from_notes(score, start_beat, end_beat, &notes))
+        let active_notes = overlapping_notes_in_window(score, start_beat, end_beat);
+        Some(frame_from_notes(
+            score,
+            start_beat,
+            end_beat,
+            &notes,
+            &active_notes,
+        ))
     }
 
     /// Cosine similarity between two canonical frame states.
@@ -171,7 +179,14 @@ impl MusicalStateTrajectory {
             let end = (start + window_beats).min(total);
             let notes = notes_in_window(score, start, end);
             if !notes.is_empty() {
-                frames.push(frame_from_notes(score, start, end, &notes));
+                let active_notes = overlapping_notes_in_window(score, start, end);
+                frames.push(frame_from_notes(
+                    score,
+                    start,
+                    end,
+                    &notes,
+                    &active_notes,
+                ));
             }
             if end >= total {
                 break;
@@ -241,6 +256,19 @@ impl MusicalStateTrajectory {
     }
 }
 
+fn overlapping_notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
+    score
+        .notes
+        .iter()
+        .copied()
+        .filter(|note| {
+            let onset = note.onset.beats();
+            let note_end = (note.onset + note.duration).beats();
+            (note_end.min(end) - onset.max(start)) > 0.0
+        })
+        .collect()
+}
+
 fn notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
     let mut notes: Vec<_> = score
         .notes
@@ -260,7 +288,13 @@ fn notes_in_window(score: &Score, start: f64, end: f64) -> Vec<ScoreNote> {
     notes
 }
 
-fn frame_from_notes(score: &Score, start: f64, end: f64, notes: &[ScoreNote]) -> MusicalStateFrame {
+fn frame_from_notes(
+    score: &Score,
+    start: f64,
+    end: f64,
+    notes: &[ScoreNote],
+    active_notes: &[ScoreNote],
+) -> MusicalStateFrame {
     let mut pitch_class_hist = [0.0; PITCH_CLASS_BINS];
     let mut rhythm_hist = [0.0; RHYTHM_BINS];
     let mut line_interval_hist = [0.0; INTERVAL_BINS];
@@ -276,18 +310,30 @@ fn frame_from_notes(score: &Score, start: f64, end: f64, notes: &[ScoreNote]) ->
         let duration = note.duration.beats().max(0.0);
         intensity_sum += note.section_intensity as f64;
 
-        let pc = note.pitch.pitch_class().value() as i32;
-        let relative_pc = (pc - tonic).rem_euclid(12) as usize;
-        pitch_class_hist[relative_pc] += duration;
-
         let duration_bin = RHYTHM_THRESHOLDS
             .iter()
             .position(|&threshold| duration <= threshold + 1e-12)
             .unwrap_or(RHYTHM_BINS - 1);
         rhythm_hist[duration_bin] += 1.0;
+    }
+
+    // Pitch-class and register features describe occupancy *inside* the frame,
+    // not the full notated duration of attacks. Include notes carried in from
+    // earlier windows and clip every contribution to the current interval.
+    for note in active_notes {
+        let onset = note.onset.beats();
+        let note_end = (note.onset + note.duration).beats();
+        let overlap = (note_end.min(end) - onset.max(start)).max(0.0);
+        if overlap <= 0.0 {
+            continue;
+        }
+
+        let pc = note.pitch.pitch_class().value() as i32;
+        let relative_pc = (pc - tonic).rem_euclid(12) as usize;
+        pitch_class_hist[relative_pc] += overlap;
 
         let midi = note.pitch.midi().clamp(0, 127) as usize;
-        register_hist[(midi / 16).min(REGISTER_BINS - 1)] += duration;
+        register_hist[(midi / 16).min(REGISTER_BINS - 1)] += overlap;
     }
 
     // PartId—not VoiceRole—is the identity of a continuing line. If any event
@@ -537,6 +583,30 @@ mod tests {
             .remove(0);
         assert!(frame.part_identity_available);
         assert_eq!(frame.line_transition_count, 2);
+    }
+
+    #[test]
+    fn duration_weighted_occupancy_includes_carry_ins_and_clips_to_window() {
+        let mut held_c = note(0, 4, 0);
+        held_c.duration = Duration::new(4, 1);
+        let mut attack_g = note(7, 5, 2);
+        attack_g.duration = Duration::new(2, 1);
+        let piece = score(&[held_c, attack_g], 0);
+
+        // Only the G attack starts in [2, 2.5), but both notes sound for half
+        // a beat inside that region. Their out-of-window tails must not count.
+        let frame = MusicalStateFrame::from_region(
+            &piece,
+            Duration::new(2, 1),
+            Duration::new(5, 2),
+        )
+        .expect("the region contains an attack");
+
+        assert_eq!(frame.event_count, 1);
+        assert!((frame.pitch_class_hist[0] - 0.5).abs() < 1e-9);
+        assert!((frame.pitch_class_hist[7] - 0.5).abs() < 1e-9);
+        assert!((frame.register_hist[3] - 0.5).abs() < 1e-9);
+        assert!((frame.register_hist[4] - 0.5).abs() < 1e-9);
     }
 
     #[test]
