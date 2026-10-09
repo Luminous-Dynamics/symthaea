@@ -687,12 +687,17 @@ impl GridPhysicsInfrastructureSimulator {
         if !load_report.is_valid() {
             return Err(GridPhysicsStepError::InvalidDerivedPhysics);
         }
-        let shed_load_kw = if dt_hours > 0.0 {
-            load_report.intentional_shed_kwh / dt_hours
+        // The electrical model must consume the amount of load actually
+        // served by the bucket allocator, not requested load that the report
+        // has already classified as involuntarily unserved. In grid-tied mode
+        // the feeder represents net upstream exchange, so battery injection
+        // is subtracted; islanded mode uses the battery as the feeder source,
+        // and subtracting its output from the load here would double-count it.
+        let served_load_kw = if dt_hours > 0.0 {
+            load_report.total_served_kwh / dt_hours
         } else {
             0.0
         };
-        let connected_load_kw = (total_requested_load_kw - shed_load_kw).max(0.0);
         let served_cooling_kw = if dt_hours > 0.0 {
             load_report.cooling_served_kwh / dt_hours
         } else {
@@ -705,7 +710,11 @@ impl GridPhysicsInfrastructureSimulator {
         };
         let effective_cooling_frac = (served_cooling_kw / COOLING_RATED_KW).clamp(0.0, 1.0);
         let effective_heating_frac = (served_heating_kw / HEATING_RATED_KW).clamp(0.0, 1.0);
-        let node_load_kw = connected_load_kw - net_battery_injection_kw;
+        let node_load_kw = if is_islanded {
+            served_load_kw
+        } else {
+            served_load_kw - net_battery_injection_kw
+        };
 
         // ── Feeder solve ──────────────────────────────────────────────
         // While islanded, the "reference" the local bus is measured against
@@ -769,7 +778,9 @@ impl GridPhysicsInfrastructureSimulator {
 
         // ── Islanding / frequency ─────────────────────────────────────
         let current_frequency_hz = if is_islanded {
-            steady_state_frequency_after_islanding(&self.freq_droop, connected_load_kw)
+            // Droop follows served electrical load; the critical shortfall
+            // remains visible in LoadServiceReport and service-integrity risk.
+            steady_state_frequency_after_islanding(&self.freq_droop, served_load_kw)
         } else {
             NOMINAL_FREQUENCY_HZ
         };
@@ -1261,6 +1272,22 @@ mod failure_mode_tests {
         assert!(sim.state().shed_load_ratio() > 0.0);
         assert!(report.energy_balance_residual_kwh().abs() < 1e-12);
         assert!(report.is_valid());
+    }
+
+    #[test]
+    fn islanded_frequency_uses_load_actually_served_after_guard_shedding() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.1;
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+
+        let served_load_kw = sim.load_service_report().total_served_kwh;
+        // try_step receives seconds; report energy is kWh, so convert this
+        // 1-second step back to average kW before comparing with droop input.
+        let served_load_kw = served_load_kw / (1.0 / 3600.0);
+        let expected = steady_state_frequency_after_islanding(&sim.freq_droop, served_load_kw);
+        assert_eq!(sim.prev_frequency_hz, expected);
+        assert!(sim.load_service_report().total_unserved_kwh > 0.0);
     }
 
     #[test]
