@@ -14,7 +14,7 @@
 //! chronology/lineage supplied by a caller. Those custody and integration claims
 //! require a later independent qualification.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -71,6 +71,9 @@ pub struct TheoryPrediction {
     pub observable_id: String,
     pub condition_id: String,
     pub expected: OutcomeValue,
+    /// Exact intervention identity for mechanism-specific predictions. None for
+    /// behavior-only or observational predictions that do not require an intervention.
+    pub intervention_id: Option<String>,
     pub required_observability: ObservabilityTier,
     pub requires_manipulation_check: bool,
 }
@@ -103,6 +106,8 @@ pub enum RegistryValidationError {
     PredictionNotFound(String),
     PredictionNotInRegistry(String),
     SameTheoryComparison(String),
+    MissingInterventionBinding(String),
+    MechanisticPredictionWithoutManipulationCheck(String),
     SerializationFailed,
     ContextMismatch(&'static str),
 }
@@ -132,6 +137,33 @@ impl PredictionRegistry {
             require_non_empty(&prediction.condition_id, "condition_id")?;
             if let OutcomeValue::Category(value) = &prediction.expected {
                 require_non_empty(value, "expected.category")?;
+            }
+            if let Some(intervention_id) = &prediction.intervention_id {
+                require_non_empty(intervention_id, "intervention_id")?;
+            }
+            if prediction.required_observability == ObservabilityTier::MechanisticInterventionAvailable {
+                if prediction.intervention_id.is_none() {
+                    return Err(RegistryValidationError::MissingInterventionBinding(
+                        prediction.prediction_id.clone(),
+                    ));
+                }
+                if !prediction.requires_manipulation_check {
+                    return Err(
+                        RegistryValidationError::MechanisticPredictionWithoutManipulationCheck(
+                            prediction.prediction_id.clone(),
+                        ),
+                    );
+                }
+            }
+            if prediction.requires_manipulation_check
+                && prediction.required_observability
+                    != ObservabilityTier::MechanisticInterventionAvailable
+            {
+                return Err(
+                    RegistryValidationError::MechanisticPredictionWithoutManipulationCheck(
+                        prediction.prediction_id.clone(),
+                    ),
+                );
             }
             if !ids.insert(prediction.prediction_id.as_str()) {
                 return Err(RegistryValidationError::DuplicatePredictionId(
@@ -230,6 +262,8 @@ pub struct Observation {
     pub observable_id: String,
     pub condition_id: String,
     pub observability_tier: ObservabilityTier,
+    /// Present whenever this observation claims the mechanism-intervention tier.
+    pub intervention_id: Option<String>,
     pub outcome: ObservationOutcome,
     pub outcome_released_at_sequence: u64,
     pub is_holdout: bool,
@@ -248,6 +282,14 @@ impl Observation {
         require_non_empty(&self.trial_id, "trial_id")?;
         require_non_empty(&self.observable_id, "observable_id")?;
         require_non_empty(&self.condition_id, "condition_id")?;
+        if let Some(intervention_id) = &self.intervention_id {
+            require_non_empty(intervention_id, "intervention_id")?;
+        }
+        if self.observability_tier == ObservabilityTier::MechanisticInterventionAvailable
+            && self.intervention_id.is_none()
+        {
+            return Err(RegistryValidationError::EmptyField("intervention_id"));
+        }
         require_digest(&self.artifact_digest, "artifact_digest")
     }
 }
@@ -282,6 +324,7 @@ pub enum EvaluationReason {
     ConfoundDetected,
     ObservableMismatch,
     ConditionMismatch,
+    InterventionMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -364,6 +407,16 @@ pub fn evaluate_prediction(
             &observation.observation_id,
             PredictionDisposition::NotApplicable,
             EvaluationReason::ConditionMismatch,
+            no_value,
+        ));
+    }
+    if prediction.intervention_id != observation.intervention_id {
+        return Ok(EvaluationReceipt::new(
+            registry_digest,
+            &prediction.prediction_id,
+            &observation.observation_id,
+            PredictionDisposition::Inconclusive,
+            EvaluationReason::InterventionMismatch,
             no_value,
         ));
     }
@@ -632,6 +685,7 @@ mod tests {
             condition_id: "persistent_conflict_v1".to_owned(),
             expected,
             required_observability: ObservabilityTier::BehaviorOnly,
+            intervention_id: None,
             requires_manipulation_check: false,
         }
     }
@@ -658,6 +712,7 @@ mod tests {
             observable_id: "broadcast_event".to_owned(),
             condition_id: "persistent_conflict_v1".to_owned(),
             observability_tier: ObservabilityTier::BehaviorOnly,
+            intervention_id: None,
             outcome: ObservationOutcome::Observed(OutcomeValue::Present),
             outcome_released_at_sequence: 20,
             is_holdout: true,
@@ -719,9 +774,11 @@ mod tests {
         let mut p = prediction("p-intervention", "theory-a", OutcomeValue::Present);
         p.required_observability = ObservabilityTier::MechanisticInterventionAvailable;
         p.requires_manipulation_check = true;
+        p.intervention_id = Some("lesion-broadcast-v1".to_owned());
         let registry = registry(vec![p.clone()]);
         let mut observation = observation();
         observation.observability_tier = ObservabilityTier::MechanisticInterventionAvailable;
+        observation.intervention_id = Some("lesion-broadcast-v1".to_owned());
         observation.manipulation_check = ManipulationCheck::Failed;
 
         let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
