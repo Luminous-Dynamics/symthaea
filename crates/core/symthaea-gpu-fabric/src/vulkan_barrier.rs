@@ -1236,13 +1236,31 @@ fn materialized_barrier_batches_digest(batches: &[MaterializedBarrierBatch]) -> 
         fields.extend([
             "batch".to_owned(),
             format!("node_id={}", batch.node_id),
+            "dependency_structure=VkDependencyInfo".to_owned(),
+            "pnext=null".to_owned(),
             "dependency_flags=0".to_owned(),
             format!("memory_barrier_count={memory_count}"),
-            format!("buffer_barrier_count={buffer_count}"),
-            "image_barrier_count=0".to_owned(),
+            format!("buffer_memory_barrier_count={buffer_count}"),
+            "image_memory_barrier_count=0".to_owned(),
         ]);
         for (ordinal, record) in batch.records.iter().enumerate() {
             let (src_access, dst_access) = access_mask_labels(record.kind);
+            let (src_access_mask, dst_access_mask) = barrier_access_masks(record.kind);
+            let stage_mask = vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw();
+            let (barrier_type, src_queue_family_index, dst_queue_family_index) =
+                if record.buffer_memory {
+                    (
+                        "VkBufferMemoryBarrier2",
+                        vk::QUEUE_FAMILY_IGNORED.to_string(),
+                        vk::QUEUE_FAMILY_IGNORED.to_string(),
+                    )
+                } else {
+                    (
+                        "VkMemoryBarrier2",
+                        "not_applicable".to_owned(),
+                        "not_applicable".to_owned(),
+                    )
+                };
             fields.extend([
                 "barrier".to_owned(),
                 format!("ordinal={ordinal}"),
@@ -1250,18 +1268,18 @@ fn materialized_barrier_batches_digest(batches: &[MaterializedBarrierBatch]) -> 
                 format!("to={}", record.to),
                 format!("resource={}", record.resource.as_str()),
                 format!("kind={}", dependency_kind_label(record.kind)),
-                format!(
-                    "type={}",
-                    if record.buffer_memory { "buffer_memory" } else { "execution_memory" }
-                ),
+                format!("type={barrier_type}"),
+                "pnext=null".to_owned(),
                 "src_stage=compute_shader".to_owned(),
+                format!("src_stage_mask={stage_mask}"),
                 format!("src_access={src_access}"),
+                format!("src_access_mask={}", src_access_mask.as_raw()),
                 "dst_stage=compute_shader".to_owned(),
+                format!("dst_stage_mask={stage_mask}"),
                 format!("dst_access={dst_access}"),
-                format!(
-                    "queue_family={}",
-                    if record.buffer_memory { "ignored" } else { "not_applicable" }
-                ),
+                format!("dst_access_mask={}", dst_access_mask.as_raw()),
+                format!("src_queue_family_index={src_queue_family_index}"),
+                format!("dst_queue_family_index={dst_queue_family_index}"),
                 "offset=0".to_owned(),
                 format!("size={}", record.storage_size),
             ]);
@@ -1269,7 +1287,7 @@ fn materialized_barrier_batches_digest(batches: &[MaterializedBarrierBatch]) -> 
     }
 
     let mut digest = Sha256::new();
-    digest.update(b"symthaea.gpu-fabric.vulkan-materialized-barriers.v1");
+    digest.update(b"symthaea.gpu-fabric.vulkan-materialized-barriers.v2");
     digest.update([0]);
     for field in fields {
         let bytes = field.as_bytes();
