@@ -2021,6 +2021,36 @@ mod tests {
     }
 
     #[test]
+    fn materialized_barrier_digest_binds_concrete_call_fields() {
+        let (_, _, plan, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| {
+                (
+                    resource.clone(),
+                    rounded_storage_bytes(value.as_bytes().len() as u64),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut batches =
+            materialized_barrier_batches_from_plan(&plan, &storage_sizes).unwrap();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].records.len(), 1);
+        let baseline = materialized_barrier_batches_digest(&batches);
+
+        batches[0].records[0].storage_size += 4;
+        assert_ne!(baseline, materialized_barrier_batches_digest(&batches));
+        batches[0].records[0].storage_size -= 4;
+
+        batches[0].records[0].kind = DependencyKind::WriteAfterWrite;
+        assert_ne!(baseline, materialized_barrier_batches_digest(&batches));
+        batches[0].records[0].kind = DependencyKind::ReadAfterWrite;
+
+        batches[0].node_id += 1;
+        assert_ne!(baseline, materialized_barrier_batches_digest(&batches));
+    }
+
+    #[test]
     fn barrier_lowering_digest_is_distinct_from_semantic_barrier_digest() {
         let (_, _, plan, final_state) = fixture();
         let storage_sizes = final_state
