@@ -46,24 +46,20 @@ Score the candidate and both baselines against the exact same bound holdout outc
 
 Brier score and log loss are proper scoring rules for probabilistic forecasts. They combine multiple aspects of probabilistic performance, so interpret them alongside calibration curves/reliability bins, discrimination, uncertainty, and family-local sample sizes. Do not interpret a lower Brier score alone as proof of better calibration. Fit any learned calibration transformation using calibration/validation data only; evaluate once on untouched holdout data.
 
-## Mixed decision-cohort API — v3 implementation candidate
+## Mixed decision-cohort API — v4 implementation candidate
 
-The separate API in `src/intelligence/reasoning_metacognition_cohort.rs` represents assertions, abstentions, and predeclared counterfactual answers without mixing their scoring populations.
+The separate API in `src/intelligence/reasoning_metacognition_cohort.rs` separates pre-outcome decisions from ground-truth labels.
 
-Current identifiers are decision-forecast schema v2, decision-outcome schema v1, frozen-cohort schema v3, report schema v3, and evaluator `rq-006-decision-cohort-v3`.
+Current identifiers are decision-forecast schema v2, decision-outcome schema v2, frozen-cohort schema v4, report schema v4, and evaluator `rq-006-decision-cohort-v4`.
 
-- `DecisionForecastV2.predicted_probability` is optional: an asserted answer requires a correctness probability; an abstention without a frozen candidate answer must not claim one. An abstention with a predeclared counterfactual answer may carry a separate probability for that answer.
-- `DecisionOutcomeV1` requires correctness for an asserted answer and forbids asserted-answer correctness for abstentions. Counterfactual correctness requires both a frozen counterfactual-answer reference and separate outcome evidence.
-- `freeze_decision_cohort_for_split` freezes forecasts, both family-local baseline profiles, evaluation split/manifest identities, bins and thresholds. `freeze_decision_cohort_for_split_with_observations` additionally freezes weak-assumption observations and confidence revisions before outcome evaluation.
-- The frozen cohort validates that every auxiliary observation refers to an episode in the cohort. Revision pairs must refer to two distinct episodes within the same task family; their before/after confidence values must exactly match the corresponding frozen forecast probabilities. Unknown episodes, cross-family pairs, or changed values fail closed. Both auxiliary collections have deterministic canonical ordering and are revalidated on deserialization.
-- `evaluate_decision_cohort` accepts the frozen cohort and outcome receipts—not replacement baselines, assumptions, or revisions—so evaluator-time arguments cannot swap those pre-outcome profiles.
-- Correctness calibration/reliability bins/AUROC and candidate/baseline loss use only asserted answers with bound correctness outcomes. Weak-assumption detection and confidence-revision metrics have a separate `decision_behavior_metrics` report over the full frozen decision cohort. Their asserted-only subset remains distinct inside the correctness report.
-- Decision coverage and threshold coverage use the full decision cohort as denominator. The nested correctness metrics use only asserted/scored answers; their legacy threshold coverage is conditional within that asserted-answer cohort. Use outer `decision_coverage` and `selective_risk[].coverage_all_decisions` for whole-cohort comparisons.
-- Counterfactual candidate answers have separate confidence, accuracy, Brier and log-loss fields and never enter asserted-answer calibration.
-- Every task family remains in the report, including abstain-only families. Their asserted-answer correctness and baseline metrics remain `None` rather than fabricated values or divisions by zero. Candidate and each baseline are evaluated on the same asserted/scored cohort.
-- Regression fixtures cover mixed decisions, zero-assertion families, absent probabilities when there is no candidate answer, contradictory/missing/duplicate outcomes, separately evidenced counterfactual scoring, baseline tampering/completeness, frozen auxiliary-observation scope and probability binding, schema rejection, and serialization restoration.
+- `DecisionForecastV2.predicted_probability` is optional: asserted answers require a correctness probability; an abstention without a frozen candidate answer must not claim one. An abstention with a predeclared counterfactual answer may carry its own correctness probability.
+- `WeakAssumptionDetectionV1` freezes only the model's pre-outcome detection decision. `DecisionOutcomeV2.weak_assumption_present` carries the later ground-truth label. Evaluation requires a one-to-one binding: a frozen detection requires a label, and an outcome label without a frozen detection decision is rejected.
+- Confidence revisions are frozen alongside the forecasts and baselines. Revision pairs must use distinct in-cohort episodes in the same task family, and their before/after confidence values must match the frozen forecast probabilities. Deserialization repeats validations and canonical-order checks.
+- `freeze_decision_cohort_for_split_with_observations` freezes detection decisions and confidence revisions, not ground truth. `evaluate_decision_cohort` accepts only frozen cohort and outcome receipts, not replacement baselines/detections/revisions.
+- Correctness calibration and candidate/baseline loss use only asserted, scored answers. Whole-cohort coverage uses all decisions. Weak-assumption detection metrics are computed only after joining frozen detections to later outcome ground truth, and remain separate from correctness calibration.
+- Counterfactual candidates are scored separately only with predeclared answer references and separate outcome evidence. Abstain-only families remain visible with absent correctness/baseline scores, not fabricated zeros or NaN.
 
-This is an **implementation candidate**, not qualified evidence. Exact-head CI, test/formatting results, and independent review are still required. Private Rust fields and serialized self-validation do not prove that forecasts or auxiliary observations were captured before outcomes were visible. Caller-supplied evidence references and manifest IDs do not authenticate content, establish calibration/holdout disjointness, or prove chronology. Those properties require an independent trusted capture and manifest verifier.
+This is an **implementation candidate**, not qualified evidence. Exact-head CI, formatting, tests and independent review remain mandatory. The evaluator does not prove capture-before-outcome chronology, authenticate evidence, or establish actual calibration/holdout disjointness; independent trusted capture and manifest verification remain required.
 
 ## Legacy correctness API: asserted-only limitation
 
