@@ -1305,6 +1305,95 @@ class DurablePromotionJournalTests(unittest.TestCase):
         self.assertEqual(journal.get_reservation("RES-1"), before)
         self.assertTrue(journal.verify_journal())
 
+    def test_prepared_attempt_recovery_is_durable_and_blocks_new_authority(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        self.assertTrue(self.prepare_one(journal))
+        prepared_identity = journal.derive_attempt_identity("RES-1")
+        self.assertIsNotNone(prepared_identity)
+        self.assertEqual(journal.current_state()["revision"], 2)
+
+        self.assertTrue(journal.require_reconciliation("RES-1"))
+        recovered = journal.get_reservation("RES-1")
+        self.assertEqual(recovered["state"], "PromotionReconciliationRequired")
+        self.assertEqual(journal.current_state()["revision"], 3)
+        self.assertTrue(journal.verify_journal())
+
+        recovered_identity = journal.derive_attempt_identity("RES-1")
+        self.assertIsNotNone(recovered_identity)
+        self.assertEqual(
+            recovered_identity.identity_digest(),
+            prepared_identity.identity_digest(),
+        )
+
+        event_count = journal.event_count()
+        state = journal.current_state()
+        self.assertTrue(journal.require_reconciliation("RES-1"))
+        self.assertEqual(journal.event_count(), event_count)
+        self.assertEqual(journal.current_state(), state)
+
+        self.assertFalse(self.prepare_one(journal, attempt_id="ATTEMPT-RETRY", sequence=10))
+        self.assertFalse(journal.advance_fence(
+            active_lease="LEASE-2",
+            trust_root_generation=2,
+            governance_generation=2,
+        ))
+        self.assertFalse(journal.reserve(
+            observed_head="L1",
+            lease_id="LEASE-1",
+            candidate="L2",
+            reservation_id="RES-2",
+            operation_id="OP-2",
+            trust_root_generation=1,
+            governance_generation=1,
+            operation_identity_digest=hashlib.sha256(b"operation-2").hexdigest(),
+            clock_id="clock-A",
+            reserved_wall_time_ms=2000,
+            reserved_monotonic_ns=200000,
+        ))
+        self.assertTrue(journal.verify_journal())
+
+        reopened = DurablePromotionJournalV1(journal.path)
+        self.assertEqual(
+            reopened.get_reservation("RES-1")["state"],
+            "PromotionReconciliationRequired",
+        )
+        self.assertEqual(
+            reopened.derive_attempt_identity("RES-1").identity_digest(),
+            prepared_identity.identity_digest(),
+        )
+
+    def test_reconciliation_transition_requires_revision_advance(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        self.assertTrue(self.prepare_one(journal))
+        connection = sqlite3.connect(journal.path)
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    """UPDATE reservations
+                       SET state = 'PromotionReconciliationRequired'
+                       WHERE reservation_id = 'RES-1'"""
+                )
+            connection.rollback()
+        finally:
+            connection.close()
+        self.assertEqual(
+            journal.get_reservation("RES-1")["state"],
+            "PromotionDispatchPrepared",
+        )
+        self.assertTrue(journal.verify_journal())
+
+    def test_reconciliation_requires_a_prepared_attempt(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        self.assertFalse(journal.require_reconciliation("RES-1"))
+        self.assertEqual(
+            journal.get_reservation("RES-1")["state"],
+            "PromotionReserved",
+        )
+        self.assertTrue(journal.verify_journal())
+
     def test_chain_audit_detects_mutated_event_payload(self) -> None:
         journal = self.make_journal()
         self.reserve_one(journal)
