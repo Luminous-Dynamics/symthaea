@@ -248,7 +248,11 @@ impl LoadRegistry {
             if !demand.requested_power_kw.is_finite() || demand.requested_power_kw < 0.0 {
                 return Err(LoadRegistryError::InvalidRequestedPower(demand.load_id.clone()));
             }
-            let Some(entry) = self.entries.iter().find(|entry| entry.load_id == demand.load_id) else {
+            let Some(entry) = self
+                .entries
+                .iter()
+                .find(|entry| entry.load_id == demand.load_id)
+            else {
                 return Err(LoadRegistryError::UnknownDemandLoad(demand.load_id.clone()));
             };
             if demand.requested_power_kw > entry.rated_power_kw {
@@ -310,7 +314,10 @@ impl LoadRegistry {
 
         let total_demand_kwh = records.iter().map(|record| record.requested_kwh).sum();
         let total_served_kwh = records.iter().map(|record| record.served_kwh).sum();
-        let intentional_shed_kwh = records.iter().map(|record| record.intentional_shed_kwh).sum();
+        let intentional_shed_kwh = records
+            .iter()
+            .map(|record| record.intentional_shed_kwh)
+            .sum();
         let total_unserved_kwh = records.iter().map(|record| record.unserved_kwh).sum();
         let unused_energy_kwh = (available_energy_kwh - total_served_kwh).max(0.0);
 
@@ -456,7 +463,8 @@ impl LoadServiceLedger {
                 self.total_served_kwh + self.unused_energy_kwh,
                 self.available_energy_kwh,
             )
-            && self.total_served_kwh <= self.available_energy_kwh + tolerance(self.available_energy_kwh)
+            && self.total_served_kwh
+                <= self.available_energy_kwh + tolerance(self.available_energy_kwh)
             && close_enough(self.energy_balance_residual_kwh(), 0.0)
     }
 }
@@ -575,7 +583,9 @@ fn tolerance(value: f64) -> f64 {
 }
 
 fn close_enough(left: f64, right: f64) -> bool {
-    left.is_finite() && right.is_finite() && (left - right).abs() <= tolerance(left.abs().max(right.abs()))
+    left.is_finite()
+        && right.is_finite()
+        && (left - right).abs() <= tolerance(left.abs().max(right.abs()))
 }
 
 #[cfg(test)]
@@ -644,11 +654,16 @@ mod tests {
             LoadRegistryError::DuplicateLoadId("duplicate".into())
         );
         assert_eq!(
-            LoadRegistry::new("v1", vec![entry("aux", LoadClass::Auxiliary, 1.0, 1, 1)]).unwrap_err(),
+            LoadRegistry::new(
+                "v1",
+                vec![entry("aux", LoadClass::Auxiliary, 1.0, 1, 1)],
+            )
+            .unwrap_err(),
             LoadRegistryError::MissingCriticalLoad
         );
         assert_eq!(
-            LoadRegistry::new("v1", vec![entry(" ", LoadClass::Critical, 1.0, 1, 1)]).unwrap_err(),
+            LoadRegistry::new("v1", vec![entry(" ", LoadClass::Critical, 1.0, 1, 1)])
+                .unwrap_err(),
             LoadRegistryError::EmptyLoadId
         );
     }
@@ -702,7 +717,13 @@ mod tests {
         assert_eq!(ledger.total_unserved_kwh, 0.0);
         assert_eq!(ledger.intentional_shed_kwh, 5.5);
 
-        let lookup = |id: &str| ledger.records.iter().find(|record| record.load_id == id).unwrap();
+        let lookup = |id: &str| {
+            ledger
+                .records
+                .iter()
+                .find(|record| record.load_id == id)
+                .unwrap()
+        };
         assert_eq!(lookup("critical-water").served_kwh, 2.0);
         assert_eq!(lookup("deferrable-comms").served_kwh, 0.5);
         assert_eq!(lookup("deferrable-pump").served_kwh, 0.0);
@@ -717,7 +738,11 @@ mod tests {
         assert_eq!(ledger.total_served_kwh, 0.5);
         assert_eq!(ledger.total_unserved_kwh, 1.5);
         assert_eq!(ledger.intentional_shed_kwh, 6.0);
-        let critical = ledger.records.iter().find(|record| record.class == LoadClass::Critical).unwrap();
+        let critical = ledger
+            .records
+            .iter()
+            .find(|record| record.class == LoadClass::Critical)
+            .unwrap();
         assert_eq!(critical.unserved_kwh, 1.5);
         assert_eq!(critical.intentional_shed_kwh, 0.0);
     }
@@ -787,7 +812,11 @@ mod tests {
                 entry("middle", LoadClass::Deferrable, 1.0, 1, 2),
             ],
         ).unwrap();
-        let ids: Vec<&str> = reg.restoration_order().iter().map(|entry| entry.load_id.as_str()).collect();
+        let ids: Vec<&str> = reg
+            .restoration_order()
+            .iter()
+            .map(|entry| entry.load_id.as_str())
+            .collect();
         assert_eq!(ids, vec!["later", "alpha", "middle", "zeta"]);
     }
 
@@ -811,7 +840,10 @@ mod tests {
         );
         assert!(matches!(
             gate.assess(true, 10.0, 10),
-            LoadRestorationDecision::ConditionsNotStable { consecutive_stable_steps: 2, .. }
+            LoadRestorationDecision::ConditionsNotStable {
+                consecutive_stable_steps: 2,
+                ..
+            }
         ));
         assert_eq!(
             gate.assess(true, 10.0, 3),
@@ -832,18 +864,30 @@ mod tests {
         let mut gate = restoration_gate();
         assert!(matches!(
             gate.assess(true, 10.0, 10),
-            LoadRestorationDecision::ConditionsNotStable { consecutive_stable_steps: 1, .. }
+            LoadRestorationDecision::ConditionsNotStable {
+                consecutive_stable_steps: 1,
+                ..
+            }
         ));
         assert!(matches!(
             gate.assess(false, 10.0, 10),
-            LoadRestorationDecision::ConditionsNotStable { consecutive_stable_steps: 0, .. }
+            LoadRestorationDecision::ConditionsNotStable {
+                consecutive_stable_steps: 0,
+                ..
+            }
         ));
         assert_eq!(gate.consecutive_stable_steps(), 0);
-        assert_eq!(gate.assess(true, f64::NAN, 10), LoadRestorationDecision::InvalidEvidence);
+        assert_eq!(
+            gate.assess(true, f64::NAN, 10),
+            LoadRestorationDecision::InvalidEvidence
+        );
         assert_eq!(gate.consecutive_stable_steps(), 0);
         assert!(matches!(
             gate.assess(true, 10.0, 10),
-            LoadRestorationDecision::ConditionsNotStable { consecutive_stable_steps: 1, .. }
+            LoadRestorationDecision::ConditionsNotStable {
+                consecutive_stable_steps: 1,
+                ..
+            }
         ));
     }
 
@@ -889,7 +933,13 @@ mod tests {
             .find(|record| record.load_id == "deferrable-comms")
             .unwrap();
         record.class = LoadClass::Auxiliary;
-        assert!(relabeled.is_valid(), "the internal ledger may still balance after a classification claim changes");
-        assert!(!reg.verify_ledger(&relabeled), "the exact registry must reject the changed classification");
+        assert!(
+            relabeled.is_valid(),
+            "the internal ledger may still balance after a classification claim changes"
+        );
+        assert!(
+            !reg.verify_ledger(&relabeled),
+            "the exact registry must reject the changed classification"
+        );
     }
 }
