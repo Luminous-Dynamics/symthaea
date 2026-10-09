@@ -2723,6 +2723,25 @@ mod tests {
     }
 
     #[test]
+    fn materialized_submission_digest_binds_concrete_call_fields() {
+        let (_, _, plan, _) = fixture();
+        let completion = expected_final_timeline_value(&plan);
+        let mut contract = MaterializedSubmissionContract::from_plan(&plan, completion, 7);
+        let baseline = contract.digest();
+
+        contract.signal_value += 1;
+        assert_ne!(baseline, contract.digest());
+        contract.signal_value -= 1;
+
+        contract.host_readback_dst_access_mask = vk::AccessFlags2::empty();
+        assert_ne!(baseline, contract.digest());
+        contract.host_readback_dst_access_mask = vk::AccessFlags2::HOST_READ;
+
+        contract.queue_family_index += 1;
+        assert_ne!(baseline, contract.digest());
+    }
+
+    #[test]
     fn completion_lowering_digest_binds_final_timeline_policy() {
         let (_, _, mut plan, _) = fixture();
         let baseline = completion_lowering_digest(
