@@ -487,6 +487,93 @@
           ]
         ]
       }
+    },
+    {
+      "name": "empty-selected-identity",
+      "expected_failure": "InvalidSelectedIdentity(Empty)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          ""
+        ],
+        "selected_representation_digests": [
+          [
+            "",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "1fc33274c82ddd167d6466e7a02c945882906b4c35d089424e173c5a0232f6d3",
+        "selected_projection_identity_digests": [
+          [
+            "",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "whitespace-only-selected-identity",
+      "expected_failure": "InvalidSelectedIdentity(WhitespaceOnly)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          " \t\n"
+        ],
+        "selected_representation_digests": [
+          [
+            " \t\n",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7c913aaa05141da2196782e293874dfb1763592552306fd58256f01948ee18bd",
+        "selected_projection_identity_digests": [
+          [
+            " \t\n",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "control-character-selected-identity",
+      "expected_failure": "InvalidSelectedIdentity(ControlCharacter)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:\ninvalid"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:\ninvalid",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "d20d0e3f0adcafd34cc72bfc2a8db8ea5b7211a2dd0da7cd167ea674e9955b80",
+        "selected_projection_identity_digests": [
+          [
+            "claim:\ninvalid",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
     }
   ]
 }
