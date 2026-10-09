@@ -266,13 +266,19 @@ impl ReceiptSelectionContext {
         })
     }
 
-    /// Build the durable selection context from the proof-carrying witness.
+    /// Build a **classical-only** durable selection context from the
+    /// proof-carrying witness.
+    ///
+    /// This constructor explicitly records that no PQ assurance was admitted.
+    /// Callers operating under a hybrid-required policy must use
+    /// `from_assurance_admission` with `HybridRequired`; this constructor is not
+    /// a substitute for that policy gate.
     ///
     /// The witness carries both the inner verified Receipt capability and the
     /// verified outer Signature_With_Receipt composition, so neither causal
     /// provenance layer is discarded when crossing into the durable model.
     #[cfg(feature = "semantic-receipts")]
-    pub fn from_verified_selection(
+    pub fn from_classical_verified_selection(
         selection: &crate::rfc9942_selection::Rfc9942VerifiedReceiptSelection,
     ) -> Result<Self, HolochainProjectionError> {
         Self::from_decision(
