@@ -2693,12 +2693,8 @@ mod tests {
         obs.systemd_job.as_mut().unwrap().removed_at_monotonic_us = Some(1_000);
         obs.observed_at_monotonic_us = 1_000;
 
-        let receipt = build_receipt(
-            &expectation(NixServiceOperationKindV1::Start),
-            &obs,
-            None,
-        )
-        .unwrap();
+        let receipt =
+            build_receipt(&expectation(NixServiceOperationKindV1::Start), &obs, None).unwrap();
 
         assert_eq!(
             receipt.systemd_job_removed_observed_at_monotonic_us,
@@ -2747,13 +2743,7 @@ mod tests {
         let mut receipt = build_proven_receipt(
             &exp,
             &obs,
-            Some(stability(
-                &obs,
-                1_000,
-                1_000,
-                2_000,
-                &[1_000, 2_000],
-            )),
+            Some(stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000])),
         )
         .unwrap();
 
