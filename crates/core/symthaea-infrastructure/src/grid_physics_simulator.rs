@@ -129,6 +129,7 @@ pub enum GridPhysicsStepError {
     NonFiniteActuator { index: usize },
     ActuatorOutOfRange { index: usize },
     InvalidBatteryConfiguration,
+    InvalidLoadServicePolicy,
     /// A battery operation rejected its input or configuration.
     BatteryOperation(BatteryError),
     InvalidDerivedPhysics,
@@ -137,12 +138,49 @@ pub enum GridPhysicsStepError {
 /// Declared split of the synthetic community demand. The fractions are part
 /// of this simulation's explicit load model, not independent state-channel
 /// metadata. They must sum to one.
-const COMMUNITY_CRITICAL_LOAD_FRACTION: f64 = 0.35;
-const COMMUNITY_DEFERRABLE_LOAD_FRACTION: f64 = 0.55;
-const COMMUNITY_AUXILIARY_LOAD_FRACTION: f64 = 0.10;
-/// Cooling is a protected auxiliary load only after the plant has already
-/// crossed this thermal-risk threshold. Below it, cooling is shed-able.
-const PROTECTED_COOLING_RISK_THRESHOLD: f64 = 0.30;
+/// Per-simulator load prioritization assumptions for the synthetic community
+/// profile. Ratios must be finite, each in [0, 1], sum to one, and retain a
+/// nonzero critical community fraction. These are model inputs, not a
+/// substitute for a measured and reviewed per-load criticality registry.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LoadServicePolicy {
+    pub critical_community_fraction: f64,
+    pub deferrable_community_fraction: f64,
+    pub auxiliary_community_fraction: f64,
+    /// Cooling is protected when the prior thermal-risk channel reaches this
+    /// threshold; it remains shed-able below the threshold.
+    pub protected_cooling_thermal_risk_threshold: f64,
+}
+
+impl LoadServicePolicy {
+    pub const fn illustrative_default() -> Self {
+        Self {
+            critical_community_fraction: 0.35,
+            deferrable_community_fraction: 0.55,
+            auxiliary_community_fraction: 0.10,
+            protected_cooling_thermal_risk_threshold: 0.30,
+        }
+    }
+
+    fn is_valid(self) -> bool {
+        let fractions = [
+            self.critical_community_fraction,
+            self.deferrable_community_fraction,
+            self.auxiliary_community_fraction,
+        ];
+        fractions.iter().all(|value| value.is_finite() && (0.0..=1.0).contains(value))
+            && self.critical_community_fraction > 0.0
+            && (fractions.iter().sum::<f64>() - 1.0).abs() <= 1e-9
+            && self.protected_cooling_thermal_risk_threshold.is_finite()
+            && (0.0..=1.0).contains(&self.protected_cooling_thermal_risk_threshold)
+    }
+}
+
+impl Default for LoadServicePolicy {
+    fn default() -> Self {
+        Self::illustrative_default()
+    }
+}
 
 /// Auditable last-step service accounting for the illustrative islanded plant.
 /// Energy values are kWh. A deficit in an eligible load bucket is intentional
@@ -207,6 +245,7 @@ pub struct LoadServiceReport {
 
 impl LoadServiceReport {
     fn allocate(
+        policy: LoadServicePolicy,
         community_load_kw: f64,
         cooling_load_kw: f64,
         heating_load_kw: f64,
@@ -217,10 +256,12 @@ impl LoadServiceReport {
         battery_charge_input_kwh: f64,
         battery_charge_stored_kwh: f64,
     ) -> Self {
-        let critical_kw = community_load_kw * COMMUNITY_CRITICAL_LOAD_FRACTION;
-        let deferrable_kw = community_load_kw * COMMUNITY_DEFERRABLE_LOAD_FRACTION;
-        let community_auxiliary_kw = community_load_kw * COMMUNITY_AUXILIARY_LOAD_FRACTION;
-        let protected_cooling_kw = if thermal_risk >= PROTECTED_COOLING_RISK_THRESHOLD {
+        let critical_kw = community_load_kw * policy.critical_community_fraction;
+        let deferrable_kw = community_load_kw * policy.deferrable_community_fraction;
+        let community_auxiliary_kw = community_load_kw * policy.auxiliary_community_fraction;
+        let protected_cooling_kw = if thermal_risk
+            >= policy.protected_cooling_thermal_risk_threshold
+        {
             cooling_load_kw
         } else {
             0.0
@@ -467,10 +508,27 @@ pub struct GridPhysicsInfrastructureSimulator {
     /// mutation-free when it rejects an input.
     last_trait_step_accepted: bool,
     last_load_service_report: LoadServiceReport,
+    load_service_policy: LoadServicePolicy,
 }
 
 impl GridPhysicsInfrastructureSimulator {
     pub fn new() -> Self {
+        Self::build_with_load_service_policy(LoadServicePolicy::illustrative_default())
+    }
+
+    /// Build a simulator with an explicit, validated load-priority policy.
+    /// This remains simulation configuration only; it grants no actuator
+    /// authority and the policy must not be treated as field-qualified.
+    pub fn try_new_with_load_service_policy(
+        policy: LoadServicePolicy,
+    ) -> Result<Self, GridPhysicsStepError> {
+        if !policy.is_valid() {
+            return Err(GridPhysicsStepError::InvalidLoadServicePolicy);
+        }
+        Ok(Self::build_with_load_service_policy(policy))
+    }
+
+    fn build_with_load_service_policy(policy: LoadServicePolicy) -> Self {
         Self {
             state: InfrastructureState::home(),
             battery: Battery::new(
@@ -501,7 +559,12 @@ impl GridPhysicsInfrastructureSimulator {
             elapsed_s: 0.0,
             last_trait_step_accepted: true,
             last_load_service_report: LoadServiceReport::default(),
+            load_service_policy: policy,
         }
+    }
+
+    pub fn load_service_policy(&self) -> LoadServicePolicy {
+        self.load_service_policy
     }
 
     /// Direct access to the last step's explicit load-bucket energy account.
@@ -587,6 +650,9 @@ impl GridPhysicsInfrastructureSimulator {
         }
         if !self.battery_configuration_is_valid() {
             return Err(GridPhysicsStepError::InvalidBatteryConfiguration);
+        }
+        if !self.load_service_policy.is_valid() {
+            return Err(GridPhysicsStepError::InvalidLoadServicePolicy);
         }
         if !self.state_channels_are_valid()
             || !self.elapsed_s.is_finite()
@@ -700,6 +766,7 @@ impl GridPhysicsInfrastructureSimulator {
         // is also the deterministic guard's explicit shed decision and service
         // receipt. In grid-tied mode the idealized infinite bus serves demand.
         let mut load_report = LoadServiceReport::allocate(
+            self.load_service_policy,
             community_load_kw,
             cooling_load_kw,
             heating_load_kw,
@@ -1375,6 +1442,7 @@ mod failure_mode_tests {
                 demand_kwh + 1.0,
             ] {
                 let islanded = LoadServiceReport::allocate(
+                    LoadServicePolicy::illustrative_default(),
                     community_kw,
                     cooling_kw,
                     heating_kw,
@@ -1399,6 +1467,7 @@ mod failure_mode_tests {
                 );
 
                 let grid_tied = LoadServiceReport::allocate(
+                    LoadServicePolicy::illustrative_default(),
                     community_kw,
                     cooling_kw,
                     heating_kw,
