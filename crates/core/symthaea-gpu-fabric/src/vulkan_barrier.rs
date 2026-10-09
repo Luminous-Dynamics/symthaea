@@ -375,6 +375,12 @@ impl VulkanBarrierExecutionReceipt {
         {
             return Err(VulkanBarrierReceiptError::CompletionLoweringDigest);
         }
+        if self.completion_observed != self.completion_expected {
+            return Err(VulkanBarrierReceiptError::TimelineCompletion {
+                expected: self.completion_expected,
+                observed: self.completion_observed,
+            });
+        }
         let expected_dispatch_records =
             materialized_dispatch_records_from_graph(graph, schedule, &expected_storage_sizes)
                 .ok_or(VulkanBarrierReceiptError::ExecutionLoweringDigest)?;
@@ -382,12 +388,6 @@ impl VulkanBarrierExecutionReceipt {
             != materialized_dispatch_records_digest(&expected_dispatch_records)
         {
             return Err(VulkanBarrierReceiptError::ExecutionLoweringDigest);
-        }
-        if self.completion_observed != self.completion_expected {
-            return Err(VulkanBarrierReceiptError::TimelineCompletion {
-                expected: self.completion_expected,
-                observed: self.completion_observed,
-            });
         }
         Ok(())
     }
@@ -2594,6 +2594,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2653,6 +2654,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2709,6 +2711,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2767,6 +2770,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2827,6 +2831,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2890,6 +2895,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2991,6 +2997,7 @@ mod tests {
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -3058,6 +3065,7 @@ mod tests {
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -3113,6 +3121,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -3426,6 +3435,7 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
