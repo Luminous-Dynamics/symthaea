@@ -25,13 +25,15 @@ pub const DECISION_COHORT_REPORT_SCHEMA_VERSION: u32 = 4;
 pub const DECISION_COHORT_EVALUATOR_VERSION: &str = "rq-006-decision-cohort-v4";
 const DECISION_SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-bonferroni-familywise-95-v1";
 const DECISION_SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = concat!(
-    "IID decision episodes; confidence thresholds and task-family taxonomy frozen before outcomes; ",
+    "IID decision episodes; confidence thresholds and task-family taxonomy frozen before ",
+    "outcomes; ",
     "Bonferroni covers pooled and task-family x threshold comparisons; risk is conditional on ",
-    "selected asserted answers; reported coverage divides by all decisions; no distribution-shift guarantee",
+    "selected asserted answers; coverage divides by all decisions; no distribution-shift guarantee",
 );
 const DECISION_BASELINE_BRIER_BOUND_METHOD: &str = "paired-hoeffding-bonferroni-familywise-95-v1";
 const DECISION_BASELINE_BRIER_BOUND_ASSUMPTIONS: &str = concat!(
-    "IID episodes within each family; candidate forecasts and baseline probabilities frozen before ",
+    "IID episodes within each family; candidate forecasts and baseline probabilities are frozen ",
+    "before ",
     "outcome access; per-episode Brier differences lie in [-1, 1]; Bonferroni covers all observed ",
     "task-family x baseline comparisons; no distribution-shift guarantee",
 );
@@ -295,7 +297,7 @@ impl TryFrom<FrozenDecisionCohortWireV4> for FrozenDecisionCohortV4 {
             pair[0].episode_id >= pair[1].episode_id
         }) {
             return Err(DecisionCohortError::new(
-                "frozen weak-assumption observations are not in canonical order",
+                "frozen weak-assumption detections are not in canonical order",
             ));
         }
         if w.confidence_revision_observations.windows(2).any(|pair| {
@@ -679,7 +681,8 @@ fn validate_forecasts(
         if f.asserted {
             if f.answer_ref.is_none() || f.counterfactual_answer_ref.is_some() {
                 return Err(DecisionCohortError::new(format!(
-                    "asserted forecast {} requires answer_ref and forbids counterfactual_answer_ref",
+                    "asserted forecast {} requires answer_ref and forbids counterfactual_",
+                    "answer_ref",
                     f.forecast_id
                 )));
             }
@@ -1673,7 +1676,7 @@ mod tests {
 
         let mut old_schema: serde_json::Value =
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
-        old_schema["schema_version"] = serde_json::json!(1);
+        old_schema["schema_version"] = serde_json::json!(3);
         assert!(serde_json::from_value::<FrozenDecisionCohortV4>(old_schema).is_err());
 
         let mut baseline_swap: serde_json::Value =
