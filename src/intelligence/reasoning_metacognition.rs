@@ -1800,6 +1800,7 @@ mod tests {
             5,
             vec![0.5, 0.9],
             "holdout-v1".into(),
+            "holdout-manifest-v1".into(),
         )
         .unwrap_or_else(|e| panic!("holdout freeze must succeed: {e}"));
         let baselines = vec![
@@ -1850,6 +1851,10 @@ mod tests {
         .unwrap_or_else(|e| panic!("baseline comparison must succeed: {e}"));
         let comparison = report.baseline_comparison.expect("comparison report");
         assert_eq!(comparison.evaluation_split_id, "holdout-v1");
+        assert_eq!(
+            comparison.evaluation_corpus_manifest_ref,
+            "holdout-manifest-v1"
+        );
         assert_eq!(comparison.family_reports.len(), 2);
         let reasoning = comparison
             .family_reports
@@ -1863,6 +1868,9 @@ mod tests {
             Some((0.99_f64.powi(2) + 0.90_f64.powi(2)) / 2.0)
         );
         assert!(reasoning.baselines.iter().all(|b| b.evaluation_split_id == "holdout-v1"));
+        assert!(reasoning.baselines.iter().all(|b| {
+            b.evaluation_corpus_manifest_ref == "holdout-manifest-v1"
+        }));
         assert!(reasoning.baselines.iter().all(|b| b.training_split_id == "calibration-v1"));
         assert!(reasoning.baselines.iter().all(|b| {
             b.training_corpus_manifest_ref
@@ -1888,6 +1896,7 @@ mod tests {
             5,
             vec![0.5],
             "holdout-v1".into(),
+            "holdout-manifest-v1".into(),
         )
         .unwrap_or_else(|e| panic!("holdout freeze must succeed: {e}"));
         let reused_split = prospective_baseline(
@@ -1907,6 +1916,26 @@ mod tests {
                 &[reused_split]
             ),
             Err(MetacognitionEvaluationError::BaselineTrainingSplitEqualsEvaluation { .. })
+        ));
+
+        let mut reused_manifest = prospective_baseline(
+            "reused-manifest",
+            ForecastBaselineMethod::ConstantBaseRate,
+            "reasoning",
+            0.5,
+            "calibration-v1",
+            25,
+        );
+        reused_manifest.training_corpus_manifest_ref = "holdout-manifest-v1".into();
+        assert!(matches!(
+            evaluate_frozen_forecasts_with_baselines(
+                &frozen,
+                &[prospective_outcome("f-1", "episode-1", true)],
+                &[],
+                &[],
+                &[reused_manifest]
+            ),
+            Err(MetacognitionEvaluationError::BaselineTrainingManifestEqualsEvaluation { .. })
         ));
 
         let one_method = prospective_baseline(
@@ -1964,6 +1993,7 @@ mod tests {
             5,
             vec![0.5],
             "holdout-v1".into(),
+            "holdout-manifest-v1".into(),
         )
         .unwrap_or_else(|e| panic!("holdout freeze must succeed: {e}"));
         let mut wrong_target = baseline;
@@ -2063,8 +2093,14 @@ mod tests {
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse JSON: {e}"));
         tampered["calibration_bins"] = serde_json::json!(0);
         assert!(
-            serde_json::from_value::<FrozenCorrectnessForecastSet>(tampered).is_err(),
+            serde_json::from_value::<FrozenCorrectnessForecastSet>(tampered.clone()).is_err(),
             "deserialization must reject policy values that could not be frozen"
+        );
+        tampered["calibration_bins"] = serde_json::json!(7);
+        tampered["evaluation_split_id"] = serde_json::json!("holdout-v1");
+        assert!(
+            serde_json::from_value::<FrozenCorrectnessForecastSet>(tampered).is_err(),
+            "split identity without a corpus manifest must fail closed"
         );
     }
 
