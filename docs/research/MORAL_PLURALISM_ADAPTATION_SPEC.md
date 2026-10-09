@@ -297,3 +297,18 @@ The first comparison API exposed a correctness seam: it could compare rows from 
 The follow-on tests are authored but have not been executed in this workflow. Workflow metadata for the new head currently reports completed-but-skipped checks, not successful tests. Do not treat this draft contract as qualified until exact-head tests and independent subject-binding checks have run.
 
 This is also aligned with current literature: a September 2026 study argues that case-by-case agreement metrics miss the relational structure of moral judgments, and that structural alignment does not itself prove a model genuinely holds a value ([Tang, 2026](https://link.springer.com/article/10.1007/s43681-026-01368-w)). For Symthaea, this supports both exact case/action binding and later cross-case structural consistency tests. It does not validate this implementation by itself.
+
+
+### Existing EthicsEngine freshness is a blocker to safe adapters — 2026-10-09
+
+A source-level inspection shows why the plural comparison API must not be wired directly to a current-cycle wrapper over `EthicsEngineOutput`:
+
+- MoralParser/MoralAlgebra updates only when `cycle % 7 == 0`; between those cycles, the last numeric score is carried forward while the verdict strings are empty and several related fields are reset to placeholders.
+- UnifiedValueEvaluator updates only when `cycle % 19 == 0`; between those cycles, its numeric score is cached while its decision string is empty. Its current active call evaluates the generic string `cognitive_cycle`, not the current input/action text.
+- HarmoniesIntegrator also updates on a 19-cycle cadence and carries cached alignment/approval between fresh evaluations. The output does not expose a uniform per-assessment origin-subject binding for these subsystems.
+
+Those are current implementation facts, not necessarily defects in the cognitive loop's intended schedule. They do mean that a plural-ethics adapter must not label every returned field as a fresh assessment of the current candidate action. The next prerequisite is tracked in [MORAL-PLURALISM-002](https://github.com/Luminous-Dynamics/symthaea/issues/undefined): retain the source subject and freshness of each sub-assessment, make stale data explicitly unavailable for cross-framework comparison, and distinguish system-state signals from action-specific moral assessments.
+
+Do not interpret empty verdict strings on skipped cycles as Neutral, do not rebind cached outputs to a new subject, and do not treat the generic `cognitive_cycle` value-evaluator call as a candidate-action evaluator. Required regression cases include cycle boundaries 6/7/8 and 18/19/20, where the input subject changes while some subsystem results are carried forward.
+
+The subject-binding work in [PR #7273](https://github.com/Luminous-Dynamics/symthaea/pull/7273) is a necessary comparison-layer contract, but it cannot compensate for inaccurate provenance from an upstream producer. Tests and CI are still unqualified at this point; the recent workflow records are skipped rather than passing.
