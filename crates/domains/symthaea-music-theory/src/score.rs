@@ -278,6 +278,25 @@ mod tests {
     }
 
     #[test]
+    fn try_push_rejects_unrepresentable_note_end_without_mutating_score() {
+        let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        let note = ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: c4(),
+            onset: Duration::quarter(),
+            duration: Duration::new(i64::MAX, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        };
+
+        assert!(s.try_push(note).is_err());
+        assert!(s.notes.is_empty());
+        assert_eq!(s.total_beats, Duration::zero());
+    }
+
+    #[test]
     fn seconds_from_beats_and_tempo() {
         let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
         s.push(ScoreNote {
