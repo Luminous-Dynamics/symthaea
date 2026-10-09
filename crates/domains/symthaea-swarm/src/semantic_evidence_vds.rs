@@ -801,6 +801,68 @@ impl Rfc9942ReceiptEnvelope {
             .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
+    /// Return a semantic verification capability for an Ed25519 inclusion
+    /// Receipt. The proof is checked first, then the signature, and both are
+    /// bound to the same payload/VDS identity before a capability is returned.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_ed25519_inclusion_state(
+        &self,
+        candidate_entry: &[u8],
+        public_key: &[u8; 32],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
+        let (proof_index, head, leaf_index, signature_payload, authenticated_payload) =
+            match (&self.payload, detached_payload) {
+                (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
+                    return Err(Rfc9942VdpError::InvalidStructure);
+                }
+                (Rfc9942ReceiptPayload::Attached(_), None) => {
+                    let root = self
+                        .payload
+                        .attached_root()
+                        .ok_or(Rfc9942VdpError::InvalidPayloadLength)?;
+                    let (proof_index, head, leaf_index) =
+                        self.vdp.verify_inclusion_with_payload_index(candidate_entry, &root)?;
+                    (proof_index, head, leaf_index, None, root)
+                }
+                (Rfc9942ReceiptPayload::Detached, supplied) => {
+                    self.vdp.validate_vds_id(self.vds_id)?;
+                    let (proof_index, head, leaf_index) =
+                        self.vdp.derive_inclusion_root_index(candidate_entry)?;
+                    if let Some(payload) = supplied {
+                        if payload != head.root() {
+                            return Err(Rfc9942VdpError::NoMatchingProof);
+                        }
+                    }
+                    let root = head.root();
+                    (proof_index, head, leaf_index, Some(root), root)
+                }
+            };
+
+        self.verify_ed25519(
+            public_key,
+            external_aad,
+            signature_payload.as_ref().map(|root| root.as_slice()),
+        )?;
+        Ok(self.verified_state(
+            Rfc9942VerifiedProof::Inclusion {
+                proof_index,
+                head,
+                leaf_index,
+                candidate_leaf: leaf_hash(candidate_entry),
+            },
+            &authenticated_payload,
+            match &self.payload {
+                Rfc9942ReceiptPayload::Attached(_) => Rfc9942PayloadMode::Attached,
+                Rfc9942ReceiptPayload::Detached => Rfc9942PayloadMode::Detached,
+            },
+            sha256(&self.vdp.proofs[proof_index]),
+            public_key,
+            external_aad,
+        ))
+    }
+
     /// Verify an RFC9942 inclusion Receipt with Ed25519: proof first, then
     /// signature, as required by RFC9942.
     #[cfg(feature = "semantic-receipts")]
@@ -811,29 +873,16 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        let (head, signature_payload) = match (&self.payload, detached_payload) {
-            (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
-                return Err(Rfc9942VdpError::InvalidStructure);
-            }
-            (Rfc9942ReceiptPayload::Attached(_), None) => {
-                (self.verify_inclusion(candidate_entry)?, None)
-            }
-            (Rfc9942ReceiptPayload::Detached, supplied) => {
-                // Match the ES256 semantic path: the inclusion proof derives
-                // the root first. A supplied detached payload is accepted only
-                // when it equals that proof-derived root.
-                self.vdp.validate_vds_id(self.vds_id)?;
-                let head = self.vdp.derive_inclusion_root(candidate_entry)?;
-                if let Some(payload) = supplied {
-                    if payload != head.root() {
-                        return Err(Rfc9942VdpError::NoMatchingProof);
-                    }
-                }
-                (head, Some(head.root()))
-            }
-        };
-        self.verify_ed25519(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
-        Ok(head)
+        let state = self.verify_ed25519_inclusion_state(
+            candidate_entry,
+            public_key,
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .inclusion_head()
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify an RFC9942 consistency Receipt with Ed25519: signature first,
