@@ -1564,6 +1564,114 @@ mod tests {
         }
     }
 
+    /// TEST-ONLY cross-process anchor stored in a separate SQLite file.
+    /// It exercises subprocess/restart behavior; it is not a production
+    /// independent trust domain because both files share the same host/storage.
+    struct PersistentTestAnchor(PathBuf);
+
+    impl PersistentTestAnchor {
+        fn open(path: impl AsRef<Path>) -> Result<Self, WitnessError> {
+            let path = path.as_ref().to_path_buf();
+            let conn = Connection::open(&path)?;
+            conn.execute_batch(
+                "PRAGMA journal_mode=WAL;
+                 PRAGMA synchronous=FULL;
+                 CREATE TABLE IF NOT EXISTS test_anchor_state (
+                    log_id TEXT PRIMARY KEY NOT NULL,
+                    generation INTEGER NOT NULL CHECK (generation >= 0),
+                    record_digest BLOB NOT NULL CHECK (length(record_digest) = 32)
+                 );",
+            )?;
+            Ok(Self(path))
+        }
+
+        fn provision(&self, log_id: &str) {
+            let conn = Connection::open(&self.0).expect("open process-test anchor");
+            conn.execute(
+                "INSERT INTO test_anchor_state (log_id, generation, record_digest)
+                 VALUES (?1, 0, ?2)
+                 ON CONFLICT(log_id) DO NOTHING",
+                params![log_id, ZERO_DIGEST.as_slice()],
+            )
+            .expect("provision process-test genesis");
+        }
+
+        fn read_state(conn: &Connection, log_id: &str) -> Result<AnchorState, AnchorError> {
+            let row: Option<(i64, Vec<u8>)> = conn
+                .query_row(
+                    "SELECT generation, record_digest FROM test_anchor_state WHERE log_id=?1",
+                    params![log_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(|error| AnchorError::Other(format!("read test anchor: {error}")))?;
+            match row {
+                None => Ok(AnchorState::genesis(log_id)),
+                Some((generation, digest)) if generation >= 0 => Ok(AnchorState {
+                    log_id: log_id.to_owned(),
+                    generation: u64::try_from(generation).map_err(|error| {
+                        AnchorError::Other(format!("invalid test-anchor generation: {error}"))
+                    })?,
+                    record_digest: digest.try_into().map_err(|_| {
+                        AnchorError::Other("test-anchor digest is not 32 bytes".into())
+                    })?,
+                }),
+                Some(_) => Err(AnchorError::Other(
+                    "test-anchor generation is negative".into(),
+                )),
+            }
+        }
+    }
+
+    impl IndependentAnchor for PersistentTestAnchor {
+        fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
+            let conn = Connection::open(&self.0)
+                .map_err(|error| AnchorError::Other(format!("open test anchor: {error}")))?;
+            Self::read_state(&conn, log_id)
+        }
+
+        fn compare_and_advance(
+            &self,
+            expected: &AnchorState,
+            next: &AnchorState,
+        ) -> Result<(), AnchorError> {
+            let mut conn = Connection::open(&self.0)
+                .map_err(|error| AnchorError::Other(format!("open test anchor: {error}")))?;
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|error| AnchorError::Other(format!("lock test anchor: {error}")))?;
+            let current = Self::read_state(&tx, &expected.log_id)?;
+            if &current != expected
+                || next.log_id != expected.log_id
+                || next.generation != expected.generation.checked_add(1).ok_or_else(|| {
+                    AnchorError::Other("test-anchor generation overflow".into())
+                })?
+                || next.generation > i64::MAX as u64
+            {
+                return Err(AnchorError::CompareFailed);
+            }
+            tx.execute(
+                "INSERT INTO test_anchor_state (log_id, generation, record_digest)
+                 VALUES (?1, ?2, ?3)
+                 ON CONFLICT(log_id) DO UPDATE SET
+                    generation=excluded.generation,
+                    record_digest=excluded.record_digest",
+                params![
+                    next.log_id,
+                    i64::try_from(next.generation).map_err(|error| {
+                        AnchorError::Other(format!("invalid next generation: {error}"))
+                    })?,
+                    next.record_digest.as_slice()
+                ],
+            )
+            .map_err(|error| AnchorError::Other(format!("advance test anchor: {error}")))?;
+            tx.commit()
+                .map_err(|error| AnchorError::Other(format!("commit test anchor: {error}")))?;
+            Ok(())
+        }
+    }
+
+
     fn h(value: &[u8]) -> Digest {
         Sha256::digest(value).into()
     }
@@ -2558,4 +2666,127 @@ mod tests {
             .expect("recover after raced advances")
             .expect("accepted state after raced advances")
     }
+    #[test]
+    fn subprocess_recovery_helper() {
+        let Ok(mode) = std::env::var("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_MODE") else {
+            // Registered as a normal unit test; the parent test invokes this
+            // exact test binary with the private mode variable set.
+            return;
+        };
+        let db_path = PathBuf::from(
+            std::env::var("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_DB")
+                .expect("process-test database path"),
+        );
+        let anchor_path = PathBuf::from(
+            std::env::var("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_ANCHOR")
+                .expect("process-test anchor path"),
+        );
+        let log_id = "log-subprocess-crash-recovery";
+        let store = SqliteWitnessStore::open(db_path).expect("open process-test witness store");
+        let anchor = PersistentTestAnchor::open(anchor_path).expect("open process-test anchor");
+
+        match mode.as_str() {
+            "advance_then_exit" => {
+                let first = store
+                    .recover(log_id, &anchor)
+                    .expect("read accepted predecessor")
+                    .expect("generation one exists");
+                assert_eq!(first.generation, 1);
+                assert!(matches!(
+                    store.transition_inner(
+                        log_id,
+                        first.generation,
+                        first.digest,
+                        None,
+                        h(b"subprocess-checkpoint-two"),
+                        1,
+                        Some(h(b"subprocess-receipt-two")),
+                        &anchor,
+                        Some(FaultPoint::AfterExternalAnchorAdvance),
+                    ),
+                    Err(WitnessError::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance))
+                ));
+                // Exit without running Rust destructors or the test harness's
+                // normal teardown, leaving the adapter at the real process
+                // boundary between external anchor commit and local finalize.
+                std::process::exit(86);
+            }
+            "recover" => {
+                let recovered = store
+                    .recover(log_id, &anchor)
+                    .expect("recover after child process termination")
+                    .expect("prepared successor was finalized");
+                assert_eq!(recovered.generation, 2);
+                assert_eq!(
+                    recovered.anchor_digest,
+                    h(b"subprocess-checkpoint-two"),
+                    "only the exact externally anchored prepared candidate recovers"
+                );
+            }
+            other => panic!("unknown process-test mode: {other}"),
+        }
+    }
+
+    #[test]
+    fn subprocess_crash_after_anchor_commit_recovers_exact_prepared_successor() {
+        use std::process::{Command, Output};
+
+        fn run_helper(mode: &str, db: &TempDb, anchor: &TempDb) -> Output {
+            Command::new(std::env::current_exe().expect("current test executable"))
+                .arg("--exact")
+                .arg("tests::subprocess_recovery_helper")
+                .arg("--nocapture")
+                .env("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_MODE", mode)
+                .env("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_DB", &db.0)
+                .env("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_ANCHOR", &anchor.0)
+                .output()
+                .expect("spawn child test process")
+        }
+
+        let db = TempDb::new();
+        let anchor_db = TempDb::new();
+        let anchor = PersistentTestAnchor::open(&anchor_db.0).expect("open anchor fixture");
+        let log_id = "log-subprocess-crash-recovery";
+        anchor.provision(log_id);
+        let store = db.open();
+        let first = store
+            .initialize(
+                log_id,
+                "policy-v1",
+                h(b"subprocess-checkpoint-one"),
+                0,
+                None,
+                &anchor,
+            )
+            .expect("initialize before subprocess");
+        assert_eq!(first.generation, 1);
+        drop(store);
+
+        let crashed = run_helper("advance_then_exit", &db, &anchor_db);
+        assert_eq!(
+            crashed.status.code(),
+            Some(86),
+            "first child should exit abruptly after external anchor advance; stdout={} stderr={}",
+            String::from_utf8_lossy(&crashed.stdout),
+            String::from_utf8_lossy(&crashed.stderr)
+        );
+
+        let recovered = run_helper("recover", &db, &anchor_db);
+        assert!(
+            recovered.status.success(),
+            "recovery child failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&recovered.stdout),
+            String::from_utf8_lossy(&recovered.stderr)
+        );
+
+        let reopened = db.open();
+        let anchor = PersistentTestAnchor::open(&anchor_db.0).expect("reopen anchor fixture");
+        let final_head = reopened
+            .recover(log_id, &anchor)
+            .expect("reopen after subprocess recovery")
+            .expect("accepted generation two");
+        assert_eq!(final_head.generation, 2);
+        assert_eq!(reopened.integrity_check().expect("semantic integrity"), "ok");
+    }
+
 }
