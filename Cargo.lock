@@ -18134,7 +18134,6 @@ dependencies = [
  "serde_json",
 ]
 
-
 [[package]]
 name = "symthaea-alife"
 version = "0.1.0"
