@@ -229,6 +229,9 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             "event_name": "pull_request",
             "repository_id": "12345",
             "head_repository_id": "12345",
+            "current_repository_id": "12345",
+            "pull_request_base_ref": "main",
+            "default_branch": "main",
         }
 
     def test_best_effort_failure_status_clears_same_head_success(self):
@@ -250,6 +253,8 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             (repo, "a" * 40, "token", {**self.event_meta(repo), "workflow_id": 1}),
             (repo, "a" * 40, "token", {**self.event_meta(repo), "event_name": "push"}),
             (repo, "a" * 40, "token", {**self.event_meta(repo), "head_repository_id": "54321"}),
+            (repo, "a" * 40, "token", {**self.event_meta(repo), "current_repository_id": "54321"}),
+            (repo, "a" * 40, "token", {**self.event_meta(repo), "pull_request_base_ref": "release"}),
         ]
         for target_repo, subject, token, event_meta in cases:
             with self.subTest(repo=target_repo, subject=subject, event_meta=event_meta), patch.object(module, "post_status") as post:
