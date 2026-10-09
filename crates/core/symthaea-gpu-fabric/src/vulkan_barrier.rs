@@ -298,6 +298,33 @@ impl VulkanResourceMemoryProfile {
     }
 }
 
+fn inconsistent_memory_profile_resource(
+    profiles: &BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
+) -> Option<ResourceId> {
+    let mut memory_types = BTreeMap::<u32, (u32, u32)>::new();
+    let mut memory_heaps = BTreeMap::<u32, (u32, u64)>::new();
+    for (resource, profile) in profiles {
+        let type_identity = (profile.memory_property_flags, profile.memory_heap_index);
+        if let Some(previous) = memory_types.get(&profile.memory_type_index) {
+            if *previous != type_identity {
+                return Some(resource.clone());
+            }
+        } else {
+            memory_types.insert(profile.memory_type_index, type_identity);
+        }
+
+        let heap_identity = (profile.memory_heap_flags, profile.memory_heap_size);
+        if let Some(previous) = memory_heaps.get(&profile.memory_heap_index) {
+            if *previous != heap_identity {
+                return Some(resource.clone());
+            }
+        } else {
+            memory_heaps.insert(profile.memory_heap_index, heap_identity);
+        }
+    }
+    None
+}
+
 fn resource_memory_profiles_digest(
     profiles: &BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
 ) -> String {
@@ -506,6 +533,11 @@ impl VulkanBarrierExecutionReceipt {
             if !profile.is_consistent_with_storage_size(*expected_size) {
                 return Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()));
             }
+        }
+        if let Some(resource) =
+            inconsistent_memory_profile_resource(&self.resource_memory_profiles)
+        {
+            return Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource));
         }
         if !is_sha256_hex(&self.memory_lowering_digest)
             || self.memory_lowering_digest != resource_memory_profiles_digest(&self.resource_memory_profiles)
@@ -2593,6 +2625,32 @@ mod tests {
             profile.read_invalidate_size = 4;
             assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
         }
+    }
+
+    #[test]
+    fn memory_profiles_reject_cross_resource_type_and_heap_inconsistency() {
+        let (_, _, _, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut profiles = test_resource_memory_profiles(&storage_sizes);
+        assert_eq!(inconsistent_memory_profile_resource(&profiles), None);
+
+        let rhs = ResourceId::new("rhs").unwrap();
+        profiles.get_mut(&rhs).unwrap().memory_heap_size += 1;
+        assert_eq!(
+            inconsistent_memory_profile_resource(&profiles),
+            Some(rhs.clone())
+        );
+
+        profiles.get_mut(&rhs).unwrap().memory_heap_size -= 1;
+        profiles.get_mut(&rhs).unwrap().memory_property_flags =
+            vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        assert_eq!(inconsistent_memory_profile_resource(&profiles), Some(rhs));
     }
 
     #[test]
