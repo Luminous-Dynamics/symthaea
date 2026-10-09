@@ -635,7 +635,7 @@ pub fn assess_trial_coverage(
     let mut requested = BTreeSet::new();
     let mut duplicate_requested = BTreeSet::new();
     for trial_id in expected_trial_ids {
-        if !requested.insert(trial_id.as_str()) {
+        if !requested.insert(trial_id.clone()) {
             duplicate_requested.insert(trial_id.clone());
         }
     }
@@ -644,20 +644,16 @@ pub fn assess_trial_coverage(
     let mut duplicate_supplied = BTreeSet::new();
     let mut unexpected = BTreeSet::new();
     for observation in observations {
-        let id = observation.trial_id.as_str();
-        if !supplied.insert(id) {
-            duplicate_supplied.insert(observation.trial_id.clone());
+        let id = observation.trial_id.clone();
+        if !supplied.insert(id.clone()) {
+            duplicate_supplied.insert(id.clone());
         }
-        if !requested.contains(id) {
-            unexpected.insert(observation.trial_id.clone());
+        if !requested.contains(&id) {
+            unexpected.insert(id);
         }
     }
 
-    let missing = requested
-        .iter()
-        .filter(|id| !supplied.contains(**id))
-        .map(|id| (*id).to_owned())
-        .collect();
+    let missing = requested.difference(&supplied).cloned().collect();
 
     TrialCoverage {
         requested_trial_count: expected_trial_ids.len(),
@@ -913,5 +909,55 @@ mod tests {
             compare_predictions(&registry, "p-a", "p-b").unwrap(),
             PairwiseDiscrimination::NotComparable
         );
+    }
+
+    #[test]
+    fn mechanism_prediction_requires_a_bound_intervention_and_check() {
+        let mut p = prediction("p-mechanism", "theory-a", OutcomeValue::Present);
+        p.required_observability = ObservabilityTier::MechanisticInterventionAvailable;
+        p.requires_manipulation_check = true;
+        let missing_binding = registry(vec![p.clone()]);
+        assert!(matches!(
+            missing_binding.validate(),
+            Err(RegistryValidationError::MissingInterventionBinding(_))
+        ));
+
+        p.intervention_id = Some("lesion-v1".to_owned());
+        let missing_check_contract = registry(vec![TheoryPrediction {
+            requires_manipulation_check: false,
+            ..p
+        }]);
+        assert!(matches!(
+            missing_check_contract.validate(),
+            Err(RegistryValidationError::MechanisticPredictionWithoutManipulationCheck(_))
+        ));
+    }
+
+    #[test]
+    fn different_intervention_instance_is_inconclusive() {
+        let mut p = prediction("p-lesion", "theory-a", OutcomeValue::Present);
+        p.required_observability = ObservabilityTier::MechanisticInterventionAvailable;
+        p.requires_manipulation_check = true;
+        p.intervention_id = Some("lesion-v1".to_owned());
+        let registry = registry(vec![p.clone()]);
+        let mut observation = observation();
+        observation.observability_tier = ObservabilityTier::MechanisticInterventionAvailable;
+        observation.intervention_id = Some("sham-v1".to_owned());
+        observation.manipulation_check = ManipulationCheck::Passed;
+
+        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
+        assert_eq!(receipt.reason, EvaluationReason::InterventionMismatch);
+    }
+
+    #[test]
+    fn non_holdout_observation_cannot_be_confirmatory_support() {
+        let p = prediction("p-not-holdout", "theory-a", OutcomeValue::Present);
+        let registry = registry(vec![p.clone()]);
+        let mut observation = observation();
+        observation.is_holdout = false;
+        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
+        assert_eq!(receipt.reason, EvaluationReason::NotHeldOut);
     }
 }
