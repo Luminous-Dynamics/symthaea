@@ -225,3 +225,40 @@ This work is not qualified merely because types compile or unit tests pass. At m
 ## Final position
 
 Symthaea should become capable of reasoning across moral traditions without pretending that traditions are interchangeable or that cultural adaptation settles moral truth. The desired capability is explicit, plural, stakeholder-aware, source-grounded, and auditable. The first deliverable is a read-only evaluator and a rigorous benchmark—not a more permissive action selector.
+
+
+## 10. Critical architecture decision: extend the existing ethics engine
+
+**Do not create a second, parallel ethics engine.** The current repository already contains a substantial orchestration and evaluation path. MORAL-PLURALISM-001 should extend that path through a read-only framework-evaluation seam and preserve existing callers until compatibility and safety tests justify changes.
+
+### Existing components and their appropriate roles
+
+- `src/cognitive_loop/ethics_engine.rs` — existing unified orchestrator. Keep it as the coordination boundary; do not introduce a competing orchestrator with different action semantics.
+- `src/cognitive_loop/moral.rs` — delegates moral input evaluation to the existing `EthicsEngine`.
+- `src/hdc/moral_parser.rs` — extracts moral primitives using pattern matching and keyword analysis. Treat its parse as a fallible interpretation of input, not ground-truth intent, consent, or a complete semantic-role parse.
+- `src/hdc/moral_algebra/` — existing HDC moral representations and judgments, including similarity-based prototypes and deontological/obligation judgments. Preserve these as the baseline evaluator; do not treat vector similarity alone as proof of moral validity.
+- `src/consciousness/unified_value_evaluator/` — existing Eight Harmonies-based action/value assessment. Expose it as one explicit, versioned evaluation profile, not as the definition of every ethical theory.
+- `HarmoniesIntegrator` and `src/hdc/harmony_basis.rs` — keep as the project's current value-model implementation and interaction structure.
+- `MoralTopology` — use as a diagnostic for patterns, anomalies, or instability only where its metrics have been validated; do not let topological scores decide moral truth.
+- The institutional-compliance checker inside the existing ethics pipeline — treat pattern/similarity flags as candidate risk signals, not legal determinations. Legal controls need explicit, current, jurisdiction-scoped rule sources and traceability.
+- `src/cognitive_loop/ethics_values_manager.rs` — existing contextual harmony weights and subsystem ownership should be audited before adding new state or learning loops.
+
+### Proposed additive flow
+
+1. Parse the scenario once using the existing engine and record which fields were detected, which were inferred, and which remain unknown.
+2. Construct a versioned normalized context that preserves provenance and uncertainty; never upgrade keyword detections into confirmed consent or intent.
+3. Run the current HDC/deontological judgment and Eight Harmonies evaluator unchanged as baseline assessments.
+4. Add read-only framework adapters that consume the normalized context and return independent, typed `FrameworkAssessment` values. The current Eight Harmonies model is one adapter; new profiles may include explicitly scoped consequentialist, duty/rights, virtue, or care-ethics models.
+5. Compare per-profile results and expose agreement, conflict, missing information, and abstention. Never silently average incompatible conclusions.
+6. Return an additive plural-ethics report through the existing orchestration boundary. It must not itself grant tool permissions, alter the execution gate, or rewrite the underlying evaluator results.
+
+### Reuse and qualification rules
+
+- Extend existing test families—especially `tests/adversarial_moral_algebra.rs`, `tests/ethics_gating_integration.rs`, `tests/moral_topology_api_integration.rs`, and `tests/proptest_ethics_gating.rs`—rather than creating redundant suites that repeat the same assertions.
+- Add profile-isolation tests proving profile selection affects framework-relative assessments but does not change tool permissions or independent safety/authorization controls.
+- Add parser uncertainty tests for negation, implicit coercion, multi-clause scenarios, missing context, and contradictory statements.
+- Keep the existing baseline outputs stable until side-by-side tests establish what changes and why.
+- Inventory exact-head source and tests before claiming any behavior is implemented. The presence of a module or passing unit tests does not establish faithful support for every ethical framework.
+- Reconcile the stale 91.1% care-classification claim against the README's corrected 56.2% headline before using either as qualified evidence.
+
+This decision makes pluralism an extension of Symthaea's existing engine, not a parallel moral authority.
