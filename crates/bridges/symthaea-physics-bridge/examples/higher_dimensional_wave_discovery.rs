@@ -12,6 +12,7 @@
 
 use std::error::Error;
 use std::env;
+use std::time::Instant;
 
 use symthaea_core::hdc::conjecture_engine::{
     RegressorConfig, discover_invariants_autonomous, is_informatively_conserved,
@@ -23,6 +24,8 @@ use symthaea_physics_bridge::{
 
 const CONSERVATION_TOLERANCE: f64 = 1e-6;
 const ENERGY_ALIGNMENT_CORRELATION: f64 = 0.995;
+const SEARCH_SEEDS: [u64; 5] = [42, 1337, 2718, 7919, 31415];
+const CANDIDATES_TO_SCREEN_PER_SEED: usize = 10;
 
 fn initial_state(spatial_dimensions: usize, phase: f64, scale: f64) -> Vec<f64> {
     let sites = 1usize << spatial_dimensions;
@@ -94,7 +97,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Energy alignment: |Pearson r| >= {ENERGY_ALIGNMENT_CORRELATION} on both trajectories");
     println!("These are screening gates, not a proof of formula identity or new physics.\n");
 
+    println!("Paired search seeds: {SEARCH_SEEDS:?}");
+    println!("Screening the top {CANDIDATES_TO_SCREEN_PER_SEED} candidates per seed; wall time is reported for reproducibility.\n");
+
     for spatial_dimensions in 1..=max_dimension {
+        let dimension_started = Instant::now();
         let sites = 1usize << spatial_dimensions;
         let train_initial = initial_state(spatial_dimensions, 0.1, 0.7);
         let holdout_initial = initial_state(spatial_dimensions, 1.3, 1.4);
@@ -104,90 +111,113 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect();
         let variable_names: Vec<&str> = variable_storage.iter().map(String::as_str).collect();
 
-        let config = RegressorConfig {
-            population_size: 120,
-            generations: 50,
-            max_depth: 4,
-            max_complexity: 48,
-            seed: 0xC0FFEE + spatial_dimensions as u64,
-            ..RegressorConfig::for_autonomous_discovery()
-        };
-
-        let candidates = discover_invariants_autonomous(
-            hypercubic_wave_rhs,
-            &train_initial,
-            &variable_names,
-            None,
-            &config,
-            8.0,
-            0.01,
-        );
+        // Trajectories are fixed across search seeds so the comparison
+        // isolates search stochasticity rather than changing the data too.
         let train_trajectory = hypercubic_wave_trajectory(&train_initial, 800, 0.01);
         let holdout_trajectory = hypercubic_wave_trajectory(&holdout_initial, 800, 0.01);
+        let mut seeds_with_screened_candidate = 0usize;
+        let mut total_candidates = 0usize;
 
         println!(
-            "d={spatial_dimensions} spatial dimensions; {} lattice sites; {} ODE state variables; {} candidates",
+            "d={spatial_dimensions} spatial dimensions; {} lattice sites; {} ODE state variables",
             sites,
-            2 * sites,
-            candidates.len()
+            2 * sites
         );
-        let mut screened = 0usize;
-        for candidate in candidates.iter().take(10) {
-            let train_variance = lie_derivative_variance(
-                &candidate.formula,
+
+        for seed in SEARCH_SEEDS {
+            let seed_started = Instant::now();
+            let config = RegressorConfig {
+                population_size: 120,
+                generations: 50,
+                max_depth: 4,
+                max_complexity: 48,
+                seed,
+                ..RegressorConfig::for_autonomous_discovery()
+            };
+
+            let candidates = discover_invariants_autonomous(
                 hypercubic_wave_rhs,
-                &train_trajectory,
+                &train_initial,
                 &variable_names,
+                None,
+                &config,
+                8.0,
+                0.01,
             );
-            let holdout_variance = lie_derivative_variance(
-                &candidate.formula,
-                hypercubic_wave_rhs,
-                &holdout_trajectory,
-                &variable_names,
-            );
-            let informative = is_informatively_conserved(
-                &candidate.formula,
-                hypercubic_wave_rhs,
-                &train_trajectory,
-                &variable_names,
-                CONSERVATION_TOLERANCE,
-            );
-            let train_correlation = correlation_with_hamiltonian(
-                &candidate.formula,
-                &train_trajectory,
-                &variable_names,
-            );
-            let holdout_correlation = correlation_with_hamiltonian(
-                &candidate.formula,
-                &holdout_trajectory,
-                &variable_names,
-            );
-            let train_ok = train_variance.is_finite()
-                && train_variance < CONSERVATION_TOLERANCE;
-            let holdout_ok = holdout_variance.is_finite()
-                && holdout_variance < CONSERVATION_TOLERANCE;
-            let aligned = train_correlation
-                .is_some_and(|r| r.abs() >= ENERGY_ALIGNMENT_CORRELATION)
-                && holdout_correlation
-                    .is_some_and(|r| r.abs() >= ENERGY_ALIGNMENT_CORRELATION);
-            let accepted = train_ok && holdout_ok && informative && aligned;
-            if accepted {
-                screened += 1;
+            total_candidates += candidates.len();
+            let mut screened_for_seed = 0usize;
+            for candidate in candidates.iter().take(CANDIDATES_TO_SCREEN_PER_SEED) {
+                let train_variance = lie_derivative_variance(
+                    &candidate.formula,
+                    hypercubic_wave_rhs,
+                    &train_trajectory,
+                    &variable_names,
+                );
+                let holdout_variance = lie_derivative_variance(
+                    &candidate.formula,
+                    hypercubic_wave_rhs,
+                    &holdout_trajectory,
+                    &variable_names,
+                );
+                let informative = is_informatively_conserved(
+                    &candidate.formula,
+                    hypercubic_wave_rhs,
+                    &train_trajectory,
+                    &variable_names,
+                    CONSERVATION_TOLERANCE,
+                );
+                let train_correlation = correlation_with_hamiltonian(
+                    &candidate.formula,
+                    &train_trajectory,
+                    &variable_names,
+                );
+                let holdout_correlation = correlation_with_hamiltonian(
+                    &candidate.formula,
+                    &holdout_trajectory,
+                    &variable_names,
+                );
+                let train_ok = train_variance.is_finite()
+                    && train_variance < CONSERVATION_TOLERANCE;
+                let holdout_ok = holdout_variance.is_finite()
+                    && holdout_variance < CONSERVATION_TOLERANCE;
+                let aligned = train_correlation
+                    .is_some_and(|r| r.abs() >= ENERGY_ALIGNMENT_CORRELATION)
+                    && holdout_correlation
+                        .is_some_and(|r| r.abs() >= ENERGY_ALIGNMENT_CORRELATION);
+                let accepted = train_ok && holdout_ok && informative && aligned;
+                if accepted {
+                    screened_for_seed += 1;
+                }
+                println!(
+                    "  seed={seed} {} {} | train={:.3e} holdout={:.3e} informative={} symbolic={} r_train={} r_holdout={} | {}",
+                    if accepted { "[SCREENED]" } else { "[candidate]" },
+                    candidate.formula_str,
+                    train_variance,
+                    holdout_variance,
+                    informative,
+                    candidate.symbolically_proven,
+                    format_correlation(train_correlation),
+                    format_correlation(holdout_correlation),
+                    if accepted { "passes screening only" } else { "not accepted by full gate" },
+                );
+            }
+
+            if screened_for_seed > 0 {
+                seeds_with_screened_candidate += 1;
             }
             println!(
-                "  {} {} | train={:.3e} holdout={:.3e} informative={} r_train={} r_holdout={} | {}",
-                if accepted { "[SCREENED]" } else { "[candidate]" },
-                candidate.formula_str,
-                train_variance,
-                holdout_variance,
-                informative,
-                format_correlation(train_correlation),
-                format_correlation(holdout_correlation),
-                if accepted { "passes screening only" } else { "not accepted by full gate" },
+                "  seed={seed}: candidates={} screened_in_top_{}={} elapsed_ms={}",
+                candidates.len(),
+                CANDIDATES_TO_SCREEN_PER_SEED,
+                screened_for_seed,
+                seed_started.elapsed().as_millis()
             );
         }
+
         println!(
-            "  screened candidates: {screened}; acceptance requires independent-initial-condition conservation and energy alignment, not just low training variance.\n"
+            "  dimension summary: seeds_with_screened_candidate={seeds_with_screened_candidate}/{}; total_candidates={total_candidates}; elapsed_ms={}.\n",
+            SEARCH_SEEDS.len(),
+            dimension_started.elapsed().as_millis()
         );
     }
     Ok(())
