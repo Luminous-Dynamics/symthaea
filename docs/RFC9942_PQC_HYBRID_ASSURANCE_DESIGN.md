@@ -140,6 +140,22 @@ runtime verifier passes
 
 No single library implementation should be treated as its own proof of correctness.
 
+### ML-DSA verifier corpus must include mutation and boundary cases
+
+Published ML-DSA signature-verification vectors are necessary but not sufficient by themselves. A public analysis in `usnistgov/ACVP-Server#470` (2026-08-11) reports five verifier mutations that survived the published `ML-DSA-sigVer-FIPS204` sets across the pinned repository states measured, while pinned Project Wycheproof community vectors detected them. The reported mutation classes include disabling or mis-stating the infinity-norm check, relaxing strict hint-index ordering, and disabling the hint-weight bound. Treat this as community research, not as an official NIST finding or validation result.
+
+The concrete ML-DSA-65 provider qualification corpus must therefore pin source revisions and SHA-256 digests and include, at minimum:
+
+- invalid signatures with repeated hint indices (the hint indices must be strictly increasing);
+- invalid signatures whose `z` coefficient reaches or exceeds `gamma_1 - beta`;
+- invalid signatures whose hint weight exceeds `omega`;
+- valid signatures immediately below the `gamma_1 - beta` boundary, so over-strict verifiers are detected as well as under-strict ones;
+- unmodified positive/negative known-answer vectors and cross-implementation checks against an independent implementation.
+
+Run these through the actual provider adapter with the RFC 9964 empty context, not only through isolated parsing helpers. Preserve per-vector expected result, corpus revision, file digest, provider/version, and exact test-command receipt. A passing corpus does not prove cryptographic correctness, but it closes concrete gaps that ordinary published verification sets may not expose.
+
+Research reference: [usnistgov/ACVP-Server issue #470](https://github.com/usnistgov/ACVP-Server/issues/470).
+
 ## Capability model
 
 Add a private capability layer, conceptually:
@@ -243,20 +259,20 @@ Instead, create a stacked follow-up qualification lane after #6737 obtains an un
 
 The hybrid qualification should include:
 
-1. RFC 9964 ML-DSA-65 fixed known-answer vectors from an independent implementation.
-2. Positive and negative COSE interoperability vectors.
-3. Exact transcript-binding tests.
-4. Classical-component tamper rejection.
-5. PQ-component tamper rejection.
-6. Wrong-PQ-key rejection.
-7. Missing-component rejection under hybrid policy.
-8. Unprotected-header substitution tests.
-9. Signature/public-key length boundary fuzz cases.
-10. Deterministic capability identity tests.
-11. Selection-witness binding tests.
-12. Holochain projection requiring the hybrid witness.
-13. Cross-implementation verification against at least one independent ML-DSA implementation.
-14. Fuzzing for nested hybrid/COSE parser exhaustion.
+1. RFC 9964 ML-DSA-65 known-answer vectors from an independent implementation, with pinned corpus revision and SHA-256 digests.
+2. Community negative vectors for repeated hint indices, hint-weight overflow, and `z)-norm violations at/above `gamma_1 - beta`.
+3. Positive boundary vectors immediately below `gamma_1 - beta` to catch over-rejection.
+4. Positive and negative COSE interoperability vectors using the empty RFC 9964 context.
+5. Exact transcript-binding tests and classical-component tamper rejection.
+6. PQ-component tamper rejection, wrong-PQ-key rejection, and missing-component rejection under hybrid policy.
+7. Unprotected-header substitution tests.
+8. Signature/public-key length boundary fuzz cases.
+9. Deterministic capability identity and selection-witness binding tests.
+10. Holochain projection requiring the hybrid witness.
+11. Cross-implementation verification against at least one independent ML-DSA implementation.
+12. Fuzzing for nested hybrid/COSE parser exhaustion.
+
+Published ACVP signature-verification vectors alone are not sufficient; retain both the reference vectors and the mutation/boundary corpus described above.
 
 The qualification result must remain fail-closed:
 
