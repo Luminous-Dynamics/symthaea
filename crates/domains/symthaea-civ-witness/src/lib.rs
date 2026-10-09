@@ -1010,6 +1010,7 @@ impl SqliteWitnessStore {
             }
         }
         let already_anchored = existing.as_ref().is_some_and(|row| row.status == 1);
+        let anchored_receipt_digest = existing.as_ref().and_then(|row| row.receipt_digest);
         drop(conn);
         if !already_anchored {
             self.prepare_fork_witness_event(event, &predecessor)?;
@@ -1025,6 +1026,12 @@ impl SqliteWitnessStore {
         )? {
             Some(receipt) => receipt,
             None => {
+                // A locally anchored receipt is proof that this event was
+                // previously accepted remotely. Never replay it as a fresh append
+                // if the external witness no longer retains the exact event.
+                if already_anchored {
+                    return Err(WitnessError::RollbackDetected);
+                }
                 let current = witness.current_frontier(&event.log_id, event.witness_epoch)?;
                 current.validate()?;
                 if current != predecessor {
@@ -1056,7 +1063,15 @@ impl SqliteWitnessStore {
             return Err(ForkWitnessError::FrontierConflict.into());
         }
         verify_remote_fork_witness_receipt(&receipt, witness)?;
-        self.finalize_fork_witness_event(&receipt)?;
+        if already_anchored {
+            if anchored_receipt_digest != Some(receipt.receipt_digest) {
+                return Err(WitnessError::CorruptStore(
+                    "re-read remote receipt differs from locally anchored receipt",
+                ));
+            }
+        } else {
+            self.finalize_fork_witness_event(&receipt)?;
+        }
         Ok(receipt)
     }
 
@@ -2862,6 +2877,75 @@ mod tests {
             1,
         );
         assert_eq!(reopened.integrity_check().expect("store integrity"), "ok");
+    }
+
+    #[test]
+    fn historical_fork_witness_retry_is_idempotent_after_a_later_successor() {
+        let db = TempDb::new();
+        let store = db.open();
+        let witness = MemoryForkWitness::default();
+        let log_id = "log-historical-fork-witness-retry";
+        let epoch = 11;
+        witness.provision(log_id, epoch);
+
+        let first_frontier = witness.current_frontier(log_id, epoch).expect("genesis frontier");
+        let first = fork_witness::ForkEvent::build(
+            &first_frontier,
+            1,
+            h(b"historical-head-one"),
+            1,
+            h(b"historical-first-one"),
+            h(b"historical-conflict-one"),
+        ).expect("build first event");
+        let first_receipt = store.append_fork_witness_event(&first, &witness)
+            .expect("append first event");
+
+        let second_frontier = witness.current_frontier(log_id, epoch).expect("frontier after first");
+        let second = fork_witness::ForkEvent::build(
+            &second_frontier,
+            2,
+            h(b"historical-head-two"),
+            2,
+            h(b"historical-first-two"),
+            h(b"historical-conflict-two"),
+        ).expect("build second event");
+        store.append_fork_witness_event(&second, &witness).expect("append second successor");
+
+        let retried = store.append_fork_witness_event(&first, &witness)
+            .expect("historical retry reconciles without moving current frontier");
+        assert_eq!(retried, first_receipt);
+        assert_eq!(witness.current_frontier(log_id, epoch).expect("remote frontier").event_count, 2);
+        assert_eq!(store.integrity_check().expect("journal integrity"), "ok");
+    }
+
+    #[test]
+    fn locally_anchored_event_is_not_replayed_if_remote_history_disappears() {
+        let db = TempDb::new();
+        let store = db.open();
+        let witness = MemoryForkWitness::default();
+        let log_id = "log-missing-remotely-anchored-fork-event";
+        let epoch = 13;
+        witness.provision(log_id, epoch);
+        let frontier = witness.current_frontier(log_id, epoch).expect("genesis frontier");
+        let event = fork_witness::ForkEvent::build(
+            &frontier,
+            1,
+            h(b"missing-remote-head"),
+            1,
+            h(b"missing-remote-first"),
+            h(b"missing-remote-conflict"),
+        ).expect("build event");
+        store.append_fork_witness_event(&event, &witness).expect("initial remote append");
+
+        witness.events.lock().expect("erase only test witness payload").remove(&(log_id.to_owned(), epoch));
+        witness.provision(log_id, epoch);
+
+        assert!(matches!(
+            store.append_fork_witness_event(&event, &witness),
+            Err(WitnessError::RollbackDetected),
+        ), "a missing external payload must not be silently re-appended over a regressed frontier");
+        assert_eq!(witness.current_frontier(log_id, epoch).expect("regressed remote frontier").event_count, 0);
+        assert_eq!(store.integrity_check().expect("local journal remains intact"), "ok");
     }
 
     #[test]
