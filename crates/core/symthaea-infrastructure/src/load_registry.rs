@@ -113,6 +113,7 @@ pub enum LoadRegistryError {
 pub struct LoadRegistry {
     version: String,
     entries: Vec<LoadRegistryEntry>,
+    registry_digest: String,
 }
 
 impl LoadRegistry {
@@ -148,11 +149,23 @@ impl LoadRegistry {
             return Err(LoadRegistryError::MissingCriticalLoad);
         }
 
-        Ok(Self { version, entries })
+        let registry_digest = canonical_registry_digest(&version, &entries);
+        Ok(Self {
+            version,
+            entries,
+            registry_digest,
+        })
     }
 
     pub fn version(&self) -> &str {
         &self.version
+    }
+
+    /// BLAKE3 digest of a domain-separated, length-prefixed canonical
+    /// encoding of the version and all registry entries sorted by load ID.
+    /// This establishes content identity, not authorship or authorization.
+    pub fn registry_digest(&self) -> &str {
+        &self.registry_digest
     }
 
     pub fn entries(&self) -> &[LoadRegistryEntry] {
@@ -304,6 +317,7 @@ impl LoadRegistry {
 
         let ledger = LoadServiceLedger {
             registry_version: self.version.clone(),
+            registry_digest: self.registry_digest.clone(),
             step_duration_hours,
             available_energy_kwh,
             total_demand_kwh,
@@ -344,6 +358,8 @@ pub struct LoadServiceRecord {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoadServiceLedger {
     pub registry_version: String,
+    /// Digest of the exact registry configuration used for this allocation.
+    pub registry_digest: String,
     pub step_duration_hours: f64,
     pub available_energy_kwh: f64,
     pub total_demand_kwh: f64,
@@ -366,6 +382,7 @@ impl LoadServiceLedger {
     /// This is useful to an independent checker and deliberately public.
     pub fn is_valid(&self) -> bool {
         if !valid_label(&self.registry_version)
+            || !valid_digest(&self.registry_digest)
             || !self.step_duration_hours.is_finite()
             || self.step_duration_hours <= 0.0
         {
@@ -560,6 +577,56 @@ fn valid_label(value: &str) -> bool {
         && !value.chars().any(char::is_control)
 }
 
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn hash_field(hasher: &mut blake3::Hasher, value: &[u8]) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value);
+}
+
+fn canonical_registry_digest(version: &str, entries: &[LoadRegistryEntry]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hash_field(&mut hasher, b"symthaea-load-registry-digest-v1");
+    hash_field(&mut hasher, version.as_bytes());
+
+    let mut canonical_entries: Vec<&LoadRegistryEntry> = entries.iter().collect();
+    canonical_entries.sort_by(|left, right| left.load_id.cmp(&right.load_id));
+    hasher.update(&(canonical_entries.len() as u64).to_le_bytes());
+
+    for entry in canonical_entries {
+        hash_field(&mut hasher, entry.load_id.as_bytes());
+        let class = match entry.class {
+            LoadClass::Critical => "critical",
+            LoadClass::Deferrable => "deferrable",
+            LoadClass::Auxiliary => "auxiliary",
+        };
+        hash_field(&mut hasher, class.as_bytes());
+        hasher.update(&entry.rated_power_kw.to_bits().to_le_bytes());
+        hasher.update(&entry.shed_priority.to_le_bytes());
+        hasher.update(&entry.restore_priority.to_le_bytes());
+        match &entry.provenance {
+            ClassificationProvenance::SyntheticScenario { scenario_id } => {
+                hash_field(&mut hasher, b"synthetic-scenario");
+                hash_field(&mut hasher, scenario_id.as_bytes());
+            }
+            ClassificationProvenance::ReviewedRecord {
+                record_id,
+                record_revision,
+                reviewer_id,
+            } => {
+                hash_field(&mut hasher, b"reviewed-record-label");
+                hash_field(&mut hasher, record_id.as_bytes());
+                hash_field(&mut hasher, record_revision.as_bytes());
+                hash_field(&mut hasher, reviewer_id.as_bytes());
+            }
+        }
+    }
+
+    hasher.finalize().to_hex().to_string()
+}
+
 fn tolerance(value: f64) -> f64 {
     1e-9 * value.abs().max(1.0)
 }
@@ -672,6 +739,32 @@ mod tests {
     }
 
     #[test]
+    fn registry_digest_is_stable_across_input_order_but_binds_configuration() {
+        let original = registry();
+        let mut reversed_entries = original.entries().to_vec();
+        reversed_entries.reverse();
+        let reordered = LoadRegistry::new(original.version(), reversed_entries).unwrap();
+        assert_eq!(original.registry_digest(), reordered.registry_digest());
+
+        let mut changed = original.entries().to_vec();
+        changed[0].restore_priority += 1;
+        let changed_policy = LoadRegistry::new(original.version(), changed).unwrap();
+        assert_ne!(original.registry_digest(), changed_policy.registry_digest());
+
+        let changed_version =
+            LoadRegistry::new("test-registry-v2", original.entries().to_vec()).unwrap();
+        assert_ne!(original.registry_digest(), changed_version.registry_digest());
+    }
+
+    #[test]
+    fn ledger_rejects_malformed_registry_digest() {
+        let mut ledger = registry().allocate(&demands(), 1.0, 3.0).unwrap();
+        ledger.registry_digest = "not-a-digest".into();
+        assert!(!ledger.is_valid());
+        assert!(!registry().verify_ledger(&ledger));
+    }
+
+    #[test]
     fn registry_explicitly_reports_synthetic_criticality_as_unverified_metadata() {
         assert!(registry().has_synthetic_criticality_assumptions());
         let reviewed = LoadRegistry::new(
@@ -694,6 +787,7 @@ mod tests {
     fn allocator_prioritizes_class_then_shed_priority_deterministically() {
         let ledger = registry().allocate(&demands(), 1.0, 2.5).unwrap();
         assert!(ledger.is_valid(), "{ledger:?}");
+        assert_eq!(ledger.registry_digest, registry().registry_digest());
         assert_eq!(ledger.total_demand_kwh, 8.0);
         assert_eq!(ledger.total_served_kwh, 2.5);
         assert_eq!(ledger.total_unserved_kwh, 0.0);
