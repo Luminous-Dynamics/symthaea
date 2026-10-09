@@ -126,33 +126,41 @@ impl CognitiveLoopService {
 
         let manifold = bridge.manifold_mut();
         let current = manifold.state().clone();
+        let compute_cost_before = manifold.geodesic_compute_cost;
 
-        // Goal: transition toward the last recognized scene, or a random exploration target if none.
-        let goal = if let Some(match_res) = manifold.last_scene_match() {
-            manifold
-                .get_scene_encoding(match_res.scene_id)
-                .unwrap_or_else(|| {
-                    symthaea_core::core::ContinuousHV::random(manifold.hdc_dim(), 777)
-                })
+        // Prefer a recognized scene only when its stored encoding is valid.
+        // Otherwise, seed goal-directed refinement from the endpoint of the
+        // manifold's own forward rollout instead of an arbitrary random vector.
+        let remembered_goal = manifold
+            .last_scene_match()
+            .and_then(|match_res| manifold.get_scene_encoding(match_res.scene_id))
+            .filter(|goal| {
+                !goal.values.is_empty() && goal.values.iter().all(|value| value.is_finite())
+            });
+        let (goal, goal_source) = if let Some(goal) = remembered_goal {
+            (goal, "remembered_scene")
         } else {
-            symthaea_core::core::ContinuousHV::random(
-                manifold.hdc_dim(),
-                self.stats.total_cycles as u64,
-            )
+            let rollout = manifold.dream_ahead(steps, 0.1);
+            let Some(goal) = rollout.into_iter().last().filter(|goal| {
+                goal.dim() == manifold.hdc_dim()
+                    && goal.values.iter().all(|value| value.is_finite())
+            }) else {
+                return Err(ImagineFutureError::NoGeodesic);
+            };
+            (goal, "model_rollout_endpoint")
         };
 
-        // Force a geodesic regardless of surprise level
-        // 4 candidates for robustness (Active Inference foraging)
+        // Refine the selected target over multiple candidate paths.
         let path = manifold.select_best_geodesic(&current, &goal, steps, 4);
+        tracing::debug!(goal_source, steps, "Imagination target selected");
 
         if path.is_empty() {
             return Err(ImagineFutureError::NoGeodesic);
         }
 
-        // Cost accounting (0.025 per step candidate evaluated)
-        // select_best_geodesic already added (steps * candidates) to geodesic_compute_cost.
-        // We just need to sync it to the service's thermodynamic load here.
-        let cost = manifold.telemetry().last_geodesic_cost;
+        // Charge only the work performed by this call, not the manifold's lifetime
+        // accumulated compute cost from previous imagination requests.
+        let cost = (manifold.geodesic_compute_cost - compute_cost_before).max(0.0);
         if self.thermodynamic_load + cost > 0.95 {
             return Err(ImagineFutureError::ThermodynamicOverload(
                 self.thermodynamic_load + cost,

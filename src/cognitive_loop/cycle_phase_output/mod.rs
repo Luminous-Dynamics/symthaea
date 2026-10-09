@@ -415,20 +415,31 @@ impl CognitiveLoopService {
                 if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
                     let manifold = bridge.manifold_mut();
                     let current_state = manifold.state().clone();
-                    let goal = if let Some(match_res) = manifold.last_scene_match() {
-                        manifold
-                            .get_scene_encoding(match_res.scene_id)
-                            .unwrap_or_else(|| {
-                                symthaea_core::core::ContinuousHV::random(manifold.hdc_dim(), 777)
-                            })
+                    let remembered_goal = manifold
+                        .last_scene_match()
+                        .and_then(|match_res| manifold.get_scene_encoding(match_res.scene_id))
+                        .filter(|goal| {
+                            !goal.values.is_empty()
+                                && goal.values.iter().all(|value| value.is_finite())
+                        });
+                    let (goal, goal_source) = if let Some(goal) = remembered_goal {
+                        (Some(goal), "remembered_scene")
                     } else {
-                        symthaea_core::core::ContinuousHV::random(
-                            manifold.hdc_dim(),
-                            self.stats.total_cycles as u64,
+                        let rollout = manifold.dream_ahead(8, 0.1);
+                        (
+                            rollout.into_iter().last().filter(|goal| {
+                                goal.dim() == manifold.hdc_dim()
+                                    && goal.values.iter().all(|value| value.is_finite())
+                            }),
+                            "model_rollout_endpoint",
                         )
                     };
 
-                    let path = manifold.select_best_geodesic(&current_state, &goal, 8, 3);
+                    // Invalid or unavailable model output fails closed; never substitute
+                    // an arbitrary random latent vector and present it as a future.
+                    let path = goal
+                        .map(|goal| manifold.select_best_geodesic(&current_state, &goal, 8, 3))
+                        .unwrap_or_default();
                     let latest_telemetry = manifold.telemetry().clone();
                     perception.vision_telemetry = Some(latest_telemetry.clone());
                     metadata.vision = Some(latest_telemetry);
@@ -450,7 +461,9 @@ impl CognitiveLoopService {
                     }
                     tracing::info!(
                         cycle = self.stats.total_cycles,
-                        "Subsystem REQUEST_GEODESIC: FEP-guided mental simulation triggered"
+                        goal_source,
+                        path_length = feedback.mental_movie.as_ref().map_or(0, |movie| movie.path_length),
+                        "Subsystem REQUEST_GEODESIC: model-grounded mental simulation completed"
                     );
                 }
             } else {

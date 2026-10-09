@@ -166,6 +166,13 @@ mod tests {
 
         assert_eq!(movie.frames.len(), 16);
         assert_eq!(movie.path_length, 16);
+        assert_eq!(movie.trajectory.len(), 16);
+        assert!(
+            movie.trajectory.iter().all(|state| {
+                state.dim() > 0 && state.values.iter().all(|value| value.is_finite())
+            }),
+            "Imagination must not return malformed or non-finite latent states"
+        );
         assert!(
             service.thermodynamic_load() > initial_thermo,
             "Thermodynamic load should increase after imagination"
