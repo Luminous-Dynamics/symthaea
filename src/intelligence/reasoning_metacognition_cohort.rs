@@ -75,6 +75,8 @@ pub struct DecisionOutcomeV2 {
     pub episode_id: String,
     pub outcome_profile_id: String,
     /// Ground-truth label returned after the pre-outcome detection decision is frozen.
+    /// Present exactly when this episode has a frozen weak-assumption detection decision;
+    /// absent otherwise. The evaluator enforces this one-to-one relation after outcome binding.
     pub weak_assumption_present: Option<bool>,
     pub outcome_receipt_id: String,
     pub outcome_evidence_ref: String,
@@ -1573,7 +1575,7 @@ mod tests {
     }
 
     #[test]
-    fn auxiliary_observations_are_frozen_and_scoped_to_matching_forecasts() {
+    fn detections_are_frozen_and_ground_truth_is_bound_only_after_outcomes() {
         let fs = vec![
             forecast("f1", "e1", "reasoning", 0.4, true, None),
             forecast("f2", "e2", "reasoning", 0.7, true, None),
