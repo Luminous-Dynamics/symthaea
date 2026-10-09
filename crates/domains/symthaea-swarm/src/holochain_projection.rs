@@ -17,6 +17,7 @@ pub const DOMAIN: &[u8] = b"symthaea-swarm/holochain-evidence-anchor-v2";
 pub const HYBRID_ASSURANCE_PROFILE_ID: &str =
     "symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-v1";
 pub const HYBRID_ASSURANCE_PROFILE_VERSION: u16 = 1;
+pub const HYBRID_ASSURANCE_CLASSICAL_ALGORITHM_ID: i64 = -7;
 pub const HYBRID_ASSURANCE_ML_DSA_65_ALGORITHM_ID: i64 = -49;
 pub const MAX_SELECTION_POLICY_BYTES: usize = 256;
 pub const MAX_CONTEXT_BYTES: usize = 8 * 1024;
@@ -111,6 +112,7 @@ pub struct ReceiptSelectionContext {
 pub struct HybridReceiptAssuranceContext {
     profile_id: String,
     profile_version: u16,
+    classical_algorithm_id: i64,
     pq_algorithm_id: i64,
     hybrid_capability_sha256: [u8; 32],
     key_policy_digest_sha256: [u8; 32],
@@ -130,6 +132,10 @@ impl HybridReceiptAssuranceContext {
 
     pub const fn profile_version(&self) -> u16 {
         self.profile_version
+    }
+
+    pub const fn classical_algorithm_id(&self) -> i64 {
+        self.classical_algorithm_id
     }
 
     pub const fn pq_algorithm_id(&self) -> i64 {
@@ -181,6 +187,7 @@ impl HybridReceiptAssuranceContext {
         Self {
             profile_id: HYBRID_ASSURANCE_PROFILE_ID.to_owned(),
             profile_version: HYBRID_ASSURANCE_PROFILE_VERSION,
+            classical_algorithm_id: transcript.classical_algorithm_id(),
             pq_algorithm_id: HYBRID_ASSURANCE_ML_DSA_65_ALGORITHM_ID,
             hybrid_capability_sha256: hybrid.hybrid_capability_sha256(),
             key_policy_digest_sha256: hybrid.key_policy_digest_sha256(),
@@ -203,6 +210,7 @@ impl HybridReceiptAssuranceContext {
         if self.profile_id != HYBRID_ASSURANCE_PROFILE_ID
             || self.profile_id.len() > MAX_SELECTION_POLICY_BYTES
             || self.profile_version != HYBRID_ASSURANCE_PROFILE_VERSION
+            || self.classical_algorithm_id != HYBRID_ASSURANCE_CLASSICAL_ALGORITHM_ID
             || self.pq_algorithm_id != HYBRID_ASSURANCE_ML_DSA_65_ALGORITHM_ID
             || self.hybrid_capability_sha256 == [0; 32]
             || self.key_policy_digest_sha256 == [0; 32]
@@ -464,6 +472,7 @@ impl HolochainEvidenceAnchor {
                         out.push(1);
                         put_string(&mut out, &hybrid.profile_id);
                         put_u16(&mut out, hybrid.profile_version);
+                        out.extend_from_slice(&hybrid.classical_algorithm_id.to_be_bytes());
                         out.extend_from_slice(&hybrid.pq_algorithm_id.to_be_bytes());
                         out.extend_from_slice(&hybrid.hybrid_capability_sha256);
                         out.extend_from_slice(&hybrid.key_policy_digest_sha256);
@@ -592,6 +601,10 @@ mod tests {
             crate::rfc9942_hybrid::HYBRID_POLICY_VERSION
         );
         assert_eq!(
+            HYBRID_ASSURANCE_CLASSICAL_ALGORITHM_ID,
+            crate::rfc9942_hybrid::CLASSICAL_COSE_ALGORITHM_ID
+        );
+        assert_eq!(
             HYBRID_ASSURANCE_ML_DSA_65_ALGORITHM_ID,
             crate::rfc9942_hybrid::ML_DSA_65_COSE_ALGORITHM_ID
         );
@@ -615,6 +628,7 @@ mod tests {
         selection.hybrid_assurance = Some(HybridReceiptAssuranceContext {
             profile_id: crate::rfc9942_hybrid::HYBRID_POLICY_ID.to_owned(),
             profile_version: crate::rfc9942_hybrid::HYBRID_POLICY_VERSION,
+            classical_algorithm_id: HYBRID_ASSURANCE_CLASSICAL_ALGORITHM_ID,
             pq_algorithm_id: crate::rfc9942_hybrid::ML_DSA_65_COSE_ALGORITHM_ID,
             hybrid_capability_sha256: [10; 32],
             key_policy_digest_sha256: [11; 32],
