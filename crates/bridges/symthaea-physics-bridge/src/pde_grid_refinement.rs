@@ -351,6 +351,12 @@ mod tests {
         // fundamental-mode test, this challenges spatial mode interaction and
         // nonzero initial velocity while preserving a known closed-form answer.
         let final_time: f64 = 0.75;
+        let omega_1_t = std::f64::consts::PI * final_time;
+        let omega_2_t = 2.0 * omega_1_t;
+        let sin_1_t = omega_1_t.sin();
+        let cos_1_t = omega_1_t.cos();
+        let sin_2_t = omega_2_t.sin();
+        let cos_2_t = omega_2_t.cos();
         let resolutions = [12, 24, 48, 96];
         let mut displacement_errors = Vec::with_capacity(resolutions.len());
         let mut velocity_errors = Vec::with_capacity(resolutions.len());
@@ -370,9 +376,8 @@ mod tests {
                 let mode_1 = (std::f64::consts::PI * x).sin();
                 let mode_2 = (2.0 * std::f64::consts::PI * x).sin();
                 initial[i] = mode_1 + 0.3 * mode_2;
-                initial[n + i] =
-                    0.2 * std::f64::consts::PI * mode_1
-                        - 0.24 * std::f64::consts::PI * mode_2;
+                initial[n + i] = 0.2 * std::f64::consts::PI * mode_1
+                    - 0.24 * std::f64::consts::PI * mode_2;
             }
 
             let numerical = wave_1d_integrate_rk4(&initial, steps, dt).unwrap();
@@ -383,21 +388,10 @@ mod tests {
                 let x = (i + 1) as f64 * h;
                 let mode_1 = (std::f64::consts::PI * x).sin();
                 let mode_2 = (2.0 * std::f64::consts::PI * x).sin();
-                let exact_u = mode_1
-                    * ((std::f64::consts::PI * final_time).cos()
-                        + 0.2 * (std::f64::consts::PI * final_time).sin())
-                    + 0.3 * mode_2
-                        * ((2.0 * std::f64::consts::PI * final_time).cos()
-                            - 0.4 * (2.0 * std::f64::consts::PI * final_time).sin());
-                let exact_v = std::f64::consts::PI
-                    * mode_1
-                    * (-(std::f64::consts::PI * final_time).sin()
-                        + 0.2 * (std::f64::consts::PI * final_time).cos())
-                    + 0.6
-                        * std::f64::consts::PI
-                        * mode_2
-                        * (-(2.0 * std::f64::consts::PI * final_time).sin()
-                            - 0.4 * (2.0 * std::f64::consts::PI * final_time).cos());
+                let exact_u =
+                    mode_1 * (cos_1_t + 0.2 * sin_1_t) + 0.3 * mode_2 * (cos_2_t - 0.4 * sin_2_t);
+                let exact_v = std::f64::consts::PI * mode_1 * (-sin_1_t + 0.2 * cos_1_t)
+                    + 0.6 * std::f64::consts::PI * mode_2 * (-sin_2_t - 0.4 * cos_2_t);
 
                 let du = numerical[i] - exact_u;
                 let dv_scaled = (numerical[n + i] - exact_v) / std::f64::consts::PI;
