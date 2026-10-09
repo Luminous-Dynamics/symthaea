@@ -114,6 +114,117 @@ const RELAY_DECAY_PER_THERMAL_RISK_S: f64 = 0.001;
 /// per load period. High-resolution runs should use the configured 200 Hz
 /// interval (0.005 s); this remains a simulation model, not a plant controller.
 const MAX_INTEGRATION_STEP_SECONDS: f64 = 1.0;
+const COMMUNITY_CRITICAL_SHARE: f64 = 0.35;
+const NONCRITICAL_DEFERRABLE_SHARE: f64 = 0.60;
+const COOLING_CRITICAL_RISK_THRESHOLD: f64 = 0.30;
+
+/// Deterministic power dispatch across priority buckets (kW).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+struct LoadDispatchPower {
+    critical_demand_kw: f64,
+    deferrable_demand_kw: f64,
+    optional_demand_kw: f64,
+    critical_served_kw: f64,
+    deferrable_served_kw: f64,
+    optional_served_kw: f64,
+    critical_unserved_kw: f64,
+    intentionally_shed_kw: f64,
+}
+
+impl LoadDispatchPower {
+    fn served_kw(self) -> f64 {
+        self.critical_served_kw + self.deferrable_served_kw + self.optional_served_kw
+    }
+    fn total_demand_kw(self) -> f64 {
+        self.critical_demand_kw + self.deferrable_demand_kw + self.optional_demand_kw
+    }
+}
+
+/// Per-step energy receipt; intentional curtailment and critical shortfall
+/// remain separate quantities.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct GridStepEnergyReport {
+    pub duration_s: f64,
+    pub critical_demand_kwh: f64,
+    pub deferrable_demand_kwh: f64,
+    pub optional_demand_kwh: f64,
+    pub critical_served_kwh: f64,
+    pub deferrable_served_kwh: f64,
+    pub optional_served_kwh: f64,
+    pub critical_unserved_kwh: f64,
+    pub intentionally_shed_kwh: f64,
+    pub total_demand_kwh: f64,
+    pub total_served_kwh: f64,
+    pub total_unserved_kwh: f64,
+    pub demand_accounting_residual_kwh: f64,
+    pub battery_charge_ac_kwh: f64,
+    pub battery_discharge_ac_kwh: f64,
+    pub grid_import_kwh: f64,
+    pub grid_export_kwh: f64,
+}
+
+fn energy_report_is_valid(report: GridStepEnergyReport) -> bool {
+    let values = [
+        report.duration_s,
+        report.critical_demand_kwh,
+        report.deferrable_demand_kwh,
+        report.optional_demand_kwh,
+        report.critical_served_kwh,
+        report.deferrable_served_kwh,
+        report.optional_served_kwh,
+        report.critical_unserved_kwh,
+        report.intentionally_shed_kwh,
+        report.total_demand_kwh,
+        report.total_served_kwh,
+        report.total_unserved_kwh,
+        report.demand_accounting_residual_kwh,
+        report.battery_charge_ac_kwh,
+        report.battery_discharge_ac_kwh,
+        report.grid_import_kwh,
+        report.grid_export_kwh,
+    ];
+    values.iter().all(|value| value.is_finite())
+        && report.duration_s >= 0.0
+        && values[1..12].iter().all(|value| *value >= 0.0)
+        && report.battery_charge_ac_kwh >= 0.0
+        && report.battery_discharge_ac_kwh >= 0.0
+        && report.grid_import_kwh >= 0.0
+        && report.grid_export_kwh >= 0.0
+        && report.demand_accounting_residual_kwh.abs()
+            <= 1e-9_f64.max(report.total_demand_kwh.abs() * 1e-10)
+}
+
+fn dispatch_loads(
+    critical_kw: f64,
+    deferrable_kw: f64,
+    optional_kw: f64,
+    available_supply_kw: f64,
+) -> Result<LoadDispatchPower, GridPhysicsStepError> {
+    if [critical_kw, deferrable_kw, optional_kw, available_supply_kw]
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
+    {
+        return Err(GridPhysicsStepError::InvalidDerivedPhysics);
+    }
+    let critical_served = critical_kw.min(available_supply_kw);
+    let after_critical = (available_supply_kw - critical_served).max(0.0);
+    let deferrable_served = deferrable_kw.min(after_critical);
+    let after_deferrable = (after_critical - deferrable_served).max(0.0);
+    let optional_served = optional_kw.min(after_deferrable);
+    let critical_unserved = (critical_kw - critical_served).max(0.0);
+    let intentionally_shed = (deferrable_kw - deferrable_served).max(0.0)
+        + (optional_kw - optional_served).max(0.0);
+    Ok(LoadDispatchPower {
+        critical_demand_kw: critical_kw,
+        deferrable_demand_kw: deferrable_kw,
+        optional_demand_kw: optional_kw,
+        critical_served_kw: critical_served,
+        deferrable_served_kw: deferrable_served,
+        optional_served_kw: optional_served,
+        critical_unserved_kw: critical_unserved,
+        intentionally_shed_kw: intentionally_shed,
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GridPhysicsStepError {
@@ -138,6 +249,7 @@ pub struct GridPhysicsInfrastructureSimulator {
     /// Checked `try_step` reports directly through its Result and remains
     /// mutation-free when it rejects an input.
     last_trait_step_accepted: bool,
+    last_energy_report: GridStepEnergyReport,
 }
 
 impl GridPhysicsInfrastructureSimulator {
@@ -171,6 +283,7 @@ impl GridPhysicsInfrastructureSimulator {
             prev_frequency_hz: NOMINAL_FREQUENCY_HZ,
             elapsed_s: 0.0,
             last_trait_step_accepted: true,
+            last_energy_report: GridStepEnergyReport::default(),
         }
     }
 
@@ -207,6 +320,11 @@ impl GridPhysicsInfrastructureSimulator {
             && (0.0..=1.0).contains(&battery.degradation_per_cycle)
             && battery.effective_capacity_kwh().is_finite()
             && battery.stored_energy_kwh().is_finite()
+    }
+
+    /// Last committed physical-energy accounting receipt.
+    pub fn last_energy_report(&self) -> GridStepEnergyReport {
+        self.last_energy_report
     }
 
     /// Validate state channels according to their units: all are normalized
@@ -267,6 +385,7 @@ impl GridPhysicsInfrastructureSimulator {
         candidate.step_candidate(cmd, dt)?;
         if !candidate.state_channels_are_valid()
             || !candidate.battery_configuration_is_valid()
+            || !energy_report_is_valid(candidate.last_energy_report)
             || !candidate.elapsed_s.is_finite()
             || candidate.elapsed_s < 0.0
             || !candidate.abnormal_voltage_elapsed_s.is_finite()
@@ -331,15 +450,45 @@ impl GridPhysicsInfrastructureSimulator {
         };
         let net_battery_injection_kw = discharge_delivered_ac_kw - actual_ac_kw_for_charge;
 
-        // ── Loads ─────────────────────────────────────────────────────
-        let community_load_kw = BASE_COMMUNITY_LOAD_KW
+        // ── Loads and deterministic priority dispatch ──────────────────
+        let base_community_load_kw = BASE_COMMUNITY_LOAD_KW
             + LOAD_SWING_KW
-                * (0.5 + 0.5 * (2.0 * std::f64::consts::PI * self.elapsed_s / LOAD_PERIOD_S).sin())
-            + ROUTING_LOAD_SCALE_KW * routing_total;
+                * (0.5 + 0.5 * (2.0 * std::f64::consts::PI * self.elapsed_s / LOAD_PERIOD_S).sin());
+        let routing_auxiliary_load_kw = ROUTING_LOAD_SCALE_KW * routing_total;
+        let community_load_kw = base_community_load_kw + routing_auxiliary_load_kw;
         let cooling_load_kw = cooling_frac * COOLING_RATED_KW;
         let heating_load_kw = heating_frac * HEATING_RATED_KW;
-        let node_load_kw =
-            community_load_kw + cooling_load_kw + heating_load_kw - net_battery_injection_kw;
+
+        // Split base community demand into declared priority buckets. Routing
+        // overhead and heating are optional. Cooling becomes protected only
+        // when the previously committed thermal-risk channel crosses threshold.
+        let critical_base_kw = base_community_load_kw * COMMUNITY_CRITICAL_SHARE;
+        let noncritical_base_kw = base_community_load_kw - critical_base_kw;
+        let deferrable_base_kw = noncritical_base_kw * NONCRITICAL_DEFERRABLE_SHARE;
+        let optional_base_kw = noncritical_base_kw - deferrable_base_kw;
+        let cooling_is_critical =
+            self.state.channels[THERMAL_RUNAWAY_RISK] >= COOLING_CRITICAL_RISK_THRESHOLD;
+        let critical_demand_kw = critical_base_kw
+            + if cooling_is_critical { cooling_load_kw } else { 0.0 };
+        let deferrable_demand_kw = deferrable_base_kw;
+        let optional_demand_kw = optional_base_kw
+            + routing_auxiliary_load_kw
+            + heating_load_kw
+            + if cooling_is_critical { 0.0 } else { cooling_load_kw };
+        let total_demand_kw = critical_demand_kw + deferrable_demand_kw + optional_demand_kw;
+        let available_supply_kw = if is_islanded {
+            net_battery_injection_kw.max(0.0)
+        } else {
+            total_demand_kw
+        };
+        let dispatch = dispatch_loads(
+            critical_demand_kw,
+            deferrable_demand_kw,
+            optional_demand_kw,
+            available_supply_kw,
+        )?;
+        let served_load_kw = dispatch.served_kw();
+        let node_load_kw = served_load_kw - net_battery_injection_kw;
 
         // ── Feeder solve ──────────────────────────────────────────────
         // While islanded, the "reference" the local bus is measured against
@@ -403,7 +552,7 @@ impl GridPhysicsInfrastructureSimulator {
 
         // ── Islanding / frequency ─────────────────────────────────────
         let current_frequency_hz = if is_islanded {
-            steady_state_frequency_after_islanding(&self.freq_droop, community_load_kw)
+            steady_state_frequency_after_islanding(&self.freq_droop, served_load_kw)
         } else {
             NOMINAL_FREQUENCY_HZ
         };
@@ -422,20 +571,53 @@ impl GridPhysicsInfrastructureSimulator {
         };
         let islanding_capability = self.battery.soc();
 
-        // ── Unserved demand (only meaningful while islanded: grid-tied
-        // assumes an infinite-bus substation that always meets local load) ──
-        let unserved_demand_ratio = if is_islanded {
-            let community_demand_ac_kwh = community_load_kw * dt_hours;
-            let shortfall = (community_demand_ac_kwh - discharge_delivered_ac_kwh).max(0.0);
-            if community_demand_ac_kwh > 0.0 {
-                (shortfall / community_demand_ac_kwh).clamp(0.0, 1.0)
-            } else {
-                0.0
-            }
+        // ── Served, intentionally curtailed, and critical-unserved energy ──
+        let total_demand_kwh = total_demand_kw * dt_hours;
+        let critical_served_kwh = dispatch.critical_served_kw * dt_hours;
+        let deferrable_served_kwh = dispatch.deferrable_served_kw * dt_hours;
+        let optional_served_kwh = dispatch.optional_served_kw * dt_hours;
+        let total_served_kwh = critical_served_kwh + deferrable_served_kwh + optional_served_kwh;
+        let critical_unserved_kwh = dispatch.critical_unserved_kw * dt_hours;
+        let intentionally_shed_kwh = dispatch.intentionally_shed_kw * dt_hours;
+        let total_unserved_kwh = critical_unserved_kwh;
+        let unserved_demand_ratio = if total_demand_kwh > 0.0 {
+            (total_unserved_kwh / total_demand_kwh).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        let shed_load_ratio = unserved_demand_ratio;
+        let shed_load_ratio = if total_demand_kwh > 0.0 {
+            (intentionally_shed_kwh / total_demand_kwh).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let energy_report = GridStepEnergyReport {
+            duration_s: dt,
+            critical_demand_kwh: dispatch.critical_demand_kw * dt_hours,
+            deferrable_demand_kwh: dispatch.deferrable_demand_kw * dt_hours,
+            optional_demand_kwh: dispatch.optional_demand_kw * dt_hours,
+            critical_served_kwh,
+            deferrable_served_kwh,
+            optional_served_kwh,
+            critical_unserved_kwh,
+            intentionally_shed_kwh,
+            total_demand_kwh,
+            total_served_kwh,
+            total_unserved_kwh,
+            demand_accounting_residual_kwh:
+                total_demand_kwh - total_served_kwh - intentionally_shed_kwh - total_unserved_kwh,
+            battery_charge_ac_kwh: actual_ac_kw_for_charge * dt_hours,
+            battery_discharge_ac_kwh: discharge_delivered_ac_kwh,
+            grid_import_kwh: if is_islanded {
+                0.0
+            } else {
+                solution.branch_power_kw[1].max(0.0) * dt_hours
+            },
+            grid_export_kwh: if is_islanded {
+                0.0
+            } else {
+                (-solution.branch_power_kw[1]).max(0.0) * dt_hours
+            },
+        };
 
         // ── grid_stress: voltage deviation + tie loading, both real ────
         let grid_stress = if is_islanded {
@@ -476,6 +658,7 @@ impl GridPhysicsInfrastructureSimulator {
 
         let service_integrity = (1.0
             - unserved_demand_ratio * 0.4
+            - shed_load_ratio * 0.20
             - brownout_risk * 0.25
             - islanding_risk * 0.15
             - deadlock_risk * 0.1)
@@ -517,13 +700,18 @@ impl GridPhysicsInfrastructureSimulator {
         s[COMMUNITY_DEMAND] = community_demand_normalized;
         s[BROWNOUT_RISK] = brownout_risk;
         s[SHED_LOAD_RATIO] = shed_load_ratio;
-        s[CRITICAL_LOAD_FRACTION] = 0.35;
+        s[CRITICAL_LOAD_FRACTION] = if total_demand_kw > 0.0 {
+            (dispatch.critical_demand_kw / total_demand_kw).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         s[UNSERVED_DEMAND_RATIO] = unserved_demand_ratio;
         s[DEADLOCK_RISK] = deadlock_risk;
         s[ISLANDING_RISK] = islanding_risk;
         s[SERVICE_INTEGRITY] = service_integrity;
         s[RECOVERY_MARGIN] = recovery_margin;
         s[THERMAL_RUNAWAY_RISK] = thermal_runaway_risk;
+        self.last_energy_report = energy_report;
         Ok(())
     }
 }
@@ -559,6 +747,7 @@ impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
         self.prev_frequency_hz = NOMINAL_FREQUENCY_HZ;
         self.elapsed_s = 0.0;
         self.last_trait_step_accepted = true;
+        self.last_energy_report = GridStepEnergyReport::default();
     }
 
     fn backend_name(&self) -> &'static str {
@@ -750,6 +939,40 @@ mod failure_mode_tests {
         );
     }
 
+    #[test]
+    fn load_dispatch_preserves_critical_before_deferrable_and_optional() {
+        let dispatch = dispatch_loads(10.0, 20.0, 30.0, 25.0).unwrap();
+        assert_eq!(dispatch.critical_served_kw, 10.0);
+        assert_eq!(dispatch.deferrable_served_kw, 15.0);
+        assert_eq!(dispatch.optional_served_kw, 0.0);
+        assert_eq!(dispatch.critical_unserved_kw, 0.0);
+        assert_eq!(dispatch.intentionally_shed_kw, 35.0);
+        assert!((dispatch.total_demand_kw() - dispatch.served_kw()
+            - dispatch.critical_unserved_kw - dispatch.intentionally_shed_kw).abs() < 1e-12);
+    }
+
+    #[test]
+    fn load_dispatch_reports_critical_shortfall_when_supply_is_inadequate() {
+        let dispatch = dispatch_loads(10.0, 20.0, 30.0, 6.0).unwrap();
+        assert_eq!(dispatch.critical_served_kw, 6.0);
+        assert_eq!(dispatch.critical_unserved_kw, 4.0);
+        assert_eq!(dispatch.deferrable_served_kw, 0.0);
+        assert_eq!(dispatch.optional_served_kw, 0.0);
+        assert_eq!(dispatch.intentionally_shed_kw, 50.0);
+    }
+
+    #[test]
+    fn load_dispatch_rejects_non_finite_or_negative_inputs() {
+        assert_eq!(
+            dispatch_loads(f64::NAN, 1.0, 1.0, 1.0),
+            Err(GridPhysicsStepError::InvalidDerivedPhysics)
+        );
+        assert_eq!(
+            dispatch_loads(1.0, -1.0, 1.0, 1.0),
+            Err(GridPhysicsStepError::InvalidDerivedPhysics)
+        );
+    }
+
     fn assert_rejected_step_is_atomic(
         sim: &mut GridPhysicsInfrastructureSimulator,
         cmd: &InfrastructureCommand,
@@ -770,6 +993,7 @@ mod failure_mode_tests {
             before.abnormal_voltage_elapsed_s
         );
         assert_eq!(sim.prev_frequency_hz, before.prev_frequency_hz);
+        assert_eq!(sim.last_energy_report, before.last_energy_report);
         assert_eq!(
             sim.last_trait_step_accepted,
             before.last_trait_step_accepted
@@ -918,6 +1142,7 @@ mod failure_mode_tests {
             before.abnormal_voltage_elapsed_s
         );
         assert_eq!(sim.prev_frequency_hz, before.prev_frequency_hz);
+        assert_eq!(sim.last_energy_report, before.last_energy_report);
         assert_eq!(
             sim.last_trait_step_accepted,
             before.last_trait_step_accepted
