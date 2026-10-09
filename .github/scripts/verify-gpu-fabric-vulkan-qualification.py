@@ -960,6 +960,22 @@ def verify_metadata(path: Path) -> None:
     if names != ["symthaea-gpu-fabric"]:
         fail(f"unexpected isolated package set: {names!r}")
 
+def verify_syncval_configuration(path: Path) -> None:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    sync_settings = [
+        line.strip()
+        for line in lines
+        if line.strip().startswith("VK_LAYER_VALIDATE_SYNC:")
+    ]
+    if sync_settings != ['VK_LAYER_VALIDATE_SYNC: "1"']:
+        fail("workflow must request SyncVal exactly once using VK_LAYER_VALIDATE_SYNC: \"1\"")
+    if any(
+        line.strip().startswith(("VK_LAYER_ENABLES:", "VK_LAYER_DISABLES:"))
+        for line in lines
+    ):
+        fail("workflow must not mix deprecated VK_LAYER_ENABLES/VK_LAYER_DISABLES settings")
+
+
 def verify_environment(path: Path, expected_commit: str) -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
     values = parse_kv(lines)
@@ -971,6 +987,12 @@ def verify_environment(path: Path, expected_commit: str) -> None:
         fail("runner architecture is not X64")
     if not any(line.startswith("rustc ") for line in lines):
         fail("rustc version missing from environment packet")
+    if values.get("validation_sync_requested") != "VK_LAYER_VALIDATE_SYNC=1":
+        fail("environment packet does not record the current SyncVal request")
+    if values.get("validation_sync_env") != "VK_LAYER_VALIDATE_SYNC":
+        fail("environment packet names the wrong SyncVal setting")
+    if values.get("validation_sync_activation") != "not_proven_without_hazard_sentinel":
+        fail("environment packet must preserve the unproven SyncVal activation boundary")
 
 def verify_cargo_manifest(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
@@ -997,11 +1019,13 @@ def main() -> int:
     parser.add_argument("--cargo-toml", type=Path, required=True)
     parser.add_argument("--package-versions", type=Path, required=True)
     parser.add_argument("--input-sha256", type=Path, required=True)
+    parser.add_argument("--workflow", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)
     args = parser.parse_args()
 
     root = args.runtime.parent
     verify_runtime(args.runtime)
+    verify_syncval_configuration(args.workflow)
     verify_environment(args.environment, args.expected_commit)
     verify_source_hashes(args.source_sha256, root)
     verify_single_hash_file(args.lock_sha256, args.lock)
