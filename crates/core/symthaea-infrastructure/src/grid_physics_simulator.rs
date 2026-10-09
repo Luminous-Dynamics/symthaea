@@ -973,6 +973,59 @@ mod failure_mode_tests {
         );
     }
 
+    #[test]
+    fn grid_tied_report_accounts_for_served_demand_and_imports() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[4] = 0.3;
+        assert_eq!(sim.try_step(&cmd, 0.005), Ok(()));
+
+        let report = sim.last_energy_report();
+        assert!(report.total_demand_kwh > 0.0);
+        assert!((report.total_demand_kwh - report.total_served_kwh).abs() < 1e-12);
+        assert_eq!(report.total_unserved_kwh, 0.0);
+        assert_eq!(report.intentionally_shed_kwh, 0.0);
+        assert!(report.grid_import_kwh > 0.0);
+        assert_eq!(report.grid_export_kwh, 0.0);
+        assert!(report.demand_accounting_residual_kwh.abs() < 1e-12);
+        assert!((sim.state().channels[CRITICAL_LOAD_FRACTION]
+            - report.critical_demand_kwh / report.total_demand_kwh).abs() < 1e-12);
+    }
+
+    #[test]
+    fn islanded_report_sheds_noncritical_load_before_critical_shortfall() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.5; // 125 kW: enough for critical, not the full community
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+
+        let report = sim.last_energy_report();
+        assert!(report.critical_served_kwh > 0.0);
+        assert_eq!(report.critical_unserved_kwh, 0.0);
+        assert_eq!(report.total_unserved_kwh, 0.0);
+        assert!(report.intentionally_shed_kwh > 0.0);
+        assert!(sim.state().shed_load_ratio() > 0.0);
+        assert_eq!(report.grid_import_kwh, 0.0);
+        assert_eq!(report.grid_export_kwh, 0.0);
+        assert!(report.demand_accounting_residual_kwh.abs() < 1e-9);
+    }
+
+    #[test]
+    fn islanded_report_surfaces_critical_shortfall_separately_from_shedding() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.05; // 12.5 kW: insufficient even for protected demand
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+
+        let report = sim.last_energy_report();
+        assert!(report.critical_unserved_kwh > 0.0);
+        assert_eq!(report.total_unserved_kwh, report.critical_unserved_kwh);
+        assert!(report.intentionally_shed_kwh > 0.0);
+        assert!(sim.state().unserved_demand_ratio() > 0.0);
+        assert!(sim.state().shed_load_ratio() > 0.0);
+        assert!(report.demand_accounting_residual_kwh.abs() < 1e-9);
+    }
+
     fn assert_rejected_step_is_atomic(
         sim: &mut GridPhysicsInfrastructureSimulator,
         cmd: &InfrastructureCommand,
