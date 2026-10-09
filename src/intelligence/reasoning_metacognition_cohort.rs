@@ -9,7 +9,8 @@
 //! chronology, or corpus separation; those properties require an independent verifier.
 
 use super::reasoning_metacognition::{
-    evaluate_metacognition, ConfidenceRevisionObservation, CorrectnessPrediction,
+    evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionObservation,
+    CorrectnessPrediction,
     ForecastBaselineMethod, ForecastBaselineV1, MetacognitionEvaluationError, MetacognitionReport,
     WeakAssumptionObservation, FORECAST_BASELINE_SCHEMA_VERSION,
 };
@@ -19,9 +20,9 @@ use std::fmt;
 
 pub const DECISION_FORECAST_SCHEMA_VERSION: u32 = 2;
 pub const DECISION_OUTCOME_SCHEMA_VERSION: u32 = 1;
-pub const FROZEN_DECISION_COHORT_SCHEMA_VERSION: u32 = 2;
-pub const DECISION_COHORT_REPORT_SCHEMA_VERSION: u32 = 2;
-pub const DECISION_COHORT_EVALUATOR_VERSION: &str = "rq-006-decision-cohort-v2";
+pub const FROZEN_DECISION_COHORT_SCHEMA_VERSION: u32 = 3;
+pub const DECISION_COHORT_REPORT_SCHEMA_VERSION: u32 = 3;
+pub const DECISION_COHORT_EVALUATOR_VERSION: &str = "rq-006-decision-cohort-v3";
 const DECISION_SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-bonferroni-familywise-95-v1";
 const DECISION_SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = concat!(
     "IID decision episodes; confidence thresholds and task-family taxonomy frozen before outcomes; ",
@@ -102,9 +103,18 @@ pub struct DecisionCounterfactualForecastMetricsV2 {
     pub log_loss: Option<f64>,
 }
 
+/// Decision-level auxiliary behavior metrics, kept separate from answer correctness calibration.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DecisionBehaviorMetricsV1 {
+    pub weak_assumption_detection: BinaryDetectionReport,
+    pub confidence_revisions: usize,
+    pub revision_direction_accuracy: Option<f64>,
+    pub mean_expected_revision_delta: Option<f64>,
+}
+
 /// Baseline comparison on the same scoreable asserted-answer cohort as the candidate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionBaselineScoreV2 {
+pub struct DecisionBaselineScoreV3 {
     pub baseline_id: String,
     pub method: ForecastBaselineMethod,
     pub task_family_id: String,
@@ -128,7 +138,7 @@ pub struct DecisionBaselineScoreV2 {
 
 /// Family report includes families that have zero asserted answers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionCohortFamilyReportV2 {
+pub struct DecisionCohortFamilyReportV3 {
     pub task_family_id: String,
     pub total_decisions: usize,
     pub asserted_decisions: usize,
@@ -141,7 +151,9 @@ pub struct DecisionCohortFamilyReportV2 {
     /// Threshold coverage always uses total_decisions as its denominator.
     pub selective_risk: Vec<DecisionSelectiveRiskPoint>,
     pub counterfactual_forecast_metrics: DecisionCounterfactualForecastMetricsV2,
-    pub baselines: Vec<DecisionBaselineScoreV2>,
+    /// Weak-assumption and confidence-revision observations across all cohort decisions.
+    pub decision_behavior_metrics: DecisionBehaviorMetricsV1,
+    pub baselines: Vec<DecisionBaselineScoreV3>,
 }
 
 /// Receipt linkage retained in deterministic forecast order. External verification is still needed.
@@ -157,7 +169,7 @@ pub struct DecisionCohortBindingV1 {
 /// Decomposed score: all decisions are accounted for, but correctness is calibrated only on answers
 /// that were asserted and independently scored. No scalar metacognition score is defined.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DecisionCohortReportV2 {
+pub struct DecisionCohortReportV3 {
     pub schema_version: u32,
     pub evaluator_version: String,
     pub outcome_profile_id: String,
@@ -182,7 +194,9 @@ pub struct DecisionCohortReportV2 {
     /// Selective risk and coverage over the full decision cohort.
     pub selective_risk: Vec<DecisionSelectiveRiskPoint>,
     pub counterfactual_forecast_metrics: DecisionCounterfactualForecastMetricsV2,
-    pub family_reports: Vec<DecisionCohortFamilyReportV2>,
+    /// Auxiliary behavior over the entire frozen decision cohort, independent of scored answers.
+    pub decision_behavior_metrics: DecisionBehaviorMetricsV1,
+    pub family_reports: Vec<DecisionCohortFamilyReportV3>,
     pub binding: DecisionCohortBindingV1,
 }
 
@@ -206,11 +220,13 @@ impl fmt::Display for DecisionCohortError {
 impl std::error::Error for DecisionCohortError {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "FrozenDecisionCohortWireV2")]
-pub struct FrozenDecisionCohortV2 {
+#[serde(try_from = "FrozenDecisionCohortWireV3")]
+pub struct FrozenDecisionCohortV3 {
     schema_version: u32,
     forecasts: Vec<DecisionForecastV2>,
     baselines: Vec<ForecastBaselineV1>,
+    weak_assumption_observations: Vec<WeakAssumptionObservation>,
+    confidence_revision_observations: Vec<ConfidenceRevisionObservation>,
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
@@ -218,20 +234,22 @@ pub struct FrozenDecisionCohortV2 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct FrozenDecisionCohortWireV2 {
+struct FrozenDecisionCohortWireV3 {
     schema_version: u32,
     forecasts: Vec<DecisionForecastV2>,
     baselines: Vec<ForecastBaselineV1>,
+    weak_assumption_observations: Vec<WeakAssumptionObservation>,
+    confidence_revision_observations: Vec<ConfidenceRevisionObservation>,
     calibration_bins: usize,
     selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
     evaluation_corpus_manifest_ref: String,
 }
 
-impl TryFrom<FrozenDecisionCohortWireV2> for FrozenDecisionCohortV2 {
+impl TryFrom<FrozenDecisionCohortWireV3> for FrozenDecisionCohortV3 {
     type Error = DecisionCohortError;
 
-    fn try_from(w: FrozenDecisionCohortWireV2) -> Result<Self, Self::Error> {
+    fn try_from(w: FrozenDecisionCohortWireV3) -> Result<Self, Self::Error> {
         if w.schema_version != FROZEN_DECISION_COHORT_SCHEMA_VERSION {
             return Err(DecisionCohortError::new(format!(
                 "unsupported decision-cohort schema version {}",
@@ -247,6 +265,13 @@ impl TryFrom<FrozenDecisionCohortWireV2> for FrozenDecisionCohortV2 {
             &w.evaluation_split_id,
             &w.evaluation_corpus_manifest_ref,
         )?;
+        validate_auxiliary_observations(
+            &w.forecasts,
+            &w.weak_assumption_observations,
+            &w.confidence_revision_observations,
+            w.calibration_bins,
+            &w.selective_thresholds,
+        )?;
         if w.forecasts.windows(2).any(|pair| pair[0].forecast_id > pair[1].forecast_id) {
             return Err(DecisionCohortError::new("frozen forecasts are not in canonical order"));
         }
@@ -256,10 +281,26 @@ impl TryFrom<FrozenDecisionCohortWireV2> for FrozenDecisionCohortV2 {
         }) {
             return Err(DecisionCohortError::new("frozen baselines are not in canonical order"));
         }
+        if w.weak_assumption_observations.windows(2).any(|pair| {
+            pair[0].episode_id >= pair[1].episode_id
+        }) {
+            return Err(DecisionCohortError::new(
+                "frozen weak-assumption observations are not in canonical order",
+            ));
+        }
+        if w.confidence_revision_observations.windows(2).any(|pair| {
+            pair[0].pair_id >= pair[1].pair_id
+        }) {
+            return Err(DecisionCohortError::new(
+                "frozen confidence revisions are not in canonical order",
+            ));
+        }
         Ok(Self {
             schema_version: w.schema_version,
             forecasts: w.forecasts,
             baselines: w.baselines,
+            weak_assumption_observations: w.weak_assumption_observations,
+            confidence_revision_observations: w.confidence_revision_observations,
             calibration_bins: w.calibration_bins,
             selective_thresholds: w.selective_thresholds,
             evaluation_split_id: w.evaluation_split_id,
@@ -268,13 +309,21 @@ impl TryFrom<FrozenDecisionCohortWireV2> for FrozenDecisionCohortV2 {
     }
 }
 
-impl FrozenDecisionCohortV2 {
+impl FrozenDecisionCohortV3 {
     pub fn forecasts(&self) -> &[DecisionForecastV2] {
         &self.forecasts
     }
 
     pub fn baselines(&self) -> &[ForecastBaselineV1] {
         &self.baselines
+    }
+
+    pub fn weak_assumption_observations(&self) -> &[WeakAssumptionObservation] {
+        &self.weak_assumption_observations
+    }
+
+    pub fn confidence_revision_observations(&self) -> &[ConfidenceRevisionObservation] {
+        &self.confidence_revision_observations
     }
 
     pub fn calibration_bins(&self) -> usize {
@@ -294,16 +343,39 @@ impl FrozenDecisionCohortV2 {
     }
 }
 
-/// Freeze a mixed decision cohort before any correctness outcomes are exposed.
+/// Freeze forecasts, baselines, and auxiliary behavior observations before outcome access.
 pub fn freeze_decision_cohort_for_split(
+    forecasts: Vec<DecisionForecastV2>,
+    baselines: Vec<ForecastBaselineV1>,
+    calibration_bins: usize,
+    selective_thresholds: Vec<f64>,
+    evaluation_split_id: String,
+    evaluation_corpus_manifest_ref: String,
+) -> Result<FrozenDecisionCohortV3, DecisionCohortError> {
+    freeze_decision_cohort_for_split_with_observations(
+        forecasts,
+        baselines,
+        Vec::new(),
+        Vec::new(),
+        calibration_bins,
+        selective_thresholds,
+        evaluation_split_id,
+        evaluation_corpus_manifest_ref,
+    )
+}
+
+/// Freeze auxiliary behavior observations along with the decision cohort, so evaluation cannot
+/// swap observations after outcomes become available.
+pub fn freeze_decision_cohort_for_split_with_observations(
     mut forecasts: Vec<DecisionForecastV2>,
     mut baselines: Vec<ForecastBaselineV1>,
+    mut weak_assumption_observations: Vec<WeakAssumptionObservation>,
+    mut confidence_revision_observations: Vec<ConfidenceRevisionObservation>,
     calibration_bins: usize,
     mut selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
     evaluation_corpus_manifest_ref: String,
-) -> Result<FrozenDecisionCohortV2, DecisionCohortError> {
-    // Canonicalize threshold ordering and reject duplicates so the policy is deterministic.
+) -> Result<FrozenDecisionCohortV3, DecisionCohortError> {
     for threshold in &selective_thresholds {
         validate_probability("selective threshold", *threshold)?;
     }
@@ -315,10 +387,14 @@ pub fn freeze_decision_cohort_for_split(
     baselines.sort_by(|a, b| {
         (&a.task_family_id, a.method).cmp(&(&b.task_family_id, b.method))
     });
-    FrozenDecisionCohortV2::try_from(FrozenDecisionCohortWireV2 {
+    weak_assumption_observations.sort_by(|a, b| a.episode_id.cmp(&b.episode_id));
+    confidence_revision_observations.sort_by(|a, b| a.pair_id.cmp(&b.pair_id));
+    FrozenDecisionCohortV3::try_from(FrozenDecisionCohortWireV3 {
         schema_version: FROZEN_DECISION_COHORT_SCHEMA_VERSION,
         forecasts,
         baselines,
+        weak_assumption_observations,
+        confidence_revision_observations,
         calibration_bins,
         selective_thresholds,
         evaluation_split_id,
@@ -443,6 +519,67 @@ fn validate_frozen_baselines(
                     family
                 )));
             }
+        }
+    }
+    Ok(())
+}
+
+fn validate_auxiliary_observations(
+    forecasts: &[DecisionForecastV2],
+    assumptions: &[WeakAssumptionObservation],
+    revisions: &[ConfidenceRevisionObservation],
+    calibration_bins: usize,
+    selective_thresholds: &[f64],
+) -> Result<(), DecisionCohortError> {
+    // Reuse structural validation, then constrain every auxiliary observation to the frozen cohort.
+    evaluate_metacognition(&[], assumptions, revisions, calibration_bins, selective_thresholds)
+        .map_err(|error| DecisionCohortError::new(error.to_string()))?;
+
+    let by_episode: BTreeMap<&str, &DecisionForecastV2> = forecasts
+        .iter()
+        .map(|forecast| (forecast.episode_id.as_str(), forecast))
+        .collect();
+    for assumption in assumptions {
+        if !by_episode.contains_key(assumption.episode_id.as_str()) {
+            return Err(DecisionCohortError::new(format!(
+                "weak-assumption observation references episode outside frozen cohort: {}",
+                assumption.episode_id
+            )));
+        }
+    }
+
+    for revision in revisions {
+        let before = by_episode
+            .get(revision.before_episode_id.as_str())
+            .ok_or_else(|| DecisionCohortError::new(format!(
+                "confidence revision {} references a before-episode outside the frozen cohort",
+                revision.pair_id
+            )))?;
+        let after = by_episode
+            .get(revision.after_episode_id.as_str())
+            .ok_or_else(|| DecisionCohortError::new(format!(
+                "confidence revision {} references an after-episode outside the frozen cohort",
+                revision.pair_id
+            )))?;
+        if revision.before_episode_id == revision.after_episode_id {
+            return Err(DecisionCohortError::new(format!(
+                "confidence revision {} must reference two distinct episodes",
+                revision.pair_id
+            )));
+        }
+        if before.task_family_id != after.task_family_id {
+            return Err(DecisionCohortError::new(format!(
+                "confidence revision {} crosses task families",
+                revision.pair_id
+            )));
+        }
+        if before.predicted_probability != Some(revision.before_confidence)
+            || after.predicted_probability != Some(revision.after_confidence)
+        {
+            return Err(DecisionCohortError::new(format!(
+                "confidence revision {} does not match the probabilities frozen for its episodes",
+                revision.pair_id
+            )));
         }
     }
     Ok(())
@@ -730,6 +867,15 @@ fn counterfactual_forecast_metrics(
     }
 }
 
+fn decision_behavior_metrics(report: MetacognitionReport) -> DecisionBehaviorMetricsV1 {
+    DecisionBehaviorMetricsV1 {
+        weak_assumption_detection: report.weak_assumption_detection,
+        confidence_revisions: report.confidence_revisions,
+        revision_direction_accuracy: report.revision_direction_accuracy,
+        mean_expected_revision_delta: report.mean_expected_revision_delta,
+    }
+}
+
 fn paired_brier_delta_interval(
     delta: Option<f64>,
     n: usize,
@@ -749,7 +895,7 @@ fn baseline_score(
     evaluation_split_id: &str,
     evaluation_manifest: &str,
     familywise_comparison_count: usize,
-) -> DecisionBaselineScoreV2 {
+) -> DecisionBaselineScoreV3 {
     let scored: Vec<_> = rows
         .iter()
         .filter(|(f, o)| f.asserted && o.asserted_answer_correct.is_some())
@@ -801,7 +947,7 @@ fn baseline_score(
     };
     let delta = candidate_brier.zip(brier).map(|(c, b)| c - b);
     let (lower, upper) = paired_brier_delta_interval(delta, n, familywise_comparison_count);
-    DecisionBaselineScoreV2 {
+    DecisionBaselineScoreV3 {
         baseline_id: baseline.baseline_id.clone(),
         method: baseline.method,
         task_family_id: baseline.task_family_id.clone(),
@@ -827,11 +973,9 @@ fn baseline_score(
 /// Correctness calibration and baseline comparison use asserted answers only, while threshold
 /// coverage divides by all decisions. Baselines must be frozen from a separately verified corpus.
 pub fn evaluate_decision_cohort(
-    frozen: &FrozenDecisionCohortV2,
+    frozen: &FrozenDecisionCohortV3,
     outcomes: &[DecisionOutcomeV1],
-    assumptions: &[WeakAssumptionObservation],
-    revisions: &[ConfidenceRevisionObservation],
-) -> Result<DecisionCohortReportV2, DecisionCohortError> {
+) -> Result<DecisionCohortReportV3, DecisionCohortError> {
     validate_forecasts(&frozen.forecasts, frozen.calibration_bins, &frozen.selective_thresholds)?;
     let forecast_by_id: BTreeMap<&str, &DecisionForecastV2> = frozen
         .forecasts
@@ -906,14 +1050,44 @@ pub fn evaluate_decision_cohort(
         .collect();
 
     let scored = score_predictions(&rows);
+    let scoreable_episode_ids: HashSet<&str> = frozen
+        .forecasts
+        .iter()
+        .filter(|forecast| forecast.asserted && forecast.predicted_probability.is_some())
+        .map(|forecast| forecast.episode_id.as_str())
+        .collect();
+    let correctness_assumptions: Vec<_> = frozen
+        .weak_assumption_observations
+        .iter()
+        .filter(|observation| scoreable_episode_ids.contains(observation.episode_id.as_str()))
+        .cloned()
+        .collect();
+    let correctness_revisions: Vec<_> = frozen
+        .confidence_revision_observations
+        .iter()
+        .filter(|revision| {
+            scoreable_episode_ids.contains(revision.before_episode_id.as_str())
+                && scoreable_episode_ids.contains(revision.after_episode_id.as_str())
+        })
+        .cloned()
+        .collect();
     let pooled_metrics = evaluate_metacognition(
         &scored,
-        assumptions,
-        revisions,
+        &correctness_assumptions,
+        &correctness_revisions,
         frozen.calibration_bins,
         &frozen.selective_thresholds,
     )
-        .map_err(|e: MetacognitionEvaluationError| DecisionCohortError::new(e.to_string()))?;
+    .map_err(|e: MetacognitionEvaluationError| DecisionCohortError::new(e.to_string()))?;
+    let pooled_behavior_report = evaluate_metacognition(
+        &[],
+        &frozen.weak_assumption_observations,
+        &frozen.confidence_revision_observations,
+        frozen.calibration_bins,
+        &frozen.selective_thresholds,
+    )
+    .map_err(|e: MetacognitionEvaluationError| DecisionCohortError::new(e.to_string()))?;
+    let pooled_behavior_metrics = decision_behavior_metrics(pooled_behavior_report);
     let familywise_risk_comparisons = frozen
         .selective_thresholds
         .len()
@@ -932,27 +1106,56 @@ pub fn evaluate_decision_cohort(
             .iter()
             .map(|(f, _)| f.episode_id.as_str())
             .collect();
-        let family_assumptions: Vec<_> = assumptions
+        let family_assumptions: Vec<_> = frozen
+            .weak_assumption_observations
             .iter()
-            .filter(|a| family_episode_ids.contains(a.episode_id.as_str()))
+            .filter(|observation| family_episode_ids.contains(observation.episode_id.as_str()))
             .cloned()
             .collect();
-        let family_revisions: Vec<_> = revisions
+        let family_revisions: Vec<_> = frozen
+            .confidence_revision_observations
             .iter()
-            .filter(|r| {
-                family_episode_ids.contains(r.before_episode_id.as_str())
-                    && family_episode_ids.contains(r.after_episode_id.as_str())
+            .filter(|revision| {
+                family_episode_ids.contains(revision.before_episode_id.as_str())
+                    && family_episode_ids.contains(revision.after_episode_id.as_str())
+            })
+            .cloned()
+            .collect();
+        let family_scoreable_episode_ids: HashSet<&str> = frows
+            .iter()
+            .filter(|(forecast, _)| forecast.asserted && forecast.predicted_probability.is_some())
+            .map(|(forecast, _)| forecast.episode_id.as_str())
+            .collect();
+        let family_correctness_assumptions: Vec<_> = family_assumptions
+            .iter()
+            .filter(|observation| family_scoreable_episode_ids.contains(observation.episode_id.as_str()))
+            .cloned()
+            .collect();
+        let family_correctness_revisions: Vec<_> = family_revisions
+            .iter()
+            .filter(|revision| {
+                family_scoreable_episode_ids.contains(revision.before_episode_id.as_str())
+                    && family_scoreable_episode_ids.contains(revision.after_episode_id.as_str())
             })
             .cloned()
             .collect();
         let metrics = evaluate_metacognition(
             &family_predictions,
+            &family_correctness_assumptions,
+            &family_correctness_revisions,
+            frozen.calibration_bins,
+            &frozen.selective_thresholds,
+        )
+        .map_err(|e| DecisionCohortError::new(e.to_string()))?;
+        let behavior_report = evaluate_metacognition(
+            &[],
             &family_assumptions,
             &family_revisions,
             frozen.calibration_bins,
             &frozen.selective_thresholds,
         )
-            .map_err(|e| DecisionCohortError::new(e.to_string()))?;
+        .map_err(|e| DecisionCohortError::new(e.to_string()))?;
+        let family_behavior_metrics = decision_behavior_metrics(behavior_report);
         let asserted = frows.iter().filter(|(f, _)| f.asserted).count();
         let abstained = frows.len() - asserted;
         let counterfactual_metrics = counterfactual_forecast_metrics(&frows);
@@ -977,7 +1180,7 @@ pub fn evaluate_decision_cohort(
                 familywise_baseline_comparisons,
             ));
         }
-        family_reports.push(DecisionCohortFamilyReportV2 {
+        family_reports.push(DecisionCohortFamilyReportV3 {
             task_family_id: family,
             total_decisions: frows.len(),
             asserted_decisions: asserted,
@@ -987,13 +1190,14 @@ pub fn evaluate_decision_cohort(
             correctness_metrics: metrics,
             selective_risk,
             counterfactual_forecast_metrics: counterfactual_metrics,
+            decision_behavior_metrics: family_behavior_metrics,
             baselines: family_baselines,
         });
     }
     let total = rows.len();
     let asserted = rows.iter().filter(|(f, _)| f.asserted).count();
     let counterfactual_metrics = counterfactual_forecast_metrics(&rows);
-    Ok(DecisionCohortReportV2 {
+    Ok(DecisionCohortReportV3 {
         schema_version: DECISION_COHORT_REPORT_SCHEMA_VERSION,
         evaluator_version: DECISION_COHORT_EVALUATOR_VERSION.into(),
         outcome_profile_id: first.outcome_profile_id.clone(),
@@ -1014,6 +1218,7 @@ pub fn evaluate_decision_cohort(
         correctness_metrics: pooled_metrics,
         selective_risk: pooled_risk,
         counterfactual_forecast_metrics: counterfactual_metrics,
+        decision_behavior_metrics: pooled_behavior_metrics,
         family_reports,
         binding: DecisionCohortBindingV1 {
             schema_version: 1,
@@ -1143,7 +1348,7 @@ mod tests {
             outcome(&fs[1], None, Some(true)),
             outcome(&fs[2], None, None),
         ];
-        let report = evaluate_decision_cohort(&frozen, &outcomes, &[], &[])
+        let report = evaluate_decision_cohort(&frozen, &outcomes)
             .unwrap_or_else(|e| panic!("evaluate: {e}"));
         assert_eq!(report.total_decisions, 3);
         assert_eq!(report.asserted_decisions, 1);
@@ -1237,13 +1442,8 @@ mod tests {
         )
         .unwrap_or_else(|e| panic!("freeze: {e}"));
         let receipt = outcome(&forecast, Some(true), None);
-        assert!(evaluate_decision_cohort(
-            &frozen,
-            &[receipt.clone(), receipt],
-            &[],
-            &[],
-        ).is_err());
-        assert!(evaluate_decision_cohort(&frozen, &[], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[receipt.clone(), receipt]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[]).is_err());
     }
 
     #[test]
@@ -1260,7 +1460,7 @@ mod tests {
             "manifest".into(),
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
-        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[o]).is_err());
     }
 
     #[test]
@@ -1276,7 +1476,7 @@ mod tests {
             "manifest".into(),
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
-        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[o]).is_err());
     }
 
     #[test]
@@ -1294,7 +1494,7 @@ mod tests {
             "manifest".into(),
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
-        assert!(evaluate_decision_cohort(&frozen, &[o], &[], &[]).is_err());
+        assert!(evaluate_decision_cohort(&frozen, &[o]).is_err());
     }
 
     #[test]
@@ -1313,6 +1513,76 @@ mod tests {
     }
 
     #[test]
+    fn auxiliary_observations_are_frozen_and_scoped_to_matching_forecasts() {
+        let fs = vec![
+            forecast("f1", "e1", "reasoning", 0.4, true, None),
+            forecast("f2", "e2", "reasoning", 0.7, true, None),
+        ];
+        let assumptions = vec![WeakAssumptionObservation {
+            episode_id: "e1".into(),
+            weak_assumption_present: true,
+            weak_assumption_detected: false,
+        }];
+        let revisions = vec![ConfidenceRevisionObservation {
+            pair_id: "revision-1".into(),
+            before_episode_id: "e1".into(),
+            after_episode_id: "e2".into(),
+            before_confidence: 0.4,
+            after_confidence: 0.7,
+            expected_direction: super::super::reasoning_metacognition::ConfidenceRevisionDirection::Increase,
+            stable_tolerance: 0.05,
+        }];
+        let frozen = freeze_decision_cohort_for_split_with_observations(
+            fs.clone(),
+            family_baselines("reasoning"),
+            assumptions.clone(),
+            revisions.clone(),
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        )
+        .unwrap_or_else(|e| panic!("freeze: {e}"));
+        assert_eq!(frozen.weak_assumption_observations().len(), 1);
+        assert_eq!(frozen.confidence_revision_observations().len(), 1);
+        let outcomes = vec![outcome(&fs[0], Some(true), None), outcome(&fs[1], Some(false), None)];
+        let report = evaluate_decision_cohort(&frozen, &outcomes)
+            .unwrap_or_else(|e| panic!("evaluate: {e}"));
+        assert_eq!(report.decision_behavior_metrics.weak_assumption_detection.observations, 1);
+        assert_eq!(report.decision_behavior_metrics.confidence_revisions, 1);
+        assert_eq!(report.correctness_metrics.confidence_revisions, 1);
+
+        let outside = vec![WeakAssumptionObservation {
+            episode_id: "not-in-cohort".into(),
+            weak_assumption_present: true,
+            weak_assumption_detected: true,
+        }];
+        assert!(freeze_decision_cohort_for_split_with_observations(
+            fs.clone(),
+            family_baselines("reasoning"),
+            outside,
+            Vec::new(),
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        ).is_err());
+
+        let mut mismatched = revisions;
+        mismatched[0].after_confidence = 0.8;
+        assert!(freeze_decision_cohort_for_split_with_observations(
+            fs,
+            family_baselines("reasoning"),
+            assumptions,
+            mismatched,
+            5,
+            vec![0.5],
+            "holdout".into(),
+            "manifest".into(),
+        ).is_err());
+    }
+
+    #[test]
     fn frozen_cohort_deserialization_rejects_tampered_policy() {
         let f = forecast("f1", "e1", "reasoning", 0.5, true, None);
         let frozen = freeze_decision_cohort_for_split(
@@ -1325,7 +1595,7 @@ mod tests {
         )
             .unwrap_or_else(|e| panic!("freeze: {e}"));
         let encoded = serde_json::to_string(&frozen).unwrap_or_else(|e| panic!("serialize: {e}"));
-        let restored: FrozenDecisionCohortV2 =
+        let restored: FrozenDecisionCohortV3 =
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("restore: {e}"));
         assert_eq!(restored, frozen);
         assert_eq!(restored.baselines(), frozen.baselines());
@@ -1333,19 +1603,19 @@ mod tests {
         let mut old_schema: serde_json::Value =
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
         old_schema["schema_version"] = serde_json::json!(1);
-        assert!(serde_json::from_value::<FrozenDecisionCohortV2>(old_schema).is_err());
+        assert!(serde_json::from_value::<FrozenDecisionCohortV3>(old_schema).is_err());
 
         let mut baseline_swap: serde_json::Value =
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
         baseline_swap["baselines"][0]["training_split_id"] = serde_json::json!("holdout");
         assert!(
-            serde_json::from_value::<FrozenDecisionCohortV2>(baseline_swap).is_err(),
+            serde_json::from_value::<FrozenDecisionCohortV3>(baseline_swap).is_err(),
             "baseline profiles may not be rebound to the evaluation split"
         );
 
         let mut tampered: serde_json::Value =
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse: {e}"));
         tampered["calibration_bins"] = serde_json::json!(0);
-        assert!(serde_json::from_value::<FrozenDecisionCohortV2>(tampered).is_err());
+        assert!(serde_json::from_value::<FrozenDecisionCohortV3>(tampered).is_err());
     }
 }
