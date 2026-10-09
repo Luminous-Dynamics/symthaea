@@ -657,7 +657,7 @@ mod tests {
     use crate::semantic_evidence_vds::{
         Rfc9162InclusionProof, Rfc9942ProofKind, Rfc9942ReceiptEnvelope,
         Rfc9942ReceiptPayload, Rfc9942Vdp, Rfc9162Sha256Vds,
-        COSE_ES256_ALGORITHM_ID,
+        COSE_EDDSA_ALGORITHM_ID, COSE_ES256_ALGORITHM_ID,
     };
     use ring::{
         rand::SystemRandom,
@@ -713,6 +713,46 @@ mod tests {
         (verified, exact_wire)
     }
 
+    fn verified_ed25519_classical_fixture() -> (Rfc9942VerifiedReceipt, Vec<u8>) {
+        use ed25519_dalek::{Signer, SigningKey};
+
+        let signing_key = SigningKey::from_bytes(&[0x35; 32]);
+        let vds = Rfc9162Sha256Vds;
+        let leaves = vec![b"hybrid-test-leaf".to_vec(), b"second-leaf".to_vec()];
+        let head = vds.tree_head(&leaves);
+        let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+        let unsigned = Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            Vec::new(),
+        )
+        .unwrap();
+        let signature = signing_key
+            .sign(&unsigned.signature1_tbs(b"", None).unwrap())
+            .to_bytes()
+            .to_vec();
+        let receipt = Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            signature,
+        )
+        .unwrap();
+        let exact_wire = receipt.to_cbor();
+        let verified = receipt
+            .verify_ed25519_inclusion_state(
+                b"hybrid-test-leaf",
+                signing_key.verifying_key().as_bytes(),
+                b"",
+                None,
+            )
+            .unwrap();
+        assert_eq!(verified.receipt_sha256(), sha256(&exact_wire));
+        (verified, exact_wire)
+    }
+
     struct CountingPolicy {
         calls: Cell<usize>,
         mismatch_key_id: bool,
@@ -755,6 +795,48 @@ mod tests {
             self.calls.set(self.calls.get() + 1);
             Ok(())
         }
+    }
+
+    #[test]
+    fn ed25519_receipt_cannot_enter_the_es256_hybrid_profile() {
+        let (verified_classical, exact_wire) = verified_ed25519_classical_fixture();
+        let key_id = Rfc9942PqKeyId::new([0x44; 16]).unwrap();
+        let key = vec![0x01; ML_DSA_65_PUBLIC_KEY_BYTES];
+        let signature = vec![0x02; ML_DSA_65_SIGNATURE_BYTES];
+        let policy = CountingPolicy {
+            calls: Cell::new(0),
+            mismatch_key_id: false,
+        };
+        let verifier = CountingVerifier {
+            calls: Cell::new(0),
+        };
+
+        assert_eq!(
+            Rfc9942HybridVerifiedReceipt::verify_with_policy(
+                &verified_classical,
+                &exact_wire,
+                key_id,
+                &key,
+                &signature,
+                1_800_000_000,
+                &policy,
+                &verifier,
+            ),
+            Err(Rfc9942HybridError::ClassicalAlgorithmMismatch)
+        );
+        assert_eq!(policy.calls.get(), 0);
+        assert_eq!(verifier.calls.get(), 0);
+
+        assert_eq!(
+            Rfc9942HybridTranscript::new(
+                &verified_classical,
+                &exact_wire,
+                key_id,
+                sha256(&key),
+                [0x77; 32],
+            ),
+            Err(Rfc9942HybridError::ClassicalAlgorithmMismatch)
+        );
     }
 
     #[test]
@@ -908,6 +990,7 @@ mod tests {
         let mut b = transcript(1, 2);
         b.key_id = Rfc9942PqKeyId([10; 16]);
         b.transcript_sha256 = digest_transcript(
+            b.classical_algorithm_id,
             b.policy_digest_sha256,
             b.key_id,
             b.verifying_key_sha256,
