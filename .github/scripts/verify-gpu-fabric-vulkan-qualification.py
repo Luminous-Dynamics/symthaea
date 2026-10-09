@@ -401,6 +401,86 @@ def verify_materialized_barrier_lowering(values: dict[str, str], spec: dict, nam
         fail(f"{name}: materialized Vulkan barrier digest mismatch")
 
 
+def verify_materialized_submission_contract(values: dict[str, str], spec: dict, name: str) -> None:
+    """Independently reconstruct the host-readback and timeline-submit call contract."""
+    try:
+        queue_family_index = int(values["queue_family_index"])
+    except (KeyError, ValueError) as exc:
+        fail(f"{name}: malformed queue family for submission digest: {exc}")
+    if queue_family_index < 0 or queue_family_index > 0xFFFFFFFF:
+        fail(f"{name}: submission queue family index outside u32 range")
+
+    completion = spec["completion"]
+    fields = [
+        "contract_version=v1",
+        f"queue_family_index={queue_family_index}",
+        "queue_index=0",
+        "semaphore_create_structure=VkSemaphoreCreateInfo",
+        "semaphore_create_flags=0",
+        "semaphore_create_pnext=VkSemaphoreTypeCreateInfo",
+        "semaphore_type_raw=1",
+        "semaphore_type=timeline",
+        "timeline_initial_value=0",
+        "host_readback_dependency_structure=VkDependencyInfo",
+        "host_readback_dependency_pnext=null",
+        "host_readback_dependency_flags=0",
+        "host_readback_memory_barrier_count=1",
+        "host_readback_buffer_memory_barrier_count=0",
+        "host_readback_image_memory_barrier_count=0",
+        "host_readback_barrier_structure=VkMemoryBarrier2",
+        "host_readback_barrier_pnext=null",
+        "host_readback_src_stage=compute_shader",
+        f"host_readback_src_stage_mask={0x800}",
+        "host_readback_src_access=shader_storage_write",
+        f"host_readback_src_access_mask={0x400000000}",
+        "host_readback_dst_stage=host",
+        f"host_readback_dst_stage_mask={0x4000}",
+        "host_readback_dst_access=host_read",
+        f"host_readback_dst_access_mask={0x2000}",
+        "host_readback_queue_family_indices=not_applicable",
+        "host_readback_offset=0",
+        "host_readback_size=0",
+        "submit_structure=VkSubmitInfo2",
+        "submit_pnext=null",
+        "submit_flags=0",
+        "wait_semaphore_count=0",
+        "command_buffer_count=1",
+        "signal_semaphore_count=1",
+        "command_buffer_structure=VkCommandBufferSubmitInfo",
+        "command_buffer_pnext=null",
+        "command_buffer_device_mask=1",
+        "signal_structure=VkSemaphoreSubmitInfo",
+        "signal_pnext=null",
+        f"signal_value={completion}",
+        "signal_stage=all_commands",
+        f"signal_stage_mask={0x10000}",
+        "signal_device_index=0",
+        "wait_structure=VkSemaphoreWaitInfo",
+        "wait_pnext=null",
+        "wait_flags=0",
+        "wait_semaphore_count=1",
+        f"wait_value={completion}",
+        "timeout_ns=5000000000",
+        "counter_query=vkGetSemaphoreCounterValue",
+        f"planned_submission_count={spec['node_count']}",
+    ]
+    for ordinal in range(spec["node_count"]):
+        fields.extend([
+            "planned_submission",
+            f"node_id={ordinal + 1}",
+            f"ordinal={ordinal}",
+            "queue_index=0",
+            f"signal_value={ordinal + 1}",
+        ])
+
+    expected = sha256_len_prefixed(
+        [field.encode("utf-8") for field in fields],
+        b"symthaea.gpu-fabric.vulkan-materialized-submission.v1",
+    )
+    if values.get("completion_lowering_digest") != expected:
+        fail(f"{name}: materialized Vulkan submission digest mismatch")
+
+
 def verify_runtime(path: Path) -> None:
     blocks = parse_runtime(path)
     if [name for name, _ in blocks] != ["fixture", "hazard"]:
@@ -428,13 +508,14 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "8":
+        if values.get("receipt_version") != "9":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
         if int(values.get("barrier_count", "-1")) != spec["barrier_count"]:
             fail(f"{name}: barrier count mismatch")
         verify_materialized_barrier_lowering(values, spec, name)
+        verify_materialized_submission_contract(values, spec, name)
         if int(values.get("completion_expected", "-1")) != spec["completion"]:
             fail(f"{name}: completion expected mismatch")
         if int(values.get("completion_observed", "-1")) != spec["completion"]:
