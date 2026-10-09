@@ -21,7 +21,7 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 7;
+const RECEIPT_VERSION: u16 = 8;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
@@ -849,6 +849,7 @@ impl VulkanBarrierWorkloadRuntime {
 
         let mut set_guard =
             DescriptorSetGuard::new(self.device.clone(), self.descriptor_pool);
+        let mut materialized_barrier_batches = Vec::new();
         for scheduled in &schedule.nodes {
             let node = graph
                 .nodes
@@ -866,12 +867,15 @@ impl VulkanBarrierWorkloadRuntime {
                 .find(|s| s.node_id == node.id)
                 .ok_or(VulkanBarrierError::UnsupportedNodeShape(node.id))?;
 
-            record_barriers(
+            if let Some(batch) = record_barriers(
                 &self.device,
                 command_guard.command(),
+                scheduled.id,
                 &submission.barriers,
                 &buffers,
-            )?;
+            )? {
+                materialized_barrier_batches.push(batch);
+            }
 
             let range = buffers[&writes[0].resource].storage_size;
             let set = allocate_set(
@@ -1000,12 +1004,9 @@ impl VulkanBarrierWorkloadRuntime {
             schedule_digest: schedule.digest_hex().map_err(VulkanBarrierError::Schedule)?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
-            barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes)
-                .map_err(|resource| {
-                    VulkanBarrierError::Receipt(
-                        VulkanBarrierReceiptError::MissingResourceStorageSize(resource),
-                    )
-                })?,
+            barrier_lowering_digest: materialized_barrier_batches_digest(
+                &materialized_barrier_batches,
+            ),
             completion_lowering_digest: completion_lowering_digest(
                 plan,
                 completion_expected,
@@ -1146,39 +1147,192 @@ fn record_host_readback_barrier(device: &Device, command: vk::CommandBuffer) {
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
 }
 
+#[derive(Debug, Clone)]
+struct MaterializedBarrierRecord {
+    from: u32,
+    to: u32,
+    resource: ResourceId,
+    kind: DependencyKind,
+    buffer_memory: bool,
+    storage_size: u64,
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedBarrierBatch {
+    node_id: u32,
+    records: Vec<MaterializedBarrierRecord>,
+}
+
+fn dependency_kind_label(kind: DependencyKind) -> &'static str {
+    match kind {
+        DependencyKind::ReadAfterWrite => "read_after_write",
+        DependencyKind::WriteAfterRead => "write_after_read",
+        DependencyKind::WriteAfterWrite => "write_after_write",
+    }
+}
+
+fn access_mask_labels(kind: DependencyKind) -> (&'static str, &'static str) {
+    match kind {
+        DependencyKind::ReadAfterWrite => ("shader_storage_write", "shader_storage_read"),
+        DependencyKind::WriteAfterRead => ("empty", "empty"),
+        DependencyKind::WriteAfterWrite => ("shader_storage_write", "shader_storage_write"),
+    }
+}
+
+fn materialized_barrier_batch(
+    node_id: u32,
+    requirements: &[VulkanBarrierRequirement],
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> Result<Option<MaterializedBarrierBatch>, ResourceId> {
+    if requirements.is_empty() {
+        return Ok(None);
+    }
+
+    let mut records = Vec::with_capacity(requirements.len());
+    for requirement in requirements {
+        let buffer_memory = requirement.requires_memory_dependency();
+        let storage_size = if buffer_memory {
+            resource_storage_sizes
+                .get(&requirement.resource)
+                .copied()
+                .ok_or_else(|| requirement.resource.clone())?
+        } else {
+            0
+        };
+        records.push(MaterializedBarrierRecord {
+            from: requirement.from,
+            to: requirement.to,
+            resource: requirement.resource.clone(),
+            kind: requirement.kind,
+            buffer_memory,
+            storage_size,
+        });
+    }
+    Ok(Some(MaterializedBarrierBatch { node_id, records }))
+}
+
+fn materialized_barrier_batches_from_plan(
+    plan: &VulkanSyncPlan,
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> Result<Vec<MaterializedBarrierBatch>, ResourceId> {
+    let mut batches = Vec::new();
+    for submission in &plan.submissions {
+        if let Some(batch) = materialized_barrier_batch(
+            submission.node_id,
+            &submission.barriers,
+            resource_storage_sizes,
+        )? {
+            batches.push(batch);
+        }
+    }
+    Ok(batches)
+}
+
+fn materialized_barrier_batches_digest(batches: &[MaterializedBarrierBatch]) -> String {
+    let mut fields = vec![format!("batch_count:{}", batches.len())];
+    for batch in batches {
+        let memory_count = batch.records.iter().filter(|record| !record.buffer_memory).count();
+        let buffer_count = batch.records.iter().filter(|record| record.buffer_memory).count();
+        fields.extend([
+            "batch".to_owned(),
+            format!("node_id={}", batch.node_id),
+            "dependency_flags=0".to_owned(),
+            format!("memory_barrier_count={memory_count}"),
+            format!("buffer_barrier_count={buffer_count}"),
+            "image_barrier_count=0".to_owned(),
+        ]);
+        for (ordinal, record) in batch.records.iter().enumerate() {
+            let (src_access, dst_access) = access_mask_labels(record.kind);
+            fields.extend([
+                "barrier".to_owned(),
+                format!("ordinal={ordinal}"),
+                format!("from={}", record.from),
+                format!("to={}", record.to),
+                format!("resource={}", record.resource.as_str()),
+                format!("kind={}", dependency_kind_label(record.kind)),
+                format!(
+                    "type={}",
+                    if record.buffer_memory { "buffer_memory" } else { "execution_memory" }
+                ),
+                "src_stage=compute_shader".to_owned(),
+                format!("src_access={src_access}"),
+                "dst_stage=compute_shader".to_owned(),
+                format!("dst_access={dst_access}"),
+                format!(
+                    "queue_family={}",
+                    if record.buffer_memory { "ignored" } else { "not_applicable" }
+                ),
+                "offset=0".to_owned(),
+                format!("size={}", record.storage_size),
+            ]);
+        }
+    }
+
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-materialized-barriers.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
+}
+
 fn record_barriers(
     device: &Device,
     command: vk::CommandBuffer,
+    node_id: u32,
     requirements: &[VulkanBarrierRequirement],
     buffers: &BTreeMap<ResourceId, WorkloadBuffer>,
-) -> Result<(), VulkanBarrierError> {
-    if requirements.is_empty() { return Ok(()); }
+) -> Result<Option<MaterializedBarrierBatch>, VulkanBarrierError> {
+    if requirements.is_empty() {
+        return Ok(None);
+    }
+    let storage_sizes = buffers
+        .iter()
+        .map(|(resource, buffer)| (resource.clone(), buffer.storage_size))
+        .collect::<BTreeMap<_, _>>();
+    let batch = materialized_barrier_batch(node_id, requirements, &storage_sizes)
+        .map_err(VulkanBarrierError::MissingResource)?
+        .ok_or(VulkanBarrierError::AllocationOverflow)?;
+
     let mut buffer_barriers = Vec::new();
     let mut execution_barriers = Vec::new();
-    for req in requirements {
-        if req.requires_memory_dependency() {
-            let buffer = buffers.get(&req.resource).ok_or(VulkanBarrierError::MissingResource(req.resource.clone()))?;
-            let (src_access, dst_access) = barrier_access_masks(req.kind);
-            buffer_barriers.push(vk::BufferMemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .src_access_mask(src_access)
-                .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .dst_access_mask(dst_access)
-                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .buffer(buffer.buffer)
-                .offset(0).size(buffer.storage_size));
+    for record in &batch.records {
+        let (src_access, dst_access) = barrier_access_masks(record.kind);
+        if record.buffer_memory {
+            let buffer = buffers
+                .get(&record.resource)
+                .ok_or_else(|| VulkanBarrierError::MissingResource(record.resource.clone()))?;
+            buffer_barriers.push(
+                vk::BufferMemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .src_access_mask(src_access)
+                    .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .dst_access_mask(dst_access)
+                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .buffer(buffer.buffer)
+                    .offset(0)
+                    .size(record.storage_size),
+            );
         } else {
-            execution_barriers.push(vk::MemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .src_access_mask(vk::AccessFlags2::empty())
-                .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .dst_access_mask(vk::AccessFlags2::empty()));
+            execution_barriers.push(
+                vk::MemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .src_access_mask(src_access)
+                    .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .dst_access_mask(dst_access),
+            );
         }
     }
-    let dependency = vk::DependencyInfo::default().memory_barriers(&execution_barriers).buffer_memory_barriers(&buffer_barriers);
+    let dependency = vk::DependencyInfo::default()
+        .dependency_flags(vk::DependencyFlags::empty())
+        .memory_barriers(&execution_barriers)
+        .buffer_memory_barriers(&buffer_barriers);
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
-    Ok(())
+    Ok(Some(batch))
 }
 
 struct CommandBufferGuard {
@@ -1579,50 +1733,8 @@ fn barrier_lowering_digest(
     plan: &VulkanSyncPlan,
     resource_storage_sizes: &BTreeMap<ResourceId, u64>,
 ) -> Result<String, ResourceId> {
-    let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v2\0");
-    h.update(b"src-stage:compute-shader\0");
-    h.update(b"dst-stage:compute-shader\0");
-    h.update(b"range-policy:rounded-storage-bytes\0");
-    h.update(b"queue-family:ignored\0");
-    h.update(b"descriptor-policy:reads-sorted-by-resource-id\0");
-    h.update(b"descriptor-policy:single-write-slot\0");
-    h.update(b"offset-policy:zero\0");
-
-    for kind in [
-        DependencyKind::ReadAfterWrite,
-        DependencyKind::WriteAfterRead,
-        DependencyKind::WriteAfterWrite,
-    ] {
-        h.update(&[match kind {
-            DependencyKind::ReadAfterWrite => 1,
-            DependencyKind::WriteAfterRead => 2,
-            DependencyKind::WriteAfterWrite => 3,
-        }]);
-        let (src_access, dst_access) = barrier_access_masks(kind);
-        h.update(&src_access.as_raw().to_le_bytes());
-        h.update(&dst_access.as_raw().to_le_bytes());
-    }
-
-    for submission in &plan.submissions {
-        for barrier in &submission.barriers {
-            h.update(&barrier.from.to_le_bytes());
-            h.update(&barrier.to.to_le_bytes());
-            h.update(&(barrier.resource.as_str().len() as u32).to_le_bytes());
-            h.update(barrier.resource.as_str().as_bytes());
-            h.update(&[match barrier.kind {
-                DependencyKind::ReadAfterWrite => 1,
-                DependencyKind::WriteAfterRead => 2,
-                DependencyKind::WriteAfterWrite => 3,
-            }]);
-            let size = resource_storage_sizes
-                .get(&barrier.resource)
-                .copied()
-                .ok_or_else(|| barrier.resource.clone())?;
-            h.update(&size.to_le_bytes());
-        }
-    }
-    Ok(h.finalize().to_hex().to_string())
+    let batches = materialized_barrier_batches_from_plan(plan, resource_storage_sizes)?;
+    Ok(materialized_barrier_batches_digest(&batches))
 }
 
 fn barrier_digest(plan: &VulkanSyncPlan) -> String {
