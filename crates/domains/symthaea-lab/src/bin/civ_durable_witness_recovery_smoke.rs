@@ -12,6 +12,7 @@ type Hash = [u8; 32];
 
 const RECORD_DOMAIN: &[u8] = b"mycelix-civ013-witness-record-v1\0";
 const COMMIT_DOMAIN: &[u8] = b"mycelix-civ013-commit-marker-v1\0";
+const FORK_EVIDENCE_DOMAIN: &[u8] = b"mycelix-civ013-fork-evidence-v1\0";
 const RECEIPT_DOMAIN: &[u8] = b"TEST-ONLY-NOT-A-WITNESS-SIGNATURE-civ013-v1\0";
 const SUPPORTED_PROTOCOL_VERSION: u16 = 1;
 const DEFAULT_POLICY_VERSION: &str = "policy-v1";
@@ -56,6 +57,8 @@ struct ForkEvidence {
     generation: u64,
     first_record_digest: Hash,
     conflicting_record_digest: Hash,
+    previous_evidence_digest: Option<Hash>,
+    digest: Hash,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -91,6 +94,7 @@ enum Failure {
     ExternalAnchorCompareFailed,
     InjectedCrash(FaultPoint),
     InvalidForkEvidence,
+    ForkEvidenceCorrupt,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -219,6 +223,40 @@ fn make_marker(record: &Record) -> CommitMarker {
     }
 }
 
+fn fork_evidence_digest(
+    generation: u64,
+    first_record_digest: Hash,
+    conflicting_record_digest: Hash,
+    previous_evidence_digest: Option<Hash>,
+) -> Hash {
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(FORK_EVIDENCE_DOMAIN);
+    encoded.extend_from_slice(&generation.to_be_bytes());
+    encoded.extend_from_slice(&first_record_digest);
+    encoded.extend_from_slice(&conflicting_record_digest);
+    option_hash(&mut encoded, previous_evidence_digest);
+    hash_bytes(&encoded)
+}
+
+fn verify_fork_evidence(evidence: &[ForkEvidence]) -> Result<(), Failure> {
+    let mut previous_digest = None;
+    for record in evidence {
+        if record.first_record_digest == record.conflicting_record_digest
+            || record.previous_evidence_digest != previous_digest
+            || record.digest != fork_evidence_digest(
+                record.generation,
+                record.first_record_digest,
+                record.conflicting_record_digest,
+                record.previous_evidence_digest,
+            )
+        {
+            return Err(Failure::ForkEvidenceCorrupt);
+        }
+        previous_digest = Some(record.digest);
+    }
+    Ok(())
+}
+
 fn validate_receipt_tail(sequence: u64, digest: Option<Hash>) -> Result<(), Failure> {
     if (sequence == 0) != digest.is_none() {
         return Err(Failure::InvalidReceiptTailShape);
@@ -315,6 +353,7 @@ impl WitnessModel {
     }
 
     fn recover(&mut self) -> Result<Record, Failure> {
+        verify_fork_evidence(&self.disk.fork_evidence)?;
         let accepted = Self::recover_disk(&mut self.disk)?;
         let Some(external) = self.external.as_ref() else {
             return Err(Failure::ExternalAnchorUnavailable);
@@ -338,6 +377,7 @@ impl WitnessModel {
     /// did not advance. Reconcile only one committed successor whose predecessor
     /// equals the currently retained external anchor.
     fn reconcile_external_anchor(&mut self) -> Result<(), Failure> {
+        verify_fork_evidence(&self.disk.fork_evidence)?;
         let accepted = Self::recover_disk(&mut self.disk)?;
         let Some(external) = self.external.as_mut() else {
             return Err(Failure::ExternalAnchorUnavailable);
@@ -514,10 +554,20 @@ impl WitnessModel {
         if first_record_digest == conflicting_record_digest {
             return Err(Failure::InvalidForkEvidence);
         }
+        verify_fork_evidence(&self.disk.fork_evidence)?;
+        let previous_evidence_digest = self.disk.fork_evidence.last().map(|item| item.digest);
+        let digest = fork_evidence_digest(
+            generation,
+            first_record_digest,
+            conflicting_record_digest,
+            previous_evidence_digest,
+        );
         self.disk.fork_evidence.push(ForkEvidence {
             generation,
             first_record_digest,
             conflicting_record_digest,
+            previous_evidence_digest,
+            digest,
         });
         Ok(())
     }
@@ -714,6 +764,9 @@ fn main() {
         fork_store.record_fork(5, hash_bytes(b"same"), hash_bytes(b"same")),
         Err(Failure::InvalidForkEvidence)
     );
+    let mut edited_fork_evidence = fork_store.clone();
+    edited_fork_evidence.disk.fork_evidence[0].conflicting_record_digest[0] ^= 1;
+    assert_eq!(edited_fork_evidence.recover(), Err(Failure::ForkEvidenceCorrupt));
 
     // If the independently retained anti-rollback anchor is unavailable, the
     // model must not commit locally or issue an attestation/fixture receipt.
