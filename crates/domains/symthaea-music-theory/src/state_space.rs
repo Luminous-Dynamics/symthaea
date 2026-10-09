@@ -282,11 +282,24 @@ impl MusicalStateTrajectory {
     /// Fraction of possible frame pairs that are recurrent at threshold.
     pub fn recurrence_rate(&self, threshold: f64) -> f64 {
         let n = self.frames.len();
-        if n < 2 {
+        if n < 2 || !threshold.is_finite() {
             return 0.0;
         }
+        let threshold = threshold.clamp(-1.0, 1.0);
         let possible = (n * (n - 1) / 2) as f64;
-        self.recurrence_pairs(threshold).len() as f64 / possible
+
+        // Count in place instead of allocating the potentially quadratic edge
+        // list returned by recurrence_pairs(). At the 4096-frame cap, a
+        // permissive threshold can otherwise materialize more than 8M tuples.
+        let mut recurrent = 0usize;
+        for i in 0..n {
+            for j in 0..i {
+                if self.frames[i].similarity(&self.frames[j]) >= threshold {
+                    recurrent += 1;
+                }
+            }
+        }
+        recurrent as f64 / possible
     }
 
     /// Return local maxima of best-prior novelty above the threshold.
@@ -832,6 +845,21 @@ mod tests {
                 && frame.novelty.is_none_or(f64::is_finite)
         }));
         assert!(trajectory.frames[1].novelty.unwrap().is_finite());
+    }
+
+    #[test]
+    fn recurrence_rate_fails_closed_for_non_finite_thresholds_without_edge_materialization() {
+        let repeated_score = score(&[note(0, 4, 0), note(2, 4, 1)], 0);
+        let trajectory = MusicalStateTrajectory::from_score(&repeated_score, 1.0, 1.0).unwrap();
+
+        assert!(trajectory.recurrence_rate(f64::NAN).is_finite());
+        assert_eq!(trajectory.recurrence_rate(f64::NAN), 0.0);
+        assert_eq!(trajectory.recurrence_rate(f64::INFINITY), 0.0);
+        assert_eq!(
+            trajectory.recurrence_rate(0.0),
+            trajectory.recurrence_pairs(0.0).len() as f64
+                / (trajectory.frames.len() * (trajectory.frames.len() - 1) / 2) as f64
+        );
     }
 
     #[test]
