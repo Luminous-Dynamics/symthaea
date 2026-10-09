@@ -11,7 +11,7 @@ These vectors define the byte-level contract for canonical retrieval receipts.
 - `mode` is a fixed one-byte tag: Historical=0, Live=1.
 - Collections that are semantically sets are sorted and deduplicated before encoding.
 - Representation bindings are sorted by identity then representation digest.
-- Projection-identity bindings are sorted by identity then projection-identity digest and bind the projection semantics exposed to reasoning, not just its representation bytes.
+- Projection-identity bindings are sorted by identity then projection-identity digest and bind the projection semantics exposed to reasoning, not just its representation bytes. Every selected identity must have both binding kinds, and their per-identity counts must match.
 - Exclusions are sorted by canonical identity then reason tag.
 - No JSON serialization, field ordering, platform endianness, or Rust enum representation participates in the digest.
 - Collection ordering is lexicographic over the UTF-8 string values (equivalently Unicode scalar-value order for valid UTF-8); no Unicode normalization is performed.
@@ -40,7 +40,10 @@ A matching digest establishes byte-level integrity under this encoding. It does 
 - duplicate retrieval-profile versions;
 - empty retrieval-profile versions;
 - whitespace-only retrieval-profile versions;
-- altered canonical bytes.
+- altered canonical bytes;
+- selected identities missing representation or projection-identity bindings;
+- unequal per-identity representation/projection binding counts;
+- historical receipts missing their required frontier.
 
 Run `python3 scripts/verify_epf010_negative_vectors.py` to verify the negative fixtures independently. A conforming implementation should reject these cases for the stated reason rather than normalize them into a different valid receipt.
 
