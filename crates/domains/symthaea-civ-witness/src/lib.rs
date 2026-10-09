@@ -2427,12 +2427,12 @@ mod tests {
         let db = TempDb::new();
         let log_id = "log-legacy-fork-meta-migration";
         let legacy_schema = SCHEMA.replace(
-            "CREATE TABLE IF NOT EXISTS witness_fork_meta (
+            r#"CREATE TABLE IF NOT EXISTS witness_fork_meta (
     log_id TEXT PRIMARY KEY NOT NULL,
     evidence_count INTEGER NOT NULL CHECK (evidence_count > 0),
     tail_digest BLOB NOT NULL CHECK (length(tail_digest) = 32)
 );
-",
+"#,
             "",
         );
         assert!(!legacy_schema.contains("witness_fork_meta"));
@@ -2486,12 +2486,12 @@ mod tests {
         let db = TempDb::new();
         let log_id = "log-corrupt-legacy-fork-meta";
         let legacy_schema = SCHEMA.replace(
-            "CREATE TABLE IF NOT EXISTS witness_fork_meta (
+            r#"CREATE TABLE IF NOT EXISTS witness_fork_meta (
     log_id TEXT PRIMARY KEY NOT NULL,
     evidence_count INTEGER NOT NULL CHECK (evidence_count > 0),
     tail_digest BLOB NOT NULL CHECK (length(tail_digest) = 32)
 );
-",
+"#,
             "",
         );
         let conn = Connection::open(&db.0).expect("open legacy database");
