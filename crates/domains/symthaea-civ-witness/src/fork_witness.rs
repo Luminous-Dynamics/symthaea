@@ -101,6 +101,16 @@ impl ForkEvent {
                 "fork evidence cannot use generation zero",
             ));
         }
+        if accepted_generation == 0 && accepted_head_digest != ZERO_DIGEST {
+            return Err(ForkWitnessError::InvalidInput(
+                "genesis accepted head must use the zero digest",
+            ));
+        }
+        if fork_generation > accepted_generation.saturating_add(1) {
+            return Err(ForkWitnessError::InvalidInput(
+                "fork generation cannot exceed the next accepted-head generation",
+            ));
+        }
         if first_record_digest == conflicting_record_digest {
             return Err(ForkWitnessError::InvalidInput(
                 "fork event must bind two distinct record digests",
@@ -136,6 +146,16 @@ impl ForkEvent {
         if self.fork_generation == 0 {
             return Err(ForkWitnessError::InvalidInput(
                 "fork evidence cannot use generation zero",
+            ));
+        }
+        if self.accepted_generation == 0 && self.accepted_head_digest != ZERO_DIGEST {
+            return Err(ForkWitnessError::InvalidInput(
+                "genesis accepted head must use the zero digest",
+            ));
+        }
+        if self.fork_generation > self.accepted_generation.saturating_add(1) {
+            return Err(ForkWitnessError::InvalidInput(
+                "fork generation cannot exceed the next accepted-head generation",
             ));
         }
         if self.first_record_digest == self.conflicting_record_digest {
@@ -570,6 +590,28 @@ mod tests {
             ForkEvent::build(&frontier, 4, d(4), 4, d(5), d(5)),
             Err(ForkWitnessError::InvalidInput(
                 "fork event must bind two distinct record digests",
+            )),
+        );
+    }
+
+    #[test]
+    fn event_rejects_a_malformed_genesis_head_digest() {
+        let frontier = ForkFrontier::empty("log-a", 7);
+        assert_eq!(
+            ForkEvent::build(&frontier, 0, d(9), 1, d(5), d(6)),
+            Err(ForkWitnessError::InvalidInput(
+                "genesis accepted head must use the zero digest",
+            )),
+        );
+    }
+
+    #[test]
+    fn event_rejects_a_fork_generation_ahead_by_more_than_one() {
+        let frontier = ForkFrontier::empty("log-a", 7);
+        assert_eq!(
+            ForkEvent::build(&frontier, 4, d(4), 6, d(5), d(6)),
+            Err(ForkWitnessError::InvalidInput(
+                "fork generation cannot exceed the next accepted-head generation",
             )),
         );
     }
