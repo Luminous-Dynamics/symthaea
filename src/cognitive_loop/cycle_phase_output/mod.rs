@@ -462,7 +462,10 @@ impl CognitiveLoopService {
                     tracing::info!(
                         cycle = self.stats.total_cycles,
                         goal_source,
-                        path_length = feedback.mental_movie.as_ref().map_or(0, |movie| movie.path_length),
+                        path_length = feedback
+                            .mental_movie
+                            .as_ref()
+                            .map_or(0, |movie| movie.path_length),
                         "Subsystem REQUEST_GEODESIC: model-grounded mental simulation completed"
                     );
                 }

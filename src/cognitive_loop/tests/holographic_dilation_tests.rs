@@ -183,6 +183,7 @@ mod tests {
         let expected_len = (64 * 64 * movie.channels) as usize;
         assert_eq!(movie.frames[0].len(), expected_len);
     }
+
     #[test]
     fn test_imagine_future_charges_incremental_not_lifetime_compute_cost() {
         let mut config = CognitiveLoopConfig::default();
@@ -205,9 +206,13 @@ mod tests {
         }
 
         let initial = service.thermodynamic_load();
-        service.imagine_future(1).expect("first one-step imagination should succeed");
+        service
+            .imagine_future(1)
+            .expect("first one-step imagination should succeed");
         let after_first = service.thermodynamic_load();
-        service.imagine_future(1).expect("second one-step imagination should succeed");
+        service
+            .imagine_future(1)
+            .expect("second one-step imagination should succeed");
         let after_second = service.thermodynamic_load();
 
         let first_cost = after_first - initial;
@@ -262,7 +267,8 @@ mod tests {
             .manifold()
             .geodesic_compute_cost;
         assert_eq!(
-            cost_after, cost_before,
+            cost_after,
+            cost_before,
             "an over-budget request must be rejected before running the model rollout or path search"
         );
     }
