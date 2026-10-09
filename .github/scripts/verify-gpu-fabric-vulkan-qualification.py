@@ -571,6 +571,8 @@ def verify_memory_topology(
                 fail(f"{name}: duplicate memory type topology index {index}")
             if index < 0 or index >= type_count or heap_index < 0 or heap_index >= heap_count:
                 fail(f"{name}: memory type topology index/heap is out of bounds")
+            if not 0 <= property_flags <= 0xFFFFFFFF:
+                fail(f"{name}: memory type property flags exceed u32")
             memory_types[index] = (property_flags, heap_index)
         elif line.startswith("memory_heap_record="):
             parts = line.split("=", 1)[1].split(":")
@@ -584,6 +586,8 @@ def verify_memory_topology(
                 fail(f"{name}: duplicate memory heap topology index {index}")
             if index < 0 or index >= heap_count or size <= 0:
                 fail(f"{name}: memory heap topology index/size is invalid")
+            if not 0 <= flags <= 0xFFFFFFFF or size > 0xFFFFFFFFFFFFFFFF:
+                fail(f"{name}: memory heap flags/size exceed Vulkan integer widths")
             memory_heaps[index] = (flags, size)
 
     if set(memory_types) != set(range(type_count)):
@@ -664,6 +668,27 @@ def verify_memory_lowering_contract(
             read_invalidate_size,
         ) = numbers
         expected_storage_size = ((len(bytes.fromhex(spec["initial"][resource])) + 3) // 4) * 4
+        u32_fields = (memory_type_bits, memory_property_flags, memory_heap_flags, buffer_usage_flags)
+        if any(not 0 <= value <= 0xFFFFFFFF for value in u32_fields):
+            fail(f"{name}: memory profile flag or mask exceeds u32 for {resource}")
+        u64_fields = (
+            memory_heap_size,
+            memory_requirement_alignment,
+            memory_requirement_size,
+            allocation_size,
+            storage_size,
+            binding_offset,
+            map_offset,
+            map_size,
+            write_flush_offset,
+            write_flush_size,
+            read_invalidate_offset,
+            read_invalidate_size,
+        )
+        if any(not 0 <= value <= 0xFFFFFFFFFFFFFFFF for value in u64_fields):
+            fail(f"{name}: memory profile range or size exceeds u64 for {resource}")
+        if write_flush_performed not in (0, 1) or read_invalidate_performed not in (0, 1):
+            fail(f"{name}: cache-maintenance outcome is not a boolean for {resource}")
         if not 0 <= memory_type_index < 32 or not (memory_type_bits & (1 << memory_type_index)):
             fail(f"{name}: selected memory type is not in the buffer's allowed memory type mask for {resource}")
         valid_type_mask = (1 << len(topology_types)) - 1
