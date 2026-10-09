@@ -810,6 +810,7 @@ def verify_runtime(path: Path) -> None:
         tuple[int, int, int],
         str,
         tuple[int, int, int, int],
+        str,
     ] | None = None
     for name, lines in blocks:
         spec = FIXTURES[name]
@@ -875,6 +876,7 @@ def verify_runtime(path: Path) -> None:
             granularity,
             sync_feature_digest,
             sync_feature_fields,
+            values["memory_topology_identity_sha256"],
         )
         if provenance is None:
             provenance = current_provenance
