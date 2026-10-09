@@ -32,7 +32,7 @@ impl<'de> Deserialize<'de> for Duration {
         if wire.den <= 0 {
             return Err(de::Error::custom("duration denominator must be positive"));
         }
-        if gcd_u128(wire.num.unsigned_abs(), wire.den as u128) != 1 {
+        if gcd_u128(u128::from(wire.num.unsigned_abs()), wire.den as u128) != 1 {
             return Err(de::Error::custom(
                 "duration rational must be reduced to canonical form",
             ));
