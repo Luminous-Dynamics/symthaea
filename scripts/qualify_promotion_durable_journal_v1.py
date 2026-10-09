@@ -19,6 +19,7 @@ from typing import Any, Iterator
 from validate_promotion_reservation_v1 import PromotionTemporalAttemptIdentityV1
 
 GENESIS_HASH = hashlib.sha256(b"").hexdigest()
+SCHEMA_VERSION = 2
 
 
 def canonical_json(value: Any) -> str:
@@ -264,6 +265,7 @@ class DurablePromotionJournalV1:
         "reservation_state_transition_guard",
         "reservation_terminal_evidence_immutable",
         "reservation_prepare_storage_fence_guard",
+        "reservation_reconciliation_storage_guard",
         "reservation_supersede_storage_fence_guard",
     }
 
@@ -286,6 +288,11 @@ class DurablePromotionJournalV1:
             "storage-enforced promotion fence rejected",
             "l.revision = new.created_revision + 1",
         ),
+        "reservation_reconciliation_storage_guard": (
+            "old.state <> 'promotiondispatchprepared'",
+            "l.revision = new.created_revision + 2",
+            "reconciliation requires exact prepared authority",
+        ),
         "reservation_supersede_storage_fence_guard": (
             "supersession requires a newer storage fence",
         ),
@@ -298,8 +305,25 @@ class DurablePromotionJournalV1:
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         connection = self._connect()
         try:
+            user_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+            existing_tables = {
+                row[0] for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            if user_version not in (0, SCHEMA_VERSION):
+                raise RuntimeError(
+                    f"unsupported promotion journal schema version {user_version}; "
+                    f"expected {SCHEMA_VERSION}; explicit migration required"
+                )
+            if user_version == 0 and "ledger_state" in existing_tables:
+                raise RuntimeError(
+                    "unversioned existing promotion journal refused; explicit migration required"
+                )
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(SCHEMA)
+            if user_version == 0:
+                connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         finally:
             connection.close()
 
@@ -820,9 +844,30 @@ class DurablePromotionJournalV1:
     def verify_journal(self) -> bool:
         connection = self._connect()
         try:
+            if int(connection.execute("PRAGMA user_version").fetchone()[0]) != SCHEMA_VERSION:
+                return False
             if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 return False
             if connection.execute("PRAGMA foreign_key_check").fetchall():
+                return False
+            table_sql = {
+                row["name"]: " ".join((row["sql"] or "").lower().split())
+                for row in connection.execute(
+                    "SELECT name, sql FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            index_sql = {
+                row["name"]: " ".join((row["sql"] or "").lower().split())
+                for row in connection.execute(
+                    "SELECT name, sql FROM sqlite_master WHERE type = 'index'"
+                ).fetchall()
+            }
+            if (
+                "promotionreconciliationrequired" not in table_sql.get("reservations", "")
+                or "promotionreconciliationrequired" not in index_sql.get(
+                    "one_active_promotion_reservation", ""
+                )
+            ):
                 return False
             trigger_rows = connection.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type = 'trigger'"
@@ -1471,6 +1516,35 @@ class DurablePromotionJournalTests(unittest.TestCase):
         self.assertEqual(journal.current_state(), before_state)
         self.assertEqual(journal.event_count(), before_count)
         self.assertTrue(journal.verify_journal())
+
+    def test_unversioned_existing_journal_refuses_implicit_schema_upgrade(self) -> None:
+        journal = self.make_journal()
+        connection = sqlite3.connect(journal.path)
+        try:
+            connection.execute("PRAGMA user_version=1")
+            connection.commit()
+        finally:
+            connection.close()
+        with self.assertRaisesRegex(RuntimeError, "unsupported promotion journal schema version"):
+            DurablePromotionJournalV1(journal.path)
+
+    def test_recovery_trigger_is_required_and_semantically_audited(self) -> None:
+        journal = self.make_journal()
+        self.reserve_one(journal)
+        self.assertTrue(self.prepare_one(journal))
+        connection = sqlite3.connect(journal.path)
+        try:
+            connection.execute("DROP TRIGGER reservation_reconciliation_storage_guard")
+            connection.execute(
+                """CREATE TRIGGER reservation_reconciliation_storage_guard
+                   BEFORE UPDATE OF state ON reservations
+                   WHEN NEW.state = 'PromotionReconciliationRequired'
+                   BEGIN SELECT 1; END"""
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        self.assertFalse(journal.verify_journal())
 
 
 if __name__ == "__main__":
