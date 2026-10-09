@@ -9,6 +9,7 @@
 //! - Evidence-first reasoning qualification records, evaluation, and receipts
 //! - Cross-domain capability matrix with explicit holdout, contamination, and resource policy
 //! - Portable lane bundles and content-bound publication artifacts for capability evidence
+//! - Decomposed metacognitive calibration, abstention, assumption, and revision qualification
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -19,6 +20,8 @@ pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
+pub mod reasoning_metacognition;
+pub mod reasoning_metacognition_cohort;
 pub mod reasoning_qualification;
 
 pub use causal_consciousness::{
@@ -48,6 +51,31 @@ pub use reasoning_evaluator::{
 pub use reasoning_evaluator_policy::{
     evaluate_episode_with_policy, ExactScoringPolicy,
     REASONING_EVALUATOR_OUTCOME_SEMANTIC_VERSION,
+};
+pub use reasoning_metacognition::{
+    evaluate_frozen_correctness_forecasts, evaluate_frozen_forecasts_with_baselines,
+    evaluate_metacognition, freeze_correctness_forecasts, freeze_correctness_forecasts_for_split,
+    BinaryDetectionReport, CalibrationBinReport, ConfidenceRevisionDirection,
+    ConfidenceRevisionObservation, CorrectnessForecastV1, CorrectnessOutcomeV1,
+    CorrectnessPrediction, ForecastBaselineComparisonReport, ForecastBaselineMethod,
+    ForecastBaselineScoreReport, ForecastBaselineV1, ForecastOutcomeBindingReport,
+    FrozenCorrectnessForecastSet, MetacognitionEvaluationError, MetacognitionReport,
+    SelectiveRiskPoint, TaskFamilyCalibrationReport, TaskFamilyForecastBaselineComparison,
+    WeakAssumptionObservation, CORRECTNESS_FORECAST_SCHEMA_VERSION,
+    CORRECTNESS_OUTCOME_SCHEMA_VERSION, FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION,
+    FORECAST_BASELINE_SCHEMA_VERSION, FORECAST_OUTCOME_BINDING_REPORT_SCHEMA_VERSION,
+    FROZEN_FORECAST_SET_SCHEMA_VERSION, METACOGNITION_EVALUATOR_VERSION,
+};
+pub use reasoning_metacognition_cohort::{
+    evaluate_decision_cohort, freeze_decision_cohort_for_split,
+    freeze_decision_cohort_for_split_with_observations, DecisionBaselineScoreV4,
+    DecisionCohortBindingV1, DecisionCohortError, DecisionCohortFamilyReportV4,
+    DecisionBehaviorMetricsV1, DecisionCohortReportV4, DecisionCounterfactualForecastMetricsV2,
+    DecisionForecastV2,
+    DecisionOutcomeV2, DecisionSelectiveRiskPoint, WeakAssumptionDetectionV1,
+    FrozenDecisionCohortV4, DECISION_COHORT_EVALUATOR_VERSION,
+    DECISION_COHORT_REPORT_SCHEMA_VERSION, DECISION_FORECAST_SCHEMA_VERSION,
+    DECISION_OUTCOME_SCHEMA_VERSION, FROZEN_DECISION_COHORT_SCHEMA_VERSION,
 };
 pub use reasoning_qualification::{
     AbstentionReason, AssumptionRecord, EvidenceRef, QualificationMetric,
