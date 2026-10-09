@@ -1834,10 +1834,12 @@ mod tests {
             genesis.clone(),
         );
 
+        // A predecessor at SQLite's signed-integer maximum has no representable
+        // successor, even though adding one still fits in Rust's u64.
         assert!(matches!(
             store.advance(
                 log_id,
-                u64::MAX,
+                i64::MAX as u64,
                 h(b"unrepresentable-predecessor"),
                 h(b"must-not-be-prepared"),
                 0,
