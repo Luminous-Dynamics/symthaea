@@ -1763,13 +1763,13 @@ jobs:
         run: |
           set -euo pipefail
           manifest="crates/domains/symthaea-lab/Cargo.toml"
-          cargo run --manifest-path "$manifest" --bin civ_independent_evaluator_smoke
-          cargo run --manifest-path "$manifest" --bin civ_contestable_revocable_lifecycle_smoke
-          cargo run --manifest-path "$manifest" --bin civ_consequence_tiered_credibility_smoke
-          cargo run --manifest-path "$manifest" --bin civ_plural_authority_quorum_smoke
-          cargo run --manifest-path "$manifest" --bin civ_governance_audit_chain_smoke
-          cargo run --manifest-path "$manifest" --bin civ_merkle_governance_checkpoint_smoke
-          cargo run --manifest-path "$manifest" --bin civ_signed_tree_head_witness_smoke
-          cargo run --manifest-path "$manifest" --bin civ_monotonic_checkpoint_acceptance_smoke
-          cargo run --manifest-path "$manifest" --bin civ_independent_receipt_tail_anchor_smoke
-          cargo run --manifest-path "$manifest" --bin civ_durable_witness_recovery_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_independent_evaluator_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_contestable_revocable_lifecycle_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_consequence_tiered_credibility_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_plural_authority_quorum_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_governance_audit_chain_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_merkle_governance_checkpoint_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_signed_tree_head_witness_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_monotonic_checkpoint_acceptance_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_independent_receipt_tail_anchor_smoke
+          cargo run --locked --manifest-path "$manifest" --bin civ_durable_witness_recovery_smoke
