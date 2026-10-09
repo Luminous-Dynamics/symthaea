@@ -261,8 +261,8 @@ mod tests {
     }
 
     #[test]
-    fn rk4_energy_drift_remains_small_for_one_two_and_three_spatial_dimensions() {
-        for dimensions in 1..=3 {
+    fn rk4_energy_drift_remains_small_through_six_spatial_dimensions() {
+        for dimensions in 1..=6 {
             let sites = 1usize << dimensions;
             let mut initial = vec![0.0; 2 * sites];
             for i in 0..sites {

@@ -40,7 +40,7 @@ This expression counts each interior bond once and includes one fixed-zero bound
 - Dimension validation from state length (*2 × 2ᵈ* values), with malformed sizes rejected by the validator.
 - Generic RHS, discrete Hamiltonian, and analytic *dH/dt* evaluation.
 - Fixed-step RK4 trajectories for conservation-drift checks.
-- Tests comparing the one-dimensional RHS with Stage A, evaluating *dH/dt* through six spatial dimensions, and measuring RK4 energy drift for dimensions 1–3.
+- Tests comparing the one-dimensional RHS and Hamiltonian with Stage A, evaluating analytic and finite-difference *dH/dt* through six spatial dimensions, and measuring RK4 energy drift through six dimensions.
 - A deterministic discovery runner that does **not** seed the known Hamiltonian into the search. It uses five paired search seeds (`42, 1337, 2718, 7919, 31415`) for each dimension while holding train and holdout trajectories fixed, and reports candidate counts, screened candidates, `symbolically_proven` metadata, and elapsed time.
 
 ## Run and interpret
