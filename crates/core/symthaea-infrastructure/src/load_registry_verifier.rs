@@ -339,9 +339,18 @@ mod tests {
 
     fn demands() -> Vec<LoadDemand> {
         vec![
-            LoadDemand { load_id: "critical-water".into(), requested_power_kw: 2.0 },
-            LoadDemand { load_id: "deferrable-comms".into(), requested_power_kw: 1.0 },
-            LoadDemand { load_id: "aux-lighting".into(), requested_power_kw: 2.0 },
+            LoadDemand {
+                load_id: "critical-water".into(),
+                requested_power_kw: 2.0,
+            },
+            LoadDemand {
+                load_id: "deferrable-comms".into(),
+                requested_power_kw: 1.0,
+            },
+            LoadDemand {
+                load_id: "aux-lighting".into(),
+                requested_power_kw: 2.0,
+            },
         ]
     }
 
@@ -376,14 +385,18 @@ mod tests {
     fn rejects_priority_violation_even_when_energy_totals_still_balance() {
         let registry = registry();
         let mut ledger = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        let critical = ledger.records.iter_mut()
+        let critical = ledger
+            .records
+            .iter_mut()
             .find(|record| record.load_id == "critical-water")
             .unwrap();
         // Move 0.25 kWh away from critical load and to a lower-tier load;
         // preserve served sum and per-record demand balance.
         critical.served_kwh -= 0.25;
         critical.unserved_kwh += 0.25;
-        let auxiliary = ledger.records.iter_mut()
+        let auxiliary = ledger
+            .records
+            .iter_mut()
             .find(|record| record.load_id == "aux-lighting")
             .unwrap();
         auxiliary.served_kwh += 0.25;
@@ -402,18 +415,24 @@ mod tests {
         let registry = registry();
 
         let mut class_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        class_changed.records.iter_mut()
+        class_changed
+            .records
+            .iter_mut()
             .find(|record| record.load_id == "deferrable-comms")
-            .unwrap().class = LoadClass::Critical;
+            .unwrap()
+            .class = LoadClass::Critical;
         assert_eq!(
             verify_load_service_ledger(&registry, &class_changed).unwrap_err(),
             LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
         );
 
         let mut provenance_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        provenance_changed.records.iter_mut()
+        provenance_changed
+            .records
+            .iter_mut()
             .find(|record| record.load_id == "deferrable-comms")
-            .unwrap().provenance = ClassificationProvenance::ReviewedRecord {
+            .unwrap()
+            .provenance = ClassificationProvenance::ReviewedRecord {
                 record_id: "review-99".into(),
                 record_revision: "r2".into(),
                 reviewer_id: "reviewer-a".into(),
@@ -424,18 +443,24 @@ mod tests {
         );
 
         let mut priority_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        priority_changed.records.iter_mut()
+        priority_changed
+            .records
+            .iter_mut()
             .find(|record| record.load_id == "deferrable-comms")
-            .unwrap().shed_priority += 1;
+            .unwrap()
+            .shed_priority += 1;
         assert_eq!(
             verify_load_service_ledger(&registry, &priority_changed).unwrap_err(),
             LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
         );
 
         let mut rating_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        rating_changed.records.iter_mut()
+        rating_changed
+            .records
+            .iter_mut()
             .find(|record| record.load_id == "deferrable-comms")
-            .unwrap().rated_power_kw += 0.5;
+            .unwrap()
+            .rated_power_kw += 0.5;
         assert_eq!(
             verify_load_service_ledger(&registry, &rating_changed).unwrap_err(),
             LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
