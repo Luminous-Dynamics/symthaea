@@ -617,7 +617,8 @@ pub struct TrialCoverage {
 
 impl TrialCoverage {
     pub fn is_complete(&self) -> bool {
-        self.missing_trial_ids.is_empty()
+        self.requested_trial_count > 0
+            && self.missing_trial_ids.is_empty()
             && self.duplicate_requested_trial_ids.is_empty()
             && self.duplicate_observation_trial_ids.is_empty()
             && self.unexpected_observation_trial_ids.is_empty()
@@ -909,6 +910,12 @@ mod tests {
             compare_predictions(&registry, "p-a", "p-b").unwrap(),
             PairwiseDiscrimination::NotComparable
         );
+    }
+
+    #[test]
+    fn empty_trial_manifest_is_not_complete() {
+        let coverage = assess_trial_coverage(&[], &[]);
+        assert!(!coverage.is_complete());
     }
 
     #[test]
