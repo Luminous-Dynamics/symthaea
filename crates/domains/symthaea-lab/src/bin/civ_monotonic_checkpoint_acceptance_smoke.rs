@@ -96,6 +96,73 @@ enum AcceptanceFailure {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AuditChainFailure {
+    SequenceMismatch,
+    PreviousDigestMismatch,
+    EventDigestMismatch,
+}
+
+fn acceptance_event_digest(
+    sequence: u64,
+    previous_event_digest: Option<Hash>,
+    prior_checkpoint_id: Option<Hash>,
+    candidate_checkpoint_id: Hash,
+    outcome: AttemptOutcome,
+    reason: &str,
+) -> Hash {
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(ACCEPTANCE_EVENT_DOMAIN);
+    encoded.extend_from_slice(&sequence.to_be_bytes());
+    match previous_event_digest {
+        Some(digest) => {
+            encoded.push(1);
+            encoded.extend_from_slice(&digest);
+        }
+        None => encoded.push(0),
+    }
+    match prior_checkpoint_id {
+        Some(id) => {
+            encoded.push(1);
+            encoded.extend_from_slice(&id);
+        }
+        None => encoded.push(0),
+    }
+    encoded.extend_from_slice(&candidate_checkpoint_id);
+    encode_field(&mut encoded, outcome.id());
+    encode_field(&mut encoded, reason.as_bytes());
+    Sha256::digest(encoded).into()
+}
+
+fn verify_event_chain(events: &[AcceptanceEvent]) -> Result<(), AuditChainFailure> {
+    let mut previous_event_digest = None;
+    for (index, event) in events.iter().enumerate() {
+        let expected_sequence = u64::try_from(index)
+            .expect("acceptance event count fits u64")
+            .checked_add(1)
+            .expect("acceptance sequence cannot wrap");
+        if event.sequence != expected_sequence {
+            return Err(AuditChainFailure::SequenceMismatch);
+        }
+        if event.previous_event_digest != previous_event_digest {
+            return Err(AuditChainFailure::PreviousDigestMismatch);
+        }
+        let expected_digest = acceptance_event_digest(
+            event.sequence,
+            event.previous_event_digest,
+            event.prior_checkpoint_id,
+            event.candidate_checkpoint_id,
+            event.outcome,
+            &event.reason,
+        );
+        if event.event_digest != expected_digest {
+            return Err(AuditChainFailure::EventDigestMismatch);
+        }
+        previous_event_digest = Some(event.event_digest);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProofFailure {
     InvalidTreeSize,
     InvalidProof,
@@ -132,27 +199,14 @@ impl CheckpointStore {
             .expect("acceptance sequence cannot wrap");
         let previous_event_digest = self.events.last().map(|event| event.event_digest);
         let candidate_checkpoint_id = checkpoint_id(candidate);
-        let mut encoded = Vec::new();
-        encoded.extend_from_slice(ACCEPTANCE_EVENT_DOMAIN);
-        encoded.extend_from_slice(&sequence.to_be_bytes());
-        match previous_event_digest {
-            Some(digest) => {
-                encoded.push(1);
-                encoded.extend_from_slice(&digest);
-            }
-            None => encoded.push(0),
-        }
-        match prior_checkpoint_id {
-            Some(id) => {
-                encoded.push(1);
-                encoded.extend_from_slice(&id);
-            }
-            None => encoded.push(0),
-        }
-        encoded.extend_from_slice(&candidate_checkpoint_id);
-        encode_field(&mut encoded, outcome.id());
-        encode_field(&mut encoded, reason.as_bytes());
-        let event_digest = Sha256::digest(encoded).into();
+        let event_digest = acceptance_event_digest(
+            sequence,
+            previous_event_digest,
+            prior_checkpoint_id,
+            candidate_checkpoint_id,
+            outcome,
+            reason,
+        );
         self.events.push(AcceptanceEvent {
             sequence,
             previous_event_digest,
@@ -710,6 +764,26 @@ fn main() {
     assert_eq!(
         store.forks[0].acceptance_event_sequence,
         store.events.last().unwrap().sequence
+    );
+    assert_eq!(verify_event_chain(&store.events), Ok(()));
+
+    let mut edited_receipt = store.events.clone();
+    edited_receipt[1].reason.push_str("-rewritten");
+    assert_eq!(
+        verify_event_chain(&edited_receipt),
+        Err(AuditChainFailure::EventDigestMismatch)
+    );
+    let mut reordered_receipts = store.events.clone();
+    reordered_receipts.swap(0, 1);
+    assert_eq!(
+        verify_event_chain(&reordered_receipts),
+        Err(AuditChainFailure::SequenceMismatch)
+    );
+    let mut interior_deletion = store.events.clone();
+    interior_deletion.remove(1);
+    assert_eq!(
+        verify_event_chain(&interior_deletion),
+        Err(AuditChainFailure::SequenceMismatch)
     );
 
     println!(
