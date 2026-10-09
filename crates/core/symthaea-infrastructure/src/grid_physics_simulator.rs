@@ -193,6 +193,10 @@ pub struct LoadServiceReport {
     /// a grid-tied step never reports a service deficit under the idealized
     /// infinite-grid assumption.
     pub is_islanded: bool,
+    /// Duration of the represented step in hours. Required to interpret the
+    /// energy values as average power and to distinguish a fresh/default
+    /// report (no completed step) from a valid zero-demand interval.
+    pub step_duration_hours: f64,
     pub total_demand_kwh: f64,
     pub total_served_kwh: f64,
     pub intentional_shed_kwh: f64,
@@ -289,6 +293,7 @@ impl LoadServiceReport {
             let storage_export_to_grid = (storage_discharge_kwh - total_demand).max(0.0);
             return Self {
                 is_islanded: false,
+                step_duration_hours: dt_hours,
                 total_demand_kwh: total_demand,
                 total_served_kwh: total_demand,
                 critical_demand_kwh: critical,
@@ -354,6 +359,7 @@ impl LoadServiceReport {
 
         Self {
             is_islanded: true,
+            step_duration_hours: dt_hours,
             total_demand_kwh: total_demand,
             total_served_kwh: total_served,
             intentional_shed_kwh: intentional_shed,
@@ -402,7 +408,8 @@ impl LoadServiceReport {
 
     fn is_valid(&self) -> bool {
         let values = [
-            self.total_demand_kwh, self.total_served_kwh, self.intentional_shed_kwh,
+            self.step_duration_hours, self.total_demand_kwh, self.total_served_kwh,
+            self.intentional_shed_kwh,
             self.total_unserved_kwh, self.critical_demand_kwh, self.critical_served_kwh,
             self.critical_unserved_kwh, self.deferrable_demand_kwh, self.deferrable_served_kwh,
             self.deferrable_shed_kwh, self.community_auxiliary_demand_kwh,
@@ -423,6 +430,7 @@ impl LoadServiceReport {
             (left - right).abs() <= 1e-9 * self.total_demand_kwh.max(1.0)
         };
         values.iter().all(|value| value.is_finite() && *value >= 0.0)
+            && self.step_duration_hours > 0.0
             && close(
                 self.critical_demand_kwh + self.deferrable_demand_kwh
                     + self.community_auxiliary_demand_kwh + self.cooling_demand_kwh
@@ -1473,10 +1481,10 @@ mod failure_mode_tests {
         cmd.torques[1] = 0.1;
         assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
 
-        let served_load_kw = sim.load_service_report().total_served_kwh;
-        // try_step receives seconds; report energy is kWh, so convert this
-        // 1-second step back to average kW before comparing with droop input.
-        let served_load_kw = served_load_kw / (1.0 / 3600.0);
+        let report = sim.load_service_report();
+        // The receipt carries its own interval so consumers need not recreate
+        // the time base from the simulator command or assume a fixed step.
+        let served_load_kw = report.total_served_kwh / report.step_duration_hours;
         let expected = steady_state_frequency_after_islanding(&sim.freq_droop, served_load_kw);
         assert_eq!(sim.prev_frequency_hz, expected);
         assert!(sim.load_service_report().total_unserved_kwh > 0.0);
@@ -1607,6 +1615,33 @@ mod failure_mode_tests {
             !forged_mode.is_valid(),
             "a grid-sourced service receipt must not validate as islanded"
         );
+    }
+
+    #[test]
+    fn load_service_receipt_carries_its_time_basis_and_rejects_no_step_defaults() {
+        assert!(
+            !LoadServiceReport::default().is_valid(),
+            "a fresh simulator report must not look like a completed zero-demand step"
+        );
+
+        let report = LoadServiceReport::allocate(
+            LoadServicePolicy::illustrative_default(),
+            200.0,
+            20.0,
+            15.0,
+            0.5,
+            0.25,
+            true,
+            0.1,
+            0.0,
+            0.0,
+        );
+        assert_eq!(report.step_duration_hours, 0.25);
+        assert!(report.is_valid());
+
+        let mut no_interval = report;
+        no_interval.step_duration_hours = 0.0;
+        assert!(!no_interval.is_valid());
     }
 
     #[test]
