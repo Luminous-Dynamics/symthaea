@@ -442,8 +442,8 @@ def best_effort_failure_status(repo: str, subject: str, token: str, reason: str,
         post_status(repo, subject, token, "failure",
                     f"Independent security audit verifier could not qualify this run: {reason}", target)
         return True
-    except VerificationError as exc:
-        print(f"Unable to publish fail-closed commit status: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Unable to publish fail-closed commit status: {type(exc).__name__}: {exc}", file=sys.stderr)
         return False
 
 
@@ -478,11 +478,11 @@ def main() -> int:
             activity = os.environ.get("TRIGGER_ACTIVITY_TYPE", "").strip()
         return process(repo, POLICY[repo], run_id, token, mode, activity,
                        expected_sha, attempt, default_branch)
-    except VerificationError as exc:
-        # On workflow_run events the expected commit SHA is supplied by
-        # GitHub's event payload. If API or identity checks fail, best-effort
-        # publishing a failure status prevents a stale green status from
-        # silently surviving on the same commit.
+    except Exception as exc:
+        # Normalize malformed API payloads and unexpected verifier defects as
+        # failures too. Never let an unhandled ordinary exception preserve a
+        # stale green status when the trusted event identity is available.
+        message = str(exc) if isinstance(exc, VerificationError) else f"unexpected {type(exc).__name__}: {exc}"
         if mode == "workflow_run":
             subject = os.environ.get("TRIGGER_RUN_HEAD_SHA", "").strip()
             raw_id = os.environ.get("TRIGGER_RUN_ID", "").strip()
@@ -491,13 +491,15 @@ def main() -> int:
             raw_workflow_id = os.environ.get("TRIGGER_RUN_WORKFLOW_ID", "").strip()
             workflow_id = int(raw_workflow_id) if raw_workflow_id.isdigit() else None
             best_effort_failure_status(
-                repo, subject, token, str(exc), target,
+                repo, subject, token, message, target,
                 workflow_id=workflow_id,
                 event_name=os.environ.get("TRIGGER_RUN_EVENT", "").strip(),
                 repository_id=os.environ.get("TRIGGER_RUN_REPOSITORY_ID", "").strip(),
                 head_repository_id=os.environ.get("TRIGGER_RUN_HEAD_REPOSITORY_ID", "").strip(),
             )
-        raise
+        if isinstance(exc, VerificationError):
+            raise
+        raise VerificationError(message) from exc
 
 
 if __name__ == "__main__":
