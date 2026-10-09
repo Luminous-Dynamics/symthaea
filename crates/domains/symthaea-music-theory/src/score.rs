@@ -146,12 +146,27 @@ impl Score {
         seen
     }
 
-    pub fn push(&mut self, note: ScoreNote) {
-        let end = note.onset + note.duration;
+    /// Insert a note only when its exact end time is representable in the
+    /// rational beat type. This is the safe ingestion API for caller-supplied
+    /// notes; it does not mutate the score when the addition cannot be stored.
+    pub fn try_push(&mut self, note: ScoreNote) -> Result<(), ScoreNote> {
+        let Some(end) = note.onset.checked_add(note.duration) else {
+            return Err(note);
+        };
         if end.beats() > self.total_beats.beats() {
             self.total_beats = end;
         }
         self.notes.push(note);
+        Ok(())
+    }
+
+    /// Insert a trusted, ordinary musical note.
+    ///
+    /// Use `try_push` for data that may contain extreme externally supplied
+    /// rational values; this wrapper fails explicitly instead of wrapping.
+    pub fn push(&mut self, note: ScoreNote) {
+        self.try_push(note)
+            .expect("score note end is not representable; use try_push for untrusted notes");
     }
 
     /// Notes belonging to a given voice, in onset order.
