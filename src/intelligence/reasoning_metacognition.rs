@@ -676,19 +676,20 @@ fn validate_evaluation_scope(
     split_id: Option<&str>,
     manifest_ref: Option<&str>,
 ) -> Result<(), MetacognitionEvaluationError> {
-    match (split_id, manifest_ref) {
-        (None, None) => Ok(()),
-        (Some(split), Some(manifest))
-            if !split.trim().is_empty()
-                && split.trim() == split
-                && !manifest.trim().is_empty()
-                && manifest.trim() == manifest =>
-        {
-            Ok(())
+    if let Some(split) = split_id {
+        if split.trim().is_empty() || split.trim() != split {
+            return Err(MetacognitionEvaluationError::MissingEvaluationSplit);
         }
+    }
+    if let Some(manifest) = manifest_ref {
+        if manifest.trim().is_empty() || manifest.trim() != manifest {
+            return Err(MetacognitionEvaluationError::MissingEvaluationManifest);
+        }
+    }
+    match (split_id, manifest_ref) {
+        (None, None) | (Some(_), Some(_)) => Ok(()),
         (None, Some(_)) => Err(MetacognitionEvaluationError::MissingEvaluationSplit),
         (Some(_), None) => Err(MetacognitionEvaluationError::MissingEvaluationManifest),
-        _ => Err(MetacognitionEvaluationError::MissingEvaluationManifest),
     }
 }
 
