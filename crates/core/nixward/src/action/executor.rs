@@ -1078,6 +1078,397 @@ impl NixOSExecutor {
     }
 
     #[cfg(feature = "systemd-observer")]
+    async fn execute_authorized_unit_file_operation_with_witness(
+        &mut self,
+        command: &NixOSCommand,
+        authority: &NixLocalExecutionAuthorityV1,
+        intent_digest: &str,
+        approval_request_id: &str,
+        projection_digest: &str,
+        observer: &NixSystemdReadOnlyObserverV1,
+        operation: NixServiceOperationKindV1,
+        unit: &str,
+        expected_manager_owner: &str,
+        expected_bus_id: &str,
+    ) -> (ExecutionResult, Option<NixLiveExecutionWitnessV1>) {
+        let safety = command.safety_level();
+
+        let identity = match authority.pre_state_identity() {
+            Some(identity) => identity,
+            None => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "unit-file Service authority has no bound pre-state identity"
+                            .to_string(),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+        let (authorized_generation, authorized_unit, _) =
+            match parse_service_pre_state_identity(identity) {
+                Ok(parsed) => parsed,
+                Err(error) => {
+                    return (
+                        ExecutionResult::Blocked {
+                            reason: format!(
+                                "unit-file Service authority has invalid pre-state identity: {error}"
+                            ),
+                            safety_level: safety,
+                        },
+                        None,
+                    );
+                }
+            };
+        if authorized_unit != unit {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "unit-file Service unit differs from approved pre-state: approved={} current={}",
+                        authorized_unit, unit
+                    ),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        let expected_content_digest = match authority.service_definition_content_digest() {
+            Some(digest) if !digest.is_empty() => digest,
+            _ => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "unit-file Service authority has no definition-content commitment"
+                            .to_string(),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let transport = match NixSystemdLifecycleMutationTransportV1::connect_system().await {
+            Ok(transport) => transport,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "could not connect native unit-file mutation transport: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        // This capture occurs after observer setup and immediately before the
+        // native unit-file call. The transport then checks the exact manager and
+        // bus epoch on its own connection before and after the RPC.
+        let content = match observer.capture_service_definition_content(unit).await {
+            Ok(content) => content,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "final unit-file definition capture failed before dispatch: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+        let actual_content_digest = match content.digest() {
+            Ok(digest) => digest,
+            Err(error) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: format!(
+                            "final unit-file definition capture could not be digested: {error}"
+                        ),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+        if actual_content_digest != expected_content_digest {
+            return (
+                ExecutionResult::Blocked {
+                    reason: format!(
+                        "unit-file definition changed since approval: approved={} current={}",
+                        expected_content_digest, actual_content_digest
+                    ),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+        if content.manager_owner() != expected_manager_owner {
+            return (
+                ExecutionResult::Blocked {
+                    reason:
+                        "unit-file definition capture manager owner differs from approved epoch"
+                            .to_string(),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+        if content.bus_id() != expected_bus_id {
+            return (
+                ExecutionResult::Blocked {
+                    reason:
+                        "unit-file definition capture bus incarnation differs from approved epoch"
+                            .to_string(),
+                    safety_level: safety,
+                },
+                None,
+            );
+        }
+
+        let started_at = std::time::Instant::now();
+        let witness = match NixLiveExecutionWitnessV1::from_live_authority(authority) {
+            Ok(witness) => witness,
+            Err(reason) => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason,
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let unit_file_result = match operation {
+            NixServiceOperationKindV1::Enable => {
+                transport
+                    .enable_unit_file_for_manager_owner_and_bus_id(
+                        unit,
+                        expected_manager_owner,
+                        expected_bus_id,
+                    )
+                    .await
+            }
+            NixServiceOperationKindV1::Disable => {
+                transport
+                    .disable_unit_file_for_manager_owner_and_bus_id(
+                        unit,
+                        expected_manager_owner,
+                        expected_bus_id,
+                    )
+                    .await
+            }
+            _ => {
+                return (
+                    ExecutionResult::Blocked {
+                        reason: "unit-file executor received a lifecycle Service operation"
+                            .to_string(),
+                        safety_level: safety,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let unit_file_result = match unit_file_result {
+            Ok(result) => result,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "unit-file mutation returned no epoch-qualified result; outcome is indeterminate: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    None,
+                );
+            }
+        };
+
+        let expected_result_kind = match operation {
+            NixServiceOperationKindV1::Enable => NixSystemdUnitFileMutationKindV1::Enable,
+            NixServiceOperationKindV1::Disable => NixSystemdUnitFileMutationKindV1::Disable,
+            _ => unreachable!("lifecycle operations return before unit-file dispatch"),
+        };
+        if unit_file_result.operation() != expected_result_kind
+            || unit_file_result.unit() != unit
+            || unit_file_result.manager_owner() != expected_manager_owner
+            || unit_file_result.bus_id() != expected_bus_id
+        {
+            return (
+                ExecutionResult::FailedNoRollback {
+                    error: "native unit-file result lineage does not match the dispatched Service operation"
+                        .to_string(),
+                    rollback_error: None,
+                },
+                Some(witness),
+            );
+        }
+
+        let generation_after = match self.capture_generation().await {
+            Ok(generation) => generation,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "unit-file mutation returned, but current NixOS generation could not be observed: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+        if u64::from(generation_after) != authorized_generation {
+            return (
+                ExecutionResult::FailedNoRollback {
+                    error: format!(
+                        "unit-file mutation returned but NixOS generation changed: approved={} current={}",
+                        authorized_generation, generation_after
+                    ),
+                    rollback_error: None,
+                },
+                Some(witness),
+            );
+        }
+
+        let observation = match observer
+            .observe_service_post_state(operation, unit, u64::from(generation_after))
+            .await
+        {
+            Ok(observation) => observation,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "unit-file mutation returned but post-state could not be observed: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+        let observed = observation.as_ref();
+        let expected_unit_file_state = match operation {
+            NixServiceOperationKindV1::Enable => ServiceUnitFileStateV1::Enabled,
+            NixServiceOperationKindV1::Disable => ServiceUnitFileStateV1::Disabled,
+            _ => unreachable!("lifecycle operations return before unit-file observation"),
+        };
+        let observed_source_digest = match observed.definition_identity.digest(unit) {
+            Ok(digest) => digest,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "unit-file mutation returned but observed definition identity is invalid: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+        if observed.operation != operation
+            || observed.unit != unit
+            || u64::from(generation_after) != observed.observed_generation
+            || observed.systemd_manager_owner.as_deref() != Some(expected_manager_owner)
+            || observed.definition_content_digest != expected_content_digest
+            || observed_source_digest != content.as_ref().source_identity_digest
+        {
+            return (
+                ExecutionResult::FailedNoRollback {
+                    error: "unit-file mutation returned but post-state provenance differs from the approved definition/manager epoch"
+                        .to_string(),
+                    rollback_error: None,
+                },
+                Some(witness),
+            );
+        }
+        if observed.unit_file_state != expected_unit_file_state {
+            return (
+                ExecutionResult::FailedNoRollback {
+                    error: format!(
+                        "unit-file mutation returned but observed UnitFileState does not satisfy the operation: operation={operation:?} observed={:?}",
+                        observed.unit_file_state
+                    ),
+                    rollback_error: None,
+                },
+                Some(witness),
+            );
+        }
+
+        // Re-capture the definition after the state observation to catch manager,
+        // bus, source, or content rollover that occurred during post-state capture.
+        if let Err(error) = self
+            .validate_authorized_service_definition_content(authority, operation, unit)
+            .await
+        {
+            return (
+                ExecutionResult::FailedNoRollback {
+                    error: format!(
+                        "unit-file mutation post-state was observed, but final definition revalidation failed: {error}"
+                    ),
+                    rollback_error: None,
+                },
+                Some(witness),
+            );
+        }
+        let generation_final = match self.capture_generation().await {
+            Ok(generation) => generation,
+            Err(error) => {
+                return (
+                    ExecutionResult::FailedNoRollback {
+                        error: format!(
+                            "unit-file mutation post-state was observed, but final generation revalidation failed: {error}"
+                        ),
+                        rollback_error: None,
+                    },
+                    Some(witness),
+                );
+            }
+        };
+        if u64::from(generation_final) != authorized_generation {
+            return (
+                ExecutionResult::FailedNoRollback {
+                    error: format!(
+                        "unit-file mutation post-state was observed, but NixOS generation changed afterward: approved={} current={}",
+                        authorized_generation, generation_final
+                    ),
+                    rollback_error: None,
+                },
+                Some(witness),
+            );
+        }
+
+        let elapsed = started_at.elapsed().as_millis() as u64;
+        let operation_label = match operation {
+            NixServiceOperationKindV1::Enable => "EnableUnitFiles",
+            NixServiceOperationKindV1::Disable => "DisableUnitFiles",
+            _ => unreachable!("lifecycle operations return before unit-file dispatch"),
+        };
+        let install_info = unit_file_result
+            .carries_install_info()
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "not-returned-by-method".to_string());
+        let result = ExecutionResult::Success {
+            stdout: format!(
+                "{operation_label} returned for {unit}; observed UnitFileState={:?}; change_records={}; carries_install_info={install_info}",
+                observed.unit_file_state,
+                unit_file_result.changes().len(),
+            ),
+            stderr: String::new(),
+            execution_time_ms: elapsed,
+        };
+        let _ = (intent_digest, approval_request_id, projection_digest);
+        (result, Some(witness))
+    }
+
+    #[cfg(feature = "systemd-observer")]
     async fn execute_authorized_service_with_witness(
         &mut self,
         command: &NixOSCommand,
