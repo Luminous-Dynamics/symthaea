@@ -760,7 +760,9 @@ impl NixSystemdReadOnlyObserverV1 {
                 observed: observed_id,
             });
         }
-        let observed_invocation = required_invocation_id(&properties)?
+        let observed_invocation = self
+            .read_invocation_id_property(&path)
+            .await?
             .ok_or(NixSystemdObserverErrorV1::InvocationIdUnavailable)?;
         let expected_invocation = hex::encode(invocation_id);
         if observed_invocation != expected_invocation {
@@ -1579,6 +1581,11 @@ mod tests {
             read_definition_content_file(link.to_str().unwrap()),
             Err(NixSystemdObserverErrorV1::DefinitionContentSymlink)
         ));
+    }
+
+    #[test]
+    fn invocation_id_is_not_a_universal_unit_getall_requirement() {
+        assert!(!REQUIRED_UNIT_PROPERTIES.contains(&"InvocationID"));
     }
 
     #[test]
