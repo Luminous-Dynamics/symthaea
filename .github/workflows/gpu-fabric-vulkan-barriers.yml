@@ -3,6 +3,12 @@ name: GPU Fabric Vulkan Barrier Qualification
 permissions:
   contents: read
 
+# Only the newest exact-head qualification for a PR is useful. Cancel stale
+# attempts on that same PR, without cancelling qualifications for other PRs.
+concurrency:
+  group: gpu-fabric-vulkan-barriers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
