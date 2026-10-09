@@ -227,8 +227,12 @@ impl fmt::Display for WitnessError {
             Self::ReceiptTailEquivocation => {
                 write!(f, "receipt digest changed without a sequence advance")
             }
-            Self::ExternalAnchorMismatch => write!(f, "external anchor disagrees with local history"),
-            Self::RollbackDetected => write!(f, "external anchor proves local rollback or missing history"),
+            Self::ExternalAnchorMismatch => {
+                write!(f, "external anchor disagrees with local history")
+            }
+            Self::RollbackDetected => {
+                write!(f, "external anchor proves local rollback or missing history")
+            }
             Self::PreparedCandidateConflict => {
                 write!(f, "a different candidate is already prepared for this generation")
             }
@@ -844,7 +848,9 @@ impl SqliteWitnessStore {
                     || accepted_count == 0
                     || blob_digest(&digest)? != records[accepted_count - 1].digest
                 {
-                    return Err(WitnessError::CorruptStore("metadata does not match accepted history"));
+                    return Err(WitnessError::CorruptStore(
+                        "metadata does not match accepted history",
+                    ));
                 }
                 Some(records[accepted_count - 1].clone())
             }
@@ -903,7 +909,7 @@ fn append_fork_evidence(
         )
         .optional()?;
     let previous = previous_blob.as_deref().map(blob_digest).transpose()?;
-    let digest = fork_digest(generation, first_digest, conflicting_digest, previous);
+    let digest = fork_digest(log_id, generation, first_digest, conflicting_digest, previous);
     tx.execute(
         "INSERT OR IGNORE INTO witness_fork_evidence (
             log_id, generation, first_record_digest, conflicting_record_digest,
@@ -954,7 +960,7 @@ fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessE
         let stored_digest =
             blob_digest(&digest).map_err(|_| WitnessError::CorruptForkEvidence)?;
         if first == conflicting || stored_previous != previous
-            || stored_digest != fork_digest(generation as u64, first, conflicting, previous)
+            || stored_digest != fork_digest(log_id, generation as u64, first, conflicting, previous)
         {
             return Err(WitnessError::CorruptForkEvidence);
         }
@@ -1027,6 +1033,7 @@ fn record_digest(
 }
 
 fn fork_digest(
+    log_id: &str,
     generation: u64,
     first: Digest,
     conflicting: Digest,
@@ -1034,6 +1041,7 @@ fn fork_digest(
 ) -> Digest {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(FORK_DOMAIN);
+    encode_field(&mut bytes, log_id.as_bytes());
     bytes.extend_from_slice(&generation.to_be_bytes());
     bytes.extend_from_slice(&first);
     bytes.extend_from_slice(&conflicting);
@@ -1280,7 +1288,10 @@ mod tests {
         drop(store);
 
         let reopened = db.open();
-        assert_eq!(reopened.recover("log-retry", &anchor).expect("prior state"), Some(first.clone()));
+        assert_eq!(
+            reopened.recover("log-retry", &anchor).expect("prior state"),
+            Some(first.clone())
+        );
         let second = reopened.advance(
             "log-retry",
             first.generation,
