@@ -2850,7 +2850,7 @@ mod tests {
         assert_eq!(second.generation, 2);
 
         assert_eq!(
-            Self::integrity_check_from_transaction(&tx).expect("validate stable read snapshot"),
+            SqliteWitnessStore::integrity_check_from_transaction(&tx).expect("validate stable read snapshot"),
             "ok"
         );
         let rows_in_snapshot: i64 = tx
