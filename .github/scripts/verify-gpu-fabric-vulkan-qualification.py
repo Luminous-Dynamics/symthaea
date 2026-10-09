@@ -71,7 +71,7 @@ def sha256_file(path: Path) -> str:
 def parse_kv(lines: list[str]) -> dict[str, str]:
     values: dict[str, str] = {}
     for line in lines:
-        if "=" not in line or line.startswith("resource_"):
+        if "=" not in line or line.startswith(("resource_", "memory_type_record=", "memory_heap_record=")):
             continue
         key, value = line.split("=", 1)
         if key in values:
@@ -537,7 +537,92 @@ def verify_materialized_dispatch_contract(values: dict[str, str], spec: dict, na
         fail(f"{name}: materialized descriptor/dispatch digest mismatch")
 
 
-def verify_memory_lowering_contract(values: dict[str, str], lines: list[str], spec: dict, name: str) -> None:
+def verify_memory_topology(
+    values: dict[str, str], lines: list[str], name: str
+) -> tuple[dict[int, tuple[int, int]], dict[int, tuple[int, int]]]:
+    """Rebuild the selected physical device's complete memory-type/heap inventory."""
+    if values.get("memory_topology_version") != "1":
+        fail(f"{name}: memory topology version mismatch")
+    try:
+        type_count = int(values["memory_type_count"])
+        heap_count = int(values["memory_heap_count"])
+    except (KeyError, ValueError) as exc:
+        fail(f"{name}: malformed memory topology counts: {exc}")
+    if not 1 <= type_count <= 32 or not 1 <= heap_count <= 16:
+        fail(f"{name}: memory topology counts exceed Vulkan limits")
+
+    memory_types: dict[int, tuple[int, int]] = {}
+    memory_heaps: dict[int, tuple[int, int]] = {}
+    fields = [
+        "topology_version=1",
+        f"memory_type_count={type_count}",
+        f"memory_heap_count={heap_count}",
+    ]
+    for line in lines:
+        if line.startswith("memory_type_record="):
+            parts = line.split("=", 1)[1].split(":")
+            if len(parts) != 3:
+                fail(f"{name}: malformed memory type topology record")
+            try:
+                index, property_flags, heap_index = map(int, parts)
+            except ValueError as exc:
+                fail(f"{name}: malformed memory type topology record: {exc}")
+            if index in memory_types:
+                fail(f"{name}: duplicate memory type topology index {index}")
+            if index < 0 or index >= type_count or heap_index < 0 or heap_index >= heap_count:
+                fail(f"{name}: memory type topology index/heap is out of bounds")
+            memory_types[index] = (property_flags, heap_index)
+        elif line.startswith("memory_heap_record="):
+            parts = line.split("=", 1)[1].split(":")
+            if len(parts) != 3:
+                fail(f"{name}: malformed memory heap topology record")
+            try:
+                index, flags, size = map(int, parts)
+            except ValueError as exc:
+                fail(f"{name}: malformed memory heap topology record: {exc}")
+            if index in memory_heaps:
+                fail(f"{name}: duplicate memory heap topology index {index}")
+            if index < 0 or index >= heap_count or size <= 0:
+                fail(f"{name}: memory heap topology index/size is invalid")
+            memory_heaps[index] = (flags, size)
+
+    if set(memory_types) != set(range(type_count)):
+        fail(f"{name}: memory type topology inventory is incomplete")
+    if set(memory_heaps) != set(range(heap_count)):
+        fail(f"{name}: memory heap topology inventory is incomplete")
+    for index in range(type_count):
+        property_flags, heap_index = memory_types[index]
+        fields.extend([
+            "memory_type",
+            f"index={index}",
+            f"property_flags={property_flags}",
+            f"heap_index={heap_index}",
+        ])
+    for index in range(heap_count):
+        flags, size = memory_heaps[index]
+        fields.extend([
+            "memory_heap",
+            f"index={index}",
+            f"flags={flags}",
+            f"size={size}",
+        ])
+    expected = sha256_len_prefixed(
+        [field.encode("utf-8") for field in fields],
+        b"symthaea.gpu-fabric.vulkan-memory-topology.v1",
+    )
+    if values.get("memory_topology_identity_sha256") != expected:
+        fail(f"{name}: physical-device memory topology digest mismatch")
+    return memory_types, memory_heaps
+
+
+def verify_memory_lowering_contract(
+    values: dict[str, str],
+    lines: list[str],
+    spec: dict,
+    name: str,
+    topology_types: dict[int, tuple[int, int]],
+    topology_heaps: dict[int, tuple[int, int]],
+) -> None:
     """Independently verify selected Vulkan memory types and cache-maintenance evidence."""
     profiles: dict[str, dict[str, int]] = {}
     for line in lines:
@@ -581,6 +666,16 @@ def verify_memory_lowering_contract(values: dict[str, str], lines: list[str], sp
         expected_storage_size = ((len(bytes.fromhex(spec["initial"][resource])) + 3) // 4) * 4
         if not 0 <= memory_type_index < 32 or not (memory_type_bits & (1 << memory_type_index)):
             fail(f"{name}: selected memory type is not in the buffer's allowed memory type mask for {resource}")
+        valid_type_mask = (1 << len(topology_types)) - 1
+        if memory_type_bits & ~valid_type_mask:
+            fail(f"{name}: memory type mask references absent physical-device memory types for {resource}")
+        topology_type = topology_types.get(memory_type_index)
+        if topology_type is None or topology_type != (memory_property_flags, memory_heap_index):
+            fail(f"{name}: resource memory profile conflicts with the sealed memory type inventory for {resource}")
+        if not 0 <= memory_heap_index < len(topology_heaps):
+            fail(f"{name}: resource references absent physical-device memory heap for {resource}")
+        if topology_heaps.get(memory_heap_index) != (memory_heap_flags, memory_heap_size):
+            fail(f"{name}: resource memory profile conflicts with the sealed memory heap inventory for {resource}")
         if not (memory_property_flags & 0x2):
             fail(f"{name}: selected memory type is not host-visible for {resource}")
         if not 0 <= memory_heap_index < 16 or memory_heap_size <= 0 or memory_requirement_alignment <= 0:
@@ -723,7 +818,7 @@ def verify_runtime(path: Path) -> None:
             fail(f"{name}: witness version mismatch")
         if values.get("qualification_claim") != "workload_execution+synchronization_only":
             fail(f"{name}: qualification claim mismatch")
-        if values.get("receipt_version") != "11":
+        if values.get("receipt_version") != "12":
             fail(f"{name}: receipt version mismatch")
         if int(values.get("node_count", "-1")) != spec["node_count"]:
             fail(f"{name}: node count mismatch")
@@ -732,7 +827,8 @@ def verify_runtime(path: Path) -> None:
         verify_materialized_barrier_lowering(values, spec, name)
         verify_materialized_submission_contract(values, spec, name)
         verify_materialized_dispatch_contract(values, spec, name)
-        verify_memory_lowering_contract(values, lines, spec, name)
+        topology_types, topology_heaps = verify_memory_topology(values, lines, name)
+        verify_memory_lowering_contract(values, lines, spec, name, topology_types, topology_heaps)
         if int(values.get("completion_expected", "-1")) != spec["completion"]:
             fail(f"{name}: completion expected mismatch")
         if int(values.get("completion_observed", "-1")) != spec["completion"]:
