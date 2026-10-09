@@ -21,7 +21,7 @@ const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 9;
+const RECEIPT_VERSION: u16 = 10;
 const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
 const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
 const VULKAN_ENTRY_POINT: &str = "main";
@@ -161,6 +161,8 @@ pub enum VulkanBarrierReceiptError {
     MultipleLogicalQueues,
     #[error("receipt completion lowering digest mismatch")]
     CompletionLoweringDigest,
+    #[error("receipt descriptor/dispatch lowering digest mismatch")]
+    ExecutionLoweringDigest,
     #[error("receipt observed timeline value {observed} does not equal expected {expected}")]
     TimelineCompletion { expected: u64, observed: u64 },
 }
@@ -240,6 +242,7 @@ pub struct VulkanBarrierExecutionReceipt {
     pub barrier_digest: String,
     pub barrier_lowering_digest: String,
     pub completion_lowering_digest: String,
+    pub execution_lowering_digest: String,
     pub node_count: u32,
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
@@ -371,6 +374,14 @@ impl VulkanBarrierExecutionReceipt {
             != completion_lowering_digest(plan, expected_completion, self.queue_family_index)
         {
             return Err(VulkanBarrierReceiptError::CompletionLoweringDigest);
+        }
+        let expected_dispatch_records =
+            materialized_dispatch_records_from_graph(graph, schedule, &expected_storage_sizes)
+                .ok_or(VulkanBarrierReceiptError::ExecutionLoweringDigest)?;
+        if self.execution_lowering_digest
+            != materialized_dispatch_records_digest(&expected_dispatch_records)
+        {
+            return Err(VulkanBarrierReceiptError::ExecutionLoweringDigest);
         }
         if self.completion_observed != self.completion_expected {
             return Err(VulkanBarrierReceiptError::TimelineCompletion {
@@ -856,6 +867,7 @@ impl VulkanBarrierWorkloadRuntime {
         let mut set_guard =
             DescriptorSetGuard::new(self.device.clone(), self.descriptor_pool);
         let mut materialized_barrier_batches = Vec::new();
+        let mut materialized_dispatch_records = Vec::new();
         for scheduled in &schedule.nodes {
             let node = graph
                 .nodes
@@ -884,39 +896,70 @@ impl VulkanBarrierWorkloadRuntime {
             }
 
             let range = buffers[&writes[0].resource].storage_size;
+            let groups = dispatch_group_count(range, self.max_compute_workgroup_count_x)
+                .ok_or_else(|| VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone()))?
+                .max(1);
+            let dispatch_record = MaterializedDispatchRecord::new(
+                node.id,
+                scheduled.ordinal,
+                [
+                    reads[0].resource.clone(),
+                    reads[1].resource.clone(),
+                    writes[0].resource.clone(),
+                ],
+                range,
+                [groups, 1, 1],
+            );
+            let descriptor_buffers = [
+                buffers
+                    .get(&dispatch_record.descriptor_bindings[0].resource)
+                    .ok_or_else(|| VulkanBarrierError::MissingResource(
+                        dispatch_record.descriptor_bindings[0].resource.clone(),
+                    ))?,
+                buffers
+                    .get(&dispatch_record.descriptor_bindings[1].resource)
+                    .ok_or_else(|| VulkanBarrierError::MissingResource(
+                        dispatch_record.descriptor_bindings[1].resource.clone(),
+                    ))?,
+                buffers
+                    .get(&dispatch_record.descriptor_bindings[2].resource)
+                    .ok_or_else(|| VulkanBarrierError::MissingResource(
+                        dispatch_record.descriptor_bindings[2].resource.clone(),
+                    ))?,
+            ];
             let set = allocate_set(
                 &self.device,
                 self.descriptor_pool,
                 self.descriptor_layout,
-                [
-                    &buffers[&reads[0].resource],
-                    &buffers[&reads[1].resource],
-                    &buffers[&writes[0].resource],
-                ],
-                range,
+                descriptor_buffers,
+                &dispatch_record.descriptor_bindings,
             )?;
             set_guard.push(set);
 
-            let groups = dispatch_group_count(range, self.max_compute_workgroup_count_x)
-                .ok_or_else(|| VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone()))?;
             qualification_stage(&format!("node_{}_dispatch_begin", node.id));
+            let descriptor_sets = [set];
             unsafe {
                 self.device.cmd_bind_pipeline(
                     command_guard.command(),
-                    vk::PipelineBindPoint::COMPUTE,
+                    dispatch_record.pipeline_bind_point,
                     self.pipeline,
                 );
                 self.device.cmd_bind_descriptor_sets(
                     command_guard.command(),
-                    vk::PipelineBindPoint::COMPUTE,
+                    dispatch_record.pipeline_bind_point,
                     self.pipeline_layout,
-                    0,
-                    &[set],
+                    dispatch_record.pipeline_layout_set_index,
+                    &descriptor_sets,
                     &[],
                 );
-                self.device
-                    .cmd_dispatch(command_guard.command(), groups.max(1), 1, 1);
+                self.device.cmd_dispatch(
+                    command_guard.command(),
+                    dispatch_record.dispatch_groups[0],
+                    dispatch_record.dispatch_groups[1],
+                    dispatch_record.dispatch_groups[2],
+                );
             }
+            materialized_dispatch_records.push(dispatch_record);
             qualification_stage(&format!("node_{}_dispatch_recorded", node.id));
         }
 
@@ -1022,6 +1065,9 @@ impl VulkanBarrierWorkloadRuntime {
                 &materialized_barrier_batches,
             ),
             completion_lowering_digest: submission_contract.digest(),
+            execution_lowering_digest: materialized_dispatch_records_digest(
+                &materialized_dispatch_records,
+            ),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -1161,6 +1207,131 @@ fn record_host_readback_barrier(
         .dependency_flags(vk::DependencyFlags::empty())
         .memory_barriers(std::slice::from_ref(&barrier));
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedDescriptorBinding {
+    binding: u32,
+    resource: ResourceId,
+    offset: u64,
+    range: u64,
+    descriptor_type: vk::DescriptorType,
+    stage_flags: vk::ShaderStageFlags,
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedDispatchRecord {
+    node_id: u32,
+    schedule_ordinal: u32,
+    pipeline_bind_point: vk::PipelineBindPoint,
+    pipeline_layout_set_index: u32,
+    descriptor_set_count: u32,
+    dynamic_offset_count: u32,
+    descriptor_bindings: Vec<MaterializedDescriptorBinding>,
+    dispatch_groups: [u32; 3],
+}
+
+impl MaterializedDispatchRecord {
+    fn new(
+        node_id: u32,
+        schedule_ordinal: u32,
+        resources: [ResourceId; 3],
+        range: u64,
+        dispatch_groups: [u32; 3],
+    ) -> Self {
+        let descriptor_bindings = resources
+            .into_iter()
+            .enumerate()
+            .map(|(binding, resource)| MaterializedDescriptorBinding {
+                binding: binding as u32,
+                resource,
+                offset: 0,
+                range,
+                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+                stage_flags: vk::ShaderStageFlags::COMPUTE,
+            })
+            .collect();
+        Self {
+            node_id,
+            schedule_ordinal,
+            pipeline_bind_point: vk::PipelineBindPoint::COMPUTE,
+            pipeline_layout_set_index: 0,
+            descriptor_set_count: 1,
+            dynamic_offset_count: 0,
+            descriptor_bindings,
+            dispatch_groups,
+        }
+    }
+}
+
+fn materialized_dispatch_records_from_graph(
+    graph: &ExecutionGraph,
+    schedule: &ExecutionSchedule,
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> Option<Vec<MaterializedDispatchRecord>> {
+    let mut records = Vec::with_capacity(schedule.nodes.len());
+    for scheduled in &schedule.nodes {
+        let node = graph.nodes.iter().find(|node| node.id == scheduled.id)?;
+        let (reads, writes) = canonical_workload_resources(node);
+        if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 {
+            return None;
+        }
+        let range = *resource_storage_sizes.get(&writes[0].resource)?;
+        let groups = dispatch_group_count(range, u32::MAX)?.max(1);
+        records.push(MaterializedDispatchRecord::new(
+            node.id,
+            scheduled.ordinal,
+            [
+                reads[0].resource.clone(),
+                reads[1].resource.clone(),
+                writes[0].resource.clone(),
+            ],
+            range,
+            [groups, 1, 1],
+        ));
+    }
+    Some(records)
+}
+
+fn materialized_dispatch_records_digest(records: &[MaterializedDispatchRecord]) -> String {
+    let mut fields = vec![format!("dispatch_record_count:{}", records.len())];
+    for record in records {
+        fields.extend([
+            "dispatch_record".to_owned(),
+            format!("node_id={}", record.node_id),
+            format!("schedule_ordinal={}", record.schedule_ordinal),
+            format!("pipeline_bind_point_raw={}", record.pipeline_bind_point.as_raw()),
+            format!("pipeline_layout_set_index={}", record.pipeline_layout_set_index),
+            format!("descriptor_set_count={}", record.descriptor_set_count),
+            format!("dynamic_offset_count={}", record.dynamic_offset_count),
+            format!("descriptor_binding_count={}", record.descriptor_bindings.len()),
+        ]);
+        for binding in &record.descriptor_bindings {
+            fields.extend([
+                "descriptor_binding".to_owned(),
+                format!("binding={}", binding.binding),
+                format!("resource={}", binding.resource.as_str()),
+                format!("offset={}", binding.offset),
+                format!("range={}", binding.range),
+                format!("descriptor_type_raw={}", binding.descriptor_type.as_raw()),
+                format!("stage_flags_raw={}", binding.stage_flags.as_raw()),
+            ]);
+        }
+        fields.extend([
+            format!("dispatch_group_count_x={}", record.dispatch_groups[0]),
+            format!("dispatch_group_count_y={}", record.dispatch_groups[1]),
+            format!("dispatch_group_count_z={}", record.dispatch_groups[2]),
+        ]);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-materialized-dispatch.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
 }
 
 #[derive(Debug, Clone)]
@@ -1510,9 +1681,14 @@ fn allocate_set(
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
     buffers: [&WorkloadBuffer; 3],
-    range: u64,
+    bindings: &[MaterializedDescriptorBinding],
 ) -> Result<vk::DescriptorSet, VulkanBarrierError> {
-    let info = vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(std::slice::from_ref(&layout));
+    if bindings.len() != 3 {
+        return Err(VulkanBarrierError::AllocationOverflow);
+    }
+    let info = vk::DescriptorSetAllocateInfo::default()
+        .descriptor_pool(pool)
+        .set_layouts(std::slice::from_ref(&layout));
     let set = unsafe {
         match device
             .allocate_descriptor_sets(&info)
@@ -1525,14 +1701,35 @@ fn allocate_set(
         }
     };
     let infos = [
-        vk::DescriptorBufferInfo::default().buffer(buffers[0].buffer).offset(0).range(range),
-        vk::DescriptorBufferInfo::default().buffer(buffers[1].buffer).offset(0).range(range),
-        vk::DescriptorBufferInfo::default().buffer(buffers[2].buffer).offset(0).range(range),
+        vk::DescriptorBufferInfo::default()
+            .buffer(buffers[0].buffer)
+            .offset(bindings[0].offset)
+            .range(bindings[0].range),
+        vk::DescriptorBufferInfo::default()
+            .buffer(buffers[1].buffer)
+            .offset(bindings[1].offset)
+            .range(bindings[1].range),
+        vk::DescriptorBufferInfo::default()
+            .buffer(buffers[2].buffer)
+            .offset(bindings[2].offset)
+            .range(bindings[2].range),
     ];
     let writes = [
-        vk::WriteDescriptorSet::default().dst_set(set).dst_binding(0).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(std::slice::from_ref(&infos[0])),
-        vk::WriteDescriptorSet::default().dst_set(set).dst_binding(1).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(std::slice::from_ref(&infos[1])),
-        vk::WriteDescriptorSet::default().dst_set(set).dst_binding(2).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(std::slice::from_ref(&infos[2])),
+        vk::WriteDescriptorSet::default()
+            .dst_set(set)
+            .dst_binding(bindings[0].binding)
+            .descriptor_type(bindings[0].descriptor_type)
+            .buffer_info(std::slice::from_ref(&infos[0])),
+        vk::WriteDescriptorSet::default()
+            .dst_set(set)
+            .dst_binding(bindings[1].binding)
+            .descriptor_type(bindings[1].descriptor_type)
+            .buffer_info(std::slice::from_ref(&infos[1])),
+        vk::WriteDescriptorSet::default()
+            .dst_set(set)
+            .dst_binding(bindings[2].binding)
+            .descriptor_type(bindings[2].descriptor_type)
+            .buffer_info(std::slice::from_ref(&infos[2])),
     ];
     unsafe { device.update_descriptor_sets(&writes, &[]); }
     Ok(set)
@@ -2341,6 +2538,7 @@ mod tests {
             barrier_digest: String::new(),
             barrier_lowering_digest: String::new(),
             completion_lowering_digest: String::new(),
+            execution_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
             resource_digests: BTreeMap::new(),
@@ -3275,6 +3473,7 @@ mod tests {
             barrier_digest: String::new(),
             barrier_lowering_digest: String::new(),
             completion_lowering_digest: String::new(),
+            execution_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
             resource_digests: BTreeMap::new(),
