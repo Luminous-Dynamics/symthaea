@@ -313,8 +313,8 @@ pub fn evaluate_metacognition(
     let abstention_opportunity_cost =
         conditional_rate(predictions.iter().filter(|p| !p.asserted), |p| p.correct);
 
-    // Freeze thresholds and group taxonomy before inspecting correctness outcomes. Bonferroni
-    // covers every pooled and task-family x threshold bound reported below.
+    // Freeze thresholds, equal-width bins, and group taxonomy before inspecting outcomes.
+    // Bonferroni covers every pooled/group threshold bound and every reported calibration bin.
     let selective_risk = selective_thresholds
         .iter()
         .map(|&threshold| {
@@ -1009,6 +1009,25 @@ mod tests {
         }));
         assert!(report.task_family_calibration[0].selective_risk[0].risk_upper_bound_95
             >= report.selective_risk[0].risk_upper_bound_95);
+
+        assert_eq!(report.calibration_bins.len(), 10);
+        let pooled_top_bin = report.calibration_bins[9];
+        assert_eq!(pooled_top_bin.episodes, 10);
+        assert_eq!(pooled_top_bin.mean_confidence, Some(0.9));
+        assert_eq!(pooled_top_bin.empirical_accuracy, Some(0.9));
+        assert!(pooled_top_bin.accuracy_lower_95.unwrap_or_default() <= 0.9);
+        assert!(pooled_top_bin.accuracy_upper_95.unwrap_or_default() >= 0.9);
+        assert_eq!(report.calibration_bins[0].episodes, 0);
+        assert_eq!(report.calibration_bins[0].empirical_accuracy, None);
+        assert_eq!(report.calibration_bins[0].accuracy_lower_95, None);
+        assert_eq!(report.task_family_calibration[1].calibration_bins[9].episodes, 5);
+        assert_eq!(report.task_family_calibration[1].calibration_bins[9].empirical_accuracy, Some(0.8));
+        let pooled_width = pooled_top_bin.accuracy_upper_95.unwrap_or_default()
+            - pooled_top_bin.accuracy_lower_95.unwrap_or_default();
+        let subgroup_bin = report.task_family_calibration[1].calibration_bins[9];
+        let subgroup_width = subgroup_bin.accuracy_upper_95.unwrap_or_default()
+            - subgroup_bin.accuracy_lower_95.unwrap_or_default();
+        assert!(subgroup_width > pooled_width, "smaller subgroup must show greater uncertainty");
     }
 
     #[test]
