@@ -1152,6 +1152,29 @@ impl NixOSExecutor {
             }
         };
 
+        // Enable/Disable are unit-file configuration mutations, not lifecycle
+        // jobs. They deliberately bypass JobRemoved and use a separate post-state
+        // contract based on the observed persistent UnitFileState.
+        if matches!(
+            *operation,
+            NixServiceOperationKindV1::Enable | NixServiceOperationKindV1::Disable
+        ) {
+            return self
+                .execute_authorized_unit_file_operation_with_witness(
+                    command,
+                    authority,
+                    intent_digest,
+                    approval_request_id,
+                    projection_digest,
+                    &observer,
+                    *operation,
+                    unit,
+                    expected_manager_owner,
+                    expected_bus_id,
+                )
+                .await;
+        }
+
         let watcher = match observer.arm_job_removed_watcher().await {
             Ok(watcher) => watcher,
             Err(error) => {
