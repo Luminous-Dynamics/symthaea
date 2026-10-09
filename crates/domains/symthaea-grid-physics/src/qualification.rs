@@ -73,6 +73,26 @@ pub struct VerifiedPolicyReceipt {
     pub recomputed_battery_cycles: f64,
 }
 
+/// Per-metric deltas computed as candidate minus baseline. Negative values
+/// mean the candidate used less of that metric; no aggregate score is formed.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PolicyMetricDeltas {
+    pub total_cost: f64,
+    pub unserved_energy_kwh: f64,
+    pub curtailed_energy_kwh: f64,
+    pub battery_cycles: f64,
+}
+
+/// Paired-policy comparison for one frozen scenario.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PolicyComparisonReceipt {
+    pub scenario_id: String,
+    pub scenario_input_digest: String,
+    pub baseline: VerifiedPolicyReceipt,
+    pub candidate: VerifiedPolicyReceipt,
+    pub deltas: PolicyMetricDeltas,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QualificationError {
     InvalidScenario,
@@ -92,6 +112,7 @@ pub enum QualificationError {
     StepMetricMismatch,
     AggregateMetricMismatch,
     EvidenceSerializationFailed,
+    ComparisonMetricOverflow,
 }
 
 impl FrozenEnergyScenario {
@@ -578,6 +599,80 @@ pub fn serialize_evidence_packet(
         .map_err(|_| QualificationError::EvidenceSerializationFailed)
 }
 
+/// Compare two independently verified policy receipts from the same
+/// frozen scenario. Metric deltas are candidate minus baseline and remain
+/// separate so reliability cannot be traded away by a composite score.
+pub fn compare_policy_receipts(
+    scenario: &FrozenEnergyScenario,
+    baseline: &PolicyRunReceipt,
+    candidate: &PolicyRunReceipt,
+) -> Result<PolicyComparisonReceipt, QualificationError> {
+    if baseline.scenario_id != candidate.scenario_id
+        || baseline.scenario_input_digest != candidate.scenario_input_digest
+    {
+        return Err(QualificationError::ScenarioIdentityMismatch);
+    }
+    let baseline_verified = scenario.verify_receipt(baseline)?;
+    let candidate_verified = scenario.verify_receipt(candidate)?;
+    let deltas = PolicyMetricDeltas {
+        total_cost: candidate_verified.recomputed_total_cost
+            - baseline_verified.recomputed_total_cost,
+        unserved_energy_kwh: candidate_verified.recomputed_unserved_energy_kwh
+            - baseline_verified.recomputed_unserved_energy_kwh,
+        curtailed_energy_kwh: candidate_verified.recomputed_curtailed_energy_kwh
+            - baseline_verified.recomputed_curtailed_energy_kwh,
+        battery_cycles: candidate_verified.recomputed_battery_cycles
+            - baseline_verified.recomputed_battery_cycles,
+    };
+    if [
+        deltas.total_cost,
+        deltas.unserved_energy_kwh,
+        deltas.curtailed_energy_kwh,
+        deltas.battery_cycles,
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+    {
+        return Err(QualificationError::ComparisonMetricOverflow);
+    }
+    Ok(PolicyComparisonReceipt {
+        scenario_id: scenario.id.clone(),
+        scenario_input_digest: scenario.input_digest(),
+        baseline: baseline_verified,
+        candidate: candidate_verified,
+        deltas,
+    })
+}
+
+#[derive(Debug, Serialize)]
+struct PolicyComparisonEvidencePacket<'a> {
+    schema_version: &'static str,
+    scenario: &'a FrozenEnergyScenario,
+    baseline_receipt: &'a PolicyRunReceipt,
+    candidate_receipt: &'a PolicyRunReceipt,
+    comparison: PolicyComparisonReceipt,
+}
+
+/// Verify both policies and serialize one paired evidence packet containing
+/// their common inputs, raw receipts, independently recomputed metrics, and
+/// candidate-minus-baseline deltas for every metric.
+pub fn serialize_policy_comparison_packet(
+    scenario: &FrozenEnergyScenario,
+    baseline: &PolicyRunReceipt,
+    candidate: &PolicyRunReceipt,
+) -> Result<String, QualificationError> {
+    let comparison = compare_policy_receipts(scenario, baseline, candidate)?;
+    let packet = PolicyComparisonEvidencePacket {
+        schema_version: "symthaea-energy-policy-comparison-v1",
+        scenario,
+        baseline_receipt: baseline,
+        candidate_receipt: candidate,
+        comparison,
+    };
+    serde_json::to_string_pretty(&packet)
+        .map_err(|_| QualificationError::EvidenceSerializationFailed)
+}
+
 fn valid_label(value: &str) -> bool {
     !value.trim().is_empty()
         && value.trim() == value
@@ -809,6 +904,28 @@ mod tests {
 
             let baseline_verified = scenario.verify_receipt(&baseline).unwrap();
             let candidate_verified = scenario.verify_receipt(&candidate).unwrap();
+            let comparison =
+                compare_policy_receipts(scenario, &baseline, &candidate).unwrap();
+            assert_eq!(
+                comparison.deltas.total_cost,
+                candidate_verified.recomputed_total_cost
+                    - baseline_verified.recomputed_total_cost
+            );
+            assert_eq!(
+                comparison.deltas.unserved_energy_kwh,
+                candidate_verified.recomputed_unserved_energy_kwh
+                    - baseline_verified.recomputed_unserved_energy_kwh
+            );
+            assert_eq!(
+                comparison.deltas.curtailed_energy_kwh,
+                candidate_verified.recomputed_curtailed_energy_kwh
+                    - baseline_verified.recomputed_curtailed_energy_kwh
+            );
+            assert_eq!(
+                comparison.deltas.battery_cycles,
+                candidate_verified.recomputed_battery_cycles
+                    - baseline_verified.recomputed_battery_cycles
+            );
             assert_eq!(baseline_verified.step_count, scenario.step_count().unwrap());
             assert_eq!(candidate_verified.step_count, scenario.step_count().unwrap());
             // These remain independent metrics; no weighted composite can mask
@@ -944,12 +1061,20 @@ mod tests {
     #[test]
     fn evidence_packet_contains_inputs_raw_steps_and_verified_metrics() {
         let scenario = deterministic_energy_corpus().remove(0);
-        let (receipt, _) = run_paired(&scenario);
-        let packet = serialize_evidence_packet(&scenario, &receipt).unwrap();
+        let (baseline, candidate) = run_paired(&scenario);
+        let packet = serialize_evidence_packet(&scenario, &baseline).unwrap();
         assert!(packet.contains("scenario_input_digest"));
         assert!(packet.contains("load_profile_kw"));
         assert!(packet.contains("curtailed_energy_delta_kwh"));
         assert!(packet.contains("recomputed_curtailed_energy_kwh"));
+
+        let paired_packet =
+            serialize_policy_comparison_packet(&scenario, &baseline, &candidate).unwrap();
+        assert!(paired_packet.contains("baseline_receipt"));
+        assert!(paired_packet.contains("candidate_receipt"));
+        assert!(paired_packet.contains("unserved_energy_kwh"));
+        assert!(paired_packet.contains("battery_cycles"));
+        assert!(paired_packet.contains("total_cost"));
     }
 
     #[test]
