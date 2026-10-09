@@ -670,7 +670,28 @@ impl SqliteWitnessStore {
             // branch; an accepted historical row is not permission to overlook
             // malformed current metadata.
             if *generation > candidate.generation as i64 {
-                let _current_head_digest = blob_digest(digest)?;
+                let current_head_digest = blob_digest(digest)?;
+                // A well-shaped 32-byte metadata pointer is not enough. Prove that
+                // it still names an accepted record at the current generation before
+                // returning idempotent success for a historical candidate.
+                let current_head_row: Option<(Vec<u8>, i64)> = tx
+                    .query_row(
+                        "SELECT record_digest, status FROM witness_records
+                         WHERE log_id=?1 AND generation=?2",
+                        params![candidate.log_id, *generation],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .optional()?;
+                let Some((stored_head_digest, current_head_status)) = current_head_row else {
+                    return Err(WitnessError::CorruptStore("metadata head record is missing"));
+                };
+                if current_head_status != 1
+                    || blob_digest(&stored_head_digest)? != current_head_digest
+                {
+                    return Err(WitnessError::CorruptStore(
+                        "metadata record digest does not match current accepted head",
+                    ));
+                }
                 // Return idempotent success only if this exact candidate is still a
                 // committed historical record, is self-consistent, and is the exact
                 // successor named by the caller's predecessor. Never move the head
