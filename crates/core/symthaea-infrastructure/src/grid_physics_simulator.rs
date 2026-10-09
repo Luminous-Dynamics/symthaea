@@ -126,6 +126,213 @@ pub enum GridPhysicsStepError {
     InvalidDerivedPhysics,
 }
 
+/// Declared split of the synthetic community demand. The fractions are part
+/// of this simulation's explicit load model, not independent state-channel
+/// metadata. They must sum to one.
+const COMMUNITY_CRITICAL_LOAD_FRACTION: f64 = 0.35;
+const COMMUNITY_DEFERRABLE_LOAD_FRACTION: f64 = 0.55;
+const COMMUNITY_AUXILIARY_LOAD_FRACTION: f64 = 0.10;
+/// Cooling is a protected auxiliary load only after the plant has already
+/// crossed this thermal-risk threshold. Below it, cooling is shed-able.
+const PROTECTED_COOLING_RISK_THRESHOLD: f64 = 0.30;
+
+/// Auditable last-step service accounting for the illustrative islanded plant.
+/// Energy values are kWh. A deficit in an eligible load bucket is intentional
+/// shedding; deficits in critical demand or thermally-protected cooling are
+/// reported as unserved, never hidden in the shed ratio.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct LoadServiceReport {
+    pub total_demand_kwh: f64,
+    pub total_served_kwh: f64,
+    pub intentional_shed_kwh: f64,
+    pub total_unserved_kwh: f64,
+    pub critical_demand_kwh: f64,
+    pub critical_served_kwh: f64,
+    pub critical_unserved_kwh: f64,
+    pub deferrable_demand_kwh: f64,
+    pub deferrable_served_kwh: f64,
+    pub deferrable_shed_kwh: f64,
+    pub community_auxiliary_demand_kwh: f64,
+    pub community_auxiliary_served_kwh: f64,
+    pub community_auxiliary_shed_kwh: f64,
+    pub cooling_demand_kwh: f64,
+    pub cooling_served_kwh: f64,
+    pub cooling_shed_kwh: f64,
+    pub protected_cooling_demand_kwh: f64,
+    pub protected_cooling_served_kwh: f64,
+    pub protected_cooling_unserved_kwh: f64,
+    pub heating_demand_kwh: f64,
+    pub heating_served_kwh: f64,
+    pub heating_shed_kwh: f64,
+    pub auxiliary_demand_kwh: f64,
+    pub auxiliary_served_kwh: f64,
+    pub auxiliary_shed_kwh: f64,
+    /// Demand actually served by local storage versus the idealized infinite
+    /// grid. Battery charge input is reported separately below.
+    pub storage_supply_to_load_kwh: f64,
+    pub grid_supply_to_load_kwh: f64,
+    pub unused_storage_supply_kwh: f64,
+    pub battery_charge_input_kwh: f64,
+    /// Noncritical deficits are categorized as deliberate shed by the
+    /// deterministic guard; this remains explicit for consumers needing the
+    /// conventional critical/noncritical accounting split.
+    pub noncritical_unserved_kwh: f64,
+}
+
+impl LoadServiceReport {
+    fn allocate(
+        community_load_kw: f64,
+        cooling_load_kw: f64,
+        heating_load_kw: f64,
+        thermal_risk: f64,
+        dt_hours: f64,
+        is_islanded: bool,
+        storage_discharge_kwh: f64,
+        battery_charge_input_kwh: f64,
+    ) -> Self {
+        let critical_kw = community_load_kw * COMMUNITY_CRITICAL_LOAD_FRACTION;
+        let deferrable_kw = community_load_kw * COMMUNITY_DEFERRABLE_LOAD_FRACTION;
+        let community_auxiliary_kw = community_load_kw * COMMUNITY_AUXILIARY_LOAD_FRACTION;
+        let protected_cooling_kw = if thermal_risk >= PROTECTED_COOLING_RISK_THRESHOLD {
+            cooling_load_kw
+        } else {
+            0.0
+        };
+        let optional_cooling_kw = cooling_load_kw - protected_cooling_kw;
+
+        let critical = critical_kw * dt_hours;
+        let deferrable = deferrable_kw * dt_hours;
+        let community_auxiliary = community_auxiliary_kw * dt_hours;
+        let cooling = cooling_load_kw * dt_hours;
+        let protected_cooling = protected_cooling_kw * dt_hours;
+        let optional_cooling = optional_cooling_kw * dt_hours;
+        let heating = heating_load_kw * dt_hours;
+        let total_demand = (community_load_kw + cooling_load_kw + heating_load_kw) * dt_hours;
+        let auxiliary_demand = community_auxiliary + cooling + heating;
+
+        if !is_islanded {
+            let storage_to_load = storage_discharge_kwh.min(total_demand);
+            let grid_to_load = (total_demand - storage_to_load).max(0.0);
+            return Self {
+                total_demand_kwh: total_demand,
+                total_served_kwh: total_demand,
+                critical_demand_kwh: critical,
+                critical_served_kwh: critical,
+                deferrable_demand_kwh: deferrable,
+                deferrable_served_kwh: deferrable,
+                community_auxiliary_demand_kwh: community_auxiliary,
+                community_auxiliary_served_kwh: community_auxiliary,
+                cooling_demand_kwh: cooling,
+                cooling_served_kwh: cooling,
+                protected_cooling_demand_kwh: protected_cooling,
+                protected_cooling_served_kwh: protected_cooling,
+                heating_demand_kwh: heating,
+                heating_served_kwh: heating,
+                auxiliary_demand_kwh: auxiliary_demand,
+                auxiliary_served_kwh: auxiliary_demand,
+                storage_supply_to_load_kwh: storage_to_load,
+                grid_supply_to_load_kwh: grid_to_load,
+                unused_storage_supply_kwh: (storage_discharge_kwh - storage_to_load).max(0.0),
+                battery_charge_input_kwh,
+                ..Self::default()
+            };
+        }
+
+        // The deterministic islanding guard allocates scarce local energy by
+        // explicit priority: critical community load, protected cooling when
+        // thermal risk is elevated, deferrable community load, ordinary
+        // cooling, heating, and community auxiliary demand. Noncritical
+        // deficits are therefore intentional shedding, not unserved energy.
+        let mut remaining = storage_discharge_kwh.max(0.0);
+        let critical_served = critical.min(remaining);
+        remaining = (remaining - critical_served).max(0.0);
+        let protected_cooling_served = protected_cooling.min(remaining);
+        remaining = (remaining - protected_cooling_served).max(0.0);
+        let deferrable_served = deferrable.min(remaining);
+        remaining = (remaining - deferrable_served).max(0.0);
+        let optional_cooling_served = optional_cooling.min(remaining);
+        remaining = (remaining - optional_cooling_served).max(0.0);
+        let heating_served = heating.min(remaining);
+        remaining = (remaining - heating_served).max(0.0);
+        let community_auxiliary_served = community_auxiliary.min(remaining);
+
+        let critical_unserved = (critical - critical_served).max(0.0);
+        let protected_cooling_unserved = (protected_cooling - protected_cooling_served).max(0.0);
+        let deferrable_shed = (deferrable - deferrable_served).max(0.0);
+        let optional_cooling_shed = (optional_cooling - optional_cooling_served).max(0.0);
+        let heating_shed = (heating - heating_served).max(0.0);
+        let community_auxiliary_shed = (community_auxiliary - community_auxiliary_served).max(0.0);
+        let cooling_served = protected_cooling_served + optional_cooling_served;
+        let auxiliary_served = cooling_served + heating_served + community_auxiliary_served;
+        let auxiliary_shed = optional_cooling_shed + heating_shed + community_auxiliary_shed;
+        let total_served =
+            critical_served + deferrable_served + auxiliary_served;
+        let intentional_shed = deferrable_shed + auxiliary_shed;
+        let total_unserved = critical_unserved + protected_cooling_unserved;
+
+        Self {
+            total_demand_kwh: total_demand,
+            total_served_kwh: total_served,
+            intentional_shed_kwh: intentional_shed,
+            total_unserved_kwh: total_unserved,
+            critical_demand_kwh: critical,
+            critical_served_kwh: critical_served,
+            critical_unserved_kwh: critical_unserved,
+            deferrable_demand_kwh: deferrable,
+            deferrable_served_kwh: deferrable_served,
+            deferrable_shed_kwh: deferrable_shed,
+            community_auxiliary_demand_kwh: community_auxiliary,
+            community_auxiliary_served_kwh: community_auxiliary_served,
+            community_auxiliary_shed_kwh: community_auxiliary_shed,
+            cooling_demand_kwh: cooling,
+            cooling_served_kwh: cooling_served,
+            cooling_shed_kwh: optional_cooling_shed,
+            protected_cooling_demand_kwh: protected_cooling,
+            protected_cooling_served_kwh: protected_cooling_served,
+            protected_cooling_unserved_kwh: protected_cooling_unserved,
+            heating_demand_kwh: heating,
+            heating_served_kwh: heating_served,
+            heating_shed_kwh: heating_shed,
+            auxiliary_demand_kwh: auxiliary_demand,
+            auxiliary_served_kwh: auxiliary_served,
+            auxiliary_shed_kwh: auxiliary_shed,
+            storage_supply_to_load_kwh: total_served,
+            grid_supply_to_load_kwh: 0.0,
+            unused_storage_supply_kwh: (storage_discharge_kwh - total_served).max(0.0),
+            battery_charge_input_kwh,
+            noncritical_unserved_kwh: 0.0,
+        }
+    }
+
+    pub fn energy_balance_residual_kwh(&self) -> f64 {
+        self.total_demand_kwh
+            - self.total_served_kwh
+            - self.intentional_shed_kwh
+            - self.total_unserved_kwh
+    }
+
+    fn is_valid(&self) -> bool {
+        let values = [
+            self.total_demand_kwh, self.total_served_kwh, self.intentional_shed_kwh,
+            self.total_unserved_kwh, self.critical_demand_kwh, self.critical_served_kwh,
+            self.critical_unserved_kwh, self.deferrable_demand_kwh, self.deferrable_served_kwh,
+            self.deferrable_shed_kwh, self.community_auxiliary_demand_kwh,
+            self.community_auxiliary_served_kwh, self.community_auxiliary_shed_kwh,
+            self.cooling_demand_kwh, self.cooling_served_kwh, self.cooling_shed_kwh,
+            self.protected_cooling_demand_kwh, self.protected_cooling_served_kwh,
+            self.protected_cooling_unserved_kwh, self.heating_demand_kwh,
+            self.heating_served_kwh, self.heating_shed_kwh, self.auxiliary_demand_kwh,
+            self.auxiliary_served_kwh, self.auxiliary_shed_kwh,
+            self.storage_supply_to_load_kwh, self.grid_supply_to_load_kwh,
+            self.unused_storage_supply_kwh, self.battery_charge_input_kwh,
+            self.noncritical_unserved_kwh,
+        ];
+        values.iter().all(|value| value.is_finite() && *value >= 0.0)
+            && (self.energy_balance_residual_kwh().abs()
+                <= 1e-9 * self.total_demand_kwh.max(1.0))
+    }
+}
+
 #[derive(Clone)]
 pub struct GridPhysicsInfrastructureSimulator {
     state: InfrastructureState,
@@ -140,6 +347,7 @@ pub struct GridPhysicsInfrastructureSimulator {
     /// Checked `try_step` reports directly through its Result and remains
     /// mutation-free when it rejects an input.
     last_trait_step_accepted: bool,
+    last_load_service_report: LoadServiceReport,
 }
 
 impl GridPhysicsInfrastructureSimulator {
@@ -173,7 +381,13 @@ impl GridPhysicsInfrastructureSimulator {
             prev_frequency_hz: NOMINAL_FREQUENCY_HZ,
             elapsed_s: 0.0,
             last_trait_step_accepted: true,
+            last_load_service_report: LoadServiceReport::default(),
         }
+    }
+
+    /// Direct access to the last step's explicit load-bucket energy account.
+    pub fn load_service_report(&self) -> &LoadServiceReport {
+        &self.last_load_service_report
     }
 
     /// Direct access to the underlying battery, for tests/benchmarks that
@@ -268,6 +482,7 @@ impl GridPhysicsInfrastructureSimulator {
         let mut candidate = self.clone();
         candidate.step_candidate(cmd, dt)?;
         if !candidate.state_channels_are_valid()
+            || !candidate.last_load_service_report.is_valid()
             || !candidate.battery_configuration_is_valid()
             || !candidate.elapsed_s.is_finite()
             || candidate.elapsed_s < 0.0
@@ -569,6 +784,7 @@ impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
         self.prev_frequency_hz = NOMINAL_FREQUENCY_HZ;
         self.elapsed_s = 0.0;
         self.last_trait_step_accepted = true;
+        self.last_load_service_report = LoadServiceReport::default();
     }
 
     fn backend_name(&self) -> &'static str {
