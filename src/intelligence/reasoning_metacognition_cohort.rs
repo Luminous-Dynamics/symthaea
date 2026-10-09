@@ -1637,11 +1637,13 @@ mod tests {
             &[missing_label, outcome(&fs[1], Some(false), None)],
         ).is_err());
 
+        let mut labelled_detection = outcome(&fs[0], Some(true), None);
+        labelled_detection.weak_assumption_present = Some(true);
         let mut unannounced_label = outcome(&fs[1], Some(false), None);
         unannounced_label.weak_assumption_present = Some(false);
         assert!(evaluate_decision_cohort(
             &frozen,
-            &[outcome(&fs[0], Some(true), None), unannounced_label],
+            &[labelled_detection, unannounced_label],
         ).is_err());
 
         let mut mismatched = revisions;
