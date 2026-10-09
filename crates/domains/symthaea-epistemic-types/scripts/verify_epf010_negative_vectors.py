@@ -77,9 +77,6 @@ def canonical_bytes(receipt):
 def semantic_failure(receipt):
     """Mirror MemoryRetrievalReceipt::verify's post-digest rejection order."""
     selected = receipt["selected"]
-    if len(selected) != len(set(selected)):
-        return "DuplicateSelectedIdentity"
-
     if receipt["mode"] == "Historical":
         frontier = receipt.get("frontier_ref")
         if frontier is None:
@@ -88,6 +85,9 @@ def semantic_failure(receipt):
             return "InvalidRequest(EmptyHistoricalFrontier)"
         if not frontier.strip():
             return "InvalidRequest(WhitespaceOnlyHistoricalFrontier)"
+
+    if len(selected) != len(set(selected)):
+        return "DuplicateSelectedIdentity"
 
     selected_set = set(selected)
     projection_bindings = sorted(
