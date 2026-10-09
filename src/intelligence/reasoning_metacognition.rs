@@ -224,6 +224,8 @@ pub enum MetacognitionEvaluationError {
     InvalidTolerance(f64),
     InvalidThreshold(f64),
     EmptyForecastSet,
+    /// The v1 prospective scorer only defines correctness probabilities for asserted answers.
+    UnscorableAbstention { forecast_id: String },
     EmptyForecastField { forecast_id: String, field: &'static str },
     EmptyOutcomeField { forecast_id: String, field: &'static str },
     UnsupportedForecastSchemaVersion(u32),
@@ -314,6 +316,10 @@ impl fmt::Display for MetacognitionEvaluationError {
                 write!(f, "selective-risk threshold must be finite and within [0, 1], got {value}")
             }
             Self::EmptyForecastSet => write!(f, "frozen forecast set must not be empty"),
+            Self::UnscorableAbstention { forecast_id } => write!(
+                f,
+                "prospective v1 correctness scoring cannot score abstention forecast '{forecast_id}'"
+            ),
             Self::EmptyForecastField { forecast_id, field } => write!(
                 f, "forecast '{forecast_id}' has empty required field '{field}'"
             ),
@@ -756,6 +762,11 @@ fn validate_forecast_set(
             ("input_snapshot_ref", p.input_snapshot_ref.as_str()),
         ] {
             require_forecast_field(&p.forecast_id, field, value)?;
+        }
+        if !p.asserted {
+            return Err(MetacognitionEvaluationError::UnscorableAbstention {
+                forecast_id: p.forecast_id.clone(),
+            });
         }
         validate_probability("predicted_probability", p.predicted_probability)?;
         if !ids.insert(p.forecast_id.as_str()) {
@@ -2124,6 +2135,29 @@ mod tests {
                 &[wrong_target, recent]
             ),
             Err(MetacognitionEvaluationError::BaselineOutcomeProfileMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn prospective_v1_freeze_rejects_abstentions_until_outcome_semantics_are_versioned() {
+        let mut abstained = prospective_forecast("f-abstain", "episode-abstain", 0.3, "reasoning");
+        abstained.asserted = false;
+
+        assert!(matches!(
+            freeze_correctness_forecasts(vec![abstained.clone()], 5, vec![0.5]),
+            Err(MetacognitionEvaluationError::UnscorableAbstention { forecast_id })
+                if forecast_id == "f-abstain"
+        ));
+        assert!(matches!(
+            freeze_correctness_forecasts_for_split(
+                vec![abstained],
+                5,
+                vec![0.5],
+                "holdout-v1".into(),
+                "holdout-manifest-v1".into(),
+            ),
+            Err(MetacognitionEvaluationError::UnscorableAbstention { forecast_id })
+                if forecast_id == "f-abstain"
         ));
     }
 
