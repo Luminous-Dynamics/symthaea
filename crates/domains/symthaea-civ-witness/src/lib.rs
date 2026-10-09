@@ -268,7 +268,7 @@ pub enum FaultPoint {
     AfterExternalAnchorAdvance,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct History {
     accepted: Option<Record>,
     prepared: Option<Record>,
