@@ -858,13 +858,17 @@ impl NixSystemdReadOnlyObserverV1 {
         let properties =
             PropertiesProxy::new(&self.connection, SYSTEMD_DESTINATION, object_path.clone())
                 .await?;
-        let value = properties
-            .get(SYSTEMD_UNIT_INTERFACE, "InvocationID")
+        let unit_proxy = Proxy::new(
+            &self.connection,
+            SYSTEMD_DESTINATION,
+            object_path.clone(),
+            SYSTEMD_UNIT_INTERFACE,
+        )
+        .await?;
+        let bytes: Vec<u8> = unit_proxy
+            .get_property("InvocationID")
             .await
             .map_err(|_| NixSystemdObserverErrorV1::InvocationIdUnavailable)?;
-        let bytes: Vec<u8> = value
-            .try_into()
-            .map_err(|_| NixSystemdObserverErrorV1::InvalidInvocationId)?;
         invocation_id_to_string(bytes)
     }
 
