@@ -29,8 +29,7 @@ jobs:
       VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
       # Synchronization validation is disabled by default in the Khronos layer.
       # Set the current layer setting and retain the legacy form for packaged-layer compatibility.
-      VK_VALIDATION_VALIDATE_SYNC: "1"
-      VK_LAYER_ENABLES: VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
+      VK_LAYER_VALIDATE_SYNC: "1"
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -96,9 +95,8 @@ jobs:
             echo "runner_arch=$RUNNER_ARCH"
             echo "runner_name=$RUNNER_NAME"
             echo "validation_layer=VK_LAYER_KHRONOS_validation"
-            echo "validation_sync_requested=VK_VALIDATION_VALIDATE_SYNC=1"
-            echo "validation_sync_compat_requested=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT"
-            echo "validation_sync_env=VK_VALIDATION_VALIDATE_SYNC,VK_LAYER_ENABLES"
+            echo "validation_sync_requested=VK_LAYER_VALIDATE_SYNC=1"
+            echo "validation_sync_env=VK_LAYER_VALIDATE_SYNC"
             rustc -Vv
             cargo -V
             gdb --version | head -n 1
