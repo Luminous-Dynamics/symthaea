@@ -885,6 +885,6 @@ fn main() {
     );
     assert_eq!(reconcile_local_chain(&events, &candidate), Ok(()));
 
-    println!("SYM-CIV-012 PASS: witness anchors detect receipt-tail truncation, rollback, and forks.");
-    println!("Claim ceiling: fixture attestations only; no real signatures, durable state, or network service.");
+    println!("SYM-CIV-012 PASS: witness anchors detect tail truncation, rollback and forks.");
+    println!("Claim ceiling: fixture only; no real signatures, persistence, or network service.");
 }
