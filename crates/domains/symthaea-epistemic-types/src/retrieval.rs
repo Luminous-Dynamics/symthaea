@@ -88,6 +88,7 @@ pub enum ReceiptVerificationError {
     BindingCountMismatch,
     InvalidRequest(RetrievalRequestError),
     InvalidSelectedIdentity(RefValidationError),
+    InvalidExcludedIdentity(RefValidationError),
 }
 
 /// A receipt whose canonical digest and internal selection bindings were checked.
@@ -171,6 +172,10 @@ impl MemoryRetrievalReceipt {
             }
         }
         let mut exclusions = self.excluded.clone();
+        for item in &exclusions {
+            CanonicalArtifactRef::try_from(item.canonical_identity.as_str())
+                .map_err(ReceiptVerificationError::InvalidExcludedIdentity)?;
+        }
         exclusions.sort_by(|a, b| {
             a.canonical_identity
                 .cmp(&b.canonical_identity)
@@ -602,6 +607,58 @@ mod tests {
         assert_eq!(
             receipt.verify(),
             Err(ReceiptVerificationError::InvalidSelectedIdentity(RefValidationError::ControlCharacter))
+        );
+    }
+
+
+    #[test]
+    fn empty_excluded_identity_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("claim:x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        receipt.excluded.push(ExcludedMemory {
+            canonical_identity: String::new(),
+            reason: RetrievalExclusion::PostFrontier,
+        });
+        receipt.receipt_digest = receipt.canonical_digest().unwrap();
+        assert_eq!(
+            receipt.verify(),
+            Err(ReceiptVerificationError::InvalidExcludedIdentity(RefValidationError::Empty))
+        );
+    }
+
+    #[test]
+    fn whitespace_only_excluded_identity_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("claim:x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        receipt.excluded.push(ExcludedMemory {
+            canonical_identity: " \t\n".into(),
+            reason: RetrievalExclusion::PostFrontier,
+        });
+        receipt.receipt_digest = receipt.canonical_digest().unwrap();
+        assert_eq!(
+            receipt.verify(),
+            Err(ReceiptVerificationError::InvalidExcludedIdentity(RefValidationError::WhitespaceOnly))
+        );
+    }
+
+    #[test]
+    fn control_character_excluded_identity_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("claim:x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        receipt.excluded.push(ExcludedMemory {
+            canonical_identity: "claim:\ninvalid".into(),
+            reason: RetrievalExclusion::PostFrontier,
+        });
+        receipt.receipt_digest = receipt.canonical_digest().unwrap();
+        assert_eq!(
+            receipt.verify(),
+            Err(ReceiptVerificationError::InvalidExcludedIdentity(RefValidationError::ControlCharacter))
         );
     }
 

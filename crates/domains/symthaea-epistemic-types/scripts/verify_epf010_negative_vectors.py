@@ -130,6 +130,15 @@ def semantic_failure(receipt):
     ):
         return "BindingCountMismatch"
 
+    for item in receipt["excluded"]:
+        identity = item["canonical_identity"]
+        if identity == "":
+            return "InvalidExcludedIdentity(Empty)"
+        if not identity.strip():
+            return "InvalidExcludedIdentity(WhitespaceOnly)"
+        if any(unicodedata.category(ch) == "Cc" for ch in identity):
+            return "InvalidExcludedIdentity(ControlCharacter)"
+
     excluded = sorted(
         receipt["excluded"],
         key=lambda item: (
