@@ -2267,8 +2267,10 @@ mod tests {
             let conn = store.open_connection().expect("open fork store");
             assert!(validate_fork_history(&conn, log_id).is_ok());
             conn.execute(
-                "DELETE FROM witness_fork_evidence WHERE log_id=?1 AND id=(
-                    "SELECT MAX(id) FROM witness_fork_evidence WHERE log_id=?1)",
+                r#"DELETE FROM witness_fork_evidence
+                   WHERE log_id=?1 AND id=(
+                     SELECT MAX(id) FROM witness_fork_evidence WHERE log_id=?1
+                   )"#,
                 params![log_id],
             )
             .expect("truncate last evidence row");
