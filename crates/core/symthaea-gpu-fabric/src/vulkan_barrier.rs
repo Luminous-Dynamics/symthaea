@@ -2791,6 +2791,41 @@ mod tests {
     }
 
     #[test]
+    fn receipt_rejects_memory_topology_runtime_mismatch() {
+        let receipt = minimal_receipt_for_binding_tests();
+        let mut other_topology = test_memory_topology();
+        other_topology.memory_heaps[0].size += 1;
+        other_topology.identity_digest = memory_topology_identity_digest(
+            other_topology.memory_type_count,
+            other_topology.memory_heap_count,
+            &other_topology.memory_types,
+            &other_topology.memory_heaps,
+        );
+        assert_eq!(other_topology.verify(), Ok(()));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &other_topology,
+            ),
+            Err(VulkanBarrierReceiptError::MemoryTopologyBinding)
+        ));
+    }
+
+    #[test]
     fn memory_profile_digest_binds_selection_and_cache_maintenance() {
         let (_, _, _, final_state) = fixture();
         let storage_sizes = final_state
@@ -3839,7 +3874,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
@@ -3859,7 +3893,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
@@ -3882,7 +3915,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
         ));
@@ -3907,7 +3939,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology())
             .is_ok());
 
@@ -3927,7 +3958,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::ImplementationIdentityBinding)
         ));
@@ -3948,7 +3978,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding)
         ));
@@ -3970,7 +3999,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::DeviceUuidBinding)
         ));
@@ -3992,7 +4020,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::DriverUuidBinding)
         ));
@@ -4013,7 +4040,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::DriverIdBinding)
         ));
@@ -4042,7 +4068,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentityBinding)
         ));
@@ -4063,7 +4088,6 @@ mod tests {
                 1,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
         ));
@@ -4084,7 +4108,6 @@ mod tests {
                 2,
                 0,
                 [1, 1, 1],
-            ,
                 &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
         ));
