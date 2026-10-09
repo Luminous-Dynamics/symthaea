@@ -105,7 +105,7 @@ const COMPOSE_BARS_RANGE: std::ops::RangeInclusive<usize> = 2..=36;
 /// styles), large enough to catch genuine near-twins.
 const NOVELTY_FLOOR: f64 = 0.5;
 const IMPORT_ROOT: &str = "data/music/imports";
-const MAX_SYMBOLIC_IMPORT_BYTES: usize = 12 * 1024 * 1024;
+const MAX_SYMBOLIC_IMPORT_BYTES: usize = symthaea_muse::symbolic_import::MAX_SYMBOLIC_IMPORT_BYTES;
 
 /// A per-process, monotonically increasing nonce for temp file/dir names
 /// that must not collide across concurrently-running `spawn_blocking`
