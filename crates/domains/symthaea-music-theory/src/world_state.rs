@@ -208,7 +208,10 @@ impl MusicalWorldStateV1 {
             .iter()
             .filter(|note| {
                 let onset = note.onset.beats();
-                let note_end = (note.onset + note.duration).beats();
+                let Some(note_end) = note.onset.checked_add(note.duration) else {
+                    return false;
+                };
+                let note_end = note_end.beats();
                 note_end > onset && note_end > start_beats && onset < end_beats
             })
             .collect();
@@ -244,7 +247,10 @@ fn active_voice_roles(score: &Score, start: f64, end: f64) -> Vec<VoiceRole> {
         .filter(|role| {
             score.notes.iter().any(|note| {
                 let onset = note.onset.beats();
-                let note_end = (note.onset + note.duration).beats();
+                let Some(note_end) = note.onset.checked_add(note.duration) else {
+                    return false;
+                };
+                let note_end = note_end.beats();
                 note.role == *role
                     && note_end > onset
                     && note_end > start
