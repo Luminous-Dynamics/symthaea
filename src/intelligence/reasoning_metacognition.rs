@@ -1678,6 +1678,218 @@ mod tests {
         }
     }
 
+    fn prospective_baseline(
+        id: &str,
+        method: ForecastBaselineMethod,
+        family: &str,
+        probability: f64,
+        training_split: &str,
+        training_samples: usize,
+    ) -> ForecastBaselineV1 {
+        ForecastBaselineV1 {
+            schema_version: FORECAST_BASELINE_SCHEMA_VERSION,
+            baseline_id: id.into(),
+            method,
+            task_family_id: family.into(),
+            task_taxonomy_id: "rq-taxonomy-v1".into(),
+            outcome_profile_id: "answer-correct-under-policy-v2".into(),
+            predicted_probability: probability,
+            training_sample_count: training_samples,
+            training_split_id: training_split.into(),
+            training_corpus_manifest_ref: format!("calibration-manifest:{id}"),
+        }
+    }
+
+    #[test]
+    fn holdout_baselines_are_family_scoped_and_scored_only_on_frozen_evaluation_split() {
+        let frozen = freeze_correctness_forecasts_for_split(
+            vec![
+                prospective_forecast("f-1", "episode-1", 0.99, "reasoning"),
+                prospective_forecast("f-2", "episode-2", 0.90, "reasoning"),
+                prospective_forecast("f-3", "episode-3", 0.40, "retrieval"),
+            ],
+            5,
+            vec![0.5, 0.9],
+            "holdout-v1".into(),
+        )
+        .unwrap_or_else(|e| panic!("holdout freeze must succeed: {e}"));
+        let baselines = vec![
+            prospective_baseline(
+                "reasoning-base-rate",
+                ForecastBaselineMethod::ConstantBaseRate,
+                "reasoning",
+                0.20,
+                "calibration-v1",
+                500,
+            ),
+            prospective_baseline(
+                "reasoning-recent",
+                ForecastBaselineMethod::RecentEmpiricalAccuracy,
+                "reasoning",
+                0.25,
+                "calibration-v1",
+                50,
+            ),
+            prospective_baseline(
+                "retrieval-base-rate",
+                ForecastBaselineMethod::ConstantBaseRate,
+                "retrieval",
+                0.60,
+                "calibration-v1",
+                400,
+            ),
+            prospective_baseline(
+                "retrieval-recent",
+                ForecastBaselineMethod::RecentEmpiricalAccuracy,
+                "retrieval",
+                0.55,
+                "calibration-v1",
+                40,
+            ),
+        ];
+        let report = evaluate_frozen_forecasts_with_baselines(
+            &frozen,
+            &[
+                prospective_outcome("f-1", "episode-1", false),
+                prospective_outcome("f-2", "episode-2", false),
+                prospective_outcome("f-3", "episode-3", true),
+            ],
+            &[],
+            &[],
+            &baselines,
+        )
+        .unwrap_or_else(|e| panic!("baseline comparison must succeed: {e}"));
+        let comparison = report.baseline_comparison.expect("comparison report");
+        assert_eq!(comparison.evaluation_split_id, "holdout-v1");
+        assert_eq!(comparison.family_reports.len(), 2);
+        let reasoning = comparison
+            .family_reports
+            .iter()
+            .find(|r| r.task_family_id == "reasoning")
+            .expect("reasoning family");
+        assert_eq!(reasoning.evaluation_episodes, 2);
+        assert_eq!(reasoning.baselines.len(), 2);
+        assert_eq!(reasoning.candidate_brier_score, Some((0.99_f64.powi(2) + 0.90_f64.powi(2)) / 2.0));
+        assert!(reasoning.baselines.iter().all(|b| b.evaluation_split_id == "holdout-v1"));
+        assert!(reasoning.baselines.iter().all(|b| b.training_split_id == "calibration-v1"));
+        assert!(reasoning.baselines.iter().all(|b| b.training_corpus_manifest_ref.starts_with("calibration-manifest:")));
+        assert!(reasoning.baselines.iter().all(|b| b.candidate_brier_delta.unwrap_or(0.0) > 0.0));
+        assert_eq!(
+            reasoning.baselines.iter().map(|b| b.method).collect::<Vec<_>>(),
+            vec![
+                ForecastBaselineMethod::ConstantBaseRate,
+                ForecastBaselineMethod::RecentEmpiricalAccuracy
+            ]
+        );
+    }
+
+    #[test]
+    fn baseline_comparison_rejects_training_split_reuse_and_missing_family_baselines() {
+        let frozen = freeze_correctness_forecasts_for_split(
+            vec![prospective_forecast("f-1", "episode-1", 0.8, "reasoning")],
+            5,
+            vec![0.5],
+            "holdout-v1".into(),
+        )
+        .unwrap_or_else(|e| panic!("holdout freeze must succeed: {e}"));
+        let reused_split = prospective_baseline(
+            "leaky-base",
+            ForecastBaselineMethod::ConstantBaseRate,
+            "reasoning",
+            0.5,
+            "holdout-v1",
+            25,
+        );
+        assert!(matches!(
+            evaluate_frozen_forecasts_with_baselines(
+                &frozen,
+                &[prospective_outcome("f-1", "episode-1", true)],
+                &[],
+                &[],
+                &[reused_split]
+            ),
+            Err(MetacognitionEvaluationError::BaselineTrainingSplitEqualsEvaluation { .. })
+        ));
+
+        let one_method = prospective_baseline(
+            "reasoning-base-rate",
+            ForecastBaselineMethod::ConstantBaseRate,
+            "reasoning",
+            0.5,
+            "calibration-v1",
+            25,
+        );
+        assert!(matches!(
+            evaluate_frozen_forecasts_with_baselines(
+                &frozen,
+                &[prospective_outcome("f-1", "episode-1", true)],
+                &[],
+                &[],
+                &[one_method]
+            ),
+            Err(MetacognitionEvaluationError::MissingBaselineForTaskFamily {
+                method: ForecastBaselineMethod::RecentEmpiricalAccuracy,
+                task_family_id
+            }) if task_family_id == "reasoning"
+        ));
+    }
+
+    #[test]
+    fn baseline_comparison_requires_explicit_split_identity_and_matching_target() {
+        let legacy_frozen = freeze_correctness_forecasts(
+            vec![prospective_forecast("f-1", "episode-1", 0.8, "reasoning")],
+            5,
+            vec![0.5],
+        )
+        .unwrap_or_else(|e| panic!("legacy freeze must succeed: {e}"));
+        let baseline = prospective_baseline(
+            "reasoning-base-rate",
+            ForecastBaselineMethod::ConstantBaseRate,
+            "reasoning",
+            0.5,
+            "calibration-v1",
+            25,
+        );
+        assert!(matches!(
+            evaluate_frozen_forecasts_with_baselines(
+                &legacy_frozen,
+                &[prospective_outcome("f-1", "episode-1", true)],
+                &[],
+                &[],
+                &[baseline.clone()]
+            ),
+            Err(MetacognitionEvaluationError::MissingEvaluationSplit)
+        ));
+
+        let split_frozen = freeze_correctness_forecasts_for_split(
+            vec![prospective_forecast("f-1", "episode-1", 0.8, "reasoning")],
+            5,
+            vec![0.5],
+            "holdout-v1".into(),
+        )
+        .unwrap_or_else(|e| panic!("holdout freeze must succeed: {e}"));
+        let mut wrong_target = baseline;
+        wrong_target.outcome_profile_id = "self-correction-succeeds".into();
+        let recent = prospective_baseline(
+            "reasoning-recent",
+            ForecastBaselineMethod::RecentEmpiricalAccuracy,
+            "reasoning",
+            0.6,
+            "calibration-v1",
+            25,
+        );
+        assert!(matches!(
+            evaluate_frozen_forecasts_with_baselines(
+                &split_frozen,
+                &[prospective_outcome("f-1", "episode-1", true)],
+                &[],
+                &[],
+                &[wrong_target, recent]
+            ),
+            Err(MetacognitionEvaluationError::BaselineOutcomeProfileMismatch { .. })
+        ));
+    }
+
     #[test]
     fn frozen_forecast_binding_retains_outcome_refs_and_scores_stable_but_wrong_forecasts() {
         let frozen = freeze_correctness_forecasts(
