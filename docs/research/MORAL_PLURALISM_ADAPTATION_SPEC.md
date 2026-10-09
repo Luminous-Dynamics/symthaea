@@ -312,3 +312,20 @@ Those are current implementation facts, not necessarily defects in the cognitive
 Do not interpret empty verdict strings on skipped cycles as Neutral, do not rebind cached outputs to a new subject, and do not treat the generic `cognitive_cycle` value-evaluator call as a candidate-action evaluator. Required regression cases include cycle boundaries 6/7/8 and 18/19/20, where the input subject changes while some subsystem results are carried forward.
 
 The subject-binding work in [PR #7273](https://github.com/Luminous-Dynamics/symthaea/pull/7273) is a necessary comparison-layer contract, but it cannot compensate for inaccurate provenance from an upstream producer. Tests and CI are still unqualified at this point; the recent workflow records are skipped rather than passing.
+
+
+### Provenance as an explicit contract — 2026-10-09
+
+The additive provenance contract is being extended in [PR #7278](https://github.com/Luminous-Dynamics/symthaea/pull/7278), stacked on [PR #7273](https://github.com/Luminous-Dynamics/symthaea/pull/7273):
+
+- Each assessment carries the exact source subject, evaluator build/revision identity, evaluation sequence/cycle, and an explicit freshness state.
+- A caller can use `compare_assessments_for(expected_subject, assessments)` to bind the comparison to the exact scenario/action it intends to discuss.
+- A source-subject mismatch is not silently normalized to the requested subject.
+- A carried-forward result is surfaced as `StaleAssessment`, not agreement.
+- An unavailable evaluator result is represented explicitly as `Unavailable` and yields `Incomplete`; it does not get a fake neutral stance or invented premise/evidence references.
+
+This follows the general model of [W3C PROV-DM](https://www.w3.org/TR/prov-dm/) and the [PROV Primer](https://www.w3.org/TR/prov-primer/): track the entities and activities involved in producing information, rather than trusting labels alone. Symthaea's current draft does **not** claim full PROV conformance. All provenance fields are still caller-supplied; build identity is not attested, and source digests are not recomputed here. Source integrity must be established by an upstream canonicalizing context constructor and an independent verification/evidence path.
+
+The current comparison module still does not know an expected registry of every framework unless the caller supplies an explicit unavailable row for the framework. Adapter integration must preserve coverage information and must not silently omit a framework that did not run. The comparator does not calculate moral truth or grant execution permission.
+
+Tests in this draft are authored but not run; the workflow records for the latest checked head are skipped, not passing. Next qualification requires exact-head Rust tests in the pinned Nix environment and cadence-boundary tests across the 7-cycle and 19-cycle evaluation schedules. The existing EthicsEngine and action gate remain unchanged.
