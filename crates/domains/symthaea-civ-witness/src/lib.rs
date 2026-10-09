@@ -1201,6 +1201,54 @@ mod tests {
         }
     }
 
+
+    struct OneShotUnavailableAnchor {
+        inner: MemoryAnchor,
+        calls: AtomicU64,
+        fail_on_call: AtomicU64,
+    }
+
+    impl OneShotUnavailableAnchor {
+        fn new() -> Self {
+            Self {
+                inner: MemoryAnchor::default(),
+                calls: AtomicU64::new(0),
+                fail_on_call: AtomicU64::new(0),
+            }
+        }
+
+        fn provision(&self, log_id: &str) {
+            self.inner.provision(log_id);
+        }
+
+        fn fail_on_nth_next_current(&self, call: u64) {
+            self.calls.store(0, Ordering::SeqCst);
+            self.fail_on_call.store(call, Ordering::SeqCst);
+        }
+    }
+
+    impl IndependentAnchor for OneShotUnavailableAnchor {
+        fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if self
+                .fail_on_call
+                .compare_exchange(call, 0, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                return Err(AnchorError::Unavailable);
+            }
+            self.inner.current(log_id)
+        }
+
+        fn compare_and_advance(
+            &self,
+            expected: &AnchorState,
+            next: &AnchorState,
+        ) -> Result<(), AnchorError> {
+            self.inner.compare_and_advance(expected, next)
+        }
+    }
+
     impl IndependentAnchor for MemoryAnchor {
         fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
             self.states
@@ -1489,6 +1537,78 @@ mod tests {
                 .recover("log-late-finalize", &anchor)
                 .expect("head remains valid"),
             Some(third)
+        );
+    }
+
+    #[test]
+    fn anchor_unavailable_after_prepare_leaves_candidate_unaccepted_then_retry_recovers() {
+        let db = TempDb::new();
+        let anchor = OneShotUnavailableAnchor::new();
+        anchor.provision("log-anchor-outage");
+        let store = db.open();
+        let first = store
+            .initialize(
+                "log-anchor-outage",
+                "policy-v1",
+                h(b"genesis-checkpoint"),
+                0,
+                None,
+                &anchor,
+            )
+            .expect("initialize before outage");
+
+        // Advance uses current() once for recovery, once before preparation,
+        // and once after the durable prepare. Fail the third read so the
+        // candidate is persisted but the external anchor is never advanced.
+        anchor.fail_on_nth_next_current(3);
+        assert!(matches!(
+            store.advance(
+                "log-anchor-outage",
+                first.generation,
+                first.digest,
+                h(b"checkpoint-two"),
+                1,
+                Some(h(b"receipt-one")),
+                &anchor,
+            ),
+            Err(WitnessError::Anchor(AnchorError::Unavailable))
+        ));
+
+        assert_eq!(
+            store.load_history("log-anchor-outage").expect("local history"),
+            History {
+                accepted: Some(first.clone()),
+                prepared: Some(Record::build(
+                    2,
+                    "log-anchor-outage",
+                    "policy-v1",
+                    h(b"checkpoint-two"),
+                    1,
+                    Some(h(b"receipt-one")),
+                    Some(first.digest),
+                )),
+            }
+        );
+        assert_eq!(
+            store.recover("log-anchor-outage", &anchor).expect("recover old accepted head"),
+            Some(first.clone())
+        );
+
+        let second = store
+            .advance(
+                "log-anchor-outage",
+                first.generation,
+                first.digest,
+                h(b"checkpoint-two"),
+                1,
+                Some(h(b"receipt-one")),
+                &anchor,
+            )
+            .expect("identical retry after anchor returns");
+        assert_eq!(second.generation, 2);
+        assert_eq!(
+            store.recover("log-anchor-outage", &anchor).expect("recover accepted retry"),
+            Some(second)
         );
     }
 
