@@ -76,7 +76,8 @@ impl ClassificationProvenance {
 
 /// Per-load configuration. A lower shed_priority means the load is more
 /// eligible to be shed within its class; higher values are protected longer.
-/// A lower restore_priority is considered earlier for restoration. Ties are
+/// A lower restore_priority is considered earlier for restoration within its
+/// class. Classes restore in Critical, Deferrable, Auxiliary order. Ties are
 /// resolved deterministically by stable load_id, not by insertion order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoadRegistryEntry {
@@ -92,6 +93,7 @@ pub struct LoadRegistryEntry {
 pub enum LoadRegistryError {
     EmptyVersion,
     EmptyRegistry,
+    MissingCriticalLoad,
     EmptyLoadId,
     DuplicateLoadId(String),
     InvalidRatedPower(String),
@@ -142,6 +144,10 @@ impl LoadRegistry {
             }
         }
 
+        if !entries.iter().any(|entry| entry.class.is_critical()) {
+            return Err(LoadRegistryError::MissingCriticalLoad);
+        }
+
         Ok(Self { version, entries })
     }
 
@@ -162,13 +168,15 @@ impl LoadRegistry {
         })
     }
 
-    /// Stable restoration ordering: lowest restore_priority first, then ID.
-    /// Actual restoration still requires the separate restoration gate below.
+    /// Stable restoration order is class-first, then lowest restore_priority,
+    /// then ID. Actual restoration still requires the separate gate below.
     pub fn restoration_order(&self) -> Vec<&LoadRegistryEntry> {
         let mut ordered: Vec<&LoadRegistryEntry> = self.entries.iter().collect();
         ordered.sort_by(|left, right| {
-            left.restore_priority
-                .cmp(&right.restore_priority)
+            left.class
+                .allocation_tier()
+                .cmp(&right.class.allocation_tier())
+                .then_with(|| left.restore_priority.cmp(&right.restore_priority))
                 .then_with(|| left.load_id.cmp(&right.load_id))
         });
         ordered
@@ -636,6 +644,10 @@ mod tests {
             LoadRegistryError::DuplicateLoadId("duplicate".into())
         );
         assert_eq!(
+            LoadRegistry::new("v1", vec![entry("aux", LoadClass::Auxiliary, 1.0, 1, 1)]).unwrap_err(),
+            LoadRegistryError::MissingCriticalLoad
+        );
+        assert_eq!(
             LoadRegistry::new("v1", vec![entry(" ", LoadClass::Critical, 1.0, 1, 1)]).unwrap_err(),
             LoadRegistryError::EmptyLoadId
         );
@@ -776,7 +788,7 @@ mod tests {
             ],
         ).unwrap();
         let ids: Vec<&str> = reg.restoration_order().iter().map(|entry| entry.load_id.as_str()).collect();
-        assert_eq!(ids, vec!["alpha", "zeta", "middle", "later"]);
+        assert_eq!(ids, vec!["later", "alpha", "middle", "zeta"]);
     }
 
     fn restoration_gate() -> LoadRestorationGate {
