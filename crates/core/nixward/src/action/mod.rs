@@ -117,6 +117,8 @@ pub use systemd_observer::{
 #[cfg(feature = "systemd-mutation")]
 pub use systemd_mutation::{
     NixSystemdLifecycleMutationTransportV1, NixSystemdMutationTransportErrorV1,
+    NixSystemdUnitFileChangeKindV1, NixSystemdUnitFileChangeV1,
+    NixSystemdUnitFileMutationKindV1, NixSystemdUnitFileOperationResultV1,
 };
 pub use service_state::{
     NixServiceEnablementEvidenceV1,

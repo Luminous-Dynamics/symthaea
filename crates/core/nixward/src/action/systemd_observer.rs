@@ -55,7 +55,6 @@ const REQUIRED_UNIT_PROPERTIES: &[&str] = &[
     "DropInPaths",
     "UnitFileState",
     "StateChangeTimestampMonotonic",
-    "InvocationID",
 ];
 
 #[derive(Debug, Error)]
@@ -500,8 +499,14 @@ impl NixSystemdReadOnlyObserverV1 {
         &self,
         object_path: &OwnedObjectPath,
         expected_unit: &str,
-    ) -> Result<(NixSystemdUnitDefinitionIdentityV1, bool, Option<String>), NixSystemdObserverErrorV1>
-    {
+    ) -> Result<
+        (
+            NixSystemdUnitDefinitionIdentityV1,
+            bool,
+            Option<String>,
+        ),
+        NixSystemdObserverErrorV1,
+    > {
         validate_unit_object_path(object_path)?;
         let properties = self
             .get_all_properties(object_path, SYSTEMD_UNIT_INTERFACE)
@@ -509,7 +514,7 @@ impl NixSystemdReadOnlyObserverV1 {
         let identity = build_definition_identity_from_properties(&properties, expected_unit)?;
         let need_daemon_reload =
             required_bool(&properties, SYSTEMD_UNIT_INTERFACE, "NeedDaemonReload")?;
-        let invocation_id = required_invocation_id(&properties)?;
+        let invocation_id = self.read_invocation_id_property(object_path).await?;
         Ok((identity, need_daemon_reload, invocation_id))
     }
 
@@ -761,7 +766,9 @@ impl NixSystemdReadOnlyObserverV1 {
                 observed: observed_id,
             });
         }
-        let observed_invocation = required_invocation_id(&properties)?
+        let observed_invocation = self
+            .read_invocation_id_property(&path)
+            .await?
             .ok_or(NixSystemdObserverErrorV1::InvocationIdUnavailable)?;
         let expected_invocation = hex::encode(invocation_id);
         if observed_invocation != expected_invocation {
@@ -793,6 +800,13 @@ impl NixSystemdReadOnlyObserverV1 {
         let service_properties = self
             .get_all_properties(&object_path, SYSTEMD_SERVICE_INTERFACE)
             .await?;
+        // InvocationID is operation-scoped evidence, not a universally required
+        // GetAll(Unit) property. Only Restart needs the explicit property probe.
+        let invocation_id = if operation == NixServiceOperationKindV1::Restart {
+            self.read_invocation_id_property(&object_path).await?
+        } else {
+            None
+        };
         let post_manager_owner = self.systemd_manager_owner().await?;
         if post_manager_owner != manager_owner {
             return Err(NixSystemdObserverErrorV1::ManagerOwnerChanged);
@@ -815,6 +829,7 @@ impl NixSystemdReadOnlyObserverV1 {
             &manager_owner,
             &service_result,
             &unit_properties,
+            invocation_id,
             job,
         )?;
 
@@ -833,6 +848,31 @@ impl NixSystemdReadOnlyObserverV1 {
         let owner: String = bus.call("GetNameOwner", &(SYSTEMD_DESTINATION,)).await?;
         validate_unique_owner(&owner)?;
         Ok(owner)
+    }
+
+    /// Probe Unit.InvocationID through Properties.Get with a typed 16-byte payload.
+    ///
+    /// Current systemd versions do not expose InvocationID in the static Unit
+    /// GetAll property set. This explicit probe is used only where invocation
+    /// continuity is semantically required; unavailable/unsupported remains
+    /// unavailable rather than poisoning unrelated operations.
+    async fn read_invocation_id_property(
+        &self,
+        object_path: &OwnedObjectPath,
+    ) -> Result<Option<String>, NixSystemdObserverErrorV1> {
+        validate_unit_object_path(object_path)?;
+        let unit_proxy = Proxy::new(
+            &self.connection,
+            SYSTEMD_DESTINATION,
+            object_path.clone(),
+            SYSTEMD_UNIT_INTERFACE,
+        )
+        .await?;
+        let bytes: Vec<u8> = unit_proxy
+            .get_property("InvocationID")
+            .await
+            .map_err(|_| NixSystemdObserverErrorV1::InvocationIdUnavailable)?;
+        invocation_id_to_string(bytes)
     }
 
     async fn get_all_properties(
@@ -1122,16 +1162,6 @@ fn required_job_unit(
         })
 }
 
-fn required_invocation_id(
-    properties: &HashMap<String, OwnedValue>,
-) -> Result<Option<String>, NixSystemdObserverErrorV1> {
-    invocation_id_to_string(required_bytes(
-        properties,
-        SYSTEMD_UNIT_INTERFACE,
-        "InvocationID",
-    )?)
-}
-
 fn invocation_id_to_string(bytes: Vec<u8>) -> Result<Option<String>, NixSystemdObserverErrorV1> {
     if bytes.len() != INVOCATION_ID_BYTES {
         return Err(NixSystemdObserverErrorV1::InvalidInvocationId);
@@ -1372,6 +1402,7 @@ fn build_observation_from_properties(
     manager_owner: &str,
     service_result: &str,
     properties: &HashMap<String, OwnedValue>,
+    invocation_id: Option<String>,
     job: Option<NixSystemdJobEvidenceV1>,
 ) -> Result<NixServicePostStateObservationV1, NixSystemdObserverErrorV1> {
     for property in REQUIRED_UNIT_PROPERTIES {
@@ -1433,7 +1464,6 @@ fn build_observation_from_properties(
         SYSTEMD_UNIT_INTERFACE,
         "StateChangeTimestampMonotonic",
     )?;
-    let invocation_id = required_invocation_id(properties)?;
     let observed_at_monotonic_us = monotonic_now_us()?;
 
     let definition_identity = NixSystemdUnitDefinitionIdentityV1::new(fragment_path, drop_in_paths)
@@ -1558,6 +1588,11 @@ mod tests {
             read_definition_content_file(link.to_str().unwrap()),
             Err(NixSystemdObserverErrorV1::DefinitionContentSymlink)
         ));
+    }
+
+    #[test]
+    fn invocation_id_is_not_a_universal_unit_getall_requirement() {
+        assert!(!REQUIRED_UNIT_PROPERTIES.contains(&"InvocationID"));
     }
 
     #[test]
