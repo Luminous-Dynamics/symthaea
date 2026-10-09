@@ -163,9 +163,22 @@ impl MusicalStateTrajectory {
             });
         }
 
-        // Bound the generation loop directly instead of estimating its size
-        // with floating-point division. This avoids both off-by-one rejection
-        // at the exact budget and cumulative drift from repeated hop addition.
+        // Fast-reject clearly pathological hops before repeatedly scanning the
+        // score. Keep a one-window rounding margin; the bounded index loop below
+        // is authoritative at the exact limit and prevents false rejection.
+        let hop_limited = (total / hop_beats).ceil();
+        let window_limited = ((total - window_beats).max(0.0) / hop_beats).ceil() + 1.0;
+        let estimated_windows = hop_limited.min(window_limited);
+        if !estimated_windows.is_finite()
+            || estimated_windows > MAX_TRAJECTORY_WINDOWS as f64 + 1.0
+        {
+            return Err(format!(
+                "hop_beats would produce more than {MAX_TRAJECTORY_WINDOWS} trajectory windows"
+            ));
+        }
+
+        // Index-derived starts avoid cumulative drift from repeated hop addition.
+        // This bounded loop is authoritative when the estimate is near the limit.
         let mut frames = Vec::new();
         let mut frame_index = 0usize;
         loop {
