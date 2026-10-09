@@ -59,7 +59,7 @@ Therefore Symthaea must not place -55 on the wire and call it an interoperable s
 
 The implementation currently uses this private assurance profile identifier:
 
-symthaea-swarm/rfc9942-pq-bound-mldsa65-v1
+symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-v1
 
 This is a **policy/profile identifier**, not a COSE alg value.
 
@@ -69,20 +69,21 @@ The current branch deliberately implements an **out-of-band PQ attestation**, no
 
 This distinction matters: the ES256 signature does **not** sign the 186-byte hybrid transcript. The transcript links the PQ attestation to a particular classical verification result, rather than pretending that the two component signatures use a standardized composite construction.
 
-The current authenticated byte layout is exactly 186 bytes:
+The current authenticated byte layout is exactly 194 bytes. This profile is restricted to ES256 classical receipts (COSE algorithm -7), and that algorithm ID is also explicitly signed:
 
 | Offset | Width | Value |
 |---|---:|---|
 | 0 | 2 | Hybrid profile version, unsigned big-endian |
 | 2 | 8 | ML-DSA-65 COSE algorithm identifier -49, signed big-endian |
-| 10 | 32 | Key-policy/snapshot SHA-256 |
-| 42 | 16 | Application key-policy ID |
-| 58 | 32 | SHA-256 of exact ML-DSA public-key bytes |
-| 90 | 32 | SHA-256 of exact serialized RFC 9942 Receipt bytes |
-| 122 | 32 | SHA-256 of the verified classical capability |
-| 154 | 32 | Domain-separated transcript digest |
+| 10 | 8 | Classical ES256 COSE algorithm identifier `-7`, signed big-endian |
+| 18 | 32 | Key-policy/snapshot SHA-256 |
+| 50 | 16 | Application key-policy ID |
+| 66 | 32 | SHA-256 of exact ML-DSA public-key bytes |
+| 98 | 32 | SHA-256 of exact serialized RFC 9942 Receipt bytes |
+| 130 | 32 | SHA-256 of the verified classical capability |
+| 162 | 32 | Domain-separated transcript digest |
 
-The transcript digest uses the private domain `symthaea-swarm/rfc9942-pq-bound-mldsa65-transcript-v1`, the profile version, algorithm ID, key-policy digest, key ID, public-key digest, and length-framed Receipt/capability digests. The full receipt bytes are bounded and hashed before this metadata is formed; parsed Rust structs are not re-serialized to define the signed meaning.
+The transcript digest uses the private domain `symthaea-swarm/rfc9942-es256-pq-bound-mldsa65-transcript-v1`, the profile version, both algorithm IDs, key-policy digest, key ID, public-key digest, and length-framed Receipt/capability digests. Both construction and verification reject a classically valid non-ES256 receipt before consulting the PQ key policy or verifier. The full receipt bytes are bounded and hashed before this metadata is formed; parsed Rust structs are not re-serialized to define the signed meaning.
 
 The verifier must retain the exact Receipt digest, classical capability digest, key-policy snapshot digest, key ID, public-key digest, PQ signature digest, transcript digest, evaluation time, and private hybrid capability identity.
 
