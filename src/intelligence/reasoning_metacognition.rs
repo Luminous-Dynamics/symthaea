@@ -19,10 +19,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v7";
+pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v8";
 pub const CORRECTNESS_FORECAST_SCHEMA_VERSION: u32 = 1;
 pub const CORRECTNESS_OUTCOME_SCHEMA_VERSION: u32 = 1;
-pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 2;
+pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 3;
 pub const FORECAST_BASELINE_SCHEMA_VERSION: u32 = 1;
 pub const FORECAST_BASELINE_COMPARISON_SCHEMA_VERSION: u32 = 2;
 pub const FORECAST_OUTCOME_BINDING_REPORT_SCHEMA_VERSION: u32 = 1;
@@ -553,8 +553,9 @@ pub struct ForecastBaselineComparisonReport {
 }
 
 /// Forecasts and scoring policy fixed before outcomes are attached. Private fields prevent
-/// ordinary Rust callers from mutating the batch or policy through this API. A trusted capture
-/// layer must still preserve the serialized value before outcomes are observed.
+/// ordinary Rust callers from mutating the batch or policy through this API. Schema v3 admits
+/// only asserted answers until abstention outcome semantics are separately specified. A trusted
+/// capture layer must still preserve the serialized value before outcomes are observed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "FrozenCorrectnessForecastSetWire")]
 pub struct FrozenCorrectnessForecastSet {
@@ -2231,6 +2232,14 @@ mod tests {
         assert_eq!(decoded, frozen);
         assert_eq!(decoded.calibration_bins(), 7);
         assert_eq!(decoded.selective_thresholds(), &[0.6]);
+
+        let mut old_schema: serde_json::Value =
+            serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse JSON: {e}"));
+        old_schema["schema_version"] = serde_json::json!(2);
+        assert!(
+            serde_json::from_value::<FrozenCorrectnessForecastSet>(old_schema).is_err(),
+            "schema v2 must not be silently reinterpreted under the stricter v3 scoring contract"
+        );
 
         let mut tampered: serde_json::Value =
             serde_json::from_str(&encoded).unwrap_or_else(|e| panic!("parse JSON: {e}"));
