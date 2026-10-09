@@ -661,6 +661,90 @@ fn main() {
         }
     }
 
+    // Empty-tree bootstrap is valid only when anchored to the RFC 9162 empty root.
+    let empty_root: Hash = Sha256::digest([]).into();
+    let empty_anchor = Checkpoint {
+        log_id: "empty-bootstrap-log".to_owned(),
+        tree_size: 0,
+        root_hash: empty_root,
+        timestamp_epoch: 100,
+        policy_version: "policy-v1".to_owned(),
+    };
+    let empty_growth_entries = sample_entries(5);
+    let empty_growth = checkpoint(
+        "empty-bootstrap-log",
+        &empty_growth_entries,
+        101,
+        "policy-v1",
+    );
+    let empty_growth_proof =
+        generate_consistency_proof(0, &empty_growth_entries).expect("empty-prefix proof");
+    assert!(empty_growth_proof.is_empty());
+    let mut empty_bootstrap_store = CheckpointStore::default();
+    empty_bootstrap_store
+        .seed_trusted(empty_anchor.clone())
+        .expect("install explicit empty-tree anchor");
+    assert_eq!(
+        empty_bootstrap_store.accept(
+            empty_growth.clone(),
+            Some(&empty_growth_proof),
+            102,
+            10
+        ),
+        Ok(AcceptanceDecision::AcceptedGrowth)
+    );
+    assert_eq!(
+        empty_bootstrap_store.current.get("empty-bootstrap-log"),
+        Some(&empty_growth)
+    );
+
+    // A malformed "empty" anchor cannot justify arbitrary growth, even with an
+    // empty proof; failed acceptance leaves that exact anchor in place.
+    let malformed_empty_anchor = Checkpoint {
+        root_hash: [0xA7; 32],
+        ..empty_anchor
+    };
+    let mut malformed_empty_store = CheckpointStore::default();
+    malformed_empty_store
+        .seed_trusted(malformed_empty_anchor.clone())
+        .expect("anchor is explicitly trusted, but consistency still checks it");
+    assert_eq!(
+        malformed_empty_store.accept(
+            empty_growth,
+            Some(&empty_growth_proof),
+            102,
+            10
+        ),
+        Err(AcceptanceFailure::InvalidConsistencyProof)
+    );
+    assert_eq!(
+        malformed_empty_store.current.get("empty-bootstrap-log"),
+        Some(&malformed_empty_anchor)
+    );
+
+    // Same-root refresh can advance authenticated checkpoint metadata/time
+    // without pretending the Merkle tree grew; the exact repeat is idempotent.
+    let refresh_entries = sample_entries(4);
+    let refresh_anchor = checkpoint("refresh-log", &refresh_entries, 100, "policy-v1");
+    let refresh_candidate = checkpoint("refresh-log", &refresh_entries, 101, "policy-v2");
+    let mut refresh_store = CheckpointStore::default();
+    refresh_store
+        .seed_trusted(refresh_anchor.clone())
+        .expect("install refresh anchor");
+    assert_eq!(
+        refresh_store.accept(refresh_candidate.clone(), None, 102, 10),
+        Ok(AcceptanceDecision::AcceptedRefresh)
+    );
+    assert_eq!(
+        refresh_store.current.get("refresh-log"),
+        Some(&refresh_candidate)
+    );
+    assert_eq!(
+        refresh_store.accept(refresh_candidate.clone(), None, 102, 10),
+        Ok(AcceptanceDecision::IdempotentReplay)
+    );
+    assert_eq!(verify_event_chain(&refresh_store.events), Ok(()));
+
     // Growth without a proof is rejected and cannot advance the accepted head.
     let entries = sample_entries(7);
     let old = checkpoint("civ-log-v1", &entries[..3], 100, "policy-v1");
@@ -784,6 +868,13 @@ fn main() {
     assert_eq!(
         verify_event_chain(&interior_deletion),
         Err(AuditChainFailure::SequenceMismatch)
+    );
+
+    // Intentionally document the chain's ceiling: without an independently
+    // retained tail digest/checkpoint, truncating a valid suffix is invisible.
+    assert_eq!(
+        verify_event_chain(&store.events[..store.events.len() - 1]),
+        Ok(())
     );
 
     println!(
