@@ -28,7 +28,7 @@ jobs:
     env:
       VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
       # Synchronization validation is disabled by default in the Khronos layer.
-      # Set the current layer setting and retain the legacy form for packaged-layer compatibility.
+      # Use only the current layer setting; do not combine it with deprecated VK_LAYER_ENABLES.
       VK_LAYER_VALIDATE_SYNC: "1"
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
