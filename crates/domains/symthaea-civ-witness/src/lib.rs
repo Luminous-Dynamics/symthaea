@@ -1110,6 +1110,27 @@ fn append_fork_evidence(
     // inconsistent, even if the current count and last-row pointer happen to agree.
     validate_fork_history(tx, log_id)?;
 
+    // Re-observing the same pair is an idempotent report, not a second fork
+    // event. This matters when recovery repeatedly sees a same-generation
+    // external-anchor mismatch; retries must not grow the evidence chain.
+    let already_recorded: bool = tx.query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM witness_fork_evidence
+            WHERE log_id=?1 AND generation=?2
+              AND first_record_digest=?3 AND conflicting_record_digest=?4
+         )",
+        params![
+            log_id,
+            generation as i64,
+            first_digest.as_slice(),
+            conflicting_digest.as_slice()
+        ],
+        |row| row.get(0),
+    )?;
+    if already_recorded {
+        return Ok(());
+    }
+
     let row_count: i64 = tx.query_row(
         "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
         params![log_id],
@@ -2437,11 +2458,23 @@ mod tests {
             store.recover(log_id, &anchor),
             Err(WitnessError::ExternalAnchorMismatch)
         ));
+        assert!(matches!(
+            store.recover(log_id, &anchor),
+            Err(WitnessError::ExternalAnchorMismatch)
+        ), "identical recovery retries still fail closed");
 
         let history = store.load_history(log_id).expect("local accepted history remains valid");
         assert_eq!(history.accepted.as_ref(), Some(&accepted));
         assert!(history.prepared.is_none(), "recovery must not invent a prepared candidate");
         let conn = store.open_connection().expect("open fork evidence query");
+        let evidence_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("count same-generation fork observations");
+        assert_eq!(evidence_count, 1, "identical retries must not duplicate one fork event");
         let evidence: (i64, Vec<u8>, Vec<u8>) = conn
             .query_row(
                 "SELECT generation, first_record_digest, conflicting_record_digest
