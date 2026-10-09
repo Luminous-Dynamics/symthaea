@@ -365,6 +365,34 @@ pub fn compare_assessments_with_roster(
     result
 }
 
+/// Construct the expected subject from canonical bytes, then compare against a
+/// required framework roster. This is the safer single-call entry point for a
+/// caller that has the canonical scenario and candidate-action bytes in hand.
+///
+/// Errors indicate invalid/empty subject inputs. A successfully returned
+/// comparison can still be incomplete, malformed, stale, or mismatched; callers
+/// must inspect its state and validation errors rather than treating Ok as allow.
+pub fn compare_assessments_with_canonical_bytes(
+    scenario_ref: impl Into<String>,
+    scenario_bytes: &[u8],
+    candidate_action_ref: impl Into<String>,
+    candidate_action_bytes: &[u8],
+    expected_frameworks: &[FrameworkIdentity],
+    assessments: &[FrameworkAssessment],
+) -> Result<PluralEthicsComparison, AssessmentSubjectError> {
+    let expected_subject = AssessmentSubject::from_canonical_bytes(
+        scenario_ref,
+        scenario_bytes,
+        candidate_action_ref,
+        candidate_action_bytes,
+    )?;
+    Ok(compare_assessments_with_roster(
+        &expected_subject,
+        expected_frameworks,
+        assessments,
+    ))
+}
+
 fn validate_framework_roster(roster: &[FrameworkIdentity]) -> Vec<String> {
     let mut errors = Vec::new();
     let mut seen = HashSet::new();
@@ -723,6 +751,71 @@ mod tests {
         assert!(!subject.matches_canonical_bytes(b"scenario-v2", b"action-v1"));
         assert!(!subject.matches_canonical_bytes(b"scenario-v1", b"action-v2"));
         assert!(!subject.matches_canonical_bytes(b"", b"action-v1"));
+    }
+
+    #[test]
+    fn canonical_bytes_entrypoint_accepts_matching_fresh_assessments() {
+        let subject = AssessmentSubject::from_canonical_bytes(
+            "scenario:case-canonical",
+            br#"{"facts":["consent","scope"]}"#,
+            "action:case-canonical",
+            br#"{"type":"share","scope":"limited"}"#,
+        )
+        .unwrap();
+        let mut care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let mut rights = assessment("rights_ethics", FrameworkStance::SupportsAction);
+        care.subject = subject.clone();
+        care.provenance.source_subject = Some(subject.clone());
+        rights.subject = subject.clone();
+        rights.provenance.source_subject = Some(subject);
+
+        let result = compare_assessments_with_canonical_bytes(
+            "scenario:case-canonical",
+            br#"{"facts":["consent","scope"]}"#,
+            "action:case-canonical",
+            br#"{"type":"share","scope":"limited"}"#,
+            &[
+                identity("care_ethics", "1.0.0"),
+                identity("rights_ethics", "1.0.0"),
+            ],
+            &[care, rights],
+        )
+        .unwrap();
+
+        assert_eq!(result.state, ComparisonState::AgreementSupports);
+        assert!(result.validation_errors.is_empty());
+    }
+
+    #[test]
+    fn canonical_bytes_entrypoint_rejects_assessment_with_forged_digest() {
+        let mut care = assessment("care_ethics", FrameworkStance::SupportsAction);
+        care.subject.scenario_digest = "blake3:v1:forged".to_owned();
+        care.provenance.source_subject = Some(care.subject.clone());
+
+        let result = compare_assessments_with_canonical_bytes(
+            "scenario:case-canonical",
+            b"canonical scenario bytes",
+            "action:case-canonical",
+            b"canonical action bytes",
+            &[identity("care_ethics", "1.0.0"), identity("rights_ethics", "1.0.0")],
+            &[care],
+        )
+        .unwrap();
+
+        assert_eq!(result.state, ComparisonState::SubjectMismatch);
+    }
+
+    #[test]
+    fn canonical_bytes_entrypoint_rejects_empty_canonical_payload() {
+        let result = compare_assessments_with_canonical_bytes(
+            "scenario:case-canonical",
+            b"",
+            "action:case-canonical",
+            b"canonical action bytes",
+            &[identity("care_ethics", "1.0.0")],
+            &[],
+        );
+        assert_eq!(result, Err(AssessmentSubjectError::EmptyScenarioBytes));
     }
 
     #[test]
