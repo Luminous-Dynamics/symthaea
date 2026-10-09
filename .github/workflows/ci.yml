@@ -9,6 +9,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # Include ready_for_review explicitly so a draft PR can start qualification
+    # checks when promoted to reviewable status; default PR activity types omit it.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   schedule:
     # Weekly psych-bench regression run: Sundays at 04:00 UTC
