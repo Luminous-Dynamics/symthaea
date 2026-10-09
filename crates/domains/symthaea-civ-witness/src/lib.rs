@@ -1353,6 +1353,76 @@ mod tests {
     }
 
     #[test]
+    fn late_finalize_is_idempotent_after_recovery_and_a_later_successor() {
+        let db = TempDb::new();
+        let anchor = MemoryAnchor::default();
+        let original_store = db.open();
+        let first = initialize(&original_store, &anchor, "log-late-finalize");
+        let checkpoint_two = h(b"checkpoint-two");
+        let receipt_two = h(b"receipt-two");
+        let candidate_two = Record::build(
+            2,
+            "log-late-finalize",
+            "policy-v1",
+            checkpoint_two,
+            1,
+            Some(receipt_two),
+            Some(first.digest),
+        );
+
+        // Simulate the original caller pausing after external CAS but before its
+        // local finalize transaction.
+        assert!(matches!(
+            original_store.transition_inner(
+                "log-late-finalize",
+                first.generation,
+                first.digest,
+                None,
+                checkpoint_two,
+                1,
+                Some(receipt_two),
+                &anchor,
+                Some(FaultPoint::AfterExternalAnchorAdvance),
+            ),
+            Err(WitnessError::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance))
+        ));
+
+        // Another store instance recovers and finalizes the same prepared
+        // candidate, then successfully advances to generation 3.
+        let recovery_store = db.open();
+        let recovered_two = recovery_store
+            .recover("log-late-finalize", &anchor)
+            .expect("recover prepared candidate")
+            .expect("accepted generation two");
+        assert_eq!(recovered_two, candidate_two);
+        let third = recovery_store
+            .advance(
+                "log-late-finalize",
+                recovered_two.generation,
+                recovered_two.digest,
+                h(b"checkpoint-three"),
+                2,
+                Some(h(b"receipt-three")),
+                &anchor,
+            )
+            .expect("advance after recovery");
+        assert_eq!(third.generation, 3);
+
+        // The original caller's late finalize sees a newer head, but its exact
+        // generation-two record is already accepted. It must not report a
+        // false stale-predecessor failure or move the head backwards.
+        original_store
+            .finalize(&candidate_two, first.generation, first.digest)
+            .expect("late finalize of accepted historical candidate is idempotent");
+        assert_eq!(
+            original_store
+                .recover("log-late-finalize", &anchor)
+                .expect("head remains valid"),
+            Some(third)
+        );
+    }
+
+    #[test]
     fn prepared_candidate_is_reused_after_restart_when_anchor_is_unchanged() {
         let db = TempDb::new();
         let anchor = MemoryAnchor::default();
