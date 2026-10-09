@@ -177,8 +177,13 @@ pub struct LoadServiceReport {
     pub auxiliary_shed_kwh: f64,
     /// Demand actually served by local storage versus the idealized infinite
     /// grid. Battery charge input is reported separately below.
+    pub storage_discharge_available_kwh: f64,
     pub storage_supply_to_load_kwh: f64,
     pub grid_supply_to_load_kwh: f64,
+    /// Surplus storage output delivered to the modeled infinite grid.
+    pub storage_export_to_grid_kwh: f64,
+    /// Surplus storage output with no modeled sink (normally zero because the
+    /// islanded guard caps discharge to demand).
     pub unused_storage_supply_kwh: f64,
     pub battery_charge_input_kwh: f64,
     /// Noncritical deficits are categorized as deliberate shed by the
@@ -227,6 +232,7 @@ impl LoadServiceReport {
         if !is_islanded {
             let storage_to_load = storage_discharge_kwh.min(total_demand);
             let grid_to_load = (total_demand - storage_to_load).max(0.0);
+            let storage_export_to_grid = (storage_discharge_kwh - total_demand).max(0.0);
             return Self {
                 total_demand_kwh: total_demand,
                 total_served_kwh: total_demand,
@@ -244,9 +250,11 @@ impl LoadServiceReport {
                 heating_served_kwh: heating,
                 auxiliary_demand_kwh: auxiliary_demand,
                 auxiliary_served_kwh: auxiliary_demand,
+                storage_discharge_available_kwh: storage_discharge_kwh,
                 storage_supply_to_load_kwh: storage_to_load,
                 grid_supply_to_load_kwh: grid_to_load,
-                unused_storage_supply_kwh: (storage_discharge_kwh - storage_to_load).max(0.0),
+                storage_export_to_grid_kwh: storage_export_to_grid,
+                unused_storage_supply_kwh: 0.0,
                 battery_charge_input_kwh,
                 ..Self::default()
             };
@@ -255,8 +263,9 @@ impl LoadServiceReport {
         // The deterministic islanding guard allocates scarce local energy by
         // explicit priority: critical community load, protected cooling when
         // thermal risk is elevated, deferrable community load, ordinary
-        // cooling, heating, and community auxiliary demand. Noncritical
-        // deficits are therefore intentional shedding, not unserved energy.
+        // cooling, heating, and community auxiliary demand. Eligible deficits
+        // are intentional shedding; critical demand and protected-cooling
+        // deficits remain explicitly unserved when supply is insufficient.
         let mut remaining = storage_discharge_kwh.max(0.0);
         let critical_served = critical.min(remaining);
         remaining = (remaining - critical_served).max(0.0);
@@ -310,8 +319,10 @@ impl LoadServiceReport {
             auxiliary_demand_kwh: auxiliary_demand,
             auxiliary_served_kwh: auxiliary_served,
             auxiliary_shed_kwh: auxiliary_shed,
+            storage_discharge_available_kwh: storage_discharge_kwh,
             storage_supply_to_load_kwh: total_served,
             grid_supply_to_load_kwh: 0.0,
+            storage_export_to_grid_kwh: 0.0,
             unused_storage_supply_kwh: (storage_discharge_kwh - total_served).max(0.0),
             battery_charge_input_kwh,
             noncritical_unserved_kwh: protected_cooling_unserved,
@@ -337,7 +348,8 @@ impl LoadServiceReport {
             self.protected_cooling_unserved_kwh, self.heating_demand_kwh,
             self.heating_served_kwh, self.heating_shed_kwh, self.auxiliary_demand_kwh,
             self.auxiliary_served_kwh, self.auxiliary_shed_kwh,
-            self.storage_supply_to_load_kwh, self.grid_supply_to_load_kwh,
+            self.storage_discharge_available_kwh, self.storage_supply_to_load_kwh,
+            self.grid_supply_to_load_kwh, self.storage_export_to_grid_kwh,
             self.unused_storage_supply_kwh, self.battery_charge_input_kwh,
             self.noncritical_unserved_kwh,
         ];
@@ -397,6 +409,12 @@ impl LoadServiceReport {
             && close(
                 self.storage_supply_to_load_kwh + self.grid_supply_to_load_kwh,
                 self.total_served_kwh,
+            )
+            && close(
+                self.storage_supply_to_load_kwh
+                    + self.storage_export_to_grid_kwh
+                    + self.unused_storage_supply_kwh,
+                self.storage_discharge_available_kwh,
             )
             && close(
                 self.energy_balance_residual_kwh(),
