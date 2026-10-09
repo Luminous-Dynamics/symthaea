@@ -1013,7 +1013,7 @@ mod tests {
         assert_eq!(report.calibration_bins.len(), 10);
         let pooled_top_bin = report.calibration_bins[9];
         assert_eq!(pooled_top_bin.episodes, 10);
-        assert_eq!(pooled_top_bin.mean_confidence, Some(0.9));
+        assert!((pooled_top_bin.mean_confidence.unwrap_or_default() - 0.9).abs() < 1.0e-12);
         assert_eq!(pooled_top_bin.empirical_accuracy, Some(0.9));
         assert!(pooled_top_bin.accuracy_lower_95.unwrap_or_default() <= 0.9);
         assert!(pooled_top_bin.accuracy_upper_95.unwrap_or_default() >= 0.9);
