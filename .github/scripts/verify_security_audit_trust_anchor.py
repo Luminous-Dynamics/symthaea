@@ -221,7 +221,7 @@ def download_artifact_zip(repo: str, artifact_id: int, token: str) -> bytes:
     return content
 
 
-def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[str, Any]) -> None:
+def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[str, Any],\n                    expected_pr_number: int | None = None) -> None:
     if not isinstance(verdict, dict):
         raise VerificationError("verdict artifact is not a JSON object")
     expected_keys = {
@@ -253,8 +253,11 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
     if not isinstance(workflow_ref, str) or not workflow_ref.startswith(expected_ref_prefix):
         raise VerificationError("verdict workflow_ref does not name the policy-expected caller workflow")
     ref_suffix = workflow_ref[len(expected_ref_prefix):]
-    if not re.fullmatch(r"refs/pull/[1-9][0-9]*/merge", ref_suffix):
+    ref_match = re.fullmatch(r"refs/pull/([1-9][0-9]*)/merge", ref_suffix)
+    if ref_match is None:
         raise VerificationError("verdict workflow_ref is not the expected pull-request merge ref")
+    if expected_pr_number is not None and int(ref_match.group(1)) != expected_pr_number:
+        raise VerificationError("verdict workflow_ref PR number differs from the independently matched open PR")
     sha(verdict.get("workflow_sha"), "verdict.workflow_sha")
     if verdict.get("workflow_run_url") != run.get("html_url") or not isinstance(run.get("html_url"), str):
         raise VerificationError("verdict run URL does not match the authoritative GitHub run")
@@ -358,7 +361,7 @@ def validate_evidence_manifest(zf: zipfile.ZipFile, entries: list[zipfile.ZipInf
             raise VerificationError(f"evidence file digest mismatch for {path}")
 
 
-def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, Any], token: str) -> None:
+def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, Any], token: str,\n                            expected_pr_number: int | None = None) -> None:
     owner, name = repo.split("/", 1)
     run_id = run["id"]
     subject = sha(run.get("head_sha"), "run.head_sha")
@@ -417,7 +420,7 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
         raise
     except Exception as exc:
         raise VerificationError(f"verdict artifact ZIP/JSON is invalid: {type(exc).__name__}: {exc}") from exc
-    validate_verdict(verdict, repo, policy, run)
+    validate_verdict(verdict, repo, policy, run, expected_pr_number)
 
 
 def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: str,
@@ -470,7 +473,10 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
                 raise VerificationError("caller engine commit differs from trusted policy pin")
         else:
             check_blob(repo, ENGINE_PATH, subject, ENGINE_BLOB, token)
-        verify_verdict_artifact(repo, policy, run, token)
+        pr_number = pr.get("number")
+        if not isinstance(pr_number, int) or pr_number <= 0:
+            raise VerificationError("matched open PR has an invalid number")
+        verify_verdict_artifact(repo, policy, run, token, expected_pr_number=pr_number)
     except VerificationError as exc:
         failure = str(exc)
 
