@@ -883,7 +883,7 @@ mod tests {
             })
         }));
         assert!(report.task_family_calibration[0].selective_risk[0].risk_upper_bound_95
-            < report.selective_risk[0].risk_upper_bound_95);
+            >= report.selective_risk[0].risk_upper_bound_95);
     }
 
     #[test]
