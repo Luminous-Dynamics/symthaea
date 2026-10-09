@@ -307,7 +307,7 @@
         "excluded": [],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "",
+        "receipt_digest": "57f1ea94cdc9028fde9732ec9917b38b4528478b3e4cfafc28a49cb64f4e490b",
         "selected_projection_identity_digests": [
           [
             "claim:x",
@@ -340,7 +340,7 @@
         "excluded": [],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "",
+        "receipt_digest": "58f532d19635b7389e9255f644d28997ca20b34330a7fbc08a664332f258c463",
         "selected_projection_identity_digests": [
           [
             "claim:other",
@@ -369,11 +369,125 @@
         "excluded": [],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "",
+        "receipt_digest": "f8761ba27ac101388ac9082e0e8266c95717e188fede168cc157a09c2cb245b0",
         "selected_projection_identity_digests": [
           [
             "claim:x",
             ""
+          ]
+        ]
+      }
+    },
+    {
+      "name": "missing-representation-binding",
+      "expected_failure": "MissingRepresentationBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x",
+          "claim:x"
+        ],
+        "selected_representation_digests": [],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "7e416f99bd3148764c24963612b21705b718e06da8b13303d93ec588af675e91",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "missing-projection-identity-binding",
+      "expected_failure": "MissingProjectionIdentityBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x",
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "5d8ce6c92bfb0c558ef28e388a442c8b3e99e2cf3b98e67e41fe9be466eedb00",
+        "selected_projection_identity_digests": []
+      }
+    },
+    {
+      "name": "binding-count-mismatch",
+      "expected_failure": "BindingCountMismatch",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x",
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ],
+          [
+            "claim:x",
+            "extra-representation-digest"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "e48a116de7fc85f8373381b5e428f28855fbc34400218eb6d214d257a93a9b45",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "historical-missing-frontier",
+      "expected_failure": "InvalidRequest(MissingHistoricalFrontier)",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": null,
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x",
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "2653645c68f80c7b0a2e6df7ba318f142523d07feddebe201a56574481333a57",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
           ]
         ]
       }
