@@ -340,13 +340,7 @@ impl SqliteWitnessStore {
     }
 
     fn open_connection(&self) -> Result<Connection, WitnessError> {
-        let runtime_version = rusqlite::version_number();
-        if runtime_version < MIN_SQLITE_VERSION_NUMBER {
-            return Err(WitnessError::UnsupportedSqliteVersion {
-                actual: runtime_version,
-                minimum: MIN_SQLITE_VERSION_NUMBER,
-            });
-        }
+        validate_sqlite_runtime_version(rusqlite::version_number())?;
         let conn = Connection::open(&self.path)?;
         conn.busy_timeout(Duration::from_millis(BUSY_TIMEOUT_MS))?;
         conn.execute_batch(
@@ -1279,6 +1273,16 @@ fn migrate_legacy_fork_metadata(conn: &mut Connection) -> Result<(), WitnessErro
     Ok(())
 }
 
+fn validate_sqlite_runtime_version(actual: i32) -> Result<(), WitnessError> {
+    if actual < MIN_SQLITE_VERSION_NUMBER {
+        return Err(WitnessError::UnsupportedSqliteVersion {
+            actual,
+            minimum: MIN_SQLITE_VERSION_NUMBER,
+        });
+    }
+    Ok(())
+}
+
 fn valid_receipt_tail(sequence: u64, digest: Option<Digest>) -> bool {
     (sequence == 0) == digest.is_none()
 }
@@ -1714,12 +1718,20 @@ mod tests {
 
     #[test]
     fn linked_sqlite_includes_wal_reset_fix() {
-        let actual = rusqlite::version_number();
-        assert!(
-            actual >= MIN_SQLITE_VERSION_NUMBER,
-            "linked SQLite runtime {actual} is below required SQLite 3.51.3 ({}); WAL durability is not qualified",
-            MIN_SQLITE_VERSION_NUMBER
-        );
+        validate_sqlite_runtime_version(rusqlite::version_number())
+            .expect("linked SQLite runtime must include the WAL-reset fix");
+    }
+
+    #[test]
+    fn rejects_sqlite_runtime_below_wal_reset_fix_floor() {
+        let actual = MIN_SQLITE_VERSION_NUMBER - 1;
+        assert!(matches!(
+            validate_sqlite_runtime_version(actual),
+            Err(WitnessError::UnsupportedSqliteVersion {
+                actual: found,
+                minimum
+            }) if found == actual && minimum == MIN_SQLITE_VERSION_NUMBER
+        ));
     }
 
     #[test]
