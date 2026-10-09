@@ -17,7 +17,7 @@ pub mod theory_comparison;
 pub use theory_comparison::{
     ConfoundStatus, EvaluationReason, EvaluationReceipt, ManipulationCheck,
     Observation, ObservationOutcome, ObservabilityTier, PairwiseDiscrimination,
-    PredictionDisposition, PredictionRegistry, RegistryValidationError,
+    PredictionDisposition, PredictionRegistry, RegistryFreezeAnchor, RegistryValidationError,
     TheoryPrediction, TrialCoverage, assess_trial_coverage,
     compare_predictions, digest_bytes, evaluate_prediction,
     has_duplicate_source_trajectory_ids,
