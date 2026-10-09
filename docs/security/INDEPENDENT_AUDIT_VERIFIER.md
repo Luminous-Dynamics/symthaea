@@ -17,3 +17,5 @@ The workflow is privilege-separated from PR code, but the repository's default b
 ## Enforcement verification snapshot (2026-10-09)
 
 The repository-level rulesets API returned an empty list for this repository during implementation. Reading branch-protection settings was denied to the connected integration, so that result does **not** prove that no organization-level ruleset or branch protection applies. Before claiming merge enforcement, a repository administrator must verify in GitHub that the exact commit status `Security Audit / Independent Verifier` and the verifier job check are required, bypasses are controlled, and the policy applies to the default branch.
+
+The verifier also compares the ZIP's complete non-verdict file set to the verdict's `evidence_files` manifest, recomputes each member's SHA-256, and rejects missing, extra, duplicate, unsafe, or digest-mismatched evidence entries. This prevents an internally inconsistent manifest from passing solely because the outer ZIP digest is correct.
