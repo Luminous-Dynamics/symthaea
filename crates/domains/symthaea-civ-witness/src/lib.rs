@@ -541,6 +541,20 @@ impl SqliteWitnessStore {
                         return Err(WitnessError::ExternalAnchorMismatch);
                     }
                     if observed_after_cas.generation > generation {
+                        // The CAS response may have been lost after the anchor committed
+                        // this candidate. A recovery worker can then finalize the candidate
+                        // and commit a later successor before this caller reads the anchor.
+                        // Reconcile only if the fully validated local accepted head exactly
+                        // matches the newer external anchor, then prove this candidate is an
+                        // accepted historical record before reporting idempotent success.
+                        let local_history = self.load_history(log_id)?;
+                        if local_history.accepted.as_ref().is_some_and(|head| {
+                            head.generation > generation
+                                && AnchorState::from_record(head) == observed_after_cas
+                        }) {
+                            self.finalize(&candidate, expected_generation, expected_digest)?;
+                            return Ok(candidate);
+                        }
                         return Err(WitnessError::RollbackDetected);
                     }
                     return Err(WitnessError::Anchor(cas_error));
@@ -1766,6 +1780,59 @@ mod tests {
     }
 
     #[test]
+    fn ambiguous_anchor_commit_reconciles_after_successor_advances() {
+        let db = TempDb::new();
+        let store = Arc::new(db.open());
+        let log_id = "log-ambiguous-cas-after-successor";
+        let anchor = CommitThenAdvanceAnchor::new(Arc::clone(&store), log_id);
+        let first = store
+            .initialize(
+                log_id,
+                "policy-v1",
+                h(b"checkpoint-one"),
+                0,
+                None,
+                &anchor,
+            )
+            .expect("initialize before injecting lost CAS response");
+
+        // The generation-two anchor CAS commits, but its response is reported as
+        // unavailable only after a recovery path accepts generation two and commits
+        // generation three. The original generation-two caller must reconcile to the
+        // validated local/anchored history, not misclassify the valid successor as rollback.
+        let second = store
+            .advance(
+                log_id,
+                first.generation,
+                first.digest,
+                h(b"checkpoint-two"),
+                1,
+                Some(h(b"receipt-two")),
+                &anchor,
+            )
+            .expect("committed candidate remains accepted after successor advances");
+        assert_eq!(second.generation, 2);
+
+        let head = store
+            .recover(log_id, &anchor)
+            .expect("reconcile current anchored head")
+            .expect("accepted head");
+        assert_eq!(head.generation, 3);
+        assert_eq!(head.previous_record_digest, Some(second.digest));
+
+        let conn = store.open_connection().expect("inspect accepted history");
+        let second_status: i64 = conn
+            .query_row(
+                "SELECT status FROM witness_records WHERE log_id=?1 AND generation=2",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("read reconciled candidate status");
+        assert_eq!(second_status, 1, "ambiguous candidate must be finalized as accepted");
+        assert_eq!(store.integrity_check().expect("semantic integrity"), "ok");
+    }
+
+    #[test]
     fn uses_wal_full_and_recovers_after_reopen() {
         let db = TempDb::new();
         let anchor = MemoryAnchor::default();
@@ -2835,6 +2902,64 @@ mod tests {
             store.recover("log-snapshot-rollback", &anchor),
             Err(WitnessError::RollbackDetected)
         ));
+    }
+
+    struct CommitThenAdvanceAnchor {
+        inner: MemoryAnchor,
+        store: Arc<SqliteWitnessStore>,
+        interleave_once: std::sync::atomic::AtomicBool,
+    }
+
+    impl CommitThenAdvanceAnchor {
+        fn new(store: Arc<SqliteWitnessStore>, log_id: &str) -> Self {
+            let inner = MemoryAnchor::default();
+            inner.provision(log_id);
+            Self {
+                inner,
+                store,
+                interleave_once: std::sync::atomic::AtomicBool::new(true),
+            }
+        }
+    }
+
+    impl IndependentAnchor for CommitThenAdvanceAnchor {
+        fn current(&self, log_id: &str) -> Result<AnchorState, AnchorError> {
+            self.inner.current(log_id)
+        }
+
+        fn compare_and_advance(
+            &self,
+            expected: &AnchorState,
+            next: &AnchorState,
+        ) -> Result<(), AnchorError> {
+            self.inner.compare_and_advance(expected, next)?;
+
+            if next.generation == 2 && self.interleave_once.swap(false, Ordering::SeqCst) {
+                // Simulate another recovery worker winning the race after the durable
+                // anchor CAS but before the original caller receives its response.
+                let recovered = self
+                    .store
+                    .recover(&next.log_id, self)
+                    .map_err(|error| AnchorError::Other(format!("interleaved recovery failed: {error}")))?
+                    .ok_or_else(|| AnchorError::Other("interleaved recovery found no accepted head".into()))?;
+                self.store
+                    .advance(
+                        &next.log_id,
+                        recovered.generation,
+                        recovered.digest,
+                        h(b"checkpoint-three-after-ambiguous-cas"),
+                        2,
+                        Some(h(b"receipt-three-after-ambiguous-cas")),
+                        self,
+                    )
+                    .map_err(|error| AnchorError::Other(format!("interleaved successor failed: {error}")))?;
+
+                // The state change is durable; only the caller's response is lost.
+                return Err(AnchorError::Unavailable);
+            }
+
+            Ok(())
+        }
     }
 
     fn storeless_recover(db: &TempDb, anchor: &MemoryAnchor, log_id: &str) -> Record {
