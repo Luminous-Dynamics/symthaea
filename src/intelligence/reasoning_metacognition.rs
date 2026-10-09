@@ -19,15 +19,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v3";
+pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v4";
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
 const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = concat!(
     "IID evaluation episodes; frozen scoring and selection rule; ",
     "supplied threshold set predeclared before correctness outcomes; ",
-    "task-family taxonomy predeclared and outcome-independent; ",
-    "simultaneous bounds cover pooled and observed task-family by threshold comparisons; ",
+    "task-family taxonomy and equal-width confidence bins predeclared and outcome-independent; ",
+    "simultaneous bounds cover pooled and observed task-family by threshold and bin comparisons; ",
     "no distribution-shift guarantee",
 );
 
@@ -95,6 +95,23 @@ pub struct SelectiveRiskPoint {
     pub selected: usize,
 }
 
+/// One fixed-width confidence bin with outcome frequency and uncertainty interval.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CalibrationBinReport {
+    pub bin_index: usize,
+    /// Inclusive lower endpoint of the confidence interval represented by this bin.
+    pub confidence_lower: f64,
+    /// Upper endpoint; exclusive except that the final bin includes confidence 1.0.
+    pub confidence_upper: f64,
+    pub episodes: usize,
+    pub mean_confidence: Option<f64>,
+    pub empirical_accuracy: Option<f64>,
+    /// Conservative family-wise adjusted two-sided Hoeffding interval for accuracy in this bin.
+    /// None when the bin is empty.
+    pub accuracy_lower_95: Option<f64>,
+    pub accuracy_upper_95: Option<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BinaryDetectionReport {
     pub observations: usize,
@@ -128,6 +145,8 @@ pub struct TaskFamilyCalibrationReport {
     /// Group-local coverage and risk; upper bounds share family-wise correction
     /// with pooled results.
     pub selective_risk: Vec<SelectiveRiskPoint>,
+    /// Equal-width reliability bins with simultaneous accuracy intervals.
+    pub calibration_bins: Vec<CalibrationBinReport>,
 }
 
 /// Decomposed RQ-006 measurement report. There is intentionally no single "metacognition score".
@@ -161,6 +180,8 @@ pub struct MetacognitionReport {
     pub selective_risk_bound_assumptions: String,
     /// Deterministically sorted, group-local calibration results; never averaged into a scalar.
     pub task_family_calibration: Vec<TaskFamilyCalibrationReport>,
+    /// Pooled equal-width reliability bins with simultaneous accuracy intervals.
+    pub calibration_bins: Vec<CalibrationBinReport>,
     pub selective_risk: Vec<SelectiveRiskPoint>,
     pub weak_assumption_detection: BinaryDetectionReport,
     pub confidence_revisions: usize,
@@ -248,8 +269,9 @@ pub fn evaluate_metacognition(
     }
     // Correct across pooled + every observed task family, for each predeclared threshold.
     // Task-family labels themselves must come from a frozen, outcome-independent taxonomy.
-    let family_comparison_count = selective_thresholds
+    let familywise_comparison_count = selective_thresholds
         .len()
+        .saturating_add(calibration_bins)
         .saturating_mul(task_family_members.len().saturating_add(1));
 
     let empirical_accuracy = mean_bool(predictions.iter().map(|p| p.correct));
@@ -313,7 +335,7 @@ pub fn evaluate_metacognition(
                 risk_upper_bound_95: hoeffding_familywise_risk_upper_bound(
                     errors,
                     selected_n,
-                    family_comparison_count,
+                    familywise_comparison_count,
                 ),
                 selected: selected_n,
             }
@@ -328,10 +350,15 @@ pub fn evaluate_metacognition(
                 members,
                 calibration_bins,
                 selective_thresholds,
-                family_comparison_count,
+                familywise_comparison_count,
             )
         })
         .collect();
+    let pooled_calibration_bins = calibration_bin_reports(
+        predictions,
+        calibration_bins,
+        familywise_comparison_count,
+    );
 
     let weak_assumption_detection = detection_report(assumptions);
     let (revision_direction_accuracy, mean_expected_revision_delta) = revision_metrics(revisions);
@@ -354,6 +381,7 @@ pub fn evaluate_metacognition(
         selective_risk_bound_method: SELECTIVE_RISK_BOUND_METHOD.into(),
         selective_risk_bound_assumptions: SELECTIVE_RISK_BOUND_ASSUMPTIONS.into(),
         task_family_calibration,
+        calibration_bins: pooled_calibration_bins,
         selective_risk,
         weak_assumption_detection,
         confidence_revisions: revisions.len(),
@@ -476,7 +504,7 @@ fn task_family_report(
     predictions: &[CorrectnessPrediction],
     calibration_bins: usize,
     selective_thresholds: &[f64],
-    family_comparison_count: usize,
+    familywise_comparison_count: usize,
 ) -> TaskFamilyCalibrationReport {
     let n = predictions.len();
     let empirical_accuracy = mean_bool(predictions.iter().map(|p| p.correct));
@@ -524,7 +552,7 @@ fn task_family_report(
                 risk_upper_bound_95: hoeffding_familywise_risk_upper_bound(
                     errors,
                     selected_n,
-                    family_comparison_count,
+                    familywise_comparison_count,
                 ),
                 selected: selected_n,
             }
@@ -546,7 +574,57 @@ fn task_family_report(
         assertion_rate,
         asserted_risk,
         selective_risk,
+        calibration_bins: calibration_bin_reports(
+            predictions,
+            calibration_bins,
+            familywise_comparison_count,
+        ),
     }
+}
+
+fn calibration_bin_reports(
+    predictions: &[CorrectnessPrediction],
+    bins: usize,
+    familywise_comparison_count: usize,
+) -> Vec<CalibrationBinReport> {
+    let mut counts = vec![0usize; bins];
+    let mut confidence_sums = vec![0.0_f64; bins];
+    let mut correct_counts = vec![0usize; bins];
+    for prediction in predictions {
+        let index = ((prediction.confidence * bins as f64).floor() as usize).min(bins - 1);
+        counts[index] += 1;
+        confidence_sums[index] += prediction.confidence;
+        correct_counts[index] += usize::from(prediction.correct);
+    }
+
+    (0..bins)
+        .map(|bin_index| {
+            let episodes = counts[bin_index];
+            let empirical_accuracy = ratio(correct_counts[bin_index], episodes);
+            let mean_confidence =
+                (episodes > 0).then(|| confidence_sums[bin_index] / episodes as f64);
+            let interval = empirical_accuracy.map(|accuracy| {
+                // Two-sided Hoeffding interval at alpha / familywise_comparison_count.
+                // The union bound covers every pooled/group bin and selective-risk threshold.
+                let per_comparison_alpha =
+                    SELECTIVE_RISK_FAMILYWISE_ALPHA / familywise_comparison_count as f64;
+                let radius = ((2.0 / per_comparison_alpha).ln()
+                    / (2.0 * episodes as f64))
+                    .sqrt();
+                ((accuracy - radius).max(0.0), (accuracy + radius).min(1.0))
+            });
+            CalibrationBinReport {
+                bin_index,
+                confidence_lower: bin_index as f64 / bins as f64,
+                confidence_upper: (bin_index + 1) as f64 / bins as f64,
+                episodes,
+                mean_confidence,
+                empirical_accuracy,
+                accuracy_lower_95: interval.map(|(lower, _)| lower),
+                accuracy_upper_95: interval.map(|(_, upper)| upper),
+            }
+        })
+        .collect()
 }
 
 fn calibration_errors(
