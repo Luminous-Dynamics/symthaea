@@ -19,8 +19,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 
-pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v1";
+pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v2";
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
+const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
+const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
 
 /// One pre-outcome prediction of whether the subject's answer is correct.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -73,8 +75,13 @@ pub struct SelectiveRiskPoint {
     /// Fraction of all evaluated episodes on which confidence meets the threshold and the subject
     /// actually asserted an answer.
     pub coverage: f64,
-    /// Error rate conditional on selection. `None` when no episode is selected.
+    /// Empirical error rate conditional on selection. `None` when no episode is selected.
     pub risk: Option<f64>,
+    /// Conservative one-sided 95% family-wise upper bound over the evaluator's supplied,
+    /// predeclared threshold list. Uses Hoeffding + Bonferroni and assumes exchangeable
+    /// evaluation episodes and a frozen score/selection rule. `None` when none are selected.
+    /// The bound does not cover thresholds searched outside that list and cannot repair shift.
+    pub risk_upper_bound_95: Option<f64>,
     pub selected: usize,
 }
 
@@ -116,6 +123,8 @@ pub struct MetacognitionReport {
     /// Fraction of abstentions that would have been correct if answered; useful for distinguishing
     /// prudent abstention from indiscriminate refusal on benchmark tasks with known answers.
     pub abstention_opportunity_cost: Option<f64>,
+    /// Machine-readable method identity for simultaneous selective-risk upper bounds.
+    pub selective_risk_bound_method: String,
     pub selective_risk: Vec<SelectiveRiskPoint>,
     pub weak_assumption_detection: BinaryDetectionReport,
     pub confidence_revisions: usize,
@@ -223,6 +232,9 @@ pub fn evaluate_metacognition(
     let abstention_opportunity_cost =
         conditional_rate(predictions.iter().filter(|p| !p.asserted), |p| p.correct);
 
+    // Freeze the threshold family before inspecting correctness outcomes. Bonferroni correction
+    // bounds simultaneous failure probability over this exact supplied list.
+    let selective_threshold_count = selective_thresholds.len();
     let selective_risk = selective_thresholds
         .iter()
         .map(|&threshold| {
@@ -240,6 +252,11 @@ pub fn evaluate_metacognition(
                     selected_n as f64 / n as f64
                 },
                 risk: ratio(errors, selected_n),
+                risk_upper_bound_95: hoeffding_familywise_risk_upper_bound(
+                    errors,
+                    selected_n,
+                    selective_threshold_count,
+                ),
                 selected: selected_n,
             }
         })
@@ -263,6 +280,7 @@ pub fn evaluate_metacognition(
         assertion_rate,
         asserted_risk,
         abstention_opportunity_cost,
+        selective_risk_bound_method: SELECTIVE_RISK_BOUND_METHOD.into(),
         selective_risk,
         weak_assumption_detection,
         confidence_revisions: revisions.len(),
@@ -351,6 +369,23 @@ fn validate_probability(field: &'static str, value: f64) -> Result<(), Metacogni
     } else {
         Err(MetacognitionEvaluationError::InvalidProbability { field, value })
     }
+}
+
+/// Conservative one-sided Hoeffding bound with Bonferroni correction over a frozen threshold
+/// family. It assumes IID/exchangeable evaluation episodes and a fixed selection rule; it is not
+/// a distribution-shift guarantee.
+fn hoeffding_familywise_risk_upper_bound(
+    errors: usize,
+    selected: usize,
+    threshold_count: usize,
+) -> Option<f64> {
+    if selected == 0 || threshold_count == 0 || errors > selected {
+        return None;
+    }
+    let empirical_risk = errors as f64 / selected as f64;
+    let per_threshold_alpha = SELECTIVE_RISK_FAMILYWISE_ALPHA / threshold_count as f64;
+    let radius = ((1.0 / per_threshold_alpha).ln() / (2.0 * selected as f64)).sqrt();
+    Some((empirical_risk + radius).min(1.0))
 }
 
 fn calibration_errors(
@@ -639,11 +674,36 @@ mod tests {
         ];
         let report = evaluate_metacognition(&observations, &[], &[], 10, &[0.5, 0.9])
             .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"));
+        assert_eq!(report.selective_risk_bound_method, "hoeffding-familywise-95-v1");
         assert_eq!(report.selective_risk[0].selected, 3);
         assert_eq!(report.selective_risk[0].coverage, 0.75);
         assert!((report.selective_risk[0].risk.unwrap_or_default() - 1.0 / 3.0).abs() < 1.0e-12);
+        assert!(report.selective_risk[0].risk_upper_bound_95.unwrap_or_default()
+            >= report.selective_risk[0].risk.unwrap_or_default());
         assert_eq!(report.selective_risk[1].selected, 2);
         assert_eq!(report.selective_risk[1].risk, Some(0.5));
+        assert!(report.selective_risk[1].risk_upper_bound_95.unwrap_or_default() >= 0.5);
+    }
+
+    #[test]
+    fn selective_risk_upper_bound_is_finite_sample_conservative_and_multiplicity_corrected() {
+        assert_eq!(hoeffding_familywise_risk_upper_bound(0, 0, 1), None);
+        assert_eq!(hoeffding_familywise_risk_upper_bound(1, 0, 1), None);
+        assert_eq!(hoeffding_familywise_risk_upper_bound(2, 1, 1), None);
+        let expected_one = (20.0_f64.ln() / 200.0).sqrt();
+        let one_threshold = hoeffding_familywise_risk_upper_bound(0, 100, 1)
+            .expect("non-empty selected sample has a bound");
+        let two_thresholds = hoeffding_familywise_risk_upper_bound(0, 100, 2)
+            .expect("non-empty selected sample has a bound");
+        assert!((one_threshold - expected_one).abs() < 1.0e-12);
+        assert!(one_threshold > 0.0);
+        assert!(two_thresholds > one_threshold,
+            "family-wise correction must account for additional thresholds");
+        assert_eq!(hoeffding_familywise_risk_upper_bound(100, 100, 4), Some(1.0));
+        assert!((0..=100).all(|errors| {
+            hoeffding_familywise_risk_upper_bound(errors, 100, 5)
+                .is_some_and(|bound| (errors as f64 / 100.0) <= bound && bound <= 1.0)
+        }));
     }
 
     #[test]
