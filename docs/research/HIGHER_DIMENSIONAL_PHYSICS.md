@@ -64,6 +64,7 @@ Research basis: summation-by-parts methods provide a systematic framework for en
 ## Run and interpret
 
     cargo test -p symthaea-physics-bridge pde_hypercubic_wave
+    cargo test -p symthaea-physics-bridge pde_grid_refinement
     cargo run -p symthaea-physics-bridge --example higher_dimensional_wave_discovery -- 2
 
 The optional example argument is the maximum spatial dimension (1–4). The runner uses five deterministic paired search seeds and prints elapsed time per seed and dimension. The discovery run is deliberately a *measurement harness*, not a CI assertion that the search must succeed. It may report zero accepted candidates. That is an honest result and should not be converted to a pass by loosening the thresholds after observing results.

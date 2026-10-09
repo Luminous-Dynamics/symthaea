@@ -85,8 +85,7 @@ pub fn wave_1d_energy_derivative(state: &[f64]) -> Option<f64> {
     let (u, v) = state.split_at(n);
     let flow = wave_1d_rhs(state)?;
 
-    let kinetic_derivative =
-        h * (0..n).map(|i| v[i] * flow[n + i]).sum::<f64>();
+    let kinetic_derivative = h * (0..n).map(|i| v[i] * flow[n + i]).sum::<f64>();
 
     // Boundary velocities are zero. Each edge contributes
     // (u_right-u_left)(v_right-v_left)/h.
@@ -109,8 +108,7 @@ mod tests {
         for i in 0..interior_points {
             let x = (i + 1) as f64 * h;
             state[i] = (std::f64::consts::PI * x).sin();
-            state[interior_points + i] =
-                0.3 * (2.0 * std::f64::consts::PI * x).cos();
+            state[interior_points + i] = 0.3 * (2.0 * std::f64::consts::PI * x).cos();
         }
         state
     }
@@ -121,7 +119,7 @@ mod tests {
             assert_eq!(interior_points_for_state_len(2 * n), Some(n));
             assert!(grid_spacing(n).unwrap().is_finite());
         }
-        for malformed in [0, 1, 3, 5, 10 + 1] {
+        for malformed in [0, 1, 3, 5, 11] {
             assert_eq!(interior_points_for_state_len(malformed), None);
         }
         assert_eq!(grid_spacing(0), None);
@@ -186,10 +184,14 @@ mod tests {
         for n in [1, 2, 4, 8, 16] {
             let state = smooth_state(n);
             let flow = wave_1d_rhs(&state).unwrap();
-            let plus: Vec<f64> = state.iter().zip(&flow)
+            let plus: Vec<f64> = state
+                .iter()
+                .zip(&flow)
                 .map(|(x, dx)| x + epsilon * dx)
                 .collect();
-            let minus: Vec<f64> = state.iter().zip(&flow)
+            let minus: Vec<f64> = state
+                .iter()
+                .zip(&flow)
                 .map(|(x, dx)| x - epsilon * dx)
                 .collect();
             let finite_difference =
