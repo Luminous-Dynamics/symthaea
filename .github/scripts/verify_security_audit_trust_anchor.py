@@ -221,7 +221,8 @@ def download_artifact_zip(repo: str, artifact_id: int, token: str) -> bytes:
     return content
 
 
-def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[str, Any],\n                    expected_pr_number: int | None = None) -> None:
+def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[str, Any],
+                    expected_pr_number: int | None = None) -> None:
     if not isinstance(verdict, dict):
         raise VerificationError("verdict artifact is not a JSON object")
     expected_keys = {
@@ -361,7 +362,8 @@ def validate_evidence_manifest(zf: zipfile.ZipFile, entries: list[zipfile.ZipInf
             raise VerificationError(f"evidence file digest mismatch for {path}")
 
 
-def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, Any], token: str,\n                            expected_pr_number: int | None = None) -> None:
+def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, Any], token: str,
+                            expected_pr_number: int | None = None) -> None:
     owner, name = repo.split("/", 1)
     run_id = run["id"]
     subject = sha(run.get("head_sha"), "run.head_sha")
