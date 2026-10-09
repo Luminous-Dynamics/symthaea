@@ -17,6 +17,13 @@ const RECEIPT_EVENT_DOMAIN: &[u8] = b"mycelix-civ012-receipt-event-v1\0";
 const ANCHOR_ID_DOMAIN: &[u8] = b"mycelix-civ012-checkpoint-anchor-v1\0";
 const FIXTURE_ATTESTATION_DOMAIN: &[u8] = b"TEST-ONLY-NOT-A-WITNESS-SIGNATURE-civ012-v1\0";
 
+// Explicit verifier work bounds; transport/parser allocation limits remain an outer layer.
+const MAX_RECEIPT_SUFFIX_EVENTS: usize = 4_096;
+const MAX_RECEIPT_EVENT_BODY_BYTES: usize = 64 * 1024;
+const MAX_RECEIPT_SUFFIX_BYTES: usize = 4 * 1024 * 1024;
+// A u64-sized append-only Merkle tree needs at most 64 consistency nodes.
+const MAX_CONSISTENCY_PROOF_NODES: usize = 64;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ReceiptEvent {
     sequence: u64,
@@ -75,6 +82,7 @@ enum Failure {
     ReceiptRollback,
     ReceiptSuffixGap,
     ReceiptSuffixInvalid,
+    ReceiptSuffixResourceLimit,
     ReceiptTailMismatchForCandidate,
     MissingAnchorLink,
     MissingConsistencyProof,
@@ -179,6 +187,21 @@ fn verify_receipt_suffix(
     candidate_digest: Option<Hash>,
     suffix: &[ReceiptEvent],
 ) -> Result<(), Failure> {
+    if suffix.len() > MAX_RECEIPT_SUFFIX_EVENTS {
+        return Err(Failure::ReceiptSuffixResourceLimit);
+    }
+    let mut suffix_bytes = 0_usize;
+    for event in suffix {
+        if event.body.len() > MAX_RECEIPT_EVENT_BODY_BYTES {
+            return Err(Failure::ReceiptSuffixResourceLimit);
+        }
+        suffix_bytes = suffix_bytes
+            .checked_add(event.body.len())
+            .ok_or(Failure::ReceiptSuffixResourceLimit)?;
+        if suffix_bytes > MAX_RECEIPT_SUFFIX_BYTES {
+            return Err(Failure::ReceiptSuffixResourceLimit);
+        }
+    }
     if candidate_sequence < previous_sequence {
         return Err(Failure::ReceiptRollback);
     }
@@ -521,6 +544,9 @@ fn verify_consistency(
     new_root: &Hash,
     proof: &[Hash],
 ) -> Result<(), ProofFailure> {
+    if proof.len() > MAX_CONSISTENCY_PROOF_NODES {
+        return Err(ProofFailure::InvalidProof);
+    }
     if old_size > new_size {
         return Err(ProofFailure::InvalidTreeSize);
     }
@@ -750,6 +776,42 @@ fn main() {
         malformed_suffix_store.current.get("civ-log-v1"),
         Some(&previous)
     );
+
+    // Reject oversized candidate data before hashing/replaying it; failures do not advance state.
+    let mut oversized_body_suffix = suffix.clone();
+    oversized_body_suffix[0].body = vec![0; MAX_RECEIPT_EVENT_BODY_BYTES + 1];
+    let mut bounded_store = WitnessStore::new("witness-bounded", "lineage-bounded");
+    bounded_store.seed_trusted(previous.clone()).expect("seed anchor");
+    assert_eq!(
+        bounded_store.observe(candidate.clone(), Some(&proof), &oversized_body_suffix, 102, 10),
+        Err(Failure::ReceiptSuffixResourceLimit)
+    );
+    assert_eq!(bounded_store.current.get("civ-log-v1"), Some(&previous));
+
+    let excessive_count = vec![suffix[0].clone(); MAX_RECEIPT_SUFFIX_EVENTS + 1];
+    assert_eq!(
+        bounded_store.observe(candidate.clone(), Some(&proof), &excessive_count, 102, 10),
+        Err(Failure::ReceiptSuffixResourceLimit)
+    );
+    assert_eq!(bounded_store.current.get("civ-log-v1"), Some(&previous));
+
+    let mut excessive_bytes = vec![suffix[0].clone(); 65];
+    for event in &mut excessive_bytes {
+        event.body = vec![0; MAX_RECEIPT_EVENT_BODY_BYTES];
+    }
+    assert_eq!(
+        bounded_store.observe(candidate.clone(), Some(&proof), &excessive_bytes, 102, 10),
+        Err(Failure::ReceiptSuffixResourceLimit)
+    );
+    assert_eq!(bounded_store.current.get("civ-log-v1"), Some(&previous));
+
+    // Even syntactically valid proof arrays are rejected above the u64-tree bound.
+    let excessive_proof = vec![[0xAA; 32]; MAX_CONSISTENCY_PROOF_NODES + 1];
+    assert_eq!(
+        bounded_store.observe(candidate.clone(), Some(&excessive_proof), &suffix, 102, 10),
+        Err(Failure::InvalidConsistencyProof)
+    );
+    assert_eq!(bounded_store.current.get("civ-log-v1"), Some(&previous));
 
     let wrong_tail = CheckpointAnchor {
         receipt_digest: Some(events[5].digest),
