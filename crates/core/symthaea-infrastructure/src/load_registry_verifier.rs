@@ -398,15 +398,46 @@ mod tests {
     }
 
     #[test]
-    fn rejects_provenance_class_and_priority_tampering() {
+    fn rejects_classification_provenance_priority_and_rating_tampering() {
         let registry = registry();
-        let mut ledger = registry.allocate(&demands(), 0.5, 1.25).unwrap();
-        let record = ledger.records.iter_mut()
+
+        let mut class_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
+        class_changed.records.iter_mut()
             .find(|record| record.load_id == "deferrable-comms")
-            .unwrap();
-        record.class = LoadClass::Critical;
+            .unwrap().class = LoadClass::Critical;
         assert_eq!(
-            verify_load_service_ledger(&registry, &ledger).unwrap_err(),
+            verify_load_service_ledger(&registry, &class_changed).unwrap_err(),
+            LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
+        );
+
+        let mut provenance_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
+        provenance_changed.records.iter_mut()
+            .find(|record| record.load_id == "deferrable-comms")
+            .unwrap().provenance = ClassificationProvenance::ReviewedRecord {
+                record_id: "review-99".into(),
+                record_revision: "r2".into(),
+                reviewer_id: "reviewer-a".into(),
+            };
+        assert_eq!(
+            verify_load_service_ledger(&registry, &provenance_changed).unwrap_err(),
+            LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
+        );
+
+        let mut priority_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
+        priority_changed.records.iter_mut()
+            .find(|record| record.load_id == "deferrable-comms")
+            .unwrap().shed_priority += 1;
+        assert_eq!(
+            verify_load_service_ledger(&registry, &priority_changed).unwrap_err(),
+            LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
+        );
+
+        let mut rating_changed = registry.allocate(&demands(), 0.5, 1.25).unwrap();
+        rating_changed.records.iter_mut()
+            .find(|record| record.load_id == "deferrable-comms")
+            .unwrap().rated_power_kw += 0.5;
+        assert_eq!(
+            verify_load_service_ledger(&registry, &rating_changed).unwrap_err(),
             LoadLedgerVerificationError::MetadataMismatch("deferrable-comms".into())
         );
     }
