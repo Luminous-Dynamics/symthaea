@@ -33,6 +33,8 @@ pub enum FrameworkStance {
 /// Error returned when constructing or checking a canonical assessment subject.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssessmentSubjectError {
+    EmptyContextSchemaId,
+    EmptyContextSchemaVersion,
     EmptyScenarioReference,
     EmptyActionReference,
     EmptyScenarioBytes,
@@ -47,6 +49,10 @@ pub enum AssessmentSubjectError {
 /// recompute digests, authenticate producers, or prove the source bytes match.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssessmentSubject {
+    /// Identifier of the schema defining the meaning of canonical context bytes.
+    pub context_schema_id: String,
+    /// Exact version of that context schema.
+    pub context_schema_version: String,
     /// Stable reference to the normalized scenario/context.
     pub scenario_ref: String,
     /// Domain-separated BLAKE3 fingerprint of canonical scenario bytes.
@@ -67,14 +73,24 @@ impl AssessmentSubject {
     /// cannot share fingerprints across the two semantic domains. The method
     /// does not canonicalize JSON/CBOR or prove the caller's bytes are canonical.
     pub fn from_canonical_bytes(
+        context_schema_id: impl Into<String>,
+        context_schema_version: impl Into<String>,
         scenario_ref: impl Into<String>,
         scenario_bytes: &[u8],
         candidate_action_ref: impl Into<String>,
         candidate_action_bytes: &[u8],
     ) -> Result<Self, AssessmentSubjectError> {
+        let context_schema_id = context_schema_id.into();
+        let context_schema_version = context_schema_version.into();
         let scenario_ref = scenario_ref.into();
         let candidate_action_ref = candidate_action_ref.into();
 
+        if context_schema_id.trim().is_empty() {
+            return Err(AssessmentSubjectError::EmptyContextSchemaId);
+        }
+        if context_schema_version.trim().is_empty() {
+            return Err(AssessmentSubjectError::EmptyContextSchemaVersion);
+        }
         if scenario_ref.trim().is_empty() {
             return Err(AssessmentSubjectError::EmptyScenarioReference);
         }
@@ -89,14 +105,20 @@ impl AssessmentSubject {
         }
 
         Ok(Self {
+            context_schema_id: context_schema_id.clone(),
+            context_schema_version: context_schema_version.clone(),
             scenario_ref,
             scenario_digest: domain_separated_digest(
                 b"symthaea.ethics.subject.scenario.v1",
+                &context_schema_id,
+                &context_schema_version,
                 scenario_bytes,
             ),
             candidate_action_ref,
             candidate_action_digest: domain_separated_digest(
                 b"symthaea.ethics.subject.candidate-action.v1",
+                &context_schema_id,
+                &context_schema_version,
                 candidate_action_bytes,
             ),
         })
@@ -116,23 +138,41 @@ impl AssessmentSubject {
             && self.scenario_digest
                 == domain_separated_digest(
                     b"symthaea.ethics.subject.scenario.v1",
+                    &self.context_schema_id,
+                    &self.context_schema_version,
                     scenario_bytes,
                 )
             && self.candidate_action_digest
                 == domain_separated_digest(
                     b"symthaea.ethics.subject.candidate-action.v1",
+                    &self.context_schema_id,
+                    &self.context_schema_version,
                     candidate_action_bytes,
                 )
     }
 }
 
 /// Domain-separated, versioned BLAKE3 fingerprint encoded as a lowercase hex string.
-fn domain_separated_digest(domain: &[u8], bytes: &[u8]) -> String {
+fn domain_separated_digest(
+    domain: &[u8],
+    context_schema_id: &str,
+    context_schema_version: &str,
+    bytes: &[u8],
+) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(domain);
     hasher.update(&[0]);
-    hasher.update(&(bytes.len() as u64).to_le_bytes());
-    hasher.update(bytes);
+
+    // Length-prefix every variable-width field to prevent ambiguous joins.
+    for field in [
+        context_schema_id.as_bytes(),
+        context_schema_version.as_bytes(),
+        bytes,
+    ] {
+        hasher.update(&(field.len() as u64).to_le_bytes());
+        hasher.update(field);
+    }
+
     format!("blake3:v1:{}", hasher.finalize().to_hex())
 }
 
@@ -373,6 +413,8 @@ pub fn compare_assessments_with_roster(
 /// comparison can still be incomplete, malformed, stale, or mismatched; callers
 /// must inspect its state and validation errors rather than treating Ok as allow.
 pub fn compare_assessments_with_canonical_bytes(
+    context_schema_id: impl Into<String>,
+    context_schema_version: impl Into<String>,
     scenario_ref: impl Into<String>,
     scenario_bytes: &[u8],
     candidate_action_ref: impl Into<String>,
@@ -381,6 +423,8 @@ pub fn compare_assessments_with_canonical_bytes(
     assessments: &[FrameworkAssessment],
 ) -> Result<PluralEthicsComparison, AssessmentSubjectError> {
     let expected_subject = AssessmentSubject::from_canonical_bytes(
+        context_schema_id,
+        context_schema_version,
         scenario_ref,
         scenario_bytes,
         candidate_action_ref,
@@ -644,6 +688,8 @@ mod tests {
             framework_id: framework_id.to_owned(),
             framework_version: "1.0.0".to_owned(),
             subject: AssessmentSubject {
+                context_schema_id: "symthaea.ethics.context".to_owned(),
+                context_schema_version: "v1".to_owned(),
                 scenario_ref: "scenario:case-001".to_owned(),
                 scenario_digest: "fixture-digest:scenario-case-001".to_owned(),
                 candidate_action_ref: "action:case-001:candidate-a".to_owned(),
@@ -651,6 +697,8 @@ mod tests {
             },
             provenance: AssessmentProvenance {
                 source_subject: Some(AssessmentSubject {
+                    context_schema_id: "symthaea.ethics.context".to_owned(),
+                    context_schema_version: "v1".to_owned(),
                     scenario_ref: "scenario:case-001".to_owned(),
                     scenario_digest: "fixture-digest:scenario-case-001".to_owned(),
                     candidate_action_ref: "action:case-001:candidate-a".to_owned(),
@@ -676,6 +724,8 @@ mod tests {
     #[test]
     fn canonical_subject_construction_is_deterministic() {
         let a = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             br#"{"facts":["a","b"]}"#,
             "action:one",
@@ -683,6 +733,8 @@ mod tests {
         )
         .unwrap();
         let b = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             br#"{"facts":["a","b"]}"#,
             "action:one",
@@ -702,6 +754,8 @@ mod tests {
     #[test]
     fn canonical_subject_changes_when_scenario_or_action_bytes_change() {
         let original = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             b"scenario-v1",
             "action:one",
@@ -709,6 +763,8 @@ mod tests {
         )
         .unwrap();
         let changed_scenario = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             b"scenario-v2",
             "action:one",
@@ -716,6 +772,8 @@ mod tests {
         )
         .unwrap();
         let changed_action = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             b"scenario-v1",
             "action:one",
@@ -728,8 +786,60 @@ mod tests {
     }
 
     #[test]
+    fn canonical_subject_schema_identity_changes_fingerprints() {
+        let v1 = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
+            "scenario:one",
+            b"same scenario",
+            "action:one",
+            b"same action",
+        ).unwrap();
+        let v2 = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v2",
+            "scenario:one",
+            b"same scenario",
+            "action:one",
+            b"same action",
+        ).unwrap();
+
+        assert_ne!(v1.scenario_digest, v2.scenario_digest);
+        assert_ne!(v1.candidate_action_digest, v2.candidate_action_digest);
+        assert_ne!(v1, v2);
+    }
+
+    #[test]
+    fn canonical_subject_rejects_missing_schema_identity() {
+        assert_eq!(
+            AssessmentSubject::from_canonical_bytes(
+                "",
+                "v1",
+                "scenario:one",
+                b"scenario",
+                "action:one",
+                b"action",
+            ),
+            Err(AssessmentSubjectError::EmptyContextSchemaId)
+        );
+        assert_eq!(
+            AssessmentSubject::from_canonical_bytes(
+                "symthaea.ethics.context",
+                " ",
+                "scenario:one",
+                b"scenario",
+                "action:one",
+                b"action",
+            ),
+            Err(AssessmentSubjectError::EmptyContextSchemaVersion)
+        );
+    }
+
+    #[test]
     fn canonical_subject_digest_is_domain_separated() {
         let subject = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             b"same bytes",
             "action:one",
@@ -742,6 +852,8 @@ mod tests {
     #[test]
     fn canonical_subject_verification_detects_changed_bytes() {
         let subject = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:one",
             b"scenario-v1",
             "action:one",
@@ -756,6 +868,8 @@ mod tests {
     #[test]
     fn canonical_bytes_entrypoint_accepts_matching_fresh_assessments() {
         let subject = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:case-canonical",
             br#"{"facts":["consent","scope"]}"#,
             "action:case-canonical",
@@ -770,6 +884,8 @@ mod tests {
         rights.provenance.source_subject = Some(subject);
 
         let result = compare_assessments_with_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:case-canonical",
             br#"{"facts":["consent","scope"]}"#,
             "action:case-canonical",
@@ -793,6 +909,8 @@ mod tests {
         care.provenance.source_subject = Some(care.subject.clone());
 
         let result = compare_assessments_with_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:case-canonical",
             b"canonical scenario bytes",
             "action:case-canonical",
@@ -808,6 +926,8 @@ mod tests {
     #[test]
     fn canonical_bytes_entrypoint_rejects_empty_canonical_payload() {
         let result = compare_assessments_with_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
             "scenario:case-canonical",
             b"",
             "action:case-canonical",
@@ -821,19 +941,31 @@ mod tests {
     #[test]
     fn canonical_subject_rejects_empty_references_and_payloads() {
         assert_eq!(
-            AssessmentSubject::from_canonical_bytes("", b"scenario", "action:one", b"action"),
+            AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
+            "", b"scenario", "action:one", b"action"),
             Err(AssessmentSubjectError::EmptyScenarioReference)
         );
         assert_eq!(
-            AssessmentSubject::from_canonical_bytes("scenario:one", b"scenario", " ", b"action"),
+            AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
+            "scenario:one", b"scenario", " ", b"action"),
             Err(AssessmentSubjectError::EmptyActionReference)
         );
         assert_eq!(
-            AssessmentSubject::from_canonical_bytes("scenario:one", b"", "action:one", b"action"),
+            AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
+            "scenario:one", b"", "action:one", b"action"),
             Err(AssessmentSubjectError::EmptyScenarioBytes)
         );
         assert_eq!(
-            AssessmentSubject::from_canonical_bytes("scenario:one", b"scenario", "action:one", b""),
+            AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
+            "scenario:one", b"scenario", "action:one", b""),
             Err(AssessmentSubjectError::EmptyActionBytes)
         );
     }
@@ -1109,6 +1241,8 @@ mod tests {
     fn explicit_expected_subject_must_match_all_assessments() {
         let result = compare_assessments_for(
             &AssessmentSubject {
+                context_schema_id: "symthaea.ethics.context".to_owned(),
+                context_schema_version: "v1".to_owned(),
                 scenario_ref: "scenario:case-999".to_owned(),
                 scenario_digest: "fixture-digest:scenario-case-999".to_owned(),
                 candidate_action_ref: "action:case-999:candidate-a".to_owned(),
