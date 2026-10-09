@@ -384,7 +384,6 @@ impl VulkanBarrierExecutionReceipt {
     pub fn verify_runtime_binding(
         &self,
         physical_device_api_version: u32,
-            synchronization_features: test_synchronization_feature_profile(),
         queue_family_index: u32,
         device_uuid: [u8; 16],
         implementation_identity_digest: &str,
@@ -1020,7 +1019,6 @@ impl VulkanBarrierWorkloadRuntime {
             completion_observed,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
-            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: self.queue_family_index,
             synchronization_features: self.synchronization_features.clone(),
             queue_family_identity_digest: self.queue_family_identity_digest.clone(),
