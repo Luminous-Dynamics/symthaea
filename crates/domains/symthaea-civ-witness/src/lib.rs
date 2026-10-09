@@ -9,6 +9,8 @@
 //! underlying filesystem honoring sync requests. It is not a claim against an
 //! attacker who can roll back both this database and the external anchor.
 
+pub mod fork_witness;
+
 use rusqlite::{
     params, Connection, OptionalExtension, Transaction, TransactionBehavior,
 };
