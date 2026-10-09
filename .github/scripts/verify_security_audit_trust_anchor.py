@@ -427,9 +427,16 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
     return 1
 
 
-def best_effort_failure_status(repo: str, subject: str, token: str, reason: str, target: str | None = None) -> bool:
-    """Clear an old success when current-run identity checks cannot complete."""
+def best_effort_failure_status(repo: str, subject: str, token: str, reason: str,
+                                target: str | None = None, *, workflow_id: int | None = None,
+                                event_name: str | None = None, repository_id: str | None = None,
+                                head_repository_id: str | None = None) -> bool:
+    """Clear stale success only for an event matching the expected same-repo audit source."""
     if repo not in POLICY or not token or not re.fullmatch(r"[0-9a-f]{40}", subject):
+        return False
+    if workflow_id != POLICY[repo]["workflow_id"] or event_name != "pull_request":
+        return False
+    if not repository_id or not head_repository_id or repository_id != head_repository_id:
         return False
     try:
         post_status(repo, subject, token, "failure",
@@ -481,7 +488,15 @@ def main() -> int:
             raw_id = os.environ.get("TRIGGER_RUN_ID", "").strip()
             target = (f"https://github.com/{repo}/actions/runs/{raw_id}"
                       if raw_id.isdigit() and repo in POLICY else None)
-            best_effort_failure_status(repo, subject, token, str(exc), target)
+            raw_workflow_id = os.environ.get("TRIGGER_RUN_WORKFLOW_ID", "").strip()
+            workflow_id = int(raw_workflow_id) if raw_workflow_id.isdigit() else None
+            best_effort_failure_status(
+                repo, subject, token, str(exc), target,
+                workflow_id=workflow_id,
+                event_name=os.environ.get("TRIGGER_RUN_EVENT", "").strip(),
+                repository_id=os.environ.get("TRIGGER_RUN_REPOSITORY_ID", "").strip(),
+                head_repository_id=os.environ.get("TRIGGER_RUN_HEAD_REPOSITORY_ID", "").strip(),
+            )
         raise
 
 
