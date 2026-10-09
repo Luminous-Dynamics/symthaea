@@ -219,9 +219,21 @@ pub enum MetacognitionEvaluationError {
     DuplicateOutcomeReceipt(String),
     OutcomeForUnknownForecast(String),
     MissingOutcomeForForecast(String),
-    OutcomeEpisodeMismatch { forecast_id: String, expected: String, found: String },
-    OutcomeProfileMismatch { forecast_id: String, expected: String, found: String },
-    MixedForecastScope { field: &'static str, expected: String, found: String },
+    OutcomeEpisodeMismatch {
+        forecast_id: String,
+        expected: String,
+        found: String,
+    },
+    OutcomeProfileMismatch {
+        forecast_id: String,
+        expected: String,
+        found: String,
+    },
+    MixedForecastScope {
+        field: &'static str,
+        expected: String,
+        found: String,
+    },
 }
 
 impl fmt::Display for MetacognitionEvaluationError {
@@ -261,14 +273,26 @@ impl fmt::Display for MetacognitionEvaluationError {
             Self::EmptyOutcomeField { forecast_id, field } => write!(
                 f, "outcome for forecast '{forecast_id}' has empty required field '{field}'"
             ),
-            Self::UnsupportedForecastSchemaVersion(v) => write!(f, "unsupported forecast schema version {v}"),
-            Self::UnsupportedOutcomeSchemaVersion(v) => write!(f, "unsupported outcome schema version {v}"),
-            Self::UnsupportedFrozenSetSchemaVersion(v) => write!(f, "unsupported frozen-set schema version {v}"),
+            Self::UnsupportedForecastSchemaVersion(v) => {
+                write!(f, "unsupported forecast schema version {v}")
+            }
+            Self::UnsupportedOutcomeSchemaVersion(v) => {
+                write!(f, "unsupported outcome schema version {v}")
+            }
+            Self::UnsupportedFrozenSetSchemaVersion(v) => {
+                write!(f, "unsupported frozen-set schema version {v}")
+            }
             Self::DuplicateForecastId(id) => write!(f, "forecast ID '{id}' appears more than once"),
-            Self::DuplicateOutcomeForecastId(id) => write!(f, "forecast '{id}' has more than one outcome"),
+            Self::DuplicateOutcomeForecastId(id) => {
+                write!(f, "forecast '{id}' has more than one outcome")
+            }
             Self::DuplicateOutcomeReceipt(id) => write!(f, "outcome receipt ID '{id}' is reused"),
-            Self::OutcomeForUnknownForecast(id) => write!(f, "outcome references unknown forecast '{id}'"),
-            Self::MissingOutcomeForForecast(id) => write!(f, "forecast '{id}' has no bound outcome"),
+            Self::OutcomeForUnknownForecast(id) => {
+                write!(f, "outcome references unknown forecast '{id}'")
+            }
+            Self::MissingOutcomeForForecast(id) => {
+                write!(f, "forecast '{id}' has no bound outcome")
+            }
             Self::OutcomeEpisodeMismatch { forecast_id, expected, found } => write!(
                 f, "outcome for '{forecast_id}' has episode '{found}', expected '{expected}'"
             ),
@@ -283,6 +307,7 @@ impl fmt::Display for MetacognitionEvaluationError {
 }
 
 impl std::error::Error for MetacognitionEvaluationError {}
+
 
 
 /// Prospective forecast record. IDs must refer to frozen identities, not mutable display names.
@@ -352,10 +377,21 @@ struct FrozenCorrectnessForecastSetWire {
 }
 
 impl FrozenCorrectnessForecastSet {
-    pub fn schema_version(&self) -> u32 { self.schema_version }
-    pub fn forecasts(&self) -> &[CorrectnessForecastV1] { &self.forecasts }
-    pub fn calibration_bins(&self) -> usize { self.calibration_bins }
-    pub fn selective_thresholds(&self) -> &[f64] { &self.selective_thresholds }
+    pub fn schema_version(&self) -> u32 {
+        self.schema_version
+    }
+
+    pub fn forecasts(&self) -> &[CorrectnessForecastV1] {
+        &self.forecasts
+    }
+
+    pub fn calibration_bins(&self) -> usize {
+        self.calibration_bins
+    }
+
+    pub fn selective_thresholds(&self) -> &[f64] {
+        &self.selective_thresholds
+    }
 }
 
 impl TryFrom<FrozenCorrectnessForecastSetWire> for FrozenCorrectnessForecastSet {
@@ -363,7 +399,11 @@ impl TryFrom<FrozenCorrectnessForecastSetWire> for FrozenCorrectnessForecastSet 
 
     fn try_from(w: FrozenCorrectnessForecastSetWire) -> Result<Self, Self::Error> {
         if w.schema_version != FROZEN_FORECAST_SET_SCHEMA_VERSION {
-            return Err(MetacognitionEvaluationError::UnsupportedFrozenSetSchemaVersion(w.schema_version));
+            return Err(
+                MetacognitionEvaluationError::UnsupportedFrozenSetSchemaVersion(
+                    w.schema_version,
+                ),
+            );
         }
         validate_forecast_set(&w.forecasts, w.calibration_bins, &w.selective_thresholds)?;
         Ok(Self {
@@ -391,12 +431,15 @@ pub fn freeze_correctness_forecasts(
     })
 }
 
-fn require_forecast_field(id: &str, field: &'static str, value: &str)
-    -> Result<(), MetacognitionEvaluationError>
-{
+fn require_forecast_field(
+    id: &str,
+    field: &'static str,
+    value: &str,
+) -> Result<(), MetacognitionEvaluationError> {
     if value.trim().is_empty() {
         return Err(MetacognitionEvaluationError::EmptyForecastField {
-            forecast_id: id.to_owned(), field
+            forecast_id: id.to_owned(),
+            field,
         });
     }
     Ok(())
@@ -407,40 +450,67 @@ fn validate_forecast_set(
     bins: usize,
     thresholds: &[f64],
 ) -> Result<(), MetacognitionEvaluationError> {
-    if forecasts.is_empty() { return Err(MetacognitionEvaluationError::EmptyForecastSet); }
+    if forecasts.is_empty() {
+        return Err(MetacognitionEvaluationError::EmptyForecastSet);
+    }
     if !(1..=100).contains(&bins) {
         return Err(MetacognitionEvaluationError::InvalidBinCount(bins));
     }
+
     let first = &forecasts[0];
     let (mut ids, mut episodes) = (HashSet::new(), HashSet::new());
     for p in forecasts {
         if p.schema_version != CORRECTNESS_FORECAST_SCHEMA_VERSION {
-            return Err(MetacognitionEvaluationError::UnsupportedForecastSchemaVersion(p.schema_version));
+            return Err(
+                MetacognitionEvaluationError::UnsupportedForecastSchemaVersion(p.schema_version),
+            );
         }
         for (field, value) in [
-            ("forecast_id", p.forecast_id.as_str()), ("episode_id", p.episode_id.as_str()),
-            ("task_family_id", p.task_family_id.as_str()), ("task_taxonomy_id", p.task_taxonomy_id.as_str()),
-            ("outcome_profile_id", p.outcome_profile_id.as_str()), ("subject_id", p.subject_id.as_str()),
-            ("model_profile_id", p.model_profile_id.as_str()), ("input_snapshot_ref", p.input_snapshot_ref.as_str()),
+            ("forecast_id", p.forecast_id.as_str()),
+            ("episode_id", p.episode_id.as_str()),
+            ("task_family_id", p.task_family_id.as_str()),
+            ("task_taxonomy_id", p.task_taxonomy_id.as_str()),
+            ("outcome_profile_id", p.outcome_profile_id.as_str()),
+            ("subject_id", p.subject_id.as_str()),
+            ("model_profile_id", p.model_profile_id.as_str()),
+            ("input_snapshot_ref", p.input_snapshot_ref.as_str()),
         ] {
             require_forecast_field(&p.forecast_id, field, value)?;
         }
         validate_probability("predicted_probability", p.predicted_probability)?;
         if !ids.insert(p.forecast_id.as_str()) {
-            return Err(MetacognitionEvaluationError::DuplicateForecastId(p.forecast_id.clone()));
+            return Err(MetacognitionEvaluationError::DuplicateForecastId(
+                p.forecast_id.clone(),
+            ));
         }
         if !episodes.insert(p.episode_id.as_str()) {
-            return Err(MetacognitionEvaluationError::DuplicatePredictionEpisode(p.episode_id.clone()));
+            return Err(MetacognitionEvaluationError::DuplicatePredictionEpisode(
+                p.episode_id.clone(),
+            ));
         }
         for (field, expected, found) in [
-            ("outcome_profile_id", first.outcome_profile_id.as_str(), p.outcome_profile_id.as_str()),
+            (
+                "outcome_profile_id",
+                first.outcome_profile_id.as_str(),
+                p.outcome_profile_id.as_str(),
+            ),
             ("subject_id", first.subject_id.as_str(), p.subject_id.as_str()),
-            ("model_profile_id", first.model_profile_id.as_str(), p.model_profile_id.as_str()),
-            ("task_taxonomy_id", first.task_taxonomy_id.as_str(), p.task_taxonomy_id.as_str()),
+            (
+                "model_profile_id",
+                first.model_profile_id.as_str(),
+                p.model_profile_id.as_str(),
+            ),
+            (
+                "task_taxonomy_id",
+                first.task_taxonomy_id.as_str(),
+                p.task_taxonomy_id.as_str(),
+            ),
         ] {
             if expected != found {
                 return Err(MetacognitionEvaluationError::MixedForecastScope {
-                    field, expected: expected.to_owned(), found: found.to_owned()
+                    field,
+                    expected: expected.to_owned(),
+                    found: found.to_owned(),
                 });
             }
         }
@@ -462,52 +532,75 @@ pub fn evaluate_frozen_correctness_forecasts(
     assumptions: &[WeakAssumptionObservation],
     revisions: &[ConfidenceRevisionObservation],
 ) -> Result<MetacognitionReport, MetacognitionEvaluationError> {
-    validate_forecast_set(&frozen.forecasts, frozen.calibration_bins, &frozen.selective_thresholds)?;
-    let forecasts: BTreeMap<&str, &CorrectnessForecastV1> = frozen.forecasts.iter()
-        .map(|p| (p.forecast_id.as_str(), p)).collect();
+    validate_forecast_set(
+        &frozen.forecasts,
+        frozen.calibration_bins,
+        &frozen.selective_thresholds,
+    )?;
+    let forecasts: BTreeMap<&str, &CorrectnessForecastV1> = frozen
+        .forecasts
+        .iter()
+        .map(|p| (p.forecast_id.as_str(), p))
+        .collect();
     let (mut joined, mut receipt_ids) = (BTreeMap::new(), HashSet::new());
     for o in outcomes {
         if o.schema_version != CORRECTNESS_OUTCOME_SCHEMA_VERSION {
-            return Err(MetacognitionEvaluationError::UnsupportedOutcomeSchemaVersion(o.schema_version));
+            return Err(
+                MetacognitionEvaluationError::UnsupportedOutcomeSchemaVersion(o.schema_version),
+            );
         }
         for (field, value) in [
-            ("forecast_id", o.forecast_id.as_str()), ("episode_id", o.episode_id.as_str()),
+            ("forecast_id", o.forecast_id.as_str()),
+            ("episode_id", o.episode_id.as_str()),
             ("outcome_profile_id", o.outcome_profile_id.as_str()),
             ("outcome_receipt_id", o.outcome_receipt_id.as_str()),
             ("outcome_evidence_ref", o.outcome_evidence_ref.as_str()),
         ] {
             if value.trim().is_empty() {
                 return Err(MetacognitionEvaluationError::EmptyOutcomeField {
-                    forecast_id: o.forecast_id.clone(), field
+                    forecast_id: o.forecast_id.clone(),
+                    field,
                 });
             }
         }
         if !receipt_ids.insert(o.outcome_receipt_id.as_str()) {
-            return Err(MetacognitionEvaluationError::DuplicateOutcomeReceipt(o.outcome_receipt_id.clone()));
+            return Err(MetacognitionEvaluationError::DuplicateOutcomeReceipt(
+                o.outcome_receipt_id.clone(),
+            ));
         }
-        let p = forecasts.get(o.forecast_id.as_str()).ok_or_else(||
-            MetacognitionEvaluationError::OutcomeForUnknownForecast(o.forecast_id.clone()))?;
+        let p = forecasts.get(o.forecast_id.as_str()).ok_or_else(|| {
+            MetacognitionEvaluationError::OutcomeForUnknownForecast(o.forecast_id.clone())
+        })?;
         if o.episode_id != p.episode_id {
             return Err(MetacognitionEvaluationError::OutcomeEpisodeMismatch {
-                forecast_id: o.forecast_id.clone(), expected: p.episode_id.clone(), found: o.episode_id.clone()
+                forecast_id: o.forecast_id.clone(),
+                expected: p.episode_id.clone(),
+                found: o.episode_id.clone(),
             });
         }
         if o.outcome_profile_id != p.outcome_profile_id {
             return Err(MetacognitionEvaluationError::OutcomeProfileMismatch {
-                forecast_id: o.forecast_id.clone(), expected: p.outcome_profile_id.clone(),
-                found: o.outcome_profile_id.clone()
+                forecast_id: o.forecast_id.clone(),
+                expected: p.outcome_profile_id.clone(),
+                found: o.outcome_profile_id.clone(),
             });
         }
         if joined.insert(o.forecast_id.as_str(), o).is_some() {
-            return Err(MetacognitionEvaluationError::DuplicateOutcomeForecastId(o.forecast_id.clone()));
+            return Err(MetacognitionEvaluationError::DuplicateOutcomeForecastId(
+                o.forecast_id.clone(),
+            ));
         }
     }
 
-    let (mut predictions, mut ordered_receipts, mut evidence_refs) =
-        (Vec::with_capacity(frozen.forecasts.len()), Vec::new(), Vec::new());
+    let (mut predictions, mut ordered_receipts, mut evidence_refs) = (
+        Vec::with_capacity(frozen.forecasts.len()),
+        Vec::new(),
+        Vec::new(),
+    );
     for p in &frozen.forecasts {
-        let o = joined.get(p.forecast_id.as_str()).ok_or_else(||
-            MetacognitionEvaluationError::MissingOutcomeForForecast(p.forecast_id.clone()))?;
+        let o = joined.get(p.forecast_id.as_str()).ok_or_else(|| {
+            MetacognitionEvaluationError::MissingOutcomeForForecast(p.forecast_id.clone())
+        })?;
         predictions.push(CorrectnessPrediction {
             episode_id: p.episode_id.clone(),
             task_family_id: p.task_family_id.clone(),
@@ -520,7 +613,11 @@ pub fn evaluate_frozen_correctness_forecasts(
         evidence_refs.push(o.outcome_evidence_ref.clone());
     }
     let mut report = evaluate_metacognition(
-        &predictions, assumptions, revisions, frozen.calibration_bins, &frozen.selective_thresholds
+        &predictions,
+        assumptions,
+        revisions,
+        frozen.calibration_bins,
+        &frozen.selective_thresholds,
     )?;
     let p = &frozen.forecasts[0];
     report.forecast_outcome_binding = Some(ForecastOutcomeBindingReport {
@@ -530,13 +627,16 @@ pub fn evaluate_frozen_correctness_forecasts(
         subject_id: p.subject_id.clone(),
         model_profile_id: p.model_profile_id.clone(),
         task_taxonomy_id: p.task_taxonomy_id.clone(),
-        forecast_ids: frozen.forecasts.iter().map(|x| x.forecast_id.clone()).collect(),
+        forecast_ids: frozen
+            .forecasts
+            .iter()
+            .map(|x| x.forecast_id.clone())
+            .collect(),
         outcome_receipt_ids: ordered_receipts,
         outcome_evidence_refs: evidence_refs,
     });
     Ok(report)
 }
-
 
 
 /// Evaluate a frozen set of metacognitive observations.
@@ -1112,56 +1212,108 @@ mod tests {
     }
 
 
-    fn prospective_forecast(id: &str, episode: &str, probability: f64, family: &str) -> CorrectnessForecastV1 {
+    fn prospective_forecast(
+        id: &str,
+        episode: &str,
+        probability: f64,
+        family: &str,
+    ) -> CorrectnessForecastV1 {
         CorrectnessForecastV1 {
             schema_version: CORRECTNESS_FORECAST_SCHEMA_VERSION,
-            forecast_id: id.into(), episode_id: episode.into(), task_family_id: family.into(),
+            forecast_id: id.into(),
+            episode_id: episode.into(),
+            task_family_id: family.into(),
             task_taxonomy_id: "rq-taxonomy-v1".into(),
             outcome_profile_id: "answer-correct-under-policy-v2".into(),
             subject_id: "symthaea-test-subject".into(),
             model_profile_id: "symthaea-profile-sha256:abc123".into(),
             input_snapshot_ref: format!("input-snapshot:{episode}"),
-            predicted_probability: probability, asserted: true,
+            predicted_probability: probability,
+            asserted: true,
         }
     }
 
-    fn prospective_outcome(id: &str, episode: &str, correct: bool) -> CorrectnessOutcomeV1 {
+    fn prospective_outcome(
+        id: &str,
+        episode: &str,
+        correct: bool,
+    ) -> CorrectnessOutcomeV1 {
         CorrectnessOutcomeV1 {
             schema_version: CORRECTNESS_OUTCOME_SCHEMA_VERSION,
-            forecast_id: id.into(), episode_id: episode.into(),
+            forecast_id: id.into(),
+            episode_id: episode.into(),
             outcome_profile_id: "answer-correct-under-policy-v2".into(),
             outcome_receipt_id: format!("outcome-receipt:{id}"),
-            outcome_evidence_ref: format!("benchmark-evidence:{episode}"), correct,
+            outcome_evidence_ref: format!("benchmark-evidence:{episode}"),
+            correct,
         }
     }
 
     #[test]
     fn frozen_forecast_binding_retains_outcome_refs_and_scores_stable_but_wrong_forecasts() {
-        let frozen = freeze_correctness_forecasts(vec![
-            prospective_forecast("f-1", "episode-1", 0.99, "reasoning"),
-            prospective_forecast("f-2", "episode-2", 0.25, "retrieval"),
-        ], 5, vec![0.5, 0.9]).unwrap_or_else(|e| panic!("freeze must succeed: {e}"));
+        let frozen = freeze_correctness_forecasts(
+            vec![
+                prospective_forecast("f-1", "episode-1", 0.99, "reasoning"),
+                prospective_forecast("f-2", "episode-2", 0.25, "retrieval"),
+            ],
+            5,
+            vec![0.5, 0.9],
+        )
+        .unwrap_or_else(|e| panic!("freeze must succeed: {e}"));
         let prior_probability = frozen.forecasts()[0].predicted_probability;
-        let report = evaluate_frozen_correctness_forecasts(&frozen, &[
-            prospective_outcome("f-2", "episode-2", false),
-            prospective_outcome("f-1", "episode-1", false),
-        ], &[], &[]).unwrap_or_else(|e| panic!("binding must succeed: {e}"));
+        let report = evaluate_frozen_correctness_forecasts(
+            &frozen,
+            &[
+                prospective_outcome("f-2", "episode-2", false),
+                prospective_outcome("f-1", "episode-1", false),
+            ],
+            &[],
+            &[],
+        )
+        .unwrap_or_else(|e| panic!("binding must succeed: {e}"));
         assert_eq!(report.predictions, 2);
-        assert_eq!(report.brier_score, Some((0.99_f64.powi(2) + 0.25_f64.powi(2)) / 2.0));
+        assert_eq!(
+            report.brier_score,
+            Some((0.99_f64.powi(2) + 0.25_f64.powi(2)) / 2.0)
+        );
         let binding = report.forecast_outcome_binding.expect("binding report");
-        assert_eq!(binding.forecast_ids.iter().map(String::as_str).collect::<Vec<_>>(), vec!["f-1", "f-2"]);
-        assert_eq!(binding.outcome_receipt_ids.iter().map(String::as_str).collect::<Vec<_>>(), vec!["outcome-receipt:f-1", "outcome-receipt:f-2"]);
-        assert_eq!(binding.outcome_evidence_refs.iter().map(String::as_str).collect::<Vec<_>>(), vec!["benchmark-evidence:episode-1", "benchmark-evidence:episode-2"]);
-        assert_eq!(frozen.forecasts()[0].predicted_probability, prior_probability);
+        assert_eq!(
+            binding.forecast_ids.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec!["f-1", "f-2"]
+        );
+        assert_eq!(
+            binding
+                .outcome_receipt_ids
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["outcome-receipt:f-1", "outcome-receipt:f-2"]
+        );
+        assert_eq!(
+            binding
+                .outcome_evidence_refs
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["benchmark-evidence:episode-1", "benchmark-evidence:episode-2"]
+        );
+        assert_eq!(
+            frozen.forecasts()[0].predicted_probability,
+            prior_probability
+        );
         assert_eq!(report.current_episode_binding_rate, Some(1.0));
     }
 
     #[test]
     fn frozen_forecast_set_roundtrips_through_validating_deserialization() {
-        let frozen = freeze_correctness_forecasts(vec![
-            prospective_forecast("f-1", "episode-1", 0.6, "reasoning")
-        ], 7, vec![0.6]).unwrap_or_else(|e| panic!("freeze must succeed: {e}"));
-        let encoded = serde_json::to_string(&frozen).unwrap_or_else(|e| panic!("serialize: {e}"));
+        let frozen = freeze_correctness_forecasts(
+            vec![prospective_forecast("f-1", "episode-1", 0.6, "reasoning")],
+            7,
+            vec![0.6],
+        )
+        .unwrap_or_else(|e| panic!("freeze must succeed: {e}"));
+        let encoded =
+            serde_json::to_string(&frozen).unwrap_or_else(|e| panic!("serialize: {e}"));
         let decoded: FrozenCorrectnessForecastSet = serde_json::from_str(&encoded)
             .unwrap_or_else(|e| panic!("validated restore: {e}"));
         assert_eq!(decoded, frozen);
@@ -1171,64 +1323,120 @@ mod tests {
 
     #[test]
     fn forecast_outcome_join_rejects_missing_duplicate_unknown_and_mismatched_receipts() {
-        let frozen = freeze_correctness_forecasts(vec![
-            prospective_forecast("f-1", "episode-1", 0.8, "reasoning"),
-            prospective_forecast("f-2", "episode-2", 0.4, "reasoning"),
-        ], 5, vec![0.5]).unwrap_or_else(|e| panic!("freeze must succeed: {e}"));
+        let frozen = freeze_correctness_forecasts(
+            vec![
+                prospective_forecast("f-1", "episode-1", 0.8, "reasoning"),
+                prospective_forecast("f-2", "episode-2", 0.4, "reasoning"),
+            ],
+            5,
+            vec![0.5],
+        )
+        .unwrap_or_else(|e| panic!("freeze must succeed: {e}"));
         assert!(matches!(
-            evaluate_frozen_correctness_forecasts(&frozen, &[prospective_outcome("f-1", "episode-1", true)], &[], &[]),
+            evaluate_frozen_correctness_forecasts(
+                &frozen,
+                &[prospective_outcome("f-1", "episode-1", true)],
+                &[],
+                &[]
+            ),
             Err(MetacognitionEvaluationError::MissingOutcomeForForecast(id)) if id == "f-2"
         ));
         let mut duplicate = prospective_outcome("f-1", "episode-1", true);
         duplicate.outcome_receipt_id = "another-receipt".into();
         assert!(matches!(
-            evaluate_frozen_correctness_forecasts(&frozen, &[prospective_outcome("f-1", "episode-1", true), duplicate], &[], &[]),
+            evaluate_frozen_correctness_forecasts(
+                &frozen,
+                &[
+                    prospective_outcome("f-1", "episode-1", true),
+                    duplicate
+                ],
+                &[],
+                &[]
+            ),
             Err(MetacognitionEvaluationError::DuplicateOutcomeForecastId(id)) if id == "f-1"
         ));
         assert!(matches!(
-            evaluate_frozen_correctness_forecasts(&frozen, &[prospective_outcome("unknown", "episode-1", true)], &[], &[]),
+            evaluate_frozen_correctness_forecasts(
+                &frozen,
+                &[prospective_outcome("unknown", "episode-1", true)],
+                &[],
+                &[]
+            ),
             Err(MetacognitionEvaluationError::OutcomeForUnknownForecast(id)) if id == "unknown"
         ));
         assert!(matches!(
-            evaluate_frozen_correctness_forecasts(&frozen, &[
-                prospective_outcome("f-1", "wrong-episode", true),
-                prospective_outcome("f-2", "episode-2", false)
-            ], &[], &[]),
-            Err(MetacognitionEvaluationError::OutcomeEpisodeMismatch { forecast_id, .. }) if forecast_id == "f-1"
+            evaluate_frozen_correctness_forecasts(
+                &frozen,
+                &[
+                    prospective_outcome("f-1", "wrong-episode", true),
+                    prospective_outcome("f-2", "episode-2", false)
+                ],
+                &[],
+                &[]
+            ),
+            Err(MetacognitionEvaluationError::OutcomeEpisodeMismatch { forecast_id, .. })
+                if forecast_id == "f-1"
         ));
         let mut wrong_profile = prospective_outcome("f-1", "episode-1", true);
         wrong_profile.outcome_profile_id = "self-correction-succeeds".into();
         assert!(matches!(
-            evaluate_frozen_correctness_forecasts(&frozen, &[
-                wrong_profile, prospective_outcome("f-2", "episode-2", false)
-            ], &[], &[]),
-            Err(MetacognitionEvaluationError::OutcomeProfileMismatch { forecast_id, .. }) if forecast_id == "f-1"
+            evaluate_frozen_correctness_forecasts(
+                &frozen,
+                &[
+                    wrong_profile,
+                    prospective_outcome("f-2", "episode-2", false)
+                ],
+                &[],
+                &[]
+            ),
+            Err(MetacognitionEvaluationError::OutcomeProfileMismatch { forecast_id, .. })
+                if forecast_id == "f-1"
         ));
         let mut reuse = prospective_outcome("f-2", "episode-2", false);
         reuse.outcome_receipt_id = "outcome-receipt:f-1".into();
         assert!(matches!(
-            evaluate_frozen_correctness_forecasts(&frozen, &[
-                prospective_outcome("f-1", "episode-1", true), reuse
-            ], &[], &[]),
-            Err(MetacognitionEvaluationError::DuplicateOutcomeReceipt(id)) if id == "outcome-receipt:f-1"
+            evaluate_frozen_correctness_forecasts(
+                &frozen,
+                &[
+                    prospective_outcome("f-1", "episode-1", true),
+                    reuse
+                ],
+                &[],
+                &[]
+            ),
+            Err(MetacognitionEvaluationError::DuplicateOutcomeReceipt(id))
+                if id == "outcome-receipt:f-1"
         ));
     }
 
     #[test]
     fn forecast_freeze_rejects_mixed_target_and_missing_provenance_refs() {
-        let mut different_target = prospective_forecast("f-2", "episode-2", 0.4, "reasoning");
+        let mut different_target =
+            prospective_forecast("f-2", "episode-2", 0.4, "reasoning");
         different_target.outcome_profile_id = "self-correction-succeeds".into();
         assert!(matches!(
-            freeze_correctness_forecasts(vec![
-                prospective_forecast("f-1", "episode-1", 0.8, "reasoning"), different_target
-            ], 5, vec![0.5]),
-            Err(MetacognitionEvaluationError::MixedForecastScope { field: "outcome_profile_id", .. })
+            freeze_correctness_forecasts(
+                vec![
+                    prospective_forecast("f-1", "episode-1", 0.8, "reasoning"),
+                    different_target
+                ],
+                5,
+                vec![0.5]
+            ),
+            Err(MetacognitionEvaluationError::MixedForecastScope {
+                field: "outcome_profile_id",
+                ..
+            })
         ));
-        let mut missing_snapshot = prospective_forecast("f-1", "episode-1", 0.8, "reasoning");
+        let mut missing_snapshot =
+            prospective_forecast("f-1", "episode-1", 0.8, "reasoning");
         missing_snapshot.input_snapshot_ref.clear();
         assert!(matches!(
             freeze_correctness_forecasts(vec![missing_snapshot], 5, vec![0.5]),
-            Err(MetacognitionEvaluationError::EmptyForecastField { field: "input_snapshot_ref", .. })
+            Err(MetacognitionEvaluationError::EmptyForecastField {
+                field: "input_snapshot_ref",
+                ..
+            })
         ));
         assert!(matches!(
             freeze_correctness_forecasts(vec![], 5, vec![0.5]),
