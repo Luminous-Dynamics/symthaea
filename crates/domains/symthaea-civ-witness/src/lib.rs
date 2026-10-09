@@ -327,8 +327,13 @@ impl SqliteWitnessStore {
         Ok(conn)
     }
 
-    /// Initialize from the trusted genesis anchor (generation zero, zero
-    /// digest). Generation one is externally anchored before local acceptance.
+    /// Initialize from the provisioned genesis position (generation zero,
+    /// zero digest). The caller must authenticate and authorize the initial
+    /// policy version and `anchor_digest` before invoking this method: this
+    /// crate does not authenticate the caller or establish the semantic truth
+    /// of the first checkpoint. The independent anchor protects subsequent
+    /// history only if it is operated outside the database's rollback domain.
+    /// Generation one is externally anchored before local acceptance.
     /// Repeated identical requests are idempotent.
     pub fn initialize(
         &self,
@@ -661,11 +666,15 @@ impl SqliteWitnessStore {
 
             // Recovery may have finalized this candidate and a later writer may
             // already have advanced the head before the original caller resumes.
-            // Return idempotent success only if this exact candidate is still a
-            // committed historical record, is self-consistent, and is the exact
-            // successor named by the caller's predecessor. Never move the head
-            // backwards or treat a different same-generation candidate as success.
+            // Validate the current head digest's encoded shape before using this
+            // branch; an accepted historical row is not permission to overlook
+            // malformed current metadata.
             if *generation > candidate.generation as i64 {
+                let _current_head_digest = blob_digest(digest)?;
+                // Return idempotent success only if this exact candidate is still a
+                // committed historical record, is self-consistent, and is the exact
+                // successor named by the caller's predecessor. Never move the head
+                // backwards or treat a different same-generation candidate as success.
                 let expected_candidate_generation = expected_generation
                     .checked_add(1)
                     .ok_or(WitnessError::GenerationOverflow)?;
