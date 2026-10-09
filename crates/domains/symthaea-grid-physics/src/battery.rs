@@ -216,7 +216,7 @@ impl Battery {
         if power_kw.abs() > self.power_rating_kw + f64::EPSILON {
             return Err(BatteryError::PowerExceedsRating);
         }
-        if !dt_hours.is_finite() || dt_hours < 0.0 {
+        if !dt_hours.is_finite() || dt_hours <= 0.0 {
             return Err(BatteryError::InvalidDuration);
         }
         let requested_ac_kwh = power_kw.max(0.0) * dt_hours;
@@ -246,7 +246,7 @@ impl Battery {
         if power_kw.abs() > self.power_rating_kw + f64::EPSILON {
             return Err(BatteryError::PowerExceedsRating);
         }
-        if !dt_hours.is_finite() || dt_hours < 0.0 {
+        if !dt_hours.is_finite() || dt_hours <= 0.0 {
             return Err(BatteryError::InvalidDuration);
         }
         let requested_ac_kwh = power_kw.max(0.0) * dt_hours;
@@ -358,6 +358,26 @@ mod tests {
             b.discharge(51.0, 1.0),
             Err(BatteryError::PowerExceedsRating)
         );
+    }
+
+    #[test]
+    fn test_zero_duration_rejected_without_mutation() {
+        let mut battery = Battery::new(100.0, 50.0, 0.9).with_soc(0.5);
+        let before_soc = battery.soc();
+        let before_soh = battery.state_of_health();
+        let before_cycles = battery.equivalent_full_cycles();
+
+        assert_eq!(
+            battery.charge(10.0, 0.0),
+            Err(BatteryError::InvalidDuration)
+        );
+        assert_eq!(
+            battery.discharge(10.0, 0.0),
+            Err(BatteryError::InvalidDuration)
+        );
+        assert_eq!(battery.soc(), before_soc);
+        assert_eq!(battery.state_of_health(), before_soh);
+        assert_eq!(battery.equivalent_full_cycles(), before_cycles);
     }
 
     #[test]
