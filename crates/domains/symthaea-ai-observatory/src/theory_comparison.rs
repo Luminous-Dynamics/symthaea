@@ -500,6 +500,19 @@ pub fn evaluate_prediction(
     }
 
     let no_value = None;
+    if anchor_mismatch(registry, freeze_anchor, &registry_digest) {
+        return Ok(EvaluationReceipt::new(
+            registry,
+            freeze_anchor,
+            registry_digest,
+            freeze_anchor_digest,
+            prediction,
+            observation,
+            PredictionDisposition::Inconclusive,
+            EvaluationReason::RegistryFreezeMismatch,
+            no_value,
+        ));
+    }
     if prediction.observable_id != observation.observable_id {
         return Ok(EvaluationReceipt::new(
             registry,
@@ -536,19 +549,6 @@ pub fn evaluate_prediction(
             observation,
             PredictionDisposition::Inconclusive,
             EvaluationReason::InterventionMismatch,
-            no_value,
-        ));
-    }
-    if anchor_mismatch(registry, freeze_anchor, &registry_digest) {
-        return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
-            PredictionDisposition::Inconclusive,
-            EvaluationReason::RegistryFreezeMismatch,
             no_value,
         ));
     }
@@ -599,9 +599,12 @@ pub fn evaluate_prediction(
             ManipulationCheck::Passed => {}
             ManipulationCheck::Failed => {
                 return Ok(EvaluationReceipt::new(
+                    registry,
+                    freeze_anchor,
                     registry_digest,
-                    &prediction.prediction_id,
-                    &observation.observation_id,
+                    freeze_anchor_digest,
+                    prediction,
+                    observation,
                     PredictionDisposition::Inconclusive,
                     EvaluationReason::ManipulationCheckFailed,
                     no_value,
@@ -609,9 +612,12 @@ pub fn evaluate_prediction(
             }
             ManipulationCheck::Missing | ManipulationCheck::NotRequired => {
                 return Ok(EvaluationReceipt::new(
+                    registry,
+                    freeze_anchor,
                     registry_digest,
-                    &prediction.prediction_id,
-                    &observation.observation_id,
+                    freeze_anchor_digest,
+                    prediction,
+                    observation,
                     PredictionDisposition::Inconclusive,
                     EvaluationReason::ManipulationCheckMissing,
                     no_value,
@@ -971,6 +977,27 @@ mod tests {
         let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
         assert_eq!(receipt.reason, EvaluationReason::ManipulationCheckFailed);
+    }
+
+    #[test]
+    fn changed_registry_after_freeze_is_inconclusive() {
+        let p = prediction("p-frozen", "theory-a", OutcomeValue::Present);
+        let frozen = registry(vec![p]);
+        let anchor = freeze_anchor(&frozen);
+        let mut mutated = frozen.clone();
+        mutated.predictions[0].expected = OutcomeValue::Absent;
+        let observation = observation();
+
+        let receipt = evaluate_prediction(
+            &mutated,
+            &anchor,
+            &mutated.predictions[0],
+            &observation,
+        )
+        .expect("mismatch is a reportable qualification outcome");
+        assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
+        assert_eq!(receipt.reason, EvaluationReason::RegistryFreezeMismatch);
+        assert_ne!(receipt.registry_digest, receipt.registered_registry_digest);
     }
 
     #[test]
