@@ -1616,7 +1616,10 @@ mod tests {
                 .optional()
                 .map_err(|error| AnchorError::Other(format!("read test anchor: {error}")))?;
             match row {
-                None => Ok(AnchorState::genesis(log_id)),
+                // A missing persisted row is not proof of a provisioned genesis
+                // anchor. Treat deletion/loss as unavailable rather than silently
+                // resetting the monotonic state to generation zero.
+                None => Err(AnchorError::Unavailable),
                 Some((generation, digest)) if generation >= 0 => Ok(AnchorState {
                     log_id: log_id.to_owned(),
                     generation: u64::try_from(generation).map_err(|error| {
@@ -2674,6 +2677,16 @@ mod tests {
             .expect("recover after raced advances")
             .expect("accepted state after raced advances")
     }
+    #[test]
+    fn persistent_test_anchor_fails_closed_when_log_is_unprovisioned() {
+        let anchor_db = TempDb::new();
+        let anchor = PersistentTestAnchor::open(&anchor_db.0).expect("open empty test anchor");
+        assert!(matches!(
+            anchor.current("log-not-provisioned"),
+            Err(AnchorError::Unavailable)
+        ));
+    }
+
     #[test]
     fn subprocess_recovery_helper() {
         let Ok(mode) = std::env::var("SYMTHAEA_CIV_WITNESS_PROCESS_TEST_MODE") else {
