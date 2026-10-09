@@ -13,7 +13,7 @@ permissions:
   actions: read
   contents: read
 
-# Preserve scan history for each exact subject instead of canceling old evidence.
+# Each run preserves evidence for its exact subject commit.
 concurrency:
   group: security-audit-${{ github.event.pull_request.number || github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
@@ -21,8 +21,8 @@ concurrency:
 jobs:
   audit:
     name: Shared security audit
-    uses: Luminous-Dynamics/luminous-platform/.github/workflows/security-audit.yml@3b0eb63de8aa68f65de2e7608f99b29ebc167a51
+    uses: Luminous-Dynamics/luminous-platform/.github/workflows/security-audit.yml@90f90cd9dc9642f662c6c0fdcc03a4197581f3d8
     with:
       subject_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      audit_engine_sha: 3b0eb63de8aa68f65de2e7608f99b29ebc167a51
+      audit_engine_sha: 90f90cd9dc9642f662c6c0fdcc03a4197581f3d8
       audit_rust: true
