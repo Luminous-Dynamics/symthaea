@@ -111,7 +111,9 @@ pub fn profile_score_region(
     for note in &score.notes {
         let onset = note.onset.beats();
         let note_end = (note.onset + note.duration).beats();
-        if note_end <= start_beats || onset >= end_beats {
+        // Zero- and negative-duration records are not sounding notes. Keep
+        // the same positive-overlap contract as the temporal-state extractor.
+        if note_end <= onset || note_end <= start_beats || onset >= end_beats {
             continue;
         }
         if onset >= start_beats {
@@ -454,6 +456,38 @@ mod tests {
         assert!(
             profile_score(&displaced).tonal_displacement > profile_score(&tonic).tonal_displacement
         );
+    }
+
+    #[test]
+    fn region_profiles_ignore_non_positive_duration_notes() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(
+            Pitch::new(PitchClass::C, 4),
+            Duration::new(2, 1),
+            Duration::zero(),
+            VoiceRole::Melody,
+        ));
+        score.push(note(
+            Pitch::new(PitchClass::G, 4),
+            Duration::new(5, 2),
+            Duration::new(-1, 2),
+            VoiceRole::Bass,
+        ));
+        // Extend the score beyond the observation without adding sound to it.
+        score.push(note(
+            Pitch::new(PitchClass::C, 3),
+            Duration::new(4, 1),
+            Duration::quarter(),
+            VoiceRole::Bass,
+        ));
+
+        let profile =
+            profile_score_region(&score, Duration::new(2, 1), Duration::new(3, 1))
+                .expect("the observation interval itself is valid");
+        assert_eq!(profile.note_count, 0);
+        assert_eq!(profile.onset_count, 0);
+        assert_eq!(profile.active_voice_count, 0);
+        assert_eq!(profile.notes_per_beat, 0.0);
     }
 
     #[test]
