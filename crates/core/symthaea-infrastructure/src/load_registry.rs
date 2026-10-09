@@ -746,10 +746,28 @@ mod tests {
         let reordered = LoadRegistry::new(original.version(), reversed_entries).unwrap();
         assert_eq!(original.registry_digest(), reordered.registry_digest());
 
-        let mut changed = original.entries().to_vec();
-        changed[0].restore_priority += 1;
-        let changed_policy = LoadRegistry::new(original.version(), changed).unwrap();
+        let mut changed_priority = original.entries().to_vec();
+        changed_priority[0].restore_priority += 1;
+        let changed_policy = LoadRegistry::new(original.version(), changed_priority).unwrap();
         assert_ne!(original.registry_digest(), changed_policy.registry_digest());
+
+        let mut changed_rating = original.entries().to_vec();
+        changed_rating[0].rated_power_kw += 0.125;
+        let changed_rating = LoadRegistry::new(original.version(), changed_rating).unwrap();
+        assert_ne!(original.registry_digest(), changed_rating.registry_digest());
+
+        let mut changed_class = original.entries().to_vec();
+        changed_class[1].class = LoadClass::Auxiliary;
+        let changed_class = LoadRegistry::new(original.version(), changed_class).unwrap();
+        assert_ne!(original.registry_digest(), changed_class.registry_digest());
+
+        let mut changed_provenance = original.entries().to_vec();
+        changed_provenance[1].provenance = ClassificationProvenance::SyntheticScenario {
+            scenario_id: "different-scenario".into(),
+        };
+        let changed_provenance =
+            LoadRegistry::new(original.version(), changed_provenance).unwrap();
+        assert_ne!(original.registry_digest(), changed_provenance.registry_digest());
 
         let changed_version =
             LoadRegistry::new("test-registry-v2", original.entries().to_vec()).unwrap();
