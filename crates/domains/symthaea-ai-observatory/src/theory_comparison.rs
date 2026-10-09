@@ -571,9 +571,10 @@ pub fn evaluate_prediction(
         )),
         ObservationOutcome::Observed(actual) if actual == &prediction.expected => {
             Ok(EvaluationReceipt::new(
+                registry,
                 registry_digest,
-                &prediction.prediction_id,
-                &observation.observation_id,
+                prediction,
+                observation,
                 PredictionDisposition::Supported,
                 EvaluationReason::ObservedMatch,
                 Some(actual.clone()),
