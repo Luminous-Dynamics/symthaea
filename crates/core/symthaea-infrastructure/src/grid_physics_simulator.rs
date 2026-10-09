@@ -36,6 +36,7 @@ use symthaea_grid_physics::islanding::{
     steady_state_frequency_after_islanding,
 };
 use symthaea_grid_physics::trip_envelope::VoltageTripEnvelope;
+use tracing::warn;
 
 use crate::simulator::InfrastructurePhysicsSimulator;
 #[cfg(test)]
@@ -107,6 +108,23 @@ const BASE_RELAY_DECAY_PER_S: f64 = 0.0005;
 const RELAY_DECAY_PER_ABNORMAL_VOLTAGE_S: f64 = 0.002;
 const RELAY_DECAY_PER_THERMAL_RISK_S: f64 = 0.001;
 
+/// Largest supported coarse simulation interval. The synthetic load period is
+/// 300 s and the lumped thermal time constant is about 100 s, so <=1 s keeps
+/// these updates resolved at >=100 steps per thermal time constant and >=300
+/// per load period. High-resolution runs should use the configured 200 Hz
+/// interval (0.005 s); this remains a simulation model, not a plant controller.
+const MAX_INTEGRATION_STEP_SECONDS: f64 = 1.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridPhysicsStepError {
+    InvalidDuration,
+    NonFiniteActuator { index: usize },
+    ActuatorOutOfRange { index: usize },
+    InvalidBatteryConfiguration,
+    InvalidDerivedPhysics,
+}
+
+#[derive(Clone)]
 pub struct GridPhysicsInfrastructureSimulator {
     state: InfrastructureState,
     battery: Battery,
@@ -160,6 +178,72 @@ impl GridPhysicsInfrastructureSimulator {
     pub fn battery_mut(&mut self) -> &mut Battery {
         &mut self.battery
     }
+
+    /// Validate battery configuration before it reaches the feeder. Public
+    /// battery parameters remain mutable for test/benchmark setup, so
+    /// constructor validation alone is insufficient.
+    fn battery_configuration_is_valid(&self) -> bool {
+        let battery = &self.battery;
+        battery.capacity_kwh.is_finite()
+            && battery.capacity_kwh > 0.0
+            && battery.capacity_kwh <= BATTERY_CAPACITY_KWH
+            && battery.power_rating_kw.is_finite()
+            && battery.power_rating_kw > 0.0
+            && battery.power_rating_kw <= BATTERY_POWER_RATING_KW
+            && battery.round_trip_efficiency.is_finite()
+            && (0.0..=1.0).contains(&battery.round_trip_efficiency)
+            && battery.soc().is_finite()
+            && (0.0..=1.0).contains(&battery.soc())
+            && battery.state_of_health().is_finite()
+            && (0.0..=1.0).contains(&battery.state_of_health())
+            && battery.equivalent_full_cycles().is_finite()
+            && battery.equivalent_full_cycles() >= 0.0
+            && battery.degradation_per_cycle.is_finite()
+            && (0.0..=1.0).contains(&battery.degradation_per_cycle)
+            && battery.effective_capacity_kwh().is_finite()
+            && battery.stored_energy_kwh().is_finite()
+    }
+
+    /// Checked, transactional step. Rejected commands and non-finite
+    /// candidate results leave every simulator field unchanged.
+    pub fn try_step(
+        &mut self,
+        cmd: &InfrastructureCommand,
+        dt: f64,
+    ) -> Result<(), GridPhysicsStepError> {
+        if !dt.is_finite() || dt <= 0.0 || dt > MAX_INTEGRATION_STEP_SECONDS {
+            return Err(GridPhysicsStepError::InvalidDuration);
+        }
+        for (index, value) in cmd.torques.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(GridPhysicsStepError::NonFiniteActuator { index });
+            }
+            // Charge/discharge/cooling/heating are nonnegative fractions.
+            // Routing is signed; the existing reflex uses negative routes.
+            let (min, max) = if index < 4 { (0.0, 1.0) } else { (-1.0, 1.0) };
+            if value < min || value > max {
+                return Err(GridPhysicsStepError::ActuatorOutOfRange { index });
+            }
+        }
+        if !self.battery_configuration_is_valid() {
+            return Err(GridPhysicsStepError::InvalidBatteryConfiguration);
+        }
+
+        let mut candidate = self.clone();
+        candidate.step_candidate(cmd, dt)?;
+        if !candidate.state.is_finite()
+            || !candidate.battery_configuration_is_valid()
+            || !candidate.elapsed_s.is_finite()
+            || candidate.elapsed_s < 0.0
+            || !candidate.abnormal_voltage_elapsed_s.is_finite()
+            || candidate.abnormal_voltage_elapsed_s < 0.0
+            || !candidate.prev_frequency_hz.is_finite()
+        {
+            return Err(GridPhysicsStepError::InvalidDerivedPhysics);
+        }
+        *self = candidate;
+        Ok(())
+    }
 }
 
 impl Default for GridPhysicsInfrastructureSimulator {
@@ -168,8 +252,13 @@ impl Default for GridPhysicsInfrastructureSimulator {
     }
 }
 
-impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
-    fn step(&mut self, cmd: &InfrastructureCommand, dt: f64) {
+impl GridPhysicsInfrastructureSimulator {
+    /// Mutates only a disposable candidate; try_step commits after postflight.
+    fn step_candidate(
+        &mut self,
+        cmd: &InfrastructureCommand,
+        dt: f64,
+    ) -> Result<(), GridPhysicsStepError> {
         self.elapsed_s += dt;
         let dt_hours = dt / 3600.0;
 
@@ -244,7 +333,7 @@ impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
                 ),
             ],
         )
-        .expect("2-node feeder topology is always valid by construction");
+        .map_err(|_| GridPhysicsStepError::InvalidDerivedPhysics)?;
         let solution = feeder.solve();
         let voltage_pu = solution.voltage_pu(1);
         let branch_loss_kw = solution.estimate_branch_loss_kw(&feeder, 1);
@@ -401,6 +490,15 @@ impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
         s[SERVICE_INTEGRITY] = service_integrity;
         s[RECOVERY_MARGIN] = recovery_margin;
         s[THERMAL_RUNAWAY_RISK] = thermal_runaway_risk;
+        Ok(())
+    }
+}
+
+impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
+    fn step(&mut self, cmd: &InfrastructureCommand, dt: f64) {
+        if let Err(error) = self.try_step(cmd, dt) {
+            warn!(?error, "rejected grid-physics simulator step; state unchanged");
+        }
     }
 
     fn state(&self) -> &InfrastructureState {
@@ -608,4 +706,130 @@ mod failure_mode_tests {
             sim.state().service_integrity()
         );
     }
+
+    fn assert_rejected_step_is_atomic(
+        sim: &mut GridPhysicsInfrastructureSimulator,
+        cmd: &InfrastructureCommand,
+        dt: f64,
+        expected: GridPhysicsStepError,
+    ) {
+        let before = sim.clone();
+        assert_eq!(sim.try_step(cmd, dt), Err(expected));
+        assert_eq!(sim.state.channels, before.state.channels);
+        assert_eq!(sim.battery.soc(), before.battery.soc());
+        assert_eq!(
+            sim.battery.equivalent_full_cycles(),
+            before.battery.equivalent_full_cycles()
+        );
+        assert_eq!(sim.elapsed_s, before.elapsed_s);
+        assert_eq!(
+            sim.abnormal_voltage_elapsed_s,
+            before.abnormal_voltage_elapsed_s
+        );
+        assert_eq!(sim.prev_frequency_hz, before.prev_frequency_hz);
+    }
+
+    #[test]
+    fn checked_step_rejects_invalid_time_steps_atomically() {
+        for dt in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -0.001, 1.000_001] {
+            let mut sim = GridPhysicsInfrastructureSimulator::new();
+            assert_rejected_step_is_atomic(
+                &mut sim,
+                &InfrastructureCommand::zero(),
+                dt,
+                GridPhysicsStepError::InvalidDuration,
+            );
+        }
+    }
+
+    #[test]
+    fn checked_step_rejects_non_finite_value_in_every_actuator_atomically() {
+        for index in 0..crate::types::NUM_ACTUATORS {
+            for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+                let mut sim = GridPhysicsInfrastructureSimulator::new();
+                let mut cmd = InfrastructureCommand::zero();
+                cmd.torques[index] = value;
+                assert_rejected_step_is_atomic(
+                    &mut sim,
+                    &cmd,
+                    0.005,
+                    GridPhysicsStepError::NonFiniteActuator { index },
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn checked_step_enforces_distinct_actuator_domains() {
+        for (index, value) in [
+            (0, -0.01),
+            (1, 1.01),
+            (2, -0.01),
+            (3, 1.01),
+            (4, -1.01),
+            (7, 1.01),
+        ] {
+            let mut sim = GridPhysicsInfrastructureSimulator::new();
+            let mut cmd = InfrastructureCommand::zero();
+            cmd.torques[index] = value;
+            assert_rejected_step_is_atomic(
+                &mut sim,
+                &cmd,
+                0.005,
+                GridPhysicsStepError::ActuatorOutOfRange { index },
+            );
+        }
+
+        // Signed routing remains valid: DeadlockRecovery uses a negative route.
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[4] = -0.3;
+        assert_eq!(sim.try_step(&cmd, 0.005), Ok(()));
+    }
+
+    #[test]
+    fn checked_step_rejects_mutated_battery_configuration_atomically() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        sim.battery_mut().power_rating_kw = f64::MAX;
+        let before = sim.clone();
+        assert_eq!(
+            sim.try_step(&InfrastructureCommand::zero(), 0.005),
+            Err(GridPhysicsStepError::InvalidBatteryConfiguration)
+        );
+        assert_eq!(sim.state.channels, before.state.channels);
+        assert_eq!(sim.elapsed_s, before.elapsed_s);
+        assert_eq!(sim.battery.power_rating_kw, before.battery.power_rating_kw);
+    }
+
+    #[test]
+    fn checked_and_compatibility_paths_match_for_valid_commands() {
+        let mut checked = GridPhysicsInfrastructureSimulator::new();
+        let mut compatibility = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[0] = 0.3;
+        cmd.torques[1] = 0.2;
+        cmd.torques[2] = 0.5;
+        cmd.torques[4] = -0.3;
+        cmd.torques[6] = 0.4;
+
+        assert_eq!(checked.try_step(&cmd, 0.005), Ok(()));
+        compatibility.step(&cmd, 0.005);
+        assert_eq!(checked.state.channels, compatibility.state.channels);
+        assert_eq!(checked.battery.soc(), compatibility.battery.soc());
+        assert_eq!(checked.elapsed_s, compatibility.elapsed_s);
+    }
+
+    #[test]
+    fn checked_step_rejects_overflow_sized_finite_actuator_without_mutation() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[0] = f32::MAX;
+        assert_rejected_step_is_atomic(
+            &mut sim,
+            &cmd,
+            0.005,
+            GridPhysicsStepError::ActuatorOutOfRange { index: 0 },
+        );
+    }
+
 }
