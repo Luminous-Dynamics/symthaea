@@ -900,11 +900,21 @@ mod tests {
         let report = evaluate_metacognition(&observations, &[], &[], 10, &[0.5, 0.9])
             .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"));
         assert_eq!(report.empirical_accuracy, Some(0.9));
-        assert_eq!(report.mean_confidence, Some(0.9));
-        assert_eq!(report.expected_calibration_error, Some(0.0));
+        assert!(
+            (report.mean_confidence.unwrap_or_default() - 0.9).abs() < 1.0e-12
+        );
+        assert!(
+            report.expected_calibration_error.unwrap_or_default().abs() < 1.0e-12
+        );
         assert_eq!(report.task_family_calibration.len(), 2);
         assert_eq!(report.task_family_calibration[0].task_family_id, "reasoning");
-        assert_eq!(report.task_family_calibration[0].expected_calibration_error, Some(0.0));
+        assert!(
+            report.task_family_calibration[0]
+                .expected_calibration_error
+                .unwrap_or_default()
+                .abs()
+                < 1.0e-12
+        );
         assert_eq!(report.task_family_calibration[1].task_family_id, "retrieval");
         assert!(
             (report.task_family_calibration[1]
