@@ -679,14 +679,14 @@ fn counterfactual_forecast_metrics(
             log_loss: None,
         };
     }
-    let correct_count = observed.iter().filter(|(_, correct)| *correct).count();
+    let correct_count = observed.iter().filter(|entry| entry.1).count();
     let mean_confidence =
-        observed.iter().map(|(probability, _)| probability).sum::<f64>() / n as f64;
+        observed.iter().map(|(probability, _)| *probability).sum::<f64>() / n as f64;
     let empirical_accuracy = correct_count as f64 / n as f64;
     let brier_score = observed
         .iter()
         .map(|(probability, correct)| {
-            (probability - if *correct { 1.0 } else { 0.0 }).powi(2)
+            (*probability - if *correct { 1.0 } else { 0.0 }).powi(2)
         })
         .sum::<f64>()
         / n as f64;
