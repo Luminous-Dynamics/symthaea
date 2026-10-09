@@ -204,7 +204,25 @@ impl GridPhysicsInfrastructureSimulator {
             && battery.stored_energy_kwh().is_finite()
     }
 
-    /// Checked, transactional step. Rejected commands and non-finite
+    /// Validate state channels according to their units: all are normalized
+    /// to [0, 1] except the two real-power channels (kW) and coolant
+    /// temperature (degrees C).
+    fn state_channels_are_valid(&self) -> bool {
+        self.state.channels.iter().enumerate().all(|(index, value)| {
+            if !value.is_finite() {
+                return false;
+            }
+            match index {
+                2 | 3 => (0.0..=SUBSTATION_TIE_CAPACITY_KW).contains(value),
+                COOLANT_TEMP_C => {
+                    (AMBIENT_TEMP_C - 10.0..=200.0).contains(value)
+                }
+                _ => (0.0..=1.0).contains(value),
+            }
+        })
+    }
+
+    /// Checked, transactional step. Rejected commands and invalid
     /// candidate results leave every simulator field unchanged.
     pub fn try_step(
         &mut self,
@@ -230,10 +248,19 @@ impl GridPhysicsInfrastructureSimulator {
         if !self.battery_configuration_is_valid() {
             return Err(GridPhysicsStepError::InvalidBatteryConfiguration);
         }
+        if !self.state_channels_are_valid()
+            || !self.elapsed_s.is_finite()
+            || self.elapsed_s < 0.0
+            || !self.abnormal_voltage_elapsed_s.is_finite()
+            || self.abnormal_voltage_elapsed_s < 0.0
+            || !self.prev_frequency_hz.is_finite()
+        {
+            return Err(GridPhysicsStepError::InvalidDerivedPhysics);
+        }
 
         let mut candidate = self.clone();
         candidate.step_candidate(cmd, dt)?;
-        if !candidate.state.is_finite()
+        if !candidate.state_channels_are_valid()
             || !candidate.battery_configuration_is_valid()
             || !candidate.elapsed_s.is_finite()
             || candidate.elapsed_s < 0.0
