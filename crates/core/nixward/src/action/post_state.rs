@@ -270,6 +270,10 @@ pub struct NixServicePostStateObservationV1 {
     #[serde(default)]
     pub systemd_bus_id: Option<String>,
     pub invocation_id: Option<String>,
+    /// Observer-derived commitment proving the post InvocationID was resolved to
+    /// this exact Unit object under the same manager owner and D-Bus incarnation.
+    #[serde(default)]
+    pub post_invocation_binding_digest: Option<String>,
     /// systemd StateChangeTimestampMonotonic represented as monotonic microseconds.
     pub state_change_at_monotonic_us: u64,
     pub observed_at_monotonic_us: u64,
@@ -308,6 +312,23 @@ impl NixServicePostStateObservationV1 {
             }
         }
         validate_optional_invocation_id(self.invocation_id.as_deref(), "post-invocation id")?;
+        if self.invocation_id.is_some() {
+            let binding = self
+                .post_invocation_binding_digest
+                .as_deref()
+                .ok_or(NixPostStateErrorV1::MissingPostInvocationBinding)?;
+            let expected_binding = invocation_binding_digest(
+                self.invocation_id.as_deref(),
+                &self.unit_object_path,
+                self.systemd_manager_owner.as_deref(),
+                self.systemd_bus_id.as_deref(),
+            )?;
+            if binding != expected_binding {
+                return Err(NixPostStateErrorV1::PostInvocationBindingMismatch);
+            }
+        } else if self.post_invocation_binding_digest.is_some() {
+            return Err(NixPostStateErrorV1::PostInvocationBindingMismatch);
+        }
         if self.observed_at_monotonic_us < self.state_change_at_monotonic_us {
             return Err(NixPostStateErrorV1::ObservationBeforeStateChange);
         }
@@ -606,6 +627,10 @@ pub struct NixPostStateReceiptV1 {
     pub systemd_bus_id: Option<String>,
     pub pre_invocation_id: Option<String>,
     pub post_invocation_id: Option<String>,
+    /// Commitment proving post InvocationID -> exact observed Unit object within
+    /// the observed manager and D-Bus epoch.
+    #[serde(default)]
+    pub post_invocation_binding_digest: Option<String>,
     pub postcondition: NixPostconditionAssessmentV1,
     pub claim: NixPostStateClaimV1,
     /// The stability contract that was part of the exact effect identity.
@@ -840,6 +865,7 @@ impl NixPostStateReceiptV1 {
             systemd_bus_id: observation.systemd_bus_id.clone(),
             pre_invocation_id: expectation.pre_invocation_id.clone(),
             post_invocation_id: observation.invocation_id.clone(),
+            post_invocation_binding_digest: observation.post_invocation_binding_digest.clone(),
             postcondition: assessment,
             claim,
             required_stability_us: expectation.required_stability_us,
@@ -1131,6 +1157,20 @@ impl NixPostStateReceiptV1 {
         }
         validate_optional_invocation_id(self.pre_invocation_id.as_deref(), "pre-invocation id")?;
         validate_optional_invocation_id(self.post_invocation_id.as_deref(), "post-invocation id")?;
+        if let Some(binding) = self.post_invocation_binding_digest.as_deref() {
+            if self.post_invocation_id.is_none() {
+                return Err(NixPostStateErrorV1::PostInvocationBindingMismatch);
+            }
+            let expected_binding = invocation_binding_digest(
+                self.post_invocation_id.as_deref(),
+                &self.observed_unit_object_path,
+                Some(&self.systemd_manager_owner),
+                self.systemd_bus_id.as_deref(),
+            )?;
+            if binding != expected_binding {
+                return Err(NixPostStateErrorV1::PostInvocationBindingMismatch);
+            }
+        }
         require_nonempty(&self.observer_identity, "observer identity")?;
         require_nonempty(&self.observer_version, "observer version")?;
 
@@ -1209,6 +1249,11 @@ impl NixPostStateReceiptV1 {
                 if self.systemd_job_removed_observed_at_monotonic_us.is_none() {
                     return Err(NixPostStateErrorV1::MissingJobRemovedObservationTime);
                 }
+                if self.post_invocation_id.is_some()
+                    && self.post_invocation_binding_digest.is_none()
+                {
+                    return Err(NixPostStateErrorV1::MissingPostInvocationBinding);
+                }
             }
             _ => {}
         }
@@ -1256,6 +1301,9 @@ impl NixPostStateReceiptV1 {
         put_opt_str(&mut h, self.systemd_bus_id.as_deref());
         put_opt_str(&mut h, self.pre_invocation_id.as_deref());
         put_opt_str(&mut h, self.post_invocation_id.as_deref());
+        if self.post_invocation_binding_digest.is_some() {
+            put_opt_str(&mut h, self.post_invocation_binding_digest.as_deref());
+        }
         put_u8(&mut h, assessment_tag(self.postcondition));
         put_u8(&mut h, claim_tag(self.claim));
         put_u64(&mut h, self.required_stability_us);
@@ -1673,6 +1721,29 @@ fn put_opt_u32(h: &mut Hasher, value: Option<u32>) {
     }
 }
 
+pub(crate) fn invocation_binding_digest(
+    invocation_id: Option<&str>,
+    unit_object_path: &str,
+    manager_owner: Option<&str>,
+    bus_id: Option<&str>,
+) -> Result<String, NixPostStateErrorV1> {
+    let invocation_id = invocation_id.ok_or(NixPostStateErrorV1::MissingPostInvocationBinding)?;
+    validate_optional_invocation_id(Some(invocation_id), "post-invocation id")?;
+    let manager_owner = manager_owner.ok_or(NixPostStateErrorV1::MissingManagerOwner)?;
+    validate_unique_manager_owner(manager_owner)?;
+    let bus_id = bus_id.ok_or(NixPostStateErrorV1::BusIncarnationMismatch)?;
+    validate_bus_id(bus_id)?;
+    validate_systemd_unit_object_path(unit_object_path)?;
+
+    let mut h = Hasher::new();
+    h.update(b"nixward-post-invocation-binding-v1");
+    put_str(&mut h, invocation_id);
+    put_str(&mut h, unit_object_path);
+    put_str(&mut h, manager_owner);
+    put_str(&mut h, bus_id);
+    Ok(h.finalize().to_hex().to_string())
+}
+
 fn put_opt_u64(h: &mut Hasher, value: Option<u64>) {
     match value {
         Some(value) => {
@@ -1753,10 +1824,6 @@ pub enum NixPostStateErrorV1 {
     InvalidJobRemovedObservationTime,
     #[error("JobRemoved was observed after the post-state observation")]
     JobRemovedAfterObservation,
-    #[error("JobRemoved observation time is zero")]
-    InvalidJobRemovedObservationTime,
-    #[error("JobRemoved was observed after the post-state observation")]
-    JobRemovedAfterObservation,
     #[error("duplicate drop-in path")]
     DuplicateDropInPath,
     #[error("drop-in paths are not deterministically sorted")]
@@ -1795,8 +1862,10 @@ pub enum NixPostStateErrorV1 {
     InvalidBoundPreState,
     #[error("live execution provenance is required for a Proven receipt")]
     MissingLiveExecutionWitness,
-    #[error("exact JobRemoved observation time is required for a Proven receipt")]
-    MissingJobRemovedObservationTime,
+    #[error("post InvocationID is present without observer-derived unit binding")]
+    MissingPostInvocationBinding,
+    #[error("post InvocationID unit binding commitment does not match the observed identity")]
+    PostInvocationBindingMismatch,
     #[error("exact JobRemoved observation time is required for a Proven receipt")]
     MissingJobRemovedObservationTime,
     #[error("live execution provenance does not match the bound authorization lineage")]
@@ -2126,6 +2195,15 @@ mod tests {
             systemd_manager_owner: Some(":1.123".to_string()),
             systemd_bus_id: Some("0123456789abcdef0123456789abcdef".to_string()),
             invocation_id: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
+            post_invocation_binding_digest: Some(
+                invocation_binding_digest(
+                    Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                    "/org/freedesktop/systemd1/unit/nginx_2eservice",
+                    Some(":1.123"),
+                    Some("0123456789abcdef0123456789abcdef"),
+                )
+                .unwrap(),
+            ),
             state_change_at_monotonic_us: 900,
             observed_at_monotonic_us: 2_000,
         }
@@ -2769,6 +2847,166 @@ mod tests {
         changed.systemd_job_removed_observed_at_monotonic_us = Some(1_600);
 
         assert_ne!(baseline, changed.digest().unwrap());
+    }
+
+    #[test]
+    fn observation_rejects_post_invocation_object_rebinding() {
+        let mut obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        obs.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+                Some(":1.123"),
+                Some("0123456789abcdef0123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            obs.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_post_invocation_binding_tampering() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+                Some(":1.123"),
+                Some("0123456789abcdef0123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
+    fn proven_receipt_requires_post_invocation_binding() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_proven_receipt(
+            &exp,
+            &obs,
+            Some(stability(&obs, 1_000, 1_000, 2_000, &[1_000, 2_000])),
+        )
+        .unwrap();
+
+        receipt.post_invocation_binding_digest = None;
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::MissingPostInvocationBinding
+        );
+    }
+
+    #[test]
+    fn post_invocation_binding_changes_receipt_digest() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let receipt = build_receipt(&exp, &obs, None).unwrap();
+        let baseline = receipt.digest().unwrap();
+
+        let mut changed = receipt.clone();
+        changed.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                "/org/freedesktop/systemd1/unit/other_2eservice",
+                Some(":1.123"),
+                Some("0123456789abcdef0123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_ne!(baseline, changed.digest().unwrap());
+    }
+
+    #[test]
+    fn legacy_nonproven_receipt_can_omit_post_invocation_binding() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = None;
+
+        assert_eq!(receipt.claim, NixPostStateClaimV1::Observed);
+        receipt.validate_shape().unwrap();
+    }
+
+    #[test]
+    fn post_invocation_binding_rejects_manager_epoch_substitution() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                &receipt.observed_unit_object_path,
+                Some(":1.999"),
+                receipt.systemd_bus_id.as_deref(),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
+    }
+
+    #[test]
+    fn post_invocation_binding_rejects_bus_epoch_substitution() {
+        let exp = expectation(NixServiceOperationKindV1::Start);
+        let obs = observation(
+            NixServiceOperationKindV1::Start,
+            ServiceActiveStateV1::Active,
+            ServiceUnitFileStateV1::Enabled,
+        );
+        let mut receipt = build_receipt(&exp, &obs, None).unwrap();
+        receipt.post_invocation_binding_digest = Some(
+            invocation_binding_digest(
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                &receipt.observed_unit_object_path,
+                Some(&receipt.systemd_manager_owner),
+                Some("fedcba98765432100123456789abcdef"),
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            receipt.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::PostInvocationBindingMismatch
+        );
     }
 
     #[test]
