@@ -3,9 +3,21 @@ use std::fmt;
 
 macro_rules! define_ref {
     ($name:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
         #[serde(transparent)]
         pub struct $name(String);
+
+        // Deserialization must cross the same validation boundary as new and
+        // TryFrom; derived transparent deserialization would bypass it.
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                Self::new(value).map_err(|err| <D::Error as serde::de::Error>::custom(err))
+            }
+        }
 
         impl $name {
             pub fn new(value: impl Into<String>) -> Result<Self, RefValidationError> {
@@ -80,6 +92,13 @@ mod tests {
     #[test]
     fn rejects_control_characters() {
         assert_eq!(FrontierRef::try_from("frontier\n1").unwrap_err(), RefValidationError::ControlCharacter);
+    }
+
+    #[test]
+    fn deserialization_cannot_bypass_reference_validation() {
+        assert!(serde_json::from_str::<FrontierRef>("\"\"").is_err());
+        assert!(serde_json::from_str::<FrontierRef>("\" \\t\\n\"").is_err());
+        assert!(serde_json::from_str::<FrontierRef>("\"frontier\\n1\"").is_err());
     }
 
     #[test]
