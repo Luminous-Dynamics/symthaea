@@ -775,6 +775,7 @@ impl SqliteWitnessStore {
     /// calls still use the local-only fork-evidence path.
     pub fn record_fork_remotely(
         &self,
+        log_id: &str,
         accepted_generation: u64,
         accepted_head_digest: Digest,
         fork_generation: u64,
@@ -787,7 +788,7 @@ impl SqliteWitnessStore {
             let conn = self.open_connection().map_err(local_store_error)?;
             find_fork_event_by_conflict(
                 &conn,
-                "",
+                log_id,
                 witness_epoch,
                 accepted_generation,
                 accepted_head_digest,
@@ -796,16 +797,16 @@ impl SqliteWitnessStore {
                 conflicting_record_digest,
             )?
         };
-        // The log ID is derived from a provisioned remote frontier. A semantic
-        // retry needs that same log ID, so read it from the caller's requested
-        // conflict scope through the witness first when no local row is found.
+        // Resolve semantic retries before asking the remote for its current
+        // frontier, so an ambiguous previous append retains the original event
+        // identity rather than being rebuilt against an advanced frontier.
         if let Some(stored) = existing {
             return reconcile_stored_fork_event(self, stored, witness);
         }
 
         // Probe the frontier before choosing the stable event identity.
         // Unknown log/epoch returns Unavailable; it is not silently provisioned.
-        let frontier = witness.current_frontier("", witness_epoch)?;
+        let frontier = witness.current_frontier(log_id, witness_epoch)?;
         let event = ForkEvent::build(
             &frontier,
             accepted_generation,
