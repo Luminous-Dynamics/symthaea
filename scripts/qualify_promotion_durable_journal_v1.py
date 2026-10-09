@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS reservations (
     predecessor_head TEXT NOT NULL,
     reservation_head TEXT NOT NULL,
     state TEXT NOT NULL CHECK (state IN (
-        'PromotionReserved', 'PromotionDispatchPrepared', 'PromotionSuperseded'
+        'PromotionReserved', 'PromotionDispatchPrepared',
+        'PromotionReconciliationRequired', 'PromotionSuperseded'
     )),
     fencing_token INTEGER NOT NULL CHECK (fencing_token > 0),
     trust_root_generation INTEGER NOT NULL CHECK (trust_root_generation >= 0),
@@ -100,7 +101,7 @@ CREATE TABLE IF NOT EXISTS reservations (
        AND attempt_identity_digest IS NULL
        AND superseded_by_fence IS NULL)
       OR
-      (state = 'PromotionDispatchPrepared'
+      (state IN ('PromotionDispatchPrepared', 'PromotionReconciliationRequired')
        AND dispatch_attempt_id IS NOT NULL
        AND length(trim(dispatch_attempt_id)) > 0
        AND dispatch_attempt_sequence IS NOT NULL
@@ -128,7 +129,9 @@ CREATE TABLE IF NOT EXISTS reservations (
 
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_promotion_reservation
 ON reservations((1))
-WHERE state IN ('PromotionReserved', 'PromotionDispatchPrepared');
+WHERE state IN (
+    'PromotionReserved', 'PromotionDispatchPrepared', 'PromotionReconciliationRequired'
+);
 
 CREATE UNIQUE INDEX IF NOT EXISTS one_sequence_per_reservation
 ON reservations(reservation_id, dispatch_attempt_sequence)
@@ -187,11 +190,32 @@ CREATE TRIGGER IF NOT EXISTS reservation_state_transition_guard
 BEFORE UPDATE OF state ON reservations
 WHEN OLD.state <> NEW.state
  AND NOT (
-    OLD.state = 'PromotionReserved'
-    AND NEW.state IN ('PromotionDispatchPrepared', 'PromotionSuperseded')
+    (OLD.state = 'PromotionReserved'
+     AND NEW.state IN ('PromotionDispatchPrepared', 'PromotionSuperseded'))
+    OR
+    (OLD.state = 'PromotionDispatchPrepared'
+     AND NEW.state = 'PromotionReconciliationRequired')
  )
 BEGIN
     SELECT RAISE(ABORT, 'invalid reservation state transition');
+END;
+
+CREATE TRIGGER IF NOT EXISTS reservation_reconciliation_storage_guard
+BEFORE UPDATE OF state ON reservations
+WHEN NEW.state = 'PromotionReconciliationRequired'
+BEGIN
+    SELECT CASE WHEN OLD.state <> 'PromotionDispatchPrepared'
+      OR NOT EXISTS (
+        SELECT 1 FROM ledger_state l
+        WHERE l.singleton = 1
+          AND l.head = NEW.reservation_head
+          AND l.active_lease = NEW.lease_id
+          AND l.fencing_token = NEW.fencing_token
+          AND l.trust_root_generation = NEW.trust_root_generation
+          AND l.governance_generation = NEW.governance_generation
+          AND l.revision = NEW.created_revision + 2
+      )
+      THEN RAISE(ABORT, 'reconciliation requires exact prepared authority') END;
 END;
 
 CREATE TRIGGER IF NOT EXISTS reservation_terminal_evidence_immutable
@@ -480,7 +504,10 @@ class DurablePromotionJournalV1:
             state = dict(state_row)
             active = connection.execute(
                 """SELECT 1 FROM reservations
-                   WHERE state IN ('PromotionReserved', 'PromotionDispatchPrepared')
+                   WHERE state IN (
+                     'PromotionReserved', 'PromotionDispatchPrepared',
+                     'PromotionReconciliationRequired'
+                   )
                    LIMIT 1"""
             ).fetchone()
             if (
@@ -563,10 +590,13 @@ class DurablePromotionJournalV1:
             state = dict(connection.execute(
                 "SELECT * FROM ledger_state WHERE singleton = 1"
             ).fetchone())
-            prepared = connection.execute(
-                "SELECT 1 FROM reservations WHERE state = 'PromotionDispatchPrepared' LIMIT 1"
+            unresolved = connection.execute(
+                """SELECT 1 FROM reservations
+                   WHERE state IN (
+                     'PromotionDispatchPrepared', 'PromotionReconciliationRequired'
+                   ) LIMIT 1"""
             ).fetchone()
-            if prepared is not None:
+            if unresolved is not None:
                 return False
             reserved = [
                 dict(row) for row in connection.execute(
@@ -800,6 +830,145 @@ class DurablePromotionJournalV1:
             )
             return True
 
+    def require_reconciliation(self, reservation_id: str) -> bool:
+        """Durably quarantine an ambiguous prepared attempt without redispatching.
+
+        The caller must first establish that the previous dispatcher is quiescent.
+        This reference model cannot itself prove process death or lease exclusivity.
+        """
+        if not self.verify_journal():
+            return False
+
+        with self._write() as connection:
+            row = connection.execute(
+                "SELECT * FROM reservations WHERE reservation_id = ?",
+                (reservation_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            reservation = dict(row)
+
+            if reservation["state"] == "PromotionReconciliationRequired":
+                existing = connection.execute(
+                    """SELECT payload_json FROM journal_events
+                       WHERE event_type = 'PromotionReconciliationRequired'
+                         AND reservation_id = ?
+                       ORDER BY seq DESC LIMIT 1""",
+                    (reservation_id,),
+                ).fetchone()
+                if existing is None:
+                    return False
+                recovery_payload = json.loads(existing["payload_json"])
+                return (
+                    recovery_payload.get("attempt_identity_digest")
+                    == reservation["attempt_identity_digest"]
+                    and recovery_payload.get("recovery_action")
+                    == "external-outcome-unknown"
+                )
+
+            if reservation["state"] != "PromotionDispatchPrepared":
+                return False
+
+            prepared_event = connection.execute(
+                """SELECT payload_json FROM journal_events
+                   WHERE event_type = 'PromotionDispatchPrepared'
+                     AND reservation_id = ?
+                   ORDER BY seq DESC LIMIT 1""",
+                (reservation_id,),
+            ).fetchone()
+            if prepared_event is None:
+                return False
+            prepared_payload = json.loads(prepared_event["payload_json"])
+            identity = self._identity_from(
+                reservation,
+                dispatch_attempt_id=reservation["dispatch_attempt_id"],
+                dispatch_attempt_sequence=reservation["dispatch_attempt_sequence"],
+                dispatch_wall_time_ms=reservation["dispatch_wall_time_ms"],
+                dispatch_monotonic_ns=reservation["dispatch_monotonic_ns"],
+            )
+            if (
+                not identity.structurally_valid()
+                or identity.identity_digest() != reservation["attempt_identity_digest"]
+                or identity.identity_digest() != prepared_payload.get("attempt_identity_digest")
+            ):
+                return False
+
+            state_row = connection.execute(
+                "SELECT * FROM ledger_state WHERE singleton = 1"
+            ).fetchone()
+            if state_row is None:
+                return False
+            state = dict(state_row)
+            if (
+                state["head"] != reservation["reservation_head"]
+                or state["active_lease"] != reservation["lease_id"]
+                or state["fencing_token"] != reservation["fencing_token"]
+                or state["trust_root_generation"] != reservation["trust_root_generation"]
+                or state["governance_generation"] != reservation["governance_generation"]
+                or state["revision"] != reservation["created_revision"] + 1
+            ):
+                return False
+
+            previous_revision = int(state["revision"])
+            new_revision = previous_revision + 1
+            updated = connection.execute(
+                """UPDATE ledger_state SET revision = ?
+                   WHERE singleton = 1 AND head = ? AND active_lease = ?
+                     AND fencing_token = ? AND trust_root_generation = ?
+                     AND governance_generation = ? AND revision = ?""",
+                (
+                    new_revision, state["head"], state["active_lease"],
+                    state["fencing_token"], state["trust_root_generation"],
+                    state["governance_generation"], previous_revision,
+                ),
+            )
+            if updated.rowcount != 1:
+                return False
+
+            changed = connection.execute(
+                """UPDATE reservations SET state = 'PromotionReconciliationRequired'
+                   WHERE reservation_id = ?
+                     AND state = 'PromotionDispatchPrepared'
+                     AND attempt_identity_digest = ?
+                     AND fencing_token = ?
+                     AND trust_root_generation = ?
+                     AND governance_generation = ?""",
+                (
+                    reservation_id, reservation["attempt_identity_digest"],
+                    reservation["fencing_token"], reservation["trust_root_generation"],
+                    reservation["governance_generation"],
+                ),
+            )
+            if changed.rowcount != 1:
+                raise RuntimeError(
+                    "reservation recovery compare-and-swap failed after revision update"
+                )
+
+            recovery_payload = {
+                "reservation_id": reservation_id,
+                "operation_id": reservation["operation_id"],
+                "attempt_identity_digest": reservation["attempt_identity_digest"],
+                "dispatch_attempt_sequence": reservation["dispatch_attempt_sequence"],
+                "fencing_token": reservation["fencing_token"],
+                "trust_root_generation": reservation["trust_root_generation"],
+                "governance_generation": reservation["governance_generation"],
+                "recovery_action": "external-outcome-unknown",
+                "previous_revision": previous_revision,
+                "revision": new_revision,
+            }
+            self._append_event(
+                connection,
+                event_id=(
+                    f"reconciliation-required:{reservation_id}:"
+                    f"{reservation['dispatch_attempt_sequence']}"
+                ),
+                event_type="PromotionReconciliationRequired",
+                reservation_id=reservation_id,
+                fencing_token=reservation["fencing_token"],
+                payload=recovery_payload,
+            )
+            return True
+
     def derive_attempt_identity(
         self, reservation_id: str
     ) -> PromotionTemporalAttemptIdentityV1 | None:
@@ -820,7 +989,9 @@ class DurablePromotionJournalV1:
             if row is None or event is None:
                 return None
             reservation = dict(row)
-            if reservation["state"] != "PromotionDispatchPrepared":
+            if reservation["state"] not in (
+                "PromotionDispatchPrepared", "PromotionReconciliationRequired"
+            ):
                 return None
             identity = self._identity_from(
                 reservation,
@@ -1041,6 +1212,30 @@ class DurablePromotionJournalV1:
                         "dispatch_clock_id": payload["clock_id"],
                         "attempt_identity_digest": payload["attempt_identity_digest"],
                     })
+                elif kind == "PromotionReconciliationRequired":
+                    reservation_id = payload["reservation_id"]
+                    reservation = replay_reservations.get(reservation_id)
+                    if (
+                        reservation is None
+                        or reservation["state"] != "PromotionDispatchPrepared"
+                        or payload["operation_id"] != reservation["operation_id"]
+                        or payload["attempt_identity_digest"] != reservation["attempt_identity_digest"]
+                        or payload["dispatch_attempt_sequence"] != reservation["dispatch_attempt_sequence"]
+                        or payload["fencing_token"] != replay_state["fencing_token"]
+                        or payload["fencing_token"] != reservation["fencing_token"]
+                        or payload["trust_root_generation"] != replay_state["trust_root_generation"]
+                        or payload["trust_root_generation"] != reservation["trust_root_generation"]
+                        or payload["governance_generation"] != replay_state["governance_generation"]
+                        or payload["governance_generation"] != reservation["governance_generation"]
+                        or payload["recovery_action"] != "external-outcome-unknown"
+                        or payload["previous_revision"] != replay_state["revision"]
+                        or payload["revision"] != replay_state["revision"] + 1
+                        or event["reservation_id"] != reservation_id
+                        or event["fencing_token"] != payload["fencing_token"]
+                    ):
+                        return False
+                    replay_state["revision"] = payload["revision"]
+                    reservation["state"] = "PromotionReconciliationRequired"
                 else:
                     return False
 
