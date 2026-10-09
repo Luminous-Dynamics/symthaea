@@ -80,6 +80,16 @@ pub struct DecisionSelectiveRiskPoint {
     pub risk_upper_bound_95: Option<f64>,
 }
 
+/// Calibration of predeclared candidate answers that were not asserted.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct DecisionCounterfactualForecastMetricsV2 {
+    pub adjudicated_answers: usize,
+    pub mean_confidence: Option<f64>,
+    pub empirical_accuracy: Option<f64>,
+    pub brier_score: Option<f64>,
+    pub log_loss: Option<f64>,
+}
+
 /// Baseline comparison on the same scoreable asserted-answer cohort as the candidate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DecisionBaselineScoreV2 {
@@ -118,9 +128,7 @@ pub struct DecisionCohortFamilyReportV2 {
     pub correctness_metrics: MetacognitionReport,
     /// Threshold coverage always uses total_decisions as its denominator.
     pub selective_risk: Vec<DecisionSelectiveRiskPoint>,
-    pub counterfactual_adjudications: usize,
-    /// Fraction of adjudicated counterfactual candidate answers that would have been correct.
-    pub counterfactual_answer_correct_rate: Option<f64>,
+    pub counterfactual_forecast_metrics: DecisionCounterfactualForecastMetricsV2,
     pub baselines: Vec<DecisionBaselineScoreV2>,
 }
 
@@ -155,8 +163,7 @@ pub struct DecisionCohortReportV2 {
     pub correctness_metrics: MetacognitionReport,
     /// Selective risk and coverage over the full decision cohort.
     pub selective_risk: Vec<DecisionSelectiveRiskPoint>,
-    pub counterfactual_adjudications: usize,
-    pub counterfactual_answer_correct_rate: Option<f64>,
+    pub counterfactual_forecast_metrics: DecisionCounterfactualForecastMetricsV2,
     pub family_reports: Vec<DecisionCohortFamilyReportV2>,
     pub binding: DecisionCohortBindingV1,
 }
@@ -643,20 +650,63 @@ fn score_predictions(
         .collect()
 }
 
-fn counterfactual_rate(rows: &[(&DecisionForecastV2, &DecisionOutcomeV1)]) -> (usize, Option<f64>) {
-    let observed: Vec<bool> = rows
+fn counterfactual_forecast_metrics(
+    rows: &[(&DecisionForecastV2, &DecisionOutcomeV1)],
+) -> DecisionCounterfactualForecastMetricsV2 {
+    let observed: Vec<(f64, bool)> = rows
         .iter()
-        .filter(|(f, o)| {
-            !f.asserted
-                && f.counterfactual_answer_ref.is_some()
-                && o.counterfactual_answer_correct.is_some()
+        .filter_map(|(forecast, outcome)| {
+            if forecast.asserted {
+                return None;
+            }
+            match (
+                forecast.counterfactual_answer_ref.as_ref(),
+                forecast.predicted_probability,
+                outcome.counterfactual_answer_correct,
+            ) {
+                (Some(_), Some(probability), Some(correct)) => Some((probability, correct)),
+                _ => None,
+            }
         })
-        .filter_map(|(_, o)| o.counterfactual_answer_correct)
         .collect();
-    let rate = (!observed.is_empty()).then(|| {
-        observed.iter().filter(|correct| **correct).count() as f64 / observed.len() as f64
-    });
-    (observed.len(), rate)
+    let n = observed.len();
+    if n == 0 {
+        return DecisionCounterfactualForecastMetricsV2 {
+            adjudicated_answers: 0,
+            mean_confidence: None,
+            empirical_accuracy: None,
+            brier_score: None,
+            log_loss: None,
+        };
+    }
+    let correct_count = observed.iter().filter(|(_, correct)| *correct).count();
+    let mean_confidence =
+        observed.iter().map(|(probability, _)| probability).sum::<f64>() / n as f64;
+    let empirical_accuracy = correct_count as f64 / n as f64;
+    let brier_score = observed
+        .iter()
+        .map(|(probability, correct)| {
+            (probability - if *correct { 1.0 } else { 0.0 }).powi(2)
+        })
+        .sum::<f64>()
+        / n as f64;
+    let log_loss = observed
+        .iter()
+        .map(|(probability, correct)| {
+            let target_probability = if *correct { *probability } else { 1.0 - *probability };
+            -target_probability
+                .clamp(LOG_LOSS_EPSILON, 1.0 - LOG_LOSS_EPSILON)
+                .ln()
+        })
+        .sum::<f64>()
+        / n as f64;
+    DecisionCounterfactualForecastMetricsV2 {
+        adjudicated_answers: n,
+        mean_confidence: Some(mean_confidence),
+        empirical_accuracy: Some(empirical_accuracy),
+        brier_score: Some(brier_score),
+        log_loss: Some(log_loss),
+    }
 }
 
 fn paired_brier_delta_interval(
@@ -855,8 +905,6 @@ pub fn evaluate_decision_cohort(
         .collect();
 
     let mut family_reports = Vec::with_capacity(family_rows.len());
-    let mut total_cf_adjudications = 0usize;
-    let mut total_cf_correct = 0usize;
     for (family, frows) in family_rows {
         let family_predictions = score_predictions(&frows);
         let family_episode_ids: HashSet<&str> = frows
@@ -886,16 +934,7 @@ pub fn evaluate_decision_cohort(
             .map_err(|e| DecisionCohortError::new(e.to_string()))?;
         let asserted = frows.iter().filter(|(f, _)| f.asserted).count();
         let abstained = frows.len() - asserted;
-        let (cf_n, cf_rate) = counterfactual_rate(&frows);
-        total_cf_adjudications += cf_n;
-        total_cf_correct += frows
-            .iter()
-            .filter(|(f, o)| {
-                !f.asserted
-                    && f.counterfactual_answer_ref.is_some()
-                    && o.counterfactual_answer_correct == Some(true)
-            })
-            .count();
+        let counterfactual_metrics = counterfactual_forecast_metrics(&frows);
         let selective_risk = frozen
             .selective_thresholds
             .iter()
@@ -926,15 +965,13 @@ pub fn evaluate_decision_cohort(
             decision_coverage: asserted as f64 / frows.len() as f64,
             correctness_metrics: metrics,
             selective_risk,
-            counterfactual_adjudications: cf_n,
-            counterfactual_answer_correct_rate: cf_rate,
+            counterfactual_forecast_metrics: counterfactual_metrics,
             baselines: family_baselines,
         });
     }
     let total = rows.len();
     let asserted = rows.iter().filter(|(f, _)| f.asserted).count();
-    let cf_n = total_cf_adjudications;
-    let cf_rate = (cf_n > 0).then(|| total_cf_correct as f64 / cf_n as f64);
+    let counterfactual_metrics = counterfactual_forecast_metrics(&rows);
     Ok(DecisionCohortReportV2 {
         schema_version: DECISION_COHORT_REPORT_SCHEMA_VERSION,
         evaluator_version: DECISION_COHORT_EVALUATOR_VERSION.into(),
@@ -951,8 +988,7 @@ pub fn evaluate_decision_cohort(
         decision_coverage: asserted as f64 / total as f64,
         correctness_metrics: pooled_metrics,
         selective_risk: pooled_risk,
-        counterfactual_adjudications: cf_n,
-        counterfactual_answer_correct_rate: cf_rate,
+        counterfactual_forecast_metrics: counterfactual_metrics,
         family_reports,
         binding: DecisionCohortBindingV1 {
             schema_version: 1,
@@ -1095,8 +1131,13 @@ mod tests {
         );
         assert_eq!(report.selective_risk[0].threshold, 0.5);
         assert_eq!(report.selective_risk[0].coverage_all_decisions, 1.0 / 3.0);
-        assert_eq!(report.counterfactual_adjudications, 1);
-        assert_eq!(report.counterfactual_answer_correct_rate, Some(1.0));
+        assert_eq!(report.counterfactual_forecast_metrics.adjudicated_answers, 1);
+        assert_eq!(report.counterfactual_forecast_metrics.empirical_accuracy, Some(1.0));
+        assert!(
+            (report.counterfactual_forecast_metrics.brier_score.unwrap_or(f64::NAN) - 0.01)
+                .abs()
+                < 1.0e-12
+        );
         assert_eq!(report.family_reports.len(), 2);
         let reasoning = report
             .family_reports
@@ -1122,7 +1163,8 @@ mod tests {
         assert_eq!(retrieval.baselines.len(), 2);
         assert_eq!(retrieval.baselines[0].candidate_scored_assertions, 0);
         assert_eq!(retrieval.baselines[0].baseline_brier_score, None);
-        assert_eq!(retrieval.counterfactual_answer_correct_rate, None);
+        assert_eq!(retrieval.counterfactual_forecast_metrics.adjudicated_answers, 0);
+        assert_eq!(retrieval.counterfactual_forecast_metrics.brier_score, None);
     }
 
     #[test]
