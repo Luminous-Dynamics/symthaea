@@ -13,9 +13,12 @@ use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::execution_witness::NixLiveExecutionWitnessV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
-use crate::action::service_state::NixServiceObservedStateV1;
+use crate::action::service_state::{NixServiceObservedStateV1, ServiceUnitFileStateV1};
 #[cfg(feature = "systemd-observer")]
-use crate::action::{NixSystemdLifecycleMutationTransportV1, NixSystemdReadOnlyObserverV1};
+use crate::action::{
+    NixSystemdLifecycleMutationTransportV1, NixSystemdReadOnlyObserverV1,
+    NixSystemdUnitFileMutationKindV1,
+};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
