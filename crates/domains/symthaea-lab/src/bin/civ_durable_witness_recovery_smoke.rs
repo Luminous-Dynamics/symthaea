@@ -84,6 +84,7 @@ enum Failure {
     GenerationOverflow,
     JournalCorrupt,
     ExternalAnchorMismatch,
+    ExternalAnchorUnavailable,
     RollbackDetected,
     PendingExternalAnchor,
     ExternalAnchorGap,
@@ -96,7 +97,7 @@ enum Failure {
 struct WitnessModel {
     witness_id: String,
     disk: DiskSnapshot,
-    external: IndependentAnchor,
+    external: Option<IndependentAnchor>,
 }
 
 impl IndependentAnchor {
@@ -260,7 +261,7 @@ impl WitnessModel {
         Ok(Self {
             witness_id: witness_id.to_owned(),
             disk,
-            external,
+            external: Some(external),
         })
     }
 
@@ -315,14 +316,17 @@ impl WitnessModel {
 
     fn recover(&mut self) -> Result<Record, Failure> {
         let accepted = Self::recover_disk(&mut self.disk)?;
-        if self.external.log_id != accepted.log_id {
+        let Some(external) = self.external.as_ref() else {
+            return Err(Failure::ExternalAnchorUnavailable);
+        };
+        if external.log_id != accepted.log_id {
             return Err(Failure::ExternalAnchorMismatch);
         }
-        if self.external.generation > accepted.generation {
+        if external.generation > accepted.generation {
             return Err(Failure::RollbackDetected);
         }
-        if self.external.generation == accepted.generation {
-            if self.external.record_digest != accepted.digest {
+        if external.generation == accepted.generation {
+            if external.record_digest != accepted.digest {
                 return Err(Failure::ExternalAnchorMismatch);
             }
             return Ok(accepted);
@@ -335,29 +339,31 @@ impl WitnessModel {
     /// equals the currently retained external anchor.
     fn reconcile_external_anchor(&mut self) -> Result<(), Failure> {
         let accepted = Self::recover_disk(&mut self.disk)?;
-        if self.external.log_id != accepted.log_id {
+        let Some(external) = self.external.as_mut() else {
+            return Err(Failure::ExternalAnchorUnavailable);
+        };
+        if external.log_id != accepted.log_id {
             return Err(Failure::ExternalAnchorMismatch);
         }
-        if accepted.generation == self.external.generation {
-            return if accepted.digest == self.external.record_digest {
+        if accepted.generation == external.generation {
+            return if accepted.digest == external.record_digest {
                 Ok(())
             } else {
                 Err(Failure::ExternalAnchorMismatch)
             };
         }
-        let expected_next = self
-            .external
+        let expected_next = external
             .generation
             .checked_add(1)
             .ok_or(Failure::GenerationOverflow)?;
         if accepted.generation != expected_next
-            || accepted.previous_record_digest != Some(self.external.record_digest)
+            || accepted.previous_record_digest != Some(external.record_digest)
         {
             return Err(Failure::ExternalAnchorGap);
         }
-        let expected_generation = self.external.generation;
-        let expected_digest = self.external.record_digest;
-        self.external.compare_and_advance(
+        let expected_generation = external.generation;
+        let expected_digest = external.record_digest;
+        external.compare_and_advance(
             expected_generation,
             expected_digest,
             &accepted,
@@ -441,9 +447,13 @@ impl WitnessModel {
         if fault == Some(FaultPoint::ExternalAnchorRace) {
             // A competing writer wins the external CAS after this local record
             // is committed. Preserve that state and refuse to overwrite it.
-            self.external.generation = candidate.generation;
-            self.external.record_digest = hash_bytes(b"competing-anchor-transition");
-            return self.external.compare_and_advance(
+            let external = self
+                .external
+                .as_mut()
+                .ok_or(Failure::ExternalAnchorUnavailable)?;
+            external.generation = candidate.generation;
+            external.record_digest = hash_bytes(b"competing-anchor-transition");
+            return external.compare_and_advance(
                 current.generation,
                 current.digest,
                 &candidate,
@@ -451,11 +461,14 @@ impl WitnessModel {
         }
         // Boundary 3: the external store must atomically compare the exact
         // previously retained generation/digest before it advances.
-        self.external.compare_and_advance(
-            current.generation,
-            current.digest,
-            &candidate,
-        )?;
+        self.external
+            .as_mut()
+            .ok_or(Failure::ExternalAnchorUnavailable)?
+            .compare_and_advance(
+                current.generation,
+                current.digest,
+                &candidate,
+            )?;
         if fault == Some(FaultPoint::AfterExternalAnchorAdvance) {
             return Err(Failure::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance));
         }
@@ -574,7 +587,7 @@ fn main() {
             FaultPoint::ExternalAnchorRace => {
                 assert_eq!(witness.recover(), Err(Failure::ExternalAnchorMismatch));
                 assert_ne!(
-                    witness.external.record_digest,
+                    witness.external.as_ref().expect("external anchor retained").record_digest,
                     witness.disk.records.last().expect("local candidate retained").digest
                 );
             }
@@ -623,7 +636,7 @@ fn main() {
     )
     .expect("trusted bootstrap");
     let old_snapshot = rollback.disk.clone();
-    let old_external = rollback.external.clone();
+    let old_external = rollback.external.clone().expect("external anchor retained");
     let predecessor = rollback.recover().expect("predecessor");
     rollback
         .advance(
@@ -635,10 +648,10 @@ fn main() {
             None,
         )
         .expect("advance witness");
-    let advanced_external = rollback.external.clone();
+    let advanced_external = rollback.external.clone().expect("advanced external anchor retained");
     rollback.disk = old_snapshot;
-    rollback.external = advanced_external;
-    assert_ne!(old_external.generation, rollback.external.generation);
+    rollback.external = Some(advanced_external.clone());
+    assert_ne!(old_external.generation, advanced_external.generation);
     assert_eq!(rollback.recover(), Err(Failure::RollbackDetected));
 
     // Fork evidence is retained independently and cannot change accepted state.
@@ -660,6 +673,34 @@ fn main() {
         fork_store.record_fork(5, hash_bytes(b"same"), hash_bytes(b"same")),
         Err(Failure::InvalidForkEvidence)
     );
+
+    // If the independently retained anti-rollback anchor is unavailable, the
+    // model must not commit locally or issue an attestation/fixture receipt.
+    let mut unavailable = WitnessModel::bootstrap(
+        "witness-anchor-unavailable",
+        "civ-log-v1",
+        initial_anchor,
+        4,
+        initial_tail,
+    )
+    .expect("trusted bootstrap");
+    let unavailable_predecessor = unavailable.recover().expect("trusted state");
+    let record_count_before = unavailable.disk.records.len();
+    unavailable.external = None;
+    assert_eq!(
+        unavailable.advance(
+            unavailable_predecessor.generation,
+            unavailable_predecessor.digest,
+            proposed_anchor,
+            5,
+            proposed_tail,
+            None,
+        ),
+        Err(Failure::ExternalAnchorUnavailable)
+    );
+    assert_eq!(unavailable.disk.records.len(), record_count_before);
+    assert_eq!(unavailable.recover(), Err(Failure::ExternalAnchorUnavailable));
+    assert_eq!(unavailable.reconcile_external_anchor(), Err(Failure::ExternalAnchorUnavailable));
 
     // Durable corruption and receipt rollback fail closed.
     let mut corrupt = WitnessModel::bootstrap(
