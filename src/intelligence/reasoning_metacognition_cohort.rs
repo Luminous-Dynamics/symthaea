@@ -683,9 +683,9 @@ fn validate_forecasts(
         if f.asserted {
             if f.answer_ref.is_none() || f.counterfactual_answer_ref.is_some() {
                 return Err(DecisionCohortError::new(format!(
-                    "asserted forecast {} requires answer_ref and forbids counterfactual_",
-                    "answer_ref",
-                    f.forecast_id
+                    "asserted forecast {} requires answer_ref and forbids counterfactual_{}",
+                    f.forecast_id,
+                    "answer_ref"
                 )));
             }
         } else if f.answer_ref.is_some() {
