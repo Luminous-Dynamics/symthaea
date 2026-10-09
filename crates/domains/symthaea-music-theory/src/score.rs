@@ -206,8 +206,10 @@ impl Score {
     pub fn melody_is_monophonic(&self) -> bool {
         let mel = self.voice(VoiceRole::Melody);
         mel.windows(2).all(|w| {
-            let end0 = (w[0].onset + w[0].duration).beats();
-            end0 <= w[1].onset.beats() + 1e-9
+            let Some(end0) = w[0].onset.checked_add(w[0].duration) else {
+                return false;
+            };
+            end0.beats() <= w[1].onset.beats() + 1e-9
         })
     }
 }
