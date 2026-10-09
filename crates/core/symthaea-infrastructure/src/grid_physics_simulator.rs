@@ -192,9 +192,10 @@ pub struct LoadServiceReport {
     pub battery_charge_stored_kwh: f64,
     /// Difference between AC input and stored DC energy.
     pub battery_charge_conversion_loss_kwh: f64,
-    /// Noncritical deficits are categorized as deliberate shed by the
-    /// deterministic guard; this remains explicit for consumers needing the
-    /// conventional critical/noncritical accounting split.
+    /// Noncritical demand that remained unserved despite being protected by
+    /// the guard. In this model that means thermally protected cooling that
+    /// the battery still could not serve; eligible noncritical deficits are
+    /// recorded separately as intentional shedding.
     pub noncritical_unserved_kwh: f64,
     /// True when an islanded command requested net charging but the plant has
     /// no modeled generation source to supply it.
