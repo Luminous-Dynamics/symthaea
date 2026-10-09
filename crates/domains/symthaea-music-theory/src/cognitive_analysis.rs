@@ -118,7 +118,10 @@ pub fn profile_score_region(
     let mut onset_count = 0usize;
     for note in &score.notes {
         let onset = note.onset.beats();
-        let note_end = (note.onset + note.duration).beats();
+        let Some(note_end_duration) = note.onset.checked_add(note.duration) else {
+            continue;
+        };
+        let note_end = note_end_duration.beats();
         // Zero- and negative-duration records are not sounding notes. Keep
         // the same positive-overlap contract as the temporal-state extractor.
         if note_end <= onset || note_end <= start_beats || onset >= end_beats {
@@ -133,11 +136,10 @@ pub fn profile_score_region(
         } else {
             note.onset
         };
-        let original_end = note.onset + note.duration;
         let clipped_end = if note_end > end_beats {
             end
         } else {
-            original_end
+            note_end_duration
         };
         let mut clipped = *note;
         clipped.onset = clipped_start;
@@ -239,7 +241,10 @@ fn mean_vertical_dissonance(notes: &[ScoreNote]) -> f32 {
             .iter()
             .filter(|note| {
                 note.onset.beats() <= event.beats()
-                    && (note.onset + note.duration).beats() > event.beats()
+                    && note
+                        .onset
+                        .checked_add(note.duration)
+                        .is_some_and(|note_end| note_end.beats() > event.beats())
             })
             .collect();
         for left in 0..active.len() {
