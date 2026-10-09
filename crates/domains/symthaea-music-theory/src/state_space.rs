@@ -33,7 +33,7 @@ const CONTOUR_BINS: usize = 3;
 const REGISTER_BINS: usize = 8;
 const RHYTHM_THRESHOLDS: [f64; RHYTHM_BINS - 1] = [0.25, 0.5, 1.0, 2.0];
 /// Bounds quadratic recurrence analysis and prevents tiny-hop resource exhaustion.
-const MAX_TRAJECTORY_FRAMES: usize = 4096;
+const MAX_TRAJECTORY_WINDOWS: usize = 4096;
 
 /// One temporal slice of a symbolic score.
 ///
@@ -163,22 +163,21 @@ impl MusicalStateTrajectory {
             });
         }
 
-        // Bound both possible stop conditions: the next hop can reach the score
-        // end before a short window does, or a wide window can cover the tail.
-        // Taking the minimum avoids rejecting an exact-limit trajectory when
-        // hop > window and the window-based estimate overcounts one start.
-        let hop_limited = (total / hop_beats).ceil();
-        let window_limited = ((total - window_beats).max(0.0) / hop_beats).ceil() + 1.0;
-        let estimated_frames = hop_limited.min(window_limited);
-        if !estimated_frames.is_finite() || estimated_frames > MAX_TRAJECTORY_FRAMES as f64 {
-            return Err(format!(
-                "hop_beats would produce more than {MAX_TRAJECTORY_FRAMES} trajectory frames"
-            ));
-        }
-
+        // Bound the generation loop directly instead of estimating its size
+        // with floating-point division. This avoids both off-by-one rejection
+        // at the exact budget and cumulative drift from repeated hop addition.
         let mut frames = Vec::new();
-        let mut start = 0.0;
-        while start < total {
+        let mut frame_index = 0usize;
+        loop {
+            let start = frame_index as f64 * hop_beats;
+            if start >= total {
+                break;
+            }
+            if frame_index >= MAX_TRAJECTORY_WINDOWS {
+                return Err(format!(
+                    "hop_beats would produce more than {MAX_TRAJECTORY_WINDOWS} trajectory windows"
+                ));
+            }
             let end = (start + window_beats).min(total);
             let notes = notes_in_window(score, start, end);
             if !notes.is_empty() {
@@ -194,7 +193,7 @@ impl MusicalStateTrajectory {
             if end >= total {
                 break;
             }
-            start += hop_beats;
+            frame_index += 1;
         }
 
         // Only earlier frames are allowed to influence recurrence/novelty.
