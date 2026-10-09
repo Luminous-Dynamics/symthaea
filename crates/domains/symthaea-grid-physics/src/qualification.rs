@@ -766,6 +766,7 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
 mod tests {
     use super::*;
     use crate::scheduling::{naive_greedy_policy, ReserveAwarePolicy};
+    use proptest::prelude::*;
 
     const TEST_POLICY_REVISION: &str = "0123456789abcdef0123456789abcdef01234567";
 
@@ -790,11 +791,14 @@ mod tests {
     fn frozen_corpus_uses_stable_ids_and_paired_policy_inputs() {
         let corpus = deterministic_energy_corpus();
         assert!(corpus.len() >= 6);
+        let replay_corpus = deterministic_energy_corpus();
+        assert_eq!(corpus.len(), replay_corpus.len());
         let mut ids = std::collections::BTreeSet::new();
-        for scenario in &corpus {
+        for (scenario, replayed) in corpus.iter().zip(&replay_corpus) {
             scenario.validate().unwrap();
             assert!(ids.insert(scenario.id.clone()), "duplicate scenario ID");
-            assert_eq!(scenario.input_digest(), scenario.input_digest());
+            assert_eq!(scenario.id, replayed.id);
+            assert_eq!(scenario.input_digest(), replayed.input_digest());
             let (baseline, candidate) = run_paired(scenario);
             assert_eq!(baseline.scenario_input_digest, candidate.scenario_input_digest);
             assert_eq!(baseline.scenario_id, candidate.scenario_id);
@@ -809,6 +813,46 @@ mod tests {
             assert!(candidate_verified.recomputed_unserved_energy_kwh >= 0.0);
             assert!(baseline_verified.recomputed_battery_cycles >= 0.0);
             assert!(candidate_verified.recomputed_battery_cycles >= 0.0);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn bounded_generated_profiles_produce_independently_verifiable_receipts(
+            load in prop::collection::vec(0.0f64..50.0, 4),
+            generation in prop::collection::vec(0.0f64..50.0, 4),
+        ) {
+            let scenario = FrozenEnergyScenario {
+                id: "bounded-generated-property-v1".into(),
+                dt_hours: 0.5,
+                total_hours: 2.0,
+                start_hour: 8.0,
+                battery: BatterySpec {
+                    capacity_kwh: 30.0,
+                    power_rating_kw: 15.0,
+                    round_trip_efficiency: 0.90,
+                    initial_soc: 0.50,
+                    degradation_per_cycle: 0.0002,
+                },
+                tariff: TariffSchedule {
+                    off_peak_price_per_kwh: 0.10,
+                    peak_price_per_kwh: 0.35,
+                    peak_start_hour: 17.0,
+                    peak_end_hour: 21.0,
+                    export_price_per_kwh: 0.05,
+                },
+                load_profile_kw: load,
+                generation_profile_kw: generation,
+                grid_available_by_step: vec![true, false, true, false],
+            };
+            let receipt = scenario
+                .run_policy("naive-greedy", TEST_POLICY_REVISION, naive_greedy_policy)
+                .unwrap();
+            let verified = scenario.verify_receipt(&receipt).unwrap();
+            prop_assert_eq!(verified.step_count, 4);
+            prop_assert!(verified.recomputed_unserved_energy_kwh >= 0.0);
+            prop_assert!(verified.recomputed_curtailed_energy_kwh >= 0.0);
+            prop_assert!(verified.recomputed_battery_cycles >= 0.0);
         }
     }
 
