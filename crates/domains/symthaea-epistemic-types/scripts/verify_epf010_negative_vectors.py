@@ -50,6 +50,32 @@ def canonical_bytes(receipt):
     for identity, digest in bindings:
         put_string(out, identity)
         put_string(out, digest)
+    if any(identity not in selected for identity, _ in bindings):
+        raise ValueError("UnselectedRepresentationIdentity")
+    if any(not any(bound == identity for bound, _ in bindings) for identity in selected):
+        raise ValueError("MissingRepresentationBinding")
+
+    projection_bindings = sorted(
+        tuple(pair) for pair in receipt["selected_projection_identity_digests"]
+    )
+    if any(not digest for _, digest in projection_bindings):
+        raise ValueError("EmptyProjectionIdentityDigest")
+    if len(projection_bindings) != len(set(projection_bindings)):
+        raise ValueError("DuplicateProjectionIdentityBinding")
+    if any(identity not in selected for identity, _ in projection_bindings):
+        raise ValueError("UnselectedProjectionIdentity")
+    if any(not any(bound == identity for bound, _ in projection_bindings) for identity in selected):
+        raise ValueError("MissingProjectionIdentityBinding")
+    if any(
+        sum(bound == identity for bound, _ in bindings)
+        != sum(bound == identity for bound, _ in projection_bindings)
+        for identity in selected
+    ):
+        raise ValueError("BindingCountMismatch")
+    out.extend(struct.pack(">I", len(projection_bindings)))
+    for identity, digest in projection_bindings:
+        put_string(out, identity)
+        put_string(out, digest)
 
     excluded = sorted(
         receipt["excluded"],
@@ -97,6 +123,8 @@ def verify(vector):
             actual = "CanonicalBytesMismatch"
         elif hashlib.sha256(encoded).hexdigest() != receipt["receipt_digest"]:
             actual = "DigestMismatch"
+        elif receipt["mode"] == "Historical" and not receipt.get("frontier_ref"):
+            actual = "InvalidRequest(MissingHistoricalFrontier)"
         else:
             actual = "Accepted"
 
