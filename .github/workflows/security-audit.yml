@@ -15,7 +15,7 @@ permissions:
 
 # Preserve scan history for each exact subject instead of canceling old evidence.
 concurrency:
-  group: security-audit-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  group: security-audit-${{ github.event.pull_request.number || github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
