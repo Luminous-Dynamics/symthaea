@@ -196,7 +196,12 @@ fn verify_receipt_suffix(
         if event.sequence != expected_sequence || event.previous_digest != rolling_digest {
             return Err(Failure::ReceiptSuffixInvalid);
         }
-        if receipt_event_digest(event.sequence, event.previous_digest, &event.body) != event.digest {
+        if receipt_event_digest(
+            event.sequence,
+            event.previous_digest,
+            &event.body,
+        ) != event.digest
+        {
             return Err(Failure::ReceiptSuffixInvalid);
         }
         rolling_digest = Some(event.digest);
@@ -880,6 +885,6 @@ fn main() {
     );
     assert_eq!(reconcile_local_chain(&events, &candidate), Ok(()));
 
-    println!("SYM-CIV-012 PASS: independent witness state detects anchored receipt-tail truncation and rejects rollback/forks.");
-    println!("Claim ceiling: in-memory fixture attestations only; no real signatures, durable witness state, network gossip, or production anti-rollback service.");
+    println!("SYM-CIV-012 PASS: witness anchors detect receipt-tail truncation, rollback, and forks.");
+    println!("Claim ceiling: fixture attestations only; no real signatures, durable state, or network service.");
 }
