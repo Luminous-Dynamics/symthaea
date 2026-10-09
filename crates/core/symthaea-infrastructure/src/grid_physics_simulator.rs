@@ -513,16 +513,6 @@ impl GridPhysicsInfrastructureSimulator {
         self.elapsed_s += dt;
         let dt_hours = dt / 3600.0;
 
-        // Charge/discharge are independent controller outputs, but a real
-        // battery cannot charge and discharge at once. Convert the pair to a
-        // signed net dispatch first, then execute at most one direction. This
-        // avoids phantom equivalent cycles and double-counted conversion loss
-        // when both learned outputs are positive.
-        let charge_command_frac = cmd.charge_bus().clamp(0.0, 1.0) as f64;
-        let discharge_command_frac = cmd.discharge_bus().clamp(0.0, 1.0) as f64;
-        let net_storage_command_frac = discharge_command_frac - charge_command_frac;
-        let charge_frac = (-net_storage_command_frac).max(0.0);
-        let discharge_frac = net_storage_command_frac.max(0.0);
         let cooling_frac = cmd.cooling_loop().clamp(0.0, 1.0) as f64;
         let heating_frac = cmd.heating_loop().clamp(0.0, 1.0) as f64;
         let north = cmd.torques[4].abs() as f64;
@@ -532,9 +522,39 @@ impl GridPhysicsInfrastructureSimulator {
         let routing_total = north + south + east + west;
         let is_islanded = routing_total < ISLANDING_ROUTING_THRESHOLD;
 
-        // ── Battery ───────────────────────────────────────────────────
+        // ── Explicit load model ───────────────────────────────────────
+        let community_load_kw = BASE_COMMUNITY_LOAD_KW
+            + LOAD_SWING_KW
+                * (0.5 + 0.5 * (2.0 * std::f64::consts::PI * self.elapsed_s / LOAD_PERIOD_S).sin())
+            + ROUTING_LOAD_SCALE_KW * routing_total;
+        let cooling_load_kw = cooling_frac * COOLING_RATED_KW;
+        let heating_load_kw = heating_frac * HEATING_RATED_KW;
+        let total_requested_load_kw = community_load_kw + cooling_load_kw + heating_load_kw;
+
+        // Charge/discharge are independent controller outputs, but a real
+        // battery cannot do both simultaneously. Net requests first, then
+        // apply a deterministic islanding interlock: this backend has no
+        // generation source model, so charging while islanded is prohibited.
+        // Also cap islanded discharge at requested local load; this model has
+        // no dump load or export path when the external tie is open.
+        let charge_command_frac = cmd.charge_bus().clamp(0.0, 1.0) as f64;
+        let discharge_command_frac = cmd.discharge_bus().clamp(0.0, 1.0) as f64;
+        let net_storage_command_frac = discharge_command_frac - charge_command_frac;
+        let charge_frac = if is_islanded {
+            0.0
+        } else {
+            (-net_storage_command_frac).max(0.0)
+        };
+        let discharge_frac = net_storage_command_frac.max(0.0);
         let charge_power_kw = charge_frac * self.battery.power_rating_kw;
-        let discharge_power_kw = discharge_frac * self.battery.power_rating_kw;
+        let requested_discharge_power_kw = discharge_frac * self.battery.power_rating_kw;
+        let discharge_power_kw = if is_islanded {
+            requested_discharge_power_kw.min(total_requested_load_kw)
+        } else {
+            requested_discharge_power_kw
+        };
+
+        // ── Battery ───────────────────────────────────────────────────
         let charge_accepted_dc_kwh = self
             .battery
             .charge(charge_power_kw, dt_hours)
@@ -555,16 +575,43 @@ impl GridPhysicsInfrastructureSimulator {
             0.0
         };
         let net_battery_injection_kw = discharge_delivered_ac_kw - actual_ac_kw_for_charge;
+        let battery_charge_input_kwh = actual_ac_kw_for_charge * dt_hours;
 
-        // ── Loads ─────────────────────────────────────────────────────
-        let community_load_kw = BASE_COMMUNITY_LOAD_KW
-            + LOAD_SWING_KW
-                * (0.5 + 0.5 * (2.0 * std::f64::consts::PI * self.elapsed_s / LOAD_PERIOD_S).sin())
-            + ROUTING_LOAD_SCALE_KW * routing_total;
-        let cooling_load_kw = cooling_frac * COOLING_RATED_KW;
-        let heating_load_kw = heating_frac * HEATING_RATED_KW;
-        let node_load_kw =
-            community_load_kw + cooling_load_kw + heating_load_kw - net_battery_injection_kw;
+        // Account each load bucket independently. In islanded mode the report
+        // is also the deterministic guard's explicit shed decision and service
+        // receipt. In grid-tied mode the idealized infinite bus serves demand.
+        let load_report = LoadServiceReport::allocate(
+            community_load_kw,
+            cooling_load_kw,
+            heating_load_kw,
+            self.state.channels[THERMAL_RUNAWAY_RISK],
+            dt_hours,
+            is_islanded,
+            discharge_delivered_ac_kwh,
+            battery_charge_input_kwh,
+        );
+        if !load_report.is_valid() {
+            return Err(GridPhysicsStepError::InvalidDerivedPhysics);
+        }
+        let shed_load_kw = if dt_hours > 0.0 {
+            load_report.intentional_shed_kwh / dt_hours
+        } else {
+            0.0
+        };
+        let connected_load_kw = (total_requested_load_kw - shed_load_kw).max(0.0);
+        let served_cooling_kw = if dt_hours > 0.0 {
+            load_report.cooling_served_kwh / dt_hours
+        } else {
+            0.0
+        };
+        let served_heating_kw = if dt_hours > 0.0 {
+            load_report.heating_served_kwh / dt_hours
+        } else {
+            0.0
+        };
+        let effective_cooling_frac = (served_cooling_kw / COOLING_RATED_KW).clamp(0.0, 1.0);
+        let effective_heating_frac = (served_heating_kw / HEATING_RATED_KW).clamp(0.0, 1.0);
+        let node_load_kw = connected_load_kw - net_battery_injection_kw;
 
         // ── Feeder solve ──────────────────────────────────────────────
         // While islanded, the "reference" the local bus is measured against
@@ -598,10 +645,10 @@ impl GridPhysicsInfrastructureSimulator {
         let branch_loss_kw = solution.estimate_branch_loss_kw(&feeder, 1);
 
         // ── Thermal ───────────────────────────────────────────────────
-        let heat_gain_kw = branch_loss_kw + heating_load_kw;
+        let heat_gain_kw = branch_loss_kw + served_heating_kw;
         let coolant_temp_c = self.state.channels[COOLANT_TEMP_C];
         let coolant_temp_c = (coolant_temp_c
-            + dt * (K_HEAT_TO_TEMP * heat_gain_kw - K_COOL * cooling_frac
+            + dt * (K_HEAT_TO_TEMP * heat_gain_kw - K_COOL * effective_cooling_frac
                 + K_AMBIENT * (AMBIENT_TEMP_C - coolant_temp_c)))
             .clamp(AMBIENT_TEMP_C - 10.0, 200.0);
         let thermal_runaway_risk = ((coolant_temp_c - AMBIENT_TEMP_C)
@@ -628,7 +675,7 @@ impl GridPhysicsInfrastructureSimulator {
 
         // ── Islanding / frequency ─────────────────────────────────────
         let current_frequency_hz = if is_islanded {
-            steady_state_frequency_after_islanding(&self.freq_droop, community_load_kw)
+            steady_state_frequency_after_islanding(&self.freq_droop, connected_load_kw)
         } else {
             NOMINAL_FREQUENCY_HZ
         };
@@ -647,20 +694,18 @@ impl GridPhysicsInfrastructureSimulator {
         };
         let islanding_capability = self.battery.soc();
 
-        // ── Unserved demand (only meaningful while islanded: grid-tied
-        // assumes an infinite-bus substation that always meets local load) ──
-        let unserved_demand_ratio = if is_islanded {
-            let community_demand_ac_kwh = community_load_kw * dt_hours;
-            let shortfall = (community_demand_ac_kwh - discharge_delivered_ac_kwh).max(0.0);
-            if community_demand_ac_kwh > 0.0 {
-                (shortfall / community_demand_ac_kwh).clamp(0.0, 1.0)
-            } else {
-                0.0
-            }
+        // Intentional shedding and involuntary unserved demand are
+        // separate metrics derived from the same last-step energy receipt.
+        let unserved_demand_ratio = if load_report.total_demand_kwh > 0.0 {
+            (load_report.total_unserved_kwh / load_report.total_demand_kwh).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        let shed_load_ratio = unserved_demand_ratio;
+        let shed_load_ratio = if load_report.total_demand_kwh > 0.0 {
+            (load_report.intentional_shed_kwh / load_report.total_demand_kwh).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         // ── grid_stress: voltage deviation + tie loading, both real ────
         let grid_stress = if is_islanded {
@@ -729,7 +774,7 @@ impl GridPhysicsInfrastructureSimulator {
         s[RELAY_HEALTH] = relay_health;
         s[VOLTAGE_STABILITY] = voltage_stability;
         s[COOLANT_TEMP_C] = coolant_temp_c;
-        s[8] = heating_frac;
+        s[8] = effective_heating_frac;
         s[9] = (s[9] + dt * 0.0005).clamp(0.0, 1.0);
         s[10] = north.clamp(0.0, 1.0);
         s[11] = south.clamp(0.0, 1.0);
@@ -742,13 +787,15 @@ impl GridPhysicsInfrastructureSimulator {
         s[COMMUNITY_DEMAND] = community_demand_normalized;
         s[BROWNOUT_RISK] = brownout_risk;
         s[SHED_LOAD_RATIO] = shed_load_ratio;
-        s[CRITICAL_LOAD_FRACTION] = 0.35;
+        s[CRITICAL_LOAD_FRACTION] =
+            load_report.critical_demand_kwh / (community_load_kw * dt_hours).max(f64::EPSILON);
         s[UNSERVED_DEMAND_RATIO] = unserved_demand_ratio;
         s[DEADLOCK_RISK] = deadlock_risk;
         s[ISLANDING_RISK] = islanding_risk;
         s[SERVICE_INTEGRITY] = service_integrity;
         s[RECOVERY_MARGIN] = recovery_margin;
         s[THERMAL_RUNAWAY_RISK] = thermal_runaway_risk;
+        self.last_load_service_report = load_report;
         Ok(())
     }
 }
