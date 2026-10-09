@@ -136,9 +136,6 @@ pub enum GridPhysicsStepError {
     InvalidDerivedPhysics,
 }
 
-/// Declared split of the synthetic community demand. The fractions are part
-/// of this simulation's explicit load model, not independent state-channel
-/// metadata. They must sum to one.
 /// Per-simulator load prioritization assumptions for the synthetic community
 /// profile. Ratios must be finite, each in [0, 1], sum to one, and retain a
 /// nonzero critical community fraction. These are model inputs, not a
@@ -169,7 +166,9 @@ impl LoadServicePolicy {
             self.deferrable_community_fraction,
             self.auxiliary_community_fraction,
         ];
-        fractions.iter().all(|value| value.is_finite() && (0.0..=1.0).contains(value))
+        fractions
+            .iter()
+            .all(|value| value.is_finite() && (0.0..=1.0).contains(value))
             && self.critical_community_fraction > 0.0
             && (fractions.iter().sum::<f64>() - 1.0).abs() <= 1e-9
             && self.protected_cooling_thermal_risk_threshold.is_finite()
@@ -1406,13 +1405,11 @@ mod failure_mode_tests {
             sim.state().channels[CRITICAL_LOAD_FRACTION]
         );
         let report = sim.load_service_report();
+        let community_demand_kwh = report.critical_demand_kwh
+            + report.deferrable_demand_kwh
+            + report.community_auxiliary_demand_kwh;
         assert!(
-            (report.critical_demand_kwh
-                / (report.critical_demand_kwh + report.deferrable_demand_kwh
-                    + report.community_auxiliary_demand_kwh)
-                - 0.60)
-                .abs()
-                < 1e-9
+            (report.critical_demand_kwh / community_demand_kwh - 0.60).abs() < 1e-9
         );
     }
 
