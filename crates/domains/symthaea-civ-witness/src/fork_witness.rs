@@ -8,9 +8,7 @@
 
 use crate::Digest;
 use sha2::{Digest as ShaDigest, Sha256};
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::Mutex;
 
 const FORK_EVENT_SCHEMA_VERSION: u16 = 1;
 const FORK_EVENT_DOMAIN: &[u8] = b"mycelix-civ014-fork-event-v1\0";
