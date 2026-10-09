@@ -400,24 +400,32 @@ pub struct EvaluationReceipt {
     pub observed_value: Option<OutcomeValue>,
 }
 
+struct EvaluationContext<'a> {
+    registry: &'a PredictionRegistry,
+    freeze_anchor: &'a RegistryFreezeAnchor,
+    registry_digest: String,
+    freeze_anchor_digest: String,
+    prediction: &'a TheoryPrediction,
+    observation: &'a Observation,
+}
+
 impl EvaluationReceipt {
     fn new(
-        registry: &PredictionRegistry,
-        freeze_anchor: &RegistryFreezeAnchor,
-        registry_digest: String,
-        freeze_anchor_digest: String,
-        prediction: &TheoryPrediction,
-        observation: &Observation,
+        context: &EvaluationContext<'_>,
         disposition: PredictionDisposition,
         reason: EvaluationReason,
         observed_value: Option<OutcomeValue>,
     ) -> Self {
+        let registry = context.registry;
+        let freeze_anchor = context.freeze_anchor;
+        let prediction = context.prediction;
+        let observation = context.observation;
         Self {
             schema_version: SCHEMA_VERSION_V1.to_owned(),
             registry_id: registry.registry_id.clone(),
-            registry_digest,
+            registry_digest: context.registry_digest.clone(),
             registered_registry_digest: freeze_anchor.registry_digest.clone(),
-            freeze_anchor_digest,
+            freeze_anchor_digest: context.freeze_anchor_digest.clone(),
             freeze_event_id: freeze_anchor.freeze_event_id.clone(),
             event_log_id: freeze_anchor.event_log_id.clone(),
             anchor_frozen_at_sequence: freeze_anchor.frozen_at_sequence,
@@ -499,15 +507,22 @@ pub fn evaluate_prediction(
         return Err(RegistryValidationError::ContextMismatch("experiment_id"));
     }
 
+    let context = EvaluationContext {
+        registry,
+        freeze_anchor,
+        registry_digest,
+        freeze_anchor_digest,
+        prediction,
+        observation,
+    };
     let no_value = None;
-    if anchor_mismatch(registry, freeze_anchor, &registry_digest) {
+    if anchor_mismatch(
+        context.registry,
+        context.freeze_anchor,
+        &context.registry_digest,
+    ) {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Inconclusive,
             EvaluationReason::RegistryFreezeMismatch,
             no_value,
@@ -515,12 +530,7 @@ pub fn evaluate_prediction(
     }
     if prediction.observable_id != observation.observable_id {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::NotApplicable,
             EvaluationReason::ObservableMismatch,
             no_value,
@@ -528,12 +538,7 @@ pub fn evaluate_prediction(
     }
     if prediction.condition_id != observation.condition_id {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::NotApplicable,
             EvaluationReason::ConditionMismatch,
             no_value,
@@ -541,12 +546,7 @@ pub fn evaluate_prediction(
     }
     if prediction.intervention_id != observation.intervention_id {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Inconclusive,
             EvaluationReason::InterventionMismatch,
             no_value,
@@ -554,12 +554,7 @@ pub fn evaluate_prediction(
     }
     if freeze_anchor.frozen_at_sequence >= observation.outcome_released_at_sequence {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Inconclusive,
             EvaluationReason::PredictionFrozenAfterOutcome,
             no_value,
@@ -567,12 +562,7 @@ pub fn evaluate_prediction(
     }
     if !observation.is_holdout {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Inconclusive,
             EvaluationReason::NotHeldOut,
             no_value,
@@ -583,12 +573,7 @@ pub fn evaluate_prediction(
         .satisfies(prediction.required_observability)
     {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::NotObservable,
             EvaluationReason::InsufficientObservability,
             no_value,
@@ -599,12 +584,7 @@ pub fn evaluate_prediction(
             ManipulationCheck::Passed => {}
             ManipulationCheck::Failed => {
                 return Ok(EvaluationReceipt::new(
-                    registry,
-                    freeze_anchor,
-                    registry_digest,
-                    freeze_anchor_digest,
-                    prediction,
-                    observation,
+                    &context,
                     PredictionDisposition::Inconclusive,
                     EvaluationReason::ManipulationCheckFailed,
                     no_value,
@@ -612,12 +592,7 @@ pub fn evaluate_prediction(
             }
             ManipulationCheck::Missing | ManipulationCheck::NotRequired => {
                 return Ok(EvaluationReceipt::new(
-                    registry,
-                    freeze_anchor,
-                    registry_digest,
-                    freeze_anchor_digest,
-                    prediction,
-                    observation,
+                    &context,
                     PredictionDisposition::Inconclusive,
                     EvaluationReason::ManipulationCheckMissing,
                     no_value,
@@ -627,12 +602,7 @@ pub fn evaluate_prediction(
     }
     if observation.confounds != ConfoundStatus::Clear {
         return Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Inconclusive,
             EvaluationReason::ConfoundDetected,
             no_value,
@@ -641,47 +611,27 @@ pub fn evaluate_prediction(
 
     match &observation.outcome {
         ObservationOutcome::NotCollected => Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::NotObservable,
             EvaluationReason::ObservationNotCollected,
             no_value,
         )),
         ObservationOutcome::Invalid => Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Inconclusive,
             EvaluationReason::ObservationMarkedInvalid,
             no_value,
         )),
         ObservationOutcome::Observed(actual) if actual == &prediction.expected => {
             Ok(EvaluationReceipt::new(
-                registry,
-                freeze_anchor,
-                registry_digest,
-                freeze_anchor_digest,
-                prediction,
-                observation,
+                &context,
                 PredictionDisposition::Supported,
                 EvaluationReason::ObservedMatch,
                 Some(actual.clone()),
             ))
         }
         ObservationOutcome::Observed(actual) => Ok(EvaluationReceipt::new(
-            registry,
-            freeze_anchor,
-            registry_digest,
-            freeze_anchor_digest,
-            prediction,
-            observation,
+            &context,
             PredictionDisposition::Challenged,
             EvaluationReason::ObservedMismatch,
             Some(actual.clone()),
