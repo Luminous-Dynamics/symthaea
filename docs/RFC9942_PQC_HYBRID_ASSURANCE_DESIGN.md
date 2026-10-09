@@ -147,7 +147,7 @@ Published ML-DSA signature-verification vectors are necessary but not sufficient
 The concrete ML-DSA-65 provider qualification corpus must therefore pin source revisions and SHA-256 digests and include, at minimum:
 
 - invalid signatures with repeated hint indices (the hint indices must be strictly increasing);
-- invalid signatures whose `z` coefficient reaches or exceeds `gamma_1 - beta`;
+- invalid signatures whose `z` vector has `||z||_∞ >= gamma_1 - beta`;
 - invalid signatures whose hint weight exceeds `omega`;
 - valid signatures immediately below the `gamma_1 - beta` boundary, so over-strict verifiers are detected as well as under-strict ones;
 - unmodified positive/negative known-answer vectors and cross-implementation checks against an independent implementation.
@@ -260,7 +260,7 @@ Instead, create a stacked follow-up qualification lane after #6737 obtains an un
 The hybrid qualification should include:
 
 1. RFC 9964 ML-DSA-65 known-answer vectors from an independent implementation, with pinned corpus revision and SHA-256 digests.
-2. Community negative vectors for repeated hint indices, hint-weight overflow, and `z)-norm violations at/above `gamma_1 - beta`.
+2. Community negative vectors for repeated hint indices, hint-weight overflow, and `||z||_∞ >= gamma_1 - beta` norm violations.
 3. Positive boundary vectors immediately below `gamma_1 - beta` to catch over-rejection.
 4. Positive and negative COSE interoperability vectors using the empty RFC 9964 context.
 5. Exact transcript-binding tests and classical-component tamper rejection.
