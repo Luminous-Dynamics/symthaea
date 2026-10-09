@@ -636,6 +636,30 @@ def verify_memory_lowering_contract(values: dict[str, str], lines: list[str], sp
 
     if set(profiles) != set(spec["initial"]):
         fail(f"{name}: resource memory profile set does not match fixture resources")
+
+    memory_types: dict[int, tuple[int, int]] = {}
+    memory_heaps: dict[int, tuple[int, int]] = {}
+    for resource, profile in profiles.items():
+        type_index = profile["memory_type_index"]
+        type_identity = (
+            profile["memory_property_flags"],
+            profile["memory_heap_index"],
+        )
+        previous_type = memory_types.get(type_index)
+        if previous_type is not None and previous_type != type_identity:
+            fail(f"{name}: shared memory type {type_index} has inconsistent properties at {resource}")
+        memory_types[type_index] = type_identity
+
+        heap_index = profile["memory_heap_index"]
+        heap_identity = (
+            profile["memory_heap_flags"],
+            profile["memory_heap_size"],
+        )
+        previous_heap = memory_heaps.get(heap_index)
+        if previous_heap is not None and previous_heap != heap_identity:
+            fail(f"{name}: shared memory heap {heap_index} has inconsistent properties at {resource}")
+        memory_heaps[heap_index] = heap_identity
+
     fields = [f"resource_profile_count:{len(profiles)}"]
     names = [
         "memory_type_index",
