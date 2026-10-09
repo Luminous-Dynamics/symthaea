@@ -1012,29 +1012,13 @@ mod tests {
 
     #[test]
     fn malformed_or_extreme_wire_durations_cannot_panic_temporal_extraction() {
-        // Serde's derived Duration deserializer accepts wire states that the
-        // public constructor would reject. The observation boundary must fail
-        // closed instead of dividing by zero or using overflowing i64 addition.
-        let zero_denominator: Duration =
-            serde_json::from_str(r#"{"num":1,"den":0}"#).unwrap();
-        let negative_denominator: Duration =
-            serde_json::from_str(r#"{"num":1,"den":-1}"#).unwrap();
+        // The Duration wire boundary itself rejects non-positive denominators.
+        // This separate score test ensures a valid but extremely large note end
+        // cannot overflow the old i64 addition path inside temporal extraction.
+        assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":0}"#).is_err());
+        assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":-1}"#).is_err());
 
         let mut s = score(&[note(0, 4, 0)], 0);
-        let mut invalid_onset = note(7, 4, 0);
-        invalid_onset.onset = zero_denominator;
-        s.notes.push(invalid_onset);
-
-        let mut invalid_duration = note(5, 4, 0);
-        invalid_duration.duration = zero_denominator;
-        s.notes.push(invalid_duration);
-
-        let mut negative_denominator_note = note(9, 4, 0);
-        negative_denominator_note.duration = negative_denominator;
-        s.notes.push(negative_denominator_note);
-
-        // This valid rational is too large for onset + duration's i64
-        // cross-products at onset=1, even though its f64 beat value is finite.
         let mut overflowing_sum = note(4, 4, 1);
         overflowing_sum.duration = Duration::new(i64::MAX, 1);
         s.notes.push(overflowing_sum);
@@ -1045,14 +1029,10 @@ mod tests {
         assert_eq!(trajectory.frames[0].event_count, 1);
         assert!(MusicalStateFrame::from_region(
             &s,
-            zero_denominator,
+            Duration::new(0, 1),
             Duration::new(1, 1)
         )
-        .is_none());
-
-        let mut invalid_total = s.clone();
-        invalid_total.total_beats = zero_denominator;
-        assert!(MusicalStateTrajectory::from_score(&invalid_total, 1.0, 1.0).is_err());
+        .is_some());
     }
 
     #[test]
