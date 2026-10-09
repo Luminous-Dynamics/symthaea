@@ -53,9 +53,9 @@ struct IndependentAnchor {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ForkEvidence {
-    tree_size: u64,
-    first_root: Hash,
-    conflicting_root: Hash,
+    generation: u64,
+    first_record_digest: Hash,
+    conflicting_record_digest: Hash,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -384,6 +384,35 @@ impl WitnessModel {
         }
     }
 
+    fn compare_external_and_record_conflict(
+        &mut self,
+        expected_generation: u64,
+        expected_digest: Hash,
+        candidate: &Record,
+    ) -> Result<(), Failure> {
+        let compare_result = {
+            let external = self
+                .external
+                .as_mut()
+                .ok_or(Failure::ExternalAnchorUnavailable)?;
+            external.compare_and_advance(expected_generation, expected_digest, candidate)
+        };
+        if compare_result.is_err() {
+            if let Some(external) = self.external.as_ref() {
+                if external.generation == candidate.generation
+                    && external.record_digest != candidate.digest
+                {
+                    self.record_fork(
+                        candidate.generation,
+                        external.record_digest,
+                        candidate.digest,
+                    )?;
+                }
+            }
+        }
+        compare_result
+    }
+
     fn advance(
         &mut self,
         expected_generation: u64,
@@ -447,13 +476,16 @@ impl WitnessModel {
         if fault == Some(FaultPoint::ExternalAnchorRace) {
             // A competing writer wins the external CAS after this local record
             // is committed. Preserve that state and refuse to overwrite it.
-            let external = self
-                .external
-                .as_mut()
-                .ok_or(Failure::ExternalAnchorUnavailable)?;
-            external.generation = candidate.generation;
-            external.record_digest = hash_bytes(b"competing-anchor-transition");
-            return external.compare_and_advance(
+            let competing_digest = hash_bytes(b"competing-anchor-transition");
+            {
+                let external = self
+                    .external
+                    .as_mut()
+                    .ok_or(Failure::ExternalAnchorUnavailable)?;
+                external.generation = candidate.generation;
+                external.record_digest = competing_digest;
+            }
+            return self.compare_external_and_record_conflict(
                 current.generation,
                 current.digest,
                 &candidate,
@@ -461,14 +493,11 @@ impl WitnessModel {
         }
         // Boundary 3: the external store must atomically compare the exact
         // previously retained generation/digest before it advances.
-        self.external
-            .as_mut()
-            .ok_or(Failure::ExternalAnchorUnavailable)?
-            .compare_and_advance(
-                current.generation,
-                current.digest,
-                &candidate,
-            )?;
+        self.compare_external_and_record_conflict(
+            current.generation,
+            current.digest,
+            &candidate,
+        )?;
         if fault == Some(FaultPoint::AfterExternalAnchorAdvance) {
             return Err(Failure::InjectedCrash(FaultPoint::AfterExternalAnchorAdvance));
         }
@@ -485,9 +514,9 @@ impl WitnessModel {
             return Err(Failure::InvalidForkEvidence);
         }
         self.disk.fork_evidence.push(ForkEvidence {
-            tree_size,
-            first_root,
-            conflicting_root,
+            generation: tree_size,
+            first_record_digest: first_root,
+            conflicting_record_digest: conflicting_root,
         });
         Ok(())
     }
@@ -588,6 +617,17 @@ fn main() {
                 assert_eq!(witness.recover(), Err(Failure::ExternalAnchorMismatch));
                 assert_ne!(
                     witness.external.as_ref().expect("external anchor retained").record_digest,
+                    witness.disk.records.last().expect("local candidate retained").digest
+                );
+                assert_eq!(witness.disk.fork_evidence.len(), 1);
+                let conflict = witness.disk.fork_evidence[0].clone();
+                assert_eq!(conflict.generation, initial.generation + 1);
+                assert_eq!(
+                    conflict.first_record_digest,
+                    witness.external.as_ref().expect("external anchor retained").record_digest
+                );
+                assert_eq!(
+                    conflict.conflicting_record_digest,
                     witness.disk.records.last().expect("local candidate retained").digest
                 );
             }
