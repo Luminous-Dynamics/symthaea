@@ -9,9 +9,9 @@
 //! chronology, or corpus separation; those properties require an independent verifier.
 
 use super::reasoning_metacognition::{
-    evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionObservation,
-    CorrectnessPrediction,
-    ForecastBaselineMethod, ForecastBaselineV1, MetacognitionEvaluationError, MetacognitionReport,
+    evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionDirection,
+    ConfidenceRevisionObservation, CorrectnessPrediction, ForecastBaselineMethod,
+    ForecastBaselineV1, MetacognitionEvaluationError, MetacognitionReport,
     WeakAssumptionObservation, FORECAST_BASELINE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
@@ -636,7 +636,9 @@ fn validate_forecasts(
         validate_optional_ref("answer_ref", f.answer_ref.as_deref())?;
         validate_optional_ref("counterfactual_answer_ref", f.counterfactual_answer_ref.as_deref())?;
         match (f.asserted || f.counterfactual_answer_ref.is_some(), f.predicted_probability) {
-            (true, Some(probability)) => validate_probability("predicted_probability", probability)?,
+            (true, Some(probability)) => {
+                validate_probability("predicted_probability", probability)?
+            }
             (true, None) => return Err(DecisionCohortError::new(format!(
                 "forecast {} references an answer but has no correctness probability",
                 f.forecast_id
@@ -763,7 +765,11 @@ fn risk_point(
 ) -> DecisionSelectiveRiskPoint {
     let selected: Vec<_> = rows
         .iter()
-        .filter(|(f, _)| f.asserted && f.predicted_probability.is_some_and(|probability| probability >= threshold))
+        .filter(|(f, _)| {
+            f.asserted
+                && f.predicted_probability
+                    .is_some_and(|probability| probability >= threshold)
+        })
         .collect();
     let n = selected.len();
     let errors = selected.iter().filter(|(_, o)| o.asserted_answer_correct == Some(false)).count();
@@ -1128,7 +1134,9 @@ pub fn evaluate_decision_cohort(
             .collect();
         let family_correctness_assumptions: Vec<_> = family_assumptions
             .iter()
-            .filter(|observation| family_scoreable_episode_ids.contains(observation.episode_id.as_str()))
+            .filter(|observation| {
+                family_scoreable_episode_ids.contains(observation.episode_id.as_str())
+            })
             .cloned()
             .collect();
         let family_correctness_revisions: Vec<_> = family_revisions
@@ -1529,7 +1537,7 @@ mod tests {
             after_episode_id: "e2".into(),
             before_confidence: 0.4,
             after_confidence: 0.7,
-            expected_direction: super::super::reasoning_metacognition::ConfidenceRevisionDirection::Increase,
+            expected_direction: ConfidenceRevisionDirection::Increase,
             stable_tolerance: 0.05,
         }];
         let frozen = freeze_decision_cohort_for_split_with_observations(
