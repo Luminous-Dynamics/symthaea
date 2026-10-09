@@ -8,6 +8,7 @@ on:
       - '.github/workflows/ci.yml'
       - '.github/workflows/civ-governance-smokes.yml'
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'Cargo.toml'
       - 'crates/domains/symthaea-lab/**'
