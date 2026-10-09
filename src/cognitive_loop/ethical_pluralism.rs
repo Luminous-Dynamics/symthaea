@@ -249,6 +249,29 @@ mod tests {
     }
 
     #[test]
+    fn unanimous_opposition_is_preserved() {
+        let result = compare_assessments(&[
+            assessment("care_ethics", FrameworkStance::OpposesAction),
+            assessment("rights_ethics", FrameworkStance::OpposesAction),
+        ]);
+        assert_eq!(result.state, ComparisonState::AgreementOpposes);
+        assert_eq!(result.counts.opposes, 2);
+        // Opposition is a framework-relative analysis, not an execution gate.
+    }
+
+    #[test]
+    fn comparison_state_is_independent_of_assessment_order() {
+        let a = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let b = assessment("rights_ethics", FrameworkStance::OpposesAction);
+        let forward = compare_assessments(&[a.clone(), b.clone()]);
+        let reverse = compare_assessments(&[b, a]);
+
+        assert_eq!(forward.state, reverse.state);
+        assert_eq!(forward.counts, reverse.counts);
+        assert_eq!(forward.state, ComparisonState::Disagreement);
+    }
+
+    #[test]
     fn duplicate_framework_version_invalidates_comparison() {
         let result = compare_assessments(&[
             assessment("care_ethics", FrameworkStance::SupportsAction),
