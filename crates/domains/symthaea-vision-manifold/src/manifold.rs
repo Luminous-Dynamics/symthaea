@@ -4680,6 +4680,10 @@ impl DelayedHorizonEvaluator {
         if !actual.as_slice().iter().all(|value| value.is_finite()) {
             return Err("encoded frame contains non-finite values".to_string());
         }
+        let next_elapsed = self.elapsed_seconds + dt as f64;
+        if !next_elapsed.is_finite() || next_elapsed <= self.elapsed_seconds {
+            return Err("horizon evaluator clock cannot advance by timestep".to_string());
+        }
         match self.hdc_dim {
             Some(expected) if expected != actual.dim() => {
                 return Err(format!(
@@ -4689,10 +4693,6 @@ impl DelayedHorizonEvaluator {
             }
             None => self.hdc_dim = Some(actual.dim()),
             _ => {}
-        }
-        let next_elapsed = self.elapsed_seconds + dt as f64;
-        if !next_elapsed.is_finite() || next_elapsed <= self.elapsed_seconds {
-            return Err("horizon evaluator clock cannot advance by timestep".to_string());
         }
         self.elapsed_seconds = next_elapsed;
 
@@ -6888,6 +6888,51 @@ mod tests {
 
         // Should be a no-op (no surprise contrast)
         assert_eq!(weights_before, weights_after);
+    }
+
+    #[test]
+    fn test_delayed_horizon_rejects_unrepresentable_clock_advance_atomically() {
+        let mut config = VisionConfig::default();
+        config.hdc_dim = 256;
+        let mut manifold = VisionManifold::new(config, 8, 8);
+        manifold
+            .observe_frame_checked(&vec![10; 64], 8, 8, 1, 0.01)
+            .unwrap();
+        let mut evaluator = DelayedHorizonEvaluator::default();
+        let mut checkpoint = evaluator.save_state();
+        checkpoint.elapsed_seconds = f64::MAX;
+        evaluator.load_state(&checkpoint).unwrap();
+        let before = evaluator.save_state();
+
+        assert!(evaluator.observe(&manifold, 0.01).is_err());
+        assert_eq!(evaluator.save_state(), before);
+    }
+
+    #[test]
+    fn test_delayed_horizon_v3_checkpoint_defaults_new_rejection_counter() {
+        let evaluator = DelayedHorizonEvaluator::default();
+        let mut encoded = serde_json::to_value(evaluator.save_state()).unwrap();
+        encoded["schema_version"] = serde_json::json!(3);
+        for accumulator in encoded["accumulators"].as_array_mut().unwrap() {
+            accumulator
+                .as_object_mut()
+                .unwrap()
+                .remove("rejected_forecasts");
+        }
+
+        let legacy: DelayedHorizonEvaluatorState = serde_json::from_value(encoded).unwrap();
+        let mut restored = DelayedHorizonEvaluator::default();
+        restored.load_state(&legacy).unwrap();
+        let migrated = restored.save_state();
+
+        assert_eq!(
+            migrated.schema_version,
+            DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION
+        );
+        assert!(migrated
+            .accumulators
+            .iter()
+            .all(|accumulator| accumulator.rejected_forecasts == 0));
     }
 
     #[test]
