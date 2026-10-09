@@ -216,6 +216,37 @@ impl PredictionRegistry {
     }
 }
 
+/// Independently recorded binding between a content-addressed registry and its
+/// freeze event. The evaluator verifies identity/digest consistency but cannot
+/// authenticate who recorded this anchor or when; that requires trusted event-log
+/// custody and signature/authority verification at the integration boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegistryFreezeAnchor {
+    pub registry_id: String,
+    pub registry_digest: String,
+    pub event_log_id: String,
+    pub freeze_event_id: String,
+    pub frozen_at_sequence: u64,
+}
+
+impl RegistryFreezeAnchor {
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        require_non_empty(&self.registry_id, "registry_id")?;
+        require_digest(&self.registry_digest, "registry_digest")?;
+        require_non_empty(&self.event_log_id, "event_log_id")?;
+        require_non_empty(&self.freeze_event_id, "freeze_event_id")
+    }
+
+    /// Content digest of this anchor. A digest does not authenticate the source.
+    pub fn canonical_digest(&self) -> Result<String, RegistryValidationError> {
+        self.validate()?;
+        let bytes =
+            serde_json::to_vec(self).map_err(|_| RegistryValidationError::SerializationFailed)?;
+        Ok(digest_bytes(&bytes))
+    }
+}
+
 /// What the experiment actually recorded. Missing/invalid data are explicit
 /// variants rather than being encoded as `OutcomeValue::Absent`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -325,6 +356,7 @@ pub enum EvaluationReason {
     ObservableMismatch,
     ConditionMismatch,
     InterventionMismatch,
+    RegistryFreezeMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -333,6 +365,11 @@ pub struct EvaluationReceipt {
     pub schema_version: String,
     pub registry_id: String,
     pub registry_digest: String,
+    pub registered_registry_digest: String,
+    pub freeze_anchor_digest: String,
+    pub freeze_event_id: String,
+    pub event_log_id: String,
+    pub anchor_frozen_at_sequence: u64,
     pub analysis_plan_digest: String,
     pub subject_id: String,
     pub experiment_id: String,
@@ -366,7 +403,9 @@ pub struct EvaluationReceipt {
 impl EvaluationReceipt {
     fn new(
         registry: &PredictionRegistry,
+        freeze_anchor: &RegistryFreezeAnchor,
         registry_digest: String,
+        freeze_anchor_digest: String,
         prediction: &TheoryPrediction,
         observation: &Observation,
         disposition: PredictionDisposition,
@@ -377,6 +416,11 @@ impl EvaluationReceipt {
             schema_version: SCHEMA_VERSION_V1.to_owned(),
             registry_id: registry.registry_id.clone(),
             registry_digest,
+            registered_registry_digest: freeze_anchor.registry_digest.clone(),
+            freeze_anchor_digest,
+            freeze_event_id: freeze_anchor.freeze_event_id.clone(),
+            event_log_id: freeze_anchor.event_log_id.clone(),
+            anchor_frozen_at_sequence: freeze_anchor.frozen_at_sequence,
             analysis_plan_digest: registry.analysis_plan_digest.clone(),
             subject_id: registry.subject_id.clone(),
             experiment_id: registry.experiment_id.clone(),
@@ -416,6 +460,16 @@ impl EvaluationReceipt {
     }
 }
 
+fn anchor_mismatch(
+    registry: &PredictionRegistry,
+    anchor: &RegistryFreezeAnchor,
+    registry_digest: &str,
+) -> bool {
+    anchor.registry_id != registry.registry_id
+        || anchor.registry_digest != registry_digest
+        || anchor.frozen_at_sequence != registry.frozen_at_sequence
+}
+
 /// Compare a frozen prediction against one already-captured observation.
 ///
 /// `Supported` means only “the declared operational outcome matched.” A valid
@@ -424,10 +478,12 @@ impl EvaluationReceipt {
 /// manipulation check failed/is missing, or a declared confound remains.
 pub fn evaluate_prediction(
     registry: &PredictionRegistry,
+    freeze_anchor: &RegistryFreezeAnchor,
     prediction: &TheoryPrediction,
     observation: &Observation,
 ) -> Result<EvaluationReceipt, RegistryValidationError> {
     let registry_digest = registry.canonical_digest()?;
+    let freeze_anchor_digest = freeze_anchor.canonical_digest()?;
     let frozen_prediction = registry.prediction(&prediction.prediction_id)?;
     if frozen_prediction != prediction {
         return Err(RegistryValidationError::PredictionNotInRegistry(
@@ -447,7 +503,9 @@ pub fn evaluate_prediction(
     if prediction.observable_id != observation.observable_id {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::NotApplicable,
@@ -458,7 +516,9 @@ pub fn evaluate_prediction(
     if prediction.condition_id != observation.condition_id {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::NotApplicable,
@@ -469,7 +529,9 @@ pub fn evaluate_prediction(
     if prediction.intervention_id != observation.intervention_id {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::Inconclusive,
@@ -477,10 +539,25 @@ pub fn evaluate_prediction(
             no_value,
         ));
     }
-    if registry.frozen_at_sequence >= observation.outcome_released_at_sequence {
+    if anchor_mismatch(registry, freeze_anchor, &registry_digest) {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
+            prediction,
+            observation,
+            PredictionDisposition::Inconclusive,
+            EvaluationReason::RegistryFreezeMismatch,
+            no_value,
+        ));
+    }
+    if freeze_anchor.frozen_at_sequence >= observation.outcome_released_at_sequence {
+        return Ok(EvaluationReceipt::new(
+            registry,
+            freeze_anchor,
+            registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::Inconclusive,
@@ -491,7 +568,9 @@ pub fn evaluate_prediction(
     if !observation.is_holdout {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::Inconclusive,
@@ -505,7 +584,9 @@ pub fn evaluate_prediction(
     {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::NotObservable,
@@ -541,7 +622,9 @@ pub fn evaluate_prediction(
     if observation.confounds != ConfoundStatus::Clear {
         return Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::Inconclusive,
@@ -553,7 +636,9 @@ pub fn evaluate_prediction(
     match &observation.outcome {
         ObservationOutcome::NotCollected => Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::NotObservable,
@@ -562,7 +647,9 @@ pub fn evaluate_prediction(
         )),
         ObservationOutcome::Invalid => Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::Inconclusive,
@@ -572,7 +659,9 @@ pub fn evaluate_prediction(
         ObservationOutcome::Observed(actual) if actual == &prediction.expected => {
             Ok(EvaluationReceipt::new(
                 registry,
+                freeze_anchor,
                 registry_digest,
+                freeze_anchor_digest,
                 prediction,
                 observation,
                 PredictionDisposition::Supported,
@@ -582,7 +671,9 @@ pub fn evaluate_prediction(
         }
         ObservationOutcome::Observed(actual) => Ok(EvaluationReceipt::new(
             registry,
+            freeze_anchor,
             registry_digest,
+            freeze_anchor_digest,
             prediction,
             observation,
             PredictionDisposition::Challenged,
@@ -769,6 +860,25 @@ mod tests {
         }
     }
 
+    fn freeze_anchor(registry: &PredictionRegistry) -> RegistryFreezeAnchor {
+        RegistryFreezeAnchor {
+            registry_id: registry.registry_id.clone(),
+            registry_digest: registry.canonical_digest().expect("registry digest"),
+            event_log_id: "event-log-fixture-001".to_owned(),
+            freeze_event_id: "freeze-event-fixture-001".to_owned(),
+            frozen_at_sequence: registry.frozen_at_sequence,
+        }
+    }
+
+    fn evaluate_registered(
+        registry: &PredictionRegistry,
+        prediction: &TheoryPrediction,
+        observation: &Observation,
+    ) -> Result<EvaluationReceipt, RegistryValidationError> {
+        let anchor = freeze_anchor(registry);
+        evaluate_prediction(registry, &anchor, prediction, observation)
+    }
+
     fn observation() -> Observation {
         Observation {
             observation_id: "observation-001".to_owned(),
@@ -796,8 +906,8 @@ mod tests {
         let registry = registry(vec![iit.clone(), gnwt.clone()]);
         let observation = observation();
 
-        let first = evaluate_prediction(&registry, &gnwt, &observation).expect("valid evaluation");
-        let second = evaluate_prediction(&registry, &iit, &observation).expect("valid evaluation");
+        let first = evaluate_registered(&registry, &gnwt, &observation).expect("valid evaluation");
+        let second = evaluate_registered(&registry, &iit, &observation).expect("valid evaluation");
 
         assert_eq!(first.disposition, PredictionDisposition::Supported);
         assert_eq!(second.disposition, PredictionDisposition::Challenged);
@@ -825,7 +935,7 @@ mod tests {
         let observation = observation();
 
         assert_eq!(
-            evaluate_prediction(&registry, &first, &observation).unwrap().disposition,
+            evaluate_registered(&registry, &first, &observation).unwrap().disposition,
             PredictionDisposition::Supported
         );
         assert_eq!(
@@ -841,7 +951,7 @@ mod tests {
         let registry = registry(vec![p.clone()]);
         let observation = observation();
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::NotObservable);
         assert_eq!(receipt.observed_value, None);
     }
@@ -858,7 +968,7 @@ mod tests {
         observation.intervention_id = Some("lesion-broadcast-v1".to_owned());
         observation.manipulation_check = ManipulationCheck::Failed;
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
         assert_eq!(receipt.reason, EvaluationReason::ManipulationCheckFailed);
     }
@@ -870,7 +980,7 @@ mod tests {
         registry.frozen_at_sequence = 21;
         let observation = observation();
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
         assert_eq!(receipt.reason, EvaluationReason::PredictionFrozenAfterOutcome);
     }
@@ -892,7 +1002,7 @@ mod tests {
         let mut observation = observation();
         observation.confounds = ConfoundStatus::EvaluatorAwarenessDetected;
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
         assert_eq!(receipt.reason, EvaluationReason::ConfoundDetected);
     }
@@ -911,7 +1021,7 @@ mod tests {
         observation.outcome =
             ObservationOutcome::Observed(OutcomeValue::Category("0.9".to_owned()));
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         // The only positive disposition is scoped to the literal operational
         // prediction. The API contains no "conscious" or "non-conscious" result.
         assert_eq!(receipt.disposition, PredictionDisposition::Supported);
@@ -926,7 +1036,7 @@ mod tests {
         observation.subject_id.clear();
 
         assert_eq!(
-            evaluate_prediction(&registry, &p, &observation),
+            evaluate_registered(&registry, &p, &observation),
             Err(RegistryValidationError::EmptyField("subject_id"))
         );
         let unknown = serde_json::from_str::<ObservabilityTier>(r#""unknown_tier""#);
@@ -965,7 +1075,7 @@ mod tests {
         let mut observation = observation();
         observation.outcome = ObservationOutcome::NotCollected;
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::NotObservable);
         assert_eq!(receipt.reason, EvaluationReason::ObservationNotCollected);
         assert_eq!(receipt.observed_value, None);
@@ -1035,7 +1145,7 @@ mod tests {
         observation.intervention_id = Some("sham-v1".to_owned());
         observation.manipulation_check = ManipulationCheck::Passed;
 
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
         assert_eq!(receipt.reason, EvaluationReason::InterventionMismatch);
     }
@@ -1046,7 +1156,7 @@ mod tests {
         let registry = registry(vec![p.clone()]);
         let mut observation = observation();
         observation.is_holdout = false;
-        let receipt = evaluate_prediction(&registry, &p, &observation).unwrap();
+        let receipt = evaluate_registered(&registry, &p, &observation).unwrap();
         assert_eq!(receipt.disposition, PredictionDisposition::Inconclusive);
         assert_eq!(receipt.reason, EvaluationReason::NotHeldOut);
     }
