@@ -57,7 +57,11 @@ Therefore, **do not qualify mixed asserted/abstained batches through the current
 - abstention opportunity cost must be reported as unavailable unless a separately frozen candidate answer and independently verified counterfactual outcome make that quantity well-defined;
 - no baseline comparison may treat an abstention as an ordinary correct/incorrect answer.
 
-Issue #7292 requires a versioned outcome/eligibility contract, separate scored-assertion and episode denominators, zero-assertion family handling, exact-cohort baseline comparisons, and regression coverage. Close that gap only after those behaviors pass exact-head CI. This limitation does not invalidate the existing all-asserted fixtures; it bounds what can be claimed from the v1 path.
+Issue #7292 requires a versioned outcome/eligibility contract, separate scored-assertion and episode denominators, zero-assertion family handling, exact-cohort baseline comparisons, and regression coverage. Close that gap only after those behaviors pass exact-head CI.
+
+The legacy combined-input `evaluate_metacognition` API has the same ambiguity for mixed cohorts: it computes correctness metrics across every `CorrectnessPrediction` and infers abstention opportunity cost from the row's generic `correct` bit. Retain that API for compatibility and diagnostics, but do not submit its mixed asserted/abstained outputs as qualification evidence unless the outcome semantics are separately established. The new prospective API is the preferred path for qualification and now rejects abstentions until #7292's versioned eligibility/outcome contract is implemented.
+
+This limitation does not invalidate the existing all-asserted fixtures; it bounds what can be claimed from the current path.
 
 ## Rejection and acceptance gates
 
