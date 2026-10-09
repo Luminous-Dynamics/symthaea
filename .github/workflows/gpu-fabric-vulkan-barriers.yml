@@ -97,6 +97,7 @@ jobs:
             echo "validation_layer=VK_LAYER_KHRONOS_validation"
             echo "validation_sync_requested=VK_LAYER_VALIDATE_SYNC=1"
             echo "validation_sync_env=VK_LAYER_VALIDATE_SYNC"
+            echo "validation_sync_activation=not_proven_without_hazard_sentinel"
             rustc -Vv
             cargo -V
             gdb --version | head -n 1
@@ -138,7 +139,7 @@ jobs:
           EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -o pipefail
-          timeout --foreground --kill-after=15s 60s python3 qualification-independent-verifier.py --runtime qualification-runtime.txt --environment qualification-environment.txt --source-sha256 source-sha256.txt --lock Cargo.lock --lock-sha256 dependency-lock.sha256 --metadata metadata.json --cargo-toml Cargo.toml --package-versions vulkan-package-versions.txt --input-sha256 qualification-input-sha256.txt --expected-commit "$EXPECTED_QUALIFICATION_SHA" 2>&1 | tee qualification-independent-verifier.txt
+          timeout --foreground --kill-after=15s 60s python3 qualification-independent-verifier.py --runtime qualification-runtime.txt --environment qualification-environment.txt --source-sha256 source-sha256.txt --lock Cargo.lock --lock-sha256 dependency-lock.sha256 --metadata metadata.json --cargo-toml Cargo.toml --package-versions vulkan-package-versions.txt --input-sha256 qualification-input-sha256.txt --workflow "${GITHUB_WORKSPACE}/.github/workflows/gpu-fabric-vulkan-barriers.yml" --expected-commit "$EXPECTED_QUALIFICATION_SHA" 2>&1 | tee qualification-independent-verifier.txt
       - name: Capture native crash backtrace
         if: ${{ failure() && (steps.runtime_preflight.outcome == 'failure' || steps.execute_runtime.outcome == 'failure') }}
         working-directory: .ci/gpu-fabric-workspace
