@@ -950,7 +950,10 @@ mod tests {
         let reordered = registry(vec![b, a.clone()]);
         assert_eq!(first.canonical_digest().unwrap(), reordered.canonical_digest().unwrap());
 
-        let changed = registry(vec![prediction("p-a", "theory-a", OutcomeValue::Absent), a]);
+        let changed = registry(vec![
+            prediction("p-a", "theory-a", OutcomeValue::Absent),
+            prediction("p-b", "theory-b", OutcomeValue::Absent),
+        ]);
         assert_ne!(first.canonical_digest().unwrap(), changed.canonical_digest().unwrap());
     }
 
