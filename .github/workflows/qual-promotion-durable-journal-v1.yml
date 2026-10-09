@@ -1,0 +1,56 @@
+name: QUAL durable promotion journal v1
+
+on:
+  push:
+    branches:
+      - qual/promotion-durable-journal-v1
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  durable-journal:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the exact triggering PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact checkout identity
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "Luminous-Dynamics/symthaea"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test -f scripts/qualify_promotion_durable_journal_v1.py
+          echo "tested_head=$EXPECTED_HEAD" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compile reference and adversarial corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/validate_promotion_reservation_v1.py \
+            scripts/qualify_promotion_durable_journal_v1.py
+
+      - name: Run durable journal adversarial corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/qualify_promotion_durable_journal_v1.py 2>&1 | tee /tmp/durable-promotion-journal.out
+          {
+            echo
+            echo "claim_ceiling=durable local SQLite journal reference model only"
+            echo "promotion_authority=false"
+            echo "provider_dispatch=not invoked"
+            echo
+            cat /tmp/durable-promotion-journal.out
+          } >> "$GITHUB_STEP_SUMMARY"
