@@ -628,7 +628,7 @@
         ],
         "excluded": [
           {
-            "canonical_identity": " \\t\\n",
+            "canonical_identity": " \t\n",
             "reason": "PostFrontier"
           }
         ],
@@ -640,7 +640,7 @@
             "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
           ]
         ],
-        "receipt_digest": "60d3650bfa00a297a0f95785b532181e3e583d061f3cf7adb0f98f8117b6a04d"
+        "receipt_digest": "660397d0d890294e51932ce20a0c0ec8b5a8ede34c60073e5b70191e3acaf252"
       }
     },
     {
@@ -662,7 +662,7 @@
         ],
         "excluded": [
           {
-            "canonical_identity": "claim:\\ninvalid",
+            "canonical_identity": "claim:\ninvalid",
             "reason": "PostFrontier"
           }
         ],
@@ -674,7 +674,7 @@
             "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
           ]
         ],
-        "receipt_digest": "7b4f0f19bf333e2440ee1d82a859499b3ee90301bafbe046490189495be322d1"
+        "receipt_digest": "0aad0c5ace1517cd3c206216f51d569536034b9d11715d0e5b5f2aa1155919b9"
       }
     }
   ]
