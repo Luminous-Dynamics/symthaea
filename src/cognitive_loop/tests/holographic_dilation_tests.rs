@@ -166,6 +166,13 @@ mod tests {
 
         assert_eq!(movie.frames.len(), 16);
         assert_eq!(movie.path_length, 16);
+        assert_eq!(movie.trajectory.len(), 16);
+        assert!(
+            movie.trajectory.iter().all(|state| {
+                state.dim() > 0 && state.values.iter().all(|value| value.is_finite())
+            }),
+            "Imagination must not return malformed or non-finite latent states"
+        );
         assert!(
             service.thermodynamic_load() > initial_thermo,
             "Thermodynamic load should increase after imagination"
@@ -176,4 +183,94 @@ mod tests {
         let expected_len = (64 * 64 * movie.channels) as usize;
         assert_eq!(movie.frames[0].len(), expected_len);
     }
+
+    #[test]
+    fn test_imagine_future_charges_incremental_not_lifetime_compute_cost() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_vision_manifold = true;
+        let mut service = CognitiveLoopService::new(config).unwrap();
+        {
+            let bridge = service
+                .sensorimotor
+                .vision_sensory
+                .vision_bridge
+                .as_mut()
+                .unwrap();
+            bridge.manifold_mut().observe_frame(
+                &vec![128u8; 64 * 64 * 3],
+                64,
+                64,
+                3,
+                0.033,
+            );
+        }
+
+        let initial = service.thermodynamic_load();
+        service
+            .imagine_future(1)
+            .expect("first one-step imagination should succeed");
+        let after_first = service.thermodynamic_load();
+        service
+            .imagine_future(1)
+            .expect("second one-step imagination should succeed");
+        let after_second = service.thermodynamic_load();
+
+        let first_cost = after_first - initial;
+        let second_cost = after_second - after_first;
+        assert!(first_cost > 0.0);
+        assert!(
+            (first_cost - second_cost).abs() < 1e-5,
+            "equal one-step calls should charge equal incremental cost, got {first_cost} then {second_cost}"
+        );
+    }
+
+    #[test]
+    fn test_imagine_future_rejects_over_budget_before_simulating() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_vision_manifold = true;
+        let mut service = CognitiveLoopService::new(config).unwrap();
+        {
+            let bridge = service
+                .sensorimotor
+                .vision_sensory
+                .vision_bridge
+                .as_mut()
+                .unwrap();
+            bridge.manifold_mut().observe_frame(
+                &vec![128u8; 64 * 64 * 3],
+                64,
+                64,
+                3,
+                0.033,
+            );
+        }
+
+        service.thermodynamic_load = 0.94;
+        let cost_before = service
+            .sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .unwrap()
+            .manifold()
+            .geodesic_compute_cost;
+
+        assert!(service.imagine_future(16).is_err());
+        assert_eq!(service.thermodynamic_load(), 0.94);
+
+        let cost_after = service
+            .sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .unwrap()
+            .manifold()
+            .geodesic_compute_cost;
+        assert_eq!(
+            cost_after,
+            cost_before,
+            "an over-budget request must be rejected before running the model rollout or path search"
+        );
+    }
+
 }
