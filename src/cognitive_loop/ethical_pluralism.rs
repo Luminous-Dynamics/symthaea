@@ -133,7 +133,9 @@ impl AssessmentSubject {
         scenario_bytes: &[u8],
         candidate_action_bytes: &[u8],
     ) -> bool {
-        !scenario_bytes.is_empty()
+        !self.context_schema_id.trim().is_empty()
+            && !self.context_schema_version.trim().is_empty()
+            && !scenario_bytes.is_empty()
             && !candidate_action_bytes.is_empty()
             && self.scenario_digest
                 == domain_separated_digest(
@@ -590,6 +592,8 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
             }
         }
         for (field, value) in [
+            ("subject.context_schema_id", assessment.subject.context_schema_id.as_str()),
+            ("subject.context_schema_version", assessment.subject.context_schema_version.as_str()),
             ("subject.scenario_ref", assessment.subject.scenario_ref.as_str()),
             ("subject.scenario_digest", assessment.subject.scenario_digest.as_str()),
             ("subject.candidate_action_ref", assessment.subject.candidate_action_ref.as_str()),
@@ -607,6 +611,8 @@ fn validate_assessments(assessments: &[FrameworkAssessment]) -> Vec<String> {
                     continue;
                 };
                 for (field, value) in [
+                    ("provenance.source_subject.context_schema_id", source_subject.context_schema_id.as_str()),
+                    ("provenance.source_subject.context_schema_version", source_subject.context_schema_version.as_str()),
                     ("provenance.source_subject.scenario_ref", source_subject.scenario_ref.as_str()),
                     ("provenance.source_subject.scenario_digest", source_subject.scenario_digest.as_str()),
                     ("provenance.source_subject.candidate_action_ref", source_subject.candidate_action_ref.as_str()),
@@ -783,6 +789,35 @@ mod tests {
 
         assert_ne!(original.scenario_digest, changed_scenario.scenario_digest);
         assert_ne!(original.candidate_action_digest, changed_action.candidate_action_digest);
+    }
+
+    #[test]
+    fn canonical_subject_verifier_rejects_missing_schema_identity() {
+        let mut subject = AssessmentSubject::from_canonical_bytes(
+            "symthaea.ethics.context",
+            "v1",
+            "scenario:one",
+            b"scenario",
+            "action:one",
+            b"action",
+        ).unwrap();
+        subject.context_schema_id.clear();
+        assert!(!subject.matches_canonical_bytes(b"scenario", b"action"));
+
+        subject.context_schema_id = "symthaea.ethics.context".to_owned();
+        subject.context_schema_version.clear();
+        assert!(!subject.matches_canonical_bytes(b"scenario", b"action"));
+    }
+
+    #[test]
+    fn manually_constructed_subject_without_schema_fails_comparison() {
+        let mut item = assessment("care_ethics", FrameworkStance::SupportsAction);
+        item.subject.context_schema_version.clear();
+        item.provenance.source_subject = Some(item.subject.clone());
+
+        let result = compare_assessments(&[item]);
+        assert_eq!(result.state, ComparisonState::InvalidInput);
+        assert!(result.validation_errors.iter().any(|e| e.contains("context_schema_version")));
     }
 
     #[test]
