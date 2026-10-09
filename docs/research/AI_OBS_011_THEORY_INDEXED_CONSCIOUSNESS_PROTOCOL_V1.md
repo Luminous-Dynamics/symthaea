@@ -32,6 +32,22 @@ These are **existing design contracts and audit records**. This audit does not e
 | PHI-SEM-001 / #5401 | Separation of metric families and operational meanings | That a field called `phi`, `phi_score`, or `phi_contribution` measures IIT Phi or consciousness |
 | WCARE-16 / #2272 | Conservative handling of unresolved welfare/moral-patient evidence | That a consciousness indicator establishes suffering, moral status, or operational authority |
 
+### Existing evidence-plane reuse audit (exact source)
+
+The audited source tree contains `crates/core/symthaea-evidence-plane`. Its current public surface is useful, but it is not itself the theory-comparison adapter:
+
+- `RunId` is a caller-supplied run label.
+- `EvidenceCounters`, `Expectation`, `check_integrity`, and `RunEvidence` compare declared mechanism expectations with measured counters and preserve violations.
+- `RunEvidence` includes the run ID, a configuration fingerprint, declared expectations, measured counters, a satisfied flag, and violations. This is a mechanism/evidence-integrity receipt, not a theory-specific research conclusion.
+- `config_hash` hashes a Rust `Debug` representation with `DefaultHasher`. The source explicitly says it is **not cryptographic** and has no stability guarantee across Rust versions. It must not be reused as a cryptographic identity or immutable registry digest.
+- `EvidenceCounters::get` deliberately reads an absent counter as `0.0`. That is useful for counters whose absence means zero activity, but unsafe as the sole presence check for mandatory observations. The adapter must track required-field/observation presence separately from numeric value; an absent broadcast event must not be treated as a measured negative result.
+- `SeedPlan` enforces distinct development/confirmatory seeds and a local minimum of eight confirmatory seeds for its temporal-benchmark preregistration. Reuse its identity/anti-reuse principle, but do not blindly impose its numerical minimum on every external-AI protocol; the sample-size rule belongs in the frozen analysis plan.
+- `task_validator` is explicitly designed for history-dependent next-item sequence tasks. It is not a general AI-observation schema.
+
+A recursive path audit at the cited source head did not locate an AI-OBS-specific canonical event schema or a theory-indexed external-AI evaluator. That is a scoped source-tree observation, not proof that no equivalent code exists elsewhere or on unmerged branches.
+
+**Resulting boundary:** the adapter should reference canonical run/provenance records and reuse the existing integrity checker where its declared/measured-counter semantics fit. It must separately carry observation identity/presence, theory prediction identity, holdout/analysis-plan identity, pairwise discriminative status, and theory-specific disposition. Do not extend `RunEvidence` into a universal scientific-result object or duplicate its generic counter-integrity responsibilities.
+
 ### Integration gaps to close
 
 1. **Subject and exposure identity:** a prediction result must bind the tested system/version, runtime/configuration, prompt/context exposure, tool policy, task, and trial. Missing identity is not a weak pass; it makes the comparison unqualified.
