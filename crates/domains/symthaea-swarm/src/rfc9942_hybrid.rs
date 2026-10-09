@@ -665,9 +665,9 @@ fn digest_hybrid_capability(
 mod tests {
     use super::*;
     use crate::semantic_evidence_vds::{
-        Rfc9162InclusionProof, Rfc9942ProofKind, Rfc9942ReceiptEnvelope,
-        Rfc9942ReceiptPayload, Rfc9942Vdp, Rfc9162Sha256Vds,
-        COSE_EDDSA_ALGORITHM_ID, COSE_ES256_ALGORITHM_ID,
+        Rfc9942ProofKind, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload,
+        Rfc9942Vdp, Rfc9162Sha256Vds, COSE_EDDSA_ALGORITHM_ID,
+        COSE_ES256_ALGORITHM_ID,
     };
     use ring::{
         rand::SystemRandom,
