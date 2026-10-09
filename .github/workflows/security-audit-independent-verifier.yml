@@ -1,0 +1,66 @@
+name: Security Audit Independent Verifier
+
+on:
+  workflow_run:
+    workflows:
+      - Security Audit
+    types: [requested, in_progress, completed]
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: "Completed audit workflow run ID to independently replay"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: security-audit-independent-${{ github.event.workflow_run.head_sha || inputs.workflow_run_id || github.ref }}-${{ github.event.workflow_run.id || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify exact audit run and evidence
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Check out verifier from the trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Test verifier invariants
+        id: self_tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/verify_security_audit_trust_anchor.py
+          python3 -m unittest discover -s .github/scripts -p 'test_verify_security_audit_trust_anchor.py' -v
+
+      - name: Verify run identity, trusted source, artifact digest, and verdict
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TRUST_ANCHOR_MODE: ${{ github.event_name }}
+          TRIGGER_ACTIVITY_TYPE: ${{ github.event.action }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
+          VERIFIER_TEST_OUTCOME: ${{ steps.self_tests.outcome }}
+        shell: bash
+        run: python3 .github/scripts/verify_security_audit_trust_anchor.py
