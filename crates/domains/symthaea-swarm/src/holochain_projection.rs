@@ -623,6 +623,32 @@ mod tests {
             .hybrid_assurance.as_mut().unwrap()
             .hybrid_capability_sha256[0] ^= 1;
         assert_ne!(before, projected.canonical_bytes().unwrap());
+        let retained_hybrid = projected
+            .receipt_selection
+            .as_ref()
+            .unwrap()
+            .hybrid_assurance
+            .clone()
+            .unwrap();
+
+        let mut wrong_algorithm = anchor();
+        wrong_algorithm
+            .receipt_selection
+            .as_mut()
+            .unwrap()
+            .hybrid_assurance = Some(retained_hybrid.clone());
+        wrong_algorithm
+            .receipt_selection
+            .as_mut()
+            .unwrap()
+            .hybrid_assurance
+            .as_mut()
+            .unwrap()
+            .classical_algorithm_id = -8;
+        assert_eq!(
+            wrong_algorithm.validate(),
+            Err(HolochainProjectionError::InvalidHybridAssurance)
+        );
 
         let mut wrong_receipt = anchor();
         wrong_receipt
@@ -631,7 +657,7 @@ mod tests {
             .unwrap()
             .selected_receipt_sha256 = [16; 32];
         wrong_receipt.receipt_selection.as_mut().unwrap().hybrid_assurance =
-            projected.receipt_selection.as_ref().unwrap().hybrid_assurance.clone();
+            Some(retained_hybrid);
         assert_eq!(
             wrong_receipt.validate(),
             Err(HolochainProjectionError::InvalidHybridAssurance)
