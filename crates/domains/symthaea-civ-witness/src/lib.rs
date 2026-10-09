@@ -1362,6 +1362,67 @@ mod tests {
     }
 
     #[test]
+    fn initialize_fails_closed_when_external_anchor_is_unavailable() {
+        let db = TempDb::new();
+        let store = db.open();
+        let anchor = MemoryAnchor::default();
+
+        assert!(matches!(
+            store.initialize(
+                "log-unavailable-anchor",
+                "policy-v1",
+                h(b"genesis-checkpoint"),
+                0,
+                None,
+                &anchor,
+            ),
+            Err(WitnessError::Anchor(AnchorError::Unavailable))
+        ));
+        assert!(matches!(
+            store.load_history("log-unavailable-anchor"),
+            Ok(History {
+                accepted: None,
+                prepared: None
+            })
+        ));
+        assert_eq!(store.integrity_check().expect("integrity"), "ok");
+    }
+
+    #[test]
+    fn initialize_rejects_anchor_state_bound_to_another_log() {
+        let db = TempDb::new();
+        let store = db.open();
+        let anchor = MemoryAnchor::default();
+        anchor.provision("log-wrong-anchor");
+        anchor
+            .states
+            .lock()
+            .expect("anchor lock")
+            .get_mut("log-wrong-anchor")
+            .expect("provisioned state")
+            .log_id = "different-log-id".to_owned();
+
+        assert!(matches!(
+            store.initialize(
+                "log-wrong-anchor",
+                "policy-v1",
+                h(b"genesis-checkpoint"),
+                0,
+                None,
+                &anchor,
+            ),
+            Err(WitnessError::ExternalAnchorMismatch)
+        ));
+        assert!(matches!(
+            store.load_history("log-wrong-anchor"),
+            Ok(History {
+                accepted: None,
+                prepared: None
+            })
+        ));
+    }
+
+    #[test]
     fn late_finalize_is_idempotent_after_recovery_and_a_later_successor() {
         let db = TempDb::new();
         let anchor = MemoryAnchor::default();
