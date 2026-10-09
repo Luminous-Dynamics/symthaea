@@ -3453,6 +3453,28 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::MemoryLoweringDigest)
         ));
+
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        let lhs = ResourceId::new("lhs").unwrap();
+        receipt.resource_memory_profiles.get_mut(&lhs).unwrap().memory_type_index = 1;
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource))
+                if resource == lhs
+        ));
+
+        receipt.resource_memory_profiles =
+            test_resource_memory_profiles(&receipt.resource_storage_sizes);
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        receipt.resource_memory_profiles.remove(&lhs);
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ResourceCount)
+        ));
     }
 
     #[test]
