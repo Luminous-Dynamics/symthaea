@@ -26,6 +26,8 @@ const RECORD_DOMAIN: &[u8] = b"mycelix-civ013-durable-record-v1\0";
 const FORK_DOMAIN: &[u8] = b"mycelix-civ013-durable-fork-v1\0";
 const ZERO_DIGEST: Digest = [0; 32];
 const BUSY_TIMEOUT_MS: u64 = 5_000;
+// SQLite's WAL-reset corruption bug is fixed starting at 3.51.3.
+const MIN_SQLITE_VERSION_NUMBER: i32 = 3_051_003;
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS witness_meta (
@@ -204,6 +206,7 @@ pub enum WitnessError {
     Anchor(AnchorError),
     InvalidInput(&'static str),
     RuntimeConfigurationMismatch,
+    UnsupportedSqliteVersion { actual: i32, minimum: i32 },
     CorruptStore(&'static str),
     CorruptForkEvidence,
     StalePredecessor,
@@ -226,6 +229,10 @@ impl fmt::Display for WitnessError {
             Self::RuntimeConfigurationMismatch => {
                 write!(f, "SQLite durability PRAGMAs do not match the required profile")
             }
+            Self::UnsupportedSqliteVersion { actual, minimum } => write!(
+                f,
+                "SQLite runtime version number {actual} is below required version number {minimum} (3.51.3)",
+            ),
             Self::CorruptStore(message) => write!(f, "corrupt witness store: {message}"),
             Self::CorruptForkEvidence => write!(f, "corrupt witness fork-evidence chain"),
             Self::StalePredecessor => write!(f, "stale predecessor"),
@@ -333,6 +340,13 @@ impl SqliteWitnessStore {
     }
 
     fn open_connection(&self) -> Result<Connection, WitnessError> {
+        let runtime_version = rusqlite::version_number();
+        if runtime_version < MIN_SQLITE_VERSION_NUMBER {
+            return Err(WitnessError::UnsupportedSqliteVersion {
+                actual: runtime_version,
+                minimum: MIN_SQLITE_VERSION_NUMBER,
+            });
+        }
         let conn = Connection::open(&self.path)?;
         conn.busy_timeout(Duration::from_millis(BUSY_TIMEOUT_MS))?;
         conn.execute_batch(
@@ -1696,6 +1710,16 @@ mod tests {
         store
             .initialize(log_id, "policy-v1", h(b"genesis-checkpoint"), 0, None, anchor)
             .expect("initialize trusted witness")
+    }
+
+    #[test]
+    fn linked_sqlite_includes_wal_reset_fix() {
+        let actual = rusqlite::version_number();
+        assert!(
+            actual >= MIN_SQLITE_VERSION_NUMBER,
+            "linked SQLite runtime {actual} is below required SQLite 3.51.3 ({}); WAL durability is not qualified",
+            MIN_SQLITE_VERSION_NUMBER
+        );
     }
 
     #[test]

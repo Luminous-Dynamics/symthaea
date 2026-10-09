@@ -120,7 +120,7 @@ tree-sitter-nix = "0.3"
 hex = "0.4"
 ed25519-dalek = { version = "=2.1.0", features = ["rand_core"] }
 syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.39.0", features = ["bundled", "fallible_uint"] }
 dashmap = "5.5"
 lru = "0.16"
 serial_test = "3.2"
