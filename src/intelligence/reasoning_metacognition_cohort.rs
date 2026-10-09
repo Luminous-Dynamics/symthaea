@@ -22,6 +22,18 @@ pub const DECISION_OUTCOME_SCHEMA_VERSION: u32 = 1;
 pub const FROZEN_DECISION_COHORT_SCHEMA_VERSION: u32 = 2;
 pub const DECISION_COHORT_REPORT_SCHEMA_VERSION: u32 = 2;
 pub const DECISION_COHORT_EVALUATOR_VERSION: &str = "rq-006-decision-cohort-v2";
+const DECISION_SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-bonferroni-familywise-95-v1";
+const DECISION_SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = concat!(
+    "IID decision episodes; confidence thresholds and task-family taxonomy frozen before outcomes; ",
+    "Bonferroni covers pooled and task-family x threshold comparisons; risk is conditional on ",
+    "selected asserted answers; reported coverage divides by all decisions; no distribution-shift guarantee",
+);
+const DECISION_BASELINE_BRIER_BOUND_METHOD: &str = "paired-hoeffding-bonferroni-familywise-95-v1";
+const DECISION_BASELINE_BRIER_BOUND_ASSUMPTIONS: &str = concat!(
+    "IID episodes within each family; candidate forecasts and baseline probabilities frozen before ",
+    "outcome access; per-episode Brier differences lie in [-1, 1]; Bonferroni covers all observed ",
+    "task-family x baseline comparisons; no distribution-shift guarantee",
+);
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 
 /// One pre-outcome decision and its correctness probability.
@@ -159,6 +171,12 @@ pub struct DecisionCohortReportV2 {
     pub abstained_decisions: usize,
     pub scoreable_assertions: usize,
     pub decision_coverage: f64,
+    /// Method and assumptions for the outer, whole-decision-cohort selective-risk bounds.
+    pub selective_risk_bound_method: String,
+    pub selective_risk_bound_assumptions: String,
+    /// Method and assumptions for candidate-minus-baseline Brier-loss intervals.
+    pub baseline_brier_delta_bound_method: String,
+    pub baseline_brier_delta_bound_assumptions: String,
     /// Calibration/discrimination metrics over scoreable asserted answers only.
     pub correctness_metrics: MetacognitionReport,
     /// Selective risk and coverage over the full decision cohort.
@@ -389,7 +407,10 @@ fn validate_frozen_baselines(
                 baseline.baseline_id
             )));
         }
-        if !families.contains(baseline.task_family_id.as_str()) {
+        if !families
+            .iter()
+            .any(|family| *family == baseline.task_family_id.as_str())
+        {
             return Err(DecisionCohortError::new(format!(
                 "baseline {} belongs to an unknown evaluation family",
                 baseline.baseline_id
@@ -986,6 +1007,10 @@ pub fn evaluate_decision_cohort(
         abstained_decisions: total - asserted,
         scoreable_assertions: scored.len(),
         decision_coverage: asserted as f64 / total as f64,
+        selective_risk_bound_method: DECISION_SELECTIVE_RISK_BOUND_METHOD.into(),
+        selective_risk_bound_assumptions: DECISION_SELECTIVE_RISK_BOUND_ASSUMPTIONS.into(),
+        baseline_brier_delta_bound_method: DECISION_BASELINE_BRIER_BOUND_METHOD.into(),
+        baseline_brier_delta_bound_assumptions: DECISION_BASELINE_BRIER_BOUND_ASSUMPTIONS.into(),
         correctness_metrics: pooled_metrics,
         selective_risk: pooled_risk,
         counterfactual_forecast_metrics: counterfactual_metrics,
@@ -1124,6 +1149,14 @@ mod tests {
         assert_eq!(report.asserted_decisions, 1);
         assert_eq!(report.abstained_decisions, 2);
         assert_eq!(report.decision_coverage, 1.0 / 3.0);
+        assert_eq!(
+            report.selective_risk_bound_method,
+            "hoeffding-bonferroni-familywise-95-v1"
+        );
+        assert_eq!(
+            report.baseline_brier_delta_bound_method,
+            "paired-hoeffding-bonferroni-familywise-95-v1"
+        );
         assert_eq!(report.correctness_metrics.predictions, 1);
         assert!(
             (report.correctness_metrics.brier_score.unwrap_or(f64::NAN) - 0.04).abs()
@@ -1160,6 +1193,8 @@ mod tests {
         assert_eq!(retrieval.total_decisions, 1);
         assert_eq!(retrieval.scoreable_assertions, 0);
         assert_eq!(retrieval.correctness_metrics.brier_score, None);
+        assert_eq!(retrieval.correctness_metrics.expected_calibration_error, None);
+        assert_eq!(retrieval.correctness_metrics.mean_confidence, None);
         assert_eq!(retrieval.baselines.len(), 2);
         assert_eq!(retrieval.baselines[0].candidate_scored_assertions, 0);
         assert_eq!(retrieval.baselines[0].baseline_brier_score, None);
