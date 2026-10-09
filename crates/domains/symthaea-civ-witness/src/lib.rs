@@ -601,6 +601,18 @@ impl SqliteWitnessStore {
             return Err(WitnessError::RollbackDetected);
         }
         if external.generation == expected.generation {
+            // A same-generation, different digest is a genuine competing
+            // history, not merely an ahead/rollback condition. Preserve both
+            // commitments in local fork evidence before failing closed. Genesis
+            // is not a record and cannot form a generation-zero fork row.
+            if expected.generation > 0 && external.record_digest != expected.record_digest {
+                self.record_fork(
+                    log_id,
+                    expected.generation,
+                    external.record_digest,
+                    expected.record_digest,
+                )?;
+            }
             return Err(WitnessError::ExternalAnchorMismatch);
         }
 
@@ -2397,6 +2409,51 @@ mod tests {
             )
             .expect("count fork evidence");
         assert_eq!(fork_count, 0, "anchor-ahead state is not same-generation fork evidence");
+    }
+
+    #[test]
+    fn recovery_records_same_generation_anchor_divergence_before_failing_closed() {
+        let db = TempDb::new();
+        let store = db.open();
+        let anchor = MemoryAnchor::default();
+        let log_id = "log-recovery-same-generation-fork";
+        let accepted = initialize(&store, &anchor, log_id);
+        let external_digest = h(b"competing-same-generation-anchor-record");
+        assert_ne!(external_digest, accepted.digest);
+        anchor
+            .states
+            .lock()
+            .expect("anchor state lock")
+            .insert(
+                log_id.to_owned(),
+                AnchorState {
+                    log_id: log_id.to_owned(),
+                    generation: accepted.generation,
+                    record_digest: external_digest,
+                },
+            );
+
+        assert!(matches!(
+            store.recover(log_id, &anchor),
+            Err(WitnessError::ExternalAnchorMismatch)
+        ));
+
+        let history = store.load_history(log_id).expect("local accepted history remains valid");
+        assert_eq!(history.accepted.as_ref(), Some(&accepted));
+        assert!(history.prepared.is_none(), "recovery must not invent a prepared candidate");
+        let conn = store.open_connection().expect("open fork evidence query");
+        let evidence: (i64, Vec<u8>, Vec<u8>) = conn
+            .query_row(
+                "SELECT generation, first_record_digest, conflicting_record_digest
+                 FROM witness_fork_evidence WHERE log_id=?1",
+                params![log_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("same-generation mismatch is preserved as fork evidence");
+        assert_eq!(evidence.0, accepted.generation as i64);
+        assert_eq!(blob_digest(&evidence.1).expect("external digest shape"), external_digest);
+        assert_eq!(blob_digest(&evidence.2).expect("local digest shape"), accepted.digest);
+        assert_eq!(store.integrity_check().expect("semantic integrity"), "ok");
     }
 
     #[test]
