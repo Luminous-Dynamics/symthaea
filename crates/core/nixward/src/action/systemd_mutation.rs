@@ -36,9 +36,9 @@ pub enum NixSystemdMutationTransportErrorV1 {
     UnsupportedOperation(&'static str),
     #[error("invalid systemd manager unique D-Bus owner")]
     InvalidManagerOwner,
-    #[error("systemd manager incarnation changed before lifecycle dispatch")]
+    #[error("systemd manager unique owner changed during governed mutation")]
     ManagerOwnerChanged,
-    #[error("D-Bus daemon incarnation changed before lifecycle dispatch")]
+    #[error("D-Bus daemon incarnation changed during governed mutation")]
     BusIncarnationChanged,
     #[error("systemd returned an invalid Job object path")]
     InvalidJobObjectPath,
@@ -46,10 +46,11 @@ pub enum NixSystemdMutationTransportErrorV1 {
     InvalidUnitFileChange,
 }
 
-/// Typed lifecycle mutation transport.
+/// Typed systemd mutation transport.
 ///
-/// The connection is private and the dispatch method accepts only the semantic
-/// service operation type. No free-form shell command can enter this boundary.
+/// Lifecycle operations and unit-file operations have distinct result types.
+/// The connection is private and mutation calls use typed semantic inputs rather
+/// than free-form shell commands.
 pub struct NixSystemdLifecycleMutationTransportV1 {
     connection: Connection,
 }
@@ -64,9 +65,15 @@ pub struct NixSystemdUnitFileOperationResultV1 {
     pub changes: Vec<NixSystemdUnitFileChangeV1>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixSystemdUnitFileChangeKindV1 {
+    Symlink,
+    Unlink,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NixSystemdUnitFileChangeV1 {
-    pub change_type: String,
+    pub change_type: NixSystemdUnitFileChangeKindV1,
     pub filename: String,
     pub destination: String,
 }
@@ -392,10 +399,12 @@ fn validate_unit_file_changes(
     changes
         .into_iter()
         .map(|(change_type, filename, destination)| {
-            if !matches!(change_type.as_str(), "symlink" | "unlink")
-                || filename.is_empty()
-                || destination.is_empty()
-            {
+            let change_type = match change_type.as_str() {
+                "symlink" => NixSystemdUnitFileChangeKindV1::Symlink,
+                "unlink" => NixSystemdUnitFileChangeKindV1::Unlink,
+                _ => return Err(NixSystemdMutationTransportErrorV1::InvalidUnitFileChange),
+            };
+            if filename.is_empty() || destination.is_empty() {
                 return Err(NixSystemdMutationTransportErrorV1::InvalidUnitFileChange);
             }
             Ok(NixSystemdUnitFileChangeV1 {
@@ -479,6 +488,14 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(changes.len(), 2);
+        assert_eq!(
+            changes[0].change_type,
+            NixSystemdUnitFileChangeKindV1::Symlink
+        );
+        assert_eq!(
+            changes[1].change_type,
+            NixSystemdUnitFileChangeKindV1::Unlink
+        );
         assert!(validate_unit_file_changes(vec![(
             "unknown".into(),
             "/etc/systemd/system/nginx.service".into(),
