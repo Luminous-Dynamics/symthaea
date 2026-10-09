@@ -23,6 +23,7 @@ pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v2";
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const SELECTIVE_RISK_FAMILYWISE_ALPHA: f64 = 0.05;
 const SELECTIVE_RISK_BOUND_METHOD: &str = "hoeffding-familywise-95-v1";
+const SELECTIVE_RISK_BOUND_ASSUMPTIONS: &str = "IID evaluation episodes; frozen scoring and selection rule; supplied threshold set predeclared before correctness outcomes; no distribution-shift guarantee";
 
 /// One pre-outcome prediction of whether the subject's answer is correct.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,8 +79,8 @@ pub struct SelectiveRiskPoint {
     /// Empirical error rate conditional on selection. `None` when no episode is selected.
     pub risk: Option<f64>,
     /// Conservative one-sided 95% family-wise upper bound over the evaluator's supplied,
-    /// predeclared threshold list. Uses Hoeffding + Bonferroni and assumes exchangeable
-    /// evaluation episodes and a frozen score/selection rule. `None` when none are selected.
+    /// predeclared threshold list. Uses Hoeffding + Bonferroni and assumes IID evaluation
+    /// episodes and a frozen score/selection rule. `None` when none are selected.
     /// The bound does not cover thresholds searched outside that list and cannot repair shift.
     pub risk_upper_bound_95: Option<f64>,
     pub selected: usize,
@@ -125,6 +126,8 @@ pub struct MetacognitionReport {
     pub abstention_opportunity_cost: Option<f64>,
     /// Machine-readable method identity for simultaneous selective-risk upper bounds.
     pub selective_risk_bound_method: String,
+    /// Explicit assumptions/limitations shipped with the report for downstream consumers.
+    pub selective_risk_bound_assumptions: String,
     pub selective_risk: Vec<SelectiveRiskPoint>,
     pub weak_assumption_detection: BinaryDetectionReport,
     pub confidence_revisions: usize,
@@ -281,6 +284,7 @@ pub fn evaluate_metacognition(
         asserted_risk,
         abstention_opportunity_cost,
         selective_risk_bound_method: SELECTIVE_RISK_BOUND_METHOD.into(),
+        selective_risk_bound_assumptions: SELECTIVE_RISK_BOUND_ASSUMPTIONS.into(),
         selective_risk,
         weak_assumption_detection,
         confidence_revisions: revisions.len(),
@@ -372,7 +376,7 @@ fn validate_probability(field: &'static str, value: f64) -> Result<(), Metacogni
 }
 
 /// Conservative one-sided Hoeffding bound with Bonferroni correction over a frozen threshold
-/// family. It assumes IID/exchangeable evaluation episodes and a fixed selection rule; it is not
+/// family. It assumes independent evaluation episodes under a fixed selection rule; it is not
 /// a distribution-shift guarantee.
 fn hoeffding_familywise_risk_upper_bound(
     errors: usize,
@@ -675,6 +679,8 @@ mod tests {
         let report = evaluate_metacognition(&observations, &[], &[], 10, &[0.5, 0.9])
             .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"));
         assert_eq!(report.selective_risk_bound_method, "hoeffding-familywise-95-v1");
+        assert!(report.selective_risk_bound_assumptions.contains("IID evaluation episodes"));
+        assert!(report.selective_risk_bound_assumptions.contains("no distribution-shift guarantee"));
         assert_eq!(report.selective_risk[0].selected, 3);
         assert_eq!(report.selective_risk[0].coverage, 0.75);
         assert!((report.selective_risk[0].risk.unwrap_or_default() - 1.0 / 3.0).abs() < 1.0e-12);
