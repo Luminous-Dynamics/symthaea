@@ -55,19 +55,52 @@ pub struct NixSystemdLifecycleMutationTransportV1 {
     connection: Connection,
 }
 
-/// Result returned by systemd's unit-file mutation APIs.
+/// Closed operation vocabulary for unit-file configuration changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixSystemdUnitFileMutationKindV1 {
+    Enable,
+    Disable,
+}
+
+/// Validated output from one manager- and bus-bound unit-file mutation RPC.
 ///
-/// Enable/Disable are configuration mutations, not lifecycle jobs; their
-/// return value is deliberately kept distinct from JobRemoved evidence.
+/// All fields are private so callers cannot manufacture a result that merely
+/// looks like transport-returned evidence. This is mutation-result evidence,
+/// not an authorization capability or post-state receipt.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NixSystemdUnitFileOperationResultV1 {
-    Enabled {
-        carries_install_info: bool,
-        changes: Vec<NixSystemdUnitFileChangeV1>,
-    },
-    Disabled {
-        changes: Vec<NixSystemdUnitFileChangeV1>,
-    },
+pub struct NixSystemdUnitFileOperationResultV1 {
+    operation: NixSystemdUnitFileMutationKindV1,
+    unit: String,
+    manager_owner: String,
+    bus_id: String,
+    carries_install_info: Option<bool>,
+    changes: Vec<NixSystemdUnitFileChangeV1>,
+}
+
+impl NixSystemdUnitFileOperationResultV1 {
+    pub fn operation(&self) -> NixSystemdUnitFileMutationKindV1 {
+        self.operation
+    }
+
+    pub fn unit(&self) -> &str {
+        &self.unit
+    }
+
+    pub fn manager_owner(&self) -> &str {
+        &self.manager_owner
+    }
+
+    pub fn bus_id(&self) -> &str {
+        &self.bus_id
+    }
+
+    pub fn carries_install_info(&self) -> Option<bool> {
+        self.carries_install_info
+    }
+
+    pub fn changes(&self) -> &[NixSystemdUnitFileChangeV1] {
+        &self.changes
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,11 +109,26 @@ pub enum NixSystemdUnitFileChangeKindV1 {
     Unlink,
 }
 
+/// One validated systemd unit-file change record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NixSystemdUnitFileChangeV1 {
-    pub change_type: NixSystemdUnitFileChangeKindV1,
-    pub filename: String,
-    pub destination: String,
+    change_type: NixSystemdUnitFileChangeKindV1,
+    filename: String,
+    destination: String,
+}
+
+impl NixSystemdUnitFileChangeV1 {
+    pub fn change_type(&self) -> NixSystemdUnitFileChangeKindV1 {
+        self.change_type
+    }
+
+    pub fn filename(&self) -> &str {
+        &self.filename
+    }
+
+    pub fn destination(&self) -> &str {
+        &self.destination
+    }
 }
 
 impl NixSystemdLifecycleMutationTransportV1 {
@@ -241,8 +289,12 @@ impl NixSystemdLifecycleMutationTransportV1 {
         self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
         let changes = validate_unit_file_changes(changes)?;
 
-        Ok(NixSystemdUnitFileOperationResultV1::Enabled {
-            carries_install_info,
+        Ok(NixSystemdUnitFileOperationResultV1 {
+            operation: NixSystemdUnitFileMutationKindV1::Enable,
+            unit,
+            manager_owner: manager_owner.to_string(),
+            bus_id: expected_bus_id.to_string(),
+            carries_install_info: Some(carries_install_info),
             changes,
         })
     }
@@ -274,7 +326,14 @@ impl NixSystemdLifecycleMutationTransportV1 {
         self.verify_manager_epoch(manager_owner, expected_bus_id).await?;
         let changes = validate_unit_file_changes(changes)?;
 
-        Ok(NixSystemdUnitFileOperationResultV1::Disabled { changes })
+        Ok(NixSystemdUnitFileOperationResultV1 {
+            operation: NixSystemdUnitFileMutationKindV1::Disable,
+            unit,
+            manager_owner: manager_owner.to_string(),
+            bus_id: expected_bus_id.to_string(),
+            carries_install_info: None,
+            changes,
+        })
     }
 
     async fn verify_manager_epoch(
@@ -491,11 +550,11 @@ mod tests {
         .unwrap();
         assert_eq!(changes.len(), 2);
         assert_eq!(
-            changes[0].change_type,
+            changes[0].change_type(),
             NixSystemdUnitFileChangeKindV1::Symlink
         );
         assert_eq!(
-            changes[1].change_type,
+            changes[1].change_type(),
             NixSystemdUnitFileChangeKindV1::Unlink
         );
         assert!(validate_unit_file_changes(vec![(
