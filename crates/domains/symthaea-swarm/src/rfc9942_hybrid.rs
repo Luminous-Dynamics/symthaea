@@ -110,16 +110,11 @@ impl MlDsa65KeyAuthorization {
             return Err(MlDsa65KeyAuthorizationError::InvalidPolicyDigest);
         }
         Ok(Self {
-            classical_algorithm_id,
             policy_digest_sha256,
             key_id,
             verifying_key_sha256,
             evaluation_time_unix_seconds,
         })
-    }
-
-    pub const fn classical_algorithm_id(&self) -> i64 {
-        self.classical_algorithm_id
     }
 
     pub const fn policy_digest_sha256(&self) -> [u8; 32] {
@@ -220,6 +215,7 @@ impl Rfc9942HybridTranscript {
         );
 
         Ok(Self {
+            classical_algorithm_id,
             policy_digest_sha256,
             key_id,
             verifying_key_sha256,
@@ -227,6 +223,10 @@ impl Rfc9942HybridTranscript {
             classical_capability_sha256,
             transcript_sha256,
         })
+    }
+
+    pub const fn classical_algorithm_id(&self) -> i64 {
+        self.classical_algorithm_id
     }
 
     pub const fn policy_digest_sha256(&self) -> [u8; 32] {
