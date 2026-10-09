@@ -83,6 +83,8 @@ pub enum ReceiptVerificationError {
     DuplicateProjectionIdentityBinding,
     EmptyProjectionIdentityDigest,
     UnselectedProjectionIdentity,
+    MissingRepresentationBinding,
+    MissingProjectionIdentityBinding,
 }
 
 /// A receipt whose canonical digest and internal selection bindings were checked.
@@ -122,6 +124,9 @@ impl MemoryRetrievalReceipt {
         if projection_bindings.iter().any(|(identity, _)| !selected.contains(identity)) {
             return Err(ReceiptVerificationError::UnselectedProjectionIdentity);
         }
+        if selected.iter().any(|identity| !projection_bindings.iter().any(|(bound, _)| bound == identity)) {
+            return Err(ReceiptVerificationError::MissingProjectionIdentityBinding);
+        }
         let mut bindings = self.selected_representation_digests.clone();
         bindings.sort();
         for pair in &bindings {
@@ -134,6 +139,9 @@ impl MemoryRetrievalReceipt {
         }
         if bindings.iter().any(|(identity, _)| !selected.contains(identity)) {
             return Err(ReceiptVerificationError::UnselectedRepresentationIdentity);
+        }
+        if selected.iter().any(|identity| !bindings.iter().any(|(bound, _)| bound == identity)) {
+            return Err(ReceiptVerificationError::MissingRepresentationBinding);
         }
         let mut exclusions = self.excluded.clone();
         exclusions.sort_by(|a, b| {
@@ -472,7 +480,37 @@ mod tests {
         assert_eq!(empty.verify(), Err(ReceiptVerificationError::EmptyRepresentationDigest));
     }
 
-    #[test] fn live_mode_needs_no_frontier {
+    #[test]
+    fn selected_identity_without_representation_binding_is_rejected() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        let mut malformed = receipt;
+        malformed.selected_representation_digests.clear();
+        malformed.receipt_digest = malformed.canonical_digest().unwrap();
+        assert_eq!(
+            malformed.verify(),
+            Err(ReceiptVerificationError::MissingRepresentationBinding)
+        );
+    }
+
+    #[test]
+    fn selected_identity_without_projection_binding_is_rejected() {
+        let (_groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "x", 10),
+            vec![candidate("x", MemoryKind::Semantic, "a", 0.8, FrontierEligibility::Eligible)],
+        );
+        let mut malformed = receipt;
+        malformed.selected_projection_identity_digests.clear();
+        malformed.receipt_digest = malformed.canonical_digest().unwrap();
+        assert_eq!(
+            malformed.verify(),
+            Err(ReceiptVerificationError::MissingProjectionIdentityBinding)
+        );
+    }
+
+    #[test] fn live_mode_needs_no_frontier() {
         let (g,r)=retrieve(&MemoryRetrievalRequest::live("x",10),vec![candidate("live",MemoryKind::Vector,"f",0.8,FrontierEligibility::Unknown)]);
         assert_eq!(g.len(),1); assert!(r.excluded.is_empty());
     }
