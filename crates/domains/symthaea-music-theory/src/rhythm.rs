@@ -94,6 +94,20 @@ impl Duration {
             .expect("normalized duration cannot be represented by i64 numerator/denominator")
     }
 
+    /// Compare exact rational beat values without converting them to floats.
+    ///
+    /// Returns None only if either value violates the positive-denominator
+    /// invariant. Cross-products use i128 intermediates, which are wide enough
+    /// for products of any two i64 values.
+    pub fn checked_cmp(self, other: Duration) -> Option<std::cmp::Ordering> {
+        if self.den <= 0 || other.den <= 0 {
+            return None;
+        }
+        let left = i128::from(self.num).checked_mul(i128::from(other.den))?;
+        let right = i128::from(other.num).checked_mul(i128::from(self.den))?;
+        Some(left.cmp(&right))
+    }
+
     /// Add two exact rationals without intermediate i64 overflow.
     ///
     /// Returns None when an input violates the canonical representation or
@@ -272,6 +286,18 @@ mod tests {
             Duration::new(1, 2)
         );
         assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":0}"#).is_err());
+    }
+
+    #[test]
+    fn checked_comparison_preserves_order_below_float_resolution() {
+        let smaller = Duration::new(1, i64::MAX);
+        let larger = Duration::new(1, i64::MAX - 2);
+        assert_eq!(smaller.beats(), larger.beats(), "f64 loses this distinction");
+        assert_eq!(
+            smaller.checked_cmp(larger),
+            Some(std::cmp::Ordering::Less),
+            "rational ordering must remain exact when f64 ties"
+        );
     }
 
     #[test]

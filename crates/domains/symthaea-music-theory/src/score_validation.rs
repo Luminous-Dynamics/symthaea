@@ -8,10 +8,17 @@
 //! not compress failures into an opaque quality number.
 
 use crate::counterpoint::{has_parallel_perfect, is_consonant};
+use crate::rhythm::Duration;
 use crate::score::{Score, ScoreNote, VoiceRole};
 use serde::{Deserialize, Serialize};
 
 pub const THEORY_VALIDATION_VERSION: &str = "theory-validation-v1";
+
+/// Per-beat theory rules probe integer beat positions and scan the score at
+/// each probe. Beyond this duration, the validator rejects the score rather
+/// than allowing caller-supplied timing to create an effectively unbounded
+/// validation loop.
+const MAX_PER_BEAT_VALIDATION_BEATS: i64 = 10_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ValidationSeverity {
@@ -94,10 +101,16 @@ pub fn validate_score(score: &Score, config: &ScoreValidationConfig) -> TheoryVa
     validate_voice_monophony(score, &mut issues);
     validate_voice_crossing(score, &mut issues);
     validate_melodic_leaps(score, config, &mut issues);
-    if config.check_strong_beat_consonance {
+    // These rules scan integer beats and then search score notes at every
+    // probe. Never enter those loops for an unbounded externally supplied
+    // duration. validate_metadata emits a fatal ScoreMetadata issue for this
+    // condition, so skipping these optional measurements cannot look like a
+    // successful validation.
+    let within_per_beat_budget = within_per_beat_validation_budget(score.total_beats);
+    if config.check_strong_beat_consonance && within_per_beat_budget {
         validate_strong_beats(score, &mut issues);
     }
-    if config.check_parallel_perfect_motion {
+    if config.check_parallel_perfect_motion && within_per_beat_budget {
         validate_parallel_motion(score, &mut issues);
     }
     if config.require_final_tonic {
@@ -193,6 +206,19 @@ fn validate_metadata(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
             "score duration must be finite and positive",
         );
     }
+    if !within_per_beat_validation_budget(score.total_beats) {
+        issue(
+            issues,
+            ScoreValidationRule::ScoreMetadata,
+            ValidationSeverity::Fatal,
+            Vec::new(),
+            None,
+            None,
+            format!(
+                "score duration exceeds the per-beat validation budget of {MAX_PER_BEAT_VALIDATION_BEATS} beats"
+            ),
+        );
+    }
     if score.notes.is_empty() {
         issue(
             issues,
@@ -214,14 +240,25 @@ fn validate_notes(
     for (index, note) in score.notes.iter().enumerate() {
         let onset = note.onset.beats();
         let duration = note.duration.beats();
-        let end = onset + duration;
+        let exact_end = note.onset.checked_add(note.duration);
+        // Keep a diagnostic approximation even when the exact rational end
+        // cannot fit in Duration; it is never used to qualify the note.
+        let end = exact_end
+            .map(Duration::beats)
+            .unwrap_or_else(|| onset + duration);
         let finite = onset.is_finite()
             && duration.is_finite()
+            && end.is_finite()
             && note.velocity.is_finite()
             && note.section_intensity.is_finite();
+        let end_within_score = exact_end.is_some_and(|exact_end| {
+            exact_end
+                .checked_cmp(score.total_beats)
+                .is_some_and(|ordering| ordering != std::cmp::Ordering::Greater)
+        });
         let bounded = onset >= 0.0
             && duration > 0.0
-            && end <= score.total_beats.beats() + 1e-9
+            && end_within_score
             && (0.0..=1.0).contains(&note.velocity)
             && note.section_intensity >= 0.0
             && (config.min_midi..=config.max_midi).contains(&note.pitch.midi());
@@ -249,8 +286,14 @@ fn validate_voice_monophony(score: &Score, issues: &mut Vec<ScoreValidationIssue
             .collect();
         notes.sort_by(|left, right| left.1.onset.beats().total_cmp(&right.1.onset.beats()));
         for pair in notes.windows(2) {
-            let previous_end = pair[0].1.onset.beats() + pair[0].1.duration.beats();
-            if previous_end > pair[1].1.onset.beats() + 1e-9 {
+            let previous_end_exact = pair[0].1.onset.checked_add(pair[0].1.duration);
+            let previous_end = previous_end_exact.map(Duration::beats).unwrap_or_else(|| {
+                pair[0].1.onset.beats() + pair[0].1.duration.beats()
+            });
+            let overlaps = previous_end_exact
+                .and_then(|end| end.checked_cmp(pair[1].1.onset))
+                .is_none_or(|ordering| ordering == std::cmp::Ordering::Greater);
+            if overlaps {
                 issue(
                     issues,
                     ScoreValidationRule::VoiceMonophony,
@@ -258,7 +301,10 @@ fn validate_voice_monophony(score: &Score, issues: &mut Vec<ScoreValidationIssue
                     vec![pair[0].0, pair[1].0],
                     Some(pair[1].1.onset.beats()),
                     Some(previous_end),
-                    format!("{} voice overlaps itself", role_name(role)),
+                    format!(
+                        "{} voice overlaps itself or has an unrepresentable note end",
+                        role_name(role)
+                    ),
                 );
             }
         }
@@ -494,6 +540,11 @@ fn sounding_all(score: &Score, role: VoiceRole, time: f64) -> Vec<(usize, &Score
         .collect()
 }
 
+fn within_per_beat_validation_budget(total_beats: Duration) -> bool {
+    i128::from(total_beats.num())
+        <= i128::from(MAX_PER_BEAT_VALIDATION_BEATS) * i128::from(total_beats.den())
+}
+
 fn role_name(role: VoiceRole) -> &'static str {
     match role {
         VoiceRole::Melody => "melody",
@@ -560,6 +611,54 @@ mod tests {
         let report = validate_score(&valid_score(), &ScoreValidationConfig::default());
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.fatal_count(), 0);
+    }
+
+    #[test]
+    fn unrepresentable_rational_note_end_is_rejected_even_when_float_end_fits() {
+        let mut score = valid_score();
+        let index = score.notes.len();
+        score.notes.push(ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: Pitch::from_midi(60),
+            onset: Duration::new(1, i64::MAX),
+            duration: Duration::new(1, i64::MAX - 2),
+            velocity: 0.7,
+            role: VoiceRole::Harmony,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        let note = score.notes[index];
+        assert!(note.onset.checked_add(note.duration).is_none());
+
+        let report = validate_score(&score, &ScoreValidationConfig::default());
+        assert!(
+            report.issues.iter().any(|issue| {
+                issue.rule == ScoreValidationRule::NoteBounds && issue.note_indices == vec![index]
+            }),
+            "unrepresentable note ends must fail exact bounds validation: {:?}",
+            report.issues
+        );
+    }
+
+    #[test]
+    fn excessive_score_duration_is_rejected_before_per_beat_scans() {
+        let mut score = valid_score();
+        score.total_beats = Duration::new(MAX_PER_BEAT_VALIDATION_BEATS + 1, 1);
+
+        let report = validate_score(&score, &ScoreValidationConfig::default());
+        assert!(
+            report.issues.iter().any(|issue| {
+                issue.rule == ScoreValidationRule::ScoreMetadata
+                    && issue.severity == ValidationSeverity::Fatal
+                    && issue.message.contains("per-beat validation budget")
+            }),
+            "over-budget scores must be rejected explicitly: {:?}",
+            report.issues
+        );
+        assert!(!report.issues.iter().any(|issue| {
+            issue.rule == ScoreValidationRule::StrongBeatConsonance
+                || issue.rule == ScoreValidationRule::ParallelPerfectMotion
+        }));
     }
 
     #[test]
