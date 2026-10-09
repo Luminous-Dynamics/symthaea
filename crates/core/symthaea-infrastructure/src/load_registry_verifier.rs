@@ -18,6 +18,7 @@ use crate::load_registry::{LoadClass, LoadRegistry, LoadServiceLedger};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoadLedgerVerificationError {
     RegistryVersionMismatch,
+    RegistryDigestMismatch,
     InvalidTimeBasis,
     InvalidAvailableEnergy,
     RegistryRecordCountMismatch,
@@ -37,6 +38,7 @@ pub enum LoadLedgerVerificationError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedLoadServiceLedger {
     pub registry_version: String,
+    pub registry_digest: String,
     pub record_count: usize,
     pub recomputed_demand_kwh: f64,
     pub recomputed_served_kwh: f64,
@@ -68,6 +70,9 @@ pub fn verify_load_service_ledger(
 ) -> Result<VerifiedLoadServiceLedger, LoadLedgerVerificationError> {
     if ledger.registry_version != registry.version() {
         return Err(LoadLedgerVerificationError::RegistryVersionMismatch);
+    }
+    if ledger.registry_digest != registry.registry_digest() {
+        return Err(LoadLedgerVerificationError::RegistryDigestMismatch);
     }
     if !ledger.step_duration_hours.is_finite() || ledger.step_duration_hours <= 0.0 {
         return Err(LoadLedgerVerificationError::InvalidTimeBasis);
@@ -255,6 +260,7 @@ pub fn verify_load_service_ledger(
 
     Ok(VerifiedLoadServiceLedger {
         registry_version: registry.version().to_string(),
+        registry_digest: registry.registry_digest().to_string(),
         record_count: ledger.records.len(),
         recomputed_demand_kwh: recomputed_demand,
         recomputed_served_kwh: recomputed_served,
@@ -361,12 +367,25 @@ mod tests {
         let verified = verify_load_service_ledger(&registry, &ledger).unwrap();
 
         assert_eq!(verified.registry_version, "independent-verifier-registry-v1");
+        assert_eq!(verified.registry_digest, registry.registry_digest());
         assert_eq!(verified.record_count, 3);
         assert_eq!(verified.recomputed_demand_kwh, 2.5);
         assert_eq!(verified.recomputed_served_kwh, 1.25);
         assert_eq!(verified.recomputed_intentional_shed_kwh, 1.25);
         assert_eq!(verified.recomputed_unserved_kwh, 0.0);
         assert!(verified.residual_kwh().abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_ledger_with_mismatched_registry_digest() {
+        let registry = registry();
+        let mut ledger = registry.allocate(&demands(), 0.5, 1.25).unwrap();
+        ledger.registry_digest = "0".repeat(64);
+
+        assert_eq!(
+            verify_load_service_ledger(&registry, &ledger).unwrap_err(),
+            LoadLedgerVerificationError::RegistryDigestMismatch
+        );
     }
 
     #[test]
