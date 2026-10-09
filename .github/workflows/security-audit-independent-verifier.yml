@@ -60,6 +60,10 @@ jobs:
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           TRIGGER_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          TRIGGER_RUN_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_RUN_REPOSITORY_ID: ${{ github.event.workflow_run.repository.id }}
+          TRIGGER_RUN_HEAD_REPOSITORY_ID: ${{ github.event.workflow_run.head_repository.id }}
           MANUAL_WORKFLOW_RUN_ID: ${{ inputs.workflow_run_id }}
           VERIFIER_TEST_OUTCOME: ${{ steps.self_tests.outcome }}
         shell: bash
