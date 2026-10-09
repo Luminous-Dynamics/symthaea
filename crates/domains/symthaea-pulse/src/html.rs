@@ -3067,7 +3067,8 @@ fn write_reasoning_pane(html: &mut String, reasoning: &ReasoningInfo) {
 <tr><td>Chain Confidence</td><td style="text-align:right;color:{conf_color}">{conf:.3}</td></tr>
 <tr><td>Plan Confidence</td><td style="text-align:right">{plan:.3}</td></tr>
 <tr><td>Tool Gate</td><td style="text-align:right;color:{gate_color}">{gate}</td></tr>
-<tr><td>Meta Confidence</td><td style="text-align:right">{meta:.3}</td></tr>
+<tr><td>Meta Confidence (heuristic, uncalibrated)</td><td style="text-align:right">{meta:.3}</td></tr>
+<tr><td>Counterfactual LR boost (not applied)</td><td style="text-align:right">{meta_lr_boost:.4}</td></tr>
 <tr><td>Reliability EMA</td><td style="text-align:right;color:{rel_color}">{rel:.3}</td></tr>
 <tr><td>Quality (cum.)</td><td style="text-align:right">{qual:.3}</td></tr>
 <tr><td>Trend</td><td style="text-align:right;color:{trend_color}">{trend}</td></tr>
@@ -3087,6 +3088,7 @@ fn write_reasoning_pane(html: &mut String, reasoning: &ReasoningInfo) {
             "open"
         },
         meta = reasoning.meta_reasoning_confidence,
+        meta_lr_boost = reasoning.meta_reasoning_counterfactual_lr_boost,
         rel_color = health_color(reasoning.reliability_ema),
         rel = reasoning.reliability_ema,
         qual = reasoning.cumulative_quality,
@@ -5031,7 +5033,9 @@ mod tests {
     }
 
     fn generate_test_html() -> String {
-        let snap = test_snapshot();
+        let mut snap = test_snapshot();
+        snap.reasoning.meta_reasoning_confidence = 0.88;
+        snap.reasoning.meta_reasoning_counterfactual_lr_boost = 0.018;
         generate_pulse_html(
             &snap.timestamp,
             &snap.profile,
@@ -5094,6 +5098,14 @@ mod tests {
             html.contains("Dopamine") || html.contains("NEURO"),
             "should have neuro-bath section"
         );
+    }
+
+    #[test]
+    fn test_html_labels_heuristic_meta_confidence_and_counterfactual_lr_as_measurement_only() {
+        let html = generate_test_html();
+        assert!(html.contains("Meta Confidence (heuristic, uncalibrated)"));
+        assert!(html.contains("Counterfactual LR boost (not applied)"));
+        assert!(html.contains("0.0180"));
     }
 
     #[test]
