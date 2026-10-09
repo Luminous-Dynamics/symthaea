@@ -88,10 +88,17 @@ impl MotifRelationObservationV1 {
         let target_part = target_notes.first()?.part;
         // VoiceRole is a function, not persistent line identity. Never merge
         // multiple/unassigned parts into one inferred motif sequence.
+        let ambiguous_onsets = |notes: &[crate::score::ScoreNote]| {
+            notes.windows(2).any(|pair| {
+                (pair[1].onset.beats() - pair[0].onset.beats()).abs() <= 1e-9
+            })
+        };
         if !source_part.is_assigned()
             || !target_part.is_assigned()
             || source_notes.iter().any(|note| note.part != source_part)
             || target_notes.iter().any(|note| note.part != target_part)
+            || ambiguous_onsets(&source_notes)
+            || ambiguous_onsets(&target_notes)
         {
             return None;
         }
@@ -154,7 +161,7 @@ pub struct MusicalWorldStateV1 {
     /// cognitive profile separately handles notes carried into a region.
     pub temporal_state: Option<MusicalStateFrame>,
     pub active_voice_roles: Vec<VoiceRole>,
-    /// True only when every score note carries an assigned PartId.
+    /// True only when every note overlapping this observed region has an assigned PartId.
     pub part_identity_available: bool,
     /// Existing deterministic symbolic profile; deliberately retained as
     /// one measurement layer rather than replaced by the world-state schema.
@@ -349,6 +356,29 @@ mod tests {
             Duration::new(3, 1),
             crate::obligation::ReturnTransformation::Literal,
         ).is_none());
+    }
+
+    #[test]
+    fn motif_relation_rejects_simultaneous_attacks_within_a_line() {
+        let mut piece = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for (pc, onset) in [(0, 0), (2, 0), (4, 1), (0, 2), (2, 3), (4, 4)] {
+            piece.push(note(
+                PitchClass::new(pc),
+                4,
+                onset,
+                VoiceRole::Melody,
+                PartId(1),
+            ));
+        }
+        assert!(MotifRelationObservationV1::from_score(
+            &piece,
+            Duration::new(0, 1),
+            Duration::new(2, 1),
+            Duration::new(2, 1),
+            Duration::new(5, 1),
+            crate::obligation::ReturnTransformation::Literal,
+        )
+        .is_none());
     }
 
     #[test]
