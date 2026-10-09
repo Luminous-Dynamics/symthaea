@@ -18126,15 +18126,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symthaea-ai-observatory"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "symthaea-alife"
 version = "0.1.0"
 dependencies = [
@@ -19495,7 +19486,9 @@ name = "symthaea-observability"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "serde",
+ "serde_json",
  "tracing-chrome",
 ]
 
