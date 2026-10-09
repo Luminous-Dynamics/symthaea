@@ -72,8 +72,9 @@ The optional example argument is the maximum spatial dimension (1–4). The runn
 The example's screening rule is predeclared:
 
 1. Lie-derivative variance must be finite and below *1e-6* on training and on a differently initialized holdout trajectory.
-2. The candidate must pass the existing *is_informatively_conserved* guard on the training trajectory, to reduce flat/degenerate false positives.
-3. Absolute Pearson correlation with the hand-derived Hamiltonian must be at least *0.995* on both trajectories.
+2. The candidate must pass *is_informatively_conserved* on the training trajectory.
+3. At least *50%* of holdout samples must meet the existing relative gradient-informativeness floor (the same non-degeneracy criterion used by *is_informatively_conserved*). This closes an asymmetry where holdout variance could pass despite a mostly near-flat candidate.
+4. Absolute Pearson correlation with the hand-derived Hamiltonian must be at least *0.995* on both trajectories.
 
 These are screening gates only. Correlation is not symbolic equivalence; a passing candidate is not a proof of being the Hamiltonian or a novel physical law. Formula identity, invariance across more initial conditions, solver convergence, and independent derivation would be stronger follow-up checks.
 
