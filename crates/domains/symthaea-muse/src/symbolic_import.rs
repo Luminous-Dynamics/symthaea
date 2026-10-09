@@ -22,7 +22,9 @@ pub const MAX_IMPORTED_NOTES: usize = 100_000;
 pub const MAX_IMPORTED_MIDI_TRACKS: usize = 256;
 pub const MAX_IMPORTED_MIDI_EVENTS: usize = 500_000;
 pub const MAX_IMPORTED_SCORE_BEATS: i64 = 10_000;
-pub const MAX_IMPORTED_DURATION_SECONDS: f64 = 180.0;
+/// Maximum musical content time synthesized for an import audition. The full
+/// score remains stored and analyzed; only `audition.wav` uses this clip.
+pub const MAX_AUDITION_CONTENT_SECONDS: f64 = 30.0;
 const MAX_RECONSTRUCTED_SECTIONS: usize = 1_000;
 
 #[derive(Clone, Debug)]
@@ -419,13 +421,8 @@ fn validate_imported_score(score: &Score) -> Result<(), String> {
         ));
     }
     let duration_seconds = score.seconds();
-    if !duration_seconds.is_finite()
-        || duration_seconds <= 0.0
-        || duration_seconds > MAX_IMPORTED_DURATION_SECONDS
-    {
-        return Err(format!(
-            "symbolic score exceeds the {MAX_IMPORTED_DURATION_SECONDS:.0}-second duration/render budget"
-        ));
+    if !duration_seconds.is_finite() || duration_seconds <= 0.0 {
+        return Err("symbolic score duration must be finite and positive".into());
     }
 
     for (index, note) in score.notes.iter().enumerate() {
