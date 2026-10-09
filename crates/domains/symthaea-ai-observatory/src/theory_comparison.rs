@@ -331,9 +331,31 @@ pub enum EvaluationReason {
 #[serde(deny_unknown_fields)]
 pub struct EvaluationReceipt {
     pub schema_version: String,
+    pub registry_id: String,
     pub registry_digest: String,
+    pub analysis_plan_digest: String,
+    pub subject_id: String,
+    pub experiment_id: String,
     pub prediction_id: String,
+    pub theory_id: String,
+    pub observable_id: String,
+    pub condition_id: String,
+    pub expected_value: OutcomeValue,
     pub observation_id: String,
+    pub source_trajectory_id: String,
+    pub observation_artifact_digest: String,
+    pub trial_id: String,
+    pub registry_frozen_at_sequence: u64,
+    pub outcome_released_at_sequence: u64,
+    pub required_observability: ObservabilityTier,
+    pub observed_observability: ObservabilityTier,
+    pub expected_intervention_id: Option<String>,
+    pub observed_intervention_id: Option<String>,
+    pub requires_manipulation_check: bool,
+    pub manipulation_check: ManipulationCheck,
+    pub confounds: ConfoundStatus,
+    pub is_holdout: bool,
+    pub observation_outcome: ObservationOutcome,
     pub disposition: PredictionDisposition,
     pub reason: EvaluationReason,
     /// Only populated when an actual categorical outcome was observed. This is
@@ -343,22 +365,54 @@ pub struct EvaluationReceipt {
 
 impl EvaluationReceipt {
     fn new(
+        registry: &PredictionRegistry,
         registry_digest: String,
-        prediction_id: &str,
-        observation_id: &str,
+        prediction: &TheoryPrediction,
+        observation: &Observation,
         disposition: PredictionDisposition,
         reason: EvaluationReason,
         observed_value: Option<OutcomeValue>,
     ) -> Self {
         Self {
             schema_version: SCHEMA_VERSION_V1.to_owned(),
+            registry_id: registry.registry_id.clone(),
             registry_digest,
-            prediction_id: prediction_id.to_owned(),
-            observation_id: observation_id.to_owned(),
+            analysis_plan_digest: registry.analysis_plan_digest.clone(),
+            subject_id: registry.subject_id.clone(),
+            experiment_id: registry.experiment_id.clone(),
+            prediction_id: prediction.prediction_id.clone(),
+            theory_id: prediction.theory_id.clone(),
+            observable_id: prediction.observable_id.clone(),
+            condition_id: prediction.condition_id.clone(),
+            expected_value: prediction.expected.clone(),
+            observation_id: observation.observation_id.clone(),
+            source_trajectory_id: observation.source_trajectory_id.clone(),
+            observation_artifact_digest: observation.artifact_digest.clone(),
+            trial_id: observation.trial_id.clone(),
+            registry_frozen_at_sequence: registry.frozen_at_sequence,
+            outcome_released_at_sequence: observation.outcome_released_at_sequence,
+            required_observability: prediction.required_observability,
+            observed_observability: observation.observability_tier,
+            expected_intervention_id: prediction.intervention_id.clone(),
+            observed_intervention_id: observation.intervention_id.clone(),
+            requires_manipulation_check: prediction.requires_manipulation_check,
+            manipulation_check: observation.manipulation_check,
+            confounds: observation.confounds,
+            is_holdout: observation.is_holdout,
+            observation_outcome: observation.outcome.clone(),
             disposition,
             reason,
             observed_value,
         }
+    }
+
+    /// Deterministic content digest of this receipt. It binds the exact
+    /// evaluated inputs and disposition; it does not sign them or establish
+    /// independent custody.
+    pub fn canonical_digest(&self) -> Result<String, RegistryValidationError> {
+        let bytes =
+            serde_json::to_vec(self).map_err(|_| RegistryValidationError::SerializationFailed)?;
+        Ok(digest_bytes(&bytes))
     }
 }
 
@@ -392,9 +446,10 @@ pub fn evaluate_prediction(
     let no_value = None;
     if prediction.observable_id != observation.observable_id {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::NotApplicable,
             EvaluationReason::ObservableMismatch,
             no_value,
@@ -402,9 +457,10 @@ pub fn evaluate_prediction(
     }
     if prediction.condition_id != observation.condition_id {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::NotApplicable,
             EvaluationReason::ConditionMismatch,
             no_value,
@@ -412,9 +468,10 @@ pub fn evaluate_prediction(
     }
     if prediction.intervention_id != observation.intervention_id {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::Inconclusive,
             EvaluationReason::InterventionMismatch,
             no_value,
@@ -422,9 +479,10 @@ pub fn evaluate_prediction(
     }
     if registry.frozen_at_sequence >= observation.outcome_released_at_sequence {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::Inconclusive,
             EvaluationReason::PredictionFrozenAfterOutcome,
             no_value,
@@ -432,9 +490,10 @@ pub fn evaluate_prediction(
     }
     if !observation.is_holdout {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::Inconclusive,
             EvaluationReason::NotHeldOut,
             no_value,
@@ -445,9 +504,10 @@ pub fn evaluate_prediction(
         .satisfies(prediction.required_observability)
     {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::NotObservable,
             EvaluationReason::InsufficientObservability,
             no_value,
@@ -480,9 +540,10 @@ pub fn evaluate_prediction(
     }
     if observation.confounds != ConfoundStatus::Clear {
         return Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::Inconclusive,
             EvaluationReason::ConfoundDetected,
             no_value,
@@ -491,17 +552,19 @@ pub fn evaluate_prediction(
 
     match &observation.outcome {
         ObservationOutcome::NotCollected => Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::NotObservable,
             EvaluationReason::ObservationNotCollected,
             no_value,
         )),
         ObservationOutcome::Invalid => Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::Inconclusive,
             EvaluationReason::ObservationMarkedInvalid,
             no_value,
@@ -517,9 +580,10 @@ pub fn evaluate_prediction(
             ))
         }
         ObservationOutcome::Observed(actual) => Ok(EvaluationReceipt::new(
+            registry,
             registry_digest,
-            &prediction.prediction_id,
-            &observation.observation_id,
+            prediction,
+            observation,
             PredictionDisposition::Challenged,
             EvaluationReason::ObservedMismatch,
             Some(actual.clone()),
@@ -736,6 +800,16 @@ mod tests {
 
         assert_eq!(first.disposition, PredictionDisposition::Supported);
         assert_eq!(second.disposition, PredictionDisposition::Challenged);
+        assert_eq!(first.subject_id, observation.subject_id);
+        assert_eq!(first.observation_artifact_digest, observation.artifact_digest);
+        assert_eq!(first.observation_outcome, observation.outcome);
+        let receipt_digest = first.canonical_digest().expect("receipt digest");
+        let mut changed_receipt = first.clone();
+        changed_receipt.observation_artifact_digest = digest("different-artifact");
+        assert_ne!(
+            receipt_digest,
+            changed_receipt.canonical_digest().expect("changed receipt digest")
+        );
         assert_eq!(
             compare_predictions(&registry, "p-gnwt", "p-iit").expect("valid pair"),
             PairwiseDiscrimination::Discriminative
