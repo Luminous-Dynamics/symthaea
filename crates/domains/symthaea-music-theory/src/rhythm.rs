@@ -29,15 +29,14 @@ impl<'de> Deserialize<'de> for Duration {
         }
 
         let wire = WireDuration::deserialize(deserializer)?;
-        if wire.den <= 0 {
-            return Err(de::Error::custom("duration denominator must be positive"));
+        if wire.den == 0 {
+            return Err(de::Error::custom("duration denominator must be non-zero"));
         }
-        if gcd_u128(u128::from(wire.num.unsigned_abs()), wire.den as u128) != 1 {
-            return Err(de::Error::custom(
-                "duration rational must be reduced to canonical form",
-            ));
-        }
-        Ok(Self { num: wire.num, den: wire.den })
+        // Normalize rather than reject older/non-canonical-but-valid rationals.
+        // This preserves their mathematical value while restoring the type's
+        // positive-denominator/reduced-fraction invariant at the wire boundary.
+        from_i128_rational(i128::from(wire.num), i128::from(wire.den))
+            .ok_or_else(|| de::Error::custom("duration cannot be represented canonically"))
     }
 }
 
@@ -249,22 +248,30 @@ mod tests {
     }
 
     #[test]
-    fn deserialization_requires_canonical_positive_denominator() {
+    fn deserialization_normalizes_legacy_rationals_and_rejects_zero_denominator() {
         let canonical = Duration::new(3, 2);
         let encoded = serde_json::to_string(&canonical).unwrap();
         assert_eq!(serde_json::from_str::<Duration>(&encoded).unwrap(), canonical);
 
-        for invalid in [
-            r#"{"num":1,"den":0}"#,
-            r#"{"num":1,"den":-1}"#,
-            r#"{"num":2,"den":4}"#,
-            r#"{"num":0,"den":2}"#,
-        ] {
-            assert!(
-                serde_json::from_str::<Duration>(invalid).is_err(),
-                "non-canonical duration unexpectedly accepted: {invalid}"
-            );
-        }
+        // Previously accepted wire values keep their mathematical meaning,
+        // but are brought back into the canonical in-memory representation.
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":2,"den":4}"#).unwrap(),
+            Duration::new(1, 2)
+        );
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":1,"den":-2}"#).unwrap(),
+            Duration::new(-1, 2)
+        );
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":0,"den":2}"#).unwrap(),
+            Duration::zero()
+        );
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":-2,"den":-4}"#).unwrap(),
+            Duration::new(1, 2)
+        );
+        assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":0}"#).is_err());
     }
 
     #[test]
