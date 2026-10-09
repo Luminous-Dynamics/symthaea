@@ -21,6 +21,7 @@ pub type Digest = [u8; 32];
 
 const PROTOCOL_VERSION: u16 = 1;
 const SCHEMA_VERSION: i64 = 1;
+const DB_SCHEMA_VERSION: i64 = 2;
 const RECORD_DOMAIN: &[u8] = b"mycelix-civ013-durable-record-v1\0";
 const FORK_DOMAIN: &[u8] = b"mycelix-civ013-durable-fork-v1\0";
 const ZERO_DIGEST: Digest = [0; 32];
@@ -298,8 +299,35 @@ impl SqliteWitnessStore {
             }
         }
         let store = Self { path };
-        let conn = store.open_connection()?;
+        let mut conn = store.open_connection()?;
+        let previous_schema_version: i64 =
+            conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        if previous_schema_version < 0 || previous_schema_version > DB_SCHEMA_VERSION {
+            return Err(WitnessError::CorruptStore("unsupported SQLite schema version"));
+        }
+        let had_adapter_schema: i64 = conn.query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM sqlite_master
+                WHERE type='table'
+                  AND name IN ('witness_meta', 'witness_records', 'witness_fork_evidence')
+             )",
+            [],
+            |row| row.get(0),
+        )?;
         conn.execute_batch(SCHEMA)?;
+
+        // Databases created before user_version 2 have the original fork rows
+        // but not the tail-commitment table. Validate each legacy chain before
+        // atomically backfilling its count/tail commitment. New databases need
+        // no backfill. Once version 2 is recorded, missing commitments are
+        // treated as corruption rather than silently reconstructed.
+        if previous_schema_version < DB_SCHEMA_VERSION {
+            if had_adapter_schema != 0 {
+                migrate_legacy_fork_metadata(&mut conn)?;
+            }
+            conn.pragma_update(None, "user_version", DB_SCHEMA_VERSION)?;
+        }
+        drop(conn);
         store.integrity_check()?;
         Ok(store)
     }
@@ -1123,7 +1151,10 @@ fn append_fork_evidence(
     Ok(())
 }
 
-fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessError> {
+fn fork_history_summary(
+    conn: &Connection,
+    log_id: &str,
+) -> Result<(i64, Option<Digest>), WitnessError> {
     let mut statement = conn.prepare(
         "SELECT generation, first_record_digest, conflicting_record_digest,
                 previous_evidence_digest, digest
@@ -1167,6 +1198,12 @@ fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessE
         previous = Some(stored_digest);
     }
 
+    let count = i64::try_from(rows.len()).map_err(|_| WitnessError::CorruptForkEvidence)?;
+    Ok((count, previous))
+}
+
+fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessError> {
+    let (actual_count, tail) = fork_history_summary(conn, log_id)?;
     let stored_meta: Option<(i64, Vec<u8>)> = conn
         .query_row(
             "SELECT evidence_count, tail_digest FROM witness_fork_meta WHERE log_id=?1",
@@ -1174,17 +1211,58 @@ fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessE
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()?;
-    let actual_count =
-        i64::try_from(rows.len()).map_err(|_| WitnessError::CorruptForkEvidence)?;
-    match (actual_count, previous, stored_meta) {
+    match (actual_count, tail, stored_meta) {
         (0, None, None) => Ok(()),
-        (count, Some(tail), Some((meta_count, meta_tail)))
+        (count, Some(expected_tail), Some((meta_count, meta_tail)))
             if count > 0
                 && meta_count == count
                 && blob_digest(&meta_tail)
-                    .map_err(|_| WitnessError::CorruptForkEvidence)? == tail => Ok(()),
+                    .map_err(|_| WitnessError::CorruptForkEvidence)? == expected_tail => Ok(()),
         _ => Err(WitnessError::CorruptForkEvidence),
     }
+}
+
+fn migrate_legacy_fork_metadata(conn: &mut Connection) -> Result<(), WitnessError> {
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let mut statement = tx.prepare(
+        "SELECT log_id FROM witness_fork_evidence
+         UNION SELECT log_id FROM witness_fork_meta
+         ORDER BY log_id ASC",
+    )?;
+    let log_ids = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    for log_id in log_ids {
+        let (count, tail) = fork_history_summary(&tx, &log_id)?;
+        let existing: Option<(i64, Vec<u8>)> = tx
+            .query_row(
+                "SELECT evidence_count, tail_digest FROM witness_fork_meta WHERE log_id=?1",
+                params![log_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        match (count, tail, existing) {
+            (0, None, None) => {}
+            (count, Some(tail), None) if count > 0 => {
+                tx.execute(
+                    "INSERT INTO witness_fork_meta (log_id, evidence_count, tail_digest)
+                     VALUES (?1, ?2, ?3)",
+                    params![log_id, count, tail.as_slice()],
+                )?;
+            }
+            (count, Some(tail), Some((stored_count, stored_tail)))
+                if count > 0
+                    && count == stored_count
+                    && blob_digest(&stored_tail)
+                        .map_err(|_| WitnessError::CorruptForkEvidence)? == tail => {}
+            _ => return Err(WitnessError::CorruptForkEvidence),
+        }
+    }
+
+    tx.commit()?;
+    Ok(())
 }
 
 fn valid_receipt_tail(sequence: u64, digest: Option<Digest>) -> bool {
