@@ -1136,7 +1136,7 @@ pub fn evaluate_decision_cohort(
     .map_err(|e: MetacognitionEvaluationError| DecisionCohortError::new(e.to_string()))?;
     let pooled_behavior_report = evaluate_metacognition(
         &[],
-        &frozen.weak_assumption_detections,
+        &assumptions,
         &frozen.confidence_revision_observations,
         frozen.calibration_bins,
         &frozen.selective_thresholds,
@@ -1644,7 +1644,7 @@ mod tests {
         assert!(freeze_decision_cohort_for_split_with_observations(
             fs,
             family_baselines("reasoning"),
-            assumptions,
+            detections,
             mismatched,
             5,
             vec![0.5],
