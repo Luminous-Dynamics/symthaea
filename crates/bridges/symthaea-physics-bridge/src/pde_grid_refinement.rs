@@ -21,7 +21,11 @@ pub fn interior_points_for_state_len(state_len: usize) -> Option<usize> {
 
 /// Grid spacing for a positive number of interior points on the unit interval.
 pub fn grid_spacing(interior_points: usize) -> Option<f64> {
-    (interior_points > 0).then(|| 1.0 / (interior_points as f64 + 1.0))
+    if interior_points == 0 {
+        None
+    } else {
+        Some(1.0 / (interior_points as f64 + 1.0))
+    }
 }
 
 /// Fundamental-mode frequency of the semi-discrete centered-difference operator.
