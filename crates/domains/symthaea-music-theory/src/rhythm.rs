@@ -108,6 +108,22 @@ impl Duration {
         Some(left.cmp(&right))
     }
 
+    /// Subtract two exact rationals without intermediate i64 overflow.
+    ///
+    /// Returns None when an input violates the positive-denominator invariant,
+    /// intermediate arithmetic overflows, or the reduced result cannot fit
+    /// this type's i64 numerator/denominator.
+    pub fn checked_sub(self, other: Duration) -> Option<Self> {
+        if self.den <= 0 || other.den <= 0 {
+            return None;
+        }
+        let left = i128::from(self.num).checked_mul(i128::from(other.den))?;
+        let right = i128::from(other.num).checked_mul(i128::from(self.den))?;
+        let numerator = left.checked_sub(right)?;
+        let denominator = i128::from(self.den).checked_mul(i128::from(other.den))?;
+        Self::from_i128_rational(numerator, denominator)
+    }
+
     /// Add two exact rationals without intermediate i64 overflow.
     ///
     /// Returns None when an input violates the canonical representation or
@@ -298,6 +314,17 @@ mod tests {
             Some(std::cmp::Ordering::Less),
             "rational ordering must remain exact when f64 ties"
         );
+    }
+
+    #[test]
+    fn checked_sub_is_exact_and_fails_when_canonical_result_does_not_fit() {
+        assert_eq!(
+            Duration::new(5, 1).checked_sub(Duration::new(2, 1)),
+            Some(Duration::new(3, 1))
+        );
+        assert!(Duration::new(1, i64::MAX)
+            .checked_sub(Duration::new(1, i64::MAX - 2))
+            .is_none());
     }
 
     #[test]

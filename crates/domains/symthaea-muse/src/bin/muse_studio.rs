@@ -2436,11 +2436,13 @@ fn audition_clip_score(
         };
 
         let mut note = source_note;
-        note.onset = note_start.saturating_sub(clip_start);
-        note.duration = note_end.saturating_sub(note_start);
+        note.onset = note_start
+            .checked_sub(clip_start)
+            .ok_or_else(|| "audition note offset is not exactly representable".to_string())?;
+        note.duration = note_end
+            .checked_sub(note_start)
+            .ok_or_else(|| "audition note duration is not exactly representable".to_string())?;
         if note.duration.den() <= 0 || note.duration.num() <= 0 {
-            // Exact subtraction can be unrepresentable for pathological
-            // rational grids. Such a vanishing sliver is not synthesized.
             continue;
         }
         clip.try_push(note)
