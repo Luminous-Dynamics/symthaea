@@ -11027,4 +11027,36 @@ mod tests {
         invalid.modality_contexts[0].next_track_id = 0;
         assert!(restored.validate_checkpoint_state(&invalid).is_err());
     }
+    #[test]
+    fn path_coherence_is_unavailable_without_a_transition() {
+        let manifold = test_manifold();
+        let state = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0001);
+
+        assert_eq!(manifold.measure_path_coherence(&[]), None);
+        assert_eq!(manifold.measure_path_coherence(std::slice::from_ref(&state)), None);
+    }
+
+    #[test]
+    fn path_coherence_is_the_mean_of_local_transition_scores() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0002);
+        let b = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0003);
+        let c = ContinuousHV::random(manifold.hdc_dim(), 0xC0_HE_0004);
+        let path = [a.clone(), b.clone(), c.clone()];
+
+        let expected = (manifold.compute_local_coherence(&a, &b)
+            + manifold.compute_local_coherence(&b, &c))
+            / 2.0;
+        let actual = manifold
+            .measure_path_coherence(&path)
+            .expect("a two-transition path must be measurable");
+
+        assert!(actual.is_finite());
+        assert!((0.0..=1.0).contains(&actual));
+        assert!(
+            (actual - expected).abs() <= f32::EPSILON,
+            "reported score {actual} must equal the mean local score {expected}"
+        );
+    }
+
 }
