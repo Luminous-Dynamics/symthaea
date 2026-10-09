@@ -183,4 +183,40 @@ mod tests {
         let expected_len = (64 * 64 * movie.channels) as usize;
         assert_eq!(movie.frames[0].len(), expected_len);
     }
+    #[test]
+    fn test_imagine_future_charges_incremental_not_lifetime_compute_cost() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_vision_manifold = true;
+        let mut service = CognitiveLoopService::new(config).unwrap();
+        {
+            let bridge = service
+                .sensorimotor
+                .vision_sensory
+                .vision_bridge
+                .as_mut()
+                .unwrap();
+            bridge.manifold_mut().observe_frame(
+                &vec![128u8; 64 * 64 * 3],
+                64,
+                64,
+                3,
+                0.033,
+            );
+        }
+
+        let initial = service.thermodynamic_load();
+        service.imagine_future(1).expect("first one-step imagination should succeed");
+        let after_first = service.thermodynamic_load();
+        service.imagine_future(1).expect("second one-step imagination should succeed");
+        let after_second = service.thermodynamic_load();
+
+        let first_cost = after_first - initial;
+        let second_cost = after_second - after_first;
+        assert!(first_cost > 0.0);
+        assert!(
+            (first_cost - second_cost).abs() < 1e-5,
+            "equal one-step calls should charge equal incremental cost, got {first_cost} then {second_cost}"
+        );
+    }
+
 }
