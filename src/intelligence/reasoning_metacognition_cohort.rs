@@ -662,7 +662,11 @@ pub fn evaluate_decision_cohort(
         .map_err(|e: MetacognitionEvaluationError| DecisionCohortError::new(e.to_string()))?;
     let familywise_risk_comparisons = frozen.selective_thresholds.len().saturating_mul(family_rows.len().saturating_add(1));
     let familywise_baseline_comparisons = family_rows.len().saturating_mul(2);
-    let pooled_risk = frozen.selective_thresholds.iter().map(|t| risk_point(*t, &rows, rows.len(), familywise_risk_comparisons)).collect();
+    let pooled_risk: Vec<DecisionSelectiveRiskPoint> = frozen
+        .selective_thresholds
+        .iter()
+        .map(|t| risk_point(*t, &rows, rows.len(), familywise_risk_comparisons))
+        .collect();
 
     let mut family_reports = Vec::with_capacity(family_rows.len());
     let mut total_cf_adjudications = 0usize;
@@ -819,7 +823,7 @@ mod tests {
         assert_eq!(reasoning.total_decisions, 2);
         assert_eq!(reasoning.scoreable_assertions, 1);
         assert_eq!(reasoning.baselines[0].candidate_scored_assertions, 1);
-        assert_eq!(reasoning.baselines[0].baseline_brier_score, Some(0.16));
+        assert!((reasoning.baselines[0].baseline_brier_score.unwrap_or(f64::NAN) - 0.16).abs() < 1.0e-12);
         assert_eq!(reasoning.baselines[0].evaluation_decisions, 2);
         let retrieval = report.family_reports.iter().find(|r| r.task_family_id == "retrieval").expect("abstain-only family retained");
         assert_eq!(retrieval.total_decisions, 1);
