@@ -339,7 +339,8 @@ def verify_materialized_barrier_lowering(values: dict[str, str], spec: dict, nam
             fail(f"{name}: expected barrier references unknown resource {resource}")
         by_target.setdefault(target, []).append((source, target, resource, kind))
 
-    parts = [f"batch_count:{sum(bool(by_target.get(node_id)) for node_id in range(1, spec['node_count'] + 1))}"]
+    batch_count = sum(bool(by_target.get(node_id)) for node_id in range(1, spec["node_count"] + 1))
+    parts = [f"batch_count:{batch_count}"]
     for node_id in range(1, spec["node_count"] + 1):
         barriers = by_target.get(node_id, [])
         if not barriers:
@@ -349,20 +350,26 @@ def verify_materialized_barrier_lowering(values: dict[str, str], spec: dict, nam
         parts.extend([
             "batch",
             f"node_id={node_id}",
+            "dependency_structure=VkDependencyInfo",
+            "pnext=null",
             "dependency_flags=0",
             f"memory_barrier_count={memory_barrier_count}",
-            f"buffer_barrier_count={buffer_barrier_count}",
-            "image_barrier_count=0",
+            f"buffer_memory_barrier_count={buffer_barrier_count}",
+            "image_memory_barrier_count=0",
         ])
         for ordinal, (source, target, resource, kind) in enumerate(barriers):
             buffer_memory = kind != "write_after_read"
             if kind == "read_after_write":
                 src_access, dst_access = "shader_storage_write", "shader_storage_read"
+                src_access_mask, dst_access_mask = 0x400000000, 0x200000000
             elif kind == "write_after_read":
                 src_access, dst_access = "empty", "empty"
+                src_access_mask, dst_access_mask = 0, 0
             else:
                 src_access, dst_access = "shader_storage_write", "shader_storage_write"
+                src_access_mask, dst_access_mask = 0x400000000, 0x400000000
             size = ((len(bytes.fromhex(spec["initial"][resource])) + 3) // 4) * 4 if buffer_memory else 0
+            queue_family_index = str(0xFFFFFFFF) if buffer_memory else "not_applicable"
             parts.extend([
                 "barrier",
                 f"ordinal={ordinal}",
@@ -370,19 +377,25 @@ def verify_materialized_barrier_lowering(values: dict[str, str], spec: dict, nam
                 f"to={target}",
                 f"resource={resource}",
                 f"kind={kind}",
-                f"type={'buffer_memory' if buffer_memory else 'execution_memory'}",
+                f"type={'VkBufferMemoryBarrier2' if buffer_memory else 'VkMemoryBarrier2'}",
+                "pnext=null",
                 "src_stage=compute_shader",
+                f"src_stage_mask={0x800}",
                 f"src_access={src_access}",
+                f"src_access_mask={src_access_mask}",
                 "dst_stage=compute_shader",
+                f"dst_stage_mask={0x800}",
                 f"dst_access={dst_access}",
-                f"queue_family={'ignored' if buffer_memory else 'not_applicable'}",
+                f"dst_access_mask={dst_access_mask}",
+                f"src_queue_family_index={queue_family_index}",
+                f"dst_queue_family_index={queue_family_index}",
                 "offset=0",
                 f"size={size}",
             ])
 
     expected = sha256_len_prefixed(
         [part.encode("utf-8") for part in parts],
-        b"symthaea.gpu-fabric.vulkan-materialized-barriers.v1",
+        b"symthaea.gpu-fabric.vulkan-materialized-barriers.v2",
     )
     if values.get("barrier_lowering_digest") != expected:
         fail(f"{name}: materialized Vulkan barrier digest mismatch")
