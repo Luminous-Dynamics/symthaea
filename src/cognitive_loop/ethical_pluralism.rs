@@ -157,9 +157,14 @@ pub enum ComparisonState {
     AgreementOpposes,
     /// At least one framework supports and at least one opposes the action.
     Disagreement,
-    /// At least one result is mixed, conditional, or underdetermined, so agreement
-    /// cannot be asserted from the supplied results.
+    /// At least one result is mixed, conditional, unavailable, or underdetermined,
+    /// or the declared framework coverage is incomplete.
     Incomplete,
+    /// Fewer than two distinct framework identities are represented.
+    ///
+    /// Multiple versions of one framework do not count as independent ethical
+    /// perspectives and cannot establish plural agreement.
+    InsufficientFrameworks,
     /// Valid assessments refer to different scenarios or candidate actions, or
     /// do not match the explicit subject requested by the caller.
     SubjectMismatch,
@@ -352,6 +357,16 @@ fn compare_assessments_inner(
     {
         // One or more requested framework results are explicitly unavailable.
         ComparisonState::Incomplete
+    } else if assessments
+        .iter()
+        .map(|assessment| assessment.framework_id.trim())
+        .collect::<HashSet<_>>()
+        .len()
+        < 2
+    {
+        // A single perspective, or multiple versions of the same perspective,
+        // cannot establish plural agreement or disagreement.
+        ComparisonState::InsufficientFrameworks
     } else if counts.supports > 0 && counts.opposes > 0 {
         ComparisonState::Disagreement
     } else if counts.mixed > 0 || counts.conditional > 0 || counts.underdetermined > 0 {
@@ -669,6 +684,25 @@ mod tests {
         assert_eq!(forward.counts, reversed.counts);
         assert_eq!(forward.missing_frameworks, reversed.missing_frameworks);
         assert_eq!(forward.unexpected_frameworks, reversed.unexpected_frameworks);
+    }
+
+    #[test]
+    fn single_framework_cannot_claim_plural_agreement() {
+        let result = compare_assessments(&[
+            assessment("care_ethics", FrameworkStance::SupportsAction),
+        ]);
+        assert_eq!(result.state, ComparisonState::InsufficientFrameworks);
+    }
+
+    #[test]
+    fn two_versions_of_one_framework_do_not_count_as_plurality() {
+        let mut older = assessment("care_ethics", FrameworkStance::SupportsAction);
+        let mut newer = assessment("care_ethics", FrameworkStance::OpposesAction);
+        older.framework_version = "1.0.0".to_owned();
+        newer.framework_version = "2.0.0".to_owned();
+
+        let result = compare_assessments(&[older, newer]);
+        assert_eq!(result.state, ComparisonState::InsufficientFrameworks);
     }
 
     #[test]
