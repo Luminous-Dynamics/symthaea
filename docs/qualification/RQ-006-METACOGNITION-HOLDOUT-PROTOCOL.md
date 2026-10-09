@@ -46,22 +46,36 @@ Score the candidate and both baselines against the exact same bound holdout outc
 
 Brier score and log loss are proper scoring rules for probabilistic forecasts. They combine multiple aspects of probabilistic performance, so interpret them alongside calibration curves/reliability bins, discrimination, uncertainty, and family-local sample sizes. Do not interpret a lower Brier score alone as proof of better calibration. Fit any learned calibration transformation using calibration/validation data only; evaluate once on untouched holdout data.
 
-## Abstention semantics — current v1 limitation
+## Mixed decision-cohort API — implementation candidate
+
+The branch now adds a separate, versioned API in `reasoning_metacognition_cohort.rs`:
+
+- `freeze_decision_cohort_for_split` freezes asserted answers and abstentions together, canonicalizes threshold order, requires a non-empty split/manifest identity, and revalidates the frozen set on deserialization.
+- `DecisionOutcomeV1` requires an asserted-answer correctness label for asserted answers and forbids that label for abstentions. A counterfactual correctness label is admitted only when the forecast already contains a counterfactual answer reference and the outcome carries separate evidence.
+- `evaluate_decision_cohort` reports every decision in the full-cohort denominator, but computes accuracy, Brier/log loss, calibration bins/ECE, AUROC, and baseline deltas only over asserted answers with bound correctness outcomes.
+- Per-family reports preserve abstain-only families. Their correctness metrics and baseline scores remain `None` rather than fabricating values or dividing by zero.
+- Threshold-selected risk includes asserted answers only; coverage is selected assertions divided by **all decisions**, both pooled and per family.
+- Candidate and baseline metrics use exactly the same asserted/scored cohort. Forecast IDs, outcome receipt IDs, and evidence references are retained deterministically.
+
+This closes the evaluator-level semantic ambiguity in a separate API without silently changing `CorrectnessForecastV1` or the legacy `evaluate_metacognition` contract. The new API is an implementation candidate until its exact-head CI, tests, formatting, and independent review are complete. It does not authenticate evidence or prove chronology, calibration-corpus disjointness, oracle independence, IID sampling, or holdout non-contamination.
+
+## Legacy correctness API: asserted-only limitation
 
 `CorrectnessForecastV1.predicted_probability` is described as the probability that an asserted answer would be correct. The current prospective implementation nevertheless passes every bound forecast/outcome pair—including `asserted = false`—into correctness calibration metrics and baseline scoring. It also derives abstention opportunity cost from the generic `correct` bit without a separately specified counterfactual candidate-answer reference.
 
-Therefore, **do not qualify mixed asserted/abstained batches through the current prospective scorer**. The implementation now fails closed at forecast freezing: both constructors reject `asserted = false` with `UnscorableAbstention`. The evaluator identifier is `rq-006-metacognition-v8`, and the frozen forecast-set schema is v3; deserialization rejects v2 sets rather than silently applying the stricter semantics. Until [#7292](https://github.com/Luminous-Dynamics/symthaea/issues/7292) is implemented and validated:
+Therefore, **do not qualify mixed asserted/abstained batches through the legacy prospective scorer**. Its freeze functions reject `asserted = false` with `UnscorableAbstention`; the evaluator identifier is `rq-006-metacognition-v8`, and the frozen-set schema is v3. Use the separate decision-cohort API described above only after exact-head CI and the remaining independent qualification gates pass.
 
-- qualification runs must contain only asserted answers with independently scoreable correctness outcomes; the freeze API enforces this boundary rather than depending only on orchestration discipline;
+Until the mixed-cohort API is validated:
+- qualification runs through the legacy prospective path must contain only asserted answers with independently scoreable correctness outcomes;
 - abstention counts and whole-cohort coverage must be reported separately, with their own explicit denominator; the v1 correctness report must not be represented as joint calibration-and-abstention qualification;
 - abstention opportunity cost must be reported as unavailable unless a separately frozen candidate answer and independently verified counterfactual outcome make that quantity well-defined;
 - no baseline comparison may treat an abstention as an ordinary correct/incorrect answer.
 
 Issue #7292 requires a versioned outcome/eligibility contract, separate scored-assertion and episode denominators, zero-assertion family handling, exact-cohort baseline comparisons, and regression coverage. Close that gap only after those behaviors pass exact-head CI.
 
-The legacy combined-input `evaluate_metacognition` API has the same ambiguity for mixed cohorts: it computes correctness metrics across every `CorrectnessPrediction` and infers abstention opportunity cost from the row's generic `correct` bit. Retain that API for compatibility and diagnostics, but do not submit its mixed asserted/abstained outputs as qualification evidence unless the outcome semantics are separately established. The new prospective API is the preferred path for qualification and now rejects abstentions until #7292's versioned eligibility/outcome contract is implemented.
+The legacy combined-input `evaluate_metacognition` API has the same ambiguity for mixed cohorts: it computes correctness metrics across every `CorrectnessPrediction` and infers abstention opportunity cost from the row's generic `correct` bit. Retain that API for compatibility and diagnostics, but do not submit its mixed-cohort outputs as qualification evidence. The new decision-cohort API is the intended mixed-cohort path; the v8 prospective correctness API remains asserted-only.
 
-This limitation does not invalidate the existing all-asserted fixtures; it bounds what can be claimed from the current path.
+This limitation does not invalidate existing all-asserted fixtures; it bounds what can be claimed from the legacy paths.
 
 ## Rejection and acceptance gates
 
