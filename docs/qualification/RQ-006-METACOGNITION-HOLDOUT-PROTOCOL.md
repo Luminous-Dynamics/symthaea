@@ -50,9 +50,9 @@ Brier score and log loss are proper scoring rules for probabilistic forecasts. T
 
 `CorrectnessForecastV1.predicted_probability` is described as the probability that an asserted answer would be correct. The current prospective implementation nevertheless passes every bound forecast/outcome pair—including `asserted = false`—into correctness calibration metrics and baseline scoring. It also derives abstention opportunity cost from the generic `correct` bit without a separately specified counterfactual candidate-answer reference.
 
-Therefore, **do not qualify mixed asserted/abstained batches through the current v1 prospective scorer**. Until [#7292](https://github.com/Luminous-Dynamics/symthaea/issues/7292) is implemented and validated:
+Therefore, **do not qualify mixed asserted/abstained batches through the current prospective scorer**. The implementation now fails closed at forecast freezing: both constructors reject `asserted = false` with `UnscorableAbstention`. The evaluator identifier is `rq-006-metacognition-v8`, and the frozen forecast-set schema is v3; deserialization rejects v2 sets rather than silently applying the stricter semantics. Until [#7292](https://github.com/Luminous-Dynamics/symthaea/issues/7292) is implemented and validated:
 
-- qualification runs using the v1 prospective path must contain only asserted answers with independently scoreable correctness outcomes; an orchestration/qualification layer must reject any batch containing an abstention rather than silently filtering it;
+- qualification runs must contain only asserted answers with independently scoreable correctness outcomes; the freeze API enforces this boundary rather than depending only on orchestration discipline;
 - abstention counts and whole-cohort coverage must be reported separately, with their own explicit denominator; the v1 correctness report must not be represented as joint calibration-and-abstention qualification;
 - abstention opportunity cost must be reported as unavailable unless a separately frozen candidate answer and independently verified counterfactual outcome make that quantity well-defined;
 - no baseline comparison may treat an abstention as an ordinary correct/incorrect answer.
