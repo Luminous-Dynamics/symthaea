@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v5";
+pub const METACOGNITION_EVALUATOR_VERSION: &str = "rq-006-metacognition-v6";
 pub const CORRECTNESS_FORECAST_SCHEMA_VERSION: u32 = 1;
 pub const CORRECTNESS_OUTCOME_SCHEMA_VERSION: u32 = 1;
 pub const FROZEN_FORECAST_SET_SCHEMA_VERSION: u32 = 2;
@@ -218,6 +218,7 @@ pub enum MetacognitionEvaluationError {
     EmptyOutcomeField { forecast_id: String, field: &'static str },
     UnsupportedForecastSchemaVersion(u32),
     UnsupportedOutcomeSchemaVersion(u32),
+    UnsupportedBaselineSchemaVersion(u32),
     UnsupportedFrozenSetSchemaVersion(u32),
     DuplicateForecastId(String),
     DuplicateOutcomeForecastId(String),
@@ -309,6 +310,9 @@ impl fmt::Display for MetacognitionEvaluationError {
             }
             Self::UnsupportedOutcomeSchemaVersion(v) => {
                 write!(f, "unsupported outcome schema version {v}")
+            }
+            Self::UnsupportedBaselineSchemaVersion(v) => {
+                write!(f, "unsupported baseline schema version {v}")
             }
             Self::UnsupportedFrozenSetSchemaVersion(v) => {
                 write!(f, "unsupported frozen-set schema version {v}")
@@ -596,7 +600,9 @@ pub fn freeze_correctness_forecasts_for_split(
     selective_thresholds: Vec<f64>,
     evaluation_split_id: String,
 ) -> Result<FrozenCorrectnessForecastSet, MetacognitionEvaluationError> {
-    if evaluation_split_id.trim().is_empty() {
+    if evaluation_split_id.trim().is_empty()
+        || evaluation_split_id.trim() != evaluation_split_id
+    {
         return Err(MetacognitionEvaluationError::MissingEvaluationSplit);
     }
     freeze_correctness_forecasts_internal(
@@ -872,7 +878,7 @@ pub fn evaluate_frozen_forecasts_with_baselines(
     for baseline in baselines {
         if baseline.schema_version != FORECAST_BASELINE_SCHEMA_VERSION {
             return Err(
-                MetacognitionEvaluationError::UnsupportedForecastSchemaVersion(
+                MetacognitionEvaluationError::UnsupportedBaselineSchemaVersion(
                     baseline.schema_version,
                 ),
             );
@@ -894,6 +900,12 @@ pub fn evaluate_frozen_forecasts_with_baselines(
                     field,
                 });
             }
+        }
+        if baseline.training_split_id.trim() != baseline.training_split_id {
+            return Err(MetacognitionEvaluationError::EmptyBaselineField {
+                baseline_id: baseline.baseline_id.clone(),
+                field: "training_split_id",
+            });
         }
         if baseline.training_sample_count == 0 {
             return Err(MetacognitionEvaluationError::InvalidBaselineSampleCount {
@@ -1769,11 +1781,20 @@ mod tests {
             .expect("reasoning family");
         assert_eq!(reasoning.evaluation_episodes, 2);
         assert_eq!(reasoning.baselines.len(), 2);
-        assert_eq!(reasoning.candidate_brier_score, Some((0.99_f64.powi(2) + 0.90_f64.powi(2)) / 2.0));
+        assert_eq!(
+            reasoning.candidate_brier_score,
+            Some((0.99_f64.powi(2) + 0.90_f64.powi(2)) / 2.0)
+        );
         assert!(reasoning.baselines.iter().all(|b| b.evaluation_split_id == "holdout-v1"));
         assert!(reasoning.baselines.iter().all(|b| b.training_split_id == "calibration-v1"));
-        assert!(reasoning.baselines.iter().all(|b| b.training_corpus_manifest_ref.starts_with("calibration-manifest:")));
-        assert!(reasoning.baselines.iter().all(|b| b.candidate_brier_delta.unwrap_or(0.0) > 0.0));
+        assert!(reasoning.baselines.iter().all(|b| {
+            b.training_corpus_manifest_ref
+                .starts_with("calibration-manifest:")
+        }));
+        assert!(reasoning
+            .baselines
+            .iter()
+            .all(|b| b.candidate_brier_delta.unwrap_or(0.0) > 0.0));
         assert_eq!(
             reasoning.baselines.iter().map(|b| b.method).collect::<Vec<_>>(),
             vec![
