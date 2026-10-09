@@ -98,6 +98,46 @@ pub fn wave_1d_energy_derivative(state: &[f64]) -> Option<f64> {
     Some(kinetic_derivative + edge_derivative_sum / h)
 }
 
+/// Integrate the arbitrary-resolution wave model with classical RK4.
+///
+/// This returns the state after exactly `steps` fixed steps. The caller chooses
+/// `dt` so space and time refinement can be studied independently. Returns None
+/// for malformed state lengths or a non-positive/non-finite time step.
+pub fn wave_1d_integrate_rk4(
+    initial_state: &[f64],
+    steps: usize,
+    dt: f64,
+) -> Option<Vec<f64>> {
+    interior_points_for_state_len(initial_state.len())?;
+    if !dt.is_finite() || dt <= 0.0 {
+        return None;
+    }
+
+    let mut state = initial_state.to_vec();
+    for _ in 0..steps {
+        let k1 = wave_1d_rhs(&state)?;
+        let stage2 = add_scaled(&state, &k1, 0.5 * dt);
+        let k2 = wave_1d_rhs(&stage2)?;
+        let stage3 = add_scaled(&state, &k2, 0.5 * dt);
+        let k3 = wave_1d_rhs(&stage3)?;
+        let stage4 = add_scaled(&state, &k3, dt);
+        let k4 = wave_1d_rhs(&stage4)?;
+
+        for i in 0..state.len() {
+            state[i] += dt / 6.0 * (k1[i] + 2.0 * k2[i] + 2.0 * k3[i] + k4[i]);
+        }
+    }
+    Some(state)
+}
+
+fn add_scaled(state: &[f64], derivative: &[f64], scale: f64) -> Vec<f64> {
+    state
+        .iter()
+        .zip(derivative)
+        .map(|(value, slope)| value + scale * slope)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +216,102 @@ mod tests {
             let energy = wave_1d_energy(&state).unwrap();
             assert!(energy.is_finite() && energy >= 0.0);
         }
+    }
+
+    fn fundamental_mode_state(interior_points: usize) -> Vec<f64> {
+        let h = grid_spacing(interior_points).unwrap();
+        let mut state = vec![0.0; 2 * interior_points];
+        for i in 0..interior_points {
+            let x = (i + 1) as f64 * h;
+            state[i] = (std::f64::consts::PI * x).sin();
+        }
+        state
+    }
+
+    fn discrete_mode_error(interior_points: usize, steps: usize) -> f64 {
+        let final_time: f64 = 1.0;
+        let dt = final_time / steps as f64;
+        let h = grid_spacing(interior_points).unwrap();
+        let omega = discrete_fundamental_frequency(interior_points).unwrap();
+        let initial = fundamental_mode_state(interior_points);
+        let numerical = wave_1d_integrate_rk4(&initial, steps, dt).unwrap();
+        let mut squared_error = 0.0;
+
+        for i in 0..interior_points {
+            let x = (i + 1) as f64 * h;
+            let mode = (std::f64::consts::PI * x).sin();
+            let exact_u = mode * (omega * final_time).cos();
+            let exact_v = -omega * mode * (omega * final_time).sin();
+            let du = numerical[i] - exact_u;
+            let dv_scaled = (numerical[interior_points + i] - exact_v) / omega;
+            squared_error += du * du + dv_scaled * dv_scaled;
+        }
+
+        (squared_error / interior_points as f64).sqrt()
+    }
+
+    #[test]
+    fn rk4_temporal_error_is_fourth_order_against_the_discrete_exact_mode() {
+        // Fixed resolution isolates temporal integration error from spatial
+        // discretization error by comparing against the exact semi-discrete mode.
+        let errors = [10, 20, 40].map(|steps| discrete_mode_error(8, steps));
+        let order_10_to_20 = (errors[0] / errors[1]).log2();
+        let order_20_to_40 = (errors[1] / errors[2]).log2();
+
+        assert!(
+            order_10_to_20 > 3.8 && order_10_to_20 < 4.2,
+            "observed RK4 order for 10→20 steps={order_10_to_20:.4}, errors={errors:?}"
+        );
+        assert!(
+            order_20_to_40 > 3.8 && order_20_to_40 < 4.2,
+            "observed RK4 order for 20→40 steps={order_20_to_40:.4}, errors={errors:?}"
+        );
+    }
+
+    #[test]
+    fn full_space_time_solution_error_converges_at_second_order() {
+        // Exact continuum solution: u(x,t)=sin(pi*x) cos(pi*t), c=1.
+        // At T=1 it has u=-sin(pi*x), v=0. Choosing dt <= h^2 makes the
+        // fourth-order RK4 error subordinate to the second-order spatial error.
+        let final_time: f64 = 1.0;
+        let resolutions = [8, 16, 32, 64];
+        let mut errors = Vec::with_capacity(resolutions.len());
+        let mut spacings = Vec::with_capacity(resolutions.len());
+
+        for n in resolutions {
+            let h = grid_spacing(n).unwrap();
+            let max_dt = h * h;
+            let steps = (final_time / max_dt).ceil() as usize;
+            let dt = final_time / steps as f64;
+            let initial = fundamental_mode_state(n);
+            let numerical = wave_1d_integrate_rk4(&initial, steps, dt).unwrap();
+            let mut squared_l2_error = 0.0;
+
+            for i in 0..n {
+                let x = (i + 1) as f64 * h;
+                let exact_u = -(std::f64::consts::PI * x).sin();
+                let du = numerical[i] - exact_u;
+                let dv_scaled = numerical[n + i] / std::f64::consts::PI;
+                squared_l2_error += du * du + dv_scaled * dv_scaled;
+            }
+
+            spacings.push(h);
+            errors.push((h * squared_l2_error).sqrt());
+        }
+
+        for pair in errors.windows(2) {
+            assert!(
+                pair[1] < pair[0],
+                "space-time L2 error must decrease under refinement: {errors:?}"
+            );
+        }
+        let coarse = errors[1];
+        let fine = errors[2];
+        let observed_order = (coarse / fine).ln() / (spacings[1] / spacings[2]).ln();
+        assert!(
+            observed_order > 1.7 && observed_order < 2.2,
+            "observed space-time convergence order={observed_order:.4}; h={spacings:?}, errors={errors:?}"
+        );
     }
 
     #[test]
