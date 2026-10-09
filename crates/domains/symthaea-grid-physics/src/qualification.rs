@@ -182,6 +182,17 @@ impl FrozenEnergyScenario {
         hash_f64(&mut hasher, self.battery.round_trip_efficiency);
         hash_f64(&mut hasher, self.battery.initial_soc);
         hash_f64(&mut hasher, self.battery.degradation_per_cycle);
+        // Hash the model's actual constructor-established battery baseline,
+        // not just the caller-facing battery specification.
+        let initial_battery = Battery::new(
+            self.battery.capacity_kwh,
+            self.battery.power_rating_kw,
+            self.battery.round_trip_efficiency,
+        )
+        .with_soc(self.battery.initial_soc)
+        .with_degradation_per_cycle(self.battery.degradation_per_cycle);
+        hash_f64(&mut hasher, initial_battery.state_of_health());
+        hash_f64(&mut hasher, initial_battery.equivalent_full_cycles());
 
         hash_f64(&mut hasher, self.tariff.off_peak_price_per_kwh);
         hash_f64(&mut hasher, self.tariff.peak_price_per_kwh);
@@ -532,7 +543,9 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
         peak_end_hour: 21.0,
         export_price_per_kwh: 0.05,
     };
-    let typical_load: Vec<f64> = (0..12).map(|index| if index >= 9 { 40.0 } else { 10.0 }).collect();
+    let typical_load: Vec<f64> = (0..12)
+        .map(|index| if index >= 9 { 40.0 } else { 10.0 })
+        .collect();
     let typical_generation: Vec<f64> = (0..12)
         .map(|index| match index {
             2..=3 => 15.0,
@@ -570,7 +583,9 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
             battery: reserve_battery,
             tariff,
             load_profile_kw: typical_load,
-            generation_profile_kw: vec![0.0, 0.0, 20.0, 25.0, 5.0, 0.0, 5.0, 20.0, 0.0, 0.0, 0.0, 0.0],
+            generation_profile_kw: vec![
+                0.0, 0.0, 20.0, 25.0, 5.0, 0.0, 5.0, 20.0, 0.0, 0.0, 0.0, 0.0,
+            ],
             grid_available_by_step: typical_grid,
         },
         FrozenEnergyScenario {
@@ -812,7 +827,7 @@ mod tests {
         let scenario = deterministic_energy_corpus().remove(0);
         assert_eq!(
             scenario.input_digest(),
-            "2e66a02b5d0f5a6539de623115e1efd96e99b5bfb59886b9133ad48c5582788b"
+            "4182a0bd42b1085875cd91b262b9142a3a44b7dd48476c4599900cf04427d090"
         );
     }
 }

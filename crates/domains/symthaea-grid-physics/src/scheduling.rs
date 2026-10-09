@@ -179,14 +179,13 @@ fn battery_state_is_valid(battery: &Battery) -> bool {
 /// unbounded CPU loop. Larger studies should be split into bounded windows.
 const MAX_SCENARIO_STEPS: usize = 1_000_000;
 
-/// Run a validated scenario atomically with respect to battery state.
+/// Run a validated scenario atomically and return the stable aggregate result.
 ///
-/// The runner rejects invalid time steps, invalid profiles and non-finite
-/// control outputs; it bounds the work for each scenario; uses a shorter
-/// final step when the horizon is not divisible by dt; and reports only the
+/// The runner rejects invalid time steps, invalid profiles, and non-finite
+/// control outputs; bounds the work for each scenario; uses a shorter final
+/// step when the horizon is not divisible by dt; and reports only the
 /// equivalent-full-cycle increment caused by this scenario. Battery state
 /// is committed back to the caller only when the complete scenario succeeds.
-/// Run a validated scenario while preserving the stable aggregate-result API.
 #[allow(clippy::too_many_arguments)]
 pub fn try_run_scenario(
     battery: &mut Battery,
@@ -720,7 +719,8 @@ mod tests {
             day_end_hour: 17.0,
         };
         let low_battery = Battery::new(50.0, 25.0, 0.9).with_soc(0.3); // below reserve
-        let (charge, discharge) = policy.decide(20.0, 15.0, 0.0, &low_battery); // 20:00, nighttime, shortfall
+        // 20:00, nighttime, shortfall.
+        let (charge, discharge) = policy.decide(20.0, 15.0, 0.0, &low_battery);
         assert_eq!(charge, 0.0);
         assert_eq!(discharge, 15.0, "no reserve cap outside daytime hours");
     }
