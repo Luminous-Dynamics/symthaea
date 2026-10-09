@@ -1,0 +1,31 @@
+diff --git a/src/symthaea/mod.rs b/src/symthaea/mod.rs
+--- a/src/symthaea/mod.rs
++++ b/src/symthaea/mod.rs
+@@ -2614,7 +2614,6 @@ impl Symthaea {
+ 
+                     let mut curriculum_clone = self.curriculum.clone();
+                     let dimension = self.hdc_dim;
+-                    let db = self.database.clone();
+                     let tx = self.research_update_tx.clone();
+ 
+                     self.task_supervisor
+@@ -2623,13 +2622,19 @@ impl Symthaea {
+                             let mut extender = extender;
+                             let result = extender
+-                                .research_and_extend(&topic, &mut curriculum_clone, dimension, db)
++                                .research_and_extend(&topic, &mut curriculum_clone, dimension, None)
+                                 .await;
+ 
+                             let (summary, curriculum, error) = match result {
+-                                Ok(summary) => (Some(summary), Some(curriculum_clone), None),
++                                Ok(summary) => {
++                                    tracing::warn!(
++                                        target: "symthaea::learning",
++                                        topic = %topic,
++                                        objectives_added = summary.objectives_added,
++                                        "Autonomous web research produced a curriculum candidate; live admission is quarantined"
++                                    );
++                                    (Some(summary), None, None)
++                                }
+                                 Err(e) => (None, None, Some(e.to_string())),
+                             };

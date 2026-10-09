@@ -1,0 +1,124 @@
+name: RES-SEC-001A Autonomous Research Quarantine
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'patches/security/res-sec-001a-autoresearch-quarantine-v1.patch'
+      - '.github/workflows/res-sec-001a-autoresearch-quarantine.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze exact current-main parent and qualification-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_parent=adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "${{ github.event.pull_request.base.sha }}" = "$expected_parent"
+          fi
+          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          changed="$(git diff --name-only "$expected_parent"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/security/res-sec-001a-autoresearch-quarantine-v1\.patch|\.github/workflows/res-sec-001a-autoresearch-quarantine\.yml)$' || true)"
+          test -z "$unexpected" || {
+            echo 'unexpected RES-SEC-001A scope:'
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Freeze current autonomous admission path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('src/symthaea/mod.rs').read_text()
+          start = text.index('"Scheduling autonomous research for unknown domain"')
+          end = text.index('// PHASE 7: PARTNERSHIP UPDATE', start)
+          block = text[start:end]
+          assert 'let db = self.database.clone();' in block
+          assert '.research_and_extend(&topic, &mut curriculum_clone, dimension, db)' in block
+          assert 'Ok(summary) => (Some(summary), Some(curriculum_clone), None)' in block
+          print('negative control: autonomous web research currently receives persistent DB authority and returns a curriculum for live adoption')
+          PY
+
+      - name: Freeze downstream verified-memory consequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'self.curriculum = curriculum;' src/symthaea/mod.rs
+          grep -F '.with_source(crate::memory::memory_coordinator::MemorySource::Internal)' src/symthaea/mod.rs
+          grep -F '.with_verification(true);' src/symthaea/mod.rs
+
+      - name: Apply exact quarantine candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/security/res-sec-001a-autoresearch-quarantine-v1.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet candidate-only autonomous research
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('src/symthaea/mod.rs').read_text()
+          start = text.index('"Scheduling autonomous research for unknown domain"')
+          end = text.index('// PHASE 7: PARTNERSHIP UPDATE', start)
+          block = text[start:end]
+          assert 'let db = self.database.clone();' not in block
+          assert '.research_and_extend(&topic, &mut curriculum_clone, dimension, None)' in block
+          assert '(Some(summary), None, None)' in block
+          assert 'Some(curriculum_clone)' not in block
+          assert 'live admission is quarantined' in block
+          PY
+
+      - name: Preserve broader boundary nonclaims
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This candidate intentionally does not claim to solve hostile-content
+          # interpretation inside the research worker itself. It only removes the
+          # autonomous persistence/live-admission capability path.
+          grep -F 'WebResearchResult.content' docs/architecture/RES_SEC_001_UNTRUSTED_EXTERNAL_CONTENT_BOUNDARY_V0_1.md 2>/dev/null || true
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Compile autonomous research feature combination
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features web_research_module,school_learning
+
+      - name: Strict Clippy
+        run: cargo +1.96.0 clippy --locked -p symthaea --lib --features web_research_module,school_learning -- -D warnings
+
+      - name: Restore product tree and prove qualification-only subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- src/symthaea/mod.rs
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Qualification statement
+        run: |
+          echo 'PASS establishes only that this exact candidate removes database authority and live-curriculum return from the autonomous web-research task.'
+          echo 'PASS does not establish prompt-injection immunity, safe manual research admission, semantic truth, scientific qualification, or a final curriculum admission policy.'
