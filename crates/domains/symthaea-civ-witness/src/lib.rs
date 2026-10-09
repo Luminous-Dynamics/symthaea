@@ -437,7 +437,7 @@ impl SqliteWitnessStore {
         anchor: &dyn IndependentAnchor,
         fault: Option<FaultPoint>,
     ) -> Result<Record, WitnessError> {
-        validate_input(log_id, initial_policy, receipt_sequence, receipt_digest)?;
+        validate_input(log_id, expected_generation, initial_policy, receipt_sequence, receipt_digest)?;
         let current = self.recover(log_id, anchor)?;
 
         if let Some(current) = current.as_ref() {
@@ -1338,10 +1338,19 @@ fn valid_receipt_tail(sequence: u64, digest: Option<Digest>) -> bool {
 
 fn validate_input(
     log_id: &str,
+    expected_generation: u64,
     policy: Option<&str>,
     sequence: u64,
     digest: Option<Digest>,
 ) -> Result<(), WitnessError> {
+    // Every transition proposes expected_generation + 1. Reject impossible
+    // SQLite generations before recovery performs any external-anchor I/O.
+    let candidate_generation = expected_generation
+        .checked_add(1)
+        .ok_or(WitnessError::GenerationOverflow)?;
+    if candidate_generation > i64::MAX as u64 {
+        return Err(WitnessError::GenerationOverflow);
+    }
     if log_id.is_empty() {
         return Err(WitnessError::InvalidInput("log ID is empty"));
     }
@@ -1810,6 +1819,49 @@ mod tests {
             store.integrity_check().expect("physical and semantic integrity"),
             "ok"
         );
+    }
+
+    #[test]
+    fn generation_overflow_is_rejected_before_anchor_read_or_state_mutation() {
+        let db = TempDb::new();
+        let store = db.open();
+        let log_id = "log-generation-range-guard";
+        let genesis = AnchorState::genesis(log_id);
+        let anchor = AdvanceDuringReadAnchor::new(
+            log_id,
+            genesis.clone(),
+            u64::MAX,
+            genesis.clone(),
+        );
+
+        assert!(matches!(
+            store.advance(
+                log_id,
+                u64::MAX,
+                h(b"unrepresentable-predecessor"),
+                h(b"must-not-be-prepared"),
+                0,
+                None,
+                &anchor,
+            ),
+            Err(WitnessError::GenerationOverflow)
+        ));
+        assert_eq!(
+            anchor.calls.load(Ordering::SeqCst),
+            0,
+            "unrepresentable generation must be rejected before any anchor read"
+        );
+        assert_eq!(
+            anchor.inner.current(log_id).expect("provisioned genesis"),
+            genesis,
+            "rejected generation must not mutate the external anchor"
+        );
+        assert_eq!(
+            store.load_history(log_id).expect("local history remains readable"),
+            History { accepted: None, prepared: None },
+            "rejected generation must not persist accepted or prepared records"
+        );
+        assert_eq!(store.integrity_check().expect("semantic integrity"), "ok");
     }
 
     #[test]
