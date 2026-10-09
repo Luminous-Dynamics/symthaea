@@ -1744,13 +1744,25 @@ struct WorkloadBuffer {
     memory_heap_flags: u32,
     memory_heap_size: u64,
     memory_requirement_alignment: u64,
+    buffer_usage_flags: u32,
+    sharing_mode_raw: i32,
+    binding_offset: u64,
+    map_offset: Cell<u64>,
+    map_size: Cell<u64>,
     write_flush_completed: Cell<bool>,
+    write_flush_offset: Cell<u64>,
+    write_flush_size: Cell<u64>,
     read_invalidate_completed: Cell<bool>,
+    read_invalidate_offset: Cell<u64>,
+    read_invalidate_size: Cell<u64>,
 }
 
 impl WorkloadBuffer {
     fn new(device: &Device, props: &vk::PhysicalDeviceMemoryProperties, size: u64) -> Result<Self, VulkanBarrierError> {
-        let info = vk::BufferCreateInfo::default().size(size).usage(vk::BufferUsageFlags::STORAGE_BUFFER).sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let info = vk::BufferCreateInfo::default()
+            .size(size)
+            .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let buffer = unsafe { device.create_buffer(&info, None).map_err(VulkanBarrierError::Vk)? };
         let req = unsafe { device.get_buffer_memory_requirements(buffer) };
         let mut selected = None;
@@ -1779,7 +1791,8 @@ impl WorkloadBuffer {
             Ok(m) => m,
             Err(error) => { unsafe { device.destroy_buffer(buffer, None); } return Err(VulkanBarrierError::Vk(error)); }
         };
-        if let Err(error) = unsafe { device.bind_buffer_memory(buffer, memory, 0) } {
+        let binding_offset = 0_u64;
+        if let Err(error) = unsafe { device.bind_buffer_memory(buffer, memory, binding_offset) } {
             unsafe { device.free_memory(memory, None); device.destroy_buffer(buffer, None); }
             return Err(VulkanBarrierError::Vk(error));
         }
@@ -1797,8 +1810,17 @@ impl WorkloadBuffer {
             memory_heap_flags: memory_heap.flags.as_raw(),
             memory_heap_size: memory_heap.size,
             memory_requirement_alignment: req.alignment,
+            buffer_usage_flags: info.usage.as_raw(),
+            sharing_mode_raw: info.sharing_mode.as_raw(),
+            binding_offset,
+            map_offset: Cell::new(0),
+            map_size: Cell::new(0),
             write_flush_completed: Cell::new(false),
+            write_flush_offset: Cell::new(0),
+            write_flush_size: Cell::new(0),
             read_invalidate_completed: Cell::new(false),
+            read_invalidate_offset: Cell::new(0),
+            read_invalidate_size: Cell::new(0),
         })
     }
 
@@ -1816,32 +1838,43 @@ impl WorkloadBuffer {
             memory_requirement_size: self.allocation_size,
             allocation_size: self.allocation_size,
             storage_size: self.storage_size,
-            buffer_usage_flags: vk::BufferUsageFlags::STORAGE_BUFFER.as_raw(),
-            sharing_mode_raw: vk::SharingMode::EXCLUSIVE.as_raw(),
-            binding_offset: 0,
-            map_offset: 0,
-            map_size: self.allocation_size,
+            buffer_usage_flags: self.buffer_usage_flags,
+            sharing_mode_raw: self.sharing_mode_raw,
+            binding_offset: self.binding_offset,
+            map_offset: self.map_offset.get(),
+            map_size: self.map_size.get(),
             write_flush_performed: flush_performed,
-            write_flush_offset: 0,
-            write_flush_size: if flush_performed { vk::WHOLE_SIZE } else { 0 },
+            write_flush_offset: self.write_flush_offset.get(),
+            write_flush_size: self.write_flush_size.get(),
             read_invalidate_performed: invalidate_performed,
-            read_invalidate_offset: 0,
-            read_invalidate_size: if invalidate_performed { vk::WHOLE_SIZE } else { 0 },
+            read_invalidate_offset: self.read_invalidate_offset.get(),
+            read_invalidate_size: self.read_invalidate_size.get(),
         }
     }
 
     fn write(&self, device: &Device, bytes: &[u8]) -> Result<(), VulkanBarrierError> {
         if bytes.len() as u64 > self.allocation_size { return Err(VulkanBarrierError::AllocationOverflow); }
-        let mapped = unsafe { device.map_memory(self.memory, 0, self.allocation_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        let map_offset = 0_u64;
+        let map_size = self.allocation_size;
+        let mapped = unsafe { device.map_memory(self.memory, map_offset, map_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        self.map_offset.set(map_offset);
+        self.map_size.set(map_size);
         unsafe {
             ptr::copy_nonoverlapping(bytes.as_ptr(), mapped.cast::<u8>(), bytes.len());
             if bytes.len() < self.allocation_size as usize { ptr::write_bytes(mapped.cast::<u8>().add(bytes.len()), 0, self.allocation_size as usize - bytes.len()); }
             if !self.coherent {
-                let range = vk::MappedMemoryRange::default().memory(self.memory).offset(0).size(vk::WHOLE_SIZE);
+                let range_offset = 0_u64;
+                let range_size = vk::WHOLE_SIZE;
+                let range = vk::MappedMemoryRange::default()
+                    .memory(self.memory)
+                    .offset(range_offset)
+                    .size(range_size);
                 if let Err(error) = device.flush_mapped_memory_ranges(std::slice::from_ref(&range)) {
                     device.unmap_memory(self.memory);
                     return Err(VulkanBarrierError::Vk(error));
                 }
+                self.write_flush_offset.set(range_offset);
+                self.write_flush_size.set(range_size);
                 self.write_flush_completed.set(true);
             }
             device.unmap_memory(self.memory);
@@ -1853,11 +1886,18 @@ impl WorkloadBuffer {
         if len as u64 > self.allocation_size { return Err(VulkanBarrierError::AllocationOverflow); }
         let mapped = unsafe { device.map_memory(self.memory, 0, self.allocation_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
         if !self.coherent {
-            let range = vk::MappedMemoryRange::default().memory(self.memory).offset(0).size(vk::WHOLE_SIZE);
+            let range_offset = 0_u64;
+            let range_size = vk::WHOLE_SIZE;
+            let range = vk::MappedMemoryRange::default()
+                .memory(self.memory)
+                .offset(range_offset)
+                .size(range_size);
             if let Err(error) = unsafe { device.invalidate_mapped_memory_ranges(std::slice::from_ref(&range)) } {
                 unsafe { device.unmap_memory(self.memory); }
                 return Err(VulkanBarrierError::Vk(error));
             }
+            self.read_invalidate_offset.set(range_offset);
+            self.read_invalidate_size.set(range_size);
             self.read_invalidate_completed.set(true);
         }
         let mut bytes = vec![0_u8; len];
