@@ -492,6 +492,17 @@ mod tests {
         assert_eq!(receipt.frontier_after.event_count, 1);
         assert_eq!(receipt.frontier_after.tail_digest, event.event_digest);
         assert_ne!(receipt.receipt_digest, event.event_digest);
+        // Frozen independently from the Rust implementation: the fixture uses
+        // log-a, epoch 7, empty prior frontier, accepted head (generation 4,
+        // digest 0x04..), fork generation 4, and record digests 0x05../0x06...
+        assert_eq!(
+            event.event_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+            "85a478bb7489447b24b8874b8e0bcdb4ae143cd856174695e155ae4114c16dff",
+        );
+        assert_eq!(
+            receipt.receipt_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+            "06df505452cc1ef6c45c717084da3f15c89f34958cee5ff0fdd4441bfb03b926",
+        );
     }
 
     #[test]
