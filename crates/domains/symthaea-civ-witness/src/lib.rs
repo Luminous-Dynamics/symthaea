@@ -1766,6 +1766,45 @@ mod tests {
     }
 
     #[test]
+    fn receipt_sequence_above_sqlite_integer_range_fails_without_state_mutation() {
+        let db = TempDb::new();
+        let store = db.open();
+        let anchor = MemoryAnchor::default();
+        let log_id = "log-receipt-sequence-out-of-range";
+        anchor.provision(log_id);
+        let initial_anchor = anchor.current(log_id).expect("read provisioned genesis");
+
+        assert!(matches!(
+            store.initialize(
+                log_id,
+                "policy-v1",
+                h(b"out-of-range-receipt-sequence-checkpoint"),
+                (i64::MAX as u64) + 1,
+                Some(h(b"out-of-range-receipt-sequence")),
+                &anchor,
+            ),
+            Err(WitnessError::InvalidInput(
+                "receipt sequence exceeds SQLite INTEGER range"
+            ))
+        ));
+
+        assert_eq!(
+            anchor.current(log_id).expect("anchor remains readable"),
+            initial_anchor,
+            "invalid sequence must be rejected before observing or advancing the anchor"
+        );
+        let history = store
+            .load_history(log_id)
+            .expect("read untouched local history");
+        assert!(history.accepted.is_none());
+        assert!(history.prepared.is_none());
+        assert_eq!(
+            store.integrity_check().expect("physical and semantic integrity"),
+            "ok"
+        );
+    }
+
+    #[test]
     fn linked_sqlite_includes_wal_reset_fix() {
         let actual = rusqlite::version_number();
         assert_eq!(
