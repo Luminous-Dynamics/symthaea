@@ -63,6 +63,11 @@ CREATE TABLE IF NOT EXISTS witness_fork_evidence (
     CHECK (previous_evidence_digest IS NULL OR length(previous_evidence_digest) = 32),
     UNIQUE (log_id, digest)
 );
+CREATE TABLE IF NOT EXISTS witness_fork_meta (
+    log_id TEXT PRIMARY KEY NOT NULL,
+    evidence_count INTEGER NOT NULL CHECK (evidence_count > 0),
+    tail_digest BLOB NOT NULL CHECK (length(tail_digest) = 32)
+);
 CREATE INDEX IF NOT EXISTS witness_records_status_idx
     ON witness_records(log_id, status, generation);
 ";
@@ -1036,6 +1041,12 @@ fn append_fork_evidence(
             "fork evidence must contain distinct record digests",
         ));
     }
+
+    let row_count: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
+        params![log_id],
+        |row| row.get(0),
+    )?;
     let previous_blob: Option<Vec<u8>> = tx
         .query_row(
             "SELECT digest FROM witness_fork_evidence
@@ -1045,9 +1056,30 @@ fn append_fork_evidence(
         )
         .optional()?;
     let previous = previous_blob.as_deref().map(blob_digest).transpose()?;
+    let prior_meta: Option<(i64, Vec<u8>)> = tx
+        .query_row(
+            "SELECT evidence_count, tail_digest FROM witness_fork_meta WHERE log_id=?1",
+            params![log_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+
+    match (row_count, previous, prior_meta) {
+        (0, None, None) => {}
+        (count, Some(tail), Some((meta_count, meta_tail)))
+            if count > 0
+                && meta_count == count
+                && blob_digest(&meta_tail)
+                    .map_err(|_| WitnessError::CorruptForkEvidence)? == tail => {}
+        _ => return Err(WitnessError::CorruptForkEvidence),
+    }
+
+    let next_count = row_count
+        .checked_add(1)
+        .ok_or(WitnessError::CorruptForkEvidence)?;
     let digest = fork_digest(log_id, generation, first_digest, conflicting_digest, previous);
     tx.execute(
-        "INSERT OR IGNORE INTO witness_fork_evidence (
+        "INSERT INTO witness_fork_evidence (
             log_id, generation, first_record_digest, conflicting_record_digest,
             previous_evidence_digest, digest
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -1059,6 +1091,14 @@ fn append_fork_evidence(
             previous.map(|value| value.to_vec()),
             digest.as_slice()
         ],
+    )?;
+    tx.execute(
+        "INSERT INTO witness_fork_meta (log_id, evidence_count, tail_digest)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(log_id) DO UPDATE SET
+            evidence_count=excluded.evidence_count,
+            tail_digest=excluded.tail_digest",
+        params![log_id, next_count, digest.as_slice()],
     )?;
     Ok(())
 }
@@ -1080,29 +1120,51 @@ fn validate_fork_history(conn: &Connection, log_id: &str) -> Result<(), WitnessE
             ))
         })?
         .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
     let mut previous: Option<Digest> = None;
-    for (generation, first, conflicting, prev, digest) in rows {
-        if generation <= 0 {
+    for (generation, first, conflicting, prev, digest) in &rows {
+        if *generation <= 0 {
             return Err(WitnessError::CorruptForkEvidence);
         }
-        let first = blob_digest(&first).map_err(|_| WitnessError::CorruptForkEvidence)?;
+        let first = blob_digest(first).map_err(|_| WitnessError::CorruptForkEvidence)?;
         let conflicting =
-            blob_digest(&conflicting).map_err(|_| WitnessError::CorruptForkEvidence)?;
+            blob_digest(conflicting).map_err(|_| WitnessError::CorruptForkEvidence)?;
         let stored_previous = prev
             .as_deref()
             .map(blob_digest)
             .transpose()
             .map_err(|_| WitnessError::CorruptForkEvidence)?;
         let stored_digest =
-            blob_digest(&digest).map_err(|_| WitnessError::CorruptForkEvidence)?;
-        if first == conflicting || stored_previous != previous
-            || stored_digest != fork_digest(log_id, generation as u64, first, conflicting, previous)
+            blob_digest(digest).map_err(|_| WitnessError::CorruptForkEvidence)?;
+        if first == conflicting
+            || stored_previous != previous
+            || stored_digest
+                != fork_digest(log_id, *generation as u64, first, conflicting, previous)
         {
             return Err(WitnessError::CorruptForkEvidence);
         }
         previous = Some(stored_digest);
     }
-    Ok(())
+
+    let stored_meta: Option<(i64, Vec<u8>)> = conn
+        .query_row(
+            "SELECT evidence_count, tail_digest FROM witness_fork_meta WHERE log_id=?1",
+            params![log_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let actual_count =
+        i64::try_from(rows.len()).map_err(|_| WitnessError::CorruptForkEvidence)?;
+    match (actual_count, previous, stored_meta) {
+        (0, None, None) => Ok(()),
+        (count, Some(tail), Some((meta_count, meta_tail)))
+            if count > 0
+                && meta_count == count
+                && blob_digest(&meta_tail)
+                    .map_err(|_| WitnessError::CorruptForkEvidence)? == tail => Ok(()),
+        _ => Err(WitnessError::CorruptForkEvidence),
+    }
 }
 
 fn valid_receipt_tail(sequence: u64, digest: Option<Digest>) -> bool {
@@ -2186,6 +2248,50 @@ mod tests {
             store.load_history("replayed-as-another-log"),
             Err(WitnessError::CorruptForkEvidence)
         ));
+    }
+
+    #[test]
+    fn fork_evidence_tail_truncation_is_detected() {
+        let db = TempDb::new();
+        let store = db.open();
+        let log_id = "log-fork-tail-truncated";
+        let first = h(b"fork-tail-first-record");
+        let conflicting = h(b"fork-tail-conflicting-record");
+        store
+            .record_fork(log_id, 2, first, conflicting)
+            .expect("append first fork evidence");
+        store
+            .record_fork(log_id, 3, h(b"fork-tail-second-first"), h(b"fork-tail-second-conflict"))
+            .expect("append second fork evidence");
+        {
+            let conn = store.open_connection().expect("open fork store");
+            assert_eq!(validate_fork_history(&conn, log_id), Ok(()));
+            conn.execute(
+                "DELETE FROM witness_fork_evidence WHERE log_id=?1 AND id=(
+                    "SELECT MAX(id) FROM witness_fork_evidence WHERE log_id=?1)",
+                params![log_id],
+            )
+            .expect("truncate last evidence row");
+        }
+        let conn = store.open_connection().expect("reopen fork store");
+        assert!(matches!(validate_fork_history(&conn, log_id), Err(WitnessError::CorruptForkEvidence)));
+    }
+
+    #[test]
+    fn fork_evidence_tail_pointer_tampering_is_detected() {
+        let db = TempDb::new();
+        let store = db.open();
+        let log_id = "log-fork-tail-pointer-tampered";
+        store
+            .record_fork(log_id, 2, h(b"fork-pointer-first"), h(b"fork-pointer-conflict"))
+            .expect("append fork evidence");
+        let conn = store.open_connection().expect("open fork store");
+        conn.execute(
+            "UPDATE witness_fork_meta SET tail_digest=?1 WHERE log_id=?2",
+            params![h(b"wrong-tail-pointer").as_slice(), log_id],
+        )
+        .expect("tamper fork tail pointer");
+        assert!(matches!(validate_fork_history(&conn, log_id), Err(WitnessError::CorruptForkEvidence)));
     }
 
     #[test]
