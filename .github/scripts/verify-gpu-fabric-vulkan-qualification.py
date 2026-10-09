@@ -683,6 +683,7 @@ def verify_memory_lowering_contract(
         if (
             memory_requirement_size != allocation_size
             or allocation_size < expected_storage_size
+            or allocation_size > memory_heap_size
             or storage_size != expected_storage_size
         ):
             fail(f"{name}: memory requirements/allocation/storage sizes disagree for {resource}")
