@@ -2265,7 +2265,7 @@ mod tests {
             .expect("append second fork evidence");
         {
             let conn = store.open_connection().expect("open fork store");
-            assert_eq!(validate_fork_history(&conn, log_id), Ok(()));
+            assert!(validate_fork_history(&conn, log_id).is_ok());
             conn.execute(
                 "DELETE FROM witness_fork_evidence WHERE log_id=?1 AND id=(
                     "SELECT MAX(id) FROM witness_fork_evidence WHERE log_id=?1)",
