@@ -375,3 +375,19 @@ The root crate already depends on BLAKE3, so this change adds no dependency. Fiv
 This supports the NIST AI RMF's Measure function and AI Resource Center's TEVV framing, which emphasize suitable test methods, measurable uncertainty, and documented evaluation practice ([NIST AI RMF](https://www.nist.gov/itl/ai-risk-management-framework); [NIST AI Resource Center](https://airc.nist.gov/)). It also supports the W3C PROV distinction between a produced data entity and the activity/agent responsible for it ([PROV-N overview](https://www.w3.org/TR/prov-n/)). These standards inform design; the implementation claims neither NIST validation nor full W3C PROV conformance.
 
 Tests remain authored but unexecuted, and the current PR is still draft. The next qualification step is execution against the exact head, followed by a versioned canonical context schema and an adapter whose captured source bytes can be independently compared against the computed subject.
+
+
+### Descriptive norms are not normative authority — 2026-10-09
+
+A recent paper, [“Large language models outperform humans at estimating society's everyday norms”](https://www.nature.com/articles/s44488-026-00018-8), published 1 September 2026, studies six LLMs across 555 everyday scenarios and compares predictions with 320 human participants. This is useful work on **descriptive norm estimation**—predicting what people in a studied population tend to regard as appropriate—not evidence that those norms are justified, universal, or morally binding.
+
+For Symthaea, represent these as different claim types:
+
+- **Descriptive norm estimate:** a population- and dataset-scoped empirical claim about what respondents tend to approve/disapprove of, with dataset version, geography/culture/population, sampling method, uncertainty, and date.
+- **Normative premise/rule:** a value, duty, right, or justification rule that needs its own provenance and declared scope.
+- **Application judgment:** the result of applying stated normative rules to explicit facts/context, including uncertainty about which contextual features are morally relevant.
+- **Operational authorization:** a separate security/safety decision, never inferred solely from a majority preference or social-norm estimate.
+
+A descriptive estimate can inform context or reveal stakeholder expectations; it must not be silently converted into a premise saying that the majority is right. Likewise, observed cultural or institutional norms should not automatically override consent, rights, or safety boundaries. This separation complements the 2026 argument that evaluations should test both value representation and context-sensitive norm application ([Kierans et al.](https://arxiv.org/abs/2608.14566)).
+
+The subject fingerprint in [PR #7283](https://github.com/Luminous-Dynamics/symthaea/pull/7283) now allows exact scenario/action bytes to be bound to an assessment, but the claim type, dataset scope, and provenance still need to be supplied by a future evidence/context layer. Hashing a norm statement does not validate the norm.
