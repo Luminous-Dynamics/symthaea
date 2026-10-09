@@ -2514,27 +2514,41 @@ mod tests {
         let mut profiles = test_resource_memory_profiles(&storage_sizes);
         let baseline = resource_memory_profiles_digest(&profiles);
         let lhs = ResourceId::new("lhs").unwrap();
-        let profile = profiles.get_mut(&lhs).unwrap();
-        profile.memory_type_index = 1;
-        profile.memory_type_bits = 2;
+
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.memory_type_index = 1;
+            profile.memory_type_bits = 2;
+        }
         assert_ne!(baseline, resource_memory_profiles_digest(&profiles));
-        profile.memory_type_index = 0;
-        profile.memory_type_bits = 1;
-        assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.memory_type_index = 0;
+            profile.memory_type_bits = 1;
+            assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        }
         let coherent_digest = resource_memory_profiles_digest(&profiles);
-        profile.memory_property_flags = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
-        assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
-        profile.write_flush_performed = true;
-        profile.write_flush_size = vk::WHOLE_SIZE;
-        profile.read_invalidate_performed = true;
-        profile.read_invalidate_size = vk::WHOLE_SIZE;
-        assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.memory_property_flags = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+            profile.write_flush_performed = true;
+            profile.write_flush_size = vk::WHOLE_SIZE;
+            profile.read_invalidate_performed = true;
+            profile.read_invalidate_size = vk::WHOLE_SIZE;
+            assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        }
         assert_ne!(coherent_digest, resource_memory_profiles_digest(&profiles));
-        profile.write_flush_size = 4;
-        assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
-        profile.write_flush_size = vk::WHOLE_SIZE;
-        profile.read_invalidate_size = 4;
-        assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.write_flush_size = 4;
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+            profile.write_flush_size = vk::WHOLE_SIZE;
+            profile.read_invalidate_size = 4;
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        }
     }
 
     #[test]
