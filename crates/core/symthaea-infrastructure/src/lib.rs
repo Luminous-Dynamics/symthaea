@@ -15,6 +15,7 @@ pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod load_registry;
+pub mod load_registry_verifier;
 #[cfg(feature = "grid_physics")]
 pub mod grid_physics_simulator;
 pub mod perturbations;
