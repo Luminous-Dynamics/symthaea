@@ -120,6 +120,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Ubuntu image does not guarantee ripgrep is preinstalled.
+      - name: Install observation-boundary checker dependency
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       # CROSS-015 is a source-boundary regression fence. It deliberately checks
       # the protected authority modules rather than claiming that grep proves
       # semantic authority correctness. Future effect-binding/adapter modules
