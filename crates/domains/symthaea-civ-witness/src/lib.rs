@@ -2490,6 +2490,48 @@ mod tests {
     }
 
     #[test]
+    fn recovery_does_not_record_genesis_digest_mismatch_as_fork_evidence() {
+        let db = TempDb::new();
+        let store = db.open();
+        let anchor = MemoryAnchor::default();
+        let log_id = "log-recovery-genesis-anchor-mismatch";
+        anchor.provision(log_id);
+        let malformed_genesis_digest = h(b"nonzero-genesis-anchor-digest");
+        assert_ne!(malformed_genesis_digest, ZERO_DIGEST);
+        anchor
+            .states
+            .lock()
+            .expect("anchor state lock")
+            .insert(
+                log_id.to_owned(),
+                AnchorState {
+                    log_id: log_id.to_owned(),
+                    generation: 0,
+                    record_digest: malformed_genesis_digest,
+                },
+            );
+
+        assert!(matches!(
+            store.recover(log_id, &anchor),
+            Err(WitnessError::ExternalAnchorMismatch)
+        ));
+
+        let history = store.load_history(log_id).expect("genesis-local history remains valid");
+        assert!(history.accepted.is_none());
+        assert!(history.prepared.is_none());
+        let conn = store.open_connection().expect("open genesis fork query");
+        let fork_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM witness_fork_evidence WHERE log_id=?1",
+                params![log_id],
+                |row| row.get(0),
+            )
+            .expect("count generation-zero fork evidence");
+        assert_eq!(fork_count, 0, "genesis is not a record and must not be forked");
+        assert_eq!(store.integrity_check().expect("semantic integrity"), "ok");
+    }
+
+    #[test]
     fn anchor_that_advances_past_candidate_is_not_recorded_as_same_generation_fork() {
         let db = TempDb::new();
         let store = db.open();
