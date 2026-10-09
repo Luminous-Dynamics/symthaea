@@ -301,6 +301,8 @@ mod tests {
                     * mode
                     * (std::f64::consts::PI * final_time).sin();
                 let du = numerical[i] - exact_u;
+                // Normalize velocity by the continuum frequency so both state
+                // components have comparable scales in the combined error norm.
                 let dv_scaled = (numerical[n + i] - exact_v) / std::f64::consts::PI;
                 squared_displacement_error += du * du;
                 squared_velocity_error += dv_scaled * dv_scaled;
