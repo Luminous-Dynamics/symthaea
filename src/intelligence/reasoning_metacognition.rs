@@ -1021,7 +1021,10 @@ mod tests {
         assert_eq!(report.calibration_bins[0].empirical_accuracy, None);
         assert_eq!(report.calibration_bins[0].accuracy_lower_95, None);
         assert_eq!(report.task_family_calibration[1].calibration_bins[9].episodes, 5);
-        assert_eq!(report.task_family_calibration[1].calibration_bins[9].empirical_accuracy, Some(0.8));
+        assert_eq!(
+            report.task_family_calibration[1].calibration_bins[9].empirical_accuracy,
+            Some(0.8)
+        );
         let pooled_width = pooled_top_bin.accuracy_upper_95.unwrap_or_default()
             - pooled_top_bin.accuracy_lower_95.unwrap_or_default();
         let subgroup_bin = report.task_family_calibration[1].calibration_bins[9];
