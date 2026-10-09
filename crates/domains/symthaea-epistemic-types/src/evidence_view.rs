@@ -98,6 +98,11 @@ impl EvidenceView {
         groups: &[RetrievedMemory],
         receipt: &MemoryRetrievalReceipt,
     ) -> Result<Self, EvidenceViewError> {
+        // A selected item with no representations is not evidence. Fail closed even
+        // if a caller recomputes an internally consistent unkeyed receipt digest.
+        if groups.iter().any(|group| group.representations.is_empty()) {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
         let mut items = groups.iter().map(|group| {
             let mut representations = group.representations.iter().map(|candidate| {
                 EvidenceViewRepresentation {
@@ -297,7 +302,7 @@ mod tests {
             vec![candidate("claim:x", 0.7, "family:a")],
         );
         receipt.provenance_families = vec!["family:other".into()];
-        receipt.receipt_digest = receipt.canonical_digest();
+        receipt.receipt_digest = receipt.canonical_digest().expect("test receipt canonicalization");
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
             Err(EvidenceViewError::ReceiptMismatch)
@@ -314,7 +319,7 @@ mod tests {
             ],
         );
         receipt.selected_representation_digests.swap(0, 1);
-        receipt.receipt_digest = receipt.canonical_digest();
+        receipt.receipt_digest = receipt.canonical_digest().expect("test receipt canonicalization");
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
             Err(EvidenceViewError::ReceiptMismatch)
@@ -328,7 +333,7 @@ mod tests {
             vec![candidate("claim:x", 0.7, "family:a")],
         );
         receipt.selected_projection_identity_digests[0].1 = "tampered-projection".into();
-        receipt.receipt_digest = receipt.canonical_digest();
+        receipt.receipt_digest = receipt.canonical_digest().expect("test receipt canonicalization");
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
             Err(EvidenceViewError::ReceiptMismatch)
@@ -367,13 +372,28 @@ mod tests {
     }
 
     #[test]
+    fn selected_identity_with_no_representations_is_rejected() {
+        let (groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![candidate("claim:x", 0.7, "family:a")],
+        );
+        let verified = receipt.verify().unwrap();
+        let mut malformed = groups;
+        malformed[0].representations.clear();
+        assert_eq!(
+            EvidenceView::from_verified_retrieval(&malformed, &verified),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
     fn mismatched_representation_digest_is_rejected() {
         let (groups, mut receipt) = retrieve(
             &MemoryRetrievalRequest::historical("f:1", "q", 5),
             vec![candidate("claim:x", 0.7, "family:a")],
         );
         receipt.selected_representation_digests[0] = "tampered".into();
-        receipt.receipt_digest = receipt.canonical_digest();
+        receipt.receipt_digest = receipt.canonical_digest().expect("test receipt canonicalization");
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
             Err(EvidenceViewError::ReceiptMismatch)
