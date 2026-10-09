@@ -629,7 +629,7 @@ pub struct SurpriseMapState {
 }
 
 /// Current serialized delayed-horizon evaluator schema.
-pub const DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION: u32 = 3;
+pub const DELAYED_HORIZON_EVALUATOR_STATE_SCHEMA_VERSION: u32 = 4;
 
 fn default_delayed_horizon_max_lateness_factor() -> f32 {
     4.0
@@ -659,6 +659,9 @@ pub struct HorizonAccumulatorState {
     pub samples: u64,
     /// Forecasts not issued because the bounded pending queue was full.
     pub dropped_forecasts: u64,
+    /// Invalid predicted vectors or matured forecasts excluded from scoring.
+    #[serde(default)]
+    pub rejected_forecasts: u64,
     /// Matured forecasts discarded because the observation arrived too late
     /// to represent the requested horizon faithfully.
     #[serde(default)]
