@@ -83,6 +83,7 @@ enum Failure {
     EmptyLogId,
     InvalidReceiptTailShape,
     ReceiptRollback,
+    ReceiptTailEquivocation,
     StalePredecessor,
     GenerationOverflow,
     JournalCorrupt,
@@ -486,6 +487,11 @@ impl WitnessModel {
         if receipt_sequence < current.receipt_sequence {
             return Err(Failure::ReceiptRollback);
         }
+        if receipt_sequence == current.receipt_sequence
+            && receipt_digest != current.receipt_digest
+        {
+            return Err(Failure::ReceiptTailEquivocation);
+        }
         let generation = current
             .generation
             .checked_add(1)
@@ -857,6 +863,22 @@ fn main() {
             None,
         ),
         Err(Failure::ReceiptRollback)
+    );
+    let count_before_equivocation = receipt_rollback.disk.records.len();
+    assert_eq!(
+        receipt_rollback.advance(
+            accepted.generation,
+            accepted.digest,
+            proposed_anchor,
+            4,
+            Some(hash_bytes(b"different-receipt-at-same-sequence")),
+            None,
+        ),
+        Err(Failure::ReceiptTailEquivocation)
+    );
+    assert_eq!(
+        receipt_rollback.disk.records.len(),
+        count_before_equivocation
     );
 
     assert_eq!(
