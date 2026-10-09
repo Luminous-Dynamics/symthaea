@@ -3,6 +3,7 @@
 import hashlib
 import json
 import struct
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -88,6 +89,14 @@ def semantic_failure(receipt):
 
     if len(selected) != len(set(selected)):
         return "DuplicateSelectedIdentity"
+
+    for identity in selected:
+        if identity == "":
+            return "InvalidSelectedIdentity(Empty)"
+        if not identity.strip():
+            return "InvalidSelectedIdentity(WhitespaceOnly)"
+        if any(unicodedata.category(ch) == "Cc" for ch in identity):
+            return "InvalidSelectedIdentity(ControlCharacter)"
 
     selected_set = set(selected)
     projection_bindings = sorted(
