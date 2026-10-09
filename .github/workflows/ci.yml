@@ -120,6 +120,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Ubuntu runner images do not guarantee ripgrep is preinstalled, and the
+      # source-boundary checker uses rg's PCRE2/multiline modes for its corpus.
+      - name: Install observation-boundary checker dependency
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       # CROSS-015 is a source-boundary regression fence. It deliberately checks
       # the protected authority modules rather than claiming that grep proves
       # semantic authority correctness. Future effect-binding/adapter modules
