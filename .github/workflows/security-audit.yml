@@ -21,8 +21,8 @@ concurrency:
 jobs:
   audit:
     name: Shared security audit
-    uses: Luminous-Dynamics/luminous-platform/.github/workflows/security-audit.yml@0d1e2bec5981ddd273333fa36b87ddc67b7d5944
+    uses: Luminous-Dynamics/luminous-platform/.github/workflows/security-audit.yml@571431e5b59f3c1896ad4bd5d7896f2bd59b2c0f
     with:
       subject_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      audit_engine_sha: 0d1e2bec5981ddd273333fa36b87ddc67b7d5944
+      audit_engine_sha: 571431e5b59f3c1896ad4bd5d7896f2bd59b2c0f
       audit_rust: true
