@@ -17,11 +17,24 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 API = "https://api.github.com"
 API_VERSION = "2022-11-28"
 STATUS_CONTEXT = "Security Audit / Independent Verifier"
+VERDICT_MAX_AGE = timedelta(days=7)
+VERDICT_FUTURE_SKEW = timedelta(minutes=5)
+
+
+def reject_duplicate_object_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects instead of accepting the last duplicate key."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise VerificationError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
 ENGINE_REPO = "Luminous-Dynamics/luminous-platform"
 ENGINE_SHA = "15f8135368e6162ca9b07861713a567f95fe765a"
 ENGINE_PATH = ".github/workflows/security-audit.yml"
@@ -211,6 +224,18 @@ def download_artifact_zip(repo: str, artifact_id: int, token: str) -> bytes:
 def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[str, Any]) -> None:
     if not isinstance(verdict, dict):
         raise VerificationError("verdict artifact is not a JSON object")
+    expected_keys = {
+        "schema", "repository", "subject_sha", "audit_engine_sha", "workflow_ref", "workflow_sha",
+        "workflow_run_url", "generated_at_utc", "aggregate_artifact_retention_days", "run_id",
+        "run_attempt", "workflow_job_result", "rustsec_job_result", "npm_job_result", "audit_rust",
+        "audit_node", "required_lanes", "non_blocking_findings_present", "non_blocking_finding_sources",
+        "status", "failure_reasons", "evidence_files",
+    }
+    if set(verdict) != expected_keys:
+        missing = sorted(expected_keys - set(verdict))
+        extra = sorted(set(verdict) - expected_keys)
+        raise VerificationError(f"verdict fields differ from the v1 contract (missing={missing}, extra={extra})")
+
     subject = sha(run.get("head_sha"), "run.head_sha")
     attempt = run.get("run_attempt")
     required = verdict.get("required_lanes")
@@ -222,6 +247,35 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
         raise VerificationError("verdict run ID/attempt does not match the authoritative run")
     if verdict.get("workflow_job_result") != "success":
         raise VerificationError("verdict does not record a successful workflow-security lane")
+
+    workflow_ref = verdict.get("workflow_ref")
+    expected_ref_prefix = f"{repo}/{policy['workflow_path']}@"
+    if not isinstance(workflow_ref, str) or not workflow_ref.startswith(expected_ref_prefix):
+        raise VerificationError("verdict workflow_ref does not name the policy-expected caller workflow")
+    ref_suffix = workflow_ref[len(expected_ref_prefix):]
+    if not re.fullmatch(r"refs/pull/[1-9][0-9]*/merge", ref_suffix):
+        raise VerificationError("verdict workflow_ref is not the expected pull-request merge ref")
+    sha(verdict.get("workflow_sha"), "verdict.workflow_sha")
+    if verdict.get("workflow_run_url") != run.get("html_url") or not isinstance(run.get("html_url"), str):
+        raise VerificationError("verdict run URL does not match the authoritative GitHub run")
+
+    generated = verdict.get("generated_at_utc")
+    if not isinstance(generated, str) or not re.fullmatch(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", generated
+    ):
+        raise VerificationError("verdict timestamp is not canonical UTC")
+    try:
+        generated_at = datetime.fromisoformat(generated.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise VerificationError("verdict timestamp is not a valid UTC date-time") from exc
+    now = datetime.now(timezone.utc)
+    if generated_at > now + VERDICT_FUTURE_SKEW:
+        raise VerificationError("verdict timestamp is too far in the future")
+    if now - generated_at > VERDICT_MAX_AGE:
+        raise VerificationError("verdict evidence is older than the seven-day freshness limit")
+    if verdict.get("aggregate_artifact_retention_days") != 30:
+        raise VerificationError("verdict retention contract differs from the v1 policy")
+
     if verdict.get("audit_rust") is not policy["audit_rust"] or verdict.get("audit_node") is not policy["audit_node"]:
         raise VerificationError("verdict requested-lane flags differ from the base-owned coverage policy")
     if not isinstance(required, dict) or required.get("workflow_security") != "PASS":
@@ -232,8 +286,12 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
         raise VerificationError("one or more required dependency-audit lanes are absent or not PASS")
     if policy["audit_rust"] and verdict.get("rustsec_job_result") != "success":
         raise VerificationError("RustSec job result is not success although the lane is required")
+    if not policy["audit_rust"] and verdict.get("rustsec_job_result") != "skipped":
+        raise VerificationError("RustSec job must be skipped when Rust auditing was not requested")
     if policy["audit_node"] and verdict.get("npm_job_result") != "success":
         raise VerificationError("npm job result is not success although the lane is required")
+    if not policy["audit_node"] and verdict.get("npm_job_result") != "skipped":
+        raise VerificationError("npm job must be skipped when npm auditing was not requested")
     if policy.get("engine_sha") and verdict.get("audit_engine_sha") != policy["engine_sha"]:
         raise VerificationError("verdict engine SHA differs from the trusted immutable engine pin")
     if not policy.get("engine_sha"):
@@ -352,7 +410,7 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
             if info.file_size > 1024 * 1024:
                 raise VerificationError("verdict.json exceeds the 1 MiB parsing limit")
             verdict_bytes = zf.read(info)
-        verdict = json.loads(verdict_bytes)
+        verdict = json.loads(verdict_bytes, object_pairs_hook=reject_duplicate_object_keys)
         if not isinstance(verdict, dict):
             raise VerificationError("verdict artifact is not a JSON object")
         validate_evidence_manifest(zf, entries, verdict)
