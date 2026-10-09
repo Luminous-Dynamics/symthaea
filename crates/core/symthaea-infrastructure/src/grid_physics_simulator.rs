@@ -306,7 +306,7 @@ impl LoadServiceReport {
             grid_supply_to_load_kwh: 0.0,
             unused_storage_supply_kwh: (storage_discharge_kwh - total_served).max(0.0),
             battery_charge_input_kwh,
-            noncritical_unserved_kwh: 0.0,
+            noncritical_unserved_kwh: protected_cooling_unserved,
         }
     }
 
@@ -338,6 +338,12 @@ impl LoadServiceReport {
         };
         values.iter().all(|value| value.is_finite() && *value >= 0.0)
             && close(
+                self.critical_demand_kwh + self.deferrable_demand_kwh
+                    + self.community_auxiliary_demand_kwh + self.cooling_demand_kwh
+                    + self.heating_demand_kwh,
+                self.total_demand_kwh,
+            )
+            && close(
                 self.total_served_kwh + self.intentional_shed_kwh + self.total_unserved_kwh,
                 self.total_demand_kwh,
             )
@@ -363,9 +369,22 @@ impl LoadServiceReport {
                 self.heating_demand_kwh,
             )
             && close(
+                self.auxiliary_demand_kwh,
+                self.community_auxiliary_demand_kwh + self.cooling_demand_kwh
+                    + self.heating_demand_kwh,
+            )
+            && close(
                 self.auxiliary_served_kwh + self.auxiliary_shed_kwh
                     + self.protected_cooling_unserved_kwh,
                 self.auxiliary_demand_kwh,
+            )
+            && close(
+                self.noncritical_unserved_kwh,
+                self.protected_cooling_unserved_kwh,
+            )
+            && close(
+                self.total_unserved_kwh,
+                self.critical_unserved_kwh + self.noncritical_unserved_kwh,
             )
             && close(
                 self.storage_supply_to_load_kwh + self.grid_supply_to_load_kwh,
@@ -1250,6 +1269,7 @@ mod failure_mode_tests {
         assert!(report.protected_cooling_unserved_kwh > 0.0);
         assert_eq!(report.cooling_shed_kwh, 0.0);
         assert!(report.total_unserved_kwh > 0.0);
+        assert_eq!(report.noncritical_unserved_kwh, report.protected_cooling_unserved_kwh);
         assert!(report.energy_balance_residual_kwh().abs() < 1e-12);
     }
 
