@@ -145,7 +145,7 @@ pub fn realize_groove_cycle(
     let score_end = score
         .notes
         .iter()
-        .map(|note| (note.onset + note.duration).beats())
+        .filter_map(|note| note.onset.checked_add(note.duration).map(|end| end.beats()))
         .fold(0.0f64, f64::max);
     let total_cycles = (score_end / cycle_beats).ceil().max(1.0) as usize;
     let sections = sections(total_cycles, intent.seed);
