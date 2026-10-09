@@ -1126,6 +1126,7 @@ impl SqliteWitnessStore {
              UNION SELECT log_id FROM witness_records
              UNION SELECT log_id FROM witness_fork_evidence
              UNION SELECT log_id FROM witness_fork_meta
+             UNION SELECT log_id FROM witness_external_fork_events
              ORDER BY log_id ASC",
         )?;
         let log_ids = statement
@@ -1134,6 +1135,8 @@ impl SqliteWitnessStore {
         drop(statement);
         for log_id in log_ids {
             Self::load_history_from_connection(&conn, &log_id)?;
+            fork_witness::validate_external_fork_journal(&conn, &log_id)
+                .map_err(WitnessError::CorruptStore)?;
         }
         Ok(result)
     }
