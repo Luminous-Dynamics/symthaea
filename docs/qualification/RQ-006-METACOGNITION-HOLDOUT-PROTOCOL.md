@@ -46,18 +46,19 @@ Score the candidate and both baselines against the exact same bound holdout outc
 
 Brier score and log loss are proper scoring rules for probabilistic forecasts. They combine multiple aspects of probabilistic performance, so interpret them alongside calibration curves/reliability bins, discrimination, uncertainty, and family-local sample sizes. Do not interpret a lower Brier score alone as proof of better calibration. Fit any learned calibration transformation using calibration/validation data only; evaluate once on untouched holdout data.
 
-## Mixed decision-cohort API — implementation candidate
+## Mixed decision-cohort API — v2 implementation candidate
 
-The branch now adds a separate, versioned API in `reasoning_metacognition_cohort.rs`:
+A separate, versioned API is in `src/intelligence/reasoning_metacognition_cohort.rs`. Its current identifiers are decision-forecast schema v2, frozen-cohort schema v2, report schema v2, and evaluator `rq-006-decision-cohort-v2`.
 
-- `freeze_decision_cohort_for_split` freezes asserted answers and abstentions together, canonicalizes threshold order, requires a non-empty split/manifest identity, and revalidates the frozen set on deserialization.
-- `DecisionOutcomeV1` requires an asserted-answer correctness label for asserted answers and forbids that label for abstentions. A counterfactual correctness label is admitted only when the forecast already contains a counterfactual answer reference and the outcome carries separate evidence.
-- `evaluate_decision_cohort` reports every decision in the full-cohort denominator, but computes accuracy, Brier/log loss, calibration bins/ECE, AUROC, and baseline deltas only over asserted answers with bound correctness outcomes.
-- Per-family reports preserve abstain-only families. Their correctness metrics and baseline scores remain `None` rather than fabricating values or dividing by zero.
-- Threshold-selected risk includes asserted answers only; coverage is selected assertions divided by **all decisions**, both pooled and per family.
-- Candidate and baseline metrics use exactly the same asserted/scored cohort. Forecast IDs, outcome receipt IDs, and evidence references are retained deterministically.
+- `DecisionForecastV2.predicted_probability` is optional: an asserted answer requires a correctness probability; an abstention without a frozen candidate answer must not claim one. An abstention with a predeclared counterfactual answer may carry a separate probability for that answer.
+- `DecisionOutcomeV1` requires correctness for an asserted answer and forbids asserted-answer correctness for abstentions. Counterfactual correctness requires both a frozen counterfactual-answer reference and separate outcome evidence.
+- `freeze_decision_cohort_for_split` freezes forecasts, both per-family baseline profiles, evaluation split/manifest identities, bins and thresholds into `FrozenDecisionCohortV2`. Deserialization revalidates those fields and rejects old schemas, tampered policy, non-canonical order, missing/duplicate baseline methods, zero-sample baselines, or baseline identity reuse. Baselines are no longer accepted as evaluator-time parameters, so their profile values cannot be swapped after freeze through the public scoring API.
+- `evaluate_decision_cohort` requires exact one-to-one outcome binding. Correctness calibration and candidate/baseline loss are computed only on asserted answers with bound correctness outcomes. Counterfactual candidate answers have separate accuracy, confidence, Brier and log-loss fields and never enter asserted-answer calibration.
+- Decision coverage and threshold coverage use the full decision cohort as denominator. The nested correctness metrics use only asserted/scored answers; their legacy threshold coverage is therefore conditional within that asserted-answer cohort. Use the outer `decision_coverage` and `selective_risk[].coverage_all_decisions` for whole-cohort comparisons.
+- Every task family remains in the report, including abstain-only families. Their asserted-answer correctness and baseline metrics remain `None` rather than fabricated values or divisions by zero. Candidate and each baseline are evaluated on the same asserted/scored cohort.
+- Regression fixtures cover mixed decisions, zero-assertion families, absent probabilities when there is no candidate answer, contradictory outcomes, separately evidenced counterfactual scoring, frozen baseline tampering, schema rejection, missing baseline methods, and duplicate/missing outcome receipts.
 
-This closes the evaluator-level semantic ambiguity in a separate API without silently changing `CorrectnessForecastV1` or the legacy `evaluate_metacognition` contract. The new API is an implementation candidate until its exact-head CI, tests, formatting, and independent review are complete. It does not authenticate evidence or prove chronology, calibration-corpus disjointness, oracle independence, IID sampling, or holdout non-contamination.
+This API is an **implementation candidate**, not qualified evidence. Exact-head CI, test and formatting results, and independent review are still required. Private Rust fields and serialized self-validation do not prove that a forecast was captured before outcomes were visible. Caller-supplied evidence references and manifest IDs do not authenticate content, establish calibration/holdout disjointness, or prove chronology. Those properties still require an independent trusted capture and manifest verifier.
 
 ## Legacy correctness API: asserted-only limitation
 
