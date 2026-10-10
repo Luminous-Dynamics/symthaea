@@ -276,7 +276,8 @@ impl ExitCodeResolver {
         };
 
         // A successfully exited shell may still leave a background process holding inherited
-        // stdout/stderr pipes. Do not let pipe draining outlive the resolver indefinitely.
+        // stdout/stderr pipes. Do not score its exit as success if the output streams fail to
+        // close promptly: terminate the remaining process group and preserve an unresolved state.
         let mut stdout = receive_output(&stdout_reader, PIPE_DRAIN_GRACE);
         let mut stderr = receive_output(&stderr_reader, PIPE_DRAIN_GRACE);
         if stdout.is_none() || stderr.is_none() {
@@ -287,14 +288,12 @@ impl ExitCodeResolver {
             if stderr.is_none() {
                 stderr = receive_output(&stderr_reader, POST_KILL_DRAIN_GRACE);
             }
-        }
-        if stdout.is_none() || stderr.is_none() {
             return ResolutionResult {
                 outcome: None,
                 disposition: ResolutionDisposition::Unclear,
                 raw_output: choose_output(stdout, stderr),
                 reason: Some(
-                    "Child exited but resolver output streams remained open; outcome is unresolved"
+                    "Child exited while a residual process held resolver output open; outcome is unresolved"
                         .to_string(),
                 ),
             };
