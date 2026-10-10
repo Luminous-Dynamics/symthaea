@@ -588,7 +588,8 @@ impl fmt::Display for AssessmentFailure {
 impl std::error::Error for AssessmentFailure {}
 
 /// Per-instrument/channel guard against replayed, duplicate, or time-reversed
-/// observations. State changes only after a measurement passes the ordering test.
+/// observations. A new sequence is consumed even when its timestamp regresses; the
+/// stored timestamp floor remains monotonic, preventing reuse of that rejected sequence.
 #[derive(Debug, Default)]
 pub struct MeasurementStreamGuard {
     last: HashMap<InstrumentIdentity, (u64, u64)>,
@@ -613,6 +614,11 @@ impl MeasurementStreamGuard {
                 });
             }
             if measurement.captured_at_ns < previous_timestamp_ns {
+                // Consume the strictly newer sequence but preserve the high-water
+                // timestamp. Retrying this sequence with a corrected timestamp must
+                // not turn a rejected observation into an accepted replay.
+                self.last
+                    .insert(identity, (measurement.sequence, previous_timestamp_ns));
                 return Err(StreamOrderFailure::TimestampMovedBackward {
                     previous_ns: previous_timestamp_ns,
                     received_ns: measurement.captured_at_ns,
