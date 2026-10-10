@@ -364,6 +364,71 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
 }
 
 #[test]
+fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
+    assert_eq!(
+        ResolvedRawData::new(
+            artifact("empty-raw", SHA_C),
+            0,
+            "application/octet-stream",
+        )
+        .unwrap_err(),
+        ContractError::EmptyRawDataArtifact
+    );
+    assert_eq!(
+        ResolvedRawData::new(artifact("raw", SHA_C), 10, " ")
+            .unwrap_err(),
+        ContractError::EmptyIdentifier("raw_data_media_type")
+    );
+}
+
+#[test]
+fn unresolved_raw_acquisition_evidence_fails_closed() {
+    let missing_raw = MockResolver {
+        resolved: Ok(resolved_calibration()),
+        resolved_raw: Err("raw artifact bytes not found".into()),
+    };
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &policy(),
+                &missing_raw,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::RawDataEvidenceUnresolved("raw artifact bytes not found".into())
+    );
+}
+
+#[test]
+fn resolved_raw_data_must_match_the_envelope_digest_and_artifact_id() {
+    let mismatched_raw = MockResolver {
+        resolved: Ok(resolved_calibration()),
+        resolved_raw: Ok(
+            ResolvedRawData::new(
+                artifact("other-acquisition", SHA_C),
+                4_096,
+                "application/octet-stream",
+            )
+            .unwrap(),
+        ),
+    };
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &policy(),
+                &mismatched_raw,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::RawDataReferenceMismatch
+    );
+}
+
+#[test]
 fn unresolved_calibration_evidence_fails_closed() {
     let missing = MockResolver {
         resolved: Err("calibration artifact not found".into()),
