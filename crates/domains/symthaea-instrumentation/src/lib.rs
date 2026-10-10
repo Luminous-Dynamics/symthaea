@@ -331,9 +331,10 @@ impl fmt::Display for ContractError {
             Self::VerifiedArtifactReferenceMismatch(artifact) => {
                 write!(f, "verified bytes must match the resolved {artifact} reference")
             }
-            Self::VerifiedReviewReceiptBindingMismatch => {
-                write!(f, "verified review receipt must bind the resolved calibration record and certificate")
-            }
+            Self::VerifiedReviewReceiptBindingMismatch => write!(
+                f,
+                "verified review receipt must bind the resolved calibration record and certificate"
+            ),
             Self::EmptyEvidenceArtifact(artifact) => {
                 write!(f, "{artifact} evidence must not be empty")
             }
