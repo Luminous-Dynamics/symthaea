@@ -36,15 +36,15 @@ def reject_duplicate_object_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]
         result[key] = value
     return result
 ENGINE_REPO = "Luminous-Dynamics/luminous-platform"
-ENGINE_SHA = "7785e6fb6b700a02c7ecc29225c1393e0c7a92cf"
+ENGINE_SHA = "dfccbd97e72463b2513c79912ca868490114b47f"
 ENGINE_PATH = ".github/workflows/security-audit.yml"
-ENGINE_BLOB = "9e1240c3b70aecedd240bab5348e40bc1eed1b8c"
+ENGINE_BLOB = "a50e47261890e1d87ef903c1b6c92b28ec77d0a1"
 POLICY: dict[str, dict[str, Any]] = {
     "Luminous-Dynamics/mycelix": {
         "workflow_id": 379572428,
         "workflow_name": "Security Audit",
         "workflow_path": ".github/workflows/security-audit.yml",
-        "workflow_blob": "d4ccafde84a590b1b92f0c590a743b85c2e85655",
+        "workflow_blob": "9af82c4da828b627ecaf5c4841041b1acb5882e3",
         "engine_sha": ENGINE_SHA,
         "audit_rust": True,
         "audit_node": True,
@@ -53,7 +53,7 @@ POLICY: dict[str, dict[str, Any]] = {
         "workflow_id": 379572736,
         "workflow_name": "Security Audit",
         "workflow_path": ".github/workflows/security-audit.yml",
-        "workflow_blob": "02bd7011d86e640405358750e48892431b92215a",
+        "workflow_blob": "45c94f39b379ee1aa78709dab0e529c9fd02b551",
         "engine_sha": ENGINE_SHA,
         "audit_rust": True,
         "audit_node": False,
