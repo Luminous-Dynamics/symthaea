@@ -28,9 +28,9 @@ pub enum ImagineFutureError {
 /// These are deterministic admission estimates, not measurements of wall-clock work.
 #[cfg(feature = "vision-manifold")]
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct ImaginationWorkEstimate {
-    rollout: f32,
-    geodesic: f32,
+pub(super) struct ImaginationWorkEstimate {
+    pub(super) rollout: f32,
+    pub(super) geodesic: f32,
 }
 
 #[cfg(feature = "vision-manifold")]
@@ -42,7 +42,7 @@ impl ImaginationWorkEstimate {
 }
 
 #[cfg(feature = "vision-manifold")]
-fn estimate_imagination_work(
+pub(super) fn estimate_imagination_work(
     rollout_steps: usize,
     geodesic_steps: usize,
     candidate_count: usize,
@@ -59,7 +59,7 @@ fn estimate_imagination_work(
 }
 
 #[cfg(feature = "vision-manifold")]
-fn preflight_imagination_work(
+pub(super) fn preflight_imagination_work(
     current_load: f32,
     estimate: ImaginationWorkEstimate,
 ) -> Result<(), f32> {
