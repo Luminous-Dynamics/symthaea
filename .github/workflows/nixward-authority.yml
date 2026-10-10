@@ -1,0 +1,72 @@
+name: Nixward Authority Focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/core/nixward/src/action/approver_evidence.rs"
+      - "crates/core/nixward/src/action/authorization.rs"
+      - "crates/core/nixward/src/action/daemon_incarnation.rs"
+      - "crates/core/nixward/src/action/local_approval.rs"
+      - "crates/core/nixward/src/action/local_approval_ipc.rs"
+      - "crates/core/nixward/src/action/local_approval_runtime.rs"
+      - "crates/core/nixward/src/action/local_approval_projection.rs"
+      - "crates/core/nixward/src/action/local_approval_socket.rs"
+      - "crates/core/nixward/src/action/local_approval_store.rs"
+      - "crates/core/nixward/src/action/local_approval_submission.rs"
+      - "crates/core/nixward/src/action/service_domain.rs"
+      - "crates/core/nixward/src/action/service_manager.rs"
+      - "crates/core/nixward/src/action/service_state.rs"
+      - "crates/core/nixward/src/action/systemd_transport.rs"
+      - "scripts/check-nixward-observation-boundary.sh"
+      - "scripts/qualify_nixward_authority.sh"
+      - "crates/core/nixward/src/action/mod.rs"
+      - "crates/core/nixward/src/action/executor.rs"
+      - "crates/core/nixward/src/action/config_writer.rs"
+      - "crates/core/nixward/src/action/plan_executor.rs"
+      - "crates/core/nixward/src/bin/nixward_daemon.rs"
+      - "crates/core/nixward/src/ipc.rs"
+      - "crates/core/nixward/src/tui/app.rs"
+      - "crates/core/nixward/tests/daemon_state_integration.rs"
+      - "crates/core/nixward/Cargo.toml"
+      - "crates/core/symthaea-observation-attestation/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/nixward-authority.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  authority-primitives:
+    # Deliberately runs on draft PRs. This is a focused early correctness lane,
+    # not a substitute for repository-wide ready-for-review/main qualification.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      # Ubuntu runner images do not guarantee ripgrep is preinstalled; the
+      # checked-in boundary qualification intentionally uses rg for PCRE2/source fences.
+      - name: Install source-boundary scanner
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Run checked-in focused qualification
+        run: bash scripts/qualify_nixward_authority.sh

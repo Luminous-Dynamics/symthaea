@@ -54,6 +54,7 @@ fn test_daemon_snapshot_serialization_with_new_fields() {
         }],
         memory_used_percent: Some(55.0),
         watchdog_status: None,
+        pending_action_intent_digest: Some("0123456789abcdef".repeat(4)),
         degraded: false,
         prediction_accuracy: Some(2.5),
         maintenance_plan_count: 1,
@@ -76,6 +77,10 @@ fn test_daemon_snapshot_serialization_with_new_fields() {
     assert_eq!(restored.support_status.as_deref(), Some("Healthy"));
     assert_eq!(restored.recommendation_count, 2);
     assert_eq!(restored.version, SNAPSHOT_VERSION);
+    assert_eq!(
+        restored.pending_action_intent_digest.as_deref(),
+        Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+    );
     assert!(!restored.degraded);
     assert!((restored.prediction_accuracy.unwrap() - 2.5).abs() < 1e-6);
     assert_eq!(restored.maintenance_plan_count, 1);
@@ -109,6 +114,7 @@ fn test_daemon_snapshot_backward_compatible() {
     assert!(snap.support_status.is_none());
     assert_eq!(snap.recommendation_count, 0);
     assert!(snap.watchdog_status.is_none());
+    assert!(snap.pending_action_intent_digest.is_none());
     assert_eq!(snap.version, 1, "Old snapshots default to version 1");
     assert!(!snap.degraded, "Old snapshots default to not degraded");
     assert!(snap.prediction_accuracy.is_none());

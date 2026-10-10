@@ -8,7 +8,7 @@
 //! and init new flakes. Produces `NixOSCommand` values for
 //! state-modifying operations; read-only queries run directly.
 
-use super::executor::{FlakeOperation, NixOSCommand, SafetyLevel};
+use super::executor::{FlakeOperation, NixOSCommand};
 use std::path::Path;
 use std::process::Command;
 
@@ -117,15 +117,10 @@ impl FlakeOps {
 
     /// Initialize a new flake in a directory.
     pub fn init(_dir: &Path, template: Option<&str>) -> NixOSCommand {
-        let mut args = vec!["flake".to_string(), "init".to_string()];
-        if let Some(tmpl) = template {
-            args.push("--template".to_string());
-            args.push(tmpl.to_string());
-        }
-        NixOSCommand::Custom {
-            command: "nix".to_string(),
-            args,
-            safety_level: SafetyLevel::UserModify,
+        NixOSCommand::Flake {
+            operation: FlakeOperation::Init {
+                template: template.map(str::to_owned),
+            },
         }
     }
 

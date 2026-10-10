@@ -113,6 +113,20 @@ jobs:
       - name: Crate registry integrity
         run: cargo run -q -p xtask -- crate-status
 
+  nixward-observation-boundary:
+    name: Nixward Observation Boundary
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      # CROSS-015 is a source-boundary regression fence. It deliberately checks
+      # the protected authority modules rather than claiming that grep proves
+      # semantic authority correctness. Future effect-binding/adapter modules
+      # must be added to the script's explicit allowlist before use.
+      - name: Enforce governed observation boundary
+        run: bash scripts/check-nixward-observation-boundary.sh
+
   embodiment-safety-composition:
     name: Embodiment Safety Composition
     runs-on: ubuntu-latest
