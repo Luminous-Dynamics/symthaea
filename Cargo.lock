@@ -19179,6 +19179,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-instrumentation"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-jepa"
 version = "0.1.0"
 dependencies = [
