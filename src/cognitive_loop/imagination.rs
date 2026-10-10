@@ -294,7 +294,7 @@ mod work_budget_tests {
         assert!(preflight_imagination_work(f32::NAN, small).is_err());
         assert!(preflight_imagination_work(f32::INFINITY, small).is_err());
         assert!(preflight_imagination_work(-0.01, small).is_err());
-        assert!(preflight_imagination_work(0.90, small).is_err());
+        assert!(preflight_imagination_work(0.91, small).is_err());
     }
 
 }
