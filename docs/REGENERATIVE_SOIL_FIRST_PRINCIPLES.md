@@ -200,3 +200,8 @@ These are research-driven design requirements, not claims that the current code 
 - [ ] A physical pilot has documented mass/energy balances, safety controls, laboratory characterization and pre-registered trial design before any agronomic effectiveness claim is made.
 
 The long-term goal is to discover whether durable, safe and affordable terra preta-inspired soil systems can improve specified outcomes while reducing dependency on imported synthetic nutrients. That question should be answered by reproducible calculations, scientific experiments and farm economics—not by the sophistication of the AI or the elegance of the visualization.
+
+
+## Experimental validation protocol
+
+The companion [validation and experimental design protocol](REGENERATIVE_SOIL_VALIDATION_PROTOCOL.md) defines evidence classes, randomized treatment comparisons, sample-size planning, batch-level provenance, safety gates, nutrient ledgers, and staged acceptance criteria. It is a research template, not an application-rate recommendation or evidence of field efficacy.
