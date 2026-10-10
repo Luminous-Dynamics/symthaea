@@ -52,6 +52,17 @@ pub struct PendingCodePrediction {
     pub backend: String,
     /// Request name for tracking
     pub request_name: String,
+    /// Evidence required to resolve the specific claim.
+    pub requirement: CodePredictionRequirement,
+}
+
+/// Evidence standard for a code-generation claim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodePredictionRequirement {
+    /// The claim is only that the generated code compiles.
+    CompilationOnly,
+    /// The claim requires both successful compilation and a passing test result.
+    CompilationAndTests,
 }
 
 /// A resolved code prediction with outcome.
@@ -76,6 +87,8 @@ pub enum CodePredictionResolution {
     Resolved { was_correct: bool },
     /// Compilation succeeded, but no test result is available yet; the prediction remains pending.
     AwaitingTests,
+    /// Compilation and test evidence contradict each other; the prediction remains pending.
+    InconsistentEvidence,
     /// No pending prediction matched the supplied identifier.
     UnknownPrediction,
 }
@@ -119,22 +132,34 @@ impl MagiCodeBridge {
         }
     }
 
-    /// Create a prediction about a code generation attempt.
+    /// Create a prediction that requires compilation and test evidence by default.
     ///
-    /// Call this BEFORE generating code. The returned prediction should be
-    /// resolved after compilation/testing via `resolve_prediction()`.
-    ///
-    /// # Arguments
-    /// * `request_name` — Name of the function/type being generated
-    /// * `backend` — Which backend will attempt generation
-    /// * `raw_confidence` — The system's raw confidence (0.0-1.0) that this will succeed
-    /// * `claim` — What specifically is being predicted (e.g., "code will compile")
+    /// For compile-only claims, use `predict_generation_with_requirement` explicitly rather than
+    /// relying on free-form claim text to define the evidence standard.
     pub fn predict_generation(
         &mut self,
         request_name: &str,
         backend: &str,
         raw_confidence: f64,
         claim: &str,
+    ) -> String {
+        self.predict_generation_with_requirement(
+            request_name,
+            backend,
+            raw_confidence,
+            claim,
+            CodePredictionRequirement::CompilationAndTests,
+        )
+    }
+
+    /// Create a prediction with an explicit, structured evidence requirement.
+    pub fn predict_generation_with_requirement(
+        &mut self,
+        request_name: &str,
+        backend: &str,
+        raw_confidence: f64,
+        claim: &str,
+        requirement: CodePredictionRequirement,
     ) -> String {
         let action_context = WorldActionContext::new(
             "compile",
@@ -159,13 +184,12 @@ impl MagiCodeBridge {
         );
 
         let prediction_id = prediction.id.clone();
-
         self.pending.push(PendingCodePrediction {
             prediction,
             backend: backend.to_string(),
             request_name: request_name.to_string(),
+            requirement,
         });
-
         prediction_id
     }
 
@@ -181,9 +205,9 @@ impl MagiCodeBridge {
     ) -> Option<bool> {
         match self.resolve_prediction_with_status(prediction_id, compiled, tests_passed) {
             CodePredictionResolution::Resolved { was_correct } => Some(was_correct),
-            CodePredictionResolution::AwaitingTests | CodePredictionResolution::UnknownPrediction => {
-                None
-            }
+            CodePredictionResolution::AwaitingTests
+            | CodePredictionResolution::InconsistentEvidence
+            | CodePredictionResolution::UnknownPrediction => None,
         }
     }
 
