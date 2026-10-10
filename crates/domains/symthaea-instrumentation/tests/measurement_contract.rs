@@ -970,6 +970,28 @@ fn calibration_resolver_rejects_certificate_bytes_with_a_wrong_digest() {
 }
 
 #[test]
+fn calibration_resolver_rejects_reference_standard_bytes_with_a_wrong_digest() {
+    let mut tampered = resolver();
+    tampered.reference_standard_bytes_override =
+        Some(b"substituted reference standard".to_vec());
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &tampered,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::CalibrationEvidenceUnresolved(
+            "reference standard SHA-256 mismatch".into()
+        )
+    );
+}
+
+#[test]
 fn calibration_resolver_rejects_review_receipts_with_a_wrong_digest() {
     let tampered = MockResolver {
         resolved: Ok(resolved_calibration()),
