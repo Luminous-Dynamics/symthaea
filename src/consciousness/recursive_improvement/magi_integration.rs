@@ -380,6 +380,16 @@ impl CalibrationQuality {
 
 const UNRESOLVED_PREDICTION_HISTORY_LIMIT: usize = 100;
 
+/// Controls whether a resolved prediction may contribute to calibration.
+///
+/// Runtime observations without an authenticated receipt are operational signals only.
+/// Synthetic outcomes are admitted solely by the explicit test/simulation path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CalibrationAdmission {
+    UnverifiedObservation,
+    SimulationOnly,
+}
+
 /// Self-model with world-grounded prediction and calibration
 pub struct WorldGroundedSelfModel {
     /// Configuration
@@ -654,60 +664,48 @@ impl WorldGroundedSelfModel {
     // STEP 4: OBSERVE (Record outcomes)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Apply an unverified observed outcome to the internal MAGI calibration state.
+    /// Apply an unverified runtime observation without training qualification-grade calibration.
     ///
-    /// This is a crate-private compatibility seam for the current runtime observer and
-    /// deterministic simulation. It does not validate `ResolutionAuthority`, authenticate
-    /// evidence, or prove that the observation occurred. Do not expose it as a production
-    /// trust boundary; verified-receipt admission is tracked in issue #7336.
+    /// The observation can finish the operational pending item and be reported to runtime
+    /// monitoring, but it is not admitted to Brier/ECE calibration or causal attribution.
+    /// A verified receipt gate must replace this adapter before runtime outcomes can train
+    /// calibration; see issue #7336.
     pub(crate) fn resolve_prediction_from_unverified_observation(
         &mut self,
         prediction_id: &str,
         observed_outcome: OutcomeCategory,
         resolution_confidence: f64,
     ) -> Option<bool> {
-        // Find the prediction index
-        let idx = self
-            .pending_predictions
-            .iter()
-            .position(|p| p.id == prediction_id)?;
+        self.resolve_prediction_with_admission(
+            prediction_id,
+            observed_outcome,
+            resolution_confidence,
+            CalibrationAdmission::UnverifiedObservation,
+        )
+    }
 
-        // Remove from pending (take ownership)
-        let mut prediction = self.pending_predictions.remove(idx)?;
-
-        // Determine if prediction was correct
-        let was_correct = prediction.predicted_outcome == observed_outcome
-            || (prediction.predicted_outcome.is_positive() == observed_outcome.is_positive());
-
-        // Resolve the prediction
-        if was_correct {
-            prediction.resolve_true(observed_outcome, resolution_confidence);
-        } else {
-            prediction.resolve_false(observed_outcome, resolution_confidence);
-        }
-
-        // Record in calibration tracker
-        self.calibration.record_prediction(&prediction);
-
-        // Update loop state
-        self.loop_state.predictions_resolved += 1;
-        self.update_calibration_quality();
-
-        // If not correct, generate causal attribution
-        if !was_correct {
-            self.generate_attribution(&prediction);
-        }
-
-        // Check for loop completion
-        self.check_loop_completion();
-
-        Some(was_correct)
+    /// Resolve a prediction with a synthetic outcome for tests and toy-world simulation.
+    ///
+    /// This helper is deliberately unavailable in ordinary production builds.
+    #[cfg(any(test, feature = "magi-simulation"))]
+    fn resolve_prediction_for_simulation_inner(
+        &mut self,
+        prediction_id: &str,
+        simulated_outcome: OutcomeCategory,
+        simulation_confidence: f64,
+    ) -> Option<bool> {
+        self.resolve_prediction_with_admission(
+            prediction_id,
+            simulated_outcome,
+            simulation_confidence,
+            CalibrationAdmission::SimulationOnly,
+        )
     }
 
     /// Inject a caller-provided outcome for the deterministic toy-world simulation only.
     ///
     /// This API exists only when the explicit `magi-simulation` feature is enabled. The
-    /// supplied outcome is unverified and will affect this model instance's calibration;
+    /// supplied outcome is synthetic and will affect this model instance's calibration;
     /// never enable this feature for a live model or qualification-grade evaluation.
     #[cfg(feature = "magi-simulation")]
     pub fn resolve_prediction_for_simulation(
@@ -716,12 +714,55 @@ impl WorldGroundedSelfModel {
         simulated_outcome: OutcomeCategory,
         simulation_confidence: f64,
     ) -> Option<bool> {
-        self.resolve_prediction_from_unverified_observation(
+        self.resolve_prediction_for_simulation_inner(
             prediction_id,
             simulated_outcome,
             simulation_confidence,
         )
     }
+
+    /// Resolve a pending prediction while keeping admission policy explicit.
+    fn resolve_prediction_with_admission(
+        &mut self,
+        prediction_id: &str,
+        observed_outcome: OutcomeCategory,
+        resolution_confidence: f64,
+        admission: CalibrationAdmission,
+    ) -> Option<bool> {
+        let idx = self
+            .pending_predictions
+            .iter()
+            .position(|p| p.id == prediction_id)?;
+        let mut prediction = self.pending_predictions.remove(idx)?;
+
+        let was_correct = prediction.predicted_outcome == observed_outcome
+            || (prediction.predicted_outcome.is_positive() == observed_outcome.is_positive());
+
+        if was_correct {
+            prediction.resolve_true(observed_outcome, resolution_confidence);
+        } else {
+            prediction.resolve_false(observed_outcome, resolution_confidence);
+        }
+
+        // Only the explicit test/simulation path is allowed to feed synthetic outcomes into
+        // calibration. Runtime observations remain operational-only until receipt verification
+        // is enforced end-to-end. This intentionally trades learning volume for trust integrity.
+        if admission == CalibrationAdmission::SimulationOnly {
+            self.calibration.record_prediction(&prediction);
+            self.update_calibration_quality();
+
+            if !was_correct {
+                self.generate_attribution(&prediction);
+            }
+        }
+
+        // This is a count of terminal operational observations, not trusted calibration samples.
+        self.loop_state.predictions_resolved += 1;
+        self.check_loop_completion();
+
+        Some(was_correct)
+    }
+
     /// Process expired predictions
     pub fn process_expired_predictions(&mut self) {
         if !self.config.auto_resolve_timeout {
@@ -1796,10 +1837,34 @@ mod tests {
         assert_eq!(model.pending_predictions().len(), 1);
 
         // Resolve the prediction
-        let was_correct = model.resolve_prediction_from_unverified_observation(&prediction.id, OutcomeCategory::Success, 1.0);
+        let was_correct = model.resolve_prediction_for_simulation_inner(&prediction.id, OutcomeCategory::Success, 1.0);
 
         assert_eq!(was_correct, Some(true));
         assert_eq!(model.loop_state().predictions_resolved, 1);
+    }
+
+    #[test]
+    fn unverified_runtime_observation_does_not_train_calibration() {
+        let mut model = WorldGroundedSelfModel::with_defaults();
+        let action =
+            WorldActionContext::new("command", "runtime observed a result")
+                .with_risk_tier(RiskTier::Observation);
+        let prediction = model.predict("Command succeeds", OutcomeCategory::Success, 0.8, action);
+        let calibration_before = model.calibration().total_predictions();
+        let quality_before = model.loop_state().calibration_quality;
+
+        assert_eq!(
+            model.resolve_prediction_from_unverified_observation(
+                &prediction.id,
+                OutcomeCategory::SafeFailure,
+                1.0,
+            ),
+            Some(false)
+        );
+        assert_eq!(model.calibration().total_predictions(), calibration_before);
+        assert_eq!(model.loop_state().calibration_quality, quality_before);
+        assert_eq!(model.loop_state().predictions_resolved, 1);
+        assert!(model.recent_attributions().is_empty());
     }
 
     #[test]
@@ -1844,7 +1909,7 @@ mod tests {
         let prediction = model.predict("Will succeed", OutcomeCategory::Success, 0.9, action);
 
         // Resolve as failure
-        model.resolve_prediction_from_unverified_observation(&prediction.id, OutcomeCategory::SafeFailure, 1.0);
+        model.resolve_prediction_for_simulation_inner(&prediction.id, OutcomeCategory::SafeFailure, 1.0);
 
         // Should have generated an attribution
         assert!(!model.recent_attributions().is_empty());
