@@ -794,6 +794,73 @@ fn calibration_resolver_rejects_review_receipts_with_a_wrong_digest() {
 }
 
 #[test]
+fn verified_calibration_rejects_empty_certificate_or_review_bytes() {
+    let empty_digest = sha256_hex(b"");
+    let empty_certificate_reference = artifact("calibration-certificate", &empty_digest);
+    let empty_certificate = VerifiedArtifactBytes::verify(
+        empty_certificate_reference.clone(),
+        Vec::new(),
+    )
+    .unwrap();
+    let valid_review =
+        VerifiedArtifactBytes::verify(review_artifact(), review_fixture_bytes()).unwrap();
+    let record_with_empty_certificate = ResolvedCalibration::new(
+        "calibration-17",
+        instrument_identity(),
+        empty_certificate_reference,
+        review_artifact(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    )
+    .unwrap();
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(
+            record_with_empty_certificate,
+            empty_certificate,
+            valid_review,
+        )
+        .unwrap_err(),
+        ContractError::EmptyEvidenceArtifact("calibration_certificate")
+    );
+
+    let verified_certificate =
+        VerifiedArtifactBytes::verify(calibration_artifact(), calibration_fixture_bytes())
+            .unwrap();
+    let empty_review_reference =
+        artifact("independent-review-receipt", &empty_digest);
+    let empty_review =
+        VerifiedArtifactBytes::verify(empty_review_reference.clone(), Vec::new()).unwrap();
+    let record_with_empty_review = ResolvedCalibration::new(
+        "calibration-17",
+        instrument_identity(),
+        calibration_artifact(),
+        empty_review_reference,
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    )
+    .unwrap();
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(
+            record_with_empty_review,
+            verified_certificate,
+            empty_review,
+        )
+        .unwrap_err(),
+        ContractError::EmptyEvidenceArtifact("calibration_review_receipt")
+    );
+}
+
+#[test]
 fn verified_calibration_requires_exact_certificate_and_review_artifact_references() {
     let calibration = resolved_calibration();
     let wrong_certificate = VerifiedArtifactBytes::verify(
