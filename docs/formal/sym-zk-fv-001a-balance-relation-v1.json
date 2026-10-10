@@ -1,0 +1,61 @@
+{
+  "schema": "symthaea.formal.sym-zk-fv-001a-balance-relation.v1",
+  "issue": 5849,
+  "parent_issue": 5841,
+  "evidence_class": "AbstractFormalTheorem",
+  "subject": {
+    "name": "BalanceRelation",
+    "value_domain": "Fin (2^64)",
+    "private_witness_fields": ["balance"],
+    "public_input_fields": ["requiredMinimum", "nonce"],
+    "public_output_fields": ["sufficient", "requiredMinimum", "nonce"],
+    "relation": "sufficient = decide(requiredMinimum <= balance); threshold and nonce preserved exactly"
+  },
+  "production_refinement_targets": [
+    {
+      "commit": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+      "path": "crates/core/symthaea-zkproof/core/src/lib.rs",
+      "blob": "07de3583896eaaab5b68994c2244acaca72152ac",
+      "symbols": ["BalanceProofInput", "BalanceProofOutput"],
+      "relationship": "future-refinement-target-not-proved-here"
+    },
+    {
+      "commit": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+      "path": "crates/core/symthaea-zkproof/methods/guest/src/main.rs",
+      "blob": "8b57a56ca9e3051bbbf83107b916d645e90099c7",
+      "symbols": ["tag=1", "run_balance_proof"],
+      "relationship": "future-refinement-target-not-proved-here"
+    }
+  ],
+  "required_theorems": [
+    "relation_holds",
+    "sufficient_eq_true_iff",
+    "sufficient_true_of_ge",
+    "sufficient_false_of_not_ge",
+    "threshold_preserved",
+    "nonce_preserved",
+    "relation_deterministic"
+  ],
+  "coverage": {
+    "kind": "Universal",
+    "scope": "all mathematical U64 values and all BalanceInput values",
+    "rust_u64_refinement": "unproved-successor-obligation"
+  },
+  "claim_ceiling": [
+    "statement-relation-only",
+    "not-risc0-guest-refinement",
+    "not-receipt-or-image-id-binding",
+    "not-proof-system-soundness",
+    "not-zero-knowledge",
+    "not-side-channel-privacy",
+    "not-runtime-authorization"
+  ],
+  "negative_controls": [
+    "comparison-mutation",
+    "nonce-theorem-deletion",
+    "threshold-theorem-deletion",
+    "proof-hole-injection",
+    "source-blob-rebinding",
+    "claim-escalation"
+  ]
+}
