@@ -497,7 +497,7 @@ mod tests {
     }
 
     fn request() -> ScreeningDesignRequest {
-        ScreeningDesignRequest {
+        let mut request = ScreeningDesignRequest {
             experiment_id: "soil-analysis-001".into(),
             preregistration_id: "prereg-analysis-v1".into(),
             input_snapshot_id: "analysis-inputs-v1".into(),
@@ -554,11 +554,15 @@ mod tests {
                 status: BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol,
                 protocol_id: "analysis-protocol-v1".into(),
                 reviewed_input_snapshot_id: "analysis-inputs-v1".into(),
+                reviewed_design_sha256: String::new(),
                 review_id: "review-analysis-v1".into(),
                 reviewer_role: "qualified bench-scale reviewer".into(),
                 evidence: evidence("review-analysis", EvidenceKind::Measured),
             },
-        }
+        };
+        request.bench_scale_review.reviewed_design_sha256 =
+            crate::screening_design::screening_design_sha256(&request).unwrap();
+        request
     }
 
     fn observations(plan: &ScreeningDesignPlan) -> Vec<ScreeningResponseObservation> {
