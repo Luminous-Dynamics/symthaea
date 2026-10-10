@@ -818,7 +818,7 @@ mod tests {
         let parsed = SignedCalibrationReviewReceipt::from_canonical_bytes(&bytes).unwrap();
         assert_eq!(parsed, receipt);
 
-        let trust = trust_store();
+        let trust = verified_trust_store();
         let mut trust_guard = ReviewTrustStoreGuard::default();
         let verified = VerifiedCalibrationReviewReceipt::verify(
             verified_artifact(&receipt),
@@ -843,7 +843,7 @@ mod tests {
         receipt.signature = signature;
         let artifact = verified_artifact(&receipt);
 
-        let trust = trust_store();
+        let trust = verified_trust_store();
         let mut trust_guard = ReviewTrustStoreGuard::default();
         assert_eq!(
             VerifiedCalibrationReviewReceipt::verify(
@@ -864,7 +864,7 @@ mod tests {
         let mut receipt = signed_receipt();
         receipt.signature[0] ^= 1;
         let artifact = verified_artifact(&receipt);
-        let trust = trust_store();
+        let trust = verified_trust_store();
         let mut guard = ReviewTrustStoreGuard::default();
 
         assert_eq!(
