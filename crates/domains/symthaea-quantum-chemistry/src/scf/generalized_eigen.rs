@@ -124,6 +124,437 @@ pub fn solve_generalized_eigen(
     }
 }
 
+/// Maximum normalized residual accepted for the original generalized equation FC = SCε.
+pub const CHECKED_GENERALIZED_EIGENPAIR_RESIDUAL_LIMIT: f64 = 1e-8;
+
+/// Checked result for FC = SCε. The inner eigensolver diagnostics refer to F' = Xᵀ F X;
+/// the generalized residual is recomputed independently in the original AO basis.
+#[derive(Debug, Clone)]
+pub struct CheckedGeneralizedEigenResult {
+    pub generalized: GeneralizedEigenResult,
+    pub eigensolver: CheckedSymmetricEigenResult,
+    pub max_relative_generalized_eigenpair_residual: f64,
+}
+
+/// Numerical receipt aggregated over every successful generalized eigensolve in an SCF run.
+///
+/// Residuals are normalized dimensionless maxima. This receipt is separate from the SCF
+/// energy/density convergence flag: it shows that each diagonalization met its own
+/// numerical contracts, but does not imply that the SCF fixed point converged or that
+/// the model/basis is chemically accurate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScfSolverDiagnostics {
+    /// Count of successfully checked generalized eigen solves (initial guess plus SCF steps).
+    pub generalized_eigensolve_count: usize,
+    /// Total Jacobi rotations across successful transformed one-electron/Fock eigensolves,
+    /// including the initial core-Hamiltonian solve.
+    pub total_jacobi_rotations: usize,
+    /// Largest absolute off-diagonal entry seen in any transformed core-Hamiltonian/Fock
+    /// matrix (Hartree), including the initial guess solve.
+    pub max_transformed_off_diagonal_hartree: f64,
+    /// Maximum residual for the transformed symmetric eigenproblem across all solves.
+    pub max_transformed_eigenpair_residual: f64,
+    /// Maximum (C'^T C' - I) elementwise residual across all solves.
+    pub max_eigenvector_orthogonality_residual: f64,
+    /// Maximum residual for (F C = S C \epsilon) in the original AO basis.
+    pub max_generalized_eigenpair_residual: f64,
+    /// Residual for (X^T S X - I) from checked canonical orthogonalization.
+    pub overlap_orthogonality_residual: f64,
+}
+
+impl ScfSolverDiagnostics {
+    pub(crate) fn from_overlap_residual(overlap_orthogonality_residual: f64) -> Self {
+        Self {
+            generalized_eigensolve_count: 0,
+            total_jacobi_rotations: 0,
+            max_transformed_off_diagonal_hartree: 0.0,
+            max_transformed_eigenpair_residual: 0.0,
+            max_eigenvector_orthogonality_residual: 0.0,
+            max_generalized_eigenpair_residual: 0.0,
+            overlap_orthogonality_residual,
+        }
+    }
+
+    pub(crate) fn record_generalized_solve(&mut self, result: &CheckedGeneralizedEigenResult) {
+        self.generalized_eigensolve_count = self.generalized_eigensolve_count.saturating_add(1);
+        self.total_jacobi_rotations = self
+            .total_jacobi_rotations
+            .saturating_add(result.eigensolver.iterations);
+        self.max_transformed_off_diagonal_hartree = self
+            .max_transformed_off_diagonal_hartree
+            .max(result.eigensolver.max_off_diagonal);
+        self.max_transformed_eigenpair_residual = self
+            .max_transformed_eigenpair_residual
+            .max(result.eigensolver.max_relative_eigenpair_residual);
+        self.max_eigenvector_orthogonality_residual = self
+            .max_eigenvector_orthogonality_residual
+            .max(result.eigensolver.max_orthogonality_residual);
+        self.max_generalized_eigenpair_residual = self
+            .max_generalized_eigenpair_residual
+            .max(result.max_relative_generalized_eigenpair_residual);
+    }
+}
+
+/// Failure from validating or solving the generalized eigenvalue problem.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CheckedGeneralizedEigenError {
+    ZeroBasisDimension,
+    ZeroIndependentDimension,
+    IndependentDimensionExceedsBasis,
+    MatrixLengthMismatch {
+        matrix: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteInput {
+        matrix: &'static str,
+        index: usize,
+    },
+    NonsymmetricFockMatrix {
+        row: usize,
+        column: usize,
+        normalized_difference: f64,
+    },
+    NonsymmetricOverlapMatrix {
+        row: usize,
+        column: usize,
+        normalized_difference: f64,
+    },
+    OrthogonalizationResidualExceeded {
+        residual: f64,
+        limit: f64,
+    },
+    NonFiniteTransformedMatrix { index: usize },
+    NonFiniteIntermediate,
+    Eigen(SymmetricEigenError),
+    EigensolverNotConverged(CheckedSymmetricEigenResult),
+    GeneralizedResidualExceeded {
+        residual: f64,
+        limit: f64,
+    },
+}
+
+impl std::fmt::Display for CheckedGeneralizedEigenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroBasisDimension => write!(f, "generalized eigenproblem has zero basis dimension"),
+            Self::ZeroIndependentDimension => write!(f, "generalized eigenproblem has zero retained dimension"),
+            Self::IndependentDimensionExceedsBasis => {
+                write!(f, "retained dimension exceeds basis dimension")
+            }
+            Self::MatrixLengthMismatch { matrix, expected, actual } => write!(
+                f,
+                "{matrix} matrix expected {expected} entries, received {actual}"
+            ),
+            Self::NonFiniteInput { matrix, index } => {
+                write!(f, "{matrix} input entry {index} is non-finite")
+            }
+            Self::NonsymmetricFockMatrix { row, column, normalized_difference } => write!(
+                f,
+                "Fock matrix is not symmetric at ({row}, {column}); normalized difference is {normalized_difference}"
+            ),
+            Self::NonsymmetricOverlapMatrix {
+                row,
+                column,
+                normalized_difference,
+            } => write!(
+                f,
+                "overlap matrix is not symmetric at ({row}, {column}); normalized difference is {normalized_difference}"
+            ),
+            Self::OrthogonalizationResidualExceeded { residual, limit } => write!(
+                f,
+                "Xᵀ S X residual {residual} exceeds limit {limit}"
+            ),
+            Self::NonFiniteTransformedMatrix { index } => {
+                write!(f, "transformed Fock matrix entry {index} is non-finite")
+            }
+            Self::NonFiniteIntermediate => {
+                write!(f, "generalized eigensolver produced a non-finite intermediate")
+            }
+            Self::Eigen(error) => write!(f, "transformed Fock eigensolver rejected input: {error}"),
+            Self::EigensolverNotConverged(result) => write!(
+                f,
+                "transformed Fock eigensolver did not satisfy convergence contracts: {:?}",
+                result.stopping_reason
+            ),
+            Self::GeneralizedResidualExceeded { residual, limit } => write!(
+                f,
+                "generalized eigenpair residual {residual} exceeds limit {limit}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CheckedGeneralizedEigenError {}
+
+/// Fail-closed error returned by RHF/UHF checked numerical paths.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScfSolveError {
+    EmptyMolecule,
+    ElectronCountOverflow,
+    UnsupportedMultiplicity {
+        method: &'static str,
+        multiplicity: u32,
+    },
+    InvalidMultiplicity {
+        multiplicity: u32,
+    },
+    InconsistentElectronicState {
+        electron_count: usize,
+        multiplicity: u32,
+    },
+    InvalidCharge {
+        charge: i32,
+        nuclear_charge: i64,
+    },
+    NoElectrons,
+    CanonicalOrthogonalization(CanonicalOrthogonalizationError),
+    GeneralizedEigen(CheckedGeneralizedEigenError),
+    NonFiniteEnergy {
+        stage: &'static str,
+    },
+}
+
+impl std::fmt::Display for ScfSolveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyMolecule => write!(f, "molecular SCF requires at least one atom"),
+            Self::ElectronCountOverflow => {
+                write!(f, "electron count cannot be represented on this target")
+            }
+            Self::UnsupportedMultiplicity { method, multiplicity } => write!(
+                f,
+                "{method} does not support multiplicity {multiplicity}"
+            ),
+            Self::InvalidMultiplicity { multiplicity } => write!(
+                f,
+                "multiplicity {multiplicity} is invalid; multiplicity must be at least one"
+            ),
+            Self::InconsistentElectronicState { electron_count, multiplicity } => write!(
+                f,
+                "{electron_count} electrons are inconsistent with multiplicity {multiplicity}"
+            ),
+            Self::InvalidCharge { charge, nuclear_charge } => write!(
+                f,
+                "molecule charge {charge} exceeds total nuclear charge {nuclear_charge}"
+            ),
+            Self::NoElectrons => {
+                write!(f, "zero-electron systems are unsupported by the molecular SCF solver")
+            }
+            Self::CanonicalOrthogonalization(error) => {
+                write!(f, "checked canonical orthogonalization failed: {error}")
+            }
+            Self::GeneralizedEigen(error) => {
+                write!(f, "checked generalized eigensolve failed: {error}")
+            }
+            Self::NonFiniteEnergy { stage } => {
+                write!(f, "SCF energy became non-finite at {stage}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ScfSolveError {}
+
+impl From<CanonicalOrthogonalizationError> for ScfSolveError {
+    fn from(value: CanonicalOrthogonalizationError) -> Self {
+        Self::CanonicalOrthogonalization(value)
+    }
+}
+
+impl From<CheckedGeneralizedEigenError> for ScfSolveError {
+    fn from(value: CheckedGeneralizedEigenError) -> Self {
+        Self::GeneralizedEigen(value)
+    }
+}
+
+/// Solve FC = SCε using only checked numeric primitives.
+///
+/// The caller must provide an orthogonalization matrix produced by
+/// `canonical_orthogonalization_checked`. This function verifies the matrix
+/// shapes/finiteness, Fock symmetry, transformed eigensolver status, and the
+/// original AO-space generalized eigenpair residual. An iteration limit or
+/// any failed contract returns an error; no result with a false convergence
+/// status is exposed as a successful generalized eigensolution.
+pub fn solve_generalized_eigen_checked(
+    f_matrix: &[f64],
+    s_matrix: &[f64],
+    x_matrix: &[f64],
+    n_basis: usize,
+    n_independent: usize,
+    max_iterations: usize,
+) -> Result<CheckedGeneralizedEigenResult, CheckedGeneralizedEigenError> {
+    if n_basis == 0 {
+        return Err(CheckedGeneralizedEigenError::ZeroBasisDimension);
+    }
+    if n_independent == 0 {
+        return Err(CheckedGeneralizedEigenError::ZeroIndependentDimension);
+    }
+    if n_independent > n_basis {
+        return Err(CheckedGeneralizedEigenError::IndependentDimensionExceedsBasis);
+    }
+    let square_len = n_basis
+        .checked_mul(n_basis)
+        .ok_or(CheckedGeneralizedEigenError::NonFiniteIntermediate)?;
+    let transform_len = n_basis
+        .checked_mul(n_independent)
+        .ok_or(CheckedGeneralizedEigenError::NonFiniteIntermediate)?;
+    for (name, matrix, expected) in [
+        ("Fock", f_matrix, square_len),
+        ("overlap", s_matrix, square_len),
+        ("orthogonalization", x_matrix, transform_len),
+    ] {
+        if matrix.len() != expected {
+            return Err(CheckedGeneralizedEigenError::MatrixLengthMismatch {
+                matrix: name,
+                expected,
+                actual: matrix.len(),
+            });
+        }
+        if let Some(index) = matrix.iter().position(|value| !value.is_finite()) {
+            return Err(CheckedGeneralizedEigenError::NonFiniteInput {
+                matrix: name,
+                index,
+            });
+        }
+    }
+
+    let fock_scale = f_matrix
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+    let fock_scale = if fock_scale == 0.0 { 1.0 } else { fock_scale };
+    for row in 0..n_basis {
+        for column in (row + 1)..n_basis {
+            let normalized_difference = (
+                f_matrix[row * n_basis + column] / fock_scale
+                    - f_matrix[column * n_basis + row] / fock_scale
+            )
+            .abs();
+            if normalized_difference > CHECKED_SYMMETRY_RELATIVE_TOLERANCE {
+                return Err(CheckedGeneralizedEigenError::NonsymmetricFockMatrix {
+                    row,
+                    column,
+                    normalized_difference,
+                });
+            }
+        }
+    }
+
+    let overlap_scale = s_matrix
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+    let overlap_scale = if overlap_scale == 0.0 { 1.0 } else { overlap_scale };
+    for row in 0..n_basis {
+        for column in (row + 1)..n_basis {
+            let normalized_difference = (
+                s_matrix[row * n_basis + column] / overlap_scale
+                    - s_matrix[column * n_basis + row] / overlap_scale
+            )
+            .abs();
+            if normalized_difference > CHECKED_SYMMETRY_RELATIVE_TOLERANCE {
+                return Err(CheckedGeneralizedEigenError::NonsymmetricOverlapMatrix {
+                    row,
+                    column,
+                    normalized_difference,
+                });
+            }
+        }
+    }
+    let orthogonality_residual =
+        max_overlap_orthogonality_residual(s_matrix, x_matrix, n_basis, n_independent);
+    if !orthogonality_residual.is_finite() {
+        return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
+    }
+    if orthogonality_residual > CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT {
+        return Err(CheckedGeneralizedEigenError::OrthogonalizationResidualExceeded {
+            residual: orthogonality_residual,
+            limit: CHECKED_ORTHOGONALIZATION_RESIDUAL_LIMIT,
+        });
+    }
+
+    let f_prime = xtax(x_matrix, f_matrix, n_basis, n_independent);
+    if let Some(index) = f_prime.iter().position(|value| !value.is_finite()) {
+        return Err(CheckedGeneralizedEigenError::NonFiniteTransformedMatrix { index });
+    }
+    let eigensolver = symmetric_eigen_checked(&f_prime, n_independent, max_iterations)
+        .map_err(CheckedGeneralizedEigenError::Eigen)?;
+    if !eigensolver.converged {
+        return Err(CheckedGeneralizedEigenError::EigensolverNotConverged(eigensolver));
+    }
+
+    let mut indices: Vec<usize> = (0..n_independent).collect();
+    indices.sort_by(|&a, &b| eigensolver.eigenvalues[a].total_cmp(&eigensolver.eigenvalues[b]));
+    let sorted_eigenvalues: Vec<f64> = indices
+        .iter()
+        .map(|&index| eigensolver.eigenvalues[index])
+        .collect();
+    let mut coefficients = vec![0.0; transform_len];
+    for (target_column, &source_column) in indices.iter().enumerate() {
+        for row in 0..n_basis {
+            let mut value = 0.0;
+            for k in 0..n_independent {
+                value += x_matrix[row * n_independent + k]
+                    * eigensolver.eigenvectors[k * n_independent + source_column];
+            }
+            coefficients[row * n_independent + target_column] = value;
+        }
+    }
+    if coefficients.iter().any(|value| !value.is_finite()) {
+        return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
+    }
+
+    let overlap_scale = s_matrix
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+    let max_energy = sorted_eigenvalues
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+    let rhs_scale = overlap_scale * max_energy;
+    if !rhs_scale.is_finite() {
+        return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
+    }
+    let residual_scale = fock_scale.max(rhs_scale);
+    let residual_scale = if residual_scale == 0.0 { 1.0 } else { residual_scale };
+    let mut max_residual = 0.0_f64;
+    for column in 0..n_independent {
+        let energy = sorted_eigenvalues[column];
+        for row in 0..n_basis {
+            let mut fc = 0.0_f64;
+            let mut sc = 0.0_f64;
+            for k in 0..n_basis {
+                fc += f_matrix[row * n_basis + k] * coefficients[k * n_independent + column];
+                sc += s_matrix[row * n_basis + k] * coefficients[k * n_independent + column];
+            }
+            let residual = fc - energy * sc;
+            if !fc.is_finite() || !sc.is_finite() || !residual.is_finite() {
+                return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
+            }
+            max_residual = max_residual.max(residual.abs() / residual_scale);
+        }
+    }
+    if !max_residual.is_finite() {
+        return Err(CheckedGeneralizedEigenError::NonFiniteIntermediate);
+    }
+    if max_residual > CHECKED_GENERALIZED_EIGENPAIR_RESIDUAL_LIMIT {
+        return Err(CheckedGeneralizedEigenError::GeneralizedResidualExceeded {
+            residual: max_residual,
+            limit: CHECKED_GENERALIZED_EIGENPAIR_RESIDUAL_LIMIT,
+        });
+    }
+
+    Ok(CheckedGeneralizedEigenResult {
+        generalized: GeneralizedEigenResult {
+            eigenvalues: sorted_eigenvalues,
+            coefficients,
+            n_independent,
+            n_discarded: n_basis - n_independent,
+            orthogonalization_matrix: x_matrix.to_vec(),
+        },
+        eigensolver,
+        max_relative_generalized_eigenpair_residual: max_residual,
+    })
+}
+
 // ── Internal linear algebra (pure f64, no HDC overhead for inner loops) ─────
 
 /// Relative off-diagonal tolerance used by the checked Jacobi path.
@@ -792,6 +1223,46 @@ mod tests {
             "Second eigenvalue: {}, expected 3.0",
             evals[1]
         );
+    }
+
+    #[test]
+    fn checked_generalized_eigensolver_verifies_original_ao_equation() {
+        let f = [2.0, 1.0, 1.0, 2.0];
+        let s = [1.0, 0.0, 0.0, 1.0];
+        let x = [1.0, 0.0, 0.0, 1.0];
+        let result = solve_generalized_eigen_checked(&f, &s, &x, 2, 2, 10).unwrap();
+        assert_eq!(result.generalized.eigenvalues, vec![1.0, 3.0]);
+        assert!(result.eigensolver.converged);
+        assert!(
+            result.max_relative_generalized_eigenpair_residual
+                <= CHECKED_GENERALIZED_EIGENPAIR_RESIDUAL_LIMIT
+        );
+        assert!(
+            (result.generalized.coefficients[0] - 2.0_f64.sqrt().recip()).abs() < 1e-12
+                || (result.generalized.coefficients[0] + 2.0_f64.sqrt().recip()).abs() < 1e-12
+        );
+    }
+
+    #[test]
+    fn checked_generalized_eigensolver_rejects_unconverged_and_invalid_inputs() {
+        let f = [2.0, 0.5, 0.5, 2.0];
+        let s = [1.0, 0.0, 0.0, 1.0];
+        let x = [1.0, 0.0, 0.0, 1.0];
+        assert!(matches!(
+            solve_generalized_eigen_checked(&f, &s, &x, 2, 2, 0),
+            Err(CheckedGeneralizedEigenError::EigensolverNotConverged(_))
+        ));
+
+        assert!(matches!(
+            solve_generalized_eigen_checked(&[1.0, 0.5, 0.1, 1.0], &s, &x, 2, 2, 10),
+            Err(CheckedGeneralizedEigenError::NonsymmetricFockMatrix { .. })
+        ));
+
+        let invalid_s = [1.0, 0.0, 0.0, 2.0];
+        assert!(matches!(
+            solve_generalized_eigen_checked(&s, &invalid_s, &x, 2, 2, 10),
+            Err(CheckedGeneralizedEigenError::OrthogonalizationResidualExceeded { .. })
+        ));
     }
 
     #[test]
