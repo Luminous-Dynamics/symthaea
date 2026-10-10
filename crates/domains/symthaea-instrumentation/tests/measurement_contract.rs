@@ -38,6 +38,10 @@ fn raw_reference() -> RawDataReference {
     RawDataReference::new(raw_artifact())
 }
 
+fn reference_standard_fixture_bytes() -> Vec<u8> {
+    b"traceable frequency reference standard fixture v1".to_vec()
+}
+
 fn calibration_certificate() -> CalibrationCertificate {
     CalibrationCertificate::new(
         "calibration-17",
@@ -53,7 +57,7 @@ fn calibration_certificate() -> CalibrationCertificate {
         "ultrasound-frequency-procedure-v1",
         artifact(
             "reference-standard-01",
-            &sha256_hex(b"traceable frequency reference standard fixture v1"),
+            &sha256_hex(&reference_standard_fixture_bytes()),
         ),
     )
     .unwrap()
@@ -322,6 +326,8 @@ struct MockResolver {
     raw_reference_override: Option<ArtifactReference>,
     calibration_bytes_override: Option<Vec<u8>>,
     review_bytes_override: Option<Vec<u8>>,
+    reference_standard_bytes_override: None,
+    reference_standard_bytes_override: Option<Vec<u8>>,
 }
 
 impl CalibrationEvidenceResolver for MockResolver {
@@ -338,6 +344,20 @@ impl CalibrationEvidenceResolver for MockResolver {
             VerifiedArtifactBytes::verify(resolved.evidence().clone(), certificate_bytes)
                 .map_err(|_| "calibration certificate SHA-256 mismatch".to_owned())?;
 
+        let parsed_certificate = CalibrationCertificate::from_canonical_bytes(
+            verified_certificate.bytes(),
+        )
+        .map_err(|error| format!("calibration certificate parse failed: {error}"))?;
+        let standard_bytes = self
+            .reference_standard_bytes_override
+            .clone()
+            .unwrap_or_else(reference_standard_fixture_bytes);
+        let verified_reference_standard = VerifiedArtifactBytes::verify(
+            parsed_certificate.reference_standard().clone(),
+            standard_bytes,
+        )
+        .map_err(|_| "reference standard SHA-256 mismatch".to_owned())?;
+
         let review_bytes = self
             .review_bytes_override
             .clone()
@@ -349,8 +369,13 @@ impl CalibrationEvidenceResolver for MockResolver {
             "calibration-17",
         )?;
 
-        VerifiedCalibrationEvidence::new(resolved, verified_certificate, verified_review)
-            .map_err(|error| error.to_string())
+        VerifiedCalibrationEvidence::new(
+            resolved,
+            verified_certificate,
+            verified_reference_standard,
+            verified_review,
+        )
+        .map_err(|error| error.to_string())
     }
 }
 
@@ -381,6 +406,7 @@ fn resolver() -> MockResolver {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: None,
+        reference_standard_bytes_override: None,
     }
 }
 
@@ -586,6 +612,7 @@ fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
         raw_reference_override: None,
         calibration_bytes_override: Some(certificate_bytes),
         review_bytes_override: Some(review_bytes),
+        reference_standard_bytes_override: None,
     };
 
     assert_eq!(
@@ -622,6 +649,7 @@ fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
         raw_reference_override: None,
         calibration_bytes_override: Some(certificate_bytes),
         review_bytes_override: Some(review_bytes),
+        reference_standard_bytes_override: None,
     };
 
     assert_eq!(
@@ -819,6 +847,7 @@ fn unresolved_raw_acquisition_evidence_fails_closed() {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: None,
+        reference_standard_bytes_override: None,
     };
 
     assert_eq!(
@@ -843,6 +872,7 @@ fn raw_resolver_rejects_bytes_whose_sha256_does_not_match_the_reference() {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: None,
+        reference_standard_bytes_override: None,
     };
 
     assert_eq!(
@@ -867,6 +897,7 @@ fn resolved_raw_data_must_match_the_envelope_digest_and_artifact_id() {
         raw_reference_override: Some(artifact("other-acquisition", &raw_digest_hex())),
         calibration_bytes_override: None,
         review_bytes_override: None,
+        reference_standard_bytes_override: None,
     };
 
     assert_eq!(
@@ -891,6 +922,7 @@ fn unresolved_calibration_evidence_fails_closed() {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: None,
+        reference_standard_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -914,6 +946,7 @@ fn calibration_resolver_rejects_certificate_bytes_with_a_wrong_digest() {
         raw_reference_override: None,
         calibration_bytes_override: Some(b"tampered calibration certificate".to_vec()),
         review_bytes_override: None,
+        reference_standard_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -939,6 +972,7 @@ fn calibration_resolver_rejects_review_receipts_with_a_wrong_digest() {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: Some(b"tampered independent review receipt".to_vec()),
+        reference_standard_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -1113,6 +1147,7 @@ fn calibration_resolver_rejects_a_review_bound_to_another_certificate_digest() {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: Some(wrong_review_bytes),
+        reference_standard_bytes_override: None,
     };
 
     assert_eq!(
@@ -1156,6 +1191,7 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
         raw_reference_override: None,
         calibration_bytes_override: None,
         review_bytes_override: Some(other_review_bytes),
+        reference_standard_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -1192,6 +1228,7 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         raw_reference_override: None,
         calibration_bytes_override: Some(wrong_certificate),
         review_bytes_override: Some(wrong_review),
+        reference_standard_bytes_override: None,
     };
     assert_eq!(
         measurement_with_calibration(1, SAMPLE_TIME_NS, wrong_reference)
@@ -1225,6 +1262,7 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         raw_reference_override: None,
         calibration_bytes_override: Some(outdated_certificate),
         review_bytes_override: Some(outdated_review),
+        reference_standard_bytes_override: None,
     };
     assert_eq!(
         measurement_with_calibration(1, SAMPLE_TIME_NS, outdated_reference)
