@@ -51,6 +51,20 @@ EXPECTED_CASE_IDS = (
     "CH4/6-31G/RHF",
 )
 
+# Independent identity contract for the frozen corpus. These checks prevent a
+# valid case ID from masking a copied/relabelled molecule record.
+EXPECTED_MOLECULE_METADATA: dict[str, tuple[tuple[str, ...], int, int]] = {
+    "H2": (("H", "H"), 0, 1),
+    "HeH+": (("He", "H"), 1, 1),
+    "H2O": (("O", "H", "H"), 0, 1),
+    "NH3": (("N", "H", "H", "H"), 0, 1),
+    "CH4": (("C", "H", "H", "H", "H"), 0, 1),
+    "HF": (("H", "F"), 0, 1),
+    "N2": (("N", "N"), 0, 1),
+    "LiH": (("Li", "H"), 0, 1),
+}
+ATOMIC_NUMBER_BY_SYMBOL = {"H": 1, "He": 2, "Li": 3, "C": 6, "N": 7, "O": 8, "F": 9}
+
 
 def finite_float(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -186,8 +200,64 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
         if not isinstance(case_id, str) or not case_id:
             raise ValueError(f"cases[{index}].case_id must be a non-empty string")
         case_ids.append(case_id)
-        if case.get("method") != "RHF":
-            raise ValueError(f"cases[{index}].method must be explicitly 'RHF'")
+        expected_name, expected_basis, expected_method = case_id.rsplit("/", 2)
+        if case.get("molecule_name") != expected_name:
+            raise ValueError(
+                f"cases[{index}] identity mismatch: expected molecule_name {expected_name!r}"
+            )
+        if case.get("basis") != expected_basis:
+            raise ValueError(
+                f"cases[{index}] identity mismatch: expected basis {expected_basis!r}"
+            )
+        if case.get("method") != expected_method:
+            raise ValueError(
+                f"cases[{index}].method must match frozen case ID method {expected_method!r}"
+            )
+        molecule = case.get("molecule")
+        if not isinstance(molecule, dict):
+            raise ValueError(f"cases[{index}].molecule must be an object")
+        expected_symbols, expected_charge, expected_multiplicity = EXPECTED_MOLECULE_METADATA[
+            expected_name
+        ]
+        charge = molecule.get("charge")
+        multiplicity = molecule.get("multiplicity")
+        if (
+            isinstance(charge, bool)
+            or not isinstance(charge, int)
+            or charge != expected_charge
+        ):
+            raise ValueError(
+                f"cases[{index}] identity mismatch: {expected_name} charge must be {expected_charge}"
+            )
+        if (
+            isinstance(multiplicity, bool)
+            or not isinstance(multiplicity, int)
+            or multiplicity != expected_multiplicity
+        ):
+            raise ValueError(
+                f"cases[{index}] identity mismatch: {expected_name} multiplicity must be "
+                f"{expected_multiplicity}"
+            )
+        atoms = molecule.get("atoms")
+        if not isinstance(atoms, list) or any(not isinstance(atom, dict) for atom in atoms):
+            raise ValueError(f"cases[{index}].molecule.atoms must be an array of atom objects")
+        symbols = tuple(atom.get("symbol") for atom in atoms)
+        if symbols != expected_symbols:
+            raise ValueError(
+                f"cases[{index}] identity mismatch: {expected_name} ordered atom symbols "
+                f"must be {expected_symbols!r}, got {symbols!r}"
+            )
+        for atom_index, (atom, symbol) in enumerate(zip(atoms, expected_symbols)):
+            atomic_number = atom.get("atomic_number")
+            if (
+                isinstance(atomic_number, bool)
+                or not isinstance(atomic_number, int)
+                or atomic_number != ATOMIC_NUMBER_BY_SYMBOL[symbol]
+            ):
+                raise ValueError(
+                    f"cases[{index}].molecule.atoms[{atom_index}] atomic_number "
+                    f"does not match symbol {symbol!r}"
+                )
     if len(set(case_ids)) != len(case_ids):
         raise ValueError("input report contains duplicate fixture case IDs")
     expected_ids = set(EXPECTED_CASE_IDS)
