@@ -36,11 +36,13 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 
 /// Compute greatest common divisor using Euclidean algorithm.
+#[cfg(test)]
 fn gcd(a: u64, b: u64) -> u64 {
     if b == 0 { a } else { gcd(b, a % b) }
 }
 
-/// Normalize a rational number: ensure denominator > 0 and coprime with |numerator|.
+/// Normalize a rational number for legacy unit tests.
+#[cfg(test)]
 fn normalize_rational(num: i64, den: i64) -> (i64, i64) {
     assert!(den != 0, "Denominator cannot be zero");
 
@@ -304,6 +306,8 @@ pub enum NumericArithmeticError {
     NonFiniteOperand,
     /// A finite input operation produced a non-finite floating-point result.
     NonFiniteResult,
+    /// The exact value cannot fit the current fixed-width Number representation.
+    ExactResultOutOfRange,
 }
 
 impl std::fmt::Display for NumericArithmeticError {
@@ -313,6 +317,9 @@ impl std::fmt::Display for NumericArithmeticError {
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
             Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
+            Self::ExactResultOutOfRange => {
+                write!(f, "exact result exceeds the fixed-width Number representation")
+            }
         }
     }
 }
@@ -421,22 +428,35 @@ impl NumericTower {
         Number::Real(x)
     }
 
-    /// Create a Number from a rational p/q (normalizes and narrows).
+    /// Create a Number from a rational p/q, normalizing and narrowing when exact.
+    ///
+    /// For compatibility this constructor falls back to Real only when a valid
+    /// rational cannot fit the fixed-width Number representation. Use
+    /// checked_from_rational when an exact value is mandatory.
     pub fn from_rational(numerator: i64, denominator: i64) -> Number {
         assert!(denominator != 0, "Denominator cannot be zero");
-        let (num, den) = normalize_rational(numerator, denominator);
-        if den == 1 {
-            if num >= 0 {
-                Number::Natural(num as u64)
-            } else {
-                Number::Integer(num)
+        match Self::checked_from_rational(numerator, denominator) {
+            Ok(number) => number,
+            Err(NumericArithmeticError::ExactResultOutOfRange) => {
+                Number::Real(numerator as f64 / denominator as f64)
             }
-        } else {
-            Number::Rational {
-                numerator: num,
-                denominator: den,
-            }
+            Err(_) => unreachable!("nonzero constructor denominator was validated"),
         }
+    }
+
+    /// Construct a rational Number without approximation.
+    ///
+    /// Returns a typed error if the denominator is zero or the normalized exact
+    /// fraction cannot fit Natural(u64), Integer(i64), or Rational(i64, i64).
+    pub fn checked_from_rational(
+        numerator: i64,
+        denominator: i64,
+    ) -> Result<Number, NumericArithmeticError> {
+        if denominator == 0 {
+            return Err(NumericArithmeticError::InvalidRationalOperand);
+        }
+        Self::number_from_fraction_i128(i128::from(numerator), i128::from(denominator))
+            .ok_or(NumericArithmeticError::ExactResultOutOfRange)
     }
 
     // ========================================================================
@@ -971,7 +991,10 @@ impl NumericTower {
         }
     }
 
-    /// Negate a number: -a
+    /// Negate a number: -a.
+    ///
+    /// Uses exact widening where the existing Number variants can represent the
+    /// result and records any unavoidable Real fallback in the proof trace.
     pub fn negate(&self, a: &Number) -> NumberResult {
         let mut proof_trace = vec![format!("Negate: -({})", a)];
 
@@ -980,29 +1003,48 @@ impl NumericTower {
                 proof_trace.push("Negation of zero is zero".to_string());
                 Number::Natural(0)
             }
-            Number::Natural(n) => {
+            Number::Natural(n) if *n <= i64::MAX as u64 => {
                 let neg = -(*n as i64);
-                proof_trace.push(format!("Promotion N -> Z: -({n}) = {neg}"));
+                proof_trace.push(format!("Exact negation: -({n}) = {neg}"));
                 Number::Integer(neg)
             }
-            Number::Integer(n) => {
-                let neg = n.wrapping_neg();
-                proof_trace.push(format!("Integer negation: -({n}) = {neg}"));
-                Self::from_i64(neg)
-            }
-            Number::Rational {
-                numerator,
-                denominator,
-            } => {
-                let neg_num = numerator.wrapping_neg();
+            Number::Natural(n) => {
+                let value = -(*n as f64);
                 proof_trace.push(format!(
-                    "Rational negation: -({numerator}/{denominator}) = {neg_num}/{denominator}"
+                    "Negation of {n} exceeds the signed fixed-width range; approximate Real({value}) returned."
                 ));
-                Self::from_rational(neg_num, *denominator)
+                Number::Real(value)
+            }
+            Number::Integer(n) => match n.checked_neg() {
+                Some(neg) => {
+                    proof_trace.push(format!("Exact integer negation: -({n}) = {neg}"));
+                    Self::from_i64(neg)
+                }
+                None => {
+                    // -i64::MIN = 2^63, which is representable as a Natural.
+                    proof_trace.push(format!("Exact integer negation: -({n}) = {}", n.unsigned_abs()));
+                    Number::Natural(n.unsigned_abs())
+                }
+            },
+            Number::Rational { numerator, denominator } => {
+                if *denominator == 0 {
+                    proof_trace.push("Invalid rational operand: zero denominator; result is an invalid NaN sentinel.".to_string());
+                    Number::Real(f64::NAN)
+                } else if let Some(negated) = Self::number_from_fraction_i128(
+                    -i128::from(*numerator),
+                    i128::from(*denominator),
+                ) {
+                    proof_trace.push(format!("Exact rational negation: -({numerator}/{denominator}) = {negated}"));
+                    negated
+                } else {
+                    let value = -(*numerator as f64 / *denominator as f64);
+                    proof_trace.push(format!("Rational negation exceeds fixed-width storage; approximate Real({value}) returned."));
+                    Number::Real(value)
+                }
             }
             Number::Real(x) => {
-                let neg = -x;
-                proof_trace.push(format!("Real negation: -({x}) = {neg}"));
+                let neg = -*x;
+                proof_trace.push(format!("Floating-point negation: -({x}) = {neg}; exactness is not claimed."));
                 Number::Real(neg)
             }
         };
@@ -1011,7 +1053,10 @@ impl NumericTower {
         self.build_result(result, "negate".to_string(), proof_trace, &input_domains)
     }
 
-    /// Absolute value: |a|
+    /// Absolute value: |a|.
+    ///
+    /// Uses unsigned magnitude and wide fraction normalization to preserve the
+    /// exact absolute value of signed minimum values where representable.
     pub fn abs(&self, a: &Number) -> NumberResult {
         let mut proof_trace = vec![format!("Absolute value: |{}|", a)];
 
@@ -1021,24 +1066,30 @@ impl NumericTower {
                 Number::Natural(*n)
             }
             Number::Integer(n) => {
-                let abs_val = n.checked_abs().unwrap_or(i64::MAX);
-                proof_trace.push(format!("Integer absolute value: |{n}| = {abs_val}"));
-                Number::Natural(abs_val as u64)
+                let magnitude = n.unsigned_abs();
+                proof_trace.push(format!("Exact integer absolute value: |{n}| = {magnitude}"));
+                Number::Natural(magnitude)
             }
-            Number::Rational {
-                numerator,
-                denominator,
-            } => {
-                let abs_num = numerator.checked_abs().unwrap_or(i64::MAX);
-                proof_trace.push(format!(
-                    "Rational absolute value: |{numerator}/{denominator}| = {abs_num}/{denominator}"
-                ));
-                Self::from_rational(abs_num, *denominator)
+            Number::Rational { numerator, denominator } => {
+                if *denominator == 0 {
+                    proof_trace.push("Invalid rational operand: zero denominator; result is an invalid NaN sentinel.".to_string());
+                    Number::Real(f64::NAN)
+                } else if let Some(absolute) = Self::number_from_fraction_i128(
+                    i128::from(*numerator).abs(),
+                    i128::from(*denominator),
+                ) {
+                    proof_trace.push(format!("Exact rational absolute value: |{numerator}/{denominator}| = {absolute}"));
+                    absolute
+                } else {
+                    let value = (*numerator as f64 / *denominator as f64).abs();
+                    proof_trace.push(format!("Rational absolute value exceeds fixed-width storage; approximate Real({value}) returned."));
+                    Number::Real(value)
+                }
             }
             Number::Real(x) => {
                 let abs_val = x.abs();
-                proof_trace.push(format!("Real absolute value: |{x}| = {abs_val}"));
-                Self::from_f64(abs_val)
+                proof_trace.push(format!("Floating-point absolute value: |{x}| = {abs_val}; exactness is not claimed."));
+                Number::Real(abs_val)
             }
         };
 
@@ -1968,6 +2019,46 @@ mod tests {
             "sqrt(4/9) = 2/3, got {:?}",
             r.number
         );
+    }
+
+    #[test]
+    fn test_checked_from_rational_reports_unrepresentable_exact_values() {
+        assert_eq!(
+            NumericTower::checked_from_rational(1, 0).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            NumericTower::checked_from_rational(1, i64::MIN).unwrap_err(),
+            NumericArithmeticError::ExactResultOutOfRange
+        );
+        assert!(matches!(
+            NumericTower::checked_from_rational(i64::MIN, -1),
+            Ok(Number::Natural(value)) if value == (1_u64 << 63)
+        ));
+        assert!(matches!(
+            NumericTower::from_rational(i64::MIN, -1),
+            Number::Natural(value) if value == (1_u64 << 63)
+        ));
+    }
+
+    #[test]
+    fn test_negate_wide_natural_and_signed_minimum() {
+        let tower = NumericTower::new();
+        let wide_natural = tower.negate(&Number::Natural(u64::MAX));
+        assert!(matches!(wide_natural.number, Number::Real(value) if value < 0.0));
+        assert!(wide_natural.proof_trace.iter().any(|line| line.contains("approximate Real")));
+
+        let signed_min = tower.negate(&Number::Integer(i64::MIN));
+        assert!(matches!(signed_min.number, Number::Natural(value) if value == (1_u64 << 63)));
+        assert!(signed_min.proof_trace.iter().any(|line| line.contains("Exact integer negation")));
+    }
+
+    #[test]
+    fn test_abs_preserves_minimum_integer_exactly() {
+        let tower = NumericTower::new();
+        let result = tower.abs(&Number::Integer(i64::MIN));
+        assert!(matches!(result.number, Number::Natural(value) if value == (1_u64 << 63)));
+        assert!(result.proof_trace.iter().any(|line| line.contains("Exact integer absolute value")));
     }
 
     #[test]
