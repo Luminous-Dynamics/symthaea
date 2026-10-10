@@ -469,7 +469,7 @@ impl CapabilityLedger {
             .values()
             .filter(|record| record.forecast.claim_id == claim_id)
             .collect();
-        Ok(calculate_metrics(&records))
+        Ok(calculate_metrics(&records, records.len()))
     }
 
     /// Metrics computed only from resolved held-out/transfer receipts issued by the evaluator
@@ -483,18 +483,22 @@ impl CapabilityLedger {
         if !self.claims.contains_key(claim_id) {
             return Err(CapabilityLedgerError::UnknownClaim);
         }
-        let records: Vec<&ForecastRecord> = self
+        let all_records: Vec<&ForecastRecord> = self
             .forecasts
             .values()
+            .filter(|record| record.forecast.claim_id == claim_id)
+            .collect();
+        let total_forecast_count = all_records.len();
+        let qualifying_records: Vec<&ForecastRecord> = all_records
+            .into_iter()
             .filter(|record| {
-                record.forecast.claim_id == claim_id
-                    && record
-                        .receipt
-                        .as_ref()
-                        .is_some_and(|receipt| policy.accepts(receipt))
+                record
+                    .receipt
+                    .as_ref()
+                    .is_some_and(|receipt| policy.accepts(receipt))
             })
             .collect();
-        Ok(calculate_metrics(&records))
+        Ok(calculate_metrics(&qualifying_records, total_forecast_count))
     }
 
     /// Promote a candidate only when a pinned evaluator policy and adequate out-of-training
@@ -536,7 +540,10 @@ impl CapabilityLedger {
     }
 }
 
-fn calculate_metrics(records: &[&ForecastRecord]) -> CapabilityMetrics {
+fn calculate_metrics(
+    records: &[&ForecastRecord],
+    total_forecast_count: usize,
+) -> CapabilityMetrics {
     let resolved: Vec<(&CapabilityForecast, &CapabilityOutcomeReceipt)> = records
         .iter()
         .filter_map(|record| {
@@ -560,7 +567,7 @@ fn calculate_metrics(records: &[&ForecastRecord]) -> CapabilityMetrics {
 
     if resolved.is_empty() {
         return CapabilityMetrics {
-            forecast_count: records.len(),
+            forecast_count: total_forecast_count,
             resolved_count,
             qualification_samples,
             held_out_samples,
@@ -612,7 +619,7 @@ fn calculate_metrics(records: &[&ForecastRecord]) -> CapabilityMetrics {
         .collect();
 
     CapabilityMetrics {
-        forecast_count: records.len(),
+        forecast_count: total_forecast_count,
         resolved_count,
         qualification_samples,
         held_out_samples,
@@ -754,6 +761,12 @@ mod tests {
             ledger.qualify_claim("rust-debugging", &policy()),
             Err(CapabilityLedgerError::InsufficientEvidence)
         );
+        let qualification_metrics = ledger
+            .qualification_metrics("rust-debugging", &policy())
+            .unwrap();
+        assert_eq!(qualification_metrics.forecast_count, 3);
+        assert_eq!(qualification_metrics.resolved_count, 0);
+        assert_eq!(qualification_metrics.brier_score, None);
         assert_eq!(
             ledger.claim("rust-debugging").unwrap().lifecycle,
             CapabilityLifecycle::Candidate
