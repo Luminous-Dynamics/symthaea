@@ -18717,6 +18717,7 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea-acoustics",
+ "symthaea-agribot",
  "symthaea-broca",
  "symthaea-causal-reasoning",
  "symthaea-circuits",

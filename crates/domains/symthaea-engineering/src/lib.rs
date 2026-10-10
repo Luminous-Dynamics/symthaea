@@ -26,6 +26,12 @@ use symthaea_sim_bridge::{
 use symthaea_swarm::{SwarmAggregator, SwarmMessage, SwarmProofMsg, SwarmStateMsg};
 use symthaea_workspace::GlobalWorkspace;
 
+pub mod regenerative;
+pub mod measurement_planner;
+pub mod screening_design;
+pub mod screening_power;
+pub mod screening_analysis;
+
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
 pub use symthaea_memory as memory;
@@ -255,6 +261,99 @@ impl EngineeringManager {
                 }
             }
         }
+    }
+
+    /// Screen a regenerative soil-process design against explicit numeric requirements
+    /// and a separately evidenced quality gate. Passing is design eligibility only;
+    /// it is not a field-efficacy claim or an authorization to apply an amendment.
+    pub fn evaluate_regenerative_process(
+        &self,
+        candidate: &regenerative::RegenerativeDesignCandidate,
+        requirements: &regenerative::RegenerativeDesignRequirements,
+    ) -> Result<regenerative::RegenerativeDesignAssessment, regenerative::DesignError> {
+        regenerative::assess_regenerative_candidate(candidate, requirements)
+    }
+
+    /// Rank evidence-linked measurement options which could resolve currently unresolved
+    /// regenerative-design constraints. This is a transparent triage heuristic, not an
+    /// optimal design-of-experiments plan or calibrated value-of-information estimate.
+    pub fn prioritize_regenerative_measurements(
+        &self,
+        intervals: &regenerative::RegenerativeMetricIntervals,
+        requirements: &regenerative::RegenerativeDesignRequirements,
+        measurement_cost_unit: &str,
+        options: &[measurement_planner::MeasurementOption],
+    ) -> Result<
+        measurement_planner::MeasurementPriorityPlan,
+        measurement_planner::MeasurementPlannerError,
+    > {
+        measurement_planner::prioritize_measurements(
+            intervals,
+            requirements,
+            measurement_cost_unit,
+            options,
+        )
+    }
+
+    /// Generate a deterministic, preregistration-first bench-scale two-level full-factorial
+    /// screening schedule after an explicit review of the exact protocol. This creates a plan,
+    /// not an execution authorization, power analysis, or agronomic recommendation.
+    pub fn generate_regenerative_screening_design(
+        &self,
+        request: &screening_design::ScreeningDesignRequest,
+    ) -> Result<
+        screening_design::ScreeningDesignPlan,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_design::generate_screening_design(request)
+    }
+
+    /// Recheck run order, block completeness, factorial cell coverage, replicate counts,
+    /// factor values/units, and center-point placement on a screening-plan artifact. This
+    /// structural check does not authenticate evidence or authorize experiment execution.
+    pub fn verify_regenerative_screening_design(
+        &self,
+        plan: &screening_design::ScreeningDesignPlan,
+    ) -> Result<
+        screening_design::ScreeningDesignVerificationReceipt,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_design::verify_screening_design(plan)
+    }
+
+    /// Estimate preliminary normal-approximation power for factorial main effects
+    /// from an explicit residual-variation estimate. This is a design-risk screen,
+    /// not exact finite-sample power or a claim that the trial is adequately powered.
+    pub fn assess_regenerative_screening_power(
+        &self,
+        request: &screening_design::ScreeningDesignRequest,
+        residual_variation: &screening_power::ResidualVariationEstimate,
+        familywise_alpha: f64,
+        target_power: f64,
+    ) -> Result<
+        screening_power::ScreeningPowerAssessment,
+        screening_power::ScreeningPowerError,
+    > {
+        screening_power::assess_screening_power(
+            request,
+            residual_variation,
+            familywise_alpha,
+            target_power,
+        )
+    }
+
+    /// Analyze measured primary-endpoint observations against a verified screening plan.
+    /// This returns descriptive factorial contrasts and block-level center-point diagnostics,
+    /// not p-values, confidence intervals, safety approvals, or agronomic claims.
+    pub fn analyze_regenerative_screening_responses(
+        &self,
+        plan: &screening_design::ScreeningDesignPlan,
+        observations: &[screening_analysis::ScreeningResponseObservation],
+    ) -> Result<
+        screening_analysis::ScreeningResponseAnalysis,
+        screening_analysis::ScreeningAnalysisError,
+    > {
+        screening_analysis::analyze_screening_responses(plan, observations)
     }
 
     pub fn evaluate_material(
@@ -1589,6 +1688,13 @@ impl EngineeringManager {
                 envelope: "closed-form stability heuristic at fixed 300 K",
             },
             FacultyCapability {
+                domain: Environmental,
+                method: "evaluate_regenerative_process",
+                solver_crate: "symthaea-agribot + symthaea-engineering::regenerative",
+                checks: "feedstock mass/carbon/heat balance + requirements + product-quality gate",
+                envelope: "screening model only; no reactor kinetics, soil efficacy, or application-rate authority",
+            },
+            FacultyCapability {
                 domain: Civil,
                 method: "evaluate_structural",
                 solver_crate: "symthaea-structural",
@@ -2376,9 +2482,14 @@ mod tests {
         // Systems: control + optics + operations research.
         assert_eq!(EngineeringManager::capabilities_for(Systems).len(), 3);
         // Covered domains report true; every registry entry names a real evaluate_* method.
-        for d in [Civil, Mechanical, Electrical, Materials, Systems] {
+        for d in [Civil, Mechanical, Electrical, Materials, Environmental, Systems] {
             assert!(EngineeringManager::is_covered(d), "{d:?} should be covered");
         }
+        assert_eq!(EngineeringManager::capabilities_for(Environmental).len(), 1);
+        assert_eq!(
+            EngineeringManager::capabilities_for(Environmental)[0].method,
+            "evaluate_regenerative_process"
+        );
         for c in EngineeringManager::capabilities() {
             assert!(c.method.starts_with("evaluate_"));
             assert!(
@@ -2392,13 +2503,13 @@ mod tests {
     fn uncovered_domains_are_honestly_reported() {
         use EngineeringDomain::*;
         let gaps = EngineeringManager::uncovered_domains();
-        // These have no faculty solver yet — must be reported as gaps, not silently claimed.
-        for d in [Aerospace, ChemicalProcess, Robotics, Nuclear, Environmental] {
+        // These still have no faculty solver; report gaps rather than imply coverage.
+        for d in [Aerospace, ChemicalProcess, Robotics, Nuclear] {
             assert!(gaps.contains(&d), "{d:?} is a known gap");
             assert!(!EngineeringManager::is_covered(d));
         }
         // Covered domains must NOT appear in the gap list.
-        for d in [Civil, Mechanical, Electrical, Materials, Systems] {
+        for d in [Civil, Mechanical, Electrical, Materials, Environmental, Systems] {
             assert!(!gaps.contains(&d));
         }
     }

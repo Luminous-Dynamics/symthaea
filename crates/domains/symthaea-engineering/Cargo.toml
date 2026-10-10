@@ -13,6 +13,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-materials = { path = "../symthaea-materials" }
+symthaea-agribot = { path = "../symthaea-agribot" }
 symthaea-structural = { path = "../symthaea-structural" }
 symthaea-grid-physics = { path = "../symthaea-grid-physics" }
 symthaea-thermofluids = { path = "../symthaea-thermofluids" }
@@ -24,6 +25,7 @@ symthaea-dsp = { path = "../symthaea-dsp" }
 symthaea-operations-research = { path = "../symthaea-operations-research" }
 uuid = { version = "1.0", features = ["v4"] }
 serde_json = "1.0"
+sha2.workspace = true
 
 
 uom.workspace = true
