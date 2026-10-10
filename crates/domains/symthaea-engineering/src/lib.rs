@@ -31,6 +31,7 @@ pub mod measurement_planner;
 pub mod screening_design;
 pub mod screening_power;
 pub mod screening_analysis;
+pub mod screening_plackett_burman;
 
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
@@ -354,6 +355,44 @@ impl EngineeringManager {
         screening_analysis::ScreeningAnalysisError,
     > {
         screening_analysis::analyze_screening_responses(plan, observations)
+    }
+
+    /// Generate a reproducible 12-run Plackett–Burman main-effect screening proposal for
+    /// 2–11 numeric factors. Effects can be confounded with two-factor interactions; this
+    /// does not replace a resolution-IV/V design where interactions matter.
+    pub fn generate_regenerative_plackett_burman_design(
+        &self,
+        request: &screening_plackett_burman::PlackettBurmanDesignRequest,
+    ) -> Result<
+        screening_plackett_burman::PlackettBurmanDesignPlan,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_plackett_burman::generate_plackett_burman_design(request)
+    }
+
+    /// Re-verify PB schedule fingerprints, seed-derived row order, block coverage and settings.
+    /// This same-crate verifier does not authenticate external review/evidence records.
+    pub fn verify_regenerative_plackett_burman_design(
+        &self,
+        plan: &screening_plackett_burman::PlackettBurmanDesignPlan,
+    ) -> Result<
+        screening_plackett_burman::PlackettBurmanVerificationReceipt,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_plackett_burman::verify_plackett_burman_design(plan)
+    }
+
+    /// Analyze complete measured PB responses as descriptive high-minus-low main effects.
+    /// This does not calculate power, estimate interactions, or produce inferential claims.
+    pub fn analyze_regenerative_plackett_burman_responses(
+        &self,
+        plan: &screening_plackett_burman::PlackettBurmanDesignPlan,
+        observations: &[screening_plackett_burman::PlackettBurmanResponseObservation],
+    ) -> Result<
+        screening_plackett_burman::PlackettBurmanResponseAnalysis,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_plackett_burman::analyze_plackett_burman_responses(plan, observations)
     }
 
     pub fn evaluate_material(
