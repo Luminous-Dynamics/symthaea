@@ -4943,7 +4943,7 @@ mod tests {
             best.formula_str, best.variance
         );
         if best.symbolic_check_passed {
-            eprintln!("  >>> SYMBOLICALLY SYMBOLIC-CHECK: dE/dt = 0 ✓");
+            eprintln!("  >>> SYMBOLIC-CHECK: finite-point residuals passed; no formal proof receipt");
         }
     }
 
