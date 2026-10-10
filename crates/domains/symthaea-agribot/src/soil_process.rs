@@ -33,6 +33,21 @@ impl fmt::Display for SoilProcessError {
 
 impl Error for SoilProcessError {}
 
+fn finite(value: f64, field: &'static str) -> Result<(), SoilProcessError> {
+    if !value.is_finite() {
+        return Err(SoilProcessError::new(field, "must be finite"));
+    }
+    Ok(())
+}
+
+fn positive(value: f64, field: &'static str) -> Result<(), SoilProcessError> {
+    finite_nonnegative(value, field)?;
+    if value == 0.0 {
+        return Err(SoilProcessError::new(field, "must be greater than zero"));
+    }
+    Ok(())
+}
+
 fn finite_nonnegative(value: f64, field: &'static str) -> Result<(), SoilProcessError> {
     if !value.is_finite() {
         return Err(SoilProcessError::new(field, "must be finite"));
@@ -137,24 +152,24 @@ pub fn calculate_pyrolysis_batch(
     fraction(input.feedstock_carbon_fraction_dry, "feedstock_carbon_fraction_dry", true)?;
     fraction(input.char_yield_fraction_dry_basis, "char_yield_fraction_dry_basis", true)?;
     fraction(input.char_carbon_fraction_dry, "char_carbon_fraction_dry", true)?;
-    finite_nonnegative(input.ambient_temperature_c, "ambient_temperature_c")?;
-    finite_nonnegative(input.target_temperature_c, "target_temperature_c")?;
-    finite_nonnegative(input.water_boiling_temperature_c, "water_boiling_temperature_c")?;
-    finite_nonnegative(
+    finite(input.ambient_temperature_c, "ambient_temperature_c")?;
+    finite(input.target_temperature_c, "target_temperature_c")?;
+    finite(input.water_boiling_temperature_c, "water_boiling_temperature_c")?;
+    positive(
         input.dry_feedstock_heat_capacity_kj_per_kg_k,
         "dry_feedstock_heat_capacity_kj_per_kg_k",
     )?;
-    finite_nonnegative(
+    positive(
         input.liquid_water_heat_capacity_kj_per_kg_k,
         "liquid_water_heat_capacity_kj_per_kg_k",
     )?;
-    finite_nonnegative(input.water_latent_heat_kj_per_kg, "water_latent_heat_kj_per_kg")?;
-    finite_nonnegative(
+    positive(input.water_latent_heat_kj_per_kg, "water_latent_heat_kj_per_kg")?;
+    positive(
         input.steam_heat_capacity_kj_per_kg_k,
         "steam_heat_capacity_kj_per_kg_k",
     )?;
     finite_nonnegative(input.reactor_mass_kg, "reactor_mass_kg")?;
-    finite_nonnegative(
+    positive(
         input.reactor_heat_capacity_kj_per_kg_k,
         "reactor_heat_capacity_kj_per_kg_k",
     )?;
@@ -402,6 +417,14 @@ mod tests {
         assert!((result.carbon_retained_in_char_fraction - (180.0 / 384.0)).abs() < 1e-12);
         assert!(result.declared_terms_heat_duty_mj > 0.0);
         assert!(result.estimated_supplied_heat_mj > result.declared_terms_heat_duty_mj);
+    }
+
+    #[test]
+    fn subzero_ambient_temperature_is_supported() {
+        let mut input = pyrolysis_input();
+        input.ambient_temperature_c = -10.0;
+        let result = calculate_pyrolysis_batch(&input).unwrap();
+        assert!(result.declared_terms_heat_duty_mj > 0.0);
     }
 
     #[test]
