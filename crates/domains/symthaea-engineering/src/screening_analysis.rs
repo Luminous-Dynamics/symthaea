@@ -105,6 +105,9 @@ pub struct ScreeningResponseAnalysis {
     pub design_verification: ScreeningDesignVerificationReceipt,
     /// Full schedule request retained to keep the observed results interpretable.
     pub request_snapshot: crate::screening_design::ScreeningDesignRequest,
+    /// Exact scheduled runs and settings analyzed; avoids relying on a future generator
+    /// to reconstruct historical treatment allocation.
+    pub schedule_snapshot: Vec<crate::screening_design::PlannedRun>,
     /// Ordered by planned run_order, preserving the audit trail for each observation.
     pub observations_in_run_order: Vec<ScreeningResponseObservation>,
     pub treatment_observation_count: u32,
@@ -466,6 +469,7 @@ pub fn analyze_screening_responses(
         endpoint_unit: endpoint.unit.clone(),
         design_verification,
         request_snapshot: request.clone(),
+        schedule_snapshot: plan.runs.clone(),
         observations_in_run_order: ordered_observations,
         treatment_observation_count,
         center_point_observation_count,
@@ -612,6 +616,7 @@ mod tests {
         assert!(result.block_center_point_diagnostics.iter()
             .all(|diagnostic| (diagnostic.center_point_minus_factorial_mean - 5.0).abs() < 1e-12));
         assert_eq!(result.observations_in_run_order[0].run_id, plan.runs[0].run_id);
+        assert_eq!(result.schedule_snapshot, plan.runs);
         assert!(result.scope_note.contains("no p-values"));
     }
 
