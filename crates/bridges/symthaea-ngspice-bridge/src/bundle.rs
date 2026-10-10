@@ -195,6 +195,27 @@ impl ModelInputBundle {
             .map(NetlistArtifact::blake3_digest)
     }
 
+    /// Canonical versioned, length-prefixed manifest bytes. The export
+    /// contains identity and digests rather than duplicating model file bytes,
+    /// so callers can preserve this exact artifact beside the input files.
+    pub fn canonical_manifest_bytes(&self) -> Vec<u8> {
+        let mut manifest = Vec::new();
+        push_field(&mut manifest, b"symthaea-ngspice-model-input-bundle-v1");
+        push_field(&mut manifest, self.request_id.as_bytes());
+        push_field(&mut manifest, self.primary_path.as_bytes());
+        push_field(&mut manifest, self.primary.blake3_digest().as_bytes());
+        push_field(
+            &mut manifest,
+            &(self.dependencies.len() as u64).to_le_bytes(),
+        );
+        for (path, artifact) in &self.dependencies {
+            push_field(&mut manifest, b"dependency");
+            push_field(&mut manifest, path.as_bytes());
+            push_field(&mut manifest, artifact.blake3_digest().as_bytes());
+        }
+        manifest
+    }
+
     /// Digest of the canonical manifest, including request ID, primary path,
     /// primary bytes digest, and sorted dependency paths/content digests.
     pub fn manifest_digest(&self) -> &str {
@@ -317,27 +338,13 @@ impl ModelInputBundle {
     }
 
     fn compute_manifest_digest(&self) -> String {
-        // Domain separation and an explicit dependency count make the
-        // serialization unambiguous, even if a path happens to resemble a
-        // digest string. BTreeMap iteration establishes canonical ordering.
-        let mut hasher = blake3::Hasher::new();
-        hash_field(&mut hasher, b"symthaea-ngspice-model-input-bundle-v1");
-        hash_field(&mut hasher, self.request_id.as_bytes());
-        hash_field(&mut hasher, self.primary_path.as_bytes());
-        hash_field(&mut hasher, self.primary.blake3_digest().as_bytes());
-        hash_field(&mut hasher, &(self.dependencies.len() as u64).to_le_bytes());
-        for (path, artifact) in &self.dependencies {
-            hash_field(&mut hasher, b"dependency");
-            hash_field(&mut hasher, path.as_bytes());
-            hash_field(&mut hasher, artifact.blake3_digest().as_bytes());
-        }
-        hasher.finalize().to_hex().to_string()
+        blake3::hash(&self.canonical_manifest_bytes()).to_hex().to_string()
     }
 }
 
-fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
-    hasher.update(&(bytes.len() as u64).to_le_bytes());
-    hasher.update(bytes);
+fn push_field(manifest: &mut Vec<u8>, bytes: &[u8]) {
+    manifest.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+    manifest.extend_from_slice(bytes);
 }
 
 fn validate_relative_path(path: String) -> Result<String, ModelInputBundleError> {
@@ -652,6 +659,22 @@ mod tests {
         assert_eq!(bundle.primary_path(), "rc_step_reference.cir");
         assert_eq!(bundle.dependency_paths().count(), 0);
         assert_eq!(bundle.primary_bytes(), source.as_bytes());
+    }
+
+    #[test]
+    fn exported_manifest_bytes_reproduce_the_manifest_digest() {
+        let bundle = bundle(
+            "main.cir",
+            ".include shared.inc\n",
+            vec![("shared.inc", ".param gain=2\n")],
+        )
+        .unwrap();
+        let canonical = bundle.canonical_manifest_bytes();
+        let expected = blake3::hash(&canonical).to_hex().to_string();
+        assert_eq!(bundle.manifest_digest(), expected);
+        assert!(canonical.starts_with(
+            b"\x23\x00\x00\x00\x00\x00\x00\x00symthaea-ngspice-model-input-bundle-v1"
+        ));
     }
 
     #[test]
