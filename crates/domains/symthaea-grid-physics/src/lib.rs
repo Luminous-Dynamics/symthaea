@@ -25,5 +25,6 @@ pub mod droop;
 pub mod feeder;
 pub mod generation;
 pub mod islanding;
+pub mod qualification;
 pub mod scheduling;
 pub mod trip_envelope;

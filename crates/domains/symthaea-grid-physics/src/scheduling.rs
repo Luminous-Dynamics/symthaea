@@ -19,9 +19,10 @@
 //! learned/HDC-driven policy can plug into the same slot.
 
 use crate::battery::Battery;
+use serde::{Deserialize, Serialize};
 
 /// Time-of-use import/export tariff.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct TariffSchedule {
     pub off_peak_price_per_kwh: f64,
     pub peak_price_per_kwh: f64,
@@ -51,7 +52,7 @@ impl TariffSchedule {
 }
 
 /// Scored outcome of running a scenario to completion.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ScenarioResult {
     /// Net cost in the tariff's currency unit (import cost minus export credit).
     pub total_cost: f64,
@@ -60,6 +61,55 @@ pub struct ScenarioResult {
     pub unserved_energy_kwh: f64,
     /// Battery equivalent full cycles accumulated over the scenario.
     pub battery_cycles: f64,
+}
+
+/// Raw per-step evidence used by the independent qualification checker.
+///
+/// These are model receipts, not authenticated telemetry or proof of physical
+/// device behavior. Values are recorded before aggregation so cost and
+/// unserved-energy summaries can be recomputed from the individual steps.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ScenarioStepReceipt {
+    pub elapsed_hours: f64,
+    pub absolute_time_hours: f64,
+    pub step_duration_hours: f64,
+    pub load_kw: f64,
+    pub generation_kw: f64,
+    pub battery_soc_before: f64,
+    pub battery_soc_after: f64,
+    pub battery_stored_energy_before_kwh: f64,
+    pub battery_stored_energy_after_kwh: f64,
+    pub battery_cycles_before: f64,
+    pub battery_cycles_after: f64,
+    pub charge_setpoint_kw: f64,
+    pub discharge_setpoint_kw: f64,
+    pub battery_charge_input_kw: f64,
+    pub battery_discharge_output_kw: f64,
+    /// AC-to-DC / DC-to-AC conversion losses over this step, in kWh.
+    pub battery_charge_loss_kwh: f64,
+    pub battery_discharge_loss_kwh: f64,
+    /// Stored-energy reduction from the model's capacity-fade update, in kWh.
+    pub battery_degradation_energy_loss_kwh: f64,
+    pub net_kw: f64,
+    pub import_price_per_kwh: f64,
+    pub export_price_per_kwh: f64,
+    pub grid_available: bool,
+    pub cost_delta: f64,
+    pub unserved_energy_delta_kwh: f64,
+    pub curtailed_energy_delta_kwh: f64,
+}
+
+/// Aggregate score plus raw step receipts from one scenario run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScenarioTraceResult {
+    pub result: ScenarioResult,
+    pub steps: Vec<ScenarioStepReceipt>,
+    /// Renewable/other surplus energy unavailable for export in islanded mode.
+    pub curtailed_energy_kwh: f64,
+    /// Charge/discharge conversion losses, recomputed from per-step receipts.
+    pub battery_conversion_loss_kwh: f64,
+    /// Inventory reduction attributed to the simplified capacity-fade model.
+    pub battery_degradation_energy_loss_kwh: f64,
 }
 
 /// Failures returned by the validated energy-scheduling scenario runner.
@@ -140,11 +190,11 @@ fn battery_state_is_valid(battery: &Battery) -> bool {
 /// unbounded CPU loop. Larger studies should be split into bounded windows.
 const MAX_SCENARIO_STEPS: usize = 1_000_000;
 
-/// Run a validated scenario atomically with respect to battery state.
+/// Run a validated scenario atomically and return the stable aggregate result.
 ///
-/// The runner rejects invalid time steps, invalid profiles and non-finite
-/// control outputs; it bounds the work for each scenario; uses a shorter
-/// final step when the horizon is not divisible by dt; and reports only the
+/// The runner rejects invalid time steps, invalid profiles, and non-finite
+/// control outputs; bounds the work for each scenario; uses a shorter final
+/// step when the horizon is not divisible by dt; and reports only the
 /// equivalent-full-cycle increment caused by this scenario. Battery state
 /// is committed back to the caller only when the complete scenario succeeds.
 #[allow(clippy::too_many_arguments)]
@@ -157,8 +207,65 @@ pub fn try_run_scenario(
     total_hours: f64,
     start_hour: f64,
     grid_available: bool,
-    mut policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
+    policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
 ) -> Result<ScenarioResult, ScenarioError> {
+    try_run_scenario_with_receipts(
+        battery,
+        tariff,
+        load_profile,
+        generation_profile,
+        dt_hours,
+        total_hours,
+        start_hour,
+        grid_available,
+        policy,
+    )
+    .map(|trace| trace.result)
+}
+
+/// Run a scenario and retain raw step receipts for independent metric checking.
+#[allow(clippy::too_many_arguments)]
+pub fn try_run_scenario_with_receipts(
+    battery: &mut Battery,
+    tariff: &TariffSchedule,
+    load_profile: impl Fn(f64) -> f64,
+    generation_profile: impl Fn(f64) -> f64,
+    dt_hours: f64,
+    total_hours: f64,
+    start_hour: f64,
+    grid_available: bool,
+    policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
+) -> Result<ScenarioTraceResult, ScenarioError> {
+    try_run_scenario_with_receipt_profiles(
+        battery,
+        tariff,
+        load_profile,
+        generation_profile,
+        dt_hours,
+        total_hours,
+        start_hour,
+        move |_| grid_available,
+        policy,
+    )
+}
+
+/// Run a scenario with step-varying grid availability and raw receipts.
+///
+/// The availability profile is sampled at each step's absolute clock hour,
+/// allowing deterministic outage/reconnection scenarios. Legacy callers can
+/// use try_run_scenario_with_receipts for a constant grid state.
+#[allow(clippy::too_many_arguments)]
+pub fn try_run_scenario_with_receipt_profiles(
+    battery: &mut Battery,
+    tariff: &TariffSchedule,
+    load_profile: impl Fn(f64) -> f64,
+    generation_profile: impl Fn(f64) -> f64,
+    dt_hours: f64,
+    total_hours: f64,
+    start_hour: f64,
+    grid_available_profile: impl Fn(f64) -> bool,
+    mut policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
+) -> Result<ScenarioTraceResult, ScenarioError> {
     if !dt_hours.is_finite() || dt_hours <= 0.0 {
         return Err(ScenarioError::InvalidTimeStep);
     }
@@ -218,6 +325,8 @@ pub fn try_run_scenario(
     let mut steps = 0usize;
     let mut total_cost = 0.0;
     let mut unserved_energy_kwh = 0.0;
+    let mut curtailed_energy_kwh = 0.0;
+    let mut step_receipts = Vec::with_capacity(estimated_steps as usize);
 
     while elapsed < total_hours {
         if steps >= MAX_SCENARIO_STEPS {
@@ -238,6 +347,10 @@ pub fn try_run_scenario(
         if !t.is_finite() {
             return Err(ScenarioError::InvalidStartHour);
         }
+        let step_grid_available = grid_available_profile(t);
+        let battery_soc_before = working_battery.soc();
+        let battery_stored_energy_before_kwh = working_battery.stored_energy_kwh();
+        let battery_cycles_before = working_battery.equivalent_full_cycles();
         let load_kw = load_profile(t);
         let generation_kw = generation_profile(t);
         if !load_kw.is_finite()
@@ -248,8 +361,7 @@ pub fn try_run_scenario(
             return Err(ScenarioError::InvalidProfile);
         }
 
-        let (charge_cmd_kw, discharge_cmd_kw) =
-            policy(t, load_kw, generation_kw, &working_battery);
+        let (charge_cmd_kw, discharge_cmd_kw) = policy(t, load_kw, generation_kw, &working_battery);
         if !charge_cmd_kw.is_finite()
             || charge_cmd_kw < 0.0
             || !discharge_cmd_kw.is_finite()
@@ -274,9 +386,7 @@ pub fn try_run_scenario(
             0.0
         } else if one_way_efficiency > 0.0 {
             charge_accepted_dc_kwh / one_way_efficiency / step_hours
-        } else if working_battery.effective_capacity_kwh() > 0.0
-            && working_battery.soc() < 1.0
-        {
+        } else if working_battery.effective_capacity_kwh() > 0.0 && working_battery.soc() < 1.0 {
             // A zero-efficiency battery can store no energy, but charging it
             // still consumes input power while usable headroom exists. Do not
             // erase that demand from the power balance just because the model
@@ -292,6 +402,21 @@ pub fn try_run_scenario(
             return Err(ScenarioError::InvalidBatteryState);
         }
         let served_kw_from_battery = discharge_delivered_ac_kwh / step_hours;
+        let discharge_removed_dc_kwh = if one_way_efficiency > 0.0 {
+            discharge_delivered_ac_kwh / one_way_efficiency
+        } else {
+            0.0
+        };
+        let battery_stored_energy_after_kwh = working_battery.stored_energy_kwh();
+        let battery_charge_loss_kwh =
+            (actual_charge_kw * step_hours - charge_accepted_dc_kwh).max(0.0);
+        let battery_discharge_loss_kwh =
+            (discharge_removed_dc_kwh - discharge_delivered_ac_kwh).max(0.0);
+        let battery_degradation_energy_loss_kwh = (battery_stored_energy_before_kwh
+            + charge_accepted_dc_kwh
+            - discharge_removed_dc_kwh
+            - battery_stored_energy_after_kwh)
+            .max(0.0);
 
         // Use accepted charge energy, not the requested setpoint, in the
         // balance. A full battery must not appear to consume its requested
@@ -300,18 +425,65 @@ pub fn try_run_scenario(
         if !net_kw.is_finite() {
             return Err(ScenarioError::NonFiniteResult);
         }
+        let import_price_per_kwh = tariff.import_price(t);
+        let export_price_per_kwh = tariff.export_price_per_kwh;
+        let mut cost_delta = 0.0;
+        let mut unserved_delta = 0.0;
+        let mut curtailed_delta = 0.0;
         if net_kw > 0.0 {
-            if grid_available {
-                total_cost += net_kw * step_hours * tariff.import_price(t);
+            if step_grid_available {
+                cost_delta = net_kw * step_hours * import_price_per_kwh;
+                total_cost += cost_delta;
             } else {
-                unserved_energy_kwh += net_kw * step_hours;
+                unserved_delta = net_kw * step_hours;
+                unserved_energy_kwh += unserved_delta;
             }
-        } else if grid_available {
-            total_cost -= (-net_kw) * step_hours * tariff.export_price_per_kwh;
+        } else if step_grid_available {
+            // Negative net power is export; negative cost is export credit.
+            cost_delta = net_kw * step_hours * export_price_per_kwh;
+            total_cost += cost_delta;
+        } else if net_kw < 0.0 {
+            // No grid means there is nowhere to export surplus energy.
+            curtailed_delta = -net_kw * step_hours;
+            curtailed_energy_kwh += curtailed_delta;
         }
-        if !total_cost.is_finite() || !unserved_energy_kwh.is_finite() {
+        if !total_cost.is_finite()
+            || !unserved_energy_kwh.is_finite()
+            || !curtailed_energy_kwh.is_finite()
+            || !cost_delta.is_finite()
+            || !unserved_delta.is_finite()
+            || !curtailed_delta.is_finite()
+        {
             return Err(ScenarioError::NonFiniteResult);
         }
+
+        step_receipts.push(ScenarioStepReceipt {
+            elapsed_hours: elapsed,
+            absolute_time_hours: t,
+            step_duration_hours: step_hours,
+            load_kw,
+            generation_kw,
+            battery_soc_before,
+            battery_soc_after: working_battery.soc(),
+            battery_stored_energy_before_kwh,
+            battery_stored_energy_after_kwh,
+            battery_cycles_before,
+            battery_cycles_after: working_battery.equivalent_full_cycles(),
+            charge_setpoint_kw: charge_kw,
+            discharge_setpoint_kw: discharge_kw,
+            battery_charge_input_kw: actual_charge_kw,
+            battery_discharge_output_kw: served_kw_from_battery,
+            battery_charge_loss_kwh,
+            battery_discharge_loss_kwh,
+            battery_degradation_energy_loss_kwh,
+            net_kw,
+            import_price_per_kwh,
+            export_price_per_kwh,
+            grid_available: step_grid_available,
+            cost_delta,
+            unserved_energy_delta_kwh: unserved_delta,
+            curtailed_energy_delta_kwh: curtailed_delta,
+        });
 
         elapsed = if final_step {
             total_hours
@@ -335,7 +507,24 @@ pub fn try_run_scenario(
         return Err(ScenarioError::NonFiniteResult);
     }
     *battery = working_battery;
-    Ok(result)
+    let battery_conversion_loss_kwh = step_receipts
+        .iter()
+        .map(|step| step.battery_charge_loss_kwh + step.battery_discharge_loss_kwh)
+        .sum::<f64>();
+    let battery_degradation_energy_loss_kwh = step_receipts
+        .iter()
+        .map(|step| step.battery_degradation_energy_loss_kwh)
+        .sum::<f64>();
+    if !battery_conversion_loss_kwh.is_finite() || !battery_degradation_energy_loss_kwh.is_finite() {
+        return Err(ScenarioError::NonFiniteResult);
+    }
+    Ok(ScenarioTraceResult {
+        result,
+        steps: step_receipts,
+        curtailed_energy_kwh,
+        battery_conversion_loss_kwh,
+        battery_degradation_energy_loss_kwh,
+    })
 }
 
 /// Baseline: greedy self-consumption with no look-ahead and no reserve
@@ -588,7 +777,8 @@ mod tests {
             day_end_hour: 17.0,
         };
         let low_battery = Battery::new(50.0, 25.0, 0.9).with_soc(0.3); // below reserve
-        let (charge, discharge) = policy.decide(20.0, 15.0, 0.0, &low_battery); // 20:00, nighttime, shortfall
+        // 20:00, nighttime, shortfall.
+        let (charge, discharge) = policy.decide(20.0, 15.0, 0.0, &low_battery);
         assert_eq!(charge, 0.0);
         assert_eq!(discharge, 15.0, "no reserve cap outside daytime hours");
     }
@@ -854,11 +1044,7 @@ mod tests {
             true,
             |_t, _load, _generation, _battery| (1.0, 1.0),
         );
-        assert_eq!(
-            result,
-            Err(ScenarioError::SimultaneousChargeAndDischarge)
-        );
+        assert_eq!(result, Err(ScenarioError::SimultaneousChargeAndDischarge));
         assert_eq!(battery.soc(), before_soc);
     }
-
 }
