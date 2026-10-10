@@ -263,7 +263,7 @@ impl Px4OffboardSubmissionProfileV1 {
             return Err(Px4OffboardSubmissionError::MinimumSamplesTooSmall);
         }
         if self.min_observation_window_ns == 0 {
-            return Err(Px4OffboardSubmissionError::ZeroPreEntryWindow);
+            return Err(Px4OffboardSubmissionError::ZeroObservationWindow);
         }
         if self.max_inter_submission_gap_ns == 0 {
             return Err(Px4OffboardSubmissionError::ZeroInterSubmissionGap);
@@ -630,7 +630,7 @@ pub enum Px4OffboardSubmissionError {
     MinimumSamplesTooSmall,
     /// Observation window must be non-zero and selected by a qualified profile.
     #[error("Offboard observation window must be non-zero")]
-    ZeroPreEntryWindow,
+    ZeroObservationWindow,
     /// A zero interval cannot qualify a recurring stream.
     #[error("Offboard maximum inter-submission gap must be non-zero")]
     ZeroInterSubmissionGap,
