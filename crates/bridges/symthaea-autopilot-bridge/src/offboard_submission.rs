@@ -78,9 +78,10 @@ pub struct Px4OffboardSubmissionEvidenceV1 {
     pub sequence_number: u64,
     /// Transport/message family and, for MAVLink, the concrete message ID.
     pub message_kind: Px4OffboardMessageKindV1,
-    /// SHA-256 or BLAKE3 hex digest of the exact serialized payload, as declared by
-    /// the capturing adapter. The algorithm/profile must be specified outside v1.
-    pub serialized_payload_digest_hex: String,
+    /// Lowercase BLAKE3 hex digest of the exact serialized payload, as declared by
+    /// the capturing adapter. This record validates shape and binds the claim, but
+    /// cannot recompute it because payload bytes are intentionally not retained.
+    pub serialized_payload_digest_blake3_hex: String,
     /// What the local publishing API returned for this submission attempt.
     pub local_result: Px4LocalSubmissionResultV1,
     /// Companion-side submission timestamp in an explicit local clock domain.
@@ -97,7 +98,7 @@ impl Px4OffboardSubmissionEvidenceV1 {
         target_instance_id: impl Into<String>,
         sequence_number: u64,
         message_kind: Px4OffboardMessageKindV1,
-        serialized_payload_digest_hex: impl Into<String>,
+        serialized_payload_digest_blake3_hex: impl Into<String>,
         local_result: Px4LocalSubmissionResultV1,
         submitted_at: TimestampV1,
     ) -> Result<Self, Px4OffboardSubmissionError> {
@@ -107,7 +108,7 @@ impl Px4OffboardSubmissionEvidenceV1 {
             target_instance_id: target_instance_id.into(),
             sequence_number,
             message_kind,
-            serialized_payload_digest_hex: serialized_payload_digest_hex.into(),
+            serialized_payload_digest_blake3_hex: serialized_payload_digest_blake3_hex.into(),
             local_result,
             submitted_at,
             submission_digest_hex: String::new(),
@@ -140,7 +141,7 @@ impl Px4OffboardSubmissionEvidenceV1 {
         validate_schema(self.schema_version)?;
         validate_identifier(&self.producer_profile_id, "producer_profile_id")?;
         validate_identifier(&self.target_instance_id, "target_instance_id")?;
-        validate_hex_digest(&self.serialized_payload_digest_hex)?;
+        validate_hex_digest(&self.serialized_payload_digest_blake3_hex)?;
         self.submitted_at
             .validate()
             .map_err(Px4OffboardSubmissionError::Timestamp)?;
@@ -163,7 +164,7 @@ impl Px4OffboardSubmissionEvidenceV1 {
                 hasher.update(&[1]);
             }
         }
-        feed_str(&mut hasher, &self.serialized_payload_digest_hex);
+        feed_str(&mut hasher, &self.serialized_payload_digest_blake3_hex);
         hasher.update(&[match self.local_result {
             Px4LocalSubmissionResultV1::AcceptedByLocalTransport => 0,
             Px4LocalSubmissionResultV1::RejectedByLocalTransport => 1,
@@ -272,11 +273,11 @@ impl Px4OffboardSubmissionProfileV1 {
         let mut seen = HashSet::with_capacity(self.allowed_mavlink_setpoint_message_ids.len());
         let mut previous = None;
         for id in &self.allowed_mavlink_setpoint_message_ids {
-            if previous.is_some_and(|value| *id <= value) {
-                return Err(Px4OffboardSubmissionError::NonCanonicalMavlinkAllowlist);
-            }
             if !seen.insert(*id) {
                 return Err(Px4OffboardSubmissionError::DuplicateMavlinkMessageId);
+            }
+            if previous.is_some_and(|value| *id <= value) {
+                return Err(Px4OffboardSubmissionError::NonCanonicalMavlinkAllowlist);
             }
             previous = Some(*id);
         }
@@ -601,14 +602,15 @@ fn digest_hex(bytes: &[u8; 32]) -> String {
 pub enum Px4OffboardSubmissionError {
     /// Unsupported evidence schema version.
     #[error("unsupported Offboard submission schema version {found}")]
-    UnsupportedSchemaVersion { /// Unsupported version encountered.
+    UnsupportedSchemaVersion {
+        /// Unsupported version encountered.
         found: u16,
     },
     /// Identifier is blank, padded, too long, or contains control characters.
     #[error("invalid {0}")]
     InvalidIdentifier(&'static str),
-    /// Payload digest is not 64 lowercase hexadecimal characters.
-    #[error("invalid serialized payload digest")]
+    /// Payload BLAKE3 digest is not 64 lowercase hexadecimal characters.
+    #[error("invalid serialized payload BLAKE3 digest")]
     InvalidPayloadDigest,
     /// Profile requires a concrete setpoint allowlist for MAVLink.
     #[error("MAVLink Offboard profile requires an explicit setpoint message allowlist")]
