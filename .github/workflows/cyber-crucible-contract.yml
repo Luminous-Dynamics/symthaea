@@ -1,0 +1,115 @@
+name: Cyber Crucible Public Contract
+
+on:
+  pull_request:
+    paths:
+      - "validation/cyber_crucible_public_v1.json"
+      - "validation/cyber_crucible_public_v1.schema.json"
+      - "validation/cyber_crucible_assessment_v1.schema.json"
+      - "scripts/cyber_crucible_verdict.py"
+      - "validation/CYBER_CRUCIBLE_PUBLIC_CALIBRATION.md"
+      - "scripts/validate_cyber_crucible_public.py"
+      - "tests/test_cyber_crucible_public.py"
+      - ".github/workflows/cyber-crucible-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "validation/cyber_crucible_public_v1.json"
+      - "validation/cyber_crucible_public_v1.schema.json"
+      - "validation/cyber_crucible_assessment_v1.schema.json"
+      - "scripts/cyber_crucible_verdict.py"
+      - "validation/CYBER_CRUCIBLE_PUBLIC_CALIBRATION.md"
+      - "scripts/validate_cyber_crucible_public.py"
+      - "tests/test_cyber_crucible_public.py"
+      - ".github/workflows/cyber-crucible-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-contract:
+    name: Manifest contract and fail-closed regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Check JSON syntax
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          for path in (
+              Path("validation/cyber_crucible_public_v1.json"),
+              Path("validation/cyber_crucible_public_v1.schema.json"),
+              Path("validation/cyber_crucible_assessment_v1.schema.json"),
+          ):
+              json.loads(path.read_text(encoding="utf-8"))
+              print(f"valid JSON: {path}")
+          PY
+
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.26.0"
+
+      - name: Validate corpus and assessment result schemas
+        run: |
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding="utf-8"))
+
+          corpus_schema = load("validation/cyber_crucible_public_v1.schema.json")
+          manifest = load("validation/cyber_crucible_public_v1.json")
+          result_schema = load("validation/cyber_crucible_assessment_v1.schema.json")
+          Draft202012Validator.check_schema(corpus_schema)
+          Draft202012Validator.check_schema(result_schema)
+          corpus_errors = list(Draft202012Validator(corpus_schema).iter_errors(manifest))
+          if corpus_errors:
+              for error in corpus_errors:
+                  print(f"corpus {'/'.join(map(str, error.absolute_path))}: {error.message}")
+              raise SystemExit(f"Corpus schema failed with {len(corpus_errors)} error(s)")
+
+          # Synthetic schema-shape fixture only: this placeholder digest is
+          # not an actual evidence receipt and cannot qualify any real outcome.
+          passing_result = {
+              "scenario_id": manifest["scenarios"][0]["scenario_id"],
+              "scenario_revision": manifest["scenarios"][0]["revision"],
+              "scenario_digest": manifest["scenarios"][0]["scenario_digest"],
+              "functional_status": "pass",
+              "security_status": "pass",
+              "execution_mode": "real",
+              "required_evidence_refs": ["E1"],
+              "required_evidence_checks": [
+                  {"check_id": "required-evidence-1", "status": "pass", "evidence_refs": ["E1"], "receipt_digest": "a" * 64}
+              ],
+              "correct_and_secure": True,
+          }
+          result_validator = Draft202012Validator(result_schema)
+          result_validator.validate(passing_result)
+
+          failing_result = copy.deepcopy(passing_result)
+          failing_result["security_status"] = "inconclusive"
+          failing_result["correct_and_secure"] = False
+          result_validator.validate(failing_result)
+
+          inconsistent_result = copy.deepcopy(failing_result)
+          inconsistent_result["correct_and_secure"] = True
+          if not list(result_validator.iter_errors(inconsistent_result)):
+              raise SystemExit("Assessment schema must reject correct_and_secure=true when security is inconclusive")
+
+          print(f"JSON Schema PASS: {manifest['corpus_id']} revision {manifest['revision']}")
+          print("Assessment schema PASS: conjunctive success and fail-closed negative control")
+          PY
+
+      - name: Validate scenario identities, evidence, and scoring policy
+        run: python3 scripts/validate_cyber_crucible_public.py
+
+      - name: Exercise fail-closed contract regressions
+        run: python3 -m unittest discover -s tests -p "test_cyber_crucible_public.py" -v
