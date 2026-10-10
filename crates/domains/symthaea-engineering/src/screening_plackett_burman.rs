@@ -302,6 +302,26 @@ fn canonical_pb12_matrix() -> Vec<Vec<i8>> {
     rows
 }
 
+
+/// Independently reconstruct the published 12 × 11 sign matrix for verification.
+/// This uses the table's textual base pattern and column indexing rather than the generator's
+/// vector rotation implementation, so a generator-matrix drift is not silently self-verified.
+fn verifier_pb12_matrix() -> Vec<Vec<i8>> {
+    let base: Vec<i8> = "-+-+++---+-"
+        .bytes()
+        .map(|sign| if sign == b'+' { 1 } else { -1 })
+        .collect();
+    let mut rows = vec![vec![1; MAX_FACTORS]];
+    for shift in 0..11 {
+        rows.push(
+            (0..MAX_FACTORS)
+                .map(|column| base[(column + MAX_FACTORS - shift) % MAX_FACTORS])
+                .collect(),
+        );
+    }
+    rows
+}
+
 fn center_point_positions(treatment_count: usize, center_count: usize) -> HashSet<usize> {
     let total = treatment_count + center_count;
     if center_count == 0 {
@@ -520,7 +540,7 @@ pub fn verify_plackett_burman_design(
     }
 
     let expected_orders = verifier_expected_orders(request);
-    let matrix = canonical_pb12_matrix();
+    let matrix = verifier_pb12_matrix();
     let center_count = request.center_point_runs_per_block as usize;
     let expected_centers_positions = center_point_positions(PB_RUNS, center_count);
     let per_block = PB_RUNS + center_count;
@@ -1152,6 +1172,11 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn canonical_matrix_matches_independent_verifier_matrix() {
+        assert_eq!(canonical_pb12_matrix(), verifier_pb12_matrix());
     }
 
     #[test]
