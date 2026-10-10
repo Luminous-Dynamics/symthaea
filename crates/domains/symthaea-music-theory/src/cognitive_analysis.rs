@@ -79,10 +79,20 @@ impl ScoreCognitiveProfile {
 
 /// Observe the complete symbolic score.
 pub fn profile_score(score: &Score) -> ScoreCognitiveProfile {
+    // A score is a public data structure and can contain records that bypass
+    // generator invariants. Zero- or negative-duration notes never sound.
+    let notes: Vec<_> = score
+        .notes
+        .iter()
+        .copied()
+        .filter(|note| {
+            note.duration.beats() > 0.0 && note.onset.checked_add(note.duration).is_some()
+        })
+        .collect();
     profile_notes(
         score,
-        &score.notes,
-        score.notes.len(),
+        &notes,
+        notes.len(),
         0.0,
         score.total_beats.beats(),
     )
@@ -110,8 +120,13 @@ pub fn profile_score_region(
     let mut onset_count = 0usize;
     for note in &score.notes {
         let onset = note.onset.beats();
-        let note_end = (note.onset + note.duration).beats();
-        if note_end <= start_beats || onset >= end_beats {
+        let Some(note_end_duration) = note.onset.checked_add(note.duration) else {
+            continue;
+        };
+        let note_end = note_end_duration.beats();
+        // Zero- and negative-duration records are not sounding notes. Keep
+        // the same positive-overlap contract as the temporal-state extractor.
+        if note_end <= onset || note_end <= start_beats || onset >= end_beats {
             continue;
         }
         if onset >= start_beats {
@@ -123,11 +138,10 @@ pub fn profile_score_region(
         } else {
             note.onset
         };
-        let original_end = note.onset + note.duration;
         let clipped_end = if note_end > end_beats {
             end
         } else {
-            original_end
+            note_end_duration
         };
         let mut clipped = *note;
         clipped.onset = clipped_start;
@@ -229,7 +243,10 @@ fn mean_vertical_dissonance(notes: &[ScoreNote]) -> f32 {
             .iter()
             .filter(|note| {
                 note.onset.beats() <= event.beats()
-                    && (note.onset + note.duration).beats() > event.beats()
+                    && note
+                        .onset
+                        .checked_add(note.duration)
+                        .is_some_and(|note_end| note_end.beats() > event.beats())
             })
             .collect();
         for left in 0..active.len() {
@@ -454,6 +471,66 @@ mod tests {
         assert!(
             profile_score(&displaced).tonal_displacement > profile_score(&tonic).tonal_displacement
         );
+    }
+
+    #[test]
+    fn region_profiles_ignore_non_positive_duration_notes() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(
+            Pitch::new(PitchClass::C, 4),
+            Duration::new(2, 1),
+            Duration::zero(),
+            VoiceRole::Melody,
+        ));
+        score.push(note(
+            Pitch::new(PitchClass::G, 4),
+            Duration::new(5, 2),
+            Duration::new(-1, 2),
+            VoiceRole::Bass,
+        ));
+        // Extend the score beyond the observation without adding sound to it.
+        score.push(note(
+            Pitch::new(PitchClass::C, 3),
+            Duration::new(4, 1),
+            Duration::quarter(),
+            VoiceRole::Bass,
+        ));
+
+        let profile =
+            profile_score_region(&score, Duration::new(2, 1), Duration::new(3, 1))
+                .expect("the observation interval itself is valid");
+        assert_eq!(profile.note_count, 0);
+        assert_eq!(profile.onset_count, 0);
+        assert_eq!(profile.active_voice_count, 0);
+        assert_eq!(profile.notes_per_beat, 0.0);
+
+        let whole_score = profile_score(&score);
+        assert_eq!(whole_score.note_count, 1);
+        assert_eq!(whole_score.onset_count, 1);
+    }
+
+    #[test]
+    fn whole_score_profile_skips_unrepresentable_note_end() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(
+            Pitch::new(PitchClass::C, 4),
+            Duration::zero(),
+            Duration::quarter(),
+            VoiceRole::Melody,
+        ));
+        // Bypass Score::push to model a wire-decoded/publicly-mutated Score.
+        // A valid duration can still have an end that is not representable.
+        score.notes.push(note(
+            Pitch::new(PitchClass::G, 4),
+            Duration::quarter(),
+            Duration::new(i64::MAX, 1),
+            VoiceRole::Bass,
+        ));
+
+        let profile = profile_score(&score);
+        assert_eq!(profile.note_count, 1);
+        assert_eq!(profile.onset_count, 1);
+        assert_eq!(profile.active_voice_count, 1);
     }
 
     #[test]

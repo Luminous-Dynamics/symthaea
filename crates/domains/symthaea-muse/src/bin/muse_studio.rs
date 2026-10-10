@@ -105,7 +105,7 @@ const COMPOSE_BARS_RANGE: std::ops::RangeInclusive<usize> = 2..=36;
 /// styles), large enough to catch genuine near-twins.
 const NOVELTY_FLOOR: f64 = 0.5;
 const IMPORT_ROOT: &str = "data/music/imports";
-const MAX_SYMBOLIC_IMPORT_BYTES: usize = 12 * 1024 * 1024;
+const MAX_SYMBOLIC_IMPORT_BYTES: usize = symthaea_muse::symbolic_import::MAX_SYMBOLIC_IMPORT_BYTES;
 
 /// A per-process, monotonically increasing nonce for temp file/dir names
 /// that must not collide across concurrently-running `spawn_blocking`
@@ -2346,14 +2346,126 @@ fn symbolic_import_format(filename: &str) -> Option<symthaea_muse_protocol::Symb
 /// the returned renderer name) when FluidSynth is unavailable, matching
 /// `/api/compose`'s own established fallback convention -- never silent,
 /// always disclosed.
+const AUDITION_BEAT_DENOMINATOR: i64 = 1_000_000;
+
+/// Creates a bounded, independently rendered audition score. This is a
+/// temporary view only: callers persist/hash/analyze the original full score.
+/// When a piece has an unusually long opening rest, the clip moves to its
+/// first note so the audition contains music; the returned offset discloses
+/// that change in the import summary.
+fn audition_clip_score(
+    score: &symthaea_music_theory::Score,
+) -> Result<(symthaea_music_theory::Score, bool, f64), String> {
+    use std::cmp::Ordering;
+
+    let duration_seconds = score.seconds();
+    if !duration_seconds.is_finite() || duration_seconds <= 0.0 {
+        return Err("cannot audition a score with non-positive or non-finite duration".into());
+    }
+    if duration_seconds <= symthaea_muse::symbolic_import::MAX_AUDITION_CONTENT_SECONDS {
+        return Ok((score.clone(), false, 0.0));
+    }
+    if !score.tempo_bpm.is_finite() || score.tempo_bpm <= 0.0 {
+        return Err("cannot audition a score with invalid tempo".into());
+    }
+
+    let max_beats = symthaea_muse::symbolic_import::MAX_AUDITION_CONTENT_SECONDS
+        * f64::from(score.tempo_bpm)
+        / 60.0;
+    let scaled = (max_beats * AUDITION_BEAT_DENOMINATOR as f64).floor();
+    if !scaled.is_finite() || scaled <= 0.0 || scaled > i64::MAX as f64 {
+        return Err("audition clip beat limit is not representable".into());
+    }
+    let clip_span = Duration::new(scaled as i64, AUDITION_BEAT_DENOMINATOR);
+
+    // Prefer the opening when it contains notes. If the piece begins with
+    // more than one full clip of silence, audition from the first note
+    // instead of returning a technically valid but silent preview.
+    let has_opening_note = score.notes.iter().any(|note| {
+        note.onset
+            .checked_cmp(clip_span)
+            .is_some_and(|ordering| ordering == Ordering::Less)
+    });
+    let clip_start = if has_opening_note {
+        Duration::zero()
+    } else {
+        score
+            .notes
+            .iter()
+            .map(|note| note.onset)
+            .min_by(|left, right| {
+                left.checked_cmp(*right).unwrap_or(Ordering::Equal)
+            })
+            .ok_or_else(|| "cannot audition a score without notes".to_string())?
+    };
+    let candidate_end = clip_start
+        .checked_add(clip_span)
+        .ok_or_else(|| "audition clip end is not exactly representable".to_string())?;
+    let clip_end = match candidate_end.checked_cmp(score.total_beats) {
+        Some(Ordering::Greater) => score.total_beats,
+        Some(_) => candidate_end,
+        None => return Err("cannot compare audition clip boundary to score end".into()),
+    };
+
+    let mut clip = Score::new(score.key, score.tempo_bpm, score.meter);
+    for source_note in score.notes.iter().copied() {
+        let source_end = source_note
+            .onset
+            .checked_add(source_note.duration)
+            .ok_or_else(|| "source note has an unrepresentable exact end".to_string())?;
+        let starts_before_clip_end = source_note
+            .onset
+            .checked_cmp(clip_end)
+            .is_some_and(|ordering| ordering == Ordering::Less);
+        let ends_after_clip_start = source_end
+            .checked_cmp(clip_start)
+            .is_some_and(|ordering| ordering == Ordering::Greater);
+        if !starts_before_clip_end || !ends_after_clip_start {
+            continue;
+        }
+
+        let note_start = match source_note.onset.checked_cmp(clip_start) {
+            Some(Ordering::Less) => clip_start,
+            Some(_) => source_note.onset,
+            None => return Err("cannot compare audition note onset".into()),
+        };
+        let note_end = match source_end.checked_cmp(clip_end) {
+            Some(Ordering::Greater) => clip_end,
+            Some(_) => source_end,
+            None => return Err("cannot compare audition note end".into()),
+        };
+
+        let mut note = source_note;
+        note.onset = note_start
+            .checked_sub(clip_start)
+            .ok_or_else(|| "audition note offset is not exactly representable".to_string())?;
+        note.duration = note_end
+            .checked_sub(note_start)
+            .ok_or_else(|| "audition note duration is not exactly representable".to_string())?;
+        if note.duration.den() <= 0 || note.duration.num() <= 0 {
+            continue;
+        }
+        clip.try_push(note)
+            .map_err(|_| "audition note end is not exactly representable".to_string())?;
+    }
+    if clip.notes.is_empty() {
+        return Err("no representable notes fall within the audition clip".into());
+    }
+    let start_seconds = clip_start.beats() * 60.0 / f64::from(score.tempo_bpm);
+    Ok((clip, true, start_seconds))
+}
+
 fn render_import_audition(
     score: &symthaea_music_theory::Score,
-) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
+) -> Result<(Vec<u8>, &'static str, bool, f64, f64), (StatusCode, String)> {
+    let (audition_score, clipped, start_seconds) = audition_clip_score(score)
+        .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
+    let duration_seconds = audition_score.seconds();
     if symthaea_muse::fluid_render::available().is_some() {
         let path =
             std::env::temp_dir().join(format!("muse_import_audition_{}.mid", unique_temp_suffix()));
         let fluid_wav = symthaea_muse::midi_export::export_score_midi(
-            score,
+            &audition_score,
             symthaea_music_theory::Style::Classical,
             0,
             &path,
@@ -2362,12 +2474,91 @@ fn render_import_audition(
         .and_then(|()| symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, None));
         let _ = std::fs::remove_file(&path);
         if let Some(wav) = fluid_wav {
-            return Ok((wav, "fluidsynth"));
+            return Ok((wav, "fluidsynth", clipped, start_seconds, duration_seconds));
         }
     }
-    let rendered =
-        symthaea_muse::theory_realize::realize(score, &MusicalState::default(), SAMPLE_RATE);
-    Ok((wav_bytes(&rendered.audio).map_err(internal)?, "native"))
+    let rendered = symthaea_muse::theory_realize::realize(
+        &audition_score,
+        &MusicalState::default(),
+        SAMPLE_RATE,
+    );
+    Ok((
+        wav_bytes(&rendered.audio).map_err(internal)?,
+        "native",
+        clipped,
+        start_seconds,
+        duration_seconds,
+    ))
+}
+
+/// Regression coverage for the temporary audition projection: the stored
+/// score is never shortened, note tails are clipped at the preview boundary,
+/// and long leading rests do not produce a silent audition.
+#[cfg(test)]
+mod import_audition_clip_tests {
+    use super::audition_clip_score;
+    use symthaea_music_theory::{
+        Duration, Emphasis, Key, PartId, Pitch, PitchClass, Score, ScoreNote, VoiceRole,
+    };
+
+    fn note(midi: u8, onset: i64, duration: i64) -> ScoreNote {
+        ScoreNote {
+            part: PartId(0),
+            pitch: Pitch::from_midi(midi),
+            onset: Duration::new(onset, 1),
+            duration: Duration::new(duration, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        }
+    }
+
+    #[test]
+    fn long_score_keeps_full_source_but_clips_a_sustained_tail_at_thirty_seconds() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(60, 0, 1));
+        score.push(note(62, 59, 3));
+        score.push(note(64, 70, 1));
+        score.push(note(65, 100, 1));
+        let full_total = score.total_beats;
+        let full_note_count = score.notes.len();
+
+        let (clip, clipped, start) = audition_clip_score(&score).unwrap();
+        assert!(clipped);
+        assert_eq!(start, 0.0);
+        assert_eq!(clip.total_beats, Duration::new(60, 1));
+        assert_eq!(clip.notes.len(), 2);
+        assert_eq!(clip.notes[1].onset, Duration::new(59, 1));
+        assert_eq!(clip.notes[1].duration, Duration::new(1, 1));
+        assert_eq!(score.total_beats, full_total);
+        assert_eq!(score.notes.len(), full_note_count);
+        assert_eq!(score.total_beats, Duration::new(101, 1));
+    }
+
+    #[test]
+    fn long_leading_rest_shifts_audition_to_first_note_and_reports_offset() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(60, 100, 1));
+        score.push(note(62, 102, 1));
+        let (clip, clipped, start) = audition_clip_score(&score).unwrap();
+        assert!(clipped);
+        assert_eq!(start, 50.0);
+        assert_eq!(clip.notes[0].onset, Duration::zero());
+        assert_eq!(clip.total_beats, Duration::new(3, 1));
+        assert_eq!(clip.seconds(), 1.5);
+        assert_eq!(score.notes[0].onset, Duration::new(100, 1));
+    }
+
+    #[test]
+    fn short_score_is_not_relabelled_as_clipped() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(60, 0, 2));
+        let (clip, clipped, start) = audition_clip_score(&score).unwrap();
+        assert!(!clipped);
+        assert_eq!(start, 0.0);
+        assert_eq!(clip, score);
+    }
 }
 
 async fn import_music(
@@ -2532,12 +2723,16 @@ async fn import_music(
         // used, purely to pick a timbre for playback (see
         // `render_import_audition`'s doc comment and
         // `instrumentation_note` below for why this still isn't neutral).
-        let (wav, audio_renderer) = render_import_audition(&score)?;
+        let (wav, audio_renderer, audition_clipped, audition_start_seconds, audition_duration_seconds) =
+            render_import_audition(&score)?;
         let summary = ImportedWorkSummary {
             manifest,
             analysis,
             audio_available: true,
             audio_renderer: audio_renderer.to_string(),
+            audition_clipped,
+            audition_start_seconds,
+            audition_duration_seconds,
             instrumentation_note: default_instrumentation_note(),
         };
 

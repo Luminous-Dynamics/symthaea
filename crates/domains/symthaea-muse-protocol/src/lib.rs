@@ -215,6 +215,18 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default)]
     pub audio_renderer: String,
+    /// True when `audition.wav` is a bounded preview rather than the whole
+    /// score. Missing in older stored summaries, so defaults to false.
+    #[serde(default)]
+    pub audition_clipped: bool,
+    /// Source-relative starting time of the preview. Non-zero only when a
+    /// long leading rest made a later clip more useful than silence.
+    #[serde(default)]
+    pub audition_start_seconds: f64,
+    /// Musical duration represented in the preview, excluding renderer tail.
+    /// Missing in older stored summaries, so defaults to zero.
+    #[serde(default)]
+    pub audition_duration_seconds: f64,
     /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
     /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
     /// tempo, meter, and voice roles into a plain `Score` -- it does not

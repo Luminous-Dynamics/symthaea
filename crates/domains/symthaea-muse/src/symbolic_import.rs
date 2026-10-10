@@ -7,13 +7,25 @@
 //! any shared Foundry or learning corpus.
 
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use symthaea_muse_protocol::{
     ImportedMotifSummary, ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
 };
 use symthaea_music_theory::{
     Duration, Emphasis, Key, Pitch, PitchClass, Score, ScoreNote, VoiceRole, score::PartId,
 };
+
+/// Keep parser memory and render work bounded for syntactically valid but
+/// adversarial symbolic files.
+pub const MAX_SYMBOLIC_IMPORT_BYTES: usize = 12 * 1024 * 1024;
+pub const MAX_IMPORTED_NOTES: usize = 100_000;
+pub const MAX_IMPORTED_MIDI_TRACKS: usize = 256;
+pub const MAX_IMPORTED_MIDI_EVENTS: usize = 500_000;
+pub const MAX_IMPORTED_SCORE_BEATS: i64 = 10_000;
+/// Maximum musical content time synthesized for an import audition. The full
+/// score remains stored and analyzed; only `audition.wav` uses this clip.
+pub const MAX_AUDITION_CONTENT_SECONDS: f64 = 30.0;
+const MAX_RECONSTRUCTED_SECTIONS: usize = 1_000;
 
 #[derive(Clone, Debug)]
 struct RawNote {
@@ -25,61 +37,141 @@ struct RawNote {
 }
 
 pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Score, String> {
+    if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
+        return Err(format!(
+            "symbolic import exceeds the {MAX_SYMBOLIC_IMPORT_BYTES}-byte parser limit"
+        ));
+    }
     match format {
         SymbolicImportFormat::Midi => parse_midi(bytes),
         SymbolicImportFormat::MusicXml => parse_musicxml(bytes),
-        SymbolicImportFormat::MuseScore => serde_json::from_slice(bytes)
-            .map_err(|error| format!("Muse score parse error: {error}")),
+        SymbolicImportFormat::MuseScore => {
+            let score: Score = serde_json::from_slice(bytes)
+                .map_err(|error| format!("Muse score parse error: {error}"))?;
+            validate_imported_score(&score)?;
+            Ok(score)
+        }
     }
 }
 
 pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
+    if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
+        return Err(format!(
+            "MIDI import exceeds the {MAX_SYMBOLIC_IMPORT_BYTES}-byte parser limit"
+        ));
+    }
     let smf = Smf::parse(bytes).map_err(|error| format!("MIDI parse error: {error}"))?;
+    if smf.tracks.len() > MAX_IMPORTED_MIDI_TRACKS {
+        return Err(format!(
+            "MIDI import exceeds the {MAX_IMPORTED_MIDI_TRACKS}-track limit"
+        ));
+    }
+    let event_count = smf
+        .tracks
+        .iter()
+        .try_fold(0_usize, |count, track| count.checked_add(track.len()))
+        .ok_or_else(|| "MIDI event count overflow".to_string())?;
+    if event_count > MAX_IMPORTED_MIDI_EVENTS {
+        return Err(format!(
+            "MIDI import exceeds the {MAX_IMPORTED_MIDI_EVENTS}-event limit"
+        ));
+    }
     let ticks_per_beat = match smf.header.timing {
         midly::Timing::Metrical(value) => u64::from(value.as_int()),
         midly::Timing::Timecode(_, _) => {
             return Err("SMPTE-time MIDI is not supported in the first symbolic importer".into());
         }
     };
-    let mut tempo_bpm = 120.0_f32;
-    let mut meter = 4_u8;
-    let mut fifths = 0_i8;
-    let mut minor = false;
+    if ticks_per_beat == 0 {
+        return Err("MIDI metrical timing must have a non-zero ticks-per-beat value".into());
+    }
+    // Collect absolute tick positions before judging whether these global
+    // metadata streams fit Score's single-value fields. Track traversal order
+    // is not a global timeline: another track may contain an earlier event.
+    let mut tempo_events = Vec::<(u64, u32)>::new();
+    let mut meter_events = Vec::<(u64, (u8, u8))>::new();
+    let mut key_events = Vec::<(u64, (i8, bool))>::new();
     let mut notes = Vec::new();
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0_u64;
-        let mut pending: HashMap<(u8, u8), (u64, u8)> = HashMap::new();
+        // Repeated note-ons for the same pitch/channel are valid in MIDI.
+        // Queue their starts rather than overwriting an earlier still-active
+        // note; each matching note-off closes the oldest outstanding onset.
+        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
         for event in track {
-            tick = tick.saturating_add(u64::from(event.delta.as_int()));
+            tick = tick
+                .checked_add(u64::from(event.delta.as_int()))
+                .ok_or_else(|| "MIDI absolute tick position overflowed".to_string())?;
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
-                    tempo_bpm = 60_000_000.0 / value.as_int() as f32;
+                    let micros_per_quarter = value.as_int();
+                    if micros_per_quarter == 0 {
+                        return Err("MIDI tempo events must be non-zero".into());
+                    }
+                    let bpm = 60_000_000.0 / micros_per_quarter as f32;
+                    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+                        return Err(
+                            "MIDI tempo must be finite and between 20 and 320 BPM".into(),
+                        );
+                    }
+                    tempo_events.push((tick, micros_per_quarter));
                 }
-                TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, _, _, _)) => {
-                    meter = numerator.max(1);
+                TrackEventKind::Meta(MetaMessage::TimeSignature(
+                    numerator,
+                    denominator_power,
+                    _,
+                    _,
+                )) => {
+                    // Score stores quarter-note beats per bar, so only x/4
+                    // can currently be represented without changing duration.
+                    if denominator_power != 2 {
+                        return Err(
+                            "MIDI time-signature denominators other than quarter notes are not representable"
+                                .into(),
+                        );
+                    }
+                    if !(1..=16).contains(&numerator) {
+                        return Err(
+                            "MIDI time-signature numerator must be in 1..=16".into(),
+                        );
+                    }
+                    meter_events.push((tick, (numerator, denominator_power)));
                 }
                 TrackEventKind::Meta(MetaMessage::KeySignature(sf, is_minor)) => {
-                    fifths = sf;
-                    minor = is_minor;
+                    if !(-7..=7).contains(&sf) {
+                        return Err("MIDI key signature must be in -7..=7 fifths".into());
+                    }
+                    key_events.push((tick, (sf, is_minor)));
                 }
                 TrackEventKind::Midi { channel, message } if channel.as_int() != 9 => {
                     let channel = channel.as_int();
                     match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            pending.insert((channel, key.as_int()), (tick, vel.as_int()));
+                            pending
+                                .entry((channel, key.as_int()))
+                                .or_default()
+                                .push_back((tick, vel.as_int()));
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
-                            if let Some((onset, velocity)) =
-                                pending.remove(&(channel, key.as_int()))
-                            {
-                                notes.push(RawNote {
-                                    track: track_index,
-                                    pitch: key.as_int(),
-                                    onset,
-                                    duration: tick.saturating_sub(onset).max(1),
-                                    velocity,
-                                });
+                            let note_key = (channel, key.as_int());
+                            let matched = pending
+                                .get_mut(&note_key)
+                                .and_then(VecDeque::pop_front);
+                            if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
+                                pending.remove(&note_key);
+                            }
+                            if let Some((onset, velocity)) = matched {
+                                push_raw_note(
+                                    &mut notes,
+                                    RawNote {
+                                        track: track_index,
+                                        pitch: key.as_int(),
+                                        onset,
+                                        duration: tick.saturating_sub(onset).max(1),
+                                        velocity,
+                                    },
+                                )?;
                             }
                         }
                         _ => {}
@@ -88,20 +180,39 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 _ => {}
             }
         }
-        for ((_, pitch), (onset, velocity)) in pending {
-            notes.push(RawNote {
-                track: track_index,
-                pitch,
-                onset,
-                duration: tick.saturating_sub(onset).max(1),
-                velocity,
-            });
+        for ((_, pitch), starts) in pending {
+            for (onset, velocity) in starts {
+                push_raw_note(
+                    &mut notes,
+                    RawNote {
+                        track: track_index,
+                        pitch,
+                        onset,
+                        duration: tick.saturating_sub(onset).max(1),
+                        velocity,
+                    },
+                )?;
+            }
         }
     }
+    let tempo_microseconds_per_quarter =
+        stable_midi_metadata(&tempo_events, 500_000_u32, "tempo", "single-tempo")?;
+    let tempo_bpm = 60_000_000.0 / tempo_microseconds_per_quarter as f32;
+    if !tempo_bpm.is_finite() || !(20.0..=320.0).contains(&tempo_bpm) {
+        return Err("MIDI tempo must be finite and between 20 and 320 BPM".into());
+    }
+    let (meter, _denominator_power) =
+        stable_midi_metadata(&meter_events, (4_u8, 2_u8), "meter", "single-meter")?;
+    let (fifths, minor) =
+        stable_midi_metadata(&key_events, (0_i8, false), "key", "single-key")?;
+
     if notes.is_empty() {
         return Err("the MIDI file contains no pitched note events".into());
     }
 
+    // Unclosed notes were flushed from HashMaps above; canonical ordering
+    // makes serialized import identity reproducible between process runs.
+    notes.sort_by_key(|note| (note.onset, note.track, note.pitch, note.duration, note.velocity));
     let roles = roles_by_track(&notes);
     let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
     let key = if minor {
@@ -109,31 +220,42 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     } else {
         Key::major(tonic)
     };
-    let mut score = Score::new(key, tempo_bpm.clamp(20.0, 320.0), meter.clamp(1, 16));
+    let mut score = Score::new(key, tempo_bpm, meter);
     for note in notes {
-        score.push(ScoreNote {
-            // Real part identity, taken from the source format rather than
-            // inferred: a MIDI track / MusicXML <part> IS the continuing line.
-            // `RawNote::track` survives to here (the role lookup below uses
-            // it), so this is the importer passing through what the file
-            // already stated. Tracks beyond u16 are refused rather than
-            // wrapped into a collision with a real part.
-            part: u16::try_from(note.track)
-                .map(PartId)
-                .unwrap_or(PartId::UNASSIGNED),
-            pitch: Pitch::from_midi(note.pitch),
-            onset: Duration::new(note.onset as i64, ticks_per_beat as i64),
-            duration: Duration::new(note.duration as i64, ticks_per_beat as i64),
-            velocity: (note.velocity as f32 / 127.0).clamp(0.05, 1.0),
-            role: roles
-                .get(&note.track)
-                .copied()
-                .unwrap_or(VoiceRole::Harmony),
-            emphasis: Emphasis::Normal,
-            section_intensity: 1.0,
-        });
+        let onset = i64::try_from(note.onset)
+            .map_err(|_| "MIDI note onset is not representable".to_string())?;
+        let duration = i64::try_from(note.duration)
+            .map_err(|_| "MIDI note duration is not representable".to_string())?;
+        score
+            .try_push(ScoreNote {
+                part: u16::try_from(note.track)
+                    .map(PartId)
+                    .unwrap_or(PartId::UNASSIGNED),
+                pitch: Pitch::from_midi(note.pitch),
+                onset: Duration::new(onset, ticks_per_beat as i64),
+                duration: Duration::new(duration, ticks_per_beat as i64),
+                velocity: (note.velocity as f32 / 127.0).clamp(0.05, 1.0),
+                role: roles
+                    .get(&note.track)
+                    .copied()
+                    .unwrap_or(VoiceRole::Harmony),
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            })
+            .map_err(|_| "MIDI note end is not exactly representable".to_string())?;
     }
+    validate_imported_score(&score)?;
     Ok(score)
+}
+
+fn push_raw_note(notes: &mut Vec<RawNote>, note: RawNote) -> Result<(), String> {
+    if notes.len() >= MAX_IMPORTED_NOTES {
+        return Err(format!(
+            "symbolic import exceeds the {MAX_IMPORTED_NOTES}-note limit"
+        ));
+    }
+    notes.push(note);
+    Ok(())
 }
 
 fn roles_by_track(notes: &[RawNote]) -> HashMap<usize, VoiceRole> {
@@ -171,6 +293,11 @@ fn roles_by_track(notes: &[RawNote]) -> HashMap<usize, VoiceRole> {
 }
 
 pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
+    if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
+        return Err(format!(
+            "MusicXML import exceeds the {MAX_SYMBOLIC_IMPORT_BYTES}-byte parser limit"
+        ));
+    }
     let text = std::str::from_utf8(bytes).map_err(|_| "MusicXML must be UTF-8 XML")?;
     let document = roxmltree::Document::parse(text)
         .map_err(|error| format!("MusicXML parse error: {error}"))?;
@@ -181,59 +308,173 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     if parts.is_empty() {
         return Err("MusicXML contains no score parts".into());
     }
-    let mut divisions = 1_i64;
+    if parts.len() > MAX_IMPORTED_MIDI_TRACKS {
+        return Err(format!(
+            "MusicXML import exceeds the {MAX_IMPORTED_MIDI_TRACKS}-part limit"
+        ));
+    }
+    let xml_note_count = document
+        .descendants()
+        .filter(|node| node.has_tag_name("note"))
+        .count();
+    if xml_note_count > MAX_IMPORTED_NOTES {
+        return Err(format!(
+            "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
+        ));
+    }
     let mut fifths = 0_i32;
     let mut minor = false;
+    let mut seen_key = None::<(i32, bool)>;
     let mut meter = 4_u8;
+    let mut seen_meter = None::<u8>;
     let mut tempo = 120.0_f32;
-    let mut raw = Vec::<(usize, u8, i64, i64)>::new();
+    let mut seen_tempo = None::<f32>;
+    let mut raw = Vec::<(usize, u8, Duration, Duration)>::new();
 
     for (part_index, part) in parts.iter().enumerate() {
-        let mut cursor = 0_i64;
-        let mut previous_onset = 0_i64;
+        // Divisions are part-local and can change during a score. Keep the
+        // cursor in exact beats so earlier notes never inherit later divisions.
+        let mut divisions = 1_i64;
+        let mut cursor = Duration::zero();
+        let mut previous_onset = Duration::zero();
         for child in part.descendants().filter(|node| node.is_element()) {
             if child.has_tag_name("divisions") {
-                divisions = node_i64(child).unwrap_or(divisions).max(1);
-            } else if child.has_tag_name("fifths") {
-                fifths = node_i64(child).unwrap_or(i64::from(fifths)) as i32;
-            } else if child.has_tag_name("mode") {
-                minor = child.text().is_some_and(|value| value.trim() == "minor");
-            } else if child.has_tag_name("beats") {
-                meter = node_i64(child).unwrap_or(i64::from(meter)).clamp(1, 16) as u8;
+                let value = node_i64(child)
+                    .ok_or_else(|| "MusicXML divisions must be a positive integer".to_string())?;
+                if value <= 0 {
+                    return Err("MusicXML divisions must be positive".into());
+                }
+                divisions = value;
+            } else if child.has_tag_name("key") {
+                // The Score contract carries one key signature. Reject later
+                // changes rather than analyzing/rendering the work in the
+                // final key from the file.
+                let key_fifths = child
+                    .children()
+                    .find(|node| node.has_tag_name("fifths"))
+                    .and_then(node_i64)
+                    .ok_or_else(|| {
+                        "MusicXML non-traditional keys are not supported by a single-key Score"
+                            .to_string()
+                    })?;
+                if !(-7..=7).contains(&key_fifths) {
+                    return Err("MusicXML key signature fifths must be in -7..=7".into());
+                }
+                let key_minor = match child.children().find(|node| node.has_tag_name("mode")) {
+                    None => false,
+                    Some(mode) => match mode.text().unwrap_or("").trim() {
+                        "major" => false,
+                        "minor" => true,
+                        value => {
+                            return Err(format!(
+                                "MusicXML key mode {value:?} is not supported by a single-key Score"
+                            ));
+                        }
+                    },
+                };
+                let signature = (key_fifths as i32, key_minor);
+                if seen_key.is_some_and(|previous| previous != signature) {
+                    return Err(
+                        "MusicXML key changes cannot be represented by a single-key Score".into(),
+                    );
+                }
+                seen_key = Some(signature);
+                fifths = signature.0;
+                minor = signature.1;
+            } else if child.has_tag_name("time") {
+                // Score::time_signature() interprets meter as quarter-note
+                // beats per bar. Compound, non-quarter and time-varying
+                // signatures cannot be flattened into this field faithfully.
+                let beats: Vec<_> = child
+                    .children()
+                    .filter(|node| node.has_tag_name("beats"))
+                    .collect();
+                let beat_types: Vec<_> = child
+                    .children()
+                    .filter(|node| node.has_tag_name("beat-type"))
+                    .collect();
+                if beats.len() != 1 || beat_types.len() != 1 {
+                    return Err(
+                        "MusicXML composite or senza-misura signatures are not supported by Score"
+                            .into(),
+                    );
+                }
+                let numerator = node_i64(beats[0]).ok_or_else(|| {
+                    "MusicXML time-signature numerator must be a single integer".to_string()
+                })?;
+                let denominator = node_i64(beat_types[0]).ok_or_else(|| {
+                    "MusicXML time-signature denominator must be an integer".to_string()
+                })?;
+                if denominator != 4 {
+                    return Err(
+                        "MusicXML time-signature denominators other than quarter notes are not representable"
+                            .into(),
+                    );
+                }
+                if !(1..=16).contains(&numerator) {
+                    return Err("MusicXML time-signature numerator must be in 1..=16".into());
+                }
+                let numerator = numerator as u8;
+                if seen_meter.is_some_and(|previous| previous != numerator) {
+                    return Err(
+                        "MusicXML meter changes cannot be represented by a single-meter Score"
+                            .into(),
+                    );
+                }
+                seen_meter = Some(numerator);
+                meter = numerator;
+            } else if child.has_tag_name("metronome") {
+                let bpm = musicxml_metronome_tempo(child)?;
+                register_musicxml_tempo(bpm, &mut seen_tempo, &mut tempo)?;
             } else if child.has_tag_name("sound") {
-                if let Some(value) = child.attribute("tempo").and_then(|v| v.parse().ok()) {
-                    tempo = value;
+                if let Some(value) = child.attribute("tempo") {
+                    let bpm = value.parse::<f32>().map_err(|_| {
+                        "MusicXML tempo must be a number between 20 and 320 BPM".to_string()
+                    })?;
+                    register_musicxml_tempo(bpm, &mut seen_tempo, &mut tempo)?;
                 }
             } else if child.has_tag_name("backup") {
-                let amount = child
-                    .children()
-                    .find(|node| node.has_tag_name("duration"))
-                    .and_then(node_i64)
-                    .unwrap_or(0);
-                cursor = cursor.saturating_sub(amount);
+                let amount = musicxml_duration(child, "backup")?;
+                let amount = Duration::new(amount, divisions);
+                cursor = cursor
+                    .checked_sub(amount)
+                    .ok_or_else(|| "MusicXML backup timing is not exactly representable".to_string())?;
+                if cursor.num() < 0 {
+                    return Err("MusicXML backup moves before the start of a part".into());
+                }
             } else if child.has_tag_name("forward") {
-                let amount = child
-                    .children()
-                    .find(|node| node.has_tag_name("duration"))
-                    .and_then(node_i64)
-                    .unwrap_or(0);
-                cursor += amount;
+                let amount = musicxml_duration(child, "forward")?;
+                let amount = Duration::new(amount, divisions);
+                cursor = cursor
+                    .checked_add(amount)
+                    .ok_or_else(|| "MusicXML forward timing overflowed".to_string())?;
             } else if child.has_tag_name("note") {
-                let duration = child
-                    .children()
-                    .find(|node| node.has_tag_name("duration"))
-                    .and_then(node_i64)
-                    .unwrap_or(divisions)
-                    .max(1);
+                if child.children().any(|node| node.has_tag_name("grace")) {
+                    return Err(
+                        "MusicXML grace notes are not yet supported; refusing to invent a duration"
+                            .into(),
+                    );
+                }
+                let duration = musicxml_duration(child, "note")?;
+                let duration = Duration::new(duration, divisions);
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
                 let rest = child.children().any(|node| node.has_tag_name("rest"));
                 let onset = if chord { previous_onset } else { cursor };
-                if !rest && let Some(midi) = musicxml_pitch(child) {
-                    raw.push((part_index, midi, onset, duration));
+                if !rest {
+                    if let Some(midi) = musicxml_pitch(child)? {
+                        if raw.len() >= MAX_IMPORTED_NOTES {
+                            return Err(format!(
+                                "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
+                            ));
+                        }
+                        raw.push((part_index, midi, onset, duration));
+                    }
                 }
                 previous_onset = onset;
                 if !chord {
-                    cursor += duration;
+                    cursor = cursor
+                        .checked_add(duration)
+                        .ok_or_else(|| "MusicXML note timing overflowed".to_string())?;
                 }
             }
         }
@@ -247,7 +488,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     } else {
         Key::major(tonic)
     };
-    let mut score = Score::new(key, tempo.clamp(20.0, 320.0), meter);
+    let mut score = Score::new(key, tempo, meter);
     let part_count = parts.len();
     for (part, midi, onset, duration) in raw {
         let role = if part_count == 1 || part == 0 {
@@ -259,57 +500,250 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         } else {
             VoiceRole::Harmony
         };
-        score.push(ScoreNote {
-            // Real part identity, taken from the source format rather than
-            // inferred: a MIDI track / MusicXML <part> IS the continuing line.
-            // Here that is the MusicXML part index already in scope. Indices
-            // beyond u16 are refused rather than wrapped into a collision
-            // with a real part.
-            part: u16::try_from(part)
-                .map(PartId)
-                .unwrap_or(PartId::UNASSIGNED),
-            pitch: Pitch::from_midi(midi),
-            onset: Duration::new(onset, divisions),
-            duration: Duration::new(duration, divisions),
-            velocity: 0.72,
-            role,
-            emphasis: Emphasis::Normal,
-            section_intensity: 1.0,
-        });
+        score
+            .try_push(ScoreNote {
+                part: u16::try_from(part)
+                    .map(PartId)
+                    .unwrap_or(PartId::UNASSIGNED),
+                pitch: Pitch::from_midi(midi),
+                onset,
+                duration,
+                velocity: 0.72,
+                role,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            })
+            .map_err(|_| "MusicXML note end is not exactly representable".to_string())?;
     }
+    validate_imported_score(&score)?;
     Ok(score)
+}
+
+fn validate_imported_score(score: &Score) -> Result<(), String> {
+    if score.notes.is_empty() {
+        return Err("symbolic import contains no pitched notes".into());
+    }
+    if score.notes.len() > MAX_IMPORTED_NOTES {
+        return Err(format!(
+            "symbolic import exceeds the {MAX_IMPORTED_NOTES}-note limit"
+        ));
+    }
+    if !score.tempo_bpm.is_finite() || !(20.0..=320.0).contains(&score.tempo_bpm) {
+        return Err("symbolic score tempo must be finite and between 20 and 320 BPM".into());
+    }
+    if score.meter == 0 {
+        return Err("symbolic score meter must be positive".into());
+    }
+    if score.key.tonic.value() >= 12 {
+        return Err("symbolic score tonic pitch class must be in 0..=11".into());
+    }
+    if score.total_beats.den() <= 0 || score.total_beats.num() <= 0 {
+        return Err("symbolic score duration must be positive".into());
+    }
+    if i128::from(score.total_beats.num())
+        > i128::from(MAX_IMPORTED_SCORE_BEATS) * i128::from(score.total_beats.den())
+    {
+        return Err(format!(
+            "symbolic score exceeds the {MAX_IMPORTED_SCORE_BEATS}-beat import limit"
+        ));
+    }
+    let duration_seconds = score.seconds();
+    if !duration_seconds.is_finite() || duration_seconds <= 0.0 {
+        return Err("symbolic score duration must be finite and positive".into());
+    }
+
+    for (index, note) in score.notes.iter().enumerate() {
+        if note.pitch.midi() > 127 {
+            return Err(format!(
+                "symbolic score note {index} has a MIDI pitch outside 0..=127"
+            ));
+        }
+        if note.onset.den() <= 0
+            || note.duration.den() <= 0
+            || note.onset.num() < 0
+            || note.duration.num() <= 0
+            || !note.velocity.is_finite()
+            || !(0.0..=1.0).contains(&note.velocity)
+            || !note.section_intensity.is_finite()
+            || !(0.0..=1.0).contains(&note.section_intensity)
+        {
+            return Err(format!(
+                "symbolic score note {index} has invalid timing or dynamics"
+            ));
+        }
+        let end = note.onset.checked_add(note.duration).ok_or_else(|| {
+            format!("symbolic score note {index} has an unrepresentable exact end")
+        })?;
+        if end
+            .checked_cmp(score.total_beats)
+            .is_none_or(|ordering| ordering == std::cmp::Ordering::Greater)
+        {
+            return Err(format!(
+                "symbolic score note {index} ends after the declared score duration"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
 }
 
-fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Option<u8> {
-    let pitch = note.children().find(|node| node.has_tag_name("pitch"))?;
+/// Validate a global MIDI metadata stream against the single-value Score
+/// schema. MIDI applies defaults before the first event; if the first explicit
+/// event occurs later at a non-default value, the opening region already has
+/// different metadata and cannot be represented by one Score field.
+fn stable_midi_metadata<T: Copy + Eq>(
+    events: &[(u64, T)],
+    default: T,
+    name: &str,
+    schema_field: &str,
+) -> Result<T, String> {
+    let Some((first_tick, first_value)) = events.iter().min_by_key(|event| event.0) else {
+        return Ok(default);
+    };
+    if *first_tick > 0 && *first_value != default {
+        return Err(format!(
+            "MIDI {name} changes from the default at a non-zero tick and cannot be represented by a {schema_field} Score"
+        ));
+    }
+    if events.iter().any(|(_, value)| value != first_value) {
+        return Err(format!(
+            "MIDI {name} changes cannot be represented by a {schema_field} Score"
+        ));
+    }
+    Ok(*first_value)
+}
+
+/// Extract only a regular, undotted quarter-note metronome mark. Metric
+/// modulations, beat-unit conversions and text/range markings require a richer
+/// tempo representation than Score's single quarter-note BPM value.
+fn musicxml_metronome_tempo(node: roxmltree::Node<'_, '_>) -> Result<f32, String> {
+    let beat_units: Vec<_> = node
+        .children()
+        .filter(|child| child.has_tag_name("beat-unit"))
+        .collect();
+    let per_minutes: Vec<_> = node
+        .children()
+        .filter(|child| child.has_tag_name("per-minute"))
+        .collect();
+    let unsupported_form = node.children().any(|child| {
+        child.has_tag_name("beat-unit-dot")
+            || child.has_tag_name("beat-unit-tied")
+            || child.has_tag_name("metronome-note")
+            || child.has_tag_name("metronome-relation")
+            || child.has_tag_name("metronome-tied")
+            || child.has_tag_name("metronome-tuplet")
+    });
+    if unsupported_form || beat_units.len() != 1 || per_minutes.len() != 1 {
+        return Err(
+            "MusicXML only undotted quarter-note metronome marks with one numeric per-minute value are supported"
+                .into(),
+        );
+    }
+    if beat_units[0].text().unwrap_or("").trim() != "quarter" {
+        return Err(
+            "MusicXML metronome beat units other than undotted quarter notes are not supported"
+                .into(),
+        );
+    }
+    let value = per_minutes[0].text().unwrap_or("").trim();
+    let bpm = value.parse::<f32>().map_err(|_| {
+        "MusicXML metronome per-minute value must be a single numeric BPM".to_string()
+    })?;
+    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+        return Err(
+            "MusicXML metronome tempo must be finite and between 20 and 320 BPM".into(),
+        );
+    }
+    Ok(bpm)
+}
+
+/// Keep all tempo indicators aligned with Score's single-tempo contract.
+/// A changing or disagreeing indicator must not win merely because it appears
+/// later in document traversal.
+fn register_musicxml_tempo(
+    bpm: f32,
+    seen_tempo: &mut Option<f32>,
+    tempo: &mut f32,
+) -> Result<(), String> {
+    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+        return Err("MusicXML tempo must be finite and between 20 and 320 BPM".into());
+    }
+    if seen_tempo.is_some_and(|previous| previous != bpm) {
+        return Err(
+            "MusicXML tempo changes cannot be represented by a single-tempo Score; conflicting tempo indicators are also rejected"
+                .into(),
+        );
+    }
+    *seen_tempo = Some(bpm);
+    *tempo = bpm;
+    Ok(())
+}
+
+/// MusicXML durations use positive integer division units. Required values
+/// must not be converted into defaults: doing so changes imported timing.
+fn musicxml_duration(parent: roxmltree::Node<'_, '_>, element: &str) -> Result<i64, String> {
+    let node = parent
+        .children()
+        .find(|node| node.has_tag_name("duration"))
+        .ok_or_else(|| format!("MusicXML {element} is missing its <duration> element"))?;
+    let value = node_i64(node).ok_or_else(|| {
+        format!("MusicXML {element} duration must be an integer number of divisions")
+    })?;
+    if value <= 0 {
+        return Err(format!("MusicXML {element} duration must be positive"));
+    }
+    Ok(value)
+}
+
+fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<Option<u8>, String> {
+    // Unpitched percussion may have no <pitch> element and remains outside
+    // this first pitched-note importer. Once a <pitch> element is present,
+    // however, malformed or unsupported values must not silently become a
+    // different valid MIDI pitch (or disappear from the imported score).
+    let Some(pitch) = note.children().find(|node| node.has_tag_name("pitch")) else {
+        return Ok(None);
+    };
     let step = pitch
         .children()
-        .find(|node| node.has_tag_name("step"))?
-        .text()?;
+        .find(|node| node.has_tag_name("step"))
+        .and_then(|node| node.text())
+        .ok_or_else(|| "MusicXML pitched note is missing its pitch step".to_string())?;
     let base = match step.trim() {
-        "C" => 0,
-        "D" => 2,
-        "E" => 4,
-        "F" => 5,
-        "G" => 7,
-        "A" => 9,
-        "B" => 11,
-        _ => return None,
+        "C" => 0_i64,
+        "D" => 2_i64,
+        "E" => 4_i64,
+        "F" => 5_i64,
+        "G" => 7_i64,
+        "A" => 9_i64,
+        "B" => 11_i64,
+        _ => return Err(format!("MusicXML pitch step is invalid: {step:?}")),
     };
-    let alter = pitch
-        .children()
-        .find(|node| node.has_tag_name("alter"))
-        .and_then(node_i64)
-        .unwrap_or(0);
+    let alter = match pitch.children().find(|node| node.has_tag_name("alter")) {
+        Some(node) => node_i64(node).ok_or_else(|| {
+            "MusicXML pitch alteration must be an integer semitone value".to_string()
+        })?,
+        None => 0,
+    };
     let octave = pitch
         .children()
         .find(|node| node.has_tag_name("octave"))
-        .and_then(node_i64)?;
-    Some(((octave + 1) * 12 + base + alter).clamp(0, 127) as u8)
+        .and_then(node_i64)
+        .ok_or_else(|| "MusicXML pitched note is missing a valid octave".to_string())?;
+    let midi = octave
+        .checked_add(1)
+        .and_then(|value| value.checked_mul(12))
+        .and_then(|value| value.checked_add(base))
+        .and_then(|value| value.checked_add(alter))
+        .ok_or_else(|| "MusicXML pitch number overflowed".to_string())?;
+    if !(0..=127).contains(&midi) {
+        return Err(format!(
+            "MusicXML pitch {midi} is outside the MIDI pitch range 0..=127"
+        ));
+    }
+    Ok(Some(midi as u8))
 }
 
 pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
@@ -353,8 +787,13 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
     let mut sections = Vec::new();
     let mut start = 0.0;
     let mut index = 1;
-    while start < total {
+    while start < total && sections.len() < MAX_RECONSTRUCTED_SECTIONS {
         let end = (start + section_beats).min(total);
+        // Floating-point resolution may prevent progress for malformed direct
+        // callers even though the public import parser rejects such scores.
+        if end <= start {
+            break;
+        }
         sections.push(ImportedSectionSummary {
             label: format!("Reconstructed region {index}"),
             start_beat: start,
@@ -365,6 +804,16 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
         });
         start = end;
         index += 1;
+    }
+    let mut unresolved_interpretations = vec![
+        "Confirm section boundaries".into(),
+        "Confirm voice and instrument roles".into(),
+        "Confirm reconstructed motif identity".into(),
+    ];
+    if start < total {
+        unresolved_interpretations.push(format!(
+            "Section reconstruction stopped at its {MAX_RECONSTRUCTED_SECTIONS}-region safety cap; the remaining duration is not segmented"
+        ));
     }
     let voices: BTreeSet<_> = score
         .notes
@@ -382,11 +831,7 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
         duration_seconds: score.seconds(),
         motifs,
         sections,
-        unresolved_interpretations: vec![
-            "Confirm section boundaries".into(),
-            "Confirm voice and instrument roles".into(),
-            "Confirm reconstructed motif identity".into(),
-        ],
+        unresolved_interpretations,
     }
 }
 
@@ -394,17 +839,480 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parses_minimal_musicxml_without_forcing_a_territory() {
-        let xml = br#"<score-partwise><part id="P1"><measure number="1">
-            <attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats></time></attributes>
+    fn minimal_musicxml() -> &'static [u8] {
+        br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><key><fifths>0</fifths><mode>major</mode></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
             <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
-        </measure></part></score-partwise>"#;
-        let score = parse_musicxml(xml).unwrap();
+        </measure></part></score-partwise>"#
+    }
+
+    fn midi_file(track: &[u8]) -> Vec<u8> {
+        midi_file_with_tracks(&[track])
+    }
+
+    fn midi_file_with_tracks(tracks: &[&[u8]]) -> Vec<u8> {
+        let mut bytes = b"MThd".to_vec();
+        let format = if tracks.len() > 1 { 1_u16 } else { 0_u16 };
+        bytes.extend_from_slice(&[0, 0, 0, 6]);
+        bytes.extend_from_slice(&format.to_be_bytes());
+        bytes.extend_from_slice(&(tracks.len() as u16).to_be_bytes());
+        bytes.extend_from_slice(&[0x01, 0xE0]);
+        for track in tracks {
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(track);
+        }
+        bytes
+    }
+
+    fn json_score_with_one_note() -> Score {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.notes.push(ScoreNote {
+            part: PartId(0),
+            pitch: Pitch::from_midi(60),
+            onset: Duration::zero(),
+            duration: Duration::quarter(),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        score.total_beats = Duration::quarter();
+        score
+    }
+
+    #[test]
+    fn parses_minimal_musicxml_without_forcing_a_territory() {
+        let score = parse_musicxml(minimal_musicxml()).unwrap();
         assert_eq!(score.notes.len(), 2);
         let analysis = analyze(&score);
         assert!(analysis.source_native);
         assert!(analysis.inferred_territory.is_none());
+    }
+
+    #[test]
+    fn musicxml_divisions_are_scoped_to_each_part() {
+        let xml = br#"<score-partwise>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+            <part id="P2"><measure number="1">
+                <attributes><divisions>2</divisions></attributes>
+                <note><pitch><step>E</step><octave>4</octave></pitch><duration>2</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[0].duration, Duration::new(1, 1));
+        assert_eq!(score.notes[1].duration, Duration::new(1, 1));
+    }
+
+    #[test]
+    fn musicxml_division_changes_preserve_the_absolute_cursor() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><divisions>2</divisions></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>2</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[1].onset, Duration::new(1, 1));
+        assert_eq!(score.notes[1].duration, Duration::new(1, 1));
+        assert_eq!(score.total_beats, Duration::new(2, 1));
+    }
+
+    #[test]
+    fn invalid_musescore_tonic_pitch_class_is_rejected_before_analysis() {
+        let mut value = serde_json::to_value(json_score_with_one_note()).unwrap();
+        value["key"]["tonic"] = serde_json::json!(255);
+        let bytes = serde_json::to_vec(&value).unwrap();
+
+        let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
+        assert!(error.contains("tonic pitch class"), "{error}");
+    }
+
+    #[test]
+    fn invalid_musescore_midi_pitch_is_rejected_before_rendering() {
+        let mut value = serde_json::to_value(json_score_with_one_note()).unwrap();
+        value["notes"][0]["pitch"]["midi"] = serde_json::json!(255);
+        let bytes = serde_json::to_vec(&value).unwrap();
+
+        let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
+        assert!(error.contains("MIDI pitch outside 0..=127"), "{error}");
+    }
+
+    #[test]
+    fn oversized_musescore_duration_is_rejected_before_analysis_or_render() {
+        let mut score = json_score_with_one_note();
+        score.total_beats = Duration::new(MAX_IMPORTED_SCORE_BEATS + 1, 1);
+        let bytes = serde_json::to_vec(&score).unwrap();
+        let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
+        assert!(error.contains("beat import limit"), "{error}");
+    }
+
+    #[test]
+    fn unrepresentable_exact_note_end_is_rejected_even_if_float_timing_fits() {
+        let mut score = json_score_with_one_note();
+        let mut malformed = score.notes[0];
+        malformed.onset = Duration::new(1, i64::MAX);
+        malformed.duration = Duration::new(1, i64::MAX - 2);
+        score.notes.push(malformed);
+        let bytes = serde_json::to_vec(&score).unwrap();
+        let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
+        assert!(error.contains("unrepresentable exact end"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_pitch_above_midi_range_is_rejected_instead_of_clipped() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>10</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("outside the MIDI pitch range 0..=127"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_fractional_pitch_alteration_is_rejected_explicitly() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><alter>0.5</alter><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("integer semitone value"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_missing_note_duration_is_rejected_instead_of_invented() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("missing its <duration> element"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_malformed_note_duration_is_rejected_instead_of_defaulted() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>abc</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("integer number of divisions"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_zero_note_duration_is_rejected_instead_of_promoted() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>0</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("duration must be positive"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_grace_note_is_rejected_instead_of_given_a_default_duration() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><grace slash="yes"/><pitch><step>B</step><octave>4</octave></pitch>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("grace notes are not yet supported"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_malformed_divisions_are_rejected_instead_of_reusing_previous_value() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>abc</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("divisions must be a positive integer"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_cursor_overflow_is_reported_not_panicked() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>9223372036854775807</duration></note>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("timing overflowed"), "{error}");
+    }
+
+    #[test]
+    fn repeated_same_pitch_midi_notes_keep_both_overlapping_onsets() {
+        // Two same-pitch note-ons before either note-off must not overwrite
+        // the earlier onset or collapse two notes into one.
+        let bytes = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 20,
+            0, 0x90, 60, 100,
+            100, 0x90, 60, 80,
+            100, 0x80, 60, 0,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&bytes).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[0].onset, Duration::new(0, 480));
+        assert_eq!(score.notes[0].duration, Duration::new(200, 480));
+        assert!((score.notes[0].velocity - 100.0 / 127.0).abs() < 1e-6);
+        assert_eq!(score.notes[1].onset, Duration::new(100, 480));
+        assert_eq!(score.notes[1].duration, Duration::new(200, 480));
+        assert!((score.notes[1].velocity - 80.0 / 127.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn midi_tempo_validation_uses_absolute_tick_order_across_tracks() {
+        // Track 0 is traversed first but contains the later tempo event.
+        // Track 1 supplies the same tempo at tick zero, so the score is
+        // constant-tempo despite traversal order.
+        let later_track = [
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 100
+            0, 0x90, 62, 100,
+            100, 0x80, 62, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let initial_track = [
+            0, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 0
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let tracks: [&[u8]; 2] = [&later_track, &initial_track];
+        let score = parse_midi(&midi_file_with_tracks(&tracks)).unwrap();
+        assert_eq!(score.tempo_bpm, 150.0);
+        assert_eq!(score.notes.len(), 2);
+    }
+
+    #[test]
+    fn midi_late_nondefault_tempo_is_rejected_against_default_120_bpm() {
+        let track = [
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_late_nondefault_key_is_rejected_against_default_c_major() {
+        let track = [
+            100, 0xFF, 0x59, 2, 1, 0, // G major at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_late_nondefault_meter_is_rejected_against_default_four_four() {
+        let track = [
+            100, 0xFF, 0x58, 4, 3, 2, 24, 8, // 3/4 at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_equal_tempo_events_at_zero_and_later_are_accepted() {
+        let track = [
+            0, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 0
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // same value later
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        assert_eq!(score.tempo_bpm, 150.0);
+    }
+
+    #[test]
+    fn midi_tempo_changes_are_rejected_instead_of_flattened() {
+        let track = [
+            0, 0xFF, 0x51, 3, 0x07, 0xA1, 0x20, // 120 BPM
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("tempo changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn midi_non_quarter_meter_is_rejected_instead_of_flattened() {
+        let track = [
+            0, 0xFF, 0x58, 4, 4, 3, 24, 8, // 4/8, denominator power 3
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("denominators other than quarter notes"), "{error}");
+    }
+
+    #[test]
+    fn midi_key_changes_are_rejected_instead_of_flattened() {
+        let track = [
+            0, 0xFF, 0x59, 2, 0, 0, // C major
+            100, 0xFF, 0x59, 2, 1, 0, // G major
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("key changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_quarter_note_metronome_mark_sets_score_tempo() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.tempo_bpm, 96.0);
+    }
+
+    #[test]
+    fn musicxml_matching_metronome_and_sound_tempo_are_accepted() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction>
+                <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type>
+                <sound tempo="96"/>
+            </direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.tempo_bpm, 96.0);
+    }
+
+    #[test]
+    fn musicxml_conflicting_metronome_and_sound_tempo_are_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction>
+                <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type>
+                <sound tempo="90"/>
+            </direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("conflicting tempo indicators"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_non_quarter_metronome_mark_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><beat-unit>eighth</beat-unit><per-minute>180</per-minute></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("beat units other than undotted quarter notes"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_dotted_metronome_mark_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><beat-unit>quarter</beat-unit><beat-unit-dot/><per-minute>72</per-minute></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("only undotted quarter-note metronome marks"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_metric_modulation_metronome_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><metronome-note><metronome-type>eighth</metronome-type></metronome-note><metronome-relation>equals</metronome-relation><metronome-note><metronome-type>quarter</metronome-type><metronome-dot/></metronome-note></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("only undotted quarter-note metronome marks"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_tempo_changes_are_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound tempo="120"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            <direction><sound tempo="90"/></direction>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("tempo changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_meter_changes_are_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2"><attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("meter changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_non_quarter_meter_is_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>6</beats><beat-type>8</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("denominators other than quarter notes"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_key_changes_are_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1"><attributes><divisions>1</divisions><key><fifths>0</fifths><mode>major</mode></key></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2"><attributes><key><fifths>1</fifths><mode>major</mode></key></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("key changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn zero_ticks_per_beat_midi_is_rejected_without_panicking() {
+        let bytes = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 0, 0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 4, 0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&bytes).unwrap_err();
+        assert!(error.contains("non-zero ticks-per-beat"), "{error}");
     }
 }

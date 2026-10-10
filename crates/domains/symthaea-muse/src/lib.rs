@@ -200,6 +200,10 @@ pub mod study_orchestration;
 pub mod study_release;
 #[cfg(feature = "theory")]
 pub mod study_runner;
+#[cfg(feature = "theory")]
+pub mod symbolic_import;
+#[cfg(feature = "theory")]
+pub mod teaching_corpus;
 pub mod synth;
 #[cfg(feature = "theory")]
 pub mod temporal_confirmatory;

@@ -146,12 +146,33 @@ impl Score {
         seen
     }
 
-    pub fn push(&mut self, note: ScoreNote) {
-        let end = note.onset + note.duration;
-        if end.beats() > self.total_beats.beats() {
+    /// Insert a note only when its exact end time is representable in the
+    /// rational beat type. This is the safe ingestion API for caller-supplied
+    /// notes; it does not mutate the score when the addition cannot be stored.
+    pub fn try_push(&mut self, note: ScoreNote) -> Result<(), ScoreNote> {
+        let Some(end) = note.onset.checked_add(note.duration) else {
+            return Err(note);
+        };
+        // Keep the canonical score boundary exact. Two distinct rational beat
+        // positions can round to the same f64 above 2^53; using beats() here
+        // would then leave total_beats shorter than a successfully inserted note.
+        let Some(ordering) = end.checked_cmp(self.total_beats) else {
+            return Err(note);
+        };
+        if ordering == std::cmp::Ordering::Greater {
             self.total_beats = end;
         }
         self.notes.push(note);
+        Ok(())
+    }
+
+    /// Insert a trusted, ordinary musical note.
+    ///
+    /// Use `try_push` for data that may contain extreme externally supplied
+    /// rational values; this wrapper fails explicitly instead of wrapping.
+    pub fn push(&mut self, note: ScoreNote) {
+        self.try_push(note)
+            .expect("score note end is not representable; use try_push for untrusted notes");
     }
 
     /// Notes belonging to a given voice, in onset order.
@@ -191,8 +212,10 @@ impl Score {
     pub fn melody_is_monophonic(&self) -> bool {
         let mel = self.voice(VoiceRole::Melody);
         mel.windows(2).all(|w| {
-            let end0 = (w[0].onset + w[0].duration).beats();
-            end0 <= w[1].onset.beats() + 1e-9
+            let Some(end0) = w[0].onset.checked_add(w[0].duration) else {
+                return false;
+            };
+            end0.beats() <= w[1].onset.beats() + 1e-9
         })
     }
 }
@@ -260,6 +283,47 @@ mod tests {
         assert_eq!(s.voice(VoiceRole::Bass).len(), 1);
         assert_eq!(s.events().len(), 2);
         assert_eq!(s.events()[0].onset, Duration::zero()); // sorted by onset
+    }
+
+    #[test]
+    fn try_push_tracks_exactly_ordered_ends_beyond_f64_integer_precision() {
+        let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        let make_note = |onset: i64| ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: c4(),
+            onset: Duration::new(onset, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        };
+
+        // IEEE-754 f64 cannot distinguish every integer above 2^53:
+        // both end values previously compared equal after beats() conversion.
+        s.try_push(make_note(9_007_199_254_740_991)).unwrap();
+        s.try_push(make_note(9_007_199_254_740_992)).unwrap();
+
+        assert_eq!(s.total_beats, Duration::new(9_007_199_254_740_993, 1));
+    }
+
+    #[test]
+    fn try_push_rejects_unrepresentable_note_end_without_mutating_score() {
+        let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        let note = ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: c4(),
+            onset: Duration::quarter(),
+            duration: Duration::new(i64::MAX, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        };
+
+        assert!(s.try_push(note).is_err());
+        assert!(s.notes.is_empty());
+        assert_eq!(s.total_beats, Duration::zero());
     }
 
     #[test]

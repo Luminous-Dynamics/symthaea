@@ -21,6 +21,8 @@ note-emitter into a composer.
 
 ## Progress
 
+- **Temporal musical state space and typed world state (Melothaea / MEL-005A substrate, 2026-10-09)** — IN REVIEW: `state_space.rs` creates deterministic temporal frames with transposition-invariant pitch-class structure, rhythm, verified part-line motion, register occupancy, entropy, activity, recurrence topology, and prior-relative novelty. `world_state.rs` adds `MusicalWorldStateV1`, explicitly separating score observations from supplied section, harmonic-function, motif-return, obligation, and performance context. Its 47-dimensional vector is structural evidence—not a perceptual or aesthetic oracle. Persistent-line transitions are not inferred from functional voice roles when PartId is missing. This does not replace `ScoreCognitiveProfile`, renderer evidence, or listener observations.
+
 - **Layer 0** primitives (pitch/scale/chord) — DONE `b390c93605`
 - **Layer 2** motif + development (transpose/invert/retrograde/augment/sequence,
   each with a proven property) — DONE `c8a0ff7174`

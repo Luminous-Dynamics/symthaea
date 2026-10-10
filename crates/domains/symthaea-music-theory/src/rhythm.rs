@@ -6,48 +6,137 @@
 //! and diminution (×2, ÷3, dotting) are EXACT and reversible — a property the
 //! motif-transformation tests depend on (augment then diminish == identity).
 
+use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
 
 /// A duration in beats, as a reduced rational (quarter note = 1/1 beat).
 /// Always stored with `den > 0` and `gcd(num, den) == 1`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Duration {
     num: i64,
     den: i64,
 }
 
-impl std::ops::Add for Duration {
-    type Output = Duration;
-    fn add(self, other: Duration) -> Duration {
-        Duration::new(
-            self.num * other.den + other.num * self.den,
-            self.den * other.den,
-        )
+impl<'de> Deserialize<'de> for Duration {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct WireDuration {
+            num: i64,
+            den: i64,
+        }
+
+        let wire = WireDuration::deserialize(deserializer)?;
+        if wire.den == 0 {
+            return Err(de::Error::custom("duration denominator must be non-zero"));
+        }
+        // Normalize rather than reject older/non-canonical-but-valid rationals.
+        // This preserves their mathematical value while restoring the type's
+        // positive-denominator/reduced-fraction invariant at the wire boundary.
+        from_i128_rational(i128::from(wire.num), i128::from(wire.den))
+            .ok_or_else(|| de::Error::custom("duration cannot be represented canonically"))
     }
 }
 
-fn gcd(mut a: i64, mut b: i64) -> i64 {
-    a = a.abs();
-    b = b.abs();
+impl std::ops::Add for Duration {
+    type Output = Duration;
+
+    /// Exact addition for representable results.
+    ///
+    /// The operator is retained for ergonomic use with trusted, ordinary
+    /// musical values. Call `checked_add` when inputs can come from external
+    /// scores or other untrusted sources.
+    fn add(self, other: Duration) -> Duration {
+        self.checked_add(other)
+            .expect("duration addition is not representable; use checked_add for untrusted values")
+    }
+}
+
+fn gcd_u128(mut a: u128, mut b: u128) -> u128 {
     while b != 0 {
-        let t = b;
-        b = a % b;
-        a = t;
+        let remainder = a % b;
+        a = b;
+        b = remainder;
     }
     a.max(1)
 }
 
+/// Reduce an exact rational in wide arithmetic, then return it only if the
+/// canonical numerator and positive denominator both fit the wire type.
+fn from_i128_rational(num: i128, den: i128) -> Option<Duration> {
+    if den == 0 {
+        return None;
+    }
+    let (num, den) = if den < 0 {
+        (num.checked_neg()?, den.checked_neg()?)
+    } else {
+        (num, den)
+    };
+    let divisor = i128::try_from(gcd_u128(num.unsigned_abs(), den as u128)).ok()?;
+    let reduced_num = num / divisor;
+    let reduced_den = den / divisor;
+    Some(Duration {
+        num: i64::try_from(reduced_num).ok()?,
+        den: i64::try_from(reduced_den).ok()?,
+    })
+}
+
 impl Duration {
-    /// Construct from a rational `num/den` beats (reduced; `den` must be > 0).
+    /// Construct from a rational `num/den` beats and reduce it exactly.
+    ///
+    /// The input denominator must be non-zero. The stored denominator is always
+    /// positive, and the reduced result must fit the i64 wire representation.
     pub fn new(num: i64, den: i64) -> Self {
         assert!(den != 0, "duration denominator must be non-zero");
-        let sign = if den < 0 { -1 } else { 1 };
-        let (num, den) = (num * sign, den * sign);
-        let g = gcd(num, den);
-        Duration {
-            num: num / g,
-            den: den / g,
+        from_i128_rational(num as i128, den as i128)
+            .expect("normalized duration cannot be represented by i64 numerator/denominator")
+    }
+
+    /// Compare exact rational beat values without converting them to floats.
+    ///
+    /// Returns None only if either value violates the positive-denominator
+    /// invariant. Cross-products use i128 intermediates, which are wide enough
+    /// for products of any two i64 values.
+    pub fn checked_cmp(self, other: Duration) -> Option<std::cmp::Ordering> {
+        if self.den <= 0 || other.den <= 0 {
+            return None;
         }
+        let left = i128::from(self.num).checked_mul(i128::from(other.den))?;
+        let right = i128::from(other.num).checked_mul(i128::from(self.den))?;
+        Some(left.cmp(&right))
+    }
+
+    /// Subtract two exact rationals without intermediate i64 overflow.
+    ///
+    /// Returns None when an input violates the positive-denominator invariant,
+    /// intermediate arithmetic overflows, or the reduced result cannot fit
+    /// this type's i64 numerator/denominator.
+    pub fn checked_sub(self, other: Duration) -> Option<Self> {
+        if self.den <= 0 || other.den <= 0 {
+            return None;
+        }
+        let left = i128::from(self.num).checked_mul(i128::from(other.den))?;
+        let right = i128::from(other.num).checked_mul(i128::from(self.den))?;
+        let numerator = left.checked_sub(right)?;
+        let denominator = i128::from(self.den).checked_mul(i128::from(other.den))?;
+        from_i128_rational(numerator, denominator)
+    }
+
+    /// Add two exact rationals without intermediate i64 overflow.
+    ///
+    /// Returns None when an input violates the canonical representation or
+    /// the reduced result cannot fit this type's i64 numerator/denominator.
+    pub fn checked_add(self, other: Duration) -> Option<Self> {
+        if self.den <= 0 || other.den <= 0 {
+            return None;
+        }
+        let left = i128::from(self.num).checked_mul(i128::from(other.den))?;
+        let right = i128::from(other.num).checked_mul(i128::from(self.den))?;
+        let numerator = left.checked_add(right)?;
+        let denominator = i128::from(self.den).checked_mul(i128::from(other.den))?;
+        from_i128_rational(numerator, denominator)
     }
 
     pub fn whole() -> Self {
@@ -91,8 +180,18 @@ impl Duration {
 
     /// Scale by a rational factor `n/d` (augmentation `2/1`, diminution `1/2`,
     /// triplet `2/3`). Exact and reversible: `scale(a,b).scale(b,a) == self`.
+    pub fn checked_scale(self, n: i64, d: i64) -> Option<Self> {
+        if self.den <= 0 || d == 0 {
+            return None;
+        }
+        let numerator = i128::from(self.num).checked_mul(i128::from(n))?;
+        let denominator = i128::from(self.den).checked_mul(i128::from(d))?;
+        from_i128_rational(numerator, denominator)
+    }
+
     pub fn scale(self, n: i64, d: i64) -> Self {
-        Duration::new(self.num * n, self.den * d)
+        self.checked_scale(n, d)
+            .expect("duration scaling is not representable; use checked_scale for untrusted values")
     }
 
     /// Convert to seconds at a given tempo (beats per minute).
@@ -103,12 +202,36 @@ impl Duration {
     /// Exact rational subtraction, floored at zero (a Duration is a length —
     /// negative lengths are never meaningful in a score).
     pub fn saturating_sub(self, other: Duration) -> Self {
-        let num = self.num * other.den - other.num * self.den;
-        if num <= 0 {
-            Duration::zero()
-        } else {
-            Duration::new(num, self.den * other.den)
+        if self.den <= 0 || other.den <= 0 {
+            return Duration::zero();
         }
+        let Some(left) = i128::from(self.num).checked_mul(i128::from(other.den)) else {
+            return Duration::zero();
+        };
+        let Some(right) = i128::from(other.num).checked_mul(i128::from(self.den)) else {
+            return Duration::zero();
+        };
+        let Some(num) = left.checked_sub(right) else {
+            return Duration::zero();
+        };
+        if num <= 0 {
+            return Duration::zero();
+        }
+        let Some(den) = i128::from(self.den).checked_mul(i128::from(other.den)) else {
+            return Duration::zero();
+        };
+        from_i128_rational(num, den).unwrap_or_else(|| {
+            let quotient = num / den;
+            let exceeds_max = quotient > i128::from(i64::MAX)
+                || (quotient == i128::from(i64::MAX) && num % den > 0);
+            if exceeds_max {
+                Duration::new(i64::MAX, 1)
+            } else {
+                // A positive but unrepresentable sub-beat fraction cannot be
+                // preserved exactly; do not turn it into a fabricated maximum.
+                Duration::zero()
+            }
+        })
     }
 }
 
@@ -152,6 +275,84 @@ mod tests {
         // Triplet eighths: three of them make a quarter, exactly.
         let te = Duration::triplet_eighth();
         assert_eq!(te + te + te, Duration::quarter());
+    }
+
+    #[test]
+    fn deserialization_normalizes_legacy_rationals_and_rejects_zero_denominator() {
+        let canonical = Duration::new(3, 2);
+        let encoded = serde_json::to_string(&canonical).unwrap();
+        assert_eq!(serde_json::from_str::<Duration>(&encoded).unwrap(), canonical);
+
+        // Previously accepted wire values keep their mathematical meaning,
+        // but are brought back into the canonical in-memory representation.
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":2,"den":4}"#).unwrap(),
+            Duration::new(1, 2)
+        );
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":1,"den":-2}"#).unwrap(),
+            Duration::new(-1, 2)
+        );
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":0,"den":2}"#).unwrap(),
+            Duration::zero()
+        );
+        assert_eq!(
+            serde_json::from_str::<Duration>(r#"{"num":-2,"den":-4}"#).unwrap(),
+            Duration::new(1, 2)
+        );
+        assert!(serde_json::from_str::<Duration>(r#"{"num":1,"den":0}"#).is_err());
+    }
+
+    #[test]
+    fn checked_comparison_preserves_order_below_float_resolution() {
+        let smaller = Duration::new(1, i64::MAX);
+        let larger = Duration::new(1, i64::MAX - 2);
+        assert_eq!(smaller.beats(), larger.beats(), "f64 loses this distinction");
+        assert_eq!(
+            smaller.checked_cmp(larger),
+            Some(std::cmp::Ordering::Less),
+            "rational ordering must remain exact when f64 ties"
+        );
+    }
+
+    #[test]
+    fn checked_sub_is_exact_and_fails_when_canonical_result_does_not_fit() {
+        assert_eq!(
+            Duration::new(5, 1).checked_sub(Duration::new(2, 1)),
+            Some(Duration::new(3, 1))
+        );
+        assert!(Duration::new(1, i64::MAX)
+            .checked_sub(Duration::new(1, i64::MAX - 2))
+            .is_none());
+    }
+
+    #[test]
+    fn checked_add_and_scale_fail_without_integer_wraparound() {
+        let largest = Duration::new(i64::MAX, 1);
+        assert_eq!(largest.checked_add(Duration::quarter()), None);
+        assert_eq!(largest.checked_scale(2, 1), None);
+        assert_eq!(
+            Duration::new(1, 2).checked_add(Duration::new(1, 3)),
+            Some(Duration::new(5, 6))
+        );
+        assert_eq!(
+            Duration::new(i64::MAX, 1).saturating_sub(Duration::new(-i64::MAX, 1)),
+            Duration::new(i64::MAX, 1)
+        );
+        assert_eq!(
+            Duration::new(1, i64::MAX - 1).saturating_sub(Duration::new(1, i64::MAX)),
+            Duration::zero()
+        );
+    }
+
+    #[test]
+    fn constructor_handles_signed_extremes_when_representable() {
+        assert_eq!(
+            Duration::new(2, i64::MIN),
+            Duration::new(-1, 1_i64 << 62)
+        );
+        assert_eq!(Duration::new(i64::MIN, 1).num(), i64::MIN);
     }
 
     #[test]
