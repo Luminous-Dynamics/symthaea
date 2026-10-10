@@ -24,7 +24,7 @@ The public module **symthaea_acoustics::ultrasound** provides:
 - validated first-order wavelength estimates using the existing canonical **wavelength** calculation;
 - idealized pulse-echo axial-resolution estimates from pulse cycle count, sound speed, and center frequency;
 - a transparent Nyquist minimum calculation and sampling-plan assessment that records whether an anti-alias evidence reference was supplied;
-- a deterministic point-reflector phantom that emits a bounded synthetic RF trace while retaining analytic pulse-echo travel times and fractional sample indices;
+- a deterministic point-reflector phantom that emits a sample-count- and work-budget-bounded synthetic RF trace while retaining analytic pulse-echo travel times and fractional sample indices;
 - a versioned canonical little-endian synthetic-fixture encoding that commits to generation parameters, analytic echo truth, and sample values, making exact-byte hashing possible for evidence storage;
 - negative and known-answer tests for malformed physical inputs, under-sampling, resource-budget overruns, too-short acquisition windows, and echo-time/sample-position agreement.
 
