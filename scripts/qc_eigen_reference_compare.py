@@ -148,6 +148,8 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
         raise ValueError(
             f"fixture corpus census mismatch: missing={missing!r}; unexpected={unexpected!r}"
         )
+    if tuple(case_ids) != EXPECTED_CASE_IDS:
+        raise ValueError("fixture corpus case order differs from the frozen reference order")
     return report, digest
 
 
