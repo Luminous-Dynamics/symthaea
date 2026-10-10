@@ -818,7 +818,11 @@ impl NumericTower {
     /// Auto-promotes ℤ → ℚ when division is not exact.
     /// Returns `None` if b is zero.
     pub fn divide(&self, a: &Number, b: &Number) -> Option<NumberResult> {
-        if b.is_zero_exact() {
+        // A malformed public Rational variant with denominator zero is not
+        // a valid divisor, even though it cannot be classified as exact zero.
+        let invalid_rational_divisor =
+            matches!(b, Number::Rational { denominator: 0, .. });
+        if b.is_zero_exact() || invalid_rational_divisor {
             return None;
         }
 
@@ -2035,6 +2039,7 @@ mod tests {
             r.number
         );
     }
+
     #[test]
     fn test_exact_zero_is_distinct_from_legacy_approximate_zero() {
         assert!(Number::Natural(0).is_zero_exact());
@@ -2061,6 +2066,18 @@ mod tests {
         assert!(!Number::Real(0.0).is_approximately_zero(-1.0));
         assert!(!Number::Real(0.0).is_approximately_zero(f64::NAN));
         assert!(!Number::Real(0.0).is_approximately_zero(f64::INFINITY));
+    }
+
+    #[test]
+    fn test_division_rejects_invalid_rational_divisor() {
+        let tower = NumericTower::new();
+        let numerator = Number::Natural(1);
+        let invalid_divisor = Number::Rational {
+            numerator: 1,
+            denominator: 0,
+        };
+
+        assert!(tower.divide(&numerator, &invalid_divisor).is_none());
     }
 
     #[test]
