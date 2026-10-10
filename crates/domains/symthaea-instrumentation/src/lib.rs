@@ -639,6 +639,14 @@ impl ResolvedCalibration {
             standard_uncertainty,
         })
     }
+
+    pub fn evidence(&self) -> &ArtifactReference {
+        &self.evidence
+    }
+
+    pub fn review_receipt(&self) -> &ArtifactReference {
+        &self.review_receipt
+    }
 }
 
 /// Resolve a calibration reference from an independently governed evidence
