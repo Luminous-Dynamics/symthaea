@@ -1,1 +1,576 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/cyber_crucible_diagnostic_loop_v1.schema.json","title":"Symthaea Cyber Crucible Diagnostic Loop Report v1","description":"A non-authorizing, evidence-bound diagnostic-process record. The schema is not a cryptographic receipt verifier or qualification authority.","type":"object","additionalProperties":false,"required":["schema_version","lane","non_authorizing","run","evidence","steps","hypotheses","proposals","evaluator_receipts","assessment","residual_uncertainty","final_claims","claim_maturity_ceiling"],"properties":{"schema_version":{"const":"cyber-crucible-diagnostic-loop.v1"},"lane":{"const":"public_calibration"},"non_authorizing":{"const":true},"run":{"$ref":"#/$defs/run"},"evidence":{"type":"array","minItems":2,"items":{"$ref":"#/$defs/evidence"}},"steps":{"type":"array","minItems":15,"items":{"$ref":"#/$defs/step"}},"hypotheses":{"type":"array","minItems":2,"items":{"$ref":"#/$defs/hypothesis"}},"proposals":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/proposal"}},"evaluator_receipts":{"type":"array","minItems":4,"items":{"$ref":"#/$defs/receipt"}},"assessment":{"$ref":"#/$defs/assessment"},"residual_uncertainty":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"final_claims":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/claim"}},"claim_maturity_ceiling":{"type":"string","minLength":1}},"$defs":{"scenario":{"type":"object","additionalProperties":false,"required":["scenario_id","revision","scenario_digest"],"properties":{"scenario_id":{"type":"string","minLength":1},"revision":{"type":"integer","minimum":1},"scenario_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},"run":{"type":"object","additionalProperties":false,"required":["run_id","scenario","subject_id","execution_mode","evidence_class"],"properties":{"run_id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},"scenario":{"$ref":"#/$defs/scenario"},"subject_id":{"type":"string","minLength":1},"execution_mode":{"enum":["real","simulated","not_run"]},"evidence_class":{"enum":["synthetic_fixture","replay","range","digital_twin","hardware","production"]}}},"evidence":{"type":"object","additionalProperties":false,"required":["evidence_id","basis","source","observed_at","payload","evidence_digest"],"properties":{"evidence_id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"},"basis":{"enum":["direct","control_plane_record","derived","flow_derived"]},"source":{"type":"string","minLength":1},"observed_at":{"type":"string","minLength":1},"payload":{"type":"object"},"evidence_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},"phase":{"enum":["orient","asset_identity_trust_boundaries","competing_hypotheses","evidence_gaps","next_bounded_observation","belief_update","impact_scope","claim_classification","containment_proposal","side_effect_prediction","authority_check","outcome_verification","recovery","residual_uncertainty","evidence_bearing_report"]},"step":{"type":"object","additionalProperties":false,"required":["sequence","step_id","phase","evidence_refs","receipt_refs","rationale","uncertainty_update"],"properties":{"sequence":{"type":"integer","minimum":1},"step_id":{"type":"string","minLength":1},"phase":{"$ref":"#/$defs/phase"},"evidence_refs":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},"receipt_refs":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},"rationale":{"type":"string","minLength":1},"uncertainty_update":{"type":"string","minLength":1},"observation_scope":{"type":"string","minLength":1},"observation_budget":{"type":"integer","minimum":1,"maximum":10},"proposal_refs":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},"authority_status":{"enum":["not_requested","denied","authorized","unknown"]}}},"hypothesis":{"type":"object","additionalProperties":false,"required":["hypothesis_id","statement","status","supporting_evidence_refs","contradicting_evidence_refs"],"properties":{"hypothesis_id":{"type":"string","minLength":1},"statement":{"type":"string","minLength":1},"status":{"enum":["active","supported","rejected","unresolved"]},"supporting_evidence_refs":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},"contradicting_evidence_refs":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}}}},"proposal":{"type":"object","additionalProperties":false,"required":["proposal_id","action_class","status","scope","rationale","predicted_side_effects","recovery_obligations","evidence_refs"],"properties":{"proposal_id":{"type":"string","minLength":1},"action_class":{"enum":["bounded_observation","containment","eradication","recovery","escalation","none"]},"status":{"enum":["proposed","approved","executed","rejected","not_authorized"]},"scope":{"type":"string","minLength":1},"rationale":{"type":"string","minLength":1},"predicted_side_effects":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"recovery_obligations":{"type":"array","items":{"type":"string","minLength":1}},"evidence_refs":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},"authority_receipt_ref":{"type":"string","minLength":1}}},"receipt":{"type":"object","additionalProperties":false,"required":["receipt_id","receipt_type","evaluator_id","scenario_id","scenario_revision","scenario_digest","status","evidence_refs","payload","receipt_digest"],"properties":{"receipt_id":{"type":"string","minLength":1},"receipt_type":{"enum":["functional_verdict","security_verdict","authorization_decision","outcome_verification","recovery_verification"]},"evaluator_id":{"type":"string","minLength":1},"scenario_id":{"type":"string","minLength":1},"scenario_revision":{"type":"integer","minimum":1},"scenario_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"},"status":{"enum":["pass","fail","inconclusive","not_run"]},"evidence_refs":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},"payload":{"type":"object"},"receipt_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},"assessment":{"type":"object","additionalProperties":false,"required":["functional_status","security_status","correct_and_secure","evaluator_receipt_refs"],"properties":{"functional_status":{"enum":["pass","fail","inconclusive","not_run"]},"security_status":{"enum":["pass","fail","inconclusive","not_run"]},"correct_and_secure":{"type":"boolean"},"evaluator_receipt_refs":{"type":"array","minItems":2,"uniqueItems":true,"items":{"type":"string","minLength":1}}}},"claim":{"type":"object","additionalProperties":false,"required":["claim_id","statement","status","maturity","evidence_refs"],"properties":{"claim_id":{"type":"string","minLength":1},"statement":{"type":"string","minLength":1},"status":{"enum":["supported","rejected","unresolved"]},"maturity":{"enum":["observation","inference","incident","compromise","attribution"]},"evidence_refs":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/cyber_crucible_diagnostic_loop_v1.schema.json",
+  "title": "Symthaea Cyber Crucible Diagnostic Loop Report v1",
+  "description": "A non-authorizing, evidence-bound diagnostic-process record. The schema is not a cryptographic receipt verifier or qualification authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lane",
+    "non_authorizing",
+    "run",
+    "evidence",
+    "steps",
+    "hypotheses",
+    "proposals",
+    "evaluator_receipts",
+    "assessment",
+    "residual_uncertainty",
+    "final_claims",
+    "claim_maturity_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-crucible-diagnostic-loop.v1"
+    },
+    "lane": {
+      "const": "public_calibration"
+    },
+    "non_authorizing": {
+      "const": true
+    },
+    "run": {
+      "$ref": "#/$defs/run"
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 15,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    },
+    "proposals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/proposal"
+      }
+    },
+    "evaluator_receipts": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/receipt"
+      }
+    },
+    "assessment": {
+      "$ref": "#/$defs/assessment"
+    },
+    "residual_uncertainty": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "final_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "claim_maturity_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "revision",
+        "scenario_digest"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scenario_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "scenario",
+        "subject_id",
+        "execution_mode",
+        "evidence_class"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "scenario": {
+          "$ref": "#/$defs/scenario"
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "execution_mode": {
+          "enum": [
+            "real",
+            "simulated",
+            "not_run"
+          ]
+        },
+        "evidence_class": {
+          "enum": [
+            "synthetic_fixture",
+            "replay",
+            "range",
+            "digital_twin",
+            "hardware",
+            "production"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "basis",
+        "source",
+        "observed_at",
+        "payload",
+        "evidence_digest"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+        },
+        "basis": {
+          "enum": [
+            "direct",
+            "control_plane_record",
+            "derived",
+            "flow_derived"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload": {
+          "type": "object"
+        },
+        "evidence_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "phase": {
+      "enum": [
+        "orient",
+        "asset_identity_trust_boundaries",
+        "competing_hypotheses",
+        "evidence_gaps",
+        "next_bounded_observation",
+        "belief_update",
+        "impact_scope",
+        "claim_classification",
+        "containment_proposal",
+        "side_effect_prediction",
+        "authority_check",
+        "outcome_verification",
+        "recovery",
+        "residual_uncertainty",
+        "evidence_bearing_report"
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "step_id",
+        "phase",
+        "evidence_refs",
+        "receipt_refs",
+        "rationale",
+        "uncertainty_update"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "step_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "receipt_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_update": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_budget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "proposal_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "authority_status": {
+          "enum": [
+            "not_requested",
+            "denied",
+            "authorized",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "statement",
+        "status",
+        "supporting_evidence_refs",
+        "contradicting_evidence_refs"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "active",
+            "supported",
+            "rejected",
+            "unresolved"
+          ]
+        },
+        "supporting_evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "contradicting_evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_id",
+        "proposal_digest",
+        "action_class",
+        "status",
+        "scope",
+        "rationale",
+        "predicted_side_effects",
+        "recovery_obligations",
+        "evidence_refs"
+      ],
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_class": {
+          "enum": [
+            "bounded_observation",
+            "containment",
+            "eradication",
+            "recovery",
+            "escalation",
+            "none"
+          ]
+        },
+        "status": {
+          "enum": [
+            "proposed",
+            "approved",
+            "executed",
+            "rejected",
+            "not_authorized"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "predicted_side_effects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recovery_obligations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "authority_receipt_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposal_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "receipt_type",
+        "evaluator_id",
+        "scenario_id",
+        "scenario_revision",
+        "scenario_digest",
+        "status",
+        "evidence_refs",
+        "payload",
+        "receipt_digest"
+      ],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_type": {
+          "enum": [
+            "functional_verdict",
+            "security_verdict",
+            "authorization_decision",
+            "outcome_verification",
+            "recovery_verification"
+          ]
+        },
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scenario_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_run"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "payload": {
+          "type": "object"
+        },
+        "receipt_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "functional_status",
+        "security_status",
+        "correct_and_secure",
+        "evaluator_receipt_refs"
+      ],
+      "properties": {
+        "functional_status": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_run"
+          ]
+        },
+        "security_status": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_run"
+          ]
+        },
+        "correct_and_secure": {
+          "type": "boolean"
+        },
+        "evaluator_receipt_refs": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "statement",
+        "status",
+        "maturity",
+        "evidence_refs"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "supported",
+            "rejected",
+            "unresolved"
+          ]
+        },
+        "maturity": {
+          "enum": [
+            "observation",
+            "inference",
+            "incident",
+            "compromise",
+            "attribution"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
