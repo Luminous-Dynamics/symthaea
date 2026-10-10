@@ -41,15 +41,19 @@ includes; see the upstream [ngspice NEWS](https://github.com/imr/ngspice/blob/ma
 Actual execution must still pin a specific ngspice package/version and matching
 sourcepath policy.
 
-Construction fails closed for missing dependencies, duplicate paths, unused
-extra files, include cycles, malformed quoting, unsupported directive operand
-counts, unbalanced in-file `.lib`/`.endl` sections, and mismatched section
-names. File count, aggregate byte count, and include-directive count are
-bounded (256 files including primary, 32 MiB total, and 4,096 static include
-directives). The bundle exports canonical versioned manifest bytes with
-length-prefixed, domain-separated fields and sorted dependency paths; its
-manifest digest is BLAKE3 over those exact exported bytes. Verification checks
-the request identity, each file digest, closure, and manifest digest before use.
+Construction fails closed for missing dependencies, missing requested
+external library sections, duplicate paths, unused extra files, include cycles,
+malformed quoting, unsupported directive operand counts, unbalanced in-file
+`.lib`/`.endl` sections, and mismatched section names. External
+`.lib file section` requests now verify that the dependency actually declares
+the selected section, case-insensitively; a file that exists but lacks that
+corner/library section is rejected. File count, aggregate byte count, and
+include-directive count are bounded (256 files including primary, 32 MiB total,
+and 4,096 static include directives). The bundle exports canonical versioned
+manifest bytes with length-prefixed, domain-separated fields and sorted
+dependency paths; its manifest digest is BLAKE3 over those exact exported bytes.
+Verification checks the request identity, each file digest, closure, and
+manifest digest before use.
 
 This is **static include closure**, not a proof of full model closure or safe
 execution. The parser does not discover arbitrary data files, control-language
