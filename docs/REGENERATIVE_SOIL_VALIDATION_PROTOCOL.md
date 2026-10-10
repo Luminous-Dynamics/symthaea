@@ -156,6 +156,8 @@ Optional center-point controls are disabled or 3–5 per block. When enabled, ev
 
 The generated plan stores a full copy of the request, factor settings and units for every run, block ID, run order, factorial standard order, replicate index, seed and algorithm version. Identical input and algorithm versions are expected to produce the same schedule. The maximum design size is bounded at 1,100 runs.
 
+The generated plan also has a separate structural-verification function. It checks treatment/replicate cells, block completeness/order, coded and physical factor values, run IDs, and control-point placement; tampered or incomplete schedules fail closed. This is not an independently deployed verifier and does not authenticate the external review/evidence reference.
+
 **Limitations:** numerical-factor only; no fractional factorial generator, power/sample-size calculator, statistical response analysis, Bayesian update, automatic stop-rule engine, or field-trial authorization. The primary meaningful difference is not an effect estimate or power claim. Treat the output as a reviewed bench-scale schedule proposal; the experiment owner must separately approve operating conditions, worker/environmental safeguards, measurement-system capability, preregistered analysis and stopping rules. This planner does not authorize product release or soil application.
 
 ## Decision gates
