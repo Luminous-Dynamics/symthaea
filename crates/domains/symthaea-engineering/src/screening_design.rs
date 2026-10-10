@@ -168,6 +168,8 @@ pub enum BenchScaleReviewStatus {
 pub struct BenchScaleReview {
     pub status: BenchScaleReviewStatus,
     pub protocol_id: String,
+    /// Must match the exact request input snapshot containing levels and endpoint.
+    pub reviewed_input_snapshot_id: String,
     pub review_id: String,
     pub reviewer_role: String,
     pub evidence: EvidenceRef,
@@ -263,6 +265,16 @@ impl ScreeningDesignRequest {
 
         self.primary_endpoint.validate()?;
         nonempty(&self.bench_scale_review.protocol_id, "bench_scale_review.protocol_id")?;
+        nonempty(
+            &self.bench_scale_review.reviewed_input_snapshot_id,
+            "bench_scale_review.reviewed_input_snapshot_id",
+        )?;
+        if self.bench_scale_review.reviewed_input_snapshot_id != self.input_snapshot_id {
+            return Err(ScreeningDesignError::new(
+                "bench_scale_review.reviewed_input_snapshot_id",
+                "review must reference the exact input snapshot containing the factor ranges and endpoint",
+            ));
+        }
         nonempty(&self.bench_scale_review.review_id, "bench_scale_review.review_id")?;
         nonempty(&self.bench_scale_review.reviewer_role, "bench_scale_review.reviewer_role")?;
         evidence(&self.bench_scale_review.evidence, "bench_scale_review.evidence")?;
@@ -564,6 +576,7 @@ mod tests {
             bench_scale_review: BenchScaleReview {
                 status: BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol,
                 protocol_id: "bench-protocol-v1".into(),
+                reviewed_input_snapshot_id: "inputs-v1".into(),
                 review_id: "review-001".into(),
                 reviewer_role: "qualified laboratory safety reviewer".into(),
                 evidence: evidence("review-record-001", EvidenceKind::Measured),
@@ -659,6 +672,10 @@ mod tests {
 
         input = request();
         input.bench_scale_review.evidence.kind = EvidenceKind::Scenario;
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.bench_scale_review.reviewed_input_snapshot_id = "different-inputs".into();
         assert!(generate_screening_design(&input).is_err());
     }
 
