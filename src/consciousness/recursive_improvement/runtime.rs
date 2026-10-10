@@ -814,7 +814,7 @@ impl MagiLoopRuntime {
                     } else {
                         OutcomeCategory::SafeFailure
                     };
-                    let _ = model.model_mut().resolve_prediction(
+                    let _ = model.model_mut().resolve_prediction_from_unverified_observation(
                         &pred.prediction.id,
                         outcome,
                         1.0,

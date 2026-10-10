@@ -654,8 +654,13 @@ impl WorldGroundedSelfModel {
     // STEP 4: OBSERVE (Record outcomes)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Resolve a prediction with an observed outcome
-    pub fn resolve_prediction(
+    /// Apply an unverified observed outcome to the internal MAGI calibration state.
+    ///
+    /// This is a crate-private compatibility seam for the current runtime observer and
+    /// deterministic simulation. It does not validate `ResolutionAuthority`, authenticate
+    /// evidence, or prove that the observation occurred. Do not expose it as a production
+    /// trust boundary; verified-receipt admission is tracked in issue #7336.
+    pub(crate) fn resolve_prediction_from_unverified_observation(
         &mut self,
         prediction_id: &str,
         observed_outcome: OutcomeCategory,
@@ -699,6 +704,24 @@ impl WorldGroundedSelfModel {
         Some(was_correct)
     }
 
+    /// Inject a caller-provided outcome for the deterministic toy-world simulation only.
+    ///
+    /// This API exists only when the explicit `magi-simulation` feature is enabled. The
+    /// supplied outcome is unverified and will affect this model instance's calibration;
+    /// never enable this feature for a live model or qualification-grade evaluation.
+    #[cfg(feature = "magi-simulation")]
+    pub fn resolve_prediction_for_simulation(
+        &mut self,
+        prediction_id: &str,
+        simulated_outcome: OutcomeCategory,
+        simulation_confidence: f64,
+    ) -> Option<bool> {
+        self.resolve_prediction_from_unverified_observation(
+            prediction_id,
+            simulated_outcome,
+            simulation_confidence,
+        )
+    }
     /// Process expired predictions
     pub fn process_expired_predictions(&mut self) {
         if !self.config.auto_resolve_timeout {
@@ -1773,7 +1796,7 @@ mod tests {
         assert_eq!(model.pending_predictions().len(), 1);
 
         // Resolve the prediction
-        let was_correct = model.resolve_prediction(&prediction.id, OutcomeCategory::Success, 1.0);
+        let was_correct = model.resolve_prediction_from_unverified_observation(&prediction.id, OutcomeCategory::Success, 1.0);
 
         assert_eq!(was_correct, Some(true));
         assert_eq!(model.loop_state().predictions_resolved, 1);
@@ -1821,7 +1844,7 @@ mod tests {
         let prediction = model.predict("Will succeed", OutcomeCategory::Success, 0.9, action);
 
         // Resolve as failure
-        model.resolve_prediction(&prediction.id, OutcomeCategory::SafeFailure, 1.0);
+        model.resolve_prediction_from_unverified_observation(&prediction.id, OutcomeCategory::SafeFailure, 1.0);
 
         // Should have generated an attribution
         assert!(!model.recent_attributions().is_empty());

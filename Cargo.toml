@@ -802,6 +802,7 @@ full_consciousness = []                     # Extended consciousness submodules
 # consumers. Real vision: visual_features.rs, vision-manifold, art-eye.
 full_language = ["neural-bridge"]                          # Advanced language features (grammar, parsers) — candle deps via neural-bridge
 magi_loop = []                              # MAGI Loop world-grounded prediction
+magi-simulation = ["magi_loop"]              # Explicit opt-in for toy-world outcome injection demos
 # Unified reasoning engine: epistemic conflict, tool gating, temporal planning, counterfactual.
 # Subsumes former epistemic_conflict, conscious_tool_gate, temporal_planning, counterfactual features.
 reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
@@ -1730,7 +1731,7 @@ required-features = ["unstable-examples"]
 
 [[example]]
 name = "magi_simulation"
-required-features = ["magi_loop"]
+required-features = ["magi_loop", "magi-simulation"]
 
 [[example]]
 name = "magi_cli"
