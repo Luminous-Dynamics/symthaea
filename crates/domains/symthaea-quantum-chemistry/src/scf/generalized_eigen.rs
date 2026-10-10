@@ -146,9 +146,11 @@ pub struct CheckedGeneralizedEigenResult {
 pub struct ScfSolverDiagnostics {
     /// Count of successfully checked generalized eigen solves (initial guess plus SCF steps).
     pub generalized_eigensolve_count: usize,
-    /// Total Jacobi rotations across successful transformed-Fock eigensolves.
+    /// Total Jacobi rotations across successful transformed one-electron/Fock eigensolves,
+    /// including the initial core-Hamiltonian solve.
     pub total_jacobi_rotations: usize,
-    /// Largest absolute off-diagonal entry seen in any transformed Fock matrix (Hartree).
+    /// Largest absolute off-diagonal entry seen in any transformed core-Hamiltonian/Fock
+    /// matrix (Hartree), including the initial guess solve.
     pub max_transformed_off_diagonal_hartree: f64,
     /// Maximum residual for the transformed symmetric eigenproblem across all solves.
     pub max_transformed_eigenpair_residual: f64,
