@@ -759,6 +759,23 @@ mod tests {
         assert!(analyze_screening_responses(&plan, &data).is_err());
 
         data = observations(&plan);
+        data[0].actual_factor_settings[0].unit = "percent".into();
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].actual_factor_settings[0].factor_id = "unknown-factor".into();
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].actual_factor_settings[1].factor_id =
+            data[0].actual_factor_settings[0].factor_id.clone();
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].actual_factor_settings[0].value = f64::NAN;
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
         data[0].actual_factor_settings.pop();
         assert!(analyze_screening_responses(&plan, &data).is_err());
     }
