@@ -11,9 +11,13 @@
 
 use std::io::{Read, Stdio};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Child, Command};
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use super::OutcomeCategory;
 
@@ -46,9 +50,13 @@ pub struct ResolutionResult {
 
 const MAX_CAPTURED_OUTPUT_BYTES: usize = 64 * 1024;
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
+const PIPE_DRAIN_GRACE: Duration = Duration::from_millis(100);
+const POST_KILL_DRAIN_GRACE: Duration = Duration::from_millis(250);
+
+type CapturedOutput = (Vec<u8>, bool);
 
 /// Drain a child's pipe while retaining at most `limit` bytes.
-fn read_bounded<R: Read>(mut reader: R, limit: usize) -> (Vec<u8>, bool) {
+fn read_bounded<R: Read>(mut reader: R, limit: usize) -> CapturedOutput {
     let mut retained = Vec::with_capacity(limit.min(8 * 1024));
     let mut buffer = [0u8; 4096];
     let mut truncated = false;
@@ -70,27 +78,70 @@ fn read_bounded<R: Read>(mut reader: R, limit: usize) -> (Vec<u8>, bool) {
     (retained, truncated)
 }
 
-fn join_output(
-    handle: thread::JoinHandle<(Vec<u8>, bool)>,
-) -> (Vec<u8>, bool) {
-    handle.join().unwrap_or_default()
+fn spawn_output_reader<R: Read + Send + 'static>(
+    reader: R,
+) -> Receiver<CapturedOutput> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = sender.send(read_bounded(reader, MAX_CAPTURED_OUTPUT_BYTES));
+    });
+    receiver
+}
+
+fn receive_output(
+    receiver: &Receiver<CapturedOutput>,
+    timeout: Duration,
+) -> Option<CapturedOutput> {
+    receiver.recv_timeout(timeout).ok()
 }
 
 fn choose_output(
-    stdout: (Vec<u8>, bool),
-    stderr: (Vec<u8>, bool),
-) -> String {
-    let (bytes, truncated) = if !stdout.0.is_empty() {
+    stdout: Option<CapturedOutput>,
+    stderr: Option<CapturedOutput>,
+) -> Option<String> {
+    let use_stdout = stdout
+        .as_ref()
+        .is_some_and(|(bytes, _)| !bytes.is_empty());
+    let selected = if use_stdout {
         stdout
     } else {
-        stderr
-    };
+        stderr.or(stdout)
+    }?;
+    let (bytes, truncated) = selected;
     let mut text = String::from_utf8_lossy(&bytes).into_owned();
     if truncated {
         text.push_str("\n[output truncated at 65536 bytes]");
     }
-    text
+    Some(text)
 }
+
+/// Best-effort termination of a resolver command and its ordinary child processes.
+///
+/// On Unix, the resolver creates a new process group and signals the group, so shells and
+/// foreground/background children that remain in that group are terminated together. A process
+/// that deliberately escapes the group cannot be guaranteed to terminate; output draining below
+/// remains bounded and unresolved if such a process retains a pipe.
+fn terminate_process_group(child: &mut Child, process_group_id: u32) {
+    #[cfg(unix)]
+    unsafe {
+        let _ = libc::kill(-(process_group_id as libc::pid_t), libc::SIGKILL);
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[cfg(unix)]
+fn terminate_group_after_leader_exit(process_group_id: u32) {
+    // Called only when a reader has failed to observe EOF after the leader exited. An inherited
+    // pipe implies that another process still holds it open; on Unix that normally means the
+    // original process group still exists.
+    unsafe {
+        let _ = libc::kill(-(process_group_id as libc::pid_t), libc::SIGKILL);
+    }
+}
+
+#[cfg(not(unix))]
+fn terminate_group_after_leader_exit(_process_group_id: u32) {}
 
 /// Trait for concrete resolvers that check external reality.
 pub trait Resolver {
@@ -150,6 +201,8 @@ impl ExitCodeResolver {
         if let Some(ref dir) = self.working_dir {
             cmd.current_dir(dir);
         }
+        #[cfg(unix)]
+        cmd.process_group(0);
 
         let mut child = match cmd.spawn() {
             Ok(child) => child,
@@ -162,10 +215,10 @@ impl ExitCodeResolver {
                 };
             }
         };
+        let process_group_id = child.id();
 
         let Some(stdout) = child.stdout.take() else {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_process_group(&mut child, process_group_id);
             return ResolutionResult {
                 outcome: None,
                 disposition: ResolutionDisposition::Unclear,
@@ -174,8 +227,7 @@ impl ExitCodeResolver {
             };
         };
         let Some(stderr) = child.stderr.take() else {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_process_group(&mut child, process_group_id);
             return ResolutionResult {
                 outcome: None,
                 disposition: ResolutionDisposition::Unclear,
@@ -184,22 +236,21 @@ impl ExitCodeResolver {
             };
         };
 
-        let stdout_reader = thread::spawn(move || read_bounded(stdout, MAX_CAPTURED_OUTPUT_BYTES));
-        let stderr_reader = thread::spawn(move || read_bounded(stderr, MAX_CAPTURED_OUTPUT_BYTES));
+        let stdout_reader = spawn_output_reader(stdout);
+        let stderr_reader = spawn_output_reader(stderr);
         let started = Instant::now();
 
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break status,
                 Ok(None) if started.elapsed() >= timeout => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    let stdout = join_output(stdout_reader);
-                    let stderr = join_output(stderr_reader);
+                    terminate_process_group(&mut child, process_group_id);
+                    let stdout = receive_output(&stdout_reader, POST_KILL_DRAIN_GRACE);
+                    let stderr = receive_output(&stderr_reader, POST_KILL_DRAIN_GRACE);
                     return ResolutionResult {
                         outcome: None,
                         disposition: ResolutionDisposition::TimedOut,
-                        raw_output: Some(choose_output(stdout, stderr)),
+                        raw_output: choose_output(stdout, stderr),
                         reason: Some(format!(
                             "Command '{}' timed out after {:?}",
                             self.program, timeout
@@ -208,22 +259,47 @@ impl ExitCodeResolver {
                 }
                 Ok(None) => thread::sleep(POLL_INTERVAL),
                 Err(error) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    let stdout = join_output(stdout_reader);
-                    let stderr = join_output(stderr_reader);
+                    terminate_process_group(&mut child, process_group_id);
+                    let stdout = receive_output(&stdout_reader, POST_KILL_DRAIN_GRACE);
+                    let stderr = receive_output(&stderr_reader, POST_KILL_DRAIN_GRACE);
                     return ResolutionResult {
                         outcome: None,
                         disposition: ResolutionDisposition::Unclear,
-                        raw_output: Some(choose_output(stdout, stderr)),
-                        reason: Some(format!("Failed while waiting for '{}': {}", self.program, error)),
+                        raw_output: choose_output(stdout, stderr),
+                        reason: Some(format!(
+                            "Failed while waiting for '{}': {}",
+                            self.program, error
+                        )),
                     };
                 }
             }
         };
 
-        let stdout = join_output(stdout_reader);
-        let stderr = join_output(stderr_reader);
+        // A successfully exited shell may still leave a background process holding inherited
+        // stdout/stderr pipes. Do not let pipe draining outlive the resolver indefinitely.
+        let mut stdout = receive_output(&stdout_reader, PIPE_DRAIN_GRACE);
+        let mut stderr = receive_output(&stderr_reader, PIPE_DRAIN_GRACE);
+        if stdout.is_none() || stderr.is_none() {
+            terminate_group_after_leader_exit(process_group_id);
+            if stdout.is_none() {
+                stdout = receive_output(&stdout_reader, POST_KILL_DRAIN_GRACE);
+            }
+            if stderr.is_none() {
+                stderr = receive_output(&stderr_reader, POST_KILL_DRAIN_GRACE);
+            }
+        }
+        if stdout.is_none() || stderr.is_none() {
+            return ResolutionResult {
+                outcome: None,
+                disposition: ResolutionDisposition::Unclear,
+                raw_output: choose_output(stdout, stderr),
+                reason: Some(
+                    "Child exited but resolver output streams remained open; outcome is unresolved"
+                        .to_string(),
+                ),
+            };
+        }
+
         let raw = choose_output(stdout, stderr);
         let code = status.code().unwrap_or(-1);
 
@@ -231,14 +307,14 @@ impl ExitCodeResolver {
             ResolutionResult {
                 outcome: Some(OutcomeCategory::Success),
                 disposition: ResolutionDisposition::Observed,
-                raw_output: Some(raw),
+                raw_output: raw,
                 reason: None,
             }
         } else {
             ResolutionResult {
                 outcome: Some(OutcomeCategory::SafeFailure),
                 disposition: ResolutionDisposition::Observed,
-                raw_output: Some(raw),
+                raw_output: raw,
                 reason: Some(format!(
                     "Exit code {} not in expected {:?}",
                     code, self.expected_codes
