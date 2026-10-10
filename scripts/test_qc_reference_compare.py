@@ -287,7 +287,6 @@ class QcReferenceCompareTests(unittest.TestCase):
                     qc.load_input(path)
 
     def test_source_binding_requires_current_head_and_clean_worktree(self):
-    def test_source_binding_requires_current_head_and_clean_worktree(self):
         source_revision = "0123456789abcdef0123456789abcdef01234567"
         source_tree = "89abcdef0123456789abcdef0123456789abcdef"
         with patch.object(
