@@ -319,6 +319,8 @@ impl CognitiveLoopService {
         let primitive_validation_phi_gain = subsystem_metrics.primitive_validation_phi_gain;
         let primitive_validation_p_value = subsystem_metrics.primitive_validation_p_value;
         let meta_reasoning_confidence = subsystem_metrics.meta_reasoning_confidence;
+        let meta_reasoning_counterfactual_lr_boost =
+            subsystem_metrics.meta_reasoning_counterfactual_lr_boost;
         let meta_reasoning_insights = subsystem_metrics.meta_reasoning_insights;
         let code_primitives_selected = subsystem_metrics.code_primitives_selected;
         let empathic_compassion = subsystem_metrics.empathic_compassion;
@@ -1985,6 +1987,7 @@ impl CognitiveLoopService {
                 epistemic_gate_confidence,
                 epistemic_gate_approved,
                 meta_reasoning_confidence,
+                meta_reasoning_counterfactual_lr_boost,
                 meta_reasoning_insights,
                 code_primitives_selected,
             },

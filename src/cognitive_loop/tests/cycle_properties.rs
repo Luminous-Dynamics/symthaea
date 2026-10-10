@@ -274,6 +274,10 @@ fn test_cycle_metadata_floats_finite() {
             "primitive_validation_p_value",
         );
         assert_finite(m.meta_reasoning_confidence, "meta_reasoning_confidence");
+        assert_finite_f32(
+            m.meta_reasoning_counterfactual_lr_boost,
+            "meta_reasoning_counterfactual_lr_boost",
+        );
         assert_finite_f32(m.negation_polarity, "negation_polarity");
         assert_finite_f32(m.ethics.moral_score, "moral_score");
         assert_finite_f32(m.actual_effective_lr, "actual_effective_lr");
