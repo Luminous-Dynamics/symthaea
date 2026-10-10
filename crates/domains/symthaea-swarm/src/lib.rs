@@ -799,6 +799,22 @@ mod domain_tests {
     }
 }
 
+pub mod semantic_admission;
+pub mod semantic_canonical;
+pub mod semantic_commit;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_digest;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_transition;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_evidence_digest;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_evidence_history;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_evidence_anchor;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_evidence_vds;
+
 pub mod fault;
 #[cfg(feature = "networking")]
 pub mod networking;
