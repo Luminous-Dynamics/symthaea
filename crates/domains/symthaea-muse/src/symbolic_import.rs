@@ -355,13 +355,15 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
                 let rest = child.children().any(|node| node.has_tag_name("rest"));
                 let onset = if chord { previous_onset } else { cursor };
-                if !rest && let Some(midi) = musicxml_pitch(child) {
-                    if raw.len() >= MAX_IMPORTED_NOTES {
-                        return Err(format!(
-                            "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
-                        ));
+                if !rest {
+                    if let Some(midi) = musicxml_pitch(child)? {
+                        if raw.len() >= MAX_IMPORTED_NOTES {
+                            return Err(format!(
+                                "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
+                            ));
+                        }
+                        raw.push((part_index, midi, onset, duration));
                     }
-                    raw.push((part_index, midi, onset, duration));
                 }
                 previous_onset = onset;
                 if !chord {
@@ -483,37 +485,52 @@ fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
 }
 
-fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Option<u8> {
-    let pitch = note.children().find(|node| node.has_tag_name("pitch"))?;
+fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<Option<u8>, String> {
+    // Unpitched percussion may have no <pitch> element and remains outside
+    // this first pitched-note importer. Once a <pitch> element is present,
+    // however, malformed or unsupported values must not silently become a
+    // different valid MIDI pitch (or disappear from the imported score).
+    let Some(pitch) = note.children().find(|node| node.has_tag_name("pitch")) else {
+        return Ok(None);
+    };
     let step = pitch
         .children()
-        .find(|node| node.has_tag_name("step"))?
-        .text()?;
+        .find(|node| node.has_tag_name("step"))
+        .and_then(|node| node.text())
+        .ok_or_else(|| "MusicXML pitched note is missing its pitch step".to_string())?;
     let base = match step.trim() {
-        "C" => 0,
-        "D" => 2,
-        "E" => 4,
-        "F" => 5,
-        "G" => 7,
-        "A" => 9,
-        "B" => 11,
-        _ => return None,
+        "C" => 0_i64,
+        "D" => 2_i64,
+        "E" => 4_i64,
+        "F" => 5_i64,
+        "G" => 7_i64,
+        "A" => 9_i64,
+        "B" => 11_i64,
+        _ => return Err(format!("MusicXML pitch step is invalid: {step:?}")),
     };
-    let alter = pitch
-        .children()
-        .find(|node| node.has_tag_name("alter"))
-        .and_then(node_i64)
-        .unwrap_or(0);
+    let alter = match pitch.children().find(|node| node.has_tag_name("alter")) {
+        Some(node) => node_i64(node).ok_or_else(|| {
+            "MusicXML pitch alteration must be an integer semitone value".to_string()
+        })?,
+        None => 0,
+    };
     let octave = pitch
         .children()
         .find(|node| node.has_tag_name("octave"))
-        .and_then(node_i64)?;
+        .and_then(node_i64)
+        .ok_or_else(|| "MusicXML pitched note is missing a valid octave".to_string())?;
     let midi = octave
-        .checked_add(1)?
-        .checked_mul(12)?
-        .checked_add(base)?
-        .checked_add(alter)?;
-    Some(midi.clamp(0, 127) as u8)
+        .checked_add(1)
+        .and_then(|value| value.checked_mul(12))
+        .and_then(|value| value.checked_add(base))
+        .and_then(|value| value.checked_add(alter))
+        .ok_or_else(|| "MusicXML pitch number overflowed".to_string())?;
+    if !(0..=127).contains(&midi) {
+        return Err(format!(
+            "MusicXML pitch {midi} is outside the MIDI pitch range 0..=127"
+        ));
+    }
+    Ok(Some(midi as u8))
 }
 
 pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
@@ -718,6 +735,26 @@ mod tests {
         let bytes = serde_json::to_vec(&score).unwrap();
         let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
         assert!(error.contains("unrepresentable exact end"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_pitch_above_midi_range_is_rejected_instead_of_clipped() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>10</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("outside the MIDI pitch range 0..=127"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_fractional_pitch_alteration_is_rejected_explicitly() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><alter>0.5</alter><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("integer semitone value"), "{error}");
     }
 
     #[test]
