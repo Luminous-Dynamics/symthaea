@@ -13,7 +13,7 @@ Ultrasound is the first use case, but calibrated measurements are cross-cutting.
 Each measurement binds:
 
 - instrument and channel identifiers (not patient identity);
-- monotonically sequenced acquisition and a timestamp in a documented clock domain;
+- monotonically sequenced acquisition, a monotonic timestamp, and an explicit `ClockDomainId` naming the clock origin/epoch;
 - explicit quantity and unit, checked for dimensional compatibility;
 - finite value and non-negative standard uncertainty in the declared unit;
 - a version/digest identifying the processing chain;
@@ -26,7 +26,7 @@ The initial unit set covers common engineering signals and research-healthcare p
 
 The strict assessment checks sequence/time ordering using a caller-maintained `MeasurementStreamGuard` and rejects:
 
-- future-dated or stale data;
+- mismatched clock-domain context, future-dated or stale data;
 - any declared quality flag (saturation, motion artifact, lead-off, missing samples, unsynchronized clock, failed self-test, out-of-range values, unknown signal quality, etc.);
 - missing raw-data or calibration references;
 - raw acquisition bytes that cannot be resolved, are empty, or do not match the envelope's artifact ID/digest;
@@ -41,13 +41,13 @@ Measurement and calibration standard uncertainties are reported separately. The 
 
 ## Stream ordering
 
-`MeasurementStreamGuard` keeps the highest consumed sequence and the last accepted non-future timestamp per instrument/channel. Repeated or lower sequences are rejected without changing state. A newer sequence with a backward or future timestamp is consumed, but the last accepted timestamp remains unchanged; retrying that sequence cannot turn the rejected sample into an accepted replay, and a future-dated sample cannot poison the timestamp high-water mark. Callers must supply timestamps from a documented, appropriately synchronized clock domain; the guard is not a clock synchronization service. The quantitative-use API requires the guard and advances its sequence state as soon as an envelope reaches the gate—even if subsequent quality or calibration-evidence checks reject it. This is intentionally conservative and means the source must send a new sequence after any rejection. The guard is in-memory, not a tamper-proof replay ledger; safety-sensitive deployments must persist/reconcile stream checkpoints across restarts and authenticate the source.
+`MeasurementStreamGuard` keeps the highest consumed sequence and the last accepted non-future timestamp per instrument/channel. Repeated or lower sequences are rejected without changing state. A newer sequence with a backward or future timestamp is consumed, but the last accepted timestamp remains unchanged; retrying that sequence cannot turn the rejected sample into an accepted replay, and a future-dated sample cannot poison the timestamp high-water mark. Every envelope carries a `ClockDomainId`; the gate requires the caller's current-time reference to use the exact same ID, so monotonic values are not compared across unrelated clock origins. A reboot/reset should get a new clock-domain ID. Callers must use documented, appropriately synchronized clock sources; the ID check is not a clock synchronization service. The quantitative-use API requires the guard and advances its sequence state as soon as an envelope reaches the gate—even if subsequent quality or calibration-evidence checks reject it. This is intentionally conservative and means the source must send a new sequence after any rejection. The guard is in-memory, not a tamper-proof replay ledger; safety-sensitive deployments must persist/reconcile stream checkpoints across restarts and authenticate the source.
 
 ## Validation strategy
 
 1. Unit tests reject bad dimensions, non-finite values, negative uncertainty, malformed identifiers and digests.
 2. Gate tests exercise freshness, quality flags, absent provenance, missing/unresolved calibration, mismatched evidence, wrong units, validity windows and uncertainty limits.
-3. Raw-evidence tests exercise empty artifacts, unresolved acquisition bytes and artifact-ID/digest mismatch; calibration tests exercise certificate/review separation and applicability.
+3. Clock-domain tests verify mismatched domains fail before consuming stream state. Raw-evidence tests exercise empty artifacts, unresolved acquisition bytes and artifact-ID/digest mismatch; calibration tests exercise certificate/review separation and applicability.
 4. Stream tests exercise duplicate/replayed sequence numbers, time reversal and rejection of future timestamps without poisoning the accepted timestamp floor.
 5. In the next integration step, connect this contract to synthetic biomedical signals and ultrasound simulator output, then use independently generated raw-acquisition and calibration-review fixtures. The current crate does not acquire hardware or claim a clinical use is safe.
 
