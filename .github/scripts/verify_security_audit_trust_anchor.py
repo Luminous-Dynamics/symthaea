@@ -250,6 +250,9 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
         raise VerificationError("verdict does not record a successful workflow-security lane")
 
     workflow_ref = verdict.get("workflow_ref")
+    run_workflow_path = run.get("path")
+    if not isinstance(run_workflow_path, str) or workflow_ref != f"{repo}/{run_workflow_path}":
+        raise VerificationError("verdict workflow_ref differs from the authoritative run workflow path/ref")
     expected_ref_prefix = f"{repo}/{policy['workflow_path']}@"
     if not isinstance(workflow_ref, str) or not workflow_ref.startswith(expected_ref_prefix):
         raise VerificationError("verdict workflow_ref does not name the policy-expected caller workflow")
