@@ -177,13 +177,13 @@ def require_ready_event(path: Path, pr_block: list[str]) -> None:
             f"{path}: runner-capable pull_request workflow must declare exactly one "
             "inline pull_request.types list including ready_for_review"
         )
-    match = re.fullmatch(r"    types:\\s*\\[([^\\]]*)\\]\\s*(?:#.*)?", type_lines[0])
+    match = re.fullmatch(r"    types:\s*\[([^\]]*)\]\s*(?:#.*)?", type_lines[0])
     if match is None:
         raise SafetyError(
             f"{path}: pull_request.types must use the supported inline list form"
         )
     event_types = {
-        item.strip().strip("\\\"'").strip()
+        item.strip().strip("'\"").strip()
         for item in match.group(1).split(",")
         if item.strip()
     }
@@ -322,7 +322,7 @@ jobs:
     # A path or comment containing the event token is not an event trigger.
     disguised = safe.replace(
         "types: [opened, synchronize, reopened, ready_for_review]",
-        "types: [opened, synchronize, reopened]\\n    paths:\\n      - ready_for_review.yml",
+        "types: [opened, synchronize, reopened]\n    paths:\n      - ready_for_review.yml",
     )
     try:
         validate_generic(
