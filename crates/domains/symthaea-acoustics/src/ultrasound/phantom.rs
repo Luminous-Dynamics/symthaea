@@ -29,6 +29,9 @@ pub enum PhantomError {
     EchoOutsideTrace,
     SampleBudgetZero,
     SampleCountExceedsBudget,
+    WorkBudgetZero,
+    SampleReflectorProductsExceedBudget,
+    WorkCountOverflow,
     DerivedValueNonFinite(&'static str),
     SerializationSizeOverflow,
     AllocationFailed,
@@ -53,6 +56,13 @@ impl fmt::Display for PhantomError {
             Self::SampleCountExceedsBudget => {
                 write!(f, "requested trace exceeds the caller-supplied sample budget")
             }
+            Self::WorkBudgetZero => {
+                write!(f, "max_sample_reflector_products must be greater than zero")
+            }
+            Self::SampleReflectorProductsExceedBudget => {
+                write!(f, "trace generation exceeds the caller-supplied work budget")
+            }
+            Self::WorkCountOverflow => write!(f, "sample-reflector work count overflowed"),
             Self::DerivedValueNonFinite(name) => {
                 write!(f, "derived value {name} is not finite")
             }
@@ -156,10 +166,11 @@ impl PointReflectorPhantom {
 
     /// Generate a deterministic synthetic RF trace and retain analytic echo truth.
     ///
-    /// `duration_s` and `sample_rate_hz` are explicit. `max_samples` is a required
-    /// resource budget; requests exceeding it fail before allocating the sample
-    /// buffer. The sample rate must meet 2 * center frequency, a necessary but
-    /// not sufficient condition for a pulse with nonzero bandwidth.
+    /// `duration_s` and `sample_rate_hz` are explicit. `max_samples` bounds the
+    /// sample buffer, while `max_sample_reflector_products` bounds the nested
+    /// sample-by-reflector synthesis loop. Both limits are checked before large
+    /// allocations or sample generation. The sample rate must meet 2 * center
+    /// frequency, a necessary but not sufficient condition for a broadband pulse.
     pub fn simulate_rf_trace(
         &self,
         center_frequency_hz: f64,
@@ -167,6 +178,7 @@ impl PointReflectorPhantom {
         pulse_cycles: f64,
         duration_s: f64,
         max_samples: usize,
+        max_sample_reflector_products: usize,
     ) -> Result<SyntheticRfTrace, PhantomError> {
         positive_finite(center_frequency_hz, "center_frequency_hz")?;
         positive_finite(sample_rate_hz, "sample_rate_hz")?;
@@ -199,6 +211,16 @@ impl PointReflectorPhantom {
         }
         let sample_count = requested_samples as usize;
 
+        if max_sample_reflector_products == 0 {
+            return Err(PhantomError::WorkBudgetZero);
+        }
+        let sample_reflector_products = sample_count
+            .checked_mul(self.reflectors.len())
+            .ok_or(PhantomError::WorkCountOverflow)?;
+        if sample_reflector_products > max_sample_reflector_products {
+            return Err(PhantomError::SampleReflectorProductsExceedBudget);
+        }
+
         let sigma_s = pulse_cycles / (2.0 * center_frequency_hz);
         let phase_scale = TAU * center_frequency_hz;
         if !sigma_s.is_finite()
@@ -209,7 +231,10 @@ impl PointReflectorPhantom {
             return Err(PhantomError::DerivedValueNonFinite("pulse_shape_parameters"));
         }
 
-        let mut expected_echoes = Vec::with_capacity(self.reflectors.len());
+        let mut expected_echoes = Vec::new();
+        expected_echoes
+            .try_reserve_exact(self.reflectors.len())
+            .map_err(|_| PhantomError::AllocationFailed)?;
         for reflector in &self.reflectors {
             let arrival_time_s = self.echo_time_s(reflector.depth_m)?;
             if arrival_time_s >= duration_s {
@@ -432,10 +457,10 @@ mod tests {
     fn synthetic_trace_is_deterministic_and_retains_analytic_truth() {
         let phantom = single_reflector_phantom();
         let first = phantom
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
             .unwrap();
         let second = phantom
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
             .unwrap();
 
         assert_eq!(first, second);
@@ -461,7 +486,7 @@ mod tests {
     fn canonical_bytes_bind_parameters_ground_truth_and_samples_deterministically() {
         let phantom = single_reflector_phantom();
         let trace = phantom
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
             .unwrap();
         let first = trace.canonical_bytes().unwrap();
         let second = trace.canonical_bytes().unwrap();
@@ -476,7 +501,7 @@ mod tests {
         )
         .unwrap();
         let changed_trace = changed_reflector
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
             .unwrap();
         assert_ne!(first, changed_trace.canonical_bytes().unwrap());
 
@@ -491,10 +516,10 @@ mod tests {
         )
         .unwrap();
         let positive_trace = positive_zero
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
             .unwrap();
         let negative_trace = negative_zero
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
             .unwrap();
         assert_eq!(
             positive_trace.canonical_bytes().unwrap(),
@@ -510,12 +535,48 @@ mod tests {
         let second = PointReflectorPhantom::new(1_540.0, vec![b, a]).unwrap();
 
         let trace_a = first
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 40e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 40e-6, 1_000, 10_000)
             .unwrap();
         let trace_b = second
-            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 40e-6, 1_000)
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 40e-6, 1_000, 10_000)
             .unwrap();
         assert_eq!(trace_a, trace_b);
+    }
+
+    #[test]
+    fn enforces_the_sample_reflector_work_budget_before_synthesis() {
+        let phantom = PointReflectorPhantom::new(
+            1_540.0,
+            vec![
+                PointReflector::new(0.01, 0.5).unwrap(),
+                PointReflector::new(0.02, 0.25).unwrap(),
+            ],
+        )
+        .unwrap();
+
+        // 500 samples times two reflectors = 1,000 synthesis operations.
+        assert_eq!(
+            phantom.simulate_rf_trace(
+                5_000_000.0,
+                20_000_000.0,
+                2.0,
+                25e-6,
+                1_000,
+                999,
+            ),
+            Err(PhantomError::SampleReflectorProductsExceedBudget)
+        );
+        assert_eq!(
+            phantom.simulate_rf_trace(
+                5_000_000.0,
+                20_000_000.0,
+                2.0,
+                25e-6,
+                1_000,
+                0,
+            ),
+            Err(PhantomError::WorkBudgetZero)
+        );
     }
 
     #[test]
@@ -542,19 +603,19 @@ mod tests {
     fn fail_closed_on_nyquist_window_budget_and_non_finite_parameters() {
         let phantom = single_reflector_phantom();
         assert_eq!(
-            phantom.simulate_rf_trace(5_000_000.0, 9_000_000.0, 2.0, 25e-6, 1_000),
+            phantom.simulate_rf_trace(5_000_000.0, 9_000_000.0, 2.0, 25e-6, 1_000, 10_000),
             Err(PhantomError::SampleRateBelowNyquist)
         );
         assert_eq!(
-            phantom.simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 100),
+            phantom.simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 100, 10_000),
             Err(PhantomError::SampleCountExceedsBudget)
         );
         assert_eq!(
-            phantom.simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 10e-6, 1_000),
+            phantom.simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 10e-6, 1_000, 10_000),
             Err(PhantomError::EchoOutsideTrace)
         );
         assert_eq!(
-            phantom.simulate_rf_trace(5_000_000.0, f64::INFINITY, 2.0, 25e-6, 1_000),
+            phantom.simulate_rf_trace(5_000_000.0, f64::INFINITY, 2.0, 25e-6, 1_000, 10_000),
             Err(PhantomError::NonFinite("sample_rate_hz"))
         );
     }
