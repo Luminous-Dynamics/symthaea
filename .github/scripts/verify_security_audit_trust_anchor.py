@@ -458,6 +458,8 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
     except Exception as exc:
         raise VerificationError(f"verdict artifact ZIP/JSON is invalid: {type(exc).__name__}: {exc}") from exc
     validate_verdict(verdict, repo, policy, run, expected_pr_number)
+    workflow_sha = sha(verdict.get("workflow_sha"), "verdict.workflow_sha")
+    check_blob(repo, policy["workflow_path"], workflow_sha, policy["workflow_blob"], token)
 
 
 def verifier_tests_passed(outcome: Any) -> bool:
