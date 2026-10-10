@@ -69,6 +69,17 @@ pub struct ResolvedCodePrediction {
     pub brier_score: f64,
 }
 
+/// Outcome of resolving a code-generation prediction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodePredictionResolution {
+    /// Compilation/test evidence was available and the prediction was scored.
+    Resolved { was_correct: bool },
+    /// Compilation succeeded, but no test result is available yet; the prediction remains pending.
+    AwaitingTests,
+    /// No pending prediction matched the supplied identifier.
+    UnknownPrediction,
+}
+
 /// Running statistics on code prediction accuracy.
 #[derive(Debug, Clone, Default)]
 pub struct CodePredictionStats {
@@ -158,30 +169,51 @@ impl MagiCodeBridge {
         prediction_id
     }
 
-    /// Resolve a pending prediction with the actual outcome.
+    /// Compatibility wrapper returning `Some(was_correct)` only when the prediction was scored.
     ///
-    /// Call this AFTER compilation/testing. Updates statistics and
-    /// returns whether the prediction was correct.
-    ///
-    /// # Arguments
-    /// * `prediction_id` — ID returned from `predict_generation()`
-    /// * `compiled` — Whether the code compiled successfully
-    /// * `tests_passed` — Whether all tests passed (None if no tests run)
+    /// Returns `None` both for an unknown prediction ID and while successful compilation awaits
+    /// its test result. Use `resolve_prediction_with_status` when those states must be distinguished.
     pub fn resolve_prediction(
         &mut self,
         prediction_id: &str,
         compiled: bool,
         tests_passed: Option<bool>,
     ) -> Option<bool> {
-        // Find and remove the pending prediction
-        let idx = self
+        match self.resolve_prediction_with_status(prediction_id, compiled, tests_passed) {
+            CodePredictionResolution::Resolved { was_correct } => Some(was_correct),
+            CodePredictionResolution::AwaitingTests | CodePredictionResolution::UnknownPrediction => {
+                None
+            }
+        }
+    }
+
+    /// Resolve a pending prediction only when evidence is sufficient to classify the stated task.
+    ///
+    /// A compile success with `tests_passed: None` is not treated as overall success: the
+    /// prediction remains pending with no calibration/statistics update so a later test result can
+    /// resolve it. A compile failure is an observed failure even if tests could not run.
+    pub fn resolve_prediction_with_status(
+        &mut self,
+        prediction_id: &str,
+        compiled: bool,
+        tests_passed: Option<bool>,
+    ) -> CodePredictionResolution {
+        let Some(idx) = self
             .pending
             .iter()
-            .position(|p| p.prediction.id == prediction_id)?;
+            .position(|p| p.prediction.id == prediction_id)
+        else {
+            return CodePredictionResolution::UnknownPrediction;
+        };
+
+        if compiled && tests_passed.is_none() {
+            return CodePredictionResolution::AwaitingTests;
+        }
+
         let mut pending = self.pending.remove(idx);
 
-        // Determine actual outcome
-        let actual_outcome = if compiled && tests_passed.unwrap_or(true) {
+        // Determine actual outcome only after an observed test result or a compile failure.
+        let actual_outcome = if compiled && tests_passed == Some(true) {
             OutcomeCategory::Success
         } else if compiled && tests_passed == Some(false) {
             OutcomeCategory::Partial
@@ -239,7 +271,7 @@ impl MagiCodeBridge {
             }
         }
 
-        Some(was_correct)
+        CodePredictionResolution::Resolved { was_correct }
     }
 
     /// Get adjusted confidence for a code generation attempt.
@@ -347,6 +379,42 @@ mod tests {
         let was_correct = bridge.resolve_prediction(&pred_id, false, None);
         assert_eq!(was_correct, Some(false)); // Predicted success (0.9), got failure
         assert_eq!(bridge.stats().correct_predictions, 0);
+    }
+
+    #[test]
+    fn missing_test_result_does_not_count_as_success_or_consume_prediction() {
+        let mut bridge = MagiCodeBridge::new();
+        let prediction_id =
+            bridge.predict_generation("sort", "CodeGenerator", 0.9, "code will compile and pass tests");
+
+        let pending = bridge.resolve_prediction_with_status(&prediction_id, true, None);
+        assert_eq!(pending, CodePredictionResolution::AwaitingTests);
+        assert_eq!(bridge.pending_count(), 1);
+        assert_eq!(bridge.stats().total_predictions, 0);
+        assert_eq!(bridge.resolve_prediction(&prediction_id, true, None), None);
+        assert_eq!(bridge.stats().total_predictions, 0);
+
+        let resolved = bridge.resolve_prediction_with_status(&prediction_id, true, Some(true));
+        assert_eq!(
+            resolved,
+            CodePredictionResolution::Resolved { was_correct: true }
+        );
+        assert_eq!(bridge.pending_count(), 0);
+        assert_eq!(bridge.stats().total_predictions, 1);
+    }
+
+    #[test]
+    fn compile_failure_can_be_resolved_without_test_execution() {
+        let mut bridge = MagiCodeBridge::new();
+        let prediction_id =
+            bridge.predict_generation("broken", "CodeGenerator", 0.9, "code will compile");
+
+        assert_eq!(
+            bridge.resolve_prediction_with_status(&prediction_id, false, None),
+            CodePredictionResolution::Resolved { was_correct: false }
+        );
+        assert_eq!(bridge.pending_count(), 0);
+        assert_eq!(bridge.stats().total_predictions, 1);
     }
 
     #[test]
