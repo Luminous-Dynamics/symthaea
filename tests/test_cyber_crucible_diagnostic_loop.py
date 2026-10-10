@@ -109,6 +109,18 @@ class DiagnosticLoopContractTests(unittest.TestCase):
         errors = VALIDATOR.validate_report(report)
         self.assertTrue(any("supported claim must cite evidence" in error for error in errors), errors)
 
+    def test_assessment_must_reference_actual_security_receipt(self):
+        report = self.changed()
+        report["assessment"]["evaluator_receipt_refs"] = ["R-FUNCTIONAL"]
+        errors = VALIDATOR.validate_report(report)
+        self.assertTrue(any("actual security_verdict receipt" in error for error in errors), errors)
+
+    def test_assessment_status_must_match_bound_receipt(self):
+        report = self.changed()
+        report["assessment"]["security_status"] = "pass"
+        errors = VALIDATOR.validate_report(report)
+        self.assertTrue(any("security_status must match" in error for error in errors), errors)
+
     def test_malformed_untrusted_values_fail_closed_without_traceback(self):
         report = self.changed()
         report["run"]["execution_mode"] = []
