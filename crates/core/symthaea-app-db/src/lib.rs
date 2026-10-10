@@ -134,6 +134,8 @@ pub enum InstallSource {
         license_attrs: &'static [&'static str],
         platforms: &'static [&'static str],
         runtime_packages: &'static [&'static str],
+        /// Freedesktop application ID for optional desktop/MIME integration.
+        desktop_id: Option<&'static str>,
     },
 }
 
@@ -989,6 +991,7 @@ static APPS: &[AppEntry] = &[
                 "libglvnd",
                 "mesa",
             ],
+            desktop_id: Some("ai.storyteller.photocraft"),
         },
         "upstream:PhotoCraft@v0.5.0#sha256:f54d863807053bbdfcffa0d624ef7e49d3fd41310c7bb1ede48536f69929d22f",
         "PhotoCraft", AppCategory::Creative2D, false,
@@ -1806,6 +1809,7 @@ mod tests {
                 license_attrs,
                 platforms,
                 runtime_packages,
+                desktop_id,
             } => {
                 assert_eq!(version, "0.5.0");
                 assert_eq!(
@@ -1816,6 +1820,7 @@ mod tests {
                 assert_eq!(homepage, "https://getartcraft.com/apps/photocraft");
                 assert_eq!(license_attrs, &["mit", "asl20"][..]);
                 assert_eq!(platforms, &["x86_64-linux"][..]);
+                assert_eq!(desktop_id, Some("ai.storyteller.photocraft"));
                 for package in [
                     "libxkbcommon",
                     "libx11",
