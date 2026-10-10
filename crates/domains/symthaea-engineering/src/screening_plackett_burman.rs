@@ -4,7 +4,8 @@
 //! Bounded 12-run Plackett–Burman main-effect screening.
 //!
 //! This design family reduces the treatment matrix from 2^k full-factorial combinations to
-//! 12 rows for 5–11 factors, where screening savings are meaningful and factor selection is the goal. It is a screening proposal only: main effects can be confounded
+//! 12 rows for 5–11 factors, where screening savings are meaningful and factor selection
+//! is the goal. It is a screening proposal only: main effects can be confounded
 //! with two-factor interactions, so do not use it when those interactions may be material.
 //! It deliberately has its own verifier and descriptive main-effect analysis; the full-factorial
 //! analysis and power formula must not be applied to these rows.
@@ -73,7 +74,10 @@ impl PlackettBurmanDesignRequest {
         if !(MIN_FACTORS..=MAX_FACTORS).contains(&self.factors.len()) {
             return Err(ScreeningDesignError::new(
                 "factors",
-                "12-run Plackett–Burman screening is reserved for 5 to 11 quantitative factors; use a full factorial for smaller factor sets",
+                concat!(
+                    "12-run Plackett–Burman screening is reserved for 5 to 11 quantitative ",
+                    "factors; use a full factorial for smaller factor sets"
+                ),
             ));
         }
         let mut factor_ids = HashSet::new();
