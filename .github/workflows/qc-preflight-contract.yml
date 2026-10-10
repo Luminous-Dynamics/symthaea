@@ -1,0 +1,37 @@
+name: QC Request Preflight Contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/request.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/lib.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/basis/**"
+      - ".github/workflows/qc-preflight-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/request.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/lib.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/basis/**"
+      - ".github/workflows/qc-preflight-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  request-preflight:
+    name: Run request validation tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master at 2026-10-09
+        with:
+          toolchain: 1.96.0
+
+      - name: Test QC request preflight
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib request::tests
