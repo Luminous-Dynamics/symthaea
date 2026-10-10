@@ -348,13 +348,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
         ));
     }
-    let mut fifths = 0_i32;
-    let mut minor = false;
-    let mut seen_key = None::<(i32, bool)>;
-    let mut meter = 4_u8;
-    let mut seen_meter = None::<u8>;
-    let mut tempo = 120.0_f32;
-    let mut seen_tempo = None::<f32>;
+    // Collect metadata before reducing it to Score's single-value fields.
+    // Part traversal order is not musical order across the whole score.
+    let mut key_events = Vec::<(Duration, (i32, bool))>::new();
+    let mut meter_events = Vec::<(Duration, u8)>::new();
+    let mut tempo_events = Vec::<(Duration, f32)>::new();
     let mut raw = Vec::<(usize, u8, Duration, Duration)>::new();
 
     for (part_index, part) in parts.iter().enumerate() {
@@ -372,9 +370,6 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 }
                 divisions = value;
             } else if child.has_tag_name("key") {
-                // The Score contract carries one key signature. Reject later
-                // changes rather than analyzing/rendering the work in the
-                // final key from the file.
                 let key_fifths = child
                     .children()
                     .find(|node| node.has_tag_name("fifths"))
@@ -398,15 +393,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                         }
                     },
                 };
-                let signature = (key_fifths as i32, key_minor);
-                if seen_key.is_some_and(|previous| previous != signature) {
-                    return Err(
-                        "MusicXML key changes cannot be represented by a single-key Score".into(),
-                    );
-                }
-                seen_key = Some(signature);
-                fifths = signature.0;
-                minor = signature.1;
+                key_events.push((cursor, (key_fifths as i32, key_minor)));
             } else if child.has_tag_name("time") {
                 // Score::time_signature() interprets meter as quarter-note
                 // beats per bar. Compound, non-quarter and time-varying
@@ -441,23 +428,18 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     return Err("MusicXML time-signature numerator must be in 1..=16".into());
                 }
                 let numerator = numerator as u8;
-                if seen_meter.is_some_and(|previous| previous != numerator) {
-                    return Err(
-                        "MusicXML meter changes cannot be represented by a single-meter Score"
-                            .into(),
-                    );
-                }
-                seen_meter = Some(numerator);
-                meter = numerator;
+                meter_events.push((cursor, numerator));
             } else if child.has_tag_name("metronome") {
                 let bpm = musicxml_metronome_tempo(child)?;
-                register_musicxml_tempo(bpm, &mut seen_tempo, &mut tempo)?;
+                let position = musicxml_tempo_position(child, cursor)?;
+                tempo_events.push((position, bpm));
             } else if child.has_tag_name("sound") {
                 if let Some(value) = child.attribute("tempo") {
                     let bpm = value.parse::<f32>().map_err(|_| {
                         "MusicXML tempo must be a number between 20 and 320 BPM".to_string()
                     })?;
-                    register_musicxml_tempo(bpm, &mut seen_tempo, &mut tempo)?;
+                    let position = musicxml_tempo_position(child, cursor)?;
+                    tempo_events.push((position, bpm));
                 }
             } else if child.has_tag_name("backup") {
                 let amount = musicxml_duration(child, "backup")?;
@@ -505,6 +487,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             }
         }
     }
+    let (fifths, minor) =
+        stable_musicxml_metadata(&key_events, (0_i32, false), "key", "single-key")?;
+    let meter = stable_musicxml_metadata(&meter_events, 4_u8, "meter", "single-meter")?;
+    let tempo = stable_musicxml_metadata(&tempo_events, 120.0_f32, "tempo", "single-tempo")?;
+
     if raw.is_empty() {
         return Err("MusicXML contains no pitched notes".into());
     }
@@ -686,26 +673,72 @@ fn musicxml_metronome_tempo(node: roxmltree::Node<'_, '_>) -> Result<f32, String
     Ok(bpm)
 }
 
-/// Keep all tempo indicators aligned with Score's single-tempo contract.
-/// A changing or disagreeing indicator must not win merely because it appears
-/// later in document traversal.
-fn register_musicxml_tempo(
-    bpm: f32,
-    seen_tempo: &mut Option<f32>,
-    tempo: &mut f32,
-) -> Result<(), String> {
-    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
-        return Err("MusicXML tempo must be finite and between 20 and 320 BPM".into());
+/// Resolve one metadata stream against Score's single-value field.
+///
+/// Events are collected across all parts before temporal validation. That way,
+/// a late event encountered in an earlier XML part cannot override or
+/// incorrectly precede a beat-zero event in a later part.
+fn stable_musicxml_metadata<T: Copy + PartialEq>(
+    events: &[(Duration, T)],
+    default: T,
+    name: &str,
+    schema_field: &str,
+) -> Result<T, String> {
+    let Some((mut earliest_position, first_value)) = events.first().copied() else {
+        return Ok(default);
+    };
+
+    for &(position, value) in &events[1..] {
+        if value != first_value {
+            return Err(format!(
+                "MusicXML {name} changes cannot be represented by a {schema_field} Score"
+            ));
+        }
+        let order = position.checked_cmp(earliest_position).ok_or_else(|| {
+            format!("MusicXML {name} event positions cannot be compared exactly")
+        })?;
+        if order == std::cmp::Ordering::Less {
+            earliest_position = position;
+        }
     }
-    if seen_tempo.is_some_and(|previous| previous != bpm) {
-        return Err(
-            "MusicXML tempo changes cannot be represented by a single-tempo Score; conflicting tempo indicators are also rejected"
-                .into(),
-        );
+
+    if earliest_position.num() > 0 && first_value != default {
+        return Err(format!(
+            "MusicXML {name} changes from the default at a non-zero beat and cannot be represented by a {schema_field} Score"
+        ));
     }
-    *seen_tempo = Some(bpm);
-    *tempo = bpm;
-    Ok(())
+    Ok(first_value)
+}
+
+/// Return the current beat position for a tempo indicator only when its
+/// containing direction has no non-zero offset. Offsets require a richer
+/// timeline than the current importer exposes, so do not silently ignore them.
+fn musicxml_tempo_position(
+    node: roxmltree::Node<'_, '_>,
+    position: Duration,
+) -> Result<Duration, String> {
+    let mut ancestor = node.parent();
+    while let Some(parent) = ancestor {
+        if parent.has_tag_name("direction") {
+            if let Some(offset) = parent
+                .children()
+                .find(|child| child.has_tag_name("offset"))
+            {
+                let value = node_i64(offset).ok_or_else(|| {
+                    "MusicXML tempo direction offset must be an integer".to_string()
+                })?;
+                if value != 0 {
+                    return Err(
+                        "MusicXML non-zero tempo direction offsets are not supported by the single-tempo Score importer"
+                            .into(),
+                    );
+                }
+            }
+            break;
+        }
+        ancestor = parent.parent();
+    }
+    Ok(position)
 }
 
 /// MusicXML durations use positive integer division units. Required values
@@ -1282,6 +1315,74 @@ mod tests {
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("key changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_late_nondefault_tempo_is_rejected_against_default_120_bpm() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <direction><sound tempo="90"/></direction>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("changes from the default at a non-zero beat"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_late_nondefault_key_is_rejected_against_default_c_major() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><key><fifths>1</fifths><mode>major</mode></key></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("changes from the default at a non-zero beat"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_late_nondefault_meter_is_rejected_against_default_four_four() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("changes from the default at a non-zero beat"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_nonzero_tempo_direction_offset_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><offset>1</offset><sound tempo="90"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("non-zero tempo direction offsets are not supported"), "{error}");
     }
 
     #[test]
