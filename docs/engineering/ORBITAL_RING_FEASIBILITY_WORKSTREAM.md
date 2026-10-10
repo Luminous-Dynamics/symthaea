@@ -182,3 +182,39 @@ This increment must not claim that an orbital ring is stable, cheap, safe, build
 
 Review the architecture-mode taxonomy, frame contract, T0 equations, conservation ledger and fidelity gates before implementation begins. The key review question is: **are the modelled geometry and reference frames sufficient to uniquely define the physical system whose equilibrium is being calculated?** If not, revise the contract; do not patch the ambiguity in code.
 
+
+
+## 11. Implementation ledger (2026-10-10)
+
+### Increment A — contract and fidelity gates
+
+**Implemented on the research branch.** The contract distinguishes the relevant architecture families, defines SI and frame boundaries, documents the ideal circular-orbit fixtures, and establishes evidence/fidelity gates.
+
+### Increment B — pure Rust T0 kernel
+
+**Source added; runtime verification pending.** The new workspace crate `crates/domains/symthaea-orbital-ring` currently provides:
+
+- checked `Meters`, `Kilograms`, `Seconds`, and `Joules` boundary types;
+- scenario metadata for architecture, frame, gravity model, drag state, and altitude;
+- closed-form circular-orbit values for a freely orbiting structure under the Earth point-mass model only;
+- an energy ledger and momentum ledger with explicit frame requirements, residuals, tolerances, and fail-closed rejection of non-finite residuals;
+- 11 unit tests covering reference fixtures, monotonic trends, invalid assumptions, unsupported modes, balance/residuals, overflow, and determinism;
+- workspace engineering-tier registration and a crate README with intended local verification commands.
+
+The kernel intentionally does not implement rotor/support equilibrium, electromagnetic force, structural dynamics, a digital twin, or a validated solver adapter.
+
+### Checks actually performed
+
+- Read back the exact branch versions of all six changed files.
+- Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
+- Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
+- Checked balanced delimiter counts in the Rust source and enumerated the 11 test functions.
+- Independently recomputed the four documented circular-orbit rows from the stated Earth radius and gravitational parameter; all 20 printed quantities agreed within their displayed rounding tolerances.
+
+### Checks not performed
+
+The present execution environment does not have `cargo` installed. The Rust tests, rustfmt, Clippy, and a workspace Cargo resolution/check have **not** been executed in this environment. No CI pass, solver pass, structural pass, or feasibility claim is made. The README lists the local commands required to perform those checks.
+
+### Next engineering increment
+
+After the code receives an actual Rust-toolchain check, the next modelling change should still be a **derived, independently checked control-volume equation for one fully specified rotor/support geometry**. Before writing that equation, pin the reference frame, rotor velocity (inertial and relative), line density or discrete-mass representation, support motion, curvature, and system boundary. A small limiting case should be checked by hand and a separate implementation before it becomes executable code.
