@@ -368,6 +368,21 @@ enum ElectricalMeasureDimension {
     Current,
 }
 
+fn simple_vector_argument<'a>(expression: &'a str, prefix: &str) -> Option<&'a str> {
+    let argument = expression.strip_prefix(prefix)?.strip_suffix(')')?;
+    if argument.is_empty()
+        || argument.chars().any(|ch| {
+            matches!(
+                ch,
+                '(' | ')' | '+' | '-' | '*' | '/' | ' ' | '\\t' | ',' | '='
+            )
+        })
+    {
+        return None;
+    }
+    Some(argument)
+}
+
 fn vector_dimension(expression: &str) -> Option<ElectricalMeasureDimension> {
     let expression = expression.trim().to_ascii_lowercase();
     let inner = expression
@@ -375,9 +390,9 @@ fn vector_dimension(expression: &str) -> Option<ElectricalMeasureDimension> {
         .and_then(|value| value.strip_suffix(')'))
         .unwrap_or(&expression);
 
-    if inner.starts_with("v(") && inner.ends_with(')') && inner.len() > 3 {
+    if simple_vector_argument(inner, "v(").is_some() {
         Some(ElectricalMeasureDimension::Voltage)
-    } else if inner.starts_with("i(") && inner.ends_with(')') && inner.len() > 3 {
+    } else if simple_vector_argument(inner, "i(").is_some() {
         Some(ElectricalMeasureDimension::Current)
     } else {
         None
