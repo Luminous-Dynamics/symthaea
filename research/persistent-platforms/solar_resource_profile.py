@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import platform
 import struct
 import sys
@@ -234,6 +235,81 @@ def _iso_date(name: str, value) -> date:
     if parsed.isoformat() != value:
         raise ValueError(f"{name} must use canonical YYYY-MM-DD form")
     return parsed
+
+
+def solar_daylight_hours_noaa(latitude_deg: float, day: str) -> float:
+    """Estimate apparent sunrise-to-sunset duration with a pinned NOAA-style formula.
+
+    The 90.833-degree solar-zenith threshold approximates the visible solar disk
+    plus standard atmospheric refraction. Terrain/building horizons, local
+    weather, aircraft attitude, and PVGIS-specific horizon masks are not modeled.
+    This is a reproducible astronomical daylight estimate, not measured sunlight.
+    """
+    latitude = _finite("latitude_deg", latitude_deg)
+    if latitude < -90.0 or latitude > 90.0:
+        raise ValueError("latitude_deg must be in [-90, 90]")
+    observed_day = _iso_date("day", day)
+    day_of_year = observed_day.timetuple().tm_yday
+
+    # NOAA fractional-year declination approximation at solar noon; the algorithm
+    # identifier is carried by the transformation source digest, not inferred.
+    gamma = 2.0 * math.pi * (day_of_year - 1) / 365.0
+    declination = (
+        0.006918
+        - 0.399912 * math.cos(gamma)
+        + 0.070257 * math.sin(gamma)
+        - 0.006758 * math.cos(2.0 * gamma)
+        + 0.000907 * math.sin(2.0 * gamma)
+        - 0.002697 * math.cos(3.0 * gamma)
+        + 0.001480 * math.sin(3.0 * gamma)
+    )
+    latitude_rad = math.radians(latitude)
+    cos_zenith = math.cos(math.radians(90.833))
+    sin_lat_sin_decl = math.sin(latitude_rad) * math.sin(declination)
+    cos_lat_cos_decl = math.cos(latitude_rad) * math.cos(declination)
+
+    if abs(cos_lat_cos_decl) < 1e-12:
+        return 24.0 if sin_lat_sin_decl >= cos_zenith else 0.0
+
+    cos_hour_angle = (cos_zenith - sin_lat_sin_decl) / cos_lat_cos_decl
+    if cos_hour_angle <= -1.0:
+        return 24.0
+    if cos_hour_angle >= 1.0:
+        return 0.0
+    daylight_hours = 24.0 * math.acos(cos_hour_angle) / math.pi
+    if not math.isfinite(daylight_hours):
+        raise ValueError("computed daylight duration is not finite")
+    return min(24.0, max(0.0, daylight_hours))
+
+
+def monthly_mean_daylight_hours_noaa(
+    latitude_deg: float,
+    period_start: str,
+    period_end: str,
+) -> tuple[float, ...]:
+    """Average the pinned daylight estimate by calendar month over an inclusive period.
+
+    Returns January through December. Every month must occur at least once in the
+    requested period; this prevents a partial-window mean from masquerading as
+    a complete twelve-month seasonal profile.
+    """
+    start = _iso_date("period_start", period_start)
+    end = _iso_date("period_end", period_end)
+    if end < start:
+        raise ValueError("period_end must not precede period_start")
+
+    totals = [0.0] * 12
+    counts = [0] * 12
+    current = start
+    while current <= end:
+        month_index = current.month - 1
+        totals[month_index] += solar_daylight_hours_noaa(latitude_deg, current.isoformat())
+        counts[month_index] += 1
+        current += timedelta(days=1)
+
+    if any(count == 0 for count in counts):
+        raise ValueError("period must include at least one day from each calendar month")
+    return tuple(total / count for total, count in zip(totals, counts))
 
 
 def _optional_angle(name: str, value, lower: float, upper: float) -> float | None:
