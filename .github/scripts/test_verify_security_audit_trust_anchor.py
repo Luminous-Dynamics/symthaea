@@ -34,24 +34,27 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         subject = "a" * 40
         pr = {"number": 12}
         associated = {"number": 12,
-                      "head": {"sha": subject, "ref": "security/fix", "repo": {"full_name": repo}},
-                      "base": {"ref": "main", "repo": {"full_name": repo}}}
-        run = {"pull_requests": [associated]}
+                      "head": {"sha": subject, "ref": "security/fix", "repo": {"id": 123}},
+                      "base": {"ref": "main", "repo": {"id": 123}}}
+        run = {"pull_requests": [associated],
+               "head_repository": {"id": 123, "full_name": repo},
+               "repository": {"id": 123, "full_name": repo}}
         module.check_run_pr_binding(run, repo, pr, subject, "security/fix", "main")
         bad_runs = [
-            {"pull_requests": []},
-            {"pull_requests": [dict(associated, number=13)]},
-            {"pull_requests": [dict(associated, head={**associated["head"], "sha": "b" * 40})]},
-            {"pull_requests": [dict(associated, head={**associated["head"], "ref": "other"})]},
-            {"pull_requests": [dict(associated, base={**associated["base"], "ref": "release"})]},
-            {"pull_requests": [dict(associated, head={**associated["head"], "repo": {"full_name": "fork/repo"}})]},
-            {"pull_requests": [dict(associated, base={**associated["base"], "repo": {"full_name": "other/repo"}})]},
-            {"pull_requests": [associated, associated]},
+            {"pull_requests": [], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [dict(associated, number=13)], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [dict(associated, head={**associated["head"], "sha": "b" * 40})], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [dict(associated, head={**associated["head"], "ref": "other"})], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [dict(associated, base={**associated["base"], "ref": "release"})], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [dict(associated, head={**associated["head"], "repo": {"id": 999}})], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [dict(associated, base={**associated["base"], "repo": {"id": 456}})], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {"pull_requests": [associated, associated], "head_repository": run["head_repository"], "repository": run["repository"]},
+            {**run, "head_repository": {"id": 123, "full_name": "fork/repo"}},
+            {**run, "repository": {"id": 123, "full_name": "other/repo"}},
         ]
         for bad in bad_runs:
             with self.subTest(bad=bad), self.assertRaises(module.VerificationError):
                 module.check_run_pr_binding(bad, repo, pr, subject, "security/fix", "main")
-
     def test_verifier_self_tests_require_explicit_success(self):
         self.assertTrue(module.verifier_tests_passed("success"))
         for outcome in ("", "failure", "cancelled", "skipped", "unexpected"):
