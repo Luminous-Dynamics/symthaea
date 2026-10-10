@@ -43,7 +43,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             {"pull_requests": [dict(associated, number=13)]},
             {"pull_requests": [dict(associated, head={**associated["head"], "sha": "b" * 40})]},
             {"pull_requests": [dict(associated, head={**associated["head"], "ref": "other"})]},
-            {"pull_requests": [dict(associated, base={**associated["base"], "ref": "release"}]},
+            {"pull_requests": [dict(associated, base={**associated["base"], "ref": "release"})]},
             {"pull_requests": [dict(associated, head={**associated["head"], "repo": {"full_name": "fork/repo"}})]},
             {"pull_requests": [dict(associated, base={**associated["base"], "repo": {"full_name": "other/repo"}})]},
             {"pull_requests": [associated, associated]},
