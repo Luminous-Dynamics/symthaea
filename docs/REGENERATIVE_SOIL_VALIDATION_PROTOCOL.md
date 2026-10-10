@@ -94,6 +94,8 @@ For each production batch, retain:
 
 Check dry-mass and elemental balances with uncertainty intervals. If balance closure falls outside a predeclared tolerance justified by measurement uncertainty, flag the batch for investigation; do not force closure by adjusting an unobserved stream. Heat accounting must distinguish theoretical duty, measured supplied energy, recovered energy and reactor losses. A screening heat calculation is not a reactor design or emissions assessment.
 
+**Measurement-closure distinction:** the initial pyrolysis screening calculation infers the non-char dry-mass residual by subtraction. That identity is useful for accounting but is not independent evidence of measured physical closure. For a pilot batch, use the observed-stream assessor with a declared boundary, complete inlet/outlet mass inventory, unique stream IDs, measured evidence for each physical mass and a tolerance justified by the measurement procedure. Include all inlets (such as purge gas or added process water) and all outputs; do not make an unmeasured gas or condensate stream silently equal to zero. The result reports signed residual and relative closure error. A closure pass does not establish safe product quality, correct emissions inventory, nutrient availability, or agronomic efficacy.
+
 ## Nutrient-cycle accounting
 
 For each element separately (at minimum N, P and K), maintain a ledger across:
