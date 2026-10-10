@@ -565,31 +565,31 @@ fn calibration_range_constructor_rejects_inverted_bounds() {
 
 #[test]
 fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
+    let wrong_identity =
+        InstrumentIdentity::new("another-ultrasound-rig", "rf-channel-0").unwrap();
+    let (resolved, certificate_bytes, review_bytes) = calibration_fixture_for(
+        "calibration-17",
+        wrong_identity,
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    );
+    let calibration_reference =
+        CalibrationReference::new("calibration-17", resolved.evidence().clone()).unwrap();
     let wrong_instrument = MockResolver {
-        resolved: Ok(
-            ResolvedCalibration::new(
-                "calibration-17",
-                InstrumentIdentity::new("another-ultrasound-rig", "rf-channel-0").unwrap(),
-                calibration_artifact(),
-                review_artifact(),
-                Quantity::Frequency,
-                Unit::Hertz,
-                4_000_000.0,
-                6_000_000.0,
-                SAMPLE_TIME_NS - 1,
-                SAMPLE_TIME_NS + 2_000_000_000,
-                900.0,
-            )
-            .unwrap(),
-        ),
+        resolved: Ok(resolved),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
-        calibration_bytes_override: None,
-        review_bytes_override: None,
+        calibration_bytes_override: Some(certificate_bytes),
+        review_bytes_override: Some(review_bytes),
     };
 
     assert_eq!(
-        measurement(1, SAMPLE_TIME_NS)
+        measurement_with_calibration(1, SAMPLE_TIME_NS, calibration_reference)
             .assess_for_quantitative_use(
                 SAMPLE_TIME_NS,
                 &clock_domain(),
@@ -601,34 +601,31 @@ fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
         AssessmentFailure::CalibrationInstrumentMismatch
     );
 }
-
 #[test]
 fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
+    let (resolved, certificate_bytes, review_bytes) = calibration_fixture_for(
+        "calibration-17",
+        instrument_identity(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        4_900_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    );
+    let calibration_reference =
+        CalibrationReference::new("calibration-17", resolved.evidence().clone()).unwrap();
     let narrow_range = MockResolver {
-        resolved: Ok(
-            ResolvedCalibration::new(
-                "calibration-17",
-                instrument_identity(),
-                calibration_artifact(),
-                review_artifact(),
-                Quantity::Frequency,
-                Unit::Hertz,
-                4_000_000.0,
-                4_900_000.0,
-                SAMPLE_TIME_NS - 1,
-                SAMPLE_TIME_NS + 2_000_000_000,
-                900.0,
-            )
-            .unwrap(),
-        ),
+        resolved: Ok(resolved),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
-        calibration_bytes_override: None,
-        review_bytes_override: None,
+        calibration_bytes_override: Some(certificate_bytes),
+        review_bytes_override: Some(review_bytes),
     };
 
     assert_eq!(
-        measurement(1, SAMPLE_TIME_NS)
+        measurement_with_calibration(1, SAMPLE_TIME_NS, calibration_reference)
             .assess_for_quantitative_use(
                 SAMPLE_TIME_NS,
                 &clock_domain(),
@@ -644,7 +641,6 @@ fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
         }
     );
 }
-
 #[test]
 fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_provenance() {
     let assessment = measurement(1, SAMPLE_TIME_NS)
