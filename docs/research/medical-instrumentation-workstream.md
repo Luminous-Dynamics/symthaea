@@ -24,7 +24,8 @@ The public module **symthaea_acoustics::ultrasound** provides:
 - validated first-order wavelength estimates using the existing canonical **wavelength** calculation;
 - idealized pulse-echo axial-resolution estimates from pulse cycle count, sound speed, and center frequency;
 - a transparent Nyquist minimum calculation and sampling-plan assessment that records whether an anti-alias evidence reference was supplied;
-- negative tests for zero, negative, NaN, infinite, under-sampled, and evidence-reference-missing cases.
+- a deterministic point-reflector phantom that emits a bounded synthetic RF trace while retaining analytic pulse-echo travel times and fractional sample indices;
+- negative and known-answer tests for malformed physical inputs, under-sampling, resource-budget overruns, too-short acquisition windows, and echo-time/sample-position agreement.
 
 The axial-resolution equation follows the spatial-pulse-length formulation: spatial pulse length is approximately Nλ, and idealized axial resolution is half that length. Bandwidth-to-resolution conversions are intentionally not hard-coded in this first increment because pulse shape and bandwidth conventions alter the conversion. The estimate is not a real-probe performance result.
 
@@ -60,11 +61,12 @@ These are architectural boundaries, not a commitment to create five new crates. 
 - Unit tests with independently sourced known-answer values.
 - Property tests for unit-domain boundaries, finite outputs, monotonic relationships, and invalid inputs.
 - Run `cargo test -p symthaea-acoustics` explicitly in CI (rather than assuming default-members include this subcrate).
+- The idealized point-reflector fixture must reproduce the analytic round-trip delay (t=2d/c) and preserve the expected fractional sample position. Test determinism, input rejection and explicit sample-budget enforcement.
 - Record exact tested commit and preserve failed cases; a queued job is not a pass.
 
 ### Gate B — simulator cross-check
 
-Use an established acoustics simulator such as [k-Wave](https://www.k-wave.org/) / [k-Wave Python](https://k-wave-python.readthedocs.io/en/latest/) as an external comparator. Start with homogeneous media and analytically solvable wave propagation; then increase complexity only while keeping ground-truth parameters, solver configuration, and error metrics fixed and recorded. A simulator cross-check is not clinical validation.
+Use an established acoustics simulator such as [k-Wave](https://www.k-wave.org/) / [k-Wave Python](https://k-wave-python.readthedocs.io/en/latest/) as an external comparator. First compare the synthetic phantom's (2d/c) echo times against analytically solvable homogeneous-medium cases; then compare simulator-derived arrival times with fixed solver configuration and recorded error metrics before adding attenuation, speckle, finite apertures or tissue complexity. The current point-reflector generator is a deterministic fixture, not a full wave solver, and has not yet been cross-validated against k-Wave. A simulator cross-check is not clinical validation.
 
 ### Gate C — hardware-independent phantom evaluation
 
