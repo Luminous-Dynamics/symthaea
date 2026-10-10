@@ -714,10 +714,14 @@ mod tests {
     fn requested_measure_units_must_match_expression_dimension() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
         let voltage_units = BTreeMap::from([("vmax".to_string(), "V".to_string())]);
-        assert!(validate_requested_measurement_units(safe_netlist(), &requested, &voltage_units).is_ok());
+        assert!(
+            validate_requested_measurement_units(safe_netlist(), &requested, &voltage_units).is_ok()
+        );
 
         let current_units = BTreeMap::from([("vmax".to_string(), "A".to_string())]);
-        assert!(validate_requested_measurement_units(safe_netlist(), &requested, &current_units).is_err());
+        assert!(
+            validate_requested_measurement_units(safe_netlist(), &requested, &current_units).is_err()
+        );
     }
 
     #[test]
