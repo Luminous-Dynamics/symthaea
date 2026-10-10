@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 
 use crate::battery::Battery;
 use crate::scheduling::{
-    try_run_scenario_with_receipt_profiles, ScenarioError, ScenarioTraceResult, TariffSchedule,
+    ScenarioError, ScenarioTraceResult, TariffSchedule, try_run_scenario_with_receipt_profiles,
 };
 
 const MAX_CORPUS_STEPS: usize = 1_000_000;
@@ -282,12 +282,18 @@ impl FrozenEnergyScenario {
         let generation_profile = |_time: f64| {
             let index = generation_index.get();
             generation_index.set(index + 1);
-            self.generation_profile_kw.get(index).copied().unwrap_or(f64::NAN)
+            self.generation_profile_kw
+                .get(index)
+                .copied()
+                .unwrap_or(f64::NAN)
         };
         let grid_profile = |_time: f64| {
             let index = grid_index.get();
             grid_index.set(index + 1);
-            self.grid_available_by_step.get(index).copied().unwrap_or(false)
+            self.grid_available_by_step
+                .get(index)
+                .copied()
+                .unwrap_or(false)
         };
 
         let trace = try_run_scenario_with_receipt_profiles(
@@ -358,7 +364,10 @@ impl FrozenEnergyScenario {
 
             if !close(step.load_kw, self.load_profile_kw[index])
                 || !close(step.generation_kw, self.generation_profile_kw[index])
-                || !close(step.import_price_per_kwh, self.tariff.import_price(expected_time))
+                || !close(
+                    step.import_price_per_kwh,
+                    self.tariff.import_price(expected_time),
+                )
                 || !close(step.export_price_per_kwh, self.tariff.export_price_per_kwh)
                 || step.grid_available != self.grid_available_by_step[index]
             {
@@ -447,11 +456,9 @@ impl FrozenEnergyScenario {
             let mut expected_removed_dc_kwh = 0.0;
 
             if step.charge_setpoint_kw > 0.0 {
-                let requested_dc_kwh = step.charge_setpoint_kw
-                    * step.step_duration_hours
-                    * efficiency;
-                let headroom_kwh =
-                    (1.0 - step.battery_soc_before) * effective_capacity_kwh;
+                let requested_dc_kwh =
+                    step.charge_setpoint_kw * step.step_duration_hours * efficiency;
+                let headroom_kwh = (1.0 - step.battery_soc_before) * effective_capacity_kwh;
                 let accepted_dc_kwh = requested_dc_kwh.min(headroom_kwh);
                 expected_accepted_dc_kwh = accepted_dc_kwh;
                 if effective_capacity_kwh > 0.0 {
@@ -464,9 +471,7 @@ impl FrozenEnergyScenario {
                 }
                 expected_charge_input_kw = if efficiency > 0.0 {
                     accepted_dc_kwh / efficiency / step.step_duration_hours
-                } else if effective_capacity_kwh > 0.0
-                    && expected_soc_after < 1.0
-                {
+                } else if effective_capacity_kwh > 0.0 && expected_soc_after < 1.0 {
                     // With zero efficiency the battery stores nothing, but
                     // requested input is still consumed while headroom exists.
                     step.charge_setpoint_kw
@@ -479,8 +484,7 @@ impl FrozenEnergyScenario {
                 } else {
                     0.0
                 };
-                let available_dc_kwh =
-                    step.battery_soc_before * effective_capacity_kwh;
+                let available_dc_kwh = step.battery_soc_before * effective_capacity_kwh;
                 let delivered_dc_kwh = requested_dc_kwh.min(available_dc_kwh);
                 let delivered_ac_kwh = delivered_dc_kwh * efficiency;
                 expected_removed_dc_kwh = delivered_dc_kwh;
@@ -492,19 +496,14 @@ impl FrozenEnergyScenario {
                 if capacity_kwh > 0.0 {
                     expected_cycles_after += delivered_dc_kwh / (2.0 * capacity_kwh);
                 }
-                expected_discharge_output_kw =
-                    delivered_ac_kwh / step.step_duration_hours;
+                expected_discharge_output_kw = delivered_ac_kwh / step.step_duration_hours;
             }
 
-            let expected_stored_before_kwh =
-                step.battery_soc_before * effective_capacity_kwh;
-            let health_after = (1.0
-                - expected_cycles_after * self.battery.degradation_per_cycle)
-                .clamp(0.0, 1.0);
-            let expected_stored_after_kwh =
-                expected_soc_after * capacity_kwh * health_after;
-            let expected_charge_loss_kwh = (expected_charge_input_kw
-                * step.step_duration_hours
+            let expected_stored_before_kwh = step.battery_soc_before * effective_capacity_kwh;
+            let health_after =
+                (1.0 - expected_cycles_after * self.battery.degradation_per_cycle).clamp(0.0, 1.0);
+            let expected_stored_after_kwh = expected_soc_after * capacity_kwh * health_after;
+            let expected_charge_loss_kwh = (expected_charge_input_kw * step.step_duration_hours
                 - expected_accepted_dc_kwh)
                 .max(0.0);
             let expected_discharge_loss_kwh = (expected_removed_dc_kwh
@@ -566,7 +565,8 @@ impl FrozenEnergyScenario {
             previous_cycles_after = Some(step.battery_cycles_after);
 
             let recomputed_net = step.load_kw + step.battery_charge_input_kw
-                - step.generation_kw - step.battery_discharge_output_kw;
+                - step.generation_kw
+                - step.battery_discharge_output_kw;
             if !close(step.net_kw, recomputed_net) {
                 return Err(QualificationError::PowerBalanceMismatch);
             }
@@ -606,8 +606,7 @@ impl FrozenEnergyScenario {
             battery_cycles += step.battery_cycles_after - step.battery_cycles_before;
             battery_conversion_loss_kwh +=
                 step.battery_charge_loss_kwh + step.battery_discharge_loss_kwh;
-            battery_degradation_energy_loss_kwh +=
-                step.battery_degradation_energy_loss_kwh;
+            battery_degradation_energy_loss_kwh += step.battery_degradation_energy_loss_kwh;
             expected_elapsed += expected_duration;
         }
 
@@ -617,7 +616,10 @@ impl FrozenEnergyScenario {
             || !receipt.trace.result.battery_cycles.is_finite()
             || !receipt.trace.curtailed_energy_kwh.is_finite()
             || !receipt.trace.battery_conversion_loss_kwh.is_finite()
-            || !receipt.trace.battery_degradation_energy_loss_kwh.is_finite()
+            || !receipt
+                .trace
+                .battery_degradation_energy_loss_kwh
+                .is_finite()
             || receipt.trace.battery_conversion_loss_kwh < 0.0
             || receipt.trace.battery_degradation_energy_loss_kwh < 0.0
             || receipt.trace.result.unserved_energy_kwh < 0.0
@@ -764,9 +766,7 @@ pub fn serialize_policy_comparison_packet(
 }
 
 fn valid_label(value: &str) -> bool {
-    !value.trim().is_empty()
-        && value.trim() == value
-        && !value.chars().any(char::is_control)
+    !value.trim().is_empty() && value.trim() == value && !value.chars().any(char::is_control)
 }
 
 fn valid_source_revision(value: &str) -> bool {
@@ -857,7 +857,10 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
             dt_hours: 1.0,
             total_hours: 24.0,
             start_hour: 0.0,
-            battery: BatterySpec { initial_soc: 0.55, ..reserve_battery },
+            battery: BatterySpec {
+                initial_soc: 0.55,
+                ..reserve_battery
+            },
             tariff,
             load_profile_kw: (0..24)
                 .map(|hour| if (17..21).contains(&hour) { 35.0 } else { 10.0 })
@@ -872,7 +875,10 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
             dt_hours: 1.0,
             total_hours: 8.0,
             start_hour: 10.0,
-            battery: BatterySpec { initial_soc: 1.0, ..reserve_battery },
+            battery: BatterySpec {
+                initial_soc: 1.0,
+                ..reserve_battery
+            },
             tariff,
             load_profile_kw: vec![5.0; 8],
             generation_profile_kw: vec![35.0, 35.0, 35.0, 30.0, 20.0, 10.0, 5.0, 0.0],
@@ -900,7 +906,10 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
             dt_hours: 1.0,
             total_hours: 6.0,
             start_hour: 8.0,
-            battery: BatterySpec { initial_soc: 0.60, ..reserve_battery },
+            battery: BatterySpec {
+                initial_soc: 0.60,
+                ..reserve_battery
+            },
             tariff: TariffSchedule {
                 off_peak_price_per_kwh: -0.05,
                 peak_price_per_kwh: 0.30,
@@ -945,7 +954,11 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
     // Corpus construction is deliberately centralized so additions cannot
     // silently depend on the current clock, ambient environment, or RNG.
     for scenario in &corpus {
-        debug_assert!(scenario.validate().is_ok(), "invalid frozen scenario {}", scenario.id);
+        debug_assert!(
+            scenario.validate().is_ok(),
+            "invalid frozen scenario {}",
+            scenario.id
+        );
     }
     corpus.shrink_to_fit();
     corpus
@@ -954,7 +967,7 @@ pub fn deterministic_energy_corpus() -> Vec<FrozenEnergyScenario> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduling::{naive_greedy_policy, ReserveAwarePolicy};
+    use crate::scheduling::{ReserveAwarePolicy, naive_greedy_policy};
     use proptest::prelude::*;
 
     const TEST_POLICY_REVISION: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -969,9 +982,11 @@ mod tests {
             day_end_hour: 17.0,
         };
         let candidate = scenario
-            .run_policy("reserve-aware-rule", TEST_POLICY_REVISION, |t, load, generation, battery| {
-                reserve_policy.decide(t, load, generation, battery)
-            })
+            .run_policy(
+                "reserve-aware-rule",
+                TEST_POLICY_REVISION,
+                |t, load, generation, battery| reserve_policy.decide(t, load, generation, battery),
+            )
             .unwrap();
         (baseline, candidate)
     }
@@ -989,17 +1004,18 @@ mod tests {
             assert_eq!(scenario.id, replayed.id);
             assert_eq!(scenario.input_digest(), replayed.input_digest());
             let (baseline, candidate) = run_paired(scenario);
-            assert_eq!(baseline.scenario_input_digest, candidate.scenario_input_digest);
+            assert_eq!(
+                baseline.scenario_input_digest,
+                candidate.scenario_input_digest
+            );
             assert_eq!(baseline.scenario_id, candidate.scenario_id);
 
             let baseline_verified = scenario.verify_receipt(&baseline).unwrap();
             let candidate_verified = scenario.verify_receipt(&candidate).unwrap();
-            let comparison =
-                compare_policy_receipts(scenario, &baseline, &candidate).unwrap();
+            let comparison = compare_policy_receipts(scenario, &baseline, &candidate).unwrap();
             assert_eq!(
                 comparison.deltas.total_cost,
-                candidate_verified.recomputed_total_cost
-                    - baseline_verified.recomputed_total_cost
+                candidate_verified.recomputed_total_cost - baseline_verified.recomputed_total_cost
             );
             assert_eq!(
                 comparison.deltas.unserved_energy_kwh,
@@ -1027,7 +1043,10 @@ mod tests {
                     - baseline_verified.recomputed_battery_degradation_energy_loss_kwh
             );
             assert_eq!(baseline_verified.step_count, scenario.step_count().unwrap());
-            assert_eq!(candidate_verified.step_count, scenario.step_count().unwrap());
+            assert_eq!(
+                candidate_verified.step_count,
+                scenario.step_count().unwrap()
+            );
             // These remain independent metrics; no weighted composite can mask
             // critical unserved energy or a cost/cycle regression.
             assert!(baseline_verified.recomputed_unserved_energy_kwh >= 0.0);
@@ -1111,7 +1130,8 @@ mod tests {
         let first = &mut forged_battery.trace.steps[0];
         first.battery_discharge_output_kw += 1.0;
         first.net_kw = first.load_kw + first.battery_charge_input_kw
-            - first.generation_kw - first.battery_discharge_output_kw;
+            - first.generation_kw
+            - first.battery_discharge_output_kw;
         assert_eq!(
             scenario.verify_receipt(&forged_battery),
             Err(QualificationError::BatteryTransitionMismatch)
@@ -1183,13 +1203,8 @@ mod tests {
             .unwrap();
         let verified = scenario.verify_receipt(&receipt).unwrap();
 
-        assert!(
-            (verified.recomputed_battery_conversion_loss_kwh - 0.5).abs() < 1e-8
-        );
-        assert!(
-            (verified.recomputed_battery_degradation_energy_loss_kwh - 0.014625).abs()
-                < 1e-8
-        );
+        assert!((verified.recomputed_battery_conversion_loss_kwh - 0.5).abs() < 1e-8);
+        assert!((verified.recomputed_battery_degradation_energy_loss_kwh - 0.014625).abs() < 1e-8);
         assert!(
             (verified.recomputed_battery_conversion_loss_kwh
                 - receipt.trace.battery_conversion_loss_kwh)

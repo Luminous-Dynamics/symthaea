@@ -210,8 +210,15 @@ pub fn try_run_scenario(
     policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
 ) -> Result<ScenarioResult, ScenarioError> {
     try_run_scenario_with_receipts(
-        battery, tariff, load_profile, generation_profile, dt_hours,
-        total_hours, start_hour, grid_available, policy,
+        battery,
+        tariff,
+        load_profile,
+        generation_profile,
+        dt_hours,
+        total_hours,
+        start_hour,
+        grid_available,
+        policy,
     )
     .map(|trace| trace.result)
 }
@@ -230,8 +237,15 @@ pub fn try_run_scenario_with_receipts(
     policy: impl FnMut(f64, f64, f64, &Battery) -> (f64, f64),
 ) -> Result<ScenarioTraceResult, ScenarioError> {
     try_run_scenario_with_receipt_profiles(
-        battery, tariff, load_profile, generation_profile, dt_hours,
-        total_hours, start_hour, move |_| grid_available, policy,
+        battery,
+        tariff,
+        load_profile,
+        generation_profile,
+        dt_hours,
+        total_hours,
+        start_hour,
+        move |_| grid_available,
+        policy,
     )
 }
 
@@ -347,8 +361,7 @@ pub fn try_run_scenario_with_receipt_profiles(
             return Err(ScenarioError::InvalidProfile);
         }
 
-        let (charge_cmd_kw, discharge_cmd_kw) =
-            policy(t, load_kw, generation_kw, &working_battery);
+        let (charge_cmd_kw, discharge_cmd_kw) = policy(t, load_kw, generation_kw, &working_battery);
         if !charge_cmd_kw.is_finite()
             || charge_cmd_kw < 0.0
             || !discharge_cmd_kw.is_finite()
@@ -373,9 +386,7 @@ pub fn try_run_scenario_with_receipt_profiles(
             0.0
         } else if one_way_efficiency > 0.0 {
             charge_accepted_dc_kwh / one_way_efficiency / step_hours
-        } else if working_battery.effective_capacity_kwh() > 0.0
-            && working_battery.soc() < 1.0
-        {
+        } else if working_battery.effective_capacity_kwh() > 0.0 && working_battery.soc() < 1.0 {
             // A zero-efficiency battery can store no energy, but charging it
             // still consumes input power while usable headroom exists. Do not
             // erase that demand from the power balance just because the model
@@ -436,9 +447,11 @@ pub fn try_run_scenario_with_receipt_profiles(
             curtailed_delta = -net_kw * step_hours;
             curtailed_energy_kwh += curtailed_delta;
         }
-        if !total_cost.is_finite() || !unserved_energy_kwh.is_finite()
+        if !total_cost.is_finite()
+            || !unserved_energy_kwh.is_finite()
             || !curtailed_energy_kwh.is_finite()
-            || !cost_delta.is_finite() || !unserved_delta.is_finite()
+            || !cost_delta.is_finite()
+            || !unserved_delta.is_finite()
             || !curtailed_delta.is_finite()
         {
             return Err(ScenarioError::NonFiniteResult);
@@ -502,9 +515,7 @@ pub fn try_run_scenario_with_receipt_profiles(
         .iter()
         .map(|step| step.battery_degradation_energy_loss_kwh)
         .sum::<f64>();
-    if !battery_conversion_loss_kwh.is_finite()
-        || !battery_degradation_energy_loss_kwh.is_finite()
-    {
+    if !battery_conversion_loss_kwh.is_finite() || !battery_degradation_energy_loss_kwh.is_finite() {
         return Err(ScenarioError::NonFiniteResult);
     }
     Ok(ScenarioTraceResult {
@@ -1033,11 +1044,7 @@ mod tests {
             true,
             |_t, _load, _generation, _battery| (1.0, 1.0),
         );
-        assert_eq!(
-            result,
-            Err(ScenarioError::SimultaneousChargeAndDischarge)
-        );
+        assert_eq!(result, Err(ScenarioError::SimultaneousChargeAndDischarge));
         assert_eq!(battery.soc(), before_soc);
     }
-
 }
