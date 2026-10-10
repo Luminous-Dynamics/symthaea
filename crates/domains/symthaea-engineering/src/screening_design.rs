@@ -29,7 +29,7 @@ pub struct ScreeningDesignError {
 }
 
 impl ScreeningDesignError {
-    fn new(field: &'static str, reason: &'static str) -> Self {
+    pub(crate) fn new(field: &'static str, reason: &'static str) -> Self {
         Self { field, reason }
     }
 }
@@ -87,7 +87,7 @@ pub struct ScreeningFactor {
 }
 
 impl ScreeningFactor {
-    fn validate(&self) -> Result<(), ScreeningDesignError> {
+    pub(crate) fn validate(&self) -> Result<(), ScreeningDesignError> {
         nonempty(&self.factor_id, "factors.factor_id")?;
         nonempty(&self.label, "factors.label")?;
         nonempty(&self.unit, "factors.unit")?;
@@ -153,7 +153,7 @@ pub struct PrimaryEndpoint {
 }
 
 impl PrimaryEndpoint {
-    fn validate(&self) -> Result<(), ScreeningDesignError> {
+    pub(crate) fn validate(&self) -> Result<(), ScreeningDesignError> {
         nonempty(&self.endpoint_id, "primary_endpoint.endpoint_id")?;
         nonempty(&self.description, "primary_endpoint.description")?;
         nonempty(&self.unit, "primary_endpoint.unit")?;
@@ -187,7 +187,7 @@ pub struct ExperimentBlock {
 }
 
 impl ExperimentBlock {
-    fn validate(&self) -> Result<(), ScreeningDesignError> {
+    pub(crate) fn validate(&self) -> Result<(), ScreeningDesignError> {
         nonempty(&self.block_id, "blocks.block_id")?;
         nonempty(&self.description, "blocks.description")?;
         evidence(&self.evidence, "blocks.evidence")
