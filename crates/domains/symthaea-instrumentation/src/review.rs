@@ -9,7 +9,7 @@
 //! its distribution, sequence, freshness, and revocation updates independently.
 
 use ed25519_dalek::{Signature, VerifyingKey};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use crate::{ArtifactReference, VerifiedArtifactBytes};
@@ -97,11 +97,16 @@ impl ReviewTrustStore {
         }
 
         let mut by_id = BTreeMap::new();
+        let mut public_keys = BTreeSet::new();
         for key in keys {
             let key_id = key.key_id.clone();
-            if by_id.insert(key_id.clone(), key).is_some() {
+            if by_id.contains_key(&key_id) {
                 return Err(ReviewVerificationError::DuplicateTrustKey(key_id));
             }
+            if !public_keys.insert(key.public_key_bytes()) {
+                return Err(ReviewVerificationError::DuplicateTrustPublicKey(key_id));
+            }
+            by_id.insert(key_id, key);
         }
         Ok(Self {
             sequence,
@@ -381,6 +386,7 @@ pub enum ReviewVerificationError {
     EmptyTrustStore,
     TooManyTrustKeys { actual: usize, maximum: usize },
     DuplicateTrustKey(String),
+    DuplicateTrustPublicKey(String),
     TrustSnapshotStale,
     UnknownSigner(String),
     SignerNotYetValid(String),
@@ -619,6 +625,56 @@ mod tests {
             Err(ReviewVerificationError::SignerExpiredAtIssue(
                 "reviewer-a".into()
             ))
+        );
+    }
+
+    #[test]
+    fn trust_store_rejects_empty_and_duplicate_key_material() {
+        assert_eq!(
+            ReviewTrustStore::new(TRUST_SEQUENCE, NOW - 10, NOW + 100, Vec::new())
+                .unwrap_err(),
+            ReviewVerificationError::EmptyTrustStore
+        );
+        assert_eq!(
+            ReviewTrustStore::new(0, NOW - 10, NOW + 100, vec![
+                ReviewTrustKey::new(
+                    "reviewer-a",
+                    signing_key().verifying_key().to_bytes(),
+                    NOW - 100,
+                    Some(NOW + 500),
+                    None,
+                )
+                .unwrap(),
+            ])
+            .unwrap_err(),
+            ReviewVerificationError::InvalidTrustWindow
+        );
+        assert_eq!(
+            ReviewTrustStore::new(
+                TRUST_SEQUENCE,
+                NOW - 10,
+                NOW + 100,
+                vec![
+                    ReviewTrustKey::new(
+                        "reviewer-a",
+                        signing_key().verifying_key().to_bytes(),
+                        NOW - 100,
+                        Some(NOW + 500),
+                        None,
+                    )
+                    .unwrap(),
+                    ReviewTrustKey::new(
+                        "reviewer-alias",
+                        signing_key().verifying_key().to_bytes(),
+                        NOW - 100,
+                        Some(NOW + 500),
+                        None,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap_err(),
+            ReviewVerificationError::DuplicateTrustPublicKey("reviewer-alias".into())
         );
     }
 
