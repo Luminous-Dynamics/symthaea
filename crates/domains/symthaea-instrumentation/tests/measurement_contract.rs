@@ -190,6 +190,24 @@ fn calibration_intervals_must_be_non_empty() {
 }
 
 #[test]
+fn calibration_evidence_and_review_receipt_must_be_distinct_artifacts() {
+    assert_eq!(
+        ResolvedCalibration::new(
+            "calibration-17",
+            artifact("same-artifact", SHA_A),
+            artifact("same-artifact", SHA_A),
+            Quantity::Frequency,
+            Unit::Hertz,
+            SAMPLE_TIME_NS - 1,
+            SAMPLE_TIME_NS + 2_000_000_000,
+            900.0,
+        )
+        .unwrap_err(),
+        ContractError::CalibrationReviewMustBeDistinct
+    );
+}
+
+#[test]
 fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_provenance() {
     let assessment = measurement(1, SAMPLE_TIME_NS)
         .assess_for_quantitative_use(SAMPLE_TIME_NS + 10, &policy(), &resolver())
@@ -402,7 +420,7 @@ fn units_map_to_the_declared_quantity_without_implicit_conversion() {
     assert_eq!(Unit::Megahertz.quantity(), Quantity::Frequency);
     assert_eq!(Unit::Microvolt.quantity(), Quantity::ElectricalPotential);
     assert_eq!(Unit::Percent.quantity(), Quantity::OxygenSaturation);
-    assert_eq!(Unit::Decibel.quantity(), Quantity::SoundPressureLevel);
+    assert_eq!(Unit::DecibelRe20Micropascal.quantity(), Quantity::SoundPressureLevel);
     // Same physical quantity, different units remain explicit; this crate does not convert.
     assert_ne!(Unit::Hertz, Unit::Megahertz);
 }
