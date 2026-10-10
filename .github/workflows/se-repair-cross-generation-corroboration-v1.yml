@@ -1,0 +1,409 @@
+name: SE-REPAIR Cross-Generation Corroboration v1
+
+on:
+  workflow_run:
+    workflows:
+      - Systems Engineering SE-001Q Repair Execution v1
+    types:
+      - completed
+    branches:
+      - systems-engineering/se-001q-repair-execution-v1
+  workflow_dispatch:
+
+permissions:
+  actions: read
+
+concurrency:
+  group: se-repair-cross-generation-${{ github.event.workflow_run.id || github.run_id }}-${{ github.event.workflow_run.run_attempt || github.run_attempt }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_WORKFLOW: Systems Engineering SE-001Q Repair Execution v1
+  EXPECTED_BRANCH: systems-engineering/se-001q-repair-execution-v1
+  FROZEN_SUBJECT_SHA: b7a26c24fc729d59932a635e284376c3941bc05d
+  EXPECTED_REPAIR_SHA: e79f8ff5d5ddd5b4ad8e134a585f7b61f742264b
+  HISTORICAL_SUBJECT_SHA: 47de7f2a306cffb66b5505786220590aa5f42e90
+  EXPECTED_BASE_REF: systems-engineering/se-001q-v1.4-frozen-base
+  EXPECTED_TOOLCHAIN: 1.96.0
+  HISTORICAL_ORACLE_RUN_ID: 36585010278
+  HISTORICAL_ORACLE_ARTIFACT_ID: 11080535345
+  HISTORICAL_ORACLE_ARTIFACT_NAME: se001q-evidence-v2_4-47de7f2a306cffb66b5505786220590aa5f42e90-36585010278-1
+  HISTORICAL_ORACLE_ARTIFACT_DIGEST: sha256:c6906d16d545e5ace429fb962fbe14fc1d456f0ee66e13e86634d3061f02470e
+
+jobs:
+  corroborate:
+    name: Cross-generation corroboration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Establish upstream identity
+        if: github.event_name == 'workflow_run'
+        env:
+          UPSTREAM_WORKFLOW: ${{ github.event.workflow_run.name }}
+          UPSTREAM_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          UPSTREAM_SHA: ${{ github.event.workflow_run.head_sha }}
+          UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          test "$UPSTREAM_WORKFLOW" = "$EXPECTED_WORKFLOW"
+          test "$UPSTREAM_BRANCH" = "$EXPECTED_BRANCH"
+          test "$UPSTREAM_SHA" = "$EXPECTED_REPAIR_SHA"
+          test -n "$UPSTREAM_RUN_ID"
+          test -n "$UPSTREAM_ATTEMPT"
+          printf '%s\n' "$UPSTREAM_RUN_ID" > upstream-run-id.txt
+          printf '%s\n' "$UPSTREAM_ATTEMPT" > upstream-run-attempt.txt
+          printf '%s\n' "$UPSTREAM_SHA" > upstream-repair-sha.txt
+          printf '%s\n' "$UPSTREAM_CONCLUSION" > upstream-conclusion.txt
+
+      - name: Establish manual identity
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          echo "manual" > upstream-run-id.txt
+          echo "manual" > upstream-run-attempt.txt
+          printf '%s\n' "$EXPECTED_REPAIR_SHA" > upstream-repair-sha.txt
+          echo "manual" > upstream-conclusion.txt
+
+      - name: Inspect upstream workflow metadata
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${{ github.repository }}/actions/runs/$UPSTREAM_RUN_ID"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api" > upstream-run.json
+
+          test "$(jq -r '.name' upstream-run.json)" = "$EXPECTED_WORKFLOW"
+          test "$(jq -r '.head_branch' upstream-run.json)" = "$EXPECTED_BRANCH"
+          test "$(jq -r '.head_sha' upstream-run.json)" = "$EXPECTED_REPAIR_SHA"
+          test "$(jq -r '.run_attempt' upstream-run.json)" = "$UPSTREAM_ATTEMPT"
+
+      - name: Download current repair evidence index
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          artifact_name="se001q-repair-index-$UPSTREAM_RUN_ID-$UPSTREAM_ATTEMPT"
+          api="https://api.github.com/repos/${{ github.repository }}/actions/runs/$UPSTREAM_RUN_ID/artifacts"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api?name=$artifact_name" > current-artifact.json
+
+          test "$(jq -r '.total_count' current-artifact.json)" = "1"
+          test "$(jq -r '.artifacts[0].name' current-artifact.json)" = "$artifact_name"
+          test "$(jq -r '.artifacts[0].expired' current-artifact.json)" = "false"
+          test "$(jq -r '.artifacts[0].workflow_run.id' current-artifact.json)" = "$UPSTREAM_RUN_ID"
+          current_digest="$(jq -r '.artifacts[0].digest' current-artifact.json)"
+          test "$current_digest" != "null"
+
+          curl --fail --silent --show-error -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$(jq -r '.artifacts[0].archive_download_url' current-artifact.json)" \
+            -o current-index.zip
+          test "sha256:$(sha256sum current-index.zip | awk '{print $1}')" = "$current_digest"
+          unzip -oq current-index.zip -d current-index
+          test -f current-index/se001q-repair-evidence-index.json
+
+      - name: Download fixed historical oracle
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${{ github.repository }}/actions/runs/$HISTORICAL_ORACLE_RUN_ID/artifacts"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api?name=$HISTORICAL_ORACLE_ARTIFACT_NAME" > historical-artifact.json
+
+          test "$(jq -r '.total_count' historical-artifact.json)" = "1"
+          test "$(jq -r '.artifacts[0].id' historical-artifact.json)" = "$HISTORICAL_ORACLE_ARTIFACT_ID"
+          test "$(jq -r '.artifacts[0].name' historical-artifact.json)" = "$HISTORICAL_ORACLE_ARTIFACT_NAME"
+          test "$(jq -r '.artifacts[0].expired' historical-artifact.json)" = "false"
+          test "$(jq -r '.artifacts[0].workflow_run.id' historical-artifact.json)" = "$HISTORICAL_ORACLE_RUN_ID"
+          test "$(jq -r '.artifacts[0].digest' historical-artifact.json)" = "$HISTORICAL_ORACLE_ARTIFACT_DIGEST"
+
+          curl --fail --silent --show-error -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$(jq -r '.artifacts[0].archive_download_url' historical-artifact.json)" \
+            -o historical-oracle.zip
+          test "sha256:$(sha256sum historical-oracle.zip | awk '{print $1}')" = "$HISTORICAL_ORACLE_ARTIFACT_DIGEST"
+          unzip -oq historical-oracle.zip -d historical-oracle
+          test -f historical-oracle/evidence/manifest.json
+          test -f historical-oracle/evidence/summary.json
+          test -f historical-oracle/evidence/focused-format/observation.json
+          test -f historical-oracle/evidence/focused-format/classification.json
+
+      - name: Verify cross-generation contract
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        env:
+          UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          current="current-index/se001q-repair-evidence-index.json"
+          historical_manifest="historical-oracle/evidence/manifest.json"
+          historical_summary="historical-oracle/evidence/summary.json"
+          historical_format="historical-oracle/evidence/focused-format/observation.json"
+          historical_format_class="historical-oracle/evidence/focused-format/classification.json"
+
+          python -m json.tool "$current" >/dev/null
+          python -m json.tool "$historical_manifest" >/dev/null
+          python -m json.tool "$historical_summary" >/dev/null
+          python -m json.tool "$historical_format" >/dev/null
+          python -m json.tool "$historical_format_class" >/dev/null
+
+          test "$(jq -r '.schema' "$current")" = "se-repair-evidence-index-v1"
+          test "$(jq -r '.experiment_subject_sha' "$current")" = "$FROZEN_SUBJECT_SHA"
+          test "$(jq -r '.experiment_subject_sha' "$current")" != "$HISTORICAL_SUBJECT_SHA"
+          test "$(jq -r '.repair_sha' "$current")" = "$EXPECTED_REPAIR_SHA"
+          test "$(jq -r '.base_ref' "$current")" = "$EXPECTED_BASE_REF"
+          test "$(jq -r '.base_sha' "$current")" = "$FROZEN_SUBJECT_SHA"
+          test "$(jq -r '.toolchain' "$current")" = "$EXPECTED_TOOLCHAIN"
+          test "$(jq -r '.qualification_state' "$current")" = "not_granted"
+          test "$(jq -r '.observation_class' "$current")" = "reproduced"
+          test "$(jq -r '.authority_class' "$current")" = "cross_artifact_execution_evidence_only"
+          test "$(jq -r '.run_id' "$current")" = "$UPSTREAM_RUN_ID"
+          test "$(jq -r '.run_attempt' "$current")" = "$UPSTREAM_ATTEMPT"
+
+          test "$(jq -r '.subject_sha' "$historical_manifest")" = "$HISTORICAL_SUBJECT_SHA"
+          test "$(jq -r '.verifier_sha' "$historical_manifest")" = "$EXPECTED_REPAIR_SHA"
+          test "$(jq -r '.subject_sha' "$historical_summary")" = "$HISTORICAL_SUBJECT_SHA"
+          test "$(jq -r '.qualification_claim' "$historical_summary")" = "NONE"
+          test "$(jq -r '.repair_authority_claim' "$historical_summary")" = "NONE"
+
+          test "$(jq -r '.identity.subject.sha' "$historical_format")" = "$HISTORICAL_SUBJECT_SHA"
+          test "$(jq -r '.identity.execution.gate_id' "$historical_format")" = "focused-format"
+          test "$(jq -r '.identity.execution.argv | join(" ")' "$historical_format")" = "rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs"
+          test "$(jq -r '.result.exit_code' "$historical_format")" = "1"
+          test "$(jq -r '.result.failure_class' "$historical_format_class")" = "FORMAT_DIVERGENCE"
+          test "$(jq -r '.result.state' "$historical_format_class")" = "CLASSIFIED_FAIL"
+          test "$(jq -r '.matched_rule_id' "$historical_format_class")" = "rustfmt-diff-marker-v1"
+
+          test "$UPSTREAM_CONCLUSION" = "success"
+
+          cat > cross-generation-index.json <<EOF
+          {
+            "schema": "se-repair-cross-generation-index-v1",
+            "repository": "${{ github.repository }}",
+            "corroborator_workflow": "${{ github.workflow }}",
+            "corroborator_workflow_sha": "${{ github.workflow_sha }}",
+            "corroborator_run_id": "${{ github.run_id }}",
+            "corroborator_run_attempt": "${{ github.run_attempt }}",
+            "upstream_workflow": "$EXPECTED_WORKFLOW",
+            "upstream_run_id": "$UPSTREAM_RUN_ID",
+            "upstream_run_attempt": "$UPSTREAM_ATTEMPT",
+            "upstream_conclusion": "$UPSTREAM_CONCLUSION",
+            "historical_oracle_run_id": "$HISTORICAL_ORACLE_RUN_ID",
+            "historical_oracle_artifact_id": "$HISTORICAL_ORACLE_ARTIFACT_ID",
+            "historical_oracle_artifact_digest": "$HISTORICAL_ORACLE_ARTIFACT_DIGEST",
+            "historical_subject_sha": "$HISTORICAL_SUBJECT_SHA",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "toolchain": "$EXPECTED_TOOLCHAIN",
+            "corroboration_result": "CORROBORATED",
+            "invariants": [
+              {
+                "id": "SE001.IDENTITY.HISTORICAL_SUBJECT",
+                "result": "satisfied",
+                "observation_class": "historical",
+                "authority": "oracle_only"
+              },
+              {
+                "id": "SE001.IDENTITY.EXPERIMENT_SUBJECT",
+                "result": "satisfied",
+                "observation_class": "reproduced",
+                "authority": "execution_evidence_only"
+              },
+              {
+                "id": "SE001.HISTORICAL.FORMAT_DIVERGENCE",
+                "result": "satisfied",
+                "observation_class": "historical",
+                "authority": "oracle_only"
+              },
+              {
+                "id": "SE001.REPAIR.DELTA_BOUNDARY",
+                "result": "satisfied_by_current_index",
+                "observation_class": "reproduced",
+                "authority": "cross_artifact_execution_evidence_only"
+              },
+              {
+                "id": "SE001.PROVENANCE.NON_LEAKAGE",
+                "result": "satisfied",
+                "observation_class": "reproduced",
+                "authority": "cross_generation_corroboration_only"
+              }
+            ],
+            "positive_invariants": [
+              "historical subject identity is exact",
+              "current experiment subject identity is exact and differs from historical subject",
+              "historical format defect is classified only within historical provenance",
+              "current execution evidence is bound to the frozen v1.4 subject and repair SHA",
+              "historical qualification and repair authority claims are NONE",
+              "current qualification state remains not_granted"
+            ],
+            "negative_invariants": [
+              {"id":"SE001.PROVENANCE.HISTORICAL_SUBJECT_NOT_CURRENT","result":"satisfied","claim":"historical subject SHA cannot satisfy experiment_subject_sha","observation_class":"historical","authority":"oracle_only"},
+              {"id":"SE001.PROVENANCE.CURRENT_EXECUTION_REQUIRED","result":"satisfied","claim":"historical workflow conclusion cannot satisfy current execution without current repair evidence","observation_class":"reproduced","authority":"cross_artifact_execution_evidence_only"},
+              {"id":"SE001.PROVENANCE.HISTORICAL_DEFECT_NON_LEAKAGE","result":"satisfied","claim":"historical FORMAT_DIVERGENCE is not asserted to be the current thiserror repair defect","observation_class":"historical","authority":"oracle_only"},
+              {"id":"SE001.PROVENANCE.QUALIFICATION_NON_LEAKAGE","result":"satisfied","claim":"historical qualification cannot be copied into current qualification","observation_class":"historical","authority":"oracle_only"},
+              {"id":"SE001.IDENTITY.EXACT_BINDING","result":"satisfied","claim":"branch or workflow-name similarity is not accepted as subject identity","observation_class":"reproduced","authority":"receiver_execution_only"}
+            ],
+            "evidence_register": [
+              {"id":"current-execution","class":"reproduced","authority":"execution_evidence_only","source":"current repair evidence artifact"},
+              {"id":"historical-oracle","class":"historical","authority":"oracle_only","source":"fixed historical oracle artifact"},
+              {"id":"receiver-observation","class":"observed","authority":"receiver_execution_only","source":"workflow metadata and artifact API inspection"},
+              {"id":"inference","class":"inferred","authority":"none","source":"not used for corroboration"}
+            ],
+            "observation_class": "mixed",
+            "authority_class": "cross_generation_corroboration_only",
+            "qualification_state": "not_granted"
+          }
+          EOF
+          python -m json.tool cross-generation-index.json >/dev/null
+
+      - name: Emit non-corroboration receipt for non-success upstream
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+        env:
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+          cat > cross-generation-index.json <<EOF
+          {
+            "schema": "se-repair-cross-generation-index-v1",
+            "repository": "${{ github.repository }}",
+            "corroborator_workflow": "${{ github.workflow }}",
+            "corroborator_workflow_sha": "${{ github.workflow_sha }}",
+            "corroborator_run_id": "${{ github.run_id }}",
+            "corroborator_run_attempt": "${{ github.run_attempt }}",
+            "upstream_workflow": "$EXPECTED_WORKFLOW",
+            "upstream_run_id": "$UPSTREAM_RUN_ID",
+            "upstream_run_attempt": "$UPSTREAM_ATTEMPT",
+            "upstream_conclusion": "$UPSTREAM_CONCLUSION",
+            "historical_oracle_run_id": "$HISTORICAL_ORACLE_RUN_ID",
+            "historical_oracle_artifact_id": "$HISTORICAL_ORACLE_ARTIFACT_ID",
+            "historical_subject_sha": "$HISTORICAL_SUBJECT_SHA",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "observation_class": "observed",
+            "authority_class": "cross_generation_corroboration_only",
+            "corroboration_result": "NOT_CORROBORATED",
+            "qualification_state": "not_granted",
+            "positive_invariants": [],
+            "negative_invariants": [
+              {"id":"SE001.RECEIVER.UPSTREAM_NOT_SUCCESS","result":"satisfied","claim":"upstream workflow did not complete successfully","observation_class":"observed","authority":"receiver_execution_only"},
+              {"id":"SE001.RECEIVER.NO_CURRENT_PROMOTION","result":"satisfied","claim":"no current repair execution evidence is promoted","observation_class":"observed","authority":"receiver_execution_only"}
+            ],
+            "evidence_register": [
+              {"id":"upstream-result","class":"observed","authority":"receiver_execution_only","source":"workflow_run conclusion"},
+              {"id":"current-execution","class":"reproduced","authority":"none","source":"not available; no evidence promoted"},
+              {"id":"historical-oracle","class":"historical","authority":"oracle_only","source":"not inspected on non-success path"},
+              {"id":"inference","class":"inferred","authority":"none","source":"not used for corroboration"}
+            ]
+          }
+          EOF
+          python -m json.tool cross-generation-index.json >/dev/null
+
+      - name: Emit manual non-corroboration receipt
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          cat > cross-generation-index.json <<EOF
+          {
+            "schema": "se-repair-cross-generation-index-v1",
+            "repository": "${{ github.repository }}",
+            "corroborator_workflow": "${{ github.workflow }}",
+            "corroborator_workflow_sha": "${{ github.workflow_sha }}",
+            "corroborator_run_id": "${{ github.run_id }}",
+            "corroborator_run_attempt": "${{ github.run_attempt }}",
+            "upstream_workflow": "$EXPECTED_WORKFLOW",
+            "upstream_run_id": "manual",
+            "upstream_run_attempt": "manual",
+            "upstream_conclusion": "manual",
+            "historical_subject_sha": "$HISTORICAL_SUBJECT_SHA",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "observation_class": "observed",
+            "authority_class": "cross_generation_corroboration_only",
+            "corroboration_result": "NOT_CORROBORATED",
+            "qualification_state": "not_granted",
+            "positive_invariants": [],
+            "negative_invariants": [
+              {"id":"SE001.RECEIVER.MANUAL_NO_EXECUTION_IDENTITY","result":"satisfied","claim":"manual dispatch does not identify a completed repair execution run","observation_class":"observed","authority":"receiver_execution_only"},
+              {"id":"SE001.RECEIVER.NO_CURRENT_PROMOTION","result":"satisfied","claim":"no current repair execution evidence is promoted","observation_class":"observed","authority":"receiver_execution_only"}
+            ],
+            "evidence_register": [
+              {"id":"manual-trigger","class":"observed","authority":"receiver_execution_only","source":"workflow_dispatch event"},
+              {"id":"current-execution","class":"reproduced","authority":"none","source":"not available; no evidence promoted"},
+              {"id":"historical-oracle","class":"historical","authority":"oracle_only","source":"not inspected on manual path"},
+              {"id":"inference","class":"inferred","authority":"none","source":"not used for corroboration"}
+            ]
+          }
+          EOF
+          python -m json.tool cross-generation-index.json >/dev/null
+
+      - name: Finalize missing receipt as non-corroborated
+        if: always()
+        run: |
+          set -euo pipefail
+          if test ! -f cross-generation-index.json; then
+            cat > cross-generation-index.json <<EOF
+          {
+            "schema": "se-repair-cross-generation-index-v1",
+            "repository": "${{ github.repository }}",
+            "corroborator_workflow": "${{ github.workflow }}",
+            "corroborator_workflow_sha": "${{ github.workflow_sha }}",
+            "corroborator_run_id": "${{ github.run_id }}",
+            "corroborator_run_attempt": "${{ github.run_attempt }}",
+            "upstream_workflow": "$EXPECTED_WORKFLOW",
+            "upstream_run_id": "${{ github.event.workflow_run.id || 'unknown' }}",
+            "upstream_run_attempt": "${{ github.event.workflow_run.run_attempt || 'unknown' }}",
+            "upstream_conclusion": "${{ github.event.workflow_run.conclusion || 'unknown' }}",
+            "historical_oracle_run_id": "$HISTORICAL_ORACLE_RUN_ID",
+            "historical_oracle_artifact_id": "$HISTORICAL_ORACLE_ARTIFACT_ID",
+            "historical_subject_sha": "$HISTORICAL_SUBJECT_SHA",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "observation_class": "observed",
+            "authority_class": "cross_generation_corroboration_only",
+            "corroboration_result": "NOT_CORROBORATED",
+            "qualification_state": "not_granted",
+            "failure_class": "RECEIVER_VALIDATION_FAILED",
+            "positive_invariants": [],
+            "negative_invariants": [{"id":"SE001.RECEIVER.NO_PROMOTION_ON_VALIDATION_FAILURE","result":"satisfied","claim":"receiver validation failed before a corroboration receipt could be produced","observation_class":"observed","authority":"receiver_execution_only"}],
+            "evidence_register": [{"id":"receiver-observation","class":"observed","authority":"receiver_execution_only","source":"receiver execution"},{"id":"inference","class":"inferred","authority":"none","source":"not used for corroboration"}]
+          }
+          EOF
+          fi
+          python -m json.tool cross-generation-index.json >/dev/null
+      - name: Upload corroboration receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: se-repair-cross-generation-index-${{ github.run_id }}-${{ github.run_attempt }}
+          path: cross-generation-index.json
+          if-no-files-found: error
+          retention-days: 90
