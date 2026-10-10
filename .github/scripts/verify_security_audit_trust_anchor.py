@@ -251,8 +251,8 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
 
     workflow_ref = verdict.get("workflow_ref")
     run_workflow_path = run.get("path")
-    if not isinstance(run_workflow_path, str) or workflow_ref != f"{repo}/{run_workflow_path}":
-        raise VerificationError("verdict workflow_ref differs from the authoritative run workflow path/ref")
+    if not isinstance(run_workflow_path, str) or run_workflow_path != policy.get("workflow_path"):
+        raise VerificationError("authoritative run workflow path differs from the base-owned policy")
     expected_ref_prefix = f"{repo}/{policy['workflow_path']}@"
     if not isinstance(workflow_ref, str) or not workflow_ref.startswith(expected_ref_prefix):
         raise VerificationError("verdict workflow_ref does not name the policy-expected caller workflow")
