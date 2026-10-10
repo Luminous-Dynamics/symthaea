@@ -534,11 +534,21 @@ impl MeasurementEnvelope {
         }
 
         Ok(MeasurementAssessment {
+            instrument: self.identity.clone(),
+            sequence: self.sequence,
+            captured_at_ns: self.captured_at_ns,
+            clock_domain: self.clock_domain.clone(),
+            quantity: self.quantity,
+            unit: self.unit,
+            value: self.value,
             age_ns,
             measurement_standard_uncertainty: self.standard_uncertainty,
             calibration_standard_uncertainty: resolved.standard_uncertainty,
             calibration_record_id: resolved.record_id,
+            calibration_evidence: resolved.evidence.clone(),
             calibration_review_receipt: resolved.review_receipt,
+            calibration_range_min_value: resolved.range_min_value,
+            calibration_range_max_value: resolved.range_max_value,
             raw_data: resolved_raw,
             processing_chain_version: self.processing_chain_version.clone(),
         })
@@ -686,15 +696,55 @@ impl MeasurementPolicy {
     }
 }
 
+/// Immutable-by-interface result of a successful quantitative-use assessment.
+/// Fields are private so downstream code cannot create a forged assessment with
+/// a struct literal. This is still not a signed receipt or clinical authorization.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeasurementAssessment {
-    pub age_ns: u64,
-    pub measurement_standard_uncertainty: f64,
-    pub calibration_standard_uncertainty: f64,
-    pub calibration_record_id: String,
-    pub calibration_review_receipt: ArtifactReference,
-    pub raw_data: ResolvedRawData,
-    pub processing_chain_version: String,
+    instrument: InstrumentIdentity,
+    sequence: u64,
+    captured_at_ns: u64,
+    clock_domain: ClockDomainId,
+    quantity: Quantity,
+    unit: Unit,
+    value: f64,
+    age_ns: u64,
+    measurement_standard_uncertainty: f64,
+    calibration_standard_uncertainty: f64,
+    calibration_record_id: String,
+    calibration_evidence: ArtifactReference,
+    calibration_review_receipt: ArtifactReference,
+    calibration_range_min_value: f64,
+    calibration_range_max_value: f64,
+    raw_data: ResolvedRawData,
+    processing_chain_version: String,
+}
+
+impl MeasurementAssessment {
+    pub fn instrument(&self) -> &InstrumentIdentity { &self.instrument }
+    pub fn sequence(&self) -> u64 { self.sequence }
+    pub fn captured_at_ns(&self) -> u64 { self.captured_at_ns }
+    pub fn clock_domain(&self) -> &ClockDomainId { &self.clock_domain }
+    pub fn quantity(&self) -> Quantity { self.quantity }
+    pub fn unit(&self) -> Unit { self.unit }
+    pub fn value(&self) -> f64 { self.value }
+    pub fn age_ns(&self) -> u64 { self.age_ns }
+    pub fn measurement_standard_uncertainty(&self) -> f64 {
+        self.measurement_standard_uncertainty
+    }
+    pub fn calibration_standard_uncertainty(&self) -> f64 {
+        self.calibration_standard_uncertainty
+    }
+    pub fn calibration_record_id(&self) -> &str { &self.calibration_record_id }
+    pub fn calibration_evidence(&self) -> &ArtifactReference { &self.calibration_evidence }
+    pub fn calibration_review_receipt(&self) -> &ArtifactReference {
+        &self.calibration_review_receipt
+    }
+    pub fn calibration_range(&self) -> (f64, f64) {
+        (self.calibration_range_min_value, self.calibration_range_max_value)
+    }
+    pub fn raw_data(&self) -> &ResolvedRawData { &self.raw_data }
+    pub fn processing_chain_version(&self) -> &str { &self.processing_chain_version }
 }
 
 #[derive(Debug, Clone, PartialEq)]
