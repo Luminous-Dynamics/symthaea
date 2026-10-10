@@ -1028,8 +1028,8 @@ mod tests {
                 evidence: ev("pb-review-record", EvidenceKind::Measured),
             },
         };
-        request.bench_scale_review.reviewed_design_sha256 =
-            plackett_burman_design_sha256(&request).unwrap();
+        let digest = plackett_burman_design_sha256(&request).unwrap();
+        request.bench_scale_review.reviewed_design_sha256 = digest;
         request
     }
 
@@ -1068,8 +1068,8 @@ mod tests {
 
         let mut changed = input.clone();
         changed.randomization_seed += 1;
-        changed.bench_scale_review.reviewed_design_sha256 =
-            plackett_burman_design_sha256(&changed).unwrap();
+        let changed_digest = plackett_burman_design_sha256(&changed).unwrap();
+        changed.bench_scale_review.reviewed_design_sha256 = changed_digest;
         let other = generate_plackett_burman_design(&changed).unwrap();
         assert_ne!(first.schedule_sha256, other.schedule_sha256);
     }
