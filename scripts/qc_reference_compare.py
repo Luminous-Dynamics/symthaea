@@ -186,6 +186,8 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
         if not isinstance(case_id, str) or not case_id:
             raise ValueError(f"cases[{index}].case_id must be a non-empty string")
         case_ids.append(case_id)
+        if case.get("method") != "RHF":
+            raise ValueError(f"cases[{index}].method must be explicitly 'RHF'")
     if len(set(case_ids)) != len(case_ids):
         raise ValueError("input report contains duplicate fixture case IDs")
     expected_ids = set(EXPECTED_CASE_IDS)
