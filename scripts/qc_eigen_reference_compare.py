@@ -25,6 +25,19 @@ MAX_RELATIVE_EIGENVALUE_ERROR = 1e-10
 MAX_RELATIVE_EIGENPAIR_RESIDUAL = 1e-10
 MAX_ORTHOGONALITY_RESIDUAL = 1e-10
 
+# Frozen corpus census: a shorter report must never become a green comparison
+# merely because a difficult or failing matrix was silently omitted.
+EXPECTED_CASE_IDS = (
+    "scalar_3_25",
+    "diagonal_3_1",
+    "degenerate_identity_scaled",
+    "dense_symmetric_3x3",
+    "negative_off_diagonal",
+    "near_linear_dependence",
+    "small_scale_symmetric",
+    "subnormal_scale_symmetric",
+)
+
 
 def full_sha(value: Any) -> bool:
     return (
@@ -117,6 +130,24 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
     cases = report.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("native report must contain a non-empty cases array")
+    case_ids = []
+    for index, case in enumerate(cases):
+        if not isinstance(case, dict):
+            raise ValueError(f"cases[{index}] must be an object")
+        case_id = case.get("case_id")
+        if not isinstance(case_id, str) or not case_id:
+            raise ValueError(f"cases[{index}].case_id must be a non-empty string")
+        case_ids.append(case_id)
+    if len(set(case_ids)) != len(case_ids):
+        raise ValueError("native report contains duplicate fixture case IDs")
+    expected_ids = set(EXPECTED_CASE_IDS)
+    actual_ids = set(case_ids)
+    if actual_ids != expected_ids:
+        missing = sorted(expected_ids - actual_ids)
+        unexpected = sorted(actual_ids - expected_ids)
+        raise ValueError(
+            f"fixture corpus census mismatch: missing={missing!r}; unexpected={unexpected!r}"
+        )
     return report, digest
 
 
