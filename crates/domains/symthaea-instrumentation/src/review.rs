@@ -143,6 +143,54 @@ impl ReviewTrustStore {
         bytes
     }
 
+    /// Decode and enforce the canonical binary snapshot representation.
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
+        const MAGIC: &[u8] = b"SYMRTRS1\\0";
+        if !bytes.starts_with(MAGIC) {
+            return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
+        }
+        let mut offset = MAGIC.len();
+        let schema = read_len_prefixed(bytes, &mut offset)?;
+        if schema != REVIEW_TRUST_STORE_SCHEMA.as_bytes() {
+            return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
+        }
+        let sequence = read_u64(bytes, &mut offset)?;
+        let issued_at_unix_s = read_u64(bytes, &mut offset)?;
+        let expires_at_unix_s = read_u64(bytes, &mut offset)?;
+        let key_count = read_u32(bytes, &mut offset)? as usize;
+        if key_count > MAX_REVIEW_TRUST_KEYS {
+            return Err(ReviewVerificationError::TooManyTrustKeys {
+                actual: key_count,
+                maximum: MAX_REVIEW_TRUST_KEYS,
+            });
+        }
+        let mut keys = Vec::with_capacity(key_count);
+        for _ in 0..key_count {
+            let key_id = std::str::from_utf8(read_len_prefixed(bytes, &mut offset)?)
+                .map_err(|_| ReviewVerificationError::InvalidEncoding)?
+                .to_owned();
+            let public_key_bytes = read_fixed::<32>(bytes, &mut offset)?;
+            let not_before_unix_s = read_u64(bytes, &mut offset)?;
+            let not_after_unix_s = read_optional_u64(bytes, &mut offset)?;
+            let revoked_at_unix_s = read_optional_u64(bytes, &mut offset)?;
+            keys.push(ReviewTrustKey::new(
+                key_id,
+                public_key_bytes,
+                not_before_unix_s,
+                not_after_unix_s,
+                revoked_at_unix_s,
+            )?);
+        }
+        if offset != bytes.len() {
+            return Err(ReviewVerificationError::NonCanonicalEncoding);
+        }
+        let snapshot = Self::new(sequence, issued_at_unix_s, expires_at_unix_s, keys)?;
+        if snapshot.canonical_bytes() != bytes {
+            return Err(ReviewVerificationError::NonCanonicalEncoding);
+        }
+        Ok(snapshot)
+    }
+
     /// Digest the canonical trust contents (not the authority signature).
     pub fn canonical_digest(&self) -> String {
         crate::sha256_hex(&self.canonical_bytes())
@@ -371,6 +419,37 @@ impl SignedReviewTrustStoreSnapshot {
         message
     }
 
+    /// Encode the signed snapshot with a fixed magic, canonical store body and signature.
+    pub fn to_canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = b"SYMRTRSS1\\0".to_vec();
+        bytes.extend_from_slice(&self.trust_store.canonical_bytes());
+        bytes.extend_from_slice(&self.signature);
+        bytes
+    }
+
+    /// Parse a signed snapshot and reject alternate/trailing encodings.
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
+        const MAGIC: &[u8] = b"SYMRTRSS1\\0";
+        if !bytes.starts_with(MAGIC) || bytes.len() < MAGIC.len() + 64 {
+            return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
+        }
+        let signature_start = bytes.len() - 64;
+        if signature_start <= MAGIC.len() {
+            return Err(ReviewVerificationError::InvalidEncoding);
+        }
+        let store = ReviewTrustStore::from_canonical_bytes(
+            &bytes[MAGIC.len()..signature_start],
+        )?;
+        let signature: [u8; 64] = bytes[signature_start..]
+            .try_into()
+            .map_err(|_| ReviewVerificationError::InvalidSignatureEncoding)?;
+        let snapshot = Self::new(store, signature);
+        if snapshot.to_canonical_bytes() != bytes {
+            return Err(ReviewVerificationError::NonCanonicalEncoding);
+        }
+        Ok(snapshot)
+    }
+
     /// Authenticate the snapshot against an authority key pinned by the caller.
     pub fn verify(
         self,
@@ -423,6 +502,56 @@ fn append_len_prefixed(bytes: &mut Vec<u8>, value: &[u8]) {
     // Schema strings and key IDs are bounded by constants before reaching here.
     bytes.extend_from_slice(&(value.len() as u16).to_le_bytes());
     bytes.extend_from_slice(value);
+}
+
+fn read_fixed<const N: usize>(
+    bytes: &[u8],
+    offset: &mut usize,
+) -> Result<[u8; N], ReviewVerificationError> {
+    let end = (*offset)
+        .checked_add(N)
+        .ok_or(ReviewVerificationError::InvalidEncoding)?;
+    let value = bytes
+        .get(*offset..end)
+        .ok_or(ReviewVerificationError::InvalidEncoding)?;
+    let mut result = [0_u8; N];
+    result.copy_from_slice(value);
+    *offset = end;
+    Ok(result)
+}
+
+fn read_len_prefixed<'a>(
+    bytes: &'a [u8],
+    offset: &mut usize,
+) -> Result<&'a [u8], ReviewVerificationError> {
+    let len = u16::from_le_bytes(read_fixed::<2>(bytes, offset)?) as usize;
+    let end = (*offset)
+        .checked_add(len)
+        .ok_or(ReviewVerificationError::InvalidEncoding)?;
+    let value = bytes
+        .get(*offset..end)
+        .ok_or(ReviewVerificationError::InvalidEncoding)?;
+    *offset = end;
+    Ok(value)
+}
+
+fn read_u32(bytes: &[u8], offset: &mut usize) -> Result<u32, ReviewVerificationError> {
+    Ok(u32::from_le_bytes(read_fixed::<4>(bytes, offset)?))
+}
+
+fn read_u64(bytes: &[u8], offset: &mut usize) -> Result<u64, ReviewVerificationError> {
+    Ok(u64::from_le_bytes(read_fixed::<8>(bytes, offset)?))
+}
+
+fn read_optional_u64(
+    bytes: &[u8],
+    offset: &mut usize,
+) -> Result<Option<u64>, ReviewVerificationError> {
+    match read_fixed::<1>(bytes, offset)?[0] {
+        0 => Ok(None),
+        1 => Ok(Some(read_u64(bytes, offset)?)),
+        _ => Err(ReviewVerificationError::InvalidEncoding),
+    }
 }
 
 fn append_optional_u64(bytes: &mut Vec<u8>, value: Option<u64>) {
