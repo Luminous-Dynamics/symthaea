@@ -1,0 +1,261 @@
+{
+  "schema_version": "1.0.0",
+  "manifest_id": "protein-dynamics-source-candidates-2026-10-11",
+  "purpose": "Source-candidate inventory only. Not a frozen test set and not a benchmark result.",
+  "observation_date": "2026-10-11",
+  "state": {
+    "target_set_frozen": false,
+    "data_downloaded": false,
+    "assets_hashed": false,
+    "model_run": false,
+    "results_available": false
+  },
+  "policy": {
+    "evidence_classes_are_disjoint": true,
+    "experimental_records_must_not_be_mixed_with_simulation_as_ground_truth": true,
+    "post_reweighting_metrics_using_evaluation_observables_are_not_held_out_validation": true,
+    "no_candidate_is_eligible_until_provenance_license_observable_and_exposure_audits_pass": true
+  },
+  "sources": [
+    {
+      "source_id": "peptonebench",
+      "source_kind": "benchmark_implementation",
+      "evidence_class": "benchmark_code_and_protocol",
+      "url": "https://github.com/PeptoneLtd/peptonebench",
+      "paper_doi": "10.1101/2025.10.18.680935",
+      "code_license_reported_by_upstream": "Apache-2.0",
+      "revision_pinned": false,
+      "disposition": "reuse_candidate_pending_revision_pin_and_reference_reproduction",
+      "required_checks": [
+        "pin immutable source commit",
+        "audit dependencies and forward-model environment",
+        "reproduce one reference case from documented inputs",
+        "separate pre-reweighting and post-reweighting results",
+        "check target overlap with model training and exposure"
+      ]
+    },
+    {
+      "source_id": "ped",
+      "source_kind": "ensemble_repository",
+      "evidence_class": "mixed_experimental_and_predicted_records",
+      "url": "https://proteinensemble.org/",
+      "api_docs_url": "https://proteinensemble.org/api",
+      "catalog_snapshot_observed": {
+        "statistics_updated": "2026-10-09",
+        "proteins": 9528,
+        "entries": 28954,
+        "ensembles": 29120,
+        "conformers": 3226106
+      },
+      "revision_pinned": false,
+      "disposition": "source_repository_candidate_records_require_per_record_admission",
+      "required_checks": [
+        "verify current entry metadata via API or entry page",
+        "distinguish experimental from predicted record types",
+        "trace primary data and experiment/source publication",
+        "verify asset-specific license and checksum",
+        "determine whether benchmark observable was used to construct/reweight ensemble",
+        "keep entry, ensemble, condition, and publication group identities"
+      ]
+    },
+    {
+      "source_id": "mdcath",
+      "source_kind": "molecular_dynamics_dataset",
+      "evidence_class": "simulation_generated",
+      "url": "https://huggingface.co/datasets/compsciencelab/mdCATH",
+      "paper_doi": "10.1038/s41597-024-04140-z",
+      "dataset_license_reported_upstream": "CC-BY-4.0",
+      "reported_scope": {
+        "domains": 5398,
+        "trajectories": 134950,
+        "temperatures_kelvin": [
+          320,
+          450
+        ],
+        "temperature_levels": 5,
+        "average_trajectory_length_ns": 464,
+        "approximate_total_size_tb": 3.3
+      },
+      "revision_pinned": false,
+      "disposition": "simulation_controller_pilot_candidate_not_experimental_validation",
+      "required_checks": [
+        "select individual assets rather than mirroring full corpus",
+        "freeze CATH family/superfamily and target partition rules",
+        "keep all replicas, temperatures, and frames for one target group together",
+        "pin asset checksums and parser/conversion version",
+        "label results simulation-derived and retain force-field/protocol lineage"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_id": "PED00001",
+      "source_id": "ped",
+      "record_url": "https://proteinensemble.org/entries/PED00001/",
+      "record_type_observed": "experimental",
+      "subject_description": "pSic1 residues 1-90 with six specified phosphorylation sites",
+      "public_listing_metadata": {
+        "ensembles": 3,
+        "conformers": 32,
+        "method_tags": [
+          "NMR",
+          "RDC",
+          "chemical shift",
+          "relaxation/T2",
+          "PRE",
+          "SAXS"
+        ]
+      },
+      "eligibility": "candidate_only",
+      "partition": null,
+      "local_assets_verified": false,
+      "primary_observables_verified": false,
+      "license_verified": false,
+      "exposure_audit_complete": false,
+      "blockers": [
+        "retrieve exact current entry and ensemble metadata",
+        "trace primary measurements and ensemble construction",
+        "verify licenses for selected assets",
+        "freeze target grouping before any prediction run"
+      ]
+    },
+    {
+      "candidate_id": "PED00003",
+      "source_id": "ped",
+      "record_url": "https://proteinensemble.org/entries/PED00003/",
+      "record_type_observed": "experimental",
+      "subject_description": "beta-synuclein residues 1-134",
+      "public_listing_metadata": {
+        "ensembles": 1,
+        "conformers": 575
+      },
+      "eligibility": "candidate_only",
+      "partition": null,
+      "local_assets_verified": false,
+      "primary_observables_verified": false,
+      "license_verified": false,
+      "exposure_audit_complete": false,
+      "blockers": [
+        "retrieve exact current entry and ensemble metadata",
+        "trace primary measurements and ensemble construction",
+        "verify observables are suitable for out-of-sample scoring",
+        "verify licenses and freeze target grouping"
+      ]
+    },
+    {
+      "candidate_id": "PED00004",
+      "source_id": "ped",
+      "record_url": "https://proteinensemble.org/entries/PED00004/",
+      "record_type_observed": "experimental",
+      "subject_description": "p27 Kip1 residues 25-93",
+      "public_listing_metadata": {
+        "ensembles": 1,
+        "conformers": 130
+      },
+      "eligibility": "candidate_only",
+      "partition": null,
+      "local_assets_verified": false,
+      "primary_observables_verified": false,
+      "license_verified": false,
+      "exposure_audit_complete": false,
+      "blockers": [
+        "retrieve exact current entry and ensemble metadata",
+        "trace primary measurements and ensemble construction",
+        "verify observables are suitable for out-of-sample scoring",
+        "verify licenses and freeze target grouping"
+      ]
+    },
+    {
+      "candidate_id": "PED00017",
+      "source_id": "ped",
+      "record_url": "https://proteinensemble.org/entries/PED00017/",
+      "record_type_observed": "experimental",
+      "subject_description": "tau-f isoform of tau",
+      "public_listing_metadata": {
+        "ensembles": 5,
+        "conformers": 995,
+        "method_tags": [
+          "NMR",
+          "NOESY",
+          "RDC",
+          "chemical shift"
+        ]
+      },
+      "eligibility": "candidate_only",
+      "partition": null,
+      "local_assets_verified": false,
+      "primary_observables_verified": false,
+      "license_verified": false,
+      "exposure_audit_complete": false,
+      "blockers": [
+        "determine whether the five ensembles correspond to independent experiments or alternative analyses",
+        "retrieve exact source-observable and construct metadata",
+        "verify licensing, exposure, and target-group boundaries"
+      ]
+    },
+    {
+      "candidate_id": "PED00197",
+      "source_id": "ped",
+      "record_url": "https://proteinensemble.org/entries/PED00197/",
+      "record_type_observed": "experimental",
+      "subject_description": "full-length human SMAD2 wildtype monomer",
+      "public_listing_metadata": {
+        "ensembles": 1,
+        "conformers": 10,
+        "method_tags": [
+          "NMR chemical shift",
+          "SAXS"
+        ],
+        "cross_references": [
+          "BMRB:50738",
+          "SASBDB:SASDK29"
+        ]
+      },
+      "eligibility": "candidate_only_with_known_observable_circularity_risk",
+      "partition": null,
+      "local_assets_verified": false,
+      "primary_observables_verified": false,
+      "license_verified": false,
+      "exposure_audit_complete": false,
+      "blockers": [
+        "SAXS is reported as used in ensemble selection; the same SAXS observable cannot be counted as held-out validation",
+        "retrieve exact current source and ensemble metadata",
+        "identify an independent or withheld observable if available",
+        "verify license, exposure, and target grouping"
+      ]
+    }
+  ],
+  "constraints": [
+    "A source candidate is not an admitted benchmark target.",
+    "A null partition means no train/validation/test assignment has been made.",
+    "No file hash is claimed until an asset is downloaded and hashed locally.",
+    "Public listing metadata can change; re-fetch and pin exact raw metadata before admission.",
+    "No experiment, simulation, prediction, or CI run is recorded as completed by this manifest."
+  ],
+  "references": [
+    {
+      "description": "PED live catalog",
+      "url": "https://proteinensemble.org/"
+    },
+    {
+      "description": "PED browse listings",
+      "url": "https://proteinensemble.org/browse"
+    },
+    {
+      "description": "PED API documentation",
+      "url": "https://proteinensemble.org/api"
+    },
+    {
+      "description": "PeptoneBench source and README",
+      "url": "https://github.com/PeptoneLtd/peptonebench"
+    },
+    {
+      "description": "PeptoneBench associated preprint",
+      "url": "https://doi.org/10.1101/2025.10.18.680935"
+    },
+    {
+      "description": "mdCATH dataset paper",
+      "url": "https://doi.org/10.1038/s41597-024-04140-z"
+    }
+  ]
+}
