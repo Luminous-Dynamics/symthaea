@@ -29,6 +29,29 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         self.assertRegex(module.ENGINE_SHA, r"^[0-9a-f]{40}$")
         self.assertRegex(module.ENGINE_BLOB, r"^[0-9a-f]{40}$")
 
+    def test_run_pr_association_must_match_exact_open_pr(self):
+        repo = "owner/repo"
+        subject = "a" * 40
+        pr = {"number": 12}
+        associated = {"number": 12,
+                      "head": {"sha": subject, "ref": "security/fix", "repo": {"full_name": repo}},
+                      "base": {"ref": "main", "repo": {"full_name": repo}}}
+        run = {"pull_requests": [associated]}
+        module.check_run_pr_binding(run, repo, pr, subject, "security/fix", "main")
+        bad_runs = [
+            {"pull_requests": []},
+            {"pull_requests": [dict(associated, number=13)]},
+            {"pull_requests": [dict(associated, head={**associated["head"], "sha": "b" * 40})]},
+            {"pull_requests": [dict(associated, head={**associated["head"], "ref": "other"})]},
+            {"pull_requests": [dict(associated, base={**associated["base"], "ref": "release"}]},
+            {"pull_requests": [dict(associated, head={**associated["head"], "repo": {"full_name": "fork/repo"}})]},
+            {"pull_requests": [dict(associated, base={**associated["base"], "repo": {"full_name": "other/repo"}})]},
+            {"pull_requests": [associated, associated]},
+        ]
+        for bad in bad_runs:
+            with self.subTest(bad=bad), self.assertRaises(module.VerificationError):
+                module.check_run_pr_binding(bad, repo, pr, subject, "security/fix", "main")
+
     def test_verifier_self_tests_require_explicit_success(self):
         self.assertTrue(module.verifier_tests_passed("success"))
         for outcome in ("", "failure", "cancelled", "skipped", "unexpected"):
