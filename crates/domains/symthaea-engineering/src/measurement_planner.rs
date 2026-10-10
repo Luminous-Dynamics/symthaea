@@ -43,7 +43,10 @@ impl MeasurementMetric {
         }
     }
 
-    fn interval<'a>(self, intervals: &'a RegenerativeMetricIntervals) -> Option<&'a MetricInterval> {
+    fn interval<'a>(
+        self,
+        intervals: &'a RegenerativeMetricIntervals,
+    ) -> Option<&'a MetricInterval> {
         match self {
             Self::CharYield => Some(&intervals.char_yield_fraction_dry_basis),
             Self::CarbonRetention => Some(&intervals.carbon_retained_fraction),
@@ -309,20 +312,26 @@ pub fn prioritize_measurements(
         };
 
         let disposition_note = if relevant && score.is_some() && is_missing_required_climate {
-            "Targets missing required climate data; ranking uses a declared acquisition-benefit fraction and is only a triage heuristic.".to_string()
+            "Targets missing required climate data; ranking uses a declared acquisition-benefit fraction and is only a triage heuristic."
+                .to_string()
         } else if relevant && score.is_some() {
-            "Targets an unresolved numeric constraint; ranking uses declared heuristic inputs only.".to_string()
+            "Targets an unresolved numeric constraint; ranking uses declared heuristic inputs only."
+                .to_string()
         } else if relevant {
-            "Constraint is unresolved, but the declared decision relevance weight is zero.".to_string()
+            "Constraint is unresolved, but the declared decision relevance weight is zero."
+                .to_string()
         } else if relevant_status.is_none() {
-            "No matching constraint is active in this specification; option is not ranked.".to_string()
+            "No matching constraint is active in this specification; option is not ranked."
+                .to_string()
         } else if relevant_status == Some(IntervalConstraintStatus::Unresolved)
             && option.metric == MeasurementMetric::NetClimate
             && option.metric.interval(intervals).is_none()
         {
-            "Required climate interval is missing; the proposed assay can supply evidence, but no numeric interval is available yet.".to_string()
+            "Required climate interval is missing; the proposed assay can supply evidence, but no numeric interval is available yet."
+                .to_string()
         } else {
-            "Does not target a currently unresolved constraint; retained for audit but not ranked.".to_string()
+            "Does not target a currently unresolved constraint; retained for audit but not ranked."
+                .to_string()
         };
 
         priorities.push(MeasurementPriority {
@@ -385,7 +394,8 @@ pub fn prioritize_measurements(
         cost_unit: cost_unit.to_string(),
         unresolved_constraint_ids,
         options: priorities,
-        scope_note: "measurement triage heuristic only; not a calibrated value-of-information estimate, statistical design-of-experiments plan, safety approval, or agronomic recommendation".into(),
+        scope_note: "measurement triage heuristic only; not a calibrated value-of-information estimate, statistical design-of-experiments plan, safety approval, or agronomic recommendation"
+            .into(),
     })
 }
 
@@ -501,7 +511,13 @@ mod tests {
     fn missing_required_climate_can_be_targeted_for_data_acquisition() {
         let mut req = requirements();
         req.include_climate_objective = true;
-        let mut climate_option = option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0);
+        let mut climate_option = option(
+            "climate-inventory",
+            MeasurementMetric::NetClimate,
+            8.0,
+            0.6,
+            1.0,
+        );
         climate_option.benefit_basis = MeasurementBenefitBasis::MissingRequiredDataAcquisition;
         let options = vec![climate_option];
         let plan = prioritize_measurements(
@@ -518,7 +534,13 @@ mod tests {
         let mut req = requirements();
         req.include_climate_objective = true;
         let mut input = intervals();
-        let mut options = vec![option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0)];
+        let mut options = vec![option(
+            "climate-inventory",
+            MeasurementMetric::NetClimate,
+            8.0,
+            0.6,
+            1.0,
+        )];
         assert!(prioritize_measurements(
             &input, &req, "USD_2026_per_measurement", &options,
         ).is_err());
@@ -545,7 +567,10 @@ mod tests {
             &input, &req, "USD_2026_per_measurement", &options,
         ).unwrap();
         assert_eq!(plan.options[0].target_constraint_id, "net_climate_maximum");
-        assert_eq!(plan.options[0].current_constraint_status, Some(IntervalConstraintStatus::Unresolved));
+        assert_eq!(
+            plan.options[0].current_constraint_status,
+            Some(IntervalConstraintStatus::Unresolved)
+        );
         assert_eq!(plan.options[0].rank, Some(1));
     }
 
