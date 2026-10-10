@@ -55,8 +55,17 @@ impl MeasurementMetric {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeasurementBenefitBasis {
+    /// The metric already has a range, and the activity is expected to narrow it.
+    IntervalWidthReduction,
+    /// Required metric bounds are absent, and the activity primarily acquires baseline evidence.
+    MissingRequiredDataAcquisition,
+}
+
 /// A possible measurement or calibration activity. All option costs must use the same
-/// cost_unit within one request. The reduction fraction and priority weight are explicit
+/// cost_unit within one request. Benefit fraction and priority weight are explicit
 /// estimates/judgments with provenance; they are not inferred by this planner.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -68,7 +77,8 @@ pub struct MeasurementOption {
     pub estimated_cost: f64,
     pub cost_unit: String,
     /// Caller-supplied expected fraction reduction in the target interval width, in (0, 1].
-    pub expected_interval_width_reduction_fraction: f64,
+    pub benefit_basis: MeasurementBenefitBasis,
+    pub expected_benefit_fraction: f64,
     /// Caller-supplied decision relevance weight in [0, 1], chosen by the study owner.
     pub decision_relevance_weight: f64,
     pub cost_evidence: EvidenceRef,
@@ -99,12 +109,12 @@ impl MeasurementOption {
                 "must be finite and greater than zero",
             ));
         }
-        if !self.expected_interval_width_reduction_fraction.is_finite()
-            || self.expected_interval_width_reduction_fraction <= 0.0
-            || self.expected_interval_width_reduction_fraction > 1.0
+        if !self.expected_benefit_fraction.is_finite()
+            || self.expected_benefit_fraction <= 0.0
+            || self.expected_benefit_fraction > 1.0
         {
             return Err(MeasurementPlannerError::new(
-                "expected_interval_width_reduction_fraction",
+                "expected_benefit_fraction",
                 "must be finite and in the interval (0, 1]",
             ));
         }
@@ -175,7 +185,7 @@ pub struct MeasurementPriority {
     pub target_constraint_id: String,
     pub current_constraint_status: Option<IntervalConstraintStatus>,
     pub currently_decision_relevant: bool,
-    /// Relevance × expected interval-width reduction / estimated cost.
+    /// Relevance × declared expected benefit fraction / estimated cost.
     /// Relative heuristic only; not a probability, confidence value, or calibrated VOI.
     pub heuristic_score: Option<f64>,
     pub estimated_cost: f64,
@@ -206,7 +216,7 @@ pub struct MeasurementPriorityPlan {
 /// regenerative-design screen. Only options mapped to a constraint that is currently
 /// unresolved are ranked. The ordering score is:
 ///
-/// decision_relevance_weight * expected_interval_width_reduction_fraction / estimated_cost.
+/// decision_relevance_weight * expected_benefit_fraction / estimated_cost.
 ///
 /// All costs must use the same explicit unit and price basis. The result is a triage aid,
 /// not an optimal experiment plan: it does not model dependencies/correlation, measurement
@@ -268,9 +278,23 @@ pub fn prioritize_measurements(
         let relevant = relevant_status == Some(IntervalConstraintStatus::Unresolved)
             && (metric_interval_available || is_missing_required_climate);
 
+        if relevant {
+            let expected_basis = if is_missing_required_climate {
+                MeasurementBenefitBasis::MissingRequiredDataAcquisition
+            } else {
+                MeasurementBenefitBasis::IntervalWidthReduction
+            };
+            if option.benefit_basis != expected_basis {
+                return Err(MeasurementPlannerError::new(
+                    "benefit_basis",
+                    "benefit basis must match whether the option narrows an existing interval or acquires missing required data",
+                ));
+            }
+        }
+
         let score = if relevant {
             let value = option.decision_relevance_weight
-                * option.expected_interval_width_reduction_fraction
+                * option.expected_benefit_fraction
                 / option.estimated_cost;
             if !value.is_finite() {
                 return Err(MeasurementPlannerError::new(
@@ -283,7 +307,9 @@ pub fn prioritize_measurements(
             None
         };
 
-        let disposition_note = if relevant && score.is_some() {
+        let disposition_note = if relevant && score.is_some() && is_missing_required_climate {
+            "Targets missing required climate data; ranking uses a declared acquisition-benefit fraction and is only a triage heuristic.".to_string()
+        } else if relevant && score.is_some() {
             "Targets an unresolved numeric constraint; ranking uses declared heuristic inputs only.".to_string()
         } else if relevant {
             "Constraint is unresolved, but the declared decision relevance weight is zero.".to_string()
@@ -421,7 +447,8 @@ mod tests {
             method_or_experiment_id: format!("method-{id}-v1"),
             estimated_cost: cost,
             cost_unit: "USD_2026_per_measurement".into(),
-            expected_interval_width_reduction_fraction: reduction,
+            benefit_basis: MeasurementBenefitBasis::IntervalWidthReduction,
+            expected_benefit_fraction: reduction,
             decision_relevance_weight: weight,
             cost_evidence: evidence(&format!("{id}-cost")),
             expected_reduction_evidence: evidence(&format!("{id}-reduction")),
@@ -472,7 +499,9 @@ mod tests {
     fn missing_required_climate_can_be_targeted_for_data_acquisition() {
         let mut req = requirements();
         req.include_climate_objective = true;
-        let options = vec![option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0)];
+        let mut climate_option = option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0);
+        climate_option.benefit_basis = MeasurementBenefitBasis::MissingRequiredDataAcquisition;
+        let options = vec![climate_option];
         let plan = prioritize_measurements(
             &intervals(), &req, "USD_2026_per_measurement", &options,
         ).unwrap();
@@ -480,6 +509,23 @@ mod tests {
         assert_eq!(plan.options[0].target_constraint_id, "climate_objective_interval_available");
         assert_eq!(plan.options[0].rank, Some(1));
         assert!(plan.options[0].currently_decision_relevant);
+    }
+
+    #[test]
+    fn climate_interval_reduction_and_missing_data_acquisition_are_distinct() {
+        let mut req = requirements();
+        req.include_climate_objective = true;
+        let mut input = intervals();
+        let options = vec![option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0)];
+        assert!(prioritize_measurements(
+            &input, &req, "USD_2026_per_measurement", &options,
+        ).is_err());
+
+        input.net_climate_kg_co2e_per_kg_dry_feedstock =
+            Some(metric_interval(-1.0, 1.0, "climate-range"));
+        assert!(prioritize_measurements(
+            &input, &req, "USD_2026_per_measurement", &options,
+        ).is_err());
     }
 
     #[test]
