@@ -1599,4 +1599,44 @@ mod tests {
             solution.iterations, elapsed, dim, threshold_ms
         );
     }
+    #[test]
+    fn cleanup_target_identity_is_local_to_relevant_codebook_entry() {
+        let dim = 4;
+        let query = vec![1.0, 0.0, 0.0, 0.0];
+        let target = query.clone();
+        let distractor = vec![0.0, 1.0, 0.0, 0.0];
+
+        let mut target_only = ResonatorNetwork::with_config(
+            dim,
+            ResonatorConfig {
+                temperature: 0.1,
+                ..ResonatorConfig::default()
+            },
+        )
+        .unwrap();
+        target_only.add_symbol("target", target.clone()).unwrap();
+        let cleaned_target_only = target_only.cleanup(&query);
+
+        let mut with_distractor = ResonatorNetwork::with_config(
+            dim,
+            ResonatorConfig {
+                temperature: 0.1,
+                ..ResonatorConfig::default()
+            },
+        )
+        .unwrap();
+        with_distractor.add_symbol("target", target.clone()).unwrap();
+        with_distractor.add_symbol("unrelated-distractor", distractor).unwrap();
+        let cleaned_with_distractor = with_distractor.cleanup(&query);
+
+        let target_sim_only = cosine_similarity(&cleaned_target_only, &target);
+        let target_sim_with_distractor = cosine_similarity(&cleaned_with_distractor, &target);
+        assert!(target_sim_only > 0.99, "target-only cleanup should preserve identity");
+        assert!(
+            target_sim_with_distractor > 0.99,
+            "unrelated codebook entry must not dislodge the authoritative target identity: {}",
+            target_sim_with_distractor
+        );
+    }
+
 }
