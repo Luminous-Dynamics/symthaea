@@ -1219,9 +1219,18 @@ mod tests {
             potassium: 0.03,
         };
         let evidence = NutrientRecoveryEvidence {
-            influent_composition: EvidenceRef { evidence_id: "scenario-influent-001".into(), kind: EvidenceKind::Scenario },
-            recovery_parameters: EvidenceRef { evidence_id: "scenario-recovery-001".into(), kind: EvidenceKind::Scenario },
-            plant_availability_parameters: EvidenceRef { evidence_id: "scenario-availability-001".into(), kind: EvidenceKind::Scenario },
+            influent_composition: EvidenceRef {
+                evidence_id: "scenario-influent-001".into(),
+                kind: EvidenceKind::Scenario,
+            },
+            recovery_parameters: EvidenceRef {
+                evidence_id: "scenario-recovery-001".into(),
+                kind: EvidenceKind::Scenario,
+            },
+            plant_availability_parameters: EvidenceRef {
+                evidence_id: "scenario-availability-001".into(),
+                kind: EvidenceKind::Scenario,
+            },
             input_snapshot_id: "scenario-nutrient-run-001".into(),
         };
         let mut fractions = NutrientRecoveryFractions {
