@@ -1281,9 +1281,16 @@ mod tests {
         let nix = &selected.configuration_nix;
         for expected in [
             "nixpkgs.overlays = [",
-            "photocraft = prev.appimageTools.wrapType2 {",
+            "photocraft =",
+            "prev.appimageTools.wrapType2 {",
+            "appimageContents = prev.appimageTools.extractType2 {",
+            "extraInstallCommands = ''",
             "version = \"0.5.0\";",
             "photocraft-0.5.0-linux-x86_64.AppImage",
+            "ai.storyteller.photocraft.desktop",
+            "ai.storyteller.photocraft.xml",
+            "ai.storyteller.photocraft.metainfo.xml",
+            "hicolor $out/share/icons/",
             "hash = \"sha256-9U2GOAcFO738/6DWJO9+SdP9QTEMe7Ht5IU29pkp0i8=\";",
             "license = [ prev.lib.licenses.mit prev.lib.licenses.asl20 ];",
             "libxkbcommon",
