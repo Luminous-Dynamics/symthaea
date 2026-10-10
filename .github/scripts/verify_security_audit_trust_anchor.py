@@ -154,6 +154,13 @@ def fetch_authoritative_pr_merge_sha(repo: str, pr: dict[str, Any], subject: str
         raise VerificationError("authoritative PR base differs from the trusted default branch")
     if current.get("mergeable") is not True:
         raise VerificationError("GitHub has not confirmed a mergeable PR test-merge commit")
+    mergeable_state = current.get("mergeable_state")
+    if mergeable_state == "behind":
+        raise VerificationError("PR head is behind the current base; strict up-to-date qualification is required")
+    if mergeable_state == "unknown":
+        raise VerificationError("GitHub has not resolved the PR merge state")
+    if mergeable_state not in {"clean", "unstable", "blocked", "ahead", "identical", "has_hooks", "draft"}:
+        raise VerificationError("PR merge state is missing or not explicitly recognized")
     return sha(current.get("merge_commit_sha"), "pr.merge_commit_sha")
 
 
