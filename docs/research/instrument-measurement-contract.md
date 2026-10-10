@@ -24,7 +24,7 @@ The initial unit set covers common engineering signals and research-healthcare p
 
 ## Fail-closed quantitative gate
 
-The strict assessment checks sequence/time ordering using a caller-maintained `MeasurementStreamGuard` and rejects:
+The strict assessment checks sequence/time ordering using a caller-maintained `MeasurementStreamGuard`; it also requires the uncertainty policy's unit to exactly match the measurement unit (no implicit conversion) and rejects:
 
 - mismatched clock-domain context, future-dated or stale data;
 - any declared quality flag (saturation, motion artifact, lead-off, missing samples, unsynchronized clock, failed self-test, out-of-range values, unknown signal quality, etc.);
@@ -33,7 +33,7 @@ The strict assessment checks sequence/time ordering using a caller-maintained `M
 - unresolved calibration evidence;
 - resolver results whose calibration record ID or evidence artifact differs from the measurement reference;
 - calibration evidence for a different instrument/channel, quantity/unit, validity interval, or calibrated value range;
-- measurement or calibration uncertainty above the consumer's explicit limits.
+- measurement or calibration uncertainty above the consumer's explicit limits. Both limits and both uncertainties are interpreted in the same explicit unit; use a separately reviewed conversion before assessing a different unit.
 
 The raw-data and calibration resolvers are explicit trust boundaries. The raw-data resolver must actually retrieve the referenced bytes, compute/verify their digest, and return non-empty artifact metadata; merely looking up a database row or echoing the supplied reference is insufficient. The calibration resolver must resolve and review artifact bytes/digests, the review receipt, exact instrument/channel identity, supported quantity/unit, validity dates, inclusive calibrated value range, calibration chain and uncertainty contributions. The strict gate rejects a calibration record for another channel or a measured value outside the stated range. The crate checks returned IDs/digests against the observation, but cannot prove either resolver is independent or authoritative by itself. Configure and test both implementations independently. The returned `MeasurementAssessment` is read-only through its public API and retains the instrument, timestamp domain, observed value, calibration evidence/review references, calibrated range, raw artifact metadata, and uncertainty limits that passed. It is not a cryptographically signed receipt or clinical authorization.
 
@@ -46,7 +46,7 @@ Measurement and calibration standard uncertainties are reported separately. The 
 ## Validation strategy
 
 1. Unit tests reject bad dimensions, non-finite values, negative uncertainty, malformed identifiers and digests.
-2. Gate tests exercise freshness, quality flags, clock epochs, absent provenance, unresolved raw/calibration artifacts, evidence mismatch, instrument/channel mismatch, wrong units, validity windows, calibrated-range enforcement and uncertainty limits.
+2. Gate tests exercise freshness, quality flags, clock epochs, absent provenance, unresolved raw/calibration artifacts, evidence mismatch, instrument/channel mismatch, wrong units (including the uncertainty-policy unit), validity windows, calibrated-range enforcement and uncertainty limits.
 3. Clock-domain tests verify mismatched caller clocks fail before consuming stream state and unexpected source epoch changes are rejected by an existing guard. Raw-evidence tests exercise empty artifacts, unresolved acquisition bytes and artifact-ID/digest mismatch; calibration tests exercise certificate/review separation and applicability.
 4. Stream tests exercise duplicate/replayed sequence numbers, time reversal and rejection of future timestamps without poisoning the accepted timestamp floor.
 5. In the next integration step, connect this contract to synthetic biomedical signals and ultrasound simulator output, then use independently generated raw-acquisition and calibration-review fixtures. The current crate does not acquire hardware or claim a clinical use is safe.
