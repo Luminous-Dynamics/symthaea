@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Energy Efficiency Measurement Benchmark
+//! Energy Throughput and Evidence Benchmark
 //!
 //! Measures HDC+CfC pipeline throughput and optionally observes Linux CPU
 //! package energy. Power × latency comparisons are illustrative scenarios.
@@ -34,24 +34,24 @@ const POWER_ASSUMPTION_DESKTOP_W: f64 = 65.0;
 const POWER_ASSUMPTION_LAPTOP_W: f64 = 15.0;
 
 // Illustrative transformer assumptions; no common measurement protocol.
-struct TransformerRef {
+struct TransformerAssumption {
     name: &'static str,
     power_watts: f64,
     time_per_inference_ms: f64,
 }
 
-const TRANSFORMER_ASSUMPTIONS: &[TransformerRef] = &[
-    TransformerRef {
+const TRANSFORMER_ASSUMPTIONS: &[TransformerAssumption] = &[
+    TransformerAssumption {
         name: "GPT-3 175B",
         power_watts: 355.0,
         time_per_inference_ms: 100.0,
     },
-    TransformerRef {
+    TransformerAssumption {
         name: "Llama 7B",
         power_watts: 50.0,
         time_per_inference_ms: 30.0,
     },
-    TransformerRef {
+    TransformerAssumption {
         name: "Mistral 7B",
         power_watts: 45.0,
         time_per_inference_ms: 25.0,
@@ -326,8 +326,8 @@ fn build_package_energy_measurement(
 
 fn build_energy_comparisons(
     symthaea_pipeline_time_ms: f64,
-    tdp: f64,
-    tdp_label: &str,
+    power_assumption_watts: f64,
+    scenario_label: &str,
 ) -> Vec<EnergyComparison> {
     let gpt3_energy = modeled_energy_per_call(
         TRANSFORMER_ASSUMPTIONS[0].power_watts,
@@ -337,14 +337,14 @@ fn build_energy_comparisons(
     let mut comparisons = Vec::new();
 
     // Symthaea entry
-    let sym_energy = modeled_energy_per_call(tdp, symthaea_pipeline_time_ms);
+    let sym_energy = modeled_energy_per_call(power_assumption_watts, symthaea_pipeline_time_ms);
     comparisons.push(EnergyComparison {
-        system: format!("Symthaea HDC+CfC ({tdp_label})"),
-        power_watts: tdp,
+        system: format!("Symthaea HDC+CfC ({scenario_label})"),
+        power_watts: power_assumption_watts,
         time_per_inference_ms: symthaea_pipeline_time_ms,
         energy_per_inference_joules: sym_energy,
         modeled_ratio_vs_gpt3: sym_energy / gpt3_energy,
-        basis: "Modeled from configured power assumption × measured pipeline latency; not metered energy.".into(),
+        basis: "Modeled from configured power assumption × measured latency on this host; not a separate hardware measurement.".into(),
     });
 
     // Transformer references
@@ -386,7 +386,7 @@ fn main() {
     let total_start = Instant::now();
 
     println!("==========================================================");
-    println!("  Energy Efficiency Measurement Benchmark");
+    println!("  Energy Throughput and Evidence Benchmark");
     println!("  HDC Dimension: {}", HDC_DIMENSION);
     println!("==========================================================");
 
