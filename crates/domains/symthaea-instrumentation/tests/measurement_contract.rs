@@ -47,10 +47,16 @@ fn calibration_fixture_bytes() -> Vec<u8> {
 }
 
 fn review_fixture_bytes_for_certificate_digest(certificate_digest: &str) -> Vec<u8> {
-    format!(
-        "symthaea-independent-calibration-review-fixture-v1\nreview=passed\nreviewer=fixture-reviewer-01\ncertificate_sha256={certificate_digest}\n"
-    )
-    .into_bytes()
+    let mut content = [
+        "symthaea-independent-calibration-review-fixture-v1",
+        "review=passed",
+        "reviewer=fixture-reviewer-01",
+    ]
+    .join("\n");
+    content.push_str("\ncertificate_sha256=");
+    content.push_str(certificate_digest);
+    content.push('\n');
+    content.into_bytes()
 }
 
 fn calibration_digest_hex() -> String {
@@ -174,7 +180,7 @@ impl CalibrationEvidenceResolver for MockResolver {
             "certificate_sha256={}",
             resolved.evidence().sha256_hex()
         );
-        if !review_text.lines().any(|line| line == expected_binding) {
+        if !review_text.lines().any(|line| line == expected_binding.as_str()) {
             return Err("calibration review receipt does not bind the certificate SHA-256".into());
         }
 
