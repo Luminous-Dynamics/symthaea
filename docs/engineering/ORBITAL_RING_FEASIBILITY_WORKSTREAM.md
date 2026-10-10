@@ -255,11 +255,11 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 **A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, field-level provenance, rejection of test-fixture/rejected evidence, typed vectors, support-frame from/to frames and epoch, support-frame quaternion, unit ring-plane normal, geometric/load consistency, step/ramp consistency, rider parameters, and explicit energy/momentum term inventories. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
 
 - Local syntax check: `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
-- Validator self-tests: **72 passed, 0 failed**. Every required value and every provenance record was removed one at a time; invalid numeric types, unknown force laws, geometry/load inconsistency, duplicate supports, frame mismatches, missing energy/momentum term inventories, fixture-only provenance, rejected evidence and empty evidence references all blocked promotion.
+- Validator self-tests: **73 passed, 0 failed**. Every required value and every provenance record was removed one at a time; invalid numeric types, unknown force laws, geometry/load inconsistency, duplicate supports, frame mismatches, missing energy/momentum term inventories, fixture-only provenance, rejected evidence and empty evidence references all blocked promotion.
 - Template assessment: contract validation `passed_contract_checks`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
 - Both emitted JSON reports were byte-identical on repeat and are preserved under `docs/engineering/evidence/`.
-- Validator Git blob SHA: `1974f34d4f920e63fbe55055775fcc2b1b329d8c`; source SHA-256: `b446b3d8b9bcde9ea26802c33203c1c0c4d1c7eec796067d4e1ef156f876bbc1`.
-- Template Git blob SHA: `4f4e5403ea1b90d81877158aced84e48b19b5659`; validation report blob: `1485c06416f5bd4fe47265a782bfc8722efca09f` (SHA-256 `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`); self-test report blob: `41ff8edb6d14274efba570f78fc7527bec0fd64a` (SHA-256 `76c97b9b2d20b592186b8bcff3d09be77e627e4ebc14625ad22df4843d44bf9b`).
+- Validator Git blob SHA: `2d07b86480dea71f3272fbee2a9fde4152727abb`; source SHA-256: `86dece2753b53f44a5f3dffc109a33121ec2b4ff5cef28bca01a41029af74217`.
+- Template Git blob SHA: `4f4e5403ea1b90d81877158aced84e48b19b5659`; validation report blob: `8d0f200eb2db33c4c4ef6b8dc07ef98d21e184d6` (SHA-256 `0aa07355674fb104d0e9bb38ad3bafad3cd768b3557e4bfe012126b25f8c253c`); self-test report blob: `87612c32dfe45c3c0fb8b8588716b35c0457aa67` (SHA-256 `dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5`).
 
 A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
 
@@ -271,7 +271,7 @@ A green manifest-contract result does **not** mean model inputs are physically v
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
 - Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
 - Ran the column-aware power-source audit (20/20 checks) and repeated it with byte-identical JSON output; local copy's Git blob SHA matched the branch source.
-- Ran the failure-manifest validator self-test (72/72 checks); the provenance and consistency gate kept the 23-field scenario template Blocked and NotRun.
+- Ran the failure-manifest validator self-test (73/73 checks); the provenance and consistency gate kept the 23-field scenario template Blocked and NotRun.
 
 ### Checks not performed
 
