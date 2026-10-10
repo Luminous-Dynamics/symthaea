@@ -64,7 +64,7 @@ These should be preserved as invariants during refactoring.
 
 For each run, create a unique workspace and a frozen manifest. Pin the absolute solver executable/package identity and version, bind the Nix closure/container image or other environment manifest, and use a controlled environment with an explicit allowlist. Use no shell interpolation; pass arguments as separate values. The working directory, solver inputs, all transitive `.include`/`.lib` dependencies, command arguments, configuration files, and output paths must be explicit and included in the run manifest.
 
-The ngspice Version 45 manual documents batch output using a rawfile and log, e.g. `ngspice -b -r result.raw -o result.log input.cir`. Use a supported, deterministic output format and parse the actual raw/log artifacts; do not infer convergence from process exit or scrape an unconstrained terminal transcript alone. Pin the chosen solver version and validate the parser against that version's actual outputs.
+The ngspice Version 47 manual documents batch output using a rawfile and log, e.g. `ngspice -b -r result.raw -o result.log input.cir`. Use a supported, deterministic output format and parse the actual raw/log artifacts; do not infer convergence from process exit or scrape an unconstrained terminal transcript alone. Pin the chosen solver version and validate the parser against that version's actual outputs.
 
 Keep an execution report even for failed runs, separately tracking:
 
@@ -96,6 +96,25 @@ The ngspice parser should not be considered ready from a single happy-path fixtu
 | Tampered input/output bytes under an existing digest | Digest verification fails; no engineering evidence accepted |
 
 The minimum numerical benchmark should be intentionally small. For example, an ideal first-order RC step response has time constant \(\tau = RC\) and capacitor voltage \(V_C(t)=V_{step}(1-e^{-t/\tau})\) for zero initial voltage. Compare a declared sample/measurement at \(t=\tau\) to \(1-e^{-1}\approx0.6321\) of the step, while accounting for the exact source, initial conditions, transient time-step settings, tolerances, and any model simplifications. This proves only that specific circuit model and parser path; it says nothing about hardware qualification.
+
+## Review of the existing ngspice implementation PR
+
+The repository already has an implementation lane in [ENG-SPICE-001 PR #5658](https://github.com/Luminous-Dynamics/symthaea/pull/5658). Do not create a duplicate implementation. Its current design narrows accepted input to built-in R/C/L elements, independent V/I sources, a small set of analyses/output directives, explicitly requested scalar `.measure` results, and rejection of model/control/file-loading surfaces until the transitive input closure is bound.
+
+### Verified correction on the PR branch
+
+The official [ngspice Version 47 manual, §2.1.1](https://ngspice.sourceforge.io/docs/ngspice-47-manual.pdf) states that the first physical line is always the title and the last line must be `.end` followed by a newline delimiter. The validator in PR #5658 initially checked all lines as if they were candidate netlist statements and did not require these framing rules. A follow-up commit on that existing branch (head `8aa64a19c3e4c3d4df958c7463d3bd682a9e7840`) now requires an explicit comment-style title beginning with `*`, validates statements only after that title, requires a terminal `.end`, and rejects a missing final newline. A regression test exercises an element in the title position, a blank title, missing `.end`, missing newline, and a statement after `.end`.
+
+This is a source-level correction committed to the PR branch—not a merge or a test PASS. No fresh workflow run was returned for that exact head during this review, so the added tests still require CI execution.
+
+### Remaining acceptance gates
+
+1. **Metric dimensions are currently caller assertions.** The bridge associates a requested measure name with a caller-supplied unit but does not prove that the `.measure` expression yields that dimension. For example, `MAX v(out)` can be labeled amperes unless the implementation binds the exact expression to a checked metric contract. Before admitting these results as typed engineering evidence, either parse a tightly restricted set of measurement forms and derive dimensions, or bind each normalized expression and unit to an independently checked contract owned by the physical-type workstream (#6870). Add a voltage-as-current negative fixture.
+2. **The output artifact is hashed then deleted.** The PR hashes the log and removes it immediately; the digest alone does not make the bytes retrievable. Add an immutable/content-addressed artifact reference in the evidence layer (#4440), or explicitly scope this tranche as parser provenance rather than full independent reproducibility. Capture successful-run stderr/warnings as artifacts in the generic subprocess evidence work.
+3. **Version string is not full solver identity.** The PR records the first non-empty line from the version command, plus netlist and log digests. It does not yet bind the solver executable/package digest, runtime closure, controlled environment, or parser binary digest. Those belong in #4440 and must be completed before making stronger reproducibility claims.
+4. **Real-solver qualification remains separate.** The three ngspice integration tests are marked ignored because they require the external solver. They must be executed against a pinned version and exact head with raw outputs retained; library unit tests alone do not qualify the real solver path.
+
+The recorded CI run from 2026-09-25 passed the workspace nextest job, the default-feature `symthaea` library tests, security audit, and PR-governance check, but the overall run was red due to other workspace jobs (unrelated orphan modules, formatting, Clippy, Muse-theory, and Spore-size failures). Those results are historical and do not qualify the later PR head.
 
 ## Proposed external toolchain
 
@@ -244,7 +263,7 @@ Primary documentation reviewed for the tool shortlist:
 
 - [MuJoCo model formats and model editing](https://mujoco.readthedocs.io/en/stable/modeling.html) — programmable multibody model boundary.
 - [ROS 2 control hardware components](https://control.ros.org/jazzy/doc/ros2_control/hardware_interface/doc/hardware_components_userdoc.html) — actuator/sensor/system interfaces and lifecycle.
-- [ngspice Version 45 manual: batch analyses and raw output](https://ngspice.sourceforge.io/docs/ngspice-45-manual.pdf) — batch execution and rawfile/log support.
+- [ngspice Version 47 manual: batch analyses and raw output](https://ngspice.sourceforge.io/docs/ngspice-47-manual.pdf) — batch execution and rawfile/log support.
 - [OpenFOAM residuals and convergence](https://doc.openfoam.com/2306/tools/processing/numerics/solvers/residuals/) — solver-specific residual semantics; do not reduce all convergence to process exit.
 - [OpenFOAM user guide](https://www.openfoam.com/documentation/user-guide) — cases, meshes, boundary conditions, solvers, monitoring and post-processing.
 - [OpenMDAO documentation](https://openmdao.org/newdocs/versions/latest/) — multidisciplinary optimization over coupled analysis components.
@@ -253,7 +272,7 @@ Primary documentation reviewed for the tool shortlist:
 - [PICLas documentation](https://piclas.readthedocs.io/en/latest/) — specialized PIC/DSMC and field/particle modeling. The project documentation notes that parts of its species/reaction database are still being verified, so data provenance and model-specific validation are particularly important.
 - [ISO 12100:2010](https://www.iso.org/standard/51528.html) — machinery hazard assessment and risk reduction.
 
-- [ngspice Version 45 User's Manual](https://ngspice.sourceforge.io/docs/ngspice-45-manual.pdf) — explicit rawfile and log output options for batch runs.
+- [ngspice Version 47 User's Manual](https://ngspice.sourceforge.io/docs/ngspice-47-manual.pdf) — explicit rawfile and log output options for batch runs.
 - [Meep licensing](https://meep.readthedocs.io/en/latest/License_and_Copyright/) — GPL-2-or-later; evaluate packaging/distribution consequences before bundling binaries or linking native code.
 - [PICLas documentation](https://piclas.readthedocs.io/en/latest/) — particle-in-cell / DSMC plasma-flow methods, GPLv3, and high-order electromagnetic field solvers.
 - [k-Wave-II project status](https://github.com/ucl-bug/k-wave-ii) — active rewrite/pre-release and requires MATLAB R2023b or newer; not an assumed portable, self-contained runtime.
