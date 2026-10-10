@@ -393,11 +393,11 @@ impl MeasurementEnvelope {
         stream_guard: &mut MeasurementStreamGuard,
     ) -> Result<MeasurementAssessment, AssessmentFailure> {
         stream_guard
-            .observe(self)
-            .map_err(AssessmentFailure::StreamOrder)?;
-        if now_ns < self.captured_at_ns {
-            return Err(AssessmentFailure::ClockInFuture);
-        }
+            .observe_at(self, now_ns)
+            .map_err(|failure| match failure {
+                StreamOrderFailure::FutureTimestamp { .. } => AssessmentFailure::ClockInFuture,
+                other => AssessmentFailure::StreamOrder(other),
+            })?;
         let age_ns = now_ns - self.captured_at_ns;
         if age_ns > policy.max_age_ns {
             return Err(AssessmentFailure::Stale { age_ns, max_age_ns: policy.max_age_ns });
@@ -587,45 +587,102 @@ impl fmt::Display for AssessmentFailure {
 
 impl std::error::Error for AssessmentFailure {}
 
-/// Per-instrument/channel guard against replayed, duplicate, or time-reversed
-/// observations. A new sequence is consumed even when its timestamp regresses; the
-/// stored timestamp floor remains monotonic, preventing reuse of that rejected sequence.
+/// Per-instrument/channel guard against replayed, duplicate, future-dated, or
+/// time-reversed observations. Rejected new sequences are consumed while the
+/// last accepted timestamp remains monotonic, preventing retry-based replay and
+/// preventing a future-dated sample from poisoning the timestamp high-water mark.
 #[derive(Debug, Default)]
 pub struct MeasurementStreamGuard {
-    last: HashMap<InstrumentIdentity, (u64, u64)>,
+    last: HashMap<InstrumentIdentity, StreamPosition>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StreamPosition {
+    sequence: u64,
+    last_timestamp_ns: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StreamOrderFailure {
     SequenceNotIncreasing { previous: u64, received: u64 },
     TimestampMovedBackward { previous_ns: u64, received_ns: u64 },
+    FutureTimestamp { captured_at_ns: u64, now_ns: u64 },
 }
 
 impl MeasurementStreamGuard {
+    /// Check sequence/time ordering when the caller does not need an explicit
+    /// wall/monotonic-now comparison. Quantitative use should call `observe_at`.
     pub fn observe(&mut self, measurement: &MeasurementEnvelope) -> Result<(), StreamOrderFailure> {
+        self.observe_inner(measurement, None)
+    }
+
+    /// Validate ordering and reject future timestamps using the same clock basis
+    /// represented by `now_ns`. A future timestamp consumes the sequence but
+    /// retains the last known non-future timestamp, so it cannot freeze the channel.
+    pub fn observe_at(
+        &mut self,
+        measurement: &MeasurementEnvelope,
+        now_ns: u64,
+    ) -> Result<(), StreamOrderFailure> {
+        self.observe_inner(measurement, Some(now_ns))
+    }
+
+    fn observe_inner(
+        &mut self,
+        measurement: &MeasurementEnvelope,
+        now_ns: Option<u64>,
+    ) -> Result<(), StreamOrderFailure> {
         let identity = measurement.identity.clone();
-        if let Some((previous_sequence, previous_timestamp_ns)) =
-            self.last.get(&identity).copied()
-        {
-            if measurement.sequence <= previous_sequence {
+        let previous = self.last.get(&identity).copied();
+
+        if let Some(position) = previous {
+            if measurement.sequence <= position.sequence {
                 return Err(StreamOrderFailure::SequenceNotIncreasing {
-                    previous: previous_sequence,
+                    previous: position.sequence,
                     received: measurement.sequence,
                 });
             }
-            if measurement.captured_at_ns < previous_timestamp_ns {
-                // Consume the strictly newer sequence but preserve the high-water
-                // timestamp. Retrying this sequence with a corrected timestamp must
-                // not turn a rejected observation into an accepted replay.
-                self.last
-                    .insert(identity, (measurement.sequence, previous_timestamp_ns));
-                return Err(StreamOrderFailure::TimestampMovedBackward {
-                    previous_ns: previous_timestamp_ns,
-                    received_ns: measurement.captured_at_ns,
+
+            if let Some(previous_timestamp_ns) = position.last_timestamp_ns {
+                if measurement.captured_at_ns < previous_timestamp_ns {
+                    self.last.insert(
+                        identity,
+                        StreamPosition {
+                            sequence: measurement.sequence,
+                            last_timestamp_ns: Some(previous_timestamp_ns),
+                        },
+                    );
+                    return Err(StreamOrderFailure::TimestampMovedBackward {
+                        previous_ns: previous_timestamp_ns,
+                        received_ns: measurement.captured_at_ns,
+                    });
+                }
+            }
+        }
+
+        if let Some(now_ns) = now_ns {
+            if measurement.captured_at_ns > now_ns {
+                self.last.insert(
+                    identity,
+                    StreamPosition {
+                        sequence: measurement.sequence,
+                        last_timestamp_ns: previous.and_then(|p| p.last_timestamp_ns),
+                    },
+                );
+                return Err(StreamOrderFailure::FutureTimestamp {
+                    captured_at_ns: measurement.captured_at_ns,
+                    now_ns,
                 });
             }
         }
-        self.last.insert(identity, (measurement.sequence, measurement.captured_at_ns));
+
+        self.last.insert(
+            identity,
+            StreamPosition {
+                sequence: measurement.sequence,
+                last_timestamp_ns: Some(measurement.captured_at_ns),
+            },
+        );
         Ok(())
     }
 }
