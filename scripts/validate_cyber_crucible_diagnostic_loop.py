@@ -375,6 +375,15 @@ def validate_report(report: Any) -> list[str]:
             errors.append(f"assessment.{field} is unsupported")
     assessment_receipt_refs = assessment.get("evaluator_receipt_refs")
     refs_known(assessment_receipt_refs, "assessment.evaluator_receipt_refs", set(receipt_by_id))
+    if isinstance(assessment_receipt_refs, list):
+        if functional and functional[0].get("receipt_id") not in assessment_receipt_refs:
+            errors.append("assessment must reference the actual functional_verdict receipt")
+        if security and security[0].get("receipt_id") not in assessment_receipt_refs:
+            errors.append("assessment must reference the actual security_verdict receipt")
+    if functional and assessment.get("functional_status") != functional[0].get("status"):
+        errors.append("assessment.functional_status must match the bound functional_verdict receipt")
+    if security and assessment.get("security_status") != security[0].get("status"):
+        errors.append("assessment.security_status must match the bound security_verdict receipt")
     expected = False
     if functional and security and isinstance(assessment_receipt_refs, list):
         expected = bool(
