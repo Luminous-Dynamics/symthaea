@@ -28,6 +28,7 @@ use symthaea_workspace::GlobalWorkspace;
 
 pub mod regenerative;
 pub mod measurement_planner;
+pub mod screening_design;
 
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
@@ -290,6 +291,19 @@ impl EngineeringManager {
             measurement_cost_unit,
             options,
         )
+    }
+
+    /// Generate a deterministic, preregistration-first bench-scale two-level full-factorial
+    /// screening schedule after an explicit review of the exact protocol. This creates a plan,
+    /// not an execution authorization, power analysis, or agronomic recommendation.
+    pub fn generate_regenerative_screening_design(
+        &self,
+        request: &screening_design::ScreeningDesignRequest,
+    ) -> Result<
+        screening_design::ScreeningDesignPlan,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_design::generate_screening_design(request)
     }
 
     pub fn evaluate_material(
