@@ -249,8 +249,16 @@ class TrustAnchorPolicyTests(unittest.TestCase):
                     "expired": False, "digest": digest,
                     "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
-             patch.object(module, "download_artifact_zip", return_value=archive_bytes):
+             patch.object(module, "download_artifact_zip", return_value=archive_bytes), \
+             patch.object(module, "check_blob") as check_blob:
             module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+        check_blob.assert_called_once_with(
+            "Luminous-Dynamics/mycelix",
+            module.POLICY["Luminous-Dynamics/mycelix"]["workflow_path"],
+            "c" * 40,
+            module.POLICY["Luminous-Dynamics/mycelix"]["workflow_blob"],
+            "token",
+        )
         altered = dict(artifact, digest="sha256:" + "0" * 64)
         with patch.object(module, "api", return_value={"artifacts": [altered]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
