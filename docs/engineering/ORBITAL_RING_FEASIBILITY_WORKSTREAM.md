@@ -55,7 +55,7 @@ If a local continuous-stream approximation is used, record line density λ, curv
 
 Energy and momentum are bookkeeping constraints, not optional secondary metrics:
 
-- Rotor kinetic energy: (E_k = \frac12 m u^2) for a defined mass (m) and speed (u) in the same stated frame.
+- Rotor kinetic energy: for absolute conservation accounting, calculate \(E_k = \\frac12 m |\\mathbf{v}_{\\text{inertial}}|^2\) using the rotor mass's velocity in one stated inertial bookkeeping frame (for example, GCRF). Relative-to-sheath kinetic energy is a useful subsystem diagnostic, but it is frame-dependent; do not add it to inertial-frame energy terms without transforming velocities and accounting for support-frame motion.
 - Every payload launch/braking case must show where energy and momentum go: rotor, supporting structure, Earth, electrical store, propulsion, or another explicitly modelled body.
 - A replenishment term must be external energy input, not a free “momentum reset.”
 - Power loss, loss of magnetic support, loss of confinement, and rotor rupture are distinct fault classes. Loss of drive power does not instantaneously erase stored kinetic energy; nevertheless, failure of support/confinement can cause a severe mechanical transient.
