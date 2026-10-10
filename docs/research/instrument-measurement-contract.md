@@ -12,7 +12,7 @@ Ultrasound is the first use case, but calibrated measurements are cross-cutting.
 
 Each measurement binds:
 
-- instrument and channel identifiers (not patient identity);
+- instrument and channel identifiers (not patient identity); the assessment receipt retains this identity and the named clock epoch;
 - monotonically sequenced acquisition, a monotonic timestamp, and an explicit `ClockDomainId` naming the clock origin/epoch;
 - explicit quantity and unit, checked for dimensional compatibility;
 - finite value and non-negative standard uncertainty in the declared unit;
@@ -35,7 +35,7 @@ The strict assessment checks sequence/time ordering using a caller-maintained `M
 - calibration evidence for a different instrument/channel, quantity/unit, validity interval, or calibrated value range;
 - measurement or calibration uncertainty above the consumer's explicit limits.
 
-The raw-data and calibration resolvers are explicit trust boundaries. The raw-data resolver must actually retrieve the referenced bytes, compute/verify their digest, and return non-empty artifact metadata; merely looking up a database row or echoing the supplied reference is insufficient. The calibration resolver must resolve and review artifact bytes/digests, the review receipt, exact instrument/channel identity, supported quantity/unit, validity dates, calibrated value range, calibration chain and uncertainty contributions. The crate checks returned IDs/digests against the observation, but cannot prove either resolver is independent or authoritative by itself. Configure and test both implementations independently.
+The raw-data and calibration resolvers are explicit trust boundaries. The raw-data resolver must actually retrieve the referenced bytes, compute/verify their digest, and return non-empty artifact metadata; merely looking up a database row or echoing the supplied reference is insufficient. The calibration resolver must resolve and review artifact bytes/digests, the review receipt, exact instrument/channel identity, supported quantity/unit, validity dates, inclusive calibrated value range, calibration chain and uncertainty contributions. The strict gate rejects a calibration record for another channel or a measured value outside the stated range. The crate checks returned IDs/digests against the observation, but cannot prove either resolver is independent or authoritative by itself. Configure and test both implementations independently. The returned `MeasurementAssessment` is read-only through its public API and retains the instrument, timestamp domain, observed value, calibration evidence/review references, calibrated range, raw artifact metadata, and uncertainty limits that passed. It is not a cryptographically signed receipt or clinical authorization.
 
 Measurement and calibration standard uncertainties are reported separately. The crate does not combine them by root-sum-square because doing so requires explicit assumptions about independence and all material uncertainty contributors. Traceability is a property of a measurement result connected through an unbroken, documented calibration chain in which each link contributes to uncertainty; a certificate reference alone does not establish traceability.
 
@@ -68,6 +68,10 @@ A command being queued is not a pass. Preserve the exact commit and the complete
 - [IMDRF — Good Machine Learning Practice for Medical Device Development](https://www.imdrf.org/documents/good-machine-learning-practice-medical-device-development-guiding-principles): relevant lifecycle and data-quality principles for future ML-enabled features.
 - [FDA — Quality Management System Regulation](https://www.fda.gov/medical-devices/postmarket-requirements-devices/quality-management-system-regulation-qmsr): became effective on 2 February 2026 and incorporates ISO 13485:2016 by reference for the U.S. device quality-system framework. This note is engineering guidance, not a jurisdiction-specific compliance determination.
 - [SAHPRA — Medical Device and IVD Guidance](https://www.sahpra.org.za/medical-devices/): South African regulatory context must be checked against the specific intended use and current applicable guidance before any clinical or commercial deployment.
+
+## Privacy boundary
+
+No patient identifier is part of the envelope. Raw acquisition references can still resolve to sensitive medical data; real integrations must apply access control, encryption, retention limits, audit logging, and appropriate de-identification/consent controls before research reuse. The test fixtures use synthetic identifiers and values, not patient records.
 
 ## Explicit non-claims
 
