@@ -225,6 +225,7 @@ pub enum CapabilityLedgerError {
     SequenceNotMonotonic,
     SplitMismatch,
     InvalidOutcomeReceipt,
+    ReceiptReplay,
     InvalidQualificationPolicy,
     InsufficientEvidence,
     QualificationRejected,
@@ -238,14 +239,14 @@ impl fmt::Display for CapabilityLedgerError {
 
 impl std::error::Error for CapabilityLedgerError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct ForecastRecord {
     forecast: CapabilityForecast,
     receipt: Option<CapabilityOutcomeReceipt>,
 }
 
 /// In-memory ledger pinned to one exact subject identity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CapabilityLedger {
     subject: SubjectIdentity,
     claims: BTreeMap<String, CapabilityClaim>,
@@ -280,7 +281,7 @@ impl CapabilityLedger {
         self.claims.insert(
             validated.claim_id.clone(),
             CapabilityClaim {
-                lifecycle: claim.lifecycle,
+                lifecycle: CapabilityLifecycle::Proposed,
                 ..validated
             },
         );
@@ -426,6 +427,13 @@ impl CapabilityLedger {
         }
         if receipt.subject != record.forecast.subject {
             return Err(CapabilityLedgerError::SubjectMismatch);
+        }
+        if self.forecasts.values().any(|existing| {
+            existing.receipt.as_ref().is_some_and(|prior| {
+                prior.receipt_sha256 == receipt.receipt_sha256
+            })
+        }) {
+            return Err(CapabilityLedgerError::ReceiptReplay);
         }
         record.receipt = Some(receipt);
         Ok(())
@@ -705,7 +713,7 @@ mod tests {
                 split,
                 evaluator_identity: "independent-qualification-runner".to_string(),
                 evaluator_revision: "v1".to_string(),
-                receipt_sha256: "1".repeat(64),
+                receipt_sha256: format!("{:064x}", forecast_seq + 1),
                 actual_compute_units: Some(12.0),
             })
             .unwrap();
@@ -836,6 +844,87 @@ mod tests {
         assert_eq!(
             ledger.record_forecast(forecast),
             Err(CapabilityLedgerError::SubjectMismatch)
+        );
+    }
+
+    #[test]
+    fn adding_a_claim_cannot_import_qualified_status() {
+        let mut ledger = CapabilityLedger::new(subject()).unwrap();
+        ledger
+            .add_claim(CapabilityClaim {
+                claim_id: "forged".to_string(),
+                claim_sha256: "f".repeat(64),
+                description: "Claim with caller-supplied status".to_string(),
+                scope: "Test only".to_string(),
+                lifecycle: CapabilityLifecycle::Qualified,
+            })
+            .unwrap();
+        assert_eq!(
+            ledger.claim("forged").unwrap().lifecycle,
+            CapabilityLifecycle::Proposed
+        );
+    }
+
+    #[test]
+    fn evaluator_must_match_pinned_qualification_policy() {
+        let mut ledger = setup_claim();
+        for i in 0..3 {
+            add_case(
+                &mut ledger,
+                &format!("heldout-untrusted-{i}"),
+                2 * i + 1,
+                CapabilitySplit::HeldOut,
+                0.9,
+                true,
+            );
+        }
+        let mut untrusted_policy = policy();
+        untrusted_policy.trusted_evaluator_identity = "different-evaluator".to_string();
+        assert_eq!(
+            ledger.qualify_claim("rust-debugging", &untrusted_policy),
+            Err(CapabilityLedgerError::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn receipt_root_cannot_be_replayed_for_a_second_forecast() {
+        let mut ledger = setup_claim();
+        for (id, seq) in [("first", 1u64), ("second", 3u64)] {
+            ledger
+                .record_forecast(CapabilityForecast {
+                    forecast_id: id.to_string(),
+                    claim_id: "rust-debugging".to_string(),
+                    claim_sha256: "f".repeat(64),
+                    subject: subject(),
+                    sequence: seq,
+                    context_id: format!("context-{id}"),
+                    split: CapabilitySplit::HeldOut,
+                    predicted_success_probability: 0.5,
+                    expected_compute_units: 1.0,
+                    predicted_failure_mode: None,
+                })
+                .unwrap();
+        }
+        let receipt = CapabilityOutcomeReceipt {
+            forecast_id: "first".to_string(),
+            subject: subject(),
+            sequence: 2,
+            observed_success: true,
+            split: CapabilitySplit::HeldOut,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            receipt_sha256: "2".repeat(64),
+            actual_compute_units: None,
+        };
+        ledger.resolve_forecast(receipt.clone()).unwrap();
+        let replay = CapabilityOutcomeReceipt {
+            forecast_id: "second".to_string(),
+            sequence: 4,
+            ..receipt
+        };
+        assert_eq!(
+            ledger.resolve_forecast(replay),
+            Err(CapabilityLedgerError::ReceiptReplay)
         );
     }
 
