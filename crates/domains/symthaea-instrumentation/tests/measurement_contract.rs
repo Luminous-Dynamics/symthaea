@@ -41,6 +41,30 @@ fn raw_reference() -> RawDataReference {
     RawDataReference::new(raw_artifact())
 }
 
+fn calibration_fixture_bytes() -> Vec<u8> {
+    b"symthaea-calibration-certificate-fixture-v1\ninstrument=ultrasound-research-rig-01\nchannel=rf-channel-0\nrange_hz=4000000..6000000\n".to_vec()
+}
+
+fn review_fixture_bytes() -> Vec<u8> {
+    b"symthaea-independent-calibration-review-fixture-v1\nreview=passed\nreviewer=fixture-reviewer-01\n".to_vec()
+}
+
+fn calibration_digest_hex() -> String {
+    sha256_hex(&calibration_fixture_bytes())
+}
+
+fn review_digest_hex() -> String {
+    sha256_hex(&review_fixture_bytes())
+}
+
+fn calibration_artifact() -> ArtifactReference {
+    artifact("calibration-certificate", &calibration_digest_hex())
+}
+
+fn review_artifact() -> ArtifactReference {
+    artifact("independent-review-receipt", &review_digest_hex())
+}
+
 fn clock_domain() -> ClockDomainId {
     ClockDomainId::new("ultrasound-rig-boot-epoch-01").unwrap()
 }
@@ -54,15 +78,15 @@ fn artifact(id: &str, sha: &str) -> ArtifactReference {
 }
 
 fn calibration_reference() -> CalibrationReference {
-    CalibrationReference::new("calibration-17", artifact("calibration-certificate", SHA_A)).unwrap()
+    CalibrationReference::new("calibration-17", calibration_artifact()).unwrap()
 }
 
 fn resolved_calibration() -> ResolvedCalibration {
     ResolvedCalibration::new(
         "calibration-17",
         instrument_identity(),
-        artifact("calibration-certificate", SHA_A),
-        artifact("independent-review-receipt", SHA_B),
+        calibration_artifact(),
+        review_artifact(),
         Quantity::Frequency,
         Unit::Hertz,
         4_000_000.0,
@@ -108,14 +132,33 @@ struct MockResolver {
     resolved: Result<ResolvedCalibration, String>,
     raw_bytes: Result<Vec<u8>, String>,
     raw_reference_override: Option<ArtifactReference>,
+    calibration_bytes_override: Option<Vec<u8>>,
+    review_bytes_override: Option<Vec<u8>>,
 }
 
 impl CalibrationEvidenceResolver for MockResolver {
     fn resolve_calibration(
         &self,
-        _reference: &CalibrationReference,
+        reference: &CalibrationReference,
     ) -> Result<ResolvedCalibration, String> {
-        self.resolved.clone()
+        let certificate_bytes = self
+            .calibration_bytes_override
+            .clone()
+            .unwrap_or_else(calibration_fixture_bytes);
+        if sha256_hex(&certificate_bytes) != reference.evidence().sha256_hex() {
+            return Err("calibration certificate SHA-256 mismatch".into());
+        }
+
+        let resolved = self.resolved.clone()?;
+        let review_bytes = self
+            .review_bytes_override
+            .clone()
+            .unwrap_or_else(review_fixture_bytes);
+        if sha256_hex(&review_bytes) != resolved.review_receipt().sha256_hex() {
+            return Err("calibration review receipt SHA-256 mismatch".into());
+        }
+
+        Ok(resolved)
     }
 }
 
@@ -147,6 +190,8 @@ fn resolver() -> MockResolver {
         resolved: Ok(resolved_calibration()),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     }
 }
 
@@ -262,7 +307,7 @@ fn calibration_intervals_must_be_non_empty() {
             "calibration",
             instrument_identity(),
             artifact("certificate", SHA_A),
-            artifact("review", SHA_B),
+            review_artifact(),
             Quantity::Frequency,
             Unit::Hertz,
             4_000_000.0,
@@ -315,7 +360,7 @@ fn calibration_range_constructor_rejects_inverted_bounds() {
             "bad-range-calibration",
             instrument_identity(),
             artifact("certificate", SHA_A),
-            artifact("review", SHA_B),
+            review_artifact(),
             Quantity::Frequency,
             Unit::Hertz,
             6_000_000.0,
@@ -336,8 +381,8 @@ fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
             ResolvedCalibration::new(
                 "calibration-17",
                 InstrumentIdentity::new("another-ultrasound-rig", "rf-channel-0").unwrap(),
-                artifact("calibration-certificate", SHA_A),
-                artifact("independent-review-receipt", SHA_B),
+                calibration_artifact(),
+                review_artifact(),
                 Quantity::Frequency,
                 Unit::Hertz,
                 4_000_000.0,
@@ -350,6 +395,8 @@ fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
         ),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
 
     assert_eq!(
@@ -373,8 +420,8 @@ fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
             ResolvedCalibration::new(
                 "calibration-17",
                 instrument_identity(),
-                artifact("calibration-certificate", SHA_A),
-                artifact("independent-review-receipt", SHA_B),
+                calibration_artifact(),
+                review_artifact(),
                 Quantity::Frequency,
                 Unit::Hertz,
                 4_000_000.0,
@@ -387,6 +434,8 @@ fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
         ),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
 
     assert_eq!(
@@ -576,6 +625,8 @@ fn unresolved_raw_acquisition_evidence_fails_closed() {
         resolved: Ok(resolved_calibration()),
         raw_bytes: Err("raw artifact bytes not found".into()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
 
     assert_eq!(
@@ -598,6 +649,8 @@ fn raw_resolver_rejects_bytes_whose_sha256_does_not_match_the_reference() {
         resolved: Ok(resolved_calibration()),
         raw_bytes: Ok(b"tampered acquisition bytes".to_vec()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
 
     assert_eq!(
@@ -620,6 +673,8 @@ fn resolved_raw_data_must_match_the_envelope_digest_and_artifact_id() {
         resolved: Ok(resolved_calibration()),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: Some(artifact("other-acquisition", &raw_digest_hex())),
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
 
     assert_eq!(
@@ -642,6 +697,8 @@ fn unresolved_calibration_evidence_fails_closed() {
         resolved: Err("calibration artifact not found".into()),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -658,13 +715,63 @@ fn unresolved_calibration_evidence_fails_closed() {
 }
 
 #[test]
+fn calibration_resolver_rejects_certificate_bytes_with_a_wrong_digest() {
+    let tampered = MockResolver {
+        resolved: Ok(resolved_calibration()),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
+        calibration_bytes_override: Some(b"tampered calibration certificate".to_vec()),
+        review_bytes_override: None,
+    };
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &tampered,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::CalibrationEvidenceUnresolved(
+            "calibration certificate SHA-256 mismatch".into()
+        )
+    );
+}
+
+#[test]
+fn calibration_resolver_rejects_review_receipts_with_a_wrong_digest() {
+    let tampered = MockResolver {
+        resolved: Ok(resolved_calibration()),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: Some(b"tampered independent review receipt".to_vec()),
+    };
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &tampered,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::CalibrationEvidenceUnresolved(
+            "calibration review receipt SHA-256 mismatch".into()
+        )
+    );
+}
+
+#[test]
 fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
     let wrong_artifact = MockResolver {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
             instrument_identity(),
-            artifact("different-certificate", SHA_A),
-            artifact("review", SHA_B),
+            artifact("different-certificate", &calibration_digest_hex()),
+            review_artifact(),
             Quantity::Frequency,
             Unit::Hertz,
             4_000_000.0,
@@ -676,6 +783,8 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
         .unwrap()),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -697,8 +806,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
             instrument_identity(),
-            artifact("calibration-certificate", SHA_A),
-            artifact("review", SHA_B),
+            calibration_artifact(),
+            review_artifact(),
             Quantity::AcousticPressure,
             Unit::Pascal,
             0.0,
@@ -710,6 +819,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         .unwrap()),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -728,8 +839,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
             instrument_identity(),
-            artifact("calibration-certificate", SHA_A),
-            artifact("review", SHA_B),
+            calibration_artifact(),
+            review_artifact(),
             Quantity::Frequency,
             Unit::Hertz,
             4_000_000.0,
@@ -741,6 +852,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         .unwrap()),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
