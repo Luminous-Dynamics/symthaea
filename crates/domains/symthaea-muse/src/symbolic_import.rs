@@ -489,6 +489,34 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 let position = musicxml_sound_position(child, cursor)?;
                 tempo_events.push((position, bpm));
             } else if child.has_tag_name("sound") {
+                if [
+                    "coda",
+                    "dacapo",
+                    "dalsegno",
+                    "damper-pedal",
+                    "divisions",
+                    "elevation",
+                    "fine",
+                    "forward-repeat",
+                    "pan",
+                    "pizzicato",
+                    "segno",
+                    "soft-pedal",
+                    "sostenuto-pedal",
+                    "time-only",
+                    "tocoda",
+                ]
+                .iter()
+                .any(|attribute| child.attribute(*attribute).is_some())
+                || child.children().any(|node| {
+                    node.is_element() && !node.has_tag_name("offset")
+                })
+                {
+                    return Err(
+                        "MusicXML sound uses unsupported playback attributes or children; tempo/dynamics-only sound directives are supported"
+                            .into(),
+                    );
+                }
                 if let Some(value) = child.attribute("tempo") {
                     let bpm = value.parse::<f32>().map_err(|_| {
                         "MusicXML tempo must be a number between 20 and 320 BPM".to_string()
@@ -540,12 +568,26 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                             .into(),
                     );
                 }
-                if ["end-dynamics", "attack", "release", "pizzicato"]
-                    .iter()
-                    .any(|attribute| child.attribute(*attribute).is_some())
+                if [
+                    "end-dynamics",
+                    "attack",
+                    "release",
+                    "pizzicato",
+                    "time-only",
+                ]
+                .iter()
+                .any(|attribute| child.attribute(*attribute).is_some())
                 {
                     return Err(
-                        "MusicXML note uses end-dynamics, attack, release, or pizzicato, which the current Score model cannot represent"
+                        "MusicXML note uses end-dynamics, attack, release, pizzicato, or time-only, which the current Score model cannot represent"
+                            .into(),
+                    );
+                }
+                if child.children().any(|node| {
+                    node.has_tag_name("instrument") || node.has_tag_name("play")
+                }) {
+                    return Err(
+                        "MusicXML note uses an unsupported instrument or playback-technique child"
                             .into(),
                     );
                 }
@@ -1283,6 +1325,59 @@ mod tests {
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(error.contains("exceeds the representable MIDI velocity range"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_unsupported_sound_playback_semantics_are_rejected() {
+        for directive in [
+            r#"pizzicato="yes""#,
+            r#"pan="45""#,
+            r#"damper-pedal="yes""#,
+        ] {
+            let xml = format!(
+                r#"<score-partwise><part id="P1"><measure number="1">
+                    <attributes><divisions>1</divisions></attributes>
+                    <direction><sound {directive}/></direction>
+                    <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+                </measure></part></score-partwise>"#
+            );
+            let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+            assert!(
+                error.contains("tempo/dynamics-only sound directives are supported"),
+                "{directive}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn musicxml_sound_instrument_or_play_child_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound><midi-instrument id="P1-I1"><midi-program>1</midi-program></midi-instrument></sound></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("tempo/dynamics-only sound directives are supported"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_note_time_only_repeat_selection_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note time-only="2"><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("end-dynamics, attack, release, pizzicato, or time-only"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_note_instrument_child_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><instrument id="P1-I1"/><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("unsupported instrument or playback-technique child"), "{error}");
     }
 
     #[test]
