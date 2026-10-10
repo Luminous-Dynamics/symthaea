@@ -1,6 +1,9 @@
 name: PhotoCraft AppImage qualification
 
 on:
+  push:
+    branches:
+      - "feat/photocraft-appimage-clean"
   pull_request:
     paths:
       - "crates/core/symthaea-app-db/**"
