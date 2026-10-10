@@ -44,13 +44,15 @@ impl From<ScreeningDesignError> for ScreeningPowerError {
     }
 }
 
-/// Residual variation estimate for the preregistered primary endpoint, expressed in
-/// exactly the same outcome unit. The context should identify the pilot, study, or
-/// publication from which this value was obtained and why it applies to the planned work.
+/// Evidence-backed lower/upper bounds for residual variation in the preregistered
+/// primary endpoint, expressed in exactly the same outcome unit. The context identifies
+/// the pilot, study, or publication and why it applies. The interval is not assumed to be
+/// a confidence interval unless the cited method explicitly supports that interpretation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResidualVariationEstimate {
-    pub residual_standard_deviation: f64,
+    pub residual_standard_deviation_lower_bound: f64,
+    pub residual_standard_deviation_upper_bound: f64,
     pub unit: String,
     pub source_context_id: String,
     pub estimation_method_id: String,
@@ -59,12 +61,21 @@ pub struct ResidualVariationEstimate {
 
 impl ResidualVariationEstimate {
     fn validate(&self, endpoint_unit: &str) -> Result<(), ScreeningPowerError> {
-        if !self.residual_standard_deviation.is_finite()
-            || self.residual_standard_deviation <= 0.0
+        if !self.residual_standard_deviation_lower_bound.is_finite()
+            || self.residual_standard_deviation_lower_bound <= 0.0
         {
             return Err(ScreeningPowerError::new(
-                "residual_standard_deviation",
+                "residual_standard_deviation_lower_bound",
                 "must be finite and greater than zero",
+            ));
+        }
+        if !self.residual_standard_deviation_upper_bound.is_finite()
+            || self.residual_standard_deviation_upper_bound
+                < self.residual_standard_deviation_lower_bound
+        {
+            return Err(ScreeningPowerError::new(
+                "residual_standard_deviation_upper_bound",
+                "must be finite and greater than or equal to the lower bound",
             ));
         }
         if self.unit.trim().is_empty() || self.unit != endpoint_unit {
@@ -131,11 +142,13 @@ pub struct ScreeningPowerAssessment {
     pub bonferroni_alpha_per_main_effect: f64,
     pub target_power: f64,
     pub projected_power_normal_approx: f64,
-    pub residual_standard_deviation: f64,
+    pub residual_standard_deviation_lower_bound: f64,
+    /// Conservative upper SD bound used for standard error, projected power and replication.
+    pub residual_standard_deviation_upper_bound_used: f64,
     pub residual_variation_source_context_id: String,
     pub residual_variation_evidence: EvidenceRef,
-    pub standard_error_main_effect: f64,
-    pub standardized_main_effect_at_minimum_meaningful_difference: f64,
+    pub standard_error_main_effect_upper_bound: f64,
+    pub standardized_main_effect_lower_bound_at_minimum_meaningful_difference: f64,
     pub status: ScreeningPowerStatus,
     pub assumptions: Vec<String>,
     pub scope_note: String,
@@ -186,7 +199,7 @@ pub fn assess_screening_power(
     // per setting in each block. This is a software bound, not a scientific optimum.
     const MAX_FULL_FACTORIAL_REPLICATES: usize = 8 * 2;
 
-    let sd = residual_variation.residual_standard_deviation;
+    let sd = residual_variation.residual_standard_deviation_upper_bound;
     let delta = endpoint.minimum_practically_meaningful_difference;
     let alpha_per_main_effect = familywise_alpha / factor_count as f64;
     let critical_z = inverse_normal_cdf(1.0 - alpha_per_main_effect / 2.0);
@@ -237,11 +250,13 @@ pub fn assess_screening_power(
         bonferroni_alpha_per_main_effect: alpha_per_main_effect,
         target_power,
         projected_power_normal_approx: projected_power,
-        residual_standard_deviation: sd,
+        residual_standard_deviation_lower_bound: residual_variation
+            .residual_standard_deviation_lower_bound,
+        residual_standard_deviation_upper_bound_used: sd,
         residual_variation_source_context_id: residual_variation.source_context_id.clone(),
         residual_variation_evidence: residual_variation.evidence.clone(),
-        standard_error_main_effect: standard_error,
-        standardized_main_effect_at_minimum_meaningful_difference: noncentrality,
+        standard_error_main_effect_upper_bound: standard_error,
+        standardized_main_effect_lower_bound_at_minimum_meaningful_difference: noncentrality,
         status,
         assumptions: vec![
             "Complete two-level factorial treatment combinations with independent, balanced replicates.".into(),
@@ -375,9 +390,10 @@ mod tests {
         }
     }
 
-    fn variation(sd: f64, kind: EvidenceKind, unit: &str) -> ResidualVariationEstimate {
+    fn variation(lower: f64, upper: f64, kind: EvidenceKind, unit: &str) -> ResidualVariationEstimate {
         ResidualVariationEstimate {
-            residual_standard_deviation: sd,
+            residual_standard_deviation_lower_bound: lower,
+            residual_standard_deviation_upper_bound: upper,
             unit: unit.into(),
             source_context_id: "pilot-batch-series-v1".into(),
             estimation_method_id: "replicated-pilot-residual-ms-v1".into(),
@@ -390,7 +406,7 @@ mod tests {
         let input = request();
         let result = assess_screening_power(
             &input,
-            &variation(0.01, EvidenceKind::Measured, &input.primary_endpoint.unit),
+            &variation(0.008, 0.01, EvidenceKind::Measured, &input.primary_endpoint.unit),
             0.05,
             0.80,
         )
@@ -417,7 +433,7 @@ mod tests {
         .unwrap();
         let high = assess_screening_power(
             &input,
-            &variation(0.20, EvidenceKind::Measured, &input.primary_endpoint.unit),
+            &variation(0.10, 0.20, EvidenceKind::Measured, &input.primary_endpoint.unit),
             0.05,
             0.80,
         )
@@ -438,14 +454,14 @@ mod tests {
         let input = request();
         assert!(assess_screening_power(
             &input,
-            &variation(0.01, EvidenceKind::Scenario, &input.primary_endpoint.unit),
+            &variation(0.008, 0.01, EvidenceKind::Scenario, &input.primary_endpoint.unit),
             0.05,
             0.80,
         )
         .is_err());
         assert!(assess_screening_power(
             &input,
-            &variation(0.01, EvidenceKind::Measured, "percent"),
+            &variation(0.008, 0.01, EvidenceKind::Measured, "percent"),
             0.05,
             0.80,
         )
@@ -460,7 +476,14 @@ mod tests {
         assert!(assess_screening_power(&input, &sd, 0.05, 1.0).is_err());
         assert!(assess_screening_power(
             &input,
-            &variation(f64::NAN, EvidenceKind::Measured, &input.primary_endpoint.unit),
+            &variation(f64::NAN, 0.01, EvidenceKind::Measured, &input.primary_endpoint.unit),
+            0.05,
+            0.80
+        )
+        .is_err());
+        assert!(assess_screening_power(
+            &input,
+            &variation(0.02, 0.01, EvidenceKind::Measured, &input.primary_endpoint.unit),
             0.05,
             0.80
         )
