@@ -412,21 +412,23 @@ impl CapabilityLedger {
         {
             return Err(CapabilityLedgerError::InvalidOutcomeReceipt);
         }
-        let record = self
-            .forecasts
-            .get_mut(&receipt.forecast_id)
-            .ok_or(CapabilityLedgerError::UnknownForecast)?;
-        if record.receipt.is_some() {
-            return Err(CapabilityLedgerError::AlreadyResolved);
-        }
-        if receipt.sequence <= record.forecast.sequence {
-            return Err(CapabilityLedgerError::SequenceNotMonotonic);
-        }
-        if receipt.split != record.forecast.split {
-            return Err(CapabilityLedgerError::SplitMismatch);
-        }
-        if receipt.subject != record.forecast.subject {
-            return Err(CapabilityLedgerError::SubjectMismatch);
+        {
+            let record = self
+                .forecasts
+                .get(&receipt.forecast_id)
+                .ok_or(CapabilityLedgerError::UnknownForecast)?;
+            if record.receipt.is_some() {
+                return Err(CapabilityLedgerError::AlreadyResolved);
+            }
+            if receipt.sequence <= record.forecast.sequence {
+                return Err(CapabilityLedgerError::SequenceNotMonotonic);
+            }
+            if receipt.split != record.forecast.split {
+                return Err(CapabilityLedgerError::SplitMismatch);
+            }
+            if receipt.subject != record.forecast.subject {
+                return Err(CapabilityLedgerError::SubjectMismatch);
+            }
         }
         if self.forecasts.values().any(|existing| {
             existing.receipt.as_ref().is_some_and(|prior| {
@@ -435,7 +437,10 @@ impl CapabilityLedger {
         }) {
             return Err(CapabilityLedgerError::ReceiptReplay);
         }
-        record.receipt = Some(receipt);
+        self.forecasts
+            .get_mut(&receipt.forecast_id)
+            .ok_or(CapabilityLedgerError::UnknownForecast)?
+            .receipt = Some(receipt);
         Ok(())
     }
 
