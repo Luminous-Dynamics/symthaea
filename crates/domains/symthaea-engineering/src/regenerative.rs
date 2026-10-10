@@ -606,6 +606,354 @@ pub fn regenerative_pareto_frontier(
     Ok(frontier)
 }
 
+
+
+/// Closed interval for an empirical/modelled metric, with provenance for the bounds.
+/// Bounds are not assumed to be a confidence interval: callers must document how they
+/// were obtained (e.g. instrument uncertainty, a calibrated prediction interval, or a
+/// deliberately conservative scenario envelope) in the referenced evidence record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetricInterval {
+    pub lower: f64,
+    pub upper: f64,
+    pub evidence: EvidenceRef,
+}
+
+impl MetricInterval {
+    fn validate(&self, field: &'static str, fraction: bool) -> Result<(), DesignError> {
+        if !self.lower.is_finite() || !self.upper.is_finite() {
+            return Err(DesignError::new(field, "interval bounds must be finite"));
+        }
+        if self.lower > self.upper {
+            return Err(DesignError::new(field, "lower bound cannot exceed upper bound"));
+        }
+        if self.evidence.evidence_id.trim().is_empty() {
+            return Err(DesignError::new(field, "interval bounds require an evidence ID"));
+        }
+        if self.lower < 0.0 {
+            return Err(DesignError::new(field, "this metric interval cannot be negative"));
+        }
+        if fraction && self.upper > 1.0 {
+            return Err(DesignError::new(field, "fraction bounds must lie in [0, 1]"));
+        }
+        Ok(())
+    }
+
+    fn validate_signed(&self, field: &'static str) -> Result<(), DesignError> {
+        if !self.lower.is_finite() || !self.upper.is_finite() {
+            return Err(DesignError::new(field, "interval bounds must be finite"));
+        }
+        if self.lower > self.upper {
+            return Err(DesignError::new(field, "lower bound cannot exceed upper bound"));
+        }
+        if self.evidence.evidence_id.trim().is_empty() {
+            return Err(DesignError::new(field, "interval bounds require an evidence ID"));
+        }
+        Ok(())
+    }
+}
+
+/// Interval inputs for robust feasibility screening. Metric units are fixed by each
+/// field name and match RegenerativeDesignMetrics. Climate values may be signed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegenerativeMetricIntervals {
+    pub candidate_id: String,
+    pub char_yield_fraction_dry_basis: MetricInterval,
+    pub carbon_retained_fraction: MetricInterval,
+    pub supplied_heat_mj_per_kg_dry_feedstock: MetricInterval,
+    pub cost_per_kg_dry_feedstock: MetricInterval,
+    pub water_l_per_kg_dry_feedstock: MetricInterval,
+    pub net_climate_kg_co2e_per_kg_dry_feedstock: Option<MetricInterval>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IntervalConstraintStatus {
+    /// Every value in the stated interval satisfies this threshold.
+    RobustPass,
+    /// Every value in the stated interval violates this threshold.
+    RobustFail,
+    /// The interval crosses the threshold, so the decision is unresolved.
+    Unresolved,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConstraintDirection {
+    AtLeast,
+    AtMost,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RobustFeasibilityStatus {
+    RobustlyFeasible,
+    RobustlyInfeasible,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IntervalConstraintResult {
+    pub constraint_id: String,
+    pub status: IntervalConstraintStatus,
+    pub direction: Option<ConstraintDirection>,
+    pub lower: Option<f64>,
+    pub upper: Option<f64>,
+    pub threshold: Option<f64>,
+    pub evidence: Option<EvidenceRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegenerativeUncertaintyAssessment {
+    pub candidate_id: String,
+    pub specification_id: String,
+    pub status: RobustFeasibilityStatus,
+    pub constraints: Vec<IntervalConstraintResult>,
+    /// Robust feasibility is still model screening, not agronomic validation.
+    pub field_validation_required: bool,
+    pub scope_note: String,
+}
+
+fn classify_interval(
+    interval: &MetricInterval,
+    threshold: f64,
+    direction: ConstraintDirection,
+) -> IntervalConstraintStatus {
+    match direction {
+        ConstraintDirection::AtLeast if interval.lower >= threshold => {
+            IntervalConstraintStatus::RobustPass
+        }
+        ConstraintDirection::AtLeast if interval.upper < threshold => {
+            IntervalConstraintStatus::RobustFail
+        }
+        ConstraintDirection::AtMost if interval.upper <= threshold => {
+            IntervalConstraintStatus::RobustPass
+        }
+        ConstraintDirection::AtMost if interval.lower > threshold => {
+            IntervalConstraintStatus::RobustFail
+        }
+        _ => IntervalConstraintStatus::Unresolved,
+    }
+}
+
+fn interval_constraint(
+    id: &'static str,
+    interval: &MetricInterval,
+    threshold: f64,
+    direction: ConstraintDirection,
+) -> IntervalConstraintResult {
+    IntervalConstraintResult {
+        constraint_id: id.to_string(),
+        status: classify_interval(interval, threshold, direction),
+        direction: Some(direction),
+        lower: Some(interval.lower),
+        upper: Some(interval.upper),
+        threshold: Some(threshold),
+        evidence: Some(interval.evidence.clone()),
+    }
+}
+
+/// Evaluate hard design requirements against uncertainty intervals rather than only
+/// point estimates. The result is conservative: an interval crossing a limit is
+/// indeterminate, not a pass. Interval semantics are deliberately independent of the
+/// existing point-estimate assessment and do not silently rewrite its outputs.
+pub fn assess_regenerative_uncertainty(
+    intervals: &RegenerativeMetricIntervals,
+    requirements: &RegenerativeDesignRequirements,
+) -> Result<RegenerativeUncertaintyAssessment, DesignError> {
+    requirements.validate()?;
+    if intervals.candidate_id.trim().is_empty() {
+        return Err(DesignError::new("candidate_id", "cannot be empty"));
+    }
+    intervals.char_yield_fraction_dry_basis
+        .validate("intervals.char_yield_fraction_dry_basis", true)?;
+    intervals.carbon_retained_fraction
+        .validate("intervals.carbon_retained_fraction", true)?;
+    intervals.supplied_heat_mj_per_kg_dry_feedstock
+        .validate("intervals.supplied_heat_mj_per_kg_dry_feedstock", false)?;
+    intervals.cost_per_kg_dry_feedstock
+        .validate("intervals.cost_per_kg_dry_feedstock", false)?;
+    intervals.water_l_per_kg_dry_feedstock
+        .validate("intervals.water_l_per_kg_dry_feedstock", false)?;
+    if let Some(climate) = &intervals.net_climate_kg_co2e_per_kg_dry_feedstock {
+        climate.validate_signed("intervals.net_climate_kg_co2e_per_kg_dry_feedstock")?;
+    }
+
+    let mut constraints = vec![
+        interval_constraint(
+            "char_yield_minimum",
+            &intervals.char_yield_fraction_dry_basis,
+            requirements.min_char_yield_fraction,
+            ConstraintDirection::AtLeast,
+        ),
+        interval_constraint(
+            "carbon_retention_minimum",
+            &intervals.carbon_retained_fraction,
+            requirements.min_carbon_retained_fraction,
+            ConstraintDirection::AtLeast,
+        ),
+        interval_constraint(
+            "supplied_heat_maximum",
+            &intervals.supplied_heat_mj_per_kg_dry_feedstock,
+            requirements.max_supplied_heat_mj_per_kg_dry_feedstock,
+            ConstraintDirection::AtMost,
+        ),
+        interval_constraint(
+            "cost_maximum",
+            &intervals.cost_per_kg_dry_feedstock,
+            requirements.max_cost_per_kg_dry_feedstock,
+            ConstraintDirection::AtMost,
+        ),
+        interval_constraint(
+            "water_use_maximum",
+            &intervals.water_l_per_kg_dry_feedstock,
+            requirements.max_water_l_per_kg_dry_feedstock,
+            ConstraintDirection::AtMost,
+        ),
+    ];
+
+    if requirements.include_climate_objective {
+        match (
+            intervals.net_climate_kg_co2e_per_kg_dry_feedstock.as_ref(),
+            requirements.max_net_climate_kg_co2e_per_kg_dry_feedstock,
+        ) {
+            (Some(interval), Some(limit)) => constraints.push(interval_constraint(
+                "net_climate_maximum",
+                interval,
+                limit,
+                ConstraintDirection::AtMost,
+            )),
+            (Some(_), None) => {}
+            (None, _) => constraints.push(IntervalConstraintResult {
+                constraint_id: "climate_objective_interval_available".to_string(),
+                status: IntervalConstraintStatus::Unresolved,
+                direction: None,
+                lower: None,
+                upper: None,
+                threshold: None,
+                evidence: None,
+            }),
+        }
+    }
+
+    let status = if constraints
+        .iter()
+        .any(|c| c.status == IntervalConstraintStatus::RobustFail)
+    {
+        RobustFeasibilityStatus::RobustlyInfeasible
+    } else if constraints
+        .iter()
+        .any(|c| c.status == IntervalConstraintStatus::Unresolved)
+    {
+        RobustFeasibilityStatus::Indeterminate
+    } else {
+        RobustFeasibilityStatus::RobustlyFeasible
+    };
+
+    Ok(RegenerativeUncertaintyAssessment {
+        candidate_id: intervals.candidate_id.clone(),
+        specification_id: requirements.specification_id.clone(),
+        status,
+        constraints,
+        field_validation_required: true,
+        scope_note: "interval-based design screen only; interval meaning depends on cited evidence and it is not proof of field efficacy or authorization to apply material".into(),
+    })
+}
+
+#[cfg(test)]
+mod uncertainty_tests {
+    use super::*;
+    use symthaea_agribot::soil_process::EvidenceKind;
+
+    fn interval(lower: f64, upper: f64, id: &str) -> MetricInterval {
+        MetricInterval {
+            lower,
+            upper,
+            evidence: EvidenceRef {
+                evidence_id: id.into(),
+                kind: EvidenceKind::Scenario,
+            },
+        }
+    }
+
+    fn intervals() -> RegenerativeMetricIntervals {
+        RegenerativeMetricIntervals {
+            candidate_id: "candidate-interval-v1".into(),
+            char_yield_fraction_dry_basis: interval(0.28, 0.32, "yield-range-v1"),
+            carbon_retained_fraction: interval(0.55, 0.64, "carbon-range-v1"),
+            supplied_heat_mj_per_kg_dry_feedstock: interval(3.0, 5.0, "heat-range-v1"),
+            cost_per_kg_dry_feedstock: interval(2.5, 4.0, "cost-range-v1"),
+            water_l_per_kg_dry_feedstock: interval(1.0, 3.0, "water-range-v1"),
+            net_climate_kg_co2e_per_kg_dry_feedstock: None,
+        }
+    }
+
+    #[test]
+    fn interval_screen_requires_the_entire_range_to_pass() {
+        let req = requirements();
+        let result = assess_regenerative_uncertainty(&intervals(), &req).unwrap();
+        assert_eq!(result.status, RobustFeasibilityStatus::RobustlyFeasible);
+        assert!(result.constraints.iter().all(|c| {
+            c.status == IntervalConstraintStatus::RobustPass
+        }));
+        assert!(result.field_validation_required);
+    }
+
+    #[test]
+    fn threshold_crossing_is_indeterminate_not_a_point_estimate_pass() {
+        let req = requirements();
+        let mut input = intervals();
+        input.char_yield_fraction_dry_basis = interval(0.19, 0.31, "uncertain-yield-v1");
+        let result = assess_regenerative_uncertainty(&input, &req).unwrap();
+        assert_eq!(result.status, RobustFeasibilityStatus::Indeterminate);
+        assert_eq!(
+            result.constraints.iter().find(|c| c.constraint_id == "char_yield_minimum").unwrap().status,
+            IntervalConstraintStatus::Unresolved
+        );
+    }
+
+    #[test]
+    fn a_fully_violating_interval_is_robustly_infeasible() {
+        let req = requirements();
+        let mut input = intervals();
+        input.supplied_heat_mj_per_kg_dry_feedstock = interval(8.1, 9.0, "heat-fail-v1");
+        let result = assess_regenerative_uncertainty(&input, &req).unwrap();
+        assert_eq!(result.status, RobustFeasibilityStatus::RobustlyInfeasible);
+        assert_eq!(
+            result.constraints.iter().find(|c| c.constraint_id == "supplied_heat_maximum").unwrap().status,
+            IntervalConstraintStatus::RobustFail
+        );
+    }
+
+    #[test]
+    fn missing_required_climate_interval_is_indeterminate() {
+        let mut req = requirements();
+        req.include_climate_objective = true;
+        let result = assess_regenerative_uncertainty(&intervals(), &req).unwrap();
+        assert_eq!(result.status, RobustFeasibilityStatus::Indeterminate);
+        assert!(result.constraints.iter().any(|c| {
+            c.constraint_id == "climate_objective_interval_available"
+                && c.status == IntervalConstraintStatus::Unresolved
+        }));
+    }
+
+    #[test]
+    fn malformed_or_unprovenanced_intervals_are_rejected() {
+        let req = requirements();
+        let mut input = intervals();
+        input.cost_per_kg_dry_feedstock = interval(5.0, 4.0, "reversed-range-v1");
+        assert!(assess_regenerative_uncertainty(&input, &req).is_err());
+
+        input = intervals();
+        input.water_l_per_kg_dry_feedstock.evidence.evidence_id.clear();
+        assert!(assess_regenerative_uncertainty(&input, &req).is_err());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
