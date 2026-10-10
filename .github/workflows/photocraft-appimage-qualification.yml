@@ -29,7 +29,6 @@ jobs:
       CARGO_TERM_COLOR: always
       NIX_CONFIG: "experimental-features = nix-command flakes"
       SOVEREIGN_REQUIRE_NIX_PARSER: "1"
-      SOVEREIGN_APPIMAGE_OVERLAY_OUT: ${{ runner.temp }}/photocraft-overlay.nix
       NIXPKGS_2605_REV: "7fc6f2c20af09cdcaf48b92ec3121860139ec668"
 
     steps:
@@ -55,6 +54,8 @@ jobs:
         run: cargo fmt --check --package symthaea-app-db --package symthaea-web
 
       - name: Run app database tests and export the generated overlay
+        env:
+          SOVEREIGN_APPIMAGE_OVERLAY_OUT: ${{ runner.temp }}/photocraft-overlay.nix
         run: cargo test --package symthaea-app-db --all-features
 
       - name: Check the deployed installer WebAssembly build
@@ -62,6 +63,8 @@ jobs:
 
       - name: Evaluate, build, and smoke-test the generated AppImage package
         shell: bash
+        env:
+          SOVEREIGN_APPIMAGE_OVERLAY_OUT: ${{ runner.temp }}/photocraft-overlay.nix
         run: |
           set -euo pipefail
           overlay="$SOVEREIGN_APPIMAGE_OVERLAY_OUT"
