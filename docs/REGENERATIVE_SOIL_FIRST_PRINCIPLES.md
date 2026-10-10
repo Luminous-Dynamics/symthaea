@@ -153,6 +153,10 @@ The target process is not 'maximum biochar yield'. It is a constrained multi-obj
 - typed evidence references for feedstock data, empirical process parameters, thermophysical properties, reactor design, stream composition, recovery parameters and plant-availability parameters; result objects retain these references;
 - tests for mass/carbon balances, thermal duty, sub-zero ambient temperature, invalid/missing evidence, nutrient recovery bounds, climate accounting and serialization.
 
+The engineering layer also exposes an evidence-linked interval screen for yield, carbon retention, heat, cost, water, and optional climate constraints. Its status describes numeric threshold relations only; it does not override the separate product-quality gate. A full interval must satisfy a constraint for a robust pass; a threshold-crossing interval remains indeterminate. Bounds are supplied by callers and are not automatically treated as statistical confidence intervals.
+
+The agribot layer now also has an independent measured-stream mass-closure assessor. This is important because the simple pyrolysis calculator derives its non-char dry-mass residual by subtraction; that arithmetic identity is not proof that a physical reactor's measured output streams close. The observed-stream assessor requires measured evidence for all enumerated inlet/outlet masses, rejects duplicate/missing stream IDs and unmeasured scenario streams, preserves the boundary/tolerance evidence, and reports the signed residual and relative closure error.
+
 `crates/domains/symthaea-engineering/src/regenerative.rs` adds:
 - candidate assessments against versioned yield, carbon-retention, supplied-heat, cost and water requirements;
 - independent re-checks of process mass, carbon and declared heat-duty identities;
