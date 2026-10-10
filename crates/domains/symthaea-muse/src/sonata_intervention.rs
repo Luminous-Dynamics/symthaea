@@ -622,7 +622,25 @@ mod tests {
         let trace = return_trace(&realization);
         let batch = generate_and_rank_sonata_return(&realization, &trace).unwrap();
         assert_eq!(batch.candidates.len(), 5);
-        let selected = batch.selection.recommended_id.as_deref().unwrap();
+        let selected = batch.selection.recommended_id.as_deref().unwrap_or_else(|| {
+            let diagnostics = batch
+                .selection
+                .assessments
+                .iter()
+                .map(|assessment| {
+                    format!(
+                        "{}: eligible={}, theory_valid={}, preserves_invariants={}, issues={:?}",
+                        assessment.alternative_id,
+                        assessment.eligible,
+                        assessment.theory_validation.valid,
+                        assessment.preserved_invariants,
+                        assessment.theory_validation.issues,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            panic!("expected at least one eligible return candidate; diagnostics: {diagnostics}");
+        });
         let selected = batch
             .candidates
             .iter()
