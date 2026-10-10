@@ -12,6 +12,8 @@
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{ToPrimitive, Zero};
+use crate::hdc::{binary_hv::BinaryHV, primitive_system::seed_from_name};
+use super::numeric_tower::Number;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -94,6 +96,10 @@ pub enum ExactRationalError {
     DivisionByZero,
     /// Parsing, an operand, or a result exceeded the configured resource budget.
     ResourceLimitExceeded,
+    /// The exact value cannot be represented by the fixed-width numeric tower.
+    ExactResultOutOfRange,
+    /// An approximate floating-point input cannot be imported as an exact rational.
+    ApproximateInput,
 }
 
 impl fmt::Display for ExactRationalError {
@@ -104,6 +110,8 @@ impl fmt::Display for ExactRationalError {
             Self::ZeroDenominator => write!(f, "rational denominator cannot be zero"),
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::ResourceLimitExceeded => write!(f, "rational resource budget exceeded"),
+            Self::ExactResultOutOfRange => write!(f, "exact rational is outside the numeric-tower range"),
+            Self::ApproximateInput => write!(f, "approximate numeric input cannot be imported as an exact rational"),
         }
     }
 }
@@ -172,6 +180,84 @@ impl ExactRational {
         ExactRationalWire {
             numerator: self.value.numer().to_str_radix(10),
             denominator: self.value.denom().to_str_radix(10),
+        }
+    }
+
+    /// Lossless, versioned, deterministic bytes for exact identity and transport.
+    ///
+    /// Unlike an HDC projection or a fixed-width seed, these bytes are an
+    /// unambiguous representation: normalized decimal numerator and denominator
+    /// components are length-prefixed and preceded by a format/version tag.
+    pub fn canonical_encoding_bytes(&self) -> Vec<u8> {
+        const PREFIX: &[u8] = b"SYMTHEA\0EXACT-RATIONAL\0V1\0";
+        let numerator = self.value.numer().to_str_radix(10);
+        let denominator = self.value.denom().to_str_radix(10);
+        let mut encoded = Vec::with_capacity(PREFIX.len() + 16 + numerator.len() + denominator.len());
+        encoded.extend_from_slice(PREFIX);
+        encoded.extend_from_slice(&(numerator.len() as u64).to_be_bytes());
+        encoded.extend_from_slice(numerator.as_bytes());
+        encoded.extend_from_slice(&(denominator.len() as u64).to_be_bytes());
+        encoded.extend_from_slice(denominator.as_bytes());
+        encoded
+    }
+
+    /// Deterministic HDC projection of this canonical rational value.
+    ///
+    /// This finite hypervector is a useful representation for similarity and
+    /// binding, but is not a lossless identifier or proof object. Use the
+    /// canonical_encoding_bytes method when exact identity matters.
+    pub fn to_hdc(&self) -> BinaryHV {
+        let material = format!(
+            "SYMTHEA.EXACT_RATIONAL.HDC.V1:{}:{}",
+            self.value.numer(),
+            self.value.denom()
+        );
+        BinaryHV::random(seed_from_name(&material))
+    }
+
+    /// Convert into the legacy numeric tower only when the exact value fits.
+    /// No approximation or overflow fallback is allowed on this path.
+    pub fn try_to_number(&self) -> Result<Number, ExactRationalError> {
+        if self.value.denom() == &BigInt::from(1u8) {
+            if let Some(value) = self.value.numer().to_u64() {
+                return Ok(Number::Natural(value));
+            }
+            if let Some(value) = self.value.numer().to_i64() {
+                return Ok(Number::Integer(value));
+            }
+            return Err(ExactRationalError::ExactResultOutOfRange);
+        }
+
+        let numerator = self
+            .value
+            .numer()
+            .to_i64()
+            .ok_or(ExactRationalError::ExactResultOutOfRange)?;
+        let denominator = self
+            .value
+            .denom()
+            .to_i64()
+            .filter(|value| *value > 0)
+            .ok_or(ExactRationalError::ExactResultOutOfRange)?;
+        Ok(Number::Rational { numerator, denominator })
+    }
+
+    /// Import an exact value from the legacy numeric tower.
+    ///
+    /// Natural, integer, and valid rational variants are imported without
+    /// rounding. Number::Real is rejected even if it looks integral because
+    /// the variant itself represents an approximation, not exact provenance.
+    pub fn try_from_number_exact(
+        value: &Number,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        match value {
+            Number::Natural(value) => Self::from_integer(&value.to_string(), budget),
+            Number::Integer(value) => Self::from_integer(&value.to_string(), budget),
+            Number::Rational { numerator, denominator } => {
+                Self::parse(&numerator.to_string(), &denominator.to_string(), budget)
+            }
+            Number::Real(_) => Err(ExactRationalError::ApproximateInput),
         }
     }
 
@@ -340,4 +426,62 @@ mod tests {
             ExactRationalError::InvalidBudget
         );
     }
+    #[test]
+    fn canonical_encoding_is_normalized_versioned_and_unambiguous() {
+        let limit = budget(128);
+        let half_a = ExactRational::parse("1", "2", limit).unwrap();
+        let half_b = ExactRational::parse("-3", "-6", limit).unwrap();
+        let two_thirds = ExactRational::parse("2", "3", limit).unwrap();
+
+        assert_eq!(half_a.canonical_encoding_bytes(), half_b.canonical_encoding_bytes());
+        assert_ne!(half_a.canonical_encoding_bytes(), two_thirds.canonical_encoding_bytes());
+        assert!(half_a.canonical_encoding_bytes().starts_with(b"SYMTHEA\\0EXACT-RATIONAL\\0V1\\0"));
+    }
+
+    #[test]
+    fn hdc_projection_is_deterministic_for_equivalent_rationals() {
+        let limit = budget(128);
+        let a = ExactRational::parse("1", "2", limit).unwrap();
+        let b = ExactRational::parse("50", "100", limit).unwrap();
+        assert_eq!(a.to_hdc(), b.to_hdc());
+    }
+
+    #[test]
+    fn exact_numeric_tower_adapter_preserves_values_without_fallback() {
+        let limit = budget(128);
+        let natural = ExactRational::from_integer("18446744073709551615", limit).unwrap();
+        assert_eq!(natural.try_to_number().unwrap(), Number::Natural(u64::MAX));
+
+        let negative = ExactRational::from_integer("-9223372036854775808", limit).unwrap();
+        assert_eq!(negative.try_to_number().unwrap(), Number::Integer(i64::MIN));
+
+        let rational = ExactRational::parse("-7", "9", limit).unwrap();
+        assert_eq!(
+            rational.try_to_number().unwrap(),
+            Number::Rational { numerator: -7, denominator: 9 }
+        );
+        assert_eq!(
+            ExactRational::try_from_number_exact(&Number::Rational { numerator: -7, denominator: 9 }, limit).unwrap(),
+            rational
+        );
+    }
+
+    #[test]
+    fn exact_numeric_tower_adapter_rejects_approximation_and_narrowing() {
+        let limit = budget(256);
+        assert_eq!(
+            ExactRational::try_from_number_exact(&Number::Real(0.5), limit).unwrap_err(),
+            ExactRationalError::ApproximateInput
+        );
+
+        let too_large = ExactRational::from_integer("18446744073709551616", limit).unwrap();
+        assert_eq!(too_large.try_to_number().unwrap_err(), ExactRationalError::ExactResultOutOfRange);
+
+        let too_wide_denominator = ExactRational::parse("1", "9223372036854775808", limit).unwrap();
+        assert_eq!(
+            too_wide_denominator.try_to_number().unwrap_err(),
+            ExactRationalError::ExactResultOutOfRange
+        );
+    }
+
 }
