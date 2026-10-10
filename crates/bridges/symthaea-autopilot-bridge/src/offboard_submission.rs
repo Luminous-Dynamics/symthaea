@@ -14,9 +14,7 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::embodiment_evidence::{
-    ClockDomainId, EvidenceValidationError, TimestampV1,
-};
+use symthaea_core::embodiment_evidence::{ClockDomainId, EvidenceValidationError, TimestampV1};
 use thiserror::Error;
 
 /// Schema version for Offboard submission records, profiles, and assessments.
@@ -509,11 +507,15 @@ impl Px4OffboardSubmissionCadenceV1 {
             if !seen_sequence.insert(sample.sequence_number) {
                 return Err(Px4OffboardSubmissionError::DuplicateSequenceNumber);
             }
-            if previous_timestamp.is_some_and(|previous| sample.submitted_at.nanoseconds <= previous) {
+            if previous_timestamp
+                .is_some_and(|previous| sample.submitted_at.nanoseconds <= previous)
+            {
                 return Err(Px4OffboardSubmissionError::NonAdvancingSubmissionTime);
             }
             if let Some(previous) = previous_sequence {
-                let expected = previous.checked_add(1).ok_or(Px4OffboardSubmissionError::SequenceOverflow)?;
+                let expected = previous
+                    .checked_add(1)
+                    .ok_or(Px4OffboardSubmissionError::SequenceOverflow)?;
                 if sample.sequence_number != expected {
                     return Err(Px4OffboardSubmissionError::SubmissionSequenceGap {
                         previous,
@@ -938,7 +940,12 @@ mod tests {
             ts(1),
         )
         .unwrap();
-        let value = Px4OffboardSubmissionCadenceV1::new(ros_profile, ts(2), vec![first, second]).unwrap();
+        let value = Px4OffboardSubmissionCadenceV1::new(
+            ros_profile,
+            ts(2),
+            vec![first, second],
+        )
+        .unwrap();
         assert_eq!(value.outcome().unwrap(), Px4OffboardSubmissionOutcomeV1::WithinProfile);
     }
 
