@@ -627,7 +627,15 @@ mod tests {
         assert!(ten_replicate_option.meets_target_power_normal_approx);
         assert!(!ten_replicate_option.matches_current_request_counts);
 
+        let mut previous_projected_power = 0.0_f64;
         for option in &result.feasible_replication_options {
+            // Options are ordered by complete-factorial replication count; with fixed
+            // factor/variance inputs, estimated power must not decrease as replication rises.
+            assert!(
+                option.projected_power_normal_approx + 1e-12 >= previous_projected_power
+            );
+            previous_projected_power = option.projected_power_normal_approx;
+
             assert!((2..=8).contains(&option.block_count));
             assert!((1..=2).contains(&option.replicates_per_setting_per_block));
             assert_eq!(
