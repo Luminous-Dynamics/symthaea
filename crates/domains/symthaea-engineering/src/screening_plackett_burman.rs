@@ -384,7 +384,7 @@ fn settings_for_row(
         .collect()
 }
 
-/// Generate a randomized, blocked, 12-run Plackett–Burman screen for 2–11 numeric factors.
+/// Generate a randomized, blocked, 12-run Plackett–Burman screen for 5–11 numeric factors.
 /// This is for main-effect screening under an explicit negligible-interactions assumption;
 /// it is not a fractional-factorial interaction model or proof of adequate power.
 pub fn generate_plackett_burman_design(
