@@ -704,6 +704,24 @@ impl WorldGroundedSelfModel {
         Some(was_correct)
     }
 
+    /// Inject a caller-provided outcome for the deterministic toy-world simulation only.
+    ///
+    /// This API exists only when the explicit `magi-simulation` feature is enabled. The
+    /// supplied outcome is unverified and will affect this model instance's calibration;
+    /// never enable this feature for a live model or qualification-grade evaluation.
+    #[cfg(feature = "magi-simulation")]
+    pub fn resolve_prediction_for_simulation(
+        &mut self,
+        prediction_id: &str,
+        simulated_outcome: OutcomeCategory,
+        simulation_confidence: f64,
+    ) -> Option<bool> {
+        self.resolve_prediction_from_unverified_observation(
+            prediction_id,
+            simulated_outcome,
+            simulation_confidence,
+        )
+    }
     /// Process expired predictions
     pub fn process_expired_predictions(&mut self) {
         if !self.config.auto_resolve_timeout {
