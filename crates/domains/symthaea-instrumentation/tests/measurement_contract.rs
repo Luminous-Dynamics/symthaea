@@ -194,21 +194,17 @@ impl RawDataEvidenceResolver for MockResolver {
         reference: &RawDataReference,
     ) -> Result<ResolvedRawData, String> {
         let bytes = self.raw_bytes.clone()?;
-        let verified = VerifiedArtifactDigest::verify_reader(
-            reference.artifact().clone(),
-            Cursor::new(bytes),
-        )
-        .map_err(|_| "raw acquisition SHA-256 mismatch".to_owned())?;
-        let returned_artifact = self
+        let reference_to_verify = self
             .raw_reference_override
             .clone()
             .unwrap_or_else(|| reference.artifact().clone());
-        ResolvedRawData::new(
-            returned_artifact,
-            verified.byte_length(),
-            "application/octet-stream",
+        let verified = VerifiedArtifactDigest::verify_reader(
+            reference_to_verify,
+            Cursor::new(bytes),
         )
-        .map_err(|error| error.to_string())
+        .map_err(|_| "raw acquisition SHA-256 mismatch".to_owned())?;
+        ResolvedRawData::from_verified_digest(verified, "application/octet-stream")
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -630,18 +626,25 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
 
 #[test]
 fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
+    let empty_digest = sha256_hex(b"");
+    let empty_verified = VerifiedArtifactDigest::verify_reader(
+        artifact("empty-raw", &empty_digest),
+        Cursor::new(Vec::new()),
+    )
+    .unwrap();
     assert_eq!(
-        ResolvedRawData::new(
-            artifact("empty-raw", &raw_digest_hex()),
-            0,
-            "application/octet-stream",
-        )
-        .unwrap_err(),
+        ResolvedRawData::from_verified_digest(empty_verified, "application/octet-stream")
+            .unwrap_err(),
         ContractError::EmptyRawDataArtifact
     );
+
+    let verified = VerifiedArtifactDigest::verify_reader(
+        raw_artifact(),
+        Cursor::new(raw_fixture_bytes()),
+    )
+    .unwrap();
     assert_eq!(
-        ResolvedRawData::new(artifact("raw", &raw_digest_hex()), 10, " ")
-            .unwrap_err(),
+        ResolvedRawData::from_verified_digest(verified, " ").unwrap_err(),
         ContractError::EmptyIdentifier("raw_data_media_type")
     );
 }
