@@ -1,0 +1,112 @@
+name: QC Numerical Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/**"
+      - "scripts/qc_reference_compare.py"
+      - "flake.nix"
+      - ".github/workflows/qc-numerical-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-numerical-diagnostic-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  independent-reference:
+    name: Run native-versus-PySCF diagnostic (discrepancies fail visibly)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact PR head (or dispatched commit) with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master at 2026-10-09
+        with:
+          toolchain: 1.96.0
+
+      - name: Assert checkout matches the requested PR head (or dispatch SHA)
+        env:
+          EXPECTED_QC_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse --verify 'HEAD^{commit}')" = "$EXPECTED_QC_SOURCE_SHA"
+
+      - name: Setup Nix with flakes
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Generate source-bound native QC fixtures
+        run: cargo run --locked -p symthaea-quantum-chemistry --example qc_native_reference_fixtures > /tmp/qc-native.json
+
+      - name: Compare against PySCF
+        id: compare
+        run: |
+          nix develop .#qc-verify --command python scripts/qc_reference_compare.py \
+            --input /tmp/qc-native.json --output /tmp/qc-comparison.json
+
+      - name: Summarize diagnostic status (does not override comparator exit code)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary_file = Path("/tmp/qc-comparison.json")
+          native_file = Path("/tmp/qc-native.json")
+          out = Path(__import__("os").environ["GITHUB_STEP_SUMMARY"])
+          lines = ["## Native quantum chemistry vs PySCF", ""]
+          if not native_file.exists():
+              lines.append("Native fixture generation failed; no numerical conclusion.")
+          elif not summary_file.exists():
+              lines.append("No comparison report was emitted; no numerical conclusion.")
+          else:
+              report = json.loads(summary_file.read_text(encoding="utf-8"))
+              counts = report["summary"]
+              lines += [
+                  f"- Native source revision: `{report.get('native_source_revision')}`",
+                  f"- PySCF version: `{report.get('reference_solver_version')}`",
+                  f"- Cases: {counts['cases']}; passed: {counts['passed']}; "
+                  f"failed: {counts['failed']}; not comparable: {counts['not_comparable']}",
+                  "",
+                  "| Case | Native status | Reference status | max ΔS (unitless) | Comparison | ΔE (Ha) |",
+                  "|---|---|---|---:|---|---:|",
+              ]
+              for item in report["results"]:
+                  delta = item.get("delta_native_minus_pyscf_hartree")
+                  delta_str = "—" if delta is None else f"{delta:.9g}"
+                  overlap_delta = item.get("native_overlap_matrix_max_abs_delta")
+                  overlap_str = "—" if overlap_delta is None else f"{overlap_delta:.3g}"
+                  lines.append(
+                      f"| {item.get('case_id')} | {item.get('native_status')} | "
+                      f"{item.get('reference_status')} | {overlap_str} | "
+                      f"{item.get('comparison_status')} | {delta_str} |"
+                  )
+              lines += [
+                  "",
+                  "A passing row means numerical cross-backend agreement only, not chemical accuracy.",
+                  "A failed workflow remains failed; this summary never converts comparator failure into success.",
+              ]
+          out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload native and comparison evidence (even if comparison fails)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qc-numerical-diagnostic-${{ github.sha }}
+          path: |
+            /tmp/qc-native.json
+            /tmp/qc-comparison.json
+          if-no-files-found: warn
+          retention-days: 30
