@@ -121,7 +121,7 @@ impl Duration {
         let right = i128::from(other.num).checked_mul(i128::from(self.den))?;
         let numerator = left.checked_sub(right)?;
         let denominator = i128::from(self.den).checked_mul(i128::from(other.den))?;
-        Self::from_i128_rational(numerator, denominator)
+        from_i128_rational(numerator, denominator)
     }
 
     /// Add two exact rationals without intermediate i64 overflow.
