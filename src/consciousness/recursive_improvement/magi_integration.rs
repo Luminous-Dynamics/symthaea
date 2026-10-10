@@ -378,6 +378,8 @@ impl CalibrationQuality {
 // WORLD GROUNDED SELF MODEL
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const UNRESOLVED_PREDICTION_HISTORY_LIMIT: usize = 100;
+
 /// Self-model with world-grounded prediction and calibration
 pub struct WorldGroundedSelfModel {
     /// Configuration
@@ -397,6 +399,10 @@ pub struct WorldGroundedSelfModel {
 
     /// Pending world predictions awaiting resolution
     pending_predictions: VecDeque<WorldPrediction>,
+
+    /// Recent predictions abandoned without an observed outcome. This bounded in-memory history
+    /// is diagnostic only and is never submitted to calibration.
+    unresolved_predictions: VecDeque<WorldPrediction>,
 
     /// Recent causal attributions
     attributions: VecDeque<CausalAttribution>,
@@ -422,6 +428,7 @@ impl WorldGroundedSelfModel {
             gate: ConstraintGate::new(config.constraint_gate.clone()),
             contracts: ContractRegistry::with_defaults(),
             pending_predictions: VecDeque::new(),
+            unresolved_predictions: VecDeque::new(),
             attributions: VecDeque::new(),
             loop_state: MagiLoopState {
                 loop_iterations: 0,
@@ -969,6 +976,38 @@ impl WorldGroundedSelfModel {
     /// Get pending predictions
     pub fn pending_predictions(&self) -> &VecDeque<WorldPrediction> {
         &self.pending_predictions
+    }
+
+    /// Record that a pending prediction could not be resolved against an observed outcome.
+    ///
+    /// The prediction leaves the active queue and is retained in a bounded diagnostic history
+    /// with `Resolution::Unclear`. This does not update calibration or resolved-prediction counts.
+    pub fn mark_prediction_unresolved(
+        &mut self,
+        prediction_id: &str,
+        reason: impl Into<String>,
+    ) -> bool {
+        let Some(index) = self
+            .pending_predictions
+            .iter()
+            .position(|prediction| prediction.id == prediction_id)
+        else {
+            return false;
+        };
+        let Some(mut prediction) = self.pending_predictions.remove(index) else {
+            return false;
+        };
+        prediction.resolve_unclear(reason);
+        if self.unresolved_predictions.len() >= UNRESOLVED_PREDICTION_HISTORY_LIMIT {
+            self.unresolved_predictions.pop_front();
+        }
+        self.unresolved_predictions.push_back(prediction);
+        true
+    }
+
+    /// Get the bounded in-memory history of predictions abandoned without observed outcomes.
+    pub fn unresolved_predictions(&self) -> &VecDeque<WorldPrediction> {
+        &self.unresolved_predictions
     }
 
     /// Get recent attributions
@@ -1737,6 +1776,26 @@ mod tests {
 
         assert_eq!(was_correct, Some(true));
         assert_eq!(model.loop_state().predictions_resolved, 1);
+    }
+
+    #[test]
+    fn unresolved_prediction_leaves_pending_without_updating_calibration() {
+        let mut model = WorldGroundedSelfModel::with_defaults();
+        let action =
+            WorldActionContext::new("command", "resolver timed out").with_risk_tier(RiskTier::Observation);
+        let prediction = model.predict("Command completes", OutcomeCategory::Success, 0.8, action);
+        let resolved_before = model.loop_state().predictions_resolved;
+        let calibration_before = model.calibration().total_predictions();
+
+        assert!(model.mark_prediction_unresolved(&prediction.id, "resolver timed out"));
+        assert!(model.pending_predictions().is_empty());
+        assert_eq!(model.unresolved_predictions().len(), 1);
+        assert!(matches!(
+            model.unresolved_predictions().front().map(|p| &p.resolution),
+            Some(Resolution::Unclear { .. })
+        ));
+        assert_eq!(model.loop_state().predictions_resolved, resolved_before);
+        assert_eq!(model.calibration().total_predictions(), calibration_before);
     }
 
     #[test]
