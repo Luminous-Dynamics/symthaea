@@ -17,7 +17,7 @@ The paper contains three relevant power estimates from different stated contexts
 
 The 500 GW estimate is **not** the Table 8 cryostat power. It is an electromagnetic drag loss estimate for the conducting-sheet model. Birch says the superconducting surface would reduce drag-related dissipation to cryogenic losses, and also notes a linear-induction-motor approach could cancel much of the eddy current. A modern design would need to model those alternatives, their controls, and power recovery consistently.
 
-The two cryogenic pairs each imply a roughly 100:1 ratio of wall-plug input to the stated cold-side load. Their absolute values differ by a factor of five. The arithmetic is clear; whether the difference comes from configuration, length basis, table normalization, or a substantive inconsistency requires a source-level reconstruction. Do not silently pick one pair or average them.
+The two cryogenic pairs each imply a roughly 100:1 ratio of wall-plug input to the stated cold-side load. Their absolute values differ by a factor of five. The arithmetic is clear; whether the difference comes from configuration, length basis, table normalization, or a substantive inconsistency requires a source-level reconstruction. Do not silently pick one pair or average them. An additional Table 8 consistency check divides the reported superconductor mass per ring by its mass per length: 5.3 × 10⁷ kg / 1.2 kg m⁻¹ = 44.17 Mm for the orbital ring, and 8.8 × 10⁷ kg / 2.0 kg m⁻¹ = 44.00 Mm for the geosynchronous-ring entry. Their mean is 44.08 Mm; at the listed 10 W/m this implies 440.8 MW, within about 12% of the rounded 500 MW total. This makes the Table 8 values look internally consistent at the stated precision, but still does not explain why the earlier paragraph gives 100 MW for the whole ORS.
 
 ## Reproduced conducting-sheet arithmetic
 
@@ -93,17 +93,17 @@ Run from the repository root:
 python3 scripts/engineering/orbital_ring_power_source_audit.py
 ```
 
-The standard-library script computes the stated ratios and drag coefficients and checks the smaller and larger drag-power estimates. The recorded run passed **12/12 checks** and emitted byte-identical JSON on repeat. The captured report is checked into [the evidence directory](evidence/orbital_ring_power_source_audit.json) for review.
+The standard-library script computes the drag coefficients, checks the smaller and larger drag-power estimates and paired cryogenic ratios, and reconstructs the Table 8 length/heat-load scale. The recorded run passed **16/16 checks** and emitted byte-identical JSON on repeat. The captured report is checked into [the evidence directory](evidence/orbital_ring_power_source_audit.json) for review.
 
-- Source Git blob: `63dd1221598644d745416476c149655906f7ab59`
-- Source SHA-256: `d12fe55f532369cdb6da009b775d3849f1219c4e1aa0db22ea296eff3cb723e5`
-- Deterministic JSON SHA-256: `02c3abbb45ad706c6d692a0a248bbf0d8d09cf26e7575b169af16176b77d0ee8`
+- Source Git blob: `68d975e603aeb08049dd89670d754346d04a332b`
+- Source SHA-256: `c1d5086eb55c9424d544ba229db76a6727d5f22e311b7e5006acd6c86f28da26`
+- Deterministic JSON SHA-256: `a9a8357c6c56cbfd1d2b0681824b1529b5ece67be78bd08aaf8f1e801b49e7c4`
 
 This evidence verifies only the arithmetic of transcribed source values. It does not establish a valid current design, cryocooler performance, heat-rejection feasibility, structural stability, safe failure behavior, costs, or buildability.
 
 ## Next closure artifacts
 
-1. Reconstruct the geometry/length basis of Table 8 and annotate which cryogenic load applies to which physical subsystem.
+1. Verify the physical interpretation of Table 8's implied ~44 Mm path length, and explain why the p. 483 whole-system heat-loss estimate is five times lower than the Table 8-derived scale.
 2. Model conducting-sheet eddy-current drag, superconducting track alternatives, and linear-motor cancellation as separate architectures with explicit boundaries.
 3. Include energy recovery and control overhead rather than representing the approximate drag power as a mandatory net electrical demand.
 4. Carry the resulting source assumptions and uncertainty intervals into the T0/T1 manifest before comparing power, throughput or lifecycle costs.
