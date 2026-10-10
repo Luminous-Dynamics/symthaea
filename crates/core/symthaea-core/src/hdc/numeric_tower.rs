@@ -36,11 +36,13 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 
 /// Compute greatest common divisor using Euclidean algorithm.
+#[cfg(test)]
 fn gcd(a: u64, b: u64) -> u64 {
     if b == 0 { a } else { gcd(b, a % b) }
 }
 
-/// Normalize a rational number: ensure denominator > 0 and coprime with |numerator|.
+/// Normalize a rational number for legacy unit tests.
+#[cfg(test)]
 fn normalize_rational(num: i64, den: i64) -> (i64, i64) {
     assert!(den != 0, "Denominator cannot be zero");
 
@@ -59,6 +61,40 @@ fn normalize_rational(num: i64, den: i64) -> (i64, i64) {
     // Reduce to lowest terms
     let g = gcd(num.unsigned_abs(), den as u64) as i64;
     (num / g, den / g)
+}
+
+/// Compute a greatest common divisor without narrowing to a machine word.
+fn gcd_u128(mut a: u128, mut b: u128) -> u128 {
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a
+}
+
+/// Normalize an exact fraction in a wider intermediate type.
+///
+/// Returns None for a zero denominator or for a sign normalization that cannot
+/// be represented by i128. The reduced denominator is always positive.
+fn normalize_fraction_i128(numerator: i128, denominator: i128) -> Option<(i128, i128)> {
+    if denominator == 0 {
+        return None;
+    }
+    // Zero normalizes to 0/1 regardless of denominator sign or magnitude;
+    // do this before sign normalization because i128::MIN cannot be negated.
+    if numerator == 0 {
+        return Some((0, 1));
+    }
+
+    let (numerator, denominator) = if denominator < 0 {
+        (numerator.checked_neg()?, denominator.checked_neg()?)
+    } else {
+        (numerator, denominator)
+    };
+
+    let divisor = i128::try_from(gcd_u128(numerator.unsigned_abs(), denominator as u128)).ok()?;
+    Some((numerator / divisor, denominator / divisor))
 }
 
 // ============================================================================
@@ -131,7 +167,41 @@ impl Number {
         }
     }
 
+    /// Check whether this number is exactly zero in its represented domain.
+    ///
+    /// Unlike Number::is_zero, this does not treat small nonzero floating-point
+    /// values as zero. NaN and infinities are never classified as exact zero.
+    /// Use this predicate for algebraic guards such as division-by-zero checks.
+    pub fn is_zero_exact(&self) -> bool {
+        match self {
+            Number::Natural(n) => *n == 0,
+            Number::Integer(n) => *n == 0,
+            Number::Rational {
+                numerator,
+                denominator,
+            } => *denominator != 0 && *numerator == 0,
+            Number::Real(x) => *x == 0.0,
+        }
+    }
+
+    /// Check whether this number is within an absolute tolerance of zero.
+    ///
+    /// Returns false for negative or non-finite tolerances and for non-finite
+    /// values. This is an approximate numerical predicate, not an algebraic one.
+    pub fn is_approximately_zero(&self, tolerance: f64) -> bool {
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return false;
+        }
+
+        let value = self.to_f64();
+        value.is_finite() && value.abs() <= tolerance
+    }
+
     /// Check if this number is zero in any domain.
+    ///
+    /// Compatibility note: floating-point values with magnitude below 1e-15
+    /// are treated as zero. Prefer is_zero_exact for algebraic guards and
+    /// is_approximately_zero when the tolerance matters.
     pub fn is_zero(&self) -> bool {
         match self {
             Number::Natural(n) => *n == 0,
@@ -158,13 +228,15 @@ impl Number {
                 }
             }
             Number::Integer(n) if n >= 0 => Number::Natural(n as u64),
-            Number::Real(x) if x.fract().abs() < 1e-12 && x >= 0.0 && x <= u64::MAX as f64 => {
-                Number::Natural(x.round() as u64)
+            // Narrow only exact integral floats. A tolerance here can silently
+            // change a nearby fractional value into a different integer.
+            Number::Real(x) if x.fract() == 0.0 && x >= 0.0 && x < u64::MAX as f64 => {
+                Number::Natural(x as u64)
             }
             Number::Real(x)
-                if x.fract().abs() < 1e-12 && x >= i64::MIN as f64 && x <= i64::MAX as f64 =>
+                if x.fract() == 0.0 && x >= i64::MIN as f64 && x < i64::MAX as f64 =>
             {
-                Number::Integer(x.round() as i64)
+                Number::Integer(x as i64)
             }
             other => other,
         }
@@ -212,6 +284,56 @@ pub struct NumberResult {
 
     /// BinaryHV encoding of the result in 16,384-dimensional HDC space
     pub encoding: BinaryHV,
+}
+
+/// Exactness classification for a numeric-tower operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArithmeticPrecision {
+    /// The value is the exact result of the operation over the represented inputs.
+    Exact,
+    /// The value was computed using floating-point arithmetic or an explicit
+    /// fallback because the fixed-width exact representation was insufficient.
+    Approximate,
+}
+
+/// Typed failures returned by the checked numeric-tower API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumericArithmeticError {
+    /// A public Rational variant had a zero denominator.
+    InvalidRationalOperand,
+    /// Division by an exactly zero denominator was requested.
+    DivisionByZero,
+    /// An input Real was NaN or infinite.
+    NonFiniteOperand,
+    /// A finite input operation produced a non-finite floating-point result.
+    NonFiniteResult,
+    /// The exact value cannot fit the current fixed-width Number representation.
+    ExactResultOutOfRange,
+}
+
+impl std::fmt::Display for NumericArithmeticError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRationalOperand => write!(f, "rational operand has a zero denominator"),
+            Self::DivisionByZero => write!(f, "division by zero"),
+            Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
+            Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
+            Self::ExactResultOutOfRange => {
+                write!(f, "exact result exceeds the fixed-width Number representation")
+            }
+        }
+    }
+}
+
+impl std::error::Error for NumericArithmeticError {}
+
+/// Result of a checked operation, including whether its value is exact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NumericArithmeticResult {
+    /// Full numeric-tower result, including encoding and operation trace.
+    pub result: NumberResult,
+    /// Exactness classification of the computed value.
+    pub precision: ArithmeticPrecision,
 }
 
 impl NumberResult {
@@ -292,33 +414,50 @@ impl NumericTower {
     /// Create a Number from an f64 (attempts to narrow to most specific domain).
     pub fn from_f64(x: f64) -> Number {
         // Try to represent as an exact integer first
-        if x.is_finite() && x.fract().abs() < 1e-12 {
-            if x >= 0.0 && x <= u64::MAX as f64 {
-                return Number::Natural(x.round() as u64);
+        if x.is_finite() && x.fract() == 0.0 {
+            // u64::MAX as f64 rounds to 2^64, which is an exclusive upper
+            // bound for values that can be cast back without saturation.
+            if x >= 0.0 && x < u64::MAX as f64 {
+                return Number::Natural(x as u64);
             }
-            if x >= i64::MIN as f64 && x <= i64::MAX as f64 {
-                return Number::Integer(x.round() as i64);
+            // i64::MAX as f64 similarly rounds to 2^63; keep that boundary
+            // exclusive while allowing i64::MIN exactly.
+            if x >= i64::MIN as f64 && x < i64::MAX as f64 {
+                return Number::Integer(x as i64);
             }
         }
         Number::Real(x)
     }
 
-    /// Create a Number from a rational p/q (normalizes and narrows).
+    /// Create a Number from a rational p/q, normalizing and narrowing when exact.
+    ///
+    /// For compatibility this constructor falls back to Real only when a valid
+    /// rational cannot fit the fixed-width Number representation. Use
+    /// checked_from_rational when an exact value is mandatory.
     pub fn from_rational(numerator: i64, denominator: i64) -> Number {
         assert!(denominator != 0, "Denominator cannot be zero");
-        let (num, den) = normalize_rational(numerator, denominator);
-        if den == 1 {
-            if num >= 0 {
-                Number::Natural(num as u64)
-            } else {
-                Number::Integer(num)
+        match Self::checked_from_rational(numerator, denominator) {
+            Ok(number) => number,
+            Err(NumericArithmeticError::ExactResultOutOfRange) => {
+                Number::Real(numerator as f64 / denominator as f64)
             }
-        } else {
-            Number::Rational {
-                numerator: num,
-                denominator: den,
-            }
+            Err(_) => unreachable!("nonzero constructor denominator was validated"),
         }
+    }
+
+    /// Construct a rational Number without approximation.
+    ///
+    /// Returns a typed error if the denominator is zero or the normalized exact
+    /// fraction cannot fit Natural(u64), Integer(i64), or Rational(i64, i64).
+    pub fn checked_from_rational(
+        numerator: i64,
+        denominator: i64,
+    ) -> Result<Number, NumericArithmeticError> {
+        if denominator == 0 {
+            return Err(NumericArithmeticError::InvalidRationalOperand);
+        }
+        Self::number_from_fraction_i128(i128::from(numerator), i128::from(denominator))
+            .ok_or(NumericArithmeticError::ExactResultOutOfRange)
     }
 
     // ========================================================================
@@ -486,441 +625,265 @@ impl NumericTower {
         }
     }
 
+    /// Convert a valid non-real Number to a normalized exact fraction.
+    fn exact_fraction_i128(number: &Number) -> Option<(i128, i128)> {
+        match number {
+            Number::Natural(value) => Some((i128::from(*value), 1)),
+            Number::Integer(value) => Some((i128::from(*value), 1)),
+            Number::Rational {
+                numerator,
+                denominator,
+            } => normalize_fraction_i128(i128::from(*numerator), i128::from(*denominator)),
+            Number::Real(_) => None,
+        }
+    }
+
+    /// Narrow an exact fraction into the current fixed-width Number variants.
+    ///
+    /// None means the exact value is outside the representable Number range;
+    /// callers must not wrap it into a different integer.
+    fn number_from_fraction_i128(numerator: i128, denominator: i128) -> Option<Number> {
+        let (numerator, denominator) = normalize_fraction_i128(numerator, denominator)?;
+
+        if denominator == 1 {
+            if numerator >= 0 && numerator <= i128::from(u64::MAX) {
+                return Some(Number::Natural(numerator as u64));
+            }
+            if numerator < 0 && numerator >= i128::from(i64::MIN) {
+                return Some(Number::Integer(numerator as i64));
+            }
+            return None;
+        }
+
+        if numerator < i128::from(i64::MIN)
+            || numerator > i128::from(i64::MAX)
+            || denominator > i128::from(i64::MAX)
+        {
+            return None;
+        }
+
+        Some(Number::Rational {
+            numerator: numerator as i64,
+            denominator: denominator as i64,
+        })
+    }
+
+    /// Compute a binary operation exactly when possible without leaving the
+    /// fixed-width Number representation. None requests an explicit Real
+    /// fallback; it never indicates that wrapping arithmetic is acceptable.
+    fn exact_binary_result(a: &Number, b: &Number, operation: &str) -> Option<Number> {
+        let (an, ad) = Self::exact_fraction_i128(a)?;
+        let (bn, bd) = Self::exact_fraction_i128(b)?;
+
+        let (numerator, denominator) = match operation {
+            "add" => (
+                an.checked_mul(bd)?.checked_add(bn.checked_mul(ad)?)?,
+                ad.checked_mul(bd)?,
+            ),
+            "subtract" => (
+                an.checked_mul(bd)?.checked_sub(bn.checked_mul(ad)?)?,
+                ad.checked_mul(bd)?,
+            ),
+            "multiply" => (an.checked_mul(bn)?, ad.checked_mul(bd)?),
+            "divide" if bn != 0 => (an.checked_mul(bd)?, ad.checked_mul(bn)?),
+            _ => return None,
+        };
+
+        Self::number_from_fraction_i128(numerator, denominator)
+    }
+
+    /// Centralized binary arithmetic. Exact operands are computed using checked
+    /// i128 intermediates and normalized fractions. If either operand or the
+    /// exact result cannot be represented, the result is explicitly a Real and
+    /// its proof trace says that it is approximate.
+    fn binary_arithmetic(
+        &self,
+        a: &Number,
+        b: &Number,
+        operation: &str,
+        symbol: &str,
+    ) -> NumberResult {
+        let mut proof_trace = vec![format!("{}: {} {} {}", operation, a, symbol, b)];
+
+        let result = if matches!(a, Number::Real(_)) || matches!(b, Number::Real(_)) {
+            let value = Self::apply_f64(a.to_f64(), b.to_f64(), operation);
+            proof_trace.push(format!(
+                "Approximate floating-point {}: result is Real({value}); exactness is not claimed.",
+                operation.to_lowercase()
+            ));
+            Number::Real(value)
+        } else if let Some(exact) = Self::exact_binary_result(a, b, operation) {
+            let input_domain = a.domain().max(b.domain());
+            if exact.domain() > input_domain {
+                proof_trace.push(format!(
+                    "Promotion {} -> {}: exact result = {}",
+                    input_domain,
+                    exact.domain(),
+                    exact
+                ));
+            } else {
+                proof_trace.push(format!("Exact {} result = {}", operation.to_lowercase(), exact));
+            }
+            exact
+        } else {
+            let value = Self::apply_f64(a.to_f64(), b.to_f64(), operation);
+            let malformed_fraction = matches!(a, Number::Rational { denominator: 0, .. })
+                || matches!(b, Number::Rational { denominator: 0, .. });
+            if malformed_fraction {
+                proof_trace.push(format!(
+                    "Invalid rational operand: {} fallback is approximate and must not be treated as exact.",
+                    operation
+                ));
+            } else {
+                proof_trace.push(format!(
+                    "Exact {} exceeds the supported fixed-width range or intermediate capacity; promoted to approximate Real({value}).",
+                    operation.to_lowercase()
+                ));
+            }
+            Number::Real(value)
+        };
+
+        let input_domains = [a.domain(), b.domain()];
+        self.build_result(result, operation.to_string(), proof_trace, &input_domains)
+    }
+
+    fn apply_f64(a: f64, b: f64, operation: &str) -> f64 {
+        match operation {
+            "add" => a + b,
+            "subtract" => a - b,
+            "multiply" => a * b,
+            "divide" => a / b,
+            _ => f64::NAN,
+        }
+    }
+
     // ========================================================================
     // ARITHMETIC OPERATIONS
     // ========================================================================
 
-    /// Add two numbers: a + b
-    ///
-    /// Stays in the narrowest domain that contains both operands and the result.
-    pub fn add(&self, a: &Number, b: &Number) -> NumberResult {
-        let mut proof_trace = vec![format!("Add: {} + {}", a, b)];
-
-        let result = match (a, b) {
-            // ℕ + ℕ → ℕ (always closed)
-            (Number::Natural(x), Number::Natural(y)) => {
-                let sum = x.wrapping_add(*y);
-                proof_trace.push(format!("Natural addition: {x} + {y} = {sum}"));
-                Number::Natural(sum)
+    /// Validate the domain-level invariants required by checked arithmetic.
+    fn validate_checked_operand(number: &Number) -> Result<(), NumericArithmeticError> {
+        match number {
+            Number::Rational { denominator: 0, .. } => {
+                Err(NumericArithmeticError::InvalidRationalOperand)
             }
-
-            // ℤ + ℤ → ℤ (or ℕ if non-negative)
-            (Number::Integer(x), Number::Integer(y)) => {
-                let sum = x.wrapping_add(*y);
-                proof_trace.push(format!("Integer addition: {x} + {y} = {sum}"));
-                Self::from_i64(sum)
+            Number::Real(value) if !value.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteOperand)
             }
-
-            // Mixed ℕ/ℤ: lift to ℤ
-            (Number::Natural(x), Number::Integer(y)) | (Number::Integer(y), Number::Natural(x)) => {
-                let sum = (*x as i64).wrapping_add(*y);
-                proof_trace.push(format!("Lift to Z: {x} + {y} = {sum}"));
-                Self::from_i64(sum)
-            }
-
-            // ℚ + ℚ → ℚ: (a/b) + (c/d) = (ad + bc) / bd
-            (
-                Number::Rational {
-                    numerator: an,
-                    denominator: ad,
-                },
-                Number::Rational {
-                    numerator: bn,
-                    denominator: bd,
-                },
-            ) => {
-                let num = an.wrapping_mul(*bd).wrapping_add(bn.wrapping_mul(*ad));
-                let den = ad.wrapping_mul(*bd);
-                proof_trace.push(format!(
-                    "Rational addition: ({an} x {bd} + {bn} x {ad}) / ({ad} x {bd}) = {num}/{den}"
-                ));
-                Self::from_rational(num, den)
-            }
-
-            // Mixed with ℚ: lift other operand to ℚ
-            (
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-                other,
-            )
-            | (
-                other,
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-            ) => {
-                let (on, od) = self.to_rational(other);
-                let num = rn.wrapping_mul(od).wrapping_add(on.wrapping_mul(*rd));
-                let den = rd.wrapping_mul(od);
-                proof_trace.push(format!("Lift to Q then add: {rn}/{rd} + {on}/{od}"));
-                Self::from_rational(num, den)
-            }
-
-            // ℝ + anything → ℝ
-            (Number::Real(x), other) | (other, Number::Real(x)) => {
-                let sum = x + other.to_f64();
-                proof_trace.push(format!(
-                    "Real addition: {} + {} = {}",
-                    x,
-                    other.to_f64(),
-                    sum
-                ));
-                Self::from_f64(sum)
-            }
-        };
-
-        let input_domains = [a.domain(), b.domain()];
-        self.build_result(result, "add".to_string(), proof_trace, &input_domains)
+            _ => Ok(()),
+        }
     }
 
-    /// Subtract two numbers: a - b
-    ///
-    /// Auto-promotes ℕ → ℤ when the result is negative.
-    pub fn subtract(&self, a: &Number, b: &Number) -> NumberResult {
-        let mut proof_trace = vec![format!("Subtract: {} - {}", a, b)];
-
-        let result = match (a, b) {
-            // ℕ - ℕ: may promote to ℤ
-            (Number::Natural(x), Number::Natural(y)) => {
-                if *x >= *y {
-                    let diff = x - y;
-                    proof_trace.push(format!(
-                        "Natural subtraction: {x} - {y} = {diff} (stays in N)"
-                    ));
-                    Number::Natural(diff)
-                } else {
-                    let diff = (*x as i64).wrapping_sub(*y as i64);
-                    proof_trace.push(format!(
-                        "Promotion N -> Z: {x} - {y} = {diff} (negative result)"
-                    ));
-                    Number::Integer(diff)
-                }
-            }
-
-            // ℤ - ℤ → ℤ (or ℕ)
-            (Number::Integer(x), Number::Integer(y)) => {
-                let diff = x.wrapping_sub(*y);
-                proof_trace.push(format!("Integer subtraction: {x} - {y} = {diff}"));
-                Self::from_i64(diff)
-            }
-
-            // Mixed ℕ/ℤ
-            (Number::Natural(x), Number::Integer(y)) => {
-                let diff = (*x as i64).wrapping_sub(*y);
-                proof_trace.push(format!("Lift to Z: {x} - {y} = {diff}"));
-                Self::from_i64(diff)
-            }
-            (Number::Integer(x), Number::Natural(y)) => {
-                let diff = x.wrapping_sub(*y as i64);
-                proof_trace.push(format!("Lift to Z: {x} - {y} = {diff}"));
-                Self::from_i64(diff)
-            }
-
-            // ℚ - ℚ
-            (
-                Number::Rational {
-                    numerator: an,
-                    denominator: ad,
-                },
-                Number::Rational {
-                    numerator: bn,
-                    denominator: bd,
-                },
-            ) => {
-                let num = an.wrapping_mul(*bd).wrapping_sub(bn.wrapping_mul(*ad));
-                let den = ad.wrapping_mul(*bd);
-                proof_trace.push(format!(
-                    "Rational subtraction: ({an} x {bd} - {bn} x {ad}) / ({ad} x {bd})"
-                ));
-                Self::from_rational(num, den)
-            }
-
-            // Mixed with ℚ
-            (
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-                other,
-            ) => {
-                let (on, od) = self.to_rational(other);
-                let num = rn.wrapping_mul(od).wrapping_sub(on.wrapping_mul(*rd));
-                let den = rd.wrapping_mul(od);
-                proof_trace.push(format!("Lift to Q: {rn}/{rd} - {on}/{od}"));
-                Self::from_rational(num, den)
-            }
-            (
-                other,
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-            ) => {
-                let (on, od) = self.to_rational(other);
-                let num = on.wrapping_mul(*rd).wrapping_sub(rn.wrapping_mul(od));
-                let den = od.wrapping_mul(*rd);
-                proof_trace.push(format!("Lift to Q: {on}/{od} - {rn}/{rd}"));
-                Self::from_rational(num, den)
-            }
-
-            // ℝ - anything → ℝ
-            (Number::Real(x), other) => {
-                let diff = x - other.to_f64();
-                proof_trace.push(format!(
-                    "Real subtraction: {} - {} = {}",
-                    x,
-                    other.to_f64(),
-                    diff
-                ));
-                Self::from_f64(diff)
-            }
-            (other, Number::Real(x)) => {
-                let diff = other.to_f64() - x;
-                proof_trace.push(format!(
-                    "Real subtraction: {} - {} = {}",
-                    other.to_f64(),
-                    x,
-                    diff
-                ));
-                Self::from_f64(diff)
-            }
-        };
-
-        let input_domains = [a.domain(), b.domain()];
-        self.build_result(result, "subtract".to_string(), proof_trace, &input_domains)
-    }
-
-    /// Multiply two numbers: a * b
-    ///
-    /// Stays in the narrowest closed domain.
-    pub fn multiply(&self, a: &Number, b: &Number) -> NumberResult {
-        let mut proof_trace = vec![format!("Multiply: {} * {}", a, b)];
-
-        let result = match (a, b) {
-            // ℕ * ℕ → ℕ
-            (Number::Natural(x), Number::Natural(y)) => {
-                let prod = x.wrapping_mul(*y);
-                proof_trace.push(format!("Natural multiplication: {x} * {y} = {prod}"));
-                Number::Natural(prod)
-            }
-
-            // ℤ * ℤ → ℤ (or ℕ)
-            (Number::Integer(x), Number::Integer(y)) => {
-                let prod = x.wrapping_mul(*y);
-                proof_trace.push(format!("Integer multiplication: {x} * {y} = {prod}"));
-                Self::from_i64(prod)
-            }
-
-            // Mixed ℕ/ℤ
-            (Number::Natural(x), Number::Integer(y)) | (Number::Integer(y), Number::Natural(x)) => {
-                let prod = (*x as i64).wrapping_mul(*y);
-                proof_trace.push(format!("Lift to Z: {x} * {y} = {prod}"));
-                Self::from_i64(prod)
-            }
-
-            // ℚ * ℚ → ℚ
-            (
-                Number::Rational {
-                    numerator: an,
-                    denominator: ad,
-                },
-                Number::Rational {
-                    numerator: bn,
-                    denominator: bd,
-                },
-            ) => {
-                let num = an.wrapping_mul(*bn);
-                let den = ad.wrapping_mul(*bd);
-                proof_trace.push(format!(
-                    "Rational multiplication: ({an} * {bn}) / ({ad} * {bd})"
-                ));
-                Self::from_rational(num, den)
-            }
-
-            // Mixed with ℚ
-            (
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-                other,
-            )
-            | (
-                other,
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-            ) => {
-                let (on, od) = self.to_rational(other);
-                let num = rn.wrapping_mul(on);
-                let den = rd.wrapping_mul(od);
-                proof_trace.push(format!("Lift to Q: ({rn}/{rd}) * ({on}/{od})"));
-                Self::from_rational(num, den)
-            }
-
-            // ℝ * anything → ℝ
-            (Number::Real(x), other) | (other, Number::Real(x)) => {
-                let prod = x * other.to_f64();
-                proof_trace.push(format!(
-                    "Real multiplication: {} * {} = {}",
-                    x,
-                    other.to_f64(),
-                    prod
-                ));
-                Self::from_f64(prod)
-            }
-        };
-
-        let input_domains = [a.domain(), b.domain()];
-        self.build_result(result, "multiply".to_string(), proof_trace, &input_domains)
-    }
-
-    /// Divide two numbers: a / b
-    ///
-    /// Auto-promotes ℤ → ℚ when division is not exact.
-    /// Returns `None` if b is zero.
-    pub fn divide(&self, a: &Number, b: &Number) -> Option<NumberResult> {
-        if b.is_zero() {
-            return None;
+    /// Shared checked arithmetic implementation used by the checked public API.
+    fn checked_binary_arithmetic(
+        &self,
+        a: &Number,
+        b: &Number,
+        operation: &str,
+        symbol: &str,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        Self::validate_checked_operand(a)?;
+        Self::validate_checked_operand(b)?;
+        if operation == "divide" && b.is_zero_exact() {
+            return Err(NumericArithmeticError::DivisionByZero);
         }
 
-        let mut proof_trace = vec![format!("Divide: {} / {}", a, b)];
+        let mut proof_trace = vec![format!("{}: {} {} {}", operation, a, symbol, b)];
+        let has_real_operand = matches!(a, Number::Real(_)) || matches!(b, Number::Real(_));
 
-        let result = match (a, b) {
-            // ℕ / ℕ: exact → ℕ, otherwise → ℚ
-            (Number::Natural(x), Number::Natural(y)) => {
-                if *y != 0 && *x % *y == 0 {
-                    let quot = x / y;
-                    proof_trace.push(format!(
-                        "Exact natural division: {x} / {y} = {quot} (stays in N)"
-                    ));
-                    Number::Natural(quot)
-                } else {
-                    let (num, den) = normalize_rational(*x as i64, *y as i64);
-                    proof_trace.push(format!(
-                        "Promotion N -> Q: {x} / {y} = {num}/{den} (not exact)"
-                    ));
-                    Self::from_rational(num, den)
+        let (number, precision) = if !has_real_operand {
+            if let Some(exact) = Self::exact_binary_result(a, b, operation) {
+                proof_trace.push(format!("Exact {} result = {}", operation, exact));
+                (exact, ArithmeticPrecision::Exact)
+            } else {
+                let value = Self::apply_f64(a.to_f64(), b.to_f64(), operation);
+                if !value.is_finite() {
+                    return Err(NumericArithmeticError::NonFiniteResult);
                 }
-            }
-
-            // ℤ / ℤ: exact → ℤ (or ℕ), otherwise → ℚ
-            (Number::Integer(x), Number::Integer(y)) => {
-                if *y != 0 && *x % *y == 0 {
-                    let quot = x / y;
-                    proof_trace.push(format!(
-                        "Exact integer division: {x} / {y} = {quot} (stays in Z)"
-                    ));
-                    Self::from_i64(quot)
-                } else {
-                    proof_trace.push(format!("Promotion Z -> Q: {x} / {y} (not exact)"));
-                    Self::from_rational(*x, *y)
-                }
-            }
-
-            // Mixed ℕ/ℤ: lift to ℤ then decide
-            (Number::Natural(x), Number::Integer(y)) => {
-                let xi = *x as i64;
-                if *y != 0 && xi % *y == 0 {
-                    let quot = xi / *y;
-                    proof_trace.push(format!("Exact division after lift: {x} / {y} = {quot}"));
-                    Self::from_i64(quot)
-                } else {
-                    proof_trace.push(format!("Promotion to Q: {x} / {y}"));
-                    Self::from_rational(xi, *y)
-                }
-            }
-            (Number::Integer(x), Number::Natural(y)) => {
-                let yi = *y as i64;
-                if yi != 0 && *x % yi == 0 {
-                    let quot = *x / yi;
-                    proof_trace.push(format!("Exact division after lift: {x} / {y} = {quot}"));
-                    Self::from_i64(quot)
-                } else {
-                    proof_trace.push(format!("Promotion to Q: {x} / {y}"));
-                    Self::from_rational(*x, yi)
-                }
-            }
-
-            // ℚ / ℚ: multiply by reciprocal
-            (
-                Number::Rational {
-                    numerator: an,
-                    denominator: ad,
-                },
-                Number::Rational {
-                    numerator: bn,
-                    denominator: bd,
-                },
-            ) => {
-                // (an/ad) / (bn/bd) = (an * bd) / (ad * bn)
-                let num = an.wrapping_mul(*bd);
-                let den = ad.wrapping_mul(*bn);
                 proof_trace.push(format!(
-                    "Rational division: ({an}/{ad}) / ({bn}/{bd}) = ({an} * {bd}) / ({ad} * {bn})"
+                    "Exact {} exceeds the current fixed-width representation or intermediate capacity; approximate Real({value}) returned.",
+                    operation
                 ));
-                Self::from_rational(num, den)
+                (Number::Real(value), ArithmeticPrecision::Approximate)
             }
-
-            // Mixed with ℚ
-            (
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-                other,
-            ) => {
-                let (on, od) = self.to_rational(other);
-                // (rn/rd) / (on/od) = (rn * od) / (rd * on)
-                let num = rn.wrapping_mul(od);
-                let den = rd.wrapping_mul(on);
-                proof_trace.push(format!("Lift to Q: ({rn}/{rd}) / ({on}/{od})"));
-                Self::from_rational(num, den)
+        } else {
+            let value = Self::apply_f64(a.to_f64(), b.to_f64(), operation);
+            if !value.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
             }
-            (
-                other,
-                Number::Rational {
-                    numerator: rn,
-                    denominator: rd,
-                },
-            ) => {
-                let (on, od) = self.to_rational(other);
-                // (on/od) / (rn/rd) = (on * rd) / (od * rn)
-                let num = on.wrapping_mul(*rd);
-                let den = od.wrapping_mul(*rn);
-                proof_trace.push(format!("Lift to Q: ({on}/{od}) / ({rn}/{rd})"));
-                Self::from_rational(num, den)
-            }
-
-            // ℝ / anything → ℝ
-            (Number::Real(x), other) => {
-                let quot = x / other.to_f64();
-                proof_trace.push(format!(
-                    "Real division: {} / {} = {}",
-                    x,
-                    other.to_f64(),
-                    quot
-                ));
-                Self::from_f64(quot)
-            }
-            (other, Number::Real(x)) => {
-                let quot = other.to_f64() / x;
-                proof_trace.push(format!(
-                    "Real division: {} / {} = {}",
-                    other.to_f64(),
-                    x,
-                    quot
-                ));
-                Self::from_f64(quot)
-            }
+            proof_trace.push(format!(
+                "Floating-point {} evaluated to Real({value}); exactness is not claimed.",
+                operation
+            ));
+            (Number::Real(value), ArithmeticPrecision::Approximate)
         };
 
         let input_domains = [a.domain(), b.domain()];
-        Some(self.build_result(result, "divide".to_string(), proof_trace, &input_domains))
+        let result = self.build_result(number, operation.to_string(), proof_trace, &input_domains);
+        Ok(NumericArithmeticResult { result, precision })
+    }
+
+    /// Checked addition: rejects malformed/non-finite operands and reports exactness.
+    pub fn checked_add(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "add", "+")
+    }
+
+    /// Checked subtraction: rejects malformed/non-finite operands and reports exactness.
+    pub fn checked_subtract(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "subtract", "-")
+    }
+
+    /// Checked multiplication: rejects malformed/non-finite operands and reports exactness.
+    pub fn checked_multiply(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "multiply", "*")
+    }
+
+    /// Checked division: rejects invalid operands and division by exact zero.
+    pub fn checked_divide(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "divide", "/")
+    }
+
+    /// Add two numbers using checked exact arithmetic with an explicit Real fallback.
+    pub fn add(&self, a: &Number, b: &Number) -> NumberResult {
+        self.binary_arithmetic(a, b, "add", "+")
+    }
+
+    /// Subtract two numbers using checked exact arithmetic with an explicit Real fallback.
+    pub fn subtract(&self, a: &Number, b: &Number) -> NumberResult {
+        self.binary_arithmetic(a, b, "subtract", "-")
+    }
+
+    /// Multiply two numbers using checked exact arithmetic with an explicit Real fallback.
+    pub fn multiply(&self, a: &Number, b: &Number) -> NumberResult {
+        self.binary_arithmetic(a, b, "multiply", "*")
+    }
+
+    /// Divide two numbers.
+    ///
+    /// Returns None for an exactly zero divisor or a malformed rational divisor.
+    /// Non-real operands retain exact rational results when representable;
+    /// overflow is reported in the proof trace and falls back to approximate Real.
+    pub fn divide(&self, a: &Number, b: &Number) -> Option<NumberResult> {
+        if b.is_zero_exact() || matches!(b, Number::Rational { denominator: 0, .. }) {
+            return None;
+        }
+        Some(self.binary_arithmetic(a, b, "divide", "/"))
     }
 
     /// Raise a number to a power: a^n
@@ -1029,7 +992,10 @@ impl NumericTower {
         }
     }
 
-    /// Negate a number: -a
+    /// Negate a number: -a.
+    ///
+    /// Uses exact widening where the existing Number variants can represent the
+    /// result and records any unavoidable Real fallback in the proof trace.
     pub fn negate(&self, a: &Number) -> NumberResult {
         let mut proof_trace = vec![format!("Negate: -({})", a)];
 
@@ -1038,29 +1004,48 @@ impl NumericTower {
                 proof_trace.push("Negation of zero is zero".to_string());
                 Number::Natural(0)
             }
-            Number::Natural(n) => {
+            Number::Natural(n) if *n <= i64::MAX as u64 => {
                 let neg = -(*n as i64);
-                proof_trace.push(format!("Promotion N -> Z: -({n}) = {neg}"));
+                proof_trace.push(format!("Exact negation: -({n}) = {neg}"));
                 Number::Integer(neg)
             }
-            Number::Integer(n) => {
-                let neg = n.wrapping_neg();
-                proof_trace.push(format!("Integer negation: -({n}) = {neg}"));
-                Self::from_i64(neg)
-            }
-            Number::Rational {
-                numerator,
-                denominator,
-            } => {
-                let neg_num = numerator.wrapping_neg();
+            Number::Natural(n) => {
+                let value = -(*n as f64);
                 proof_trace.push(format!(
-                    "Rational negation: -({numerator}/{denominator}) = {neg_num}/{denominator}"
+                    "Negation of {n} exceeds the signed fixed-width range; approximate Real({value}) returned."
                 ));
-                Self::from_rational(neg_num, *denominator)
+                Number::Real(value)
+            }
+            Number::Integer(n) => match n.checked_neg() {
+                Some(neg) => {
+                    proof_trace.push(format!("Exact integer negation: -({n}) = {neg}"));
+                    Self::from_i64(neg)
+                }
+                None => {
+                    // -i64::MIN = 2^63, which is representable as a Natural.
+                    proof_trace.push(format!("Exact integer negation: -({n}) = {}", n.unsigned_abs()));
+                    Number::Natural(n.unsigned_abs())
+                }
+            },
+            Number::Rational { numerator, denominator } => {
+                if *denominator == 0 {
+                    proof_trace.push("Invalid rational operand: zero denominator; result is an invalid NaN sentinel.".to_string());
+                    Number::Real(f64::NAN)
+                } else if let Some(negated) = Self::number_from_fraction_i128(
+                    -i128::from(*numerator),
+                    i128::from(*denominator),
+                ) {
+                    proof_trace.push(format!("Exact rational negation: -({numerator}/{denominator}) = {negated}"));
+                    negated
+                } else {
+                    let value = -(*numerator as f64 / *denominator as f64);
+                    proof_trace.push(format!("Rational negation exceeds fixed-width storage; approximate Real({value}) returned."));
+                    Number::Real(value)
+                }
             }
             Number::Real(x) => {
-                let neg = -x;
-                proof_trace.push(format!("Real negation: -({x}) = {neg}"));
+                let neg = -*x;
+                proof_trace.push(format!("Floating-point negation: -({x}) = {neg}; exactness is not claimed."));
                 Number::Real(neg)
             }
         };
@@ -1069,7 +1054,10 @@ impl NumericTower {
         self.build_result(result, "negate".to_string(), proof_trace, &input_domains)
     }
 
-    /// Absolute value: |a|
+    /// Absolute value: |a|.
+    ///
+    /// Uses unsigned magnitude and wide fraction normalization to preserve the
+    /// exact absolute value of signed minimum values where representable.
     pub fn abs(&self, a: &Number) -> NumberResult {
         let mut proof_trace = vec![format!("Absolute value: |{}|", a)];
 
@@ -1079,24 +1067,30 @@ impl NumericTower {
                 Number::Natural(*n)
             }
             Number::Integer(n) => {
-                let abs_val = n.checked_abs().unwrap_or(i64::MAX);
-                proof_trace.push(format!("Integer absolute value: |{n}| = {abs_val}"));
-                Number::Natural(abs_val as u64)
+                let magnitude = n.unsigned_abs();
+                proof_trace.push(format!("Exact integer absolute value: |{n}| = {magnitude}"));
+                Number::Natural(magnitude)
             }
-            Number::Rational {
-                numerator,
-                denominator,
-            } => {
-                let abs_num = numerator.checked_abs().unwrap_or(i64::MAX);
-                proof_trace.push(format!(
-                    "Rational absolute value: |{numerator}/{denominator}| = {abs_num}/{denominator}"
-                ));
-                Self::from_rational(abs_num, *denominator)
+            Number::Rational { numerator, denominator } => {
+                if *denominator == 0 {
+                    proof_trace.push("Invalid rational operand: zero denominator; result is an invalid NaN sentinel.".to_string());
+                    Number::Real(f64::NAN)
+                } else if let Some(absolute) = Self::number_from_fraction_i128(
+                    i128::from(*numerator).abs(),
+                    i128::from(*denominator),
+                ) {
+                    proof_trace.push(format!("Exact rational absolute value: |{numerator}/{denominator}| = {absolute}"));
+                    absolute
+                } else {
+                    let value = (*numerator as f64 / *denominator as f64).abs();
+                    proof_trace.push(format!("Rational absolute value exceeds fixed-width storage; approximate Real({value}) returned."));
+                    Number::Real(value)
+                }
             }
             Number::Real(x) => {
                 let abs_val = x.abs();
-                proof_trace.push(format!("Real absolute value: |{x}| = {abs_val}"));
-                Self::from_f64(abs_val)
+                proof_trace.push(format!("Floating-point absolute value: |{x}| = {abs_val}; exactness is not claimed."));
+                Number::Real(abs_val)
             }
         };
 
@@ -1277,6 +1271,32 @@ mod tests {
     fn test_from_i64_negative() {
         let n = NumericTower::from_i64(-3);
         assert!(matches!(n, Number::Integer(-3)));
+    }
+
+    #[test]
+    fn test_from_f64_near_integer_stays_real() {
+        let value = 1.0 - 5e-13;
+        assert!(matches!(NumericTower::from_f64(value), Number::Real(actual) if actual == value));
+
+        let narrowed = Number::Real(value).narrow();
+        assert!(matches!(narrowed, Number::Real(actual) if actual == value));
+    }
+
+    #[test]
+    fn test_from_f64_upper_cast_boundaries_do_not_saturate() {
+        let u64_upper_exclusive = u64::MAX as f64;
+        assert!(matches!(
+            NumericTower::from_f64(u64_upper_exclusive),
+            Number::Real(value) if value == u64_upper_exclusive
+        ));
+        assert!(matches!(
+            Number::Real(u64_upper_exclusive).narrow(),
+            Number::Real(value) if value == u64_upper_exclusive
+        ));
+
+        let i64_min = i64::MIN as f64;
+        assert!(matches!(NumericTower::from_f64(i64_min), Number::Integer(i64::MIN)));
+        assert!(matches!(Number::Real(i64_min).narrow(), Number::Integer(i64::MIN)));
     }
 
     #[test]
@@ -2001,4 +2021,239 @@ mod tests {
             r.number
         );
     }
+
+    #[test]
+    fn test_fraction_normalization_handles_zero_before_sign_negation() {
+        assert_eq!(normalize_fraction_i128(0, i128::MIN), Some((0, 1)));
+        assert_eq!(normalize_fraction_i128(0, i128::MAX), Some((0, 1)));
+    }
+
+    #[test]
+    fn test_checked_from_rational_reports_unrepresentable_exact_values() {
+        assert_eq!(
+            NumericTower::checked_from_rational(1, 0).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            NumericTower::checked_from_rational(1, i64::MIN).unwrap_err(),
+            NumericArithmeticError::ExactResultOutOfRange
+        );
+        assert!(matches!(
+            NumericTower::checked_from_rational(i64::MIN, -1),
+            Ok(Number::Natural(value)) if value == (1_u64 << 63)
+        ));
+        assert!(matches!(
+            NumericTower::from_rational(i64::MIN, -1),
+            Number::Natural(value) if value == (1_u64 << 63)
+        ));
+    }
+
+    #[test]
+    fn test_negate_wide_natural_and_signed_minimum() {
+        let tower = NumericTower::new();
+        let wide_natural = tower.negate(&Number::Natural(u64::MAX));
+        assert!(matches!(wide_natural.number, Number::Real(value) if value < 0.0));
+        assert!(wide_natural.proof_trace.iter().any(|line| line.contains("approximate Real")));
+
+        let signed_min = tower.negate(&Number::Integer(i64::MIN));
+        assert!(matches!(signed_min.number, Number::Natural(value) if value == (1_u64 << 63)));
+        assert!(signed_min.proof_trace.iter().any(|line| line.contains("Exact integer negation")));
+    }
+
+    #[test]
+    fn test_abs_preserves_minimum_integer_exactly() {
+        let tower = NumericTower::new();
+        let result = tower.abs(&Number::Integer(i64::MIN));
+        assert!(matches!(result.number, Number::Natural(value) if value == (1_u64 << 63)));
+        assert!(result.proof_trace.iter().any(|line| line.contains("Exact integer absolute value")));
+    }
+
+    #[test]
+    fn test_checked_arithmetic_reports_exactness() {
+        let tower = NumericTower::new();
+        let exact = tower
+            .checked_add(&Number::Natural(2), &Number::Natural(3))
+            .expect("valid exact addition");
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.number, Number::Natural(5)));
+
+        let approximate = tower
+            .checked_add(&Number::Natural(u64::MAX), &Number::Natural(1))
+            .expect("finite approximate fallback");
+        assert_eq!(approximate.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(approximate.result.number, Number::Real(value) if value.is_finite()));
+        assert!(approximate.result.proof_trace.iter().any(|line| line.contains("approximate Real")));
+    }
+
+    #[test]
+    fn test_checked_arithmetic_rejects_malformed_rational_operand() {
+        let tower = NumericTower::new();
+        let malformed = Number::Rational { numerator: 7, denominator: 0 };
+        assert_eq!(
+            tower.checked_add(&malformed, &Number::Natural(1)).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            tower.checked_multiply(&Number::Natural(1), &malformed).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_arithmetic_rejects_non_finite_operands_and_results() {
+        let tower = NumericTower::new();
+        assert_eq!(
+            tower.checked_add(&Number::Real(f64::NAN), &Number::Natural(1)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            tower.checked_multiply(&Number::Real(f64::MAX), &Number::Real(2.0)).unwrap_err(),
+            NumericArithmeticError::NonFiniteResult
+        );
+    }
+
+    #[test]
+    fn test_checked_division_rejects_exact_zero() {
+        let tower = NumericTower::new();
+        assert_eq!(
+            tower.checked_divide(&Number::Natural(1), &Number::Real(-0.0)).unwrap_err(),
+            NumericArithmeticError::DivisionByZero
+        );
+    }
+
+    #[test]
+    fn test_natural_addition_overflow_is_approximate_not_wrapped() {
+        let tower = NumericTower::new();
+        let result = tower.add(&Number::Natural(u64::MAX), &Number::Natural(1));
+
+        assert!(matches!(result.number, Number::Real(value) if value.is_finite()));
+        assert!(
+            result.proof_trace.iter().any(|step| step.contains("approximate Real")),
+            "overflow fallback must be disclosed in the proof trace: {:?}",
+            result.proof_trace
+        );
+    }
+
+    #[test]
+    fn test_mixed_natural_subtraction_does_not_cast_through_i64() {
+        let tower = NumericTower::new();
+        let result = tower.subtract(&Number::Natural(u64::MAX), &Number::Integer(1));
+
+        assert!(
+            matches!(result.number, Number::Natural(value) if value == u64::MAX - 1),
+            "u64::MAX - 1 must remain exact, got {:?}",
+            result.number
+        );
+    }
+
+    #[test]
+    fn test_rational_multiplication_reduces_wide_intermediate_exactly() {
+        let tower = NumericTower::new();
+        let rational = Number::Rational {
+            numerator: i64::MAX,
+            denominator: 2,
+        };
+        let result = tower.multiply(&rational, &Number::Natural(2));
+
+        assert!(
+            matches!(result.number, Number::Natural(value) if value == i64::MAX as u64),
+            "((i64::MAX / 2) * 2) must reduce exactly, got {:?}",
+            result.number
+        );
+        assert!(
+            !result.proof_trace.iter().any(|step| step.contains("approximate Real")),
+            "representable result should not take the approximation fallback: {:?}",
+            result.proof_trace
+        );
+    }
+
+    #[test]
+    fn test_large_natural_division_never_wraps_through_i64() {
+        let tower = NumericTower::new();
+        let result = tower
+            .divide(&Number::Natural(u64::MAX), &Number::Natural(2))
+            .expect("divisor is nonzero");
+
+        assert!(
+            matches!(result.number, Number::Real(value) if (value - (u64::MAX as f64 / 2.0)).abs() < 2.0),
+            "unrepresentable rational must use approximate Real rather than a corrupted fraction, got {:?}",
+            result.number
+        );
+        assert!(
+            result.proof_trace.iter().any(|step| step.contains("approximate Real")),
+            "approximation must be disclosed: {:?}",
+            result.proof_trace
+        );
+    }
+
+    #[test]
+    fn test_signed_underflow_uses_explicit_approximate_fallback() {
+        let tower = NumericTower::new();
+        let result = tower.subtract(&Number::Integer(i64::MIN), &Number::Natural(1));
+
+        assert!(matches!(result.number, Number::Real(value) if value.is_finite()));
+        assert!(
+            result.proof_trace.iter().any(|step| step.contains("approximate Real")),
+            "out-of-range exact result must be disclosed: {:?}",
+            result.proof_trace
+        );
+    }
+
+    #[test]
+    fn test_exact_zero_is_distinct_from_legacy_approximate_zero() {
+        assert!(Number::Natural(0).is_zero_exact());
+        assert!(Number::Integer(0).is_zero_exact());
+        assert!(Number::Rational { numerator: 0, denominator: 5 }.is_zero_exact());
+        assert!(Number::Real(0.0).is_zero_exact());
+        assert!(Number::Real(-0.0).is_zero_exact());
+
+        let smallest_subnormal = f64::from_bits(1);
+        assert!(!Number::Real(smallest_subnormal).is_zero_exact());
+        // Keep the historical tolerance behavior for existing callers.
+        assert!(Number::Real(smallest_subnormal).is_zero());
+        assert!(!Number::Real(f64::NAN).is_zero_exact());
+        assert!(!Number::Real(f64::INFINITY).is_zero_exact());
+        assert!(!Number::Rational { numerator: 0, denominator: 0 }.is_zero_exact());
+    }
+
+    #[test]
+    fn test_approximate_zero_requires_explicit_valid_tolerance() {
+        assert!(Number::Real(1e-16).is_approximately_zero(1e-15));
+        assert!(!Number::Real(1e-16).is_approximately_zero(1e-17));
+        assert!(Number::Natural(0).is_approximately_zero(0.0));
+        assert!(!Number::Real(f64::NAN).is_approximately_zero(1.0));
+        assert!(!Number::Real(0.0).is_approximately_zero(-1.0));
+        assert!(!Number::Real(0.0).is_approximately_zero(f64::NAN));
+        assert!(!Number::Real(0.0).is_approximately_zero(f64::INFINITY));
+    }
+
+    #[test]
+    fn test_division_rejects_invalid_rational_divisor() {
+        let tower = NumericTower::new();
+        let numerator = Number::Natural(1);
+        let invalid_divisor = Number::Rational {
+            numerator: 1,
+            denominator: 0,
+        };
+
+        assert!(tower.divide(&numerator, &invalid_divisor).is_none());
+    }
+
+    #[test]
+    fn test_division_accepts_small_nonzero_real_divisor() {
+        let tower = NumericTower::new();
+        let numerator = Number::Natural(1);
+        let divisor = Number::Real(1e-16);
+
+        let result = tower
+            .divide(&numerator, &divisor)
+            .expect("a finite, nonzero real divisor must not be rejected as zero");
+
+        assert!(
+            (result.number.to_f64() - 1e16).abs() < 2.0,
+            "1 / 1e-16 should be approximately 1e16, got {:?}",
+            result.number
+        );
+    }
+
 }
