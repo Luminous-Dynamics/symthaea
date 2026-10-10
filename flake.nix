@@ -918,7 +918,9 @@ EOF
         };
 
         devShells.qc-verify = pkgs.mkShell {
-          buildInputs = [ pythonQcVerifyEnv ];
+          # The QC report comparator verifies exact source commit/tree binding
+          # using Git, so make the executable part of this shell contract.
+          buildInputs = [ pkgs.git pythonQcVerifyEnv ];
 
           shellHook = ''
             echo ""
