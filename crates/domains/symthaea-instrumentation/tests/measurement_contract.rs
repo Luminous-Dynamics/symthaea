@@ -46,18 +46,19 @@ fn calibration_fixture_bytes() -> Vec<u8> {
     .into_bytes()
 }
 
-fn review_fixture_bytes() -> Vec<u8> {
-    [
-        "symthaea-independent-calibration-review-fixture-v1",
-        "review=passed",
-        "reviewer=fixture-reviewer-01",
-    ]
-    .join("\n")
+fn review_fixture_bytes_for_certificate_digest(certificate_digest: &str) -> Vec<u8> {
+    format!(
+        "symthaea-independent-calibration-review-fixture-v1\nreview=passed\nreviewer=fixture-reviewer-01\ncertificate_sha256={certificate_digest}\n"
+    )
     .into_bytes()
 }
 
 fn calibration_digest_hex() -> String {
     sha256_hex(&calibration_fixture_bytes())
+}
+
+fn review_fixture_bytes() -> Vec<u8> {
+    review_fixture_bytes_for_certificate_digest(&calibration_digest_hex())
 }
 
 fn review_digest_hex() -> String {
@@ -70,6 +71,10 @@ fn calibration_artifact() -> ArtifactReference {
 
 fn review_artifact() -> ArtifactReference {
     artifact("independent-review-receipt", &review_digest_hex())
+}
+
+fn review_artifact_for_bytes(bytes: &[u8]) -> ArtifactReference {
+    artifact("independent-review-receipt", &sha256_hex(bytes))
 }
 
 fn clock_domain() -> ClockDomainId {
@@ -160,8 +165,18 @@ impl CalibrationEvidenceResolver for MockResolver {
             .review_bytes_override
             .clone()
             .unwrap_or_else(review_fixture_bytes);
-        VerifiedArtifactBytes::verify(resolved.review_receipt().clone(), review_bytes)
-            .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
+        let verified_review =
+            VerifiedArtifactBytes::verify(resolved.review_receipt().clone(), review_bytes)
+                .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
+        let review_text = std::str::from_utf8(verified_review.bytes())
+            .map_err(|_| "calibration review receipt is not UTF-8".to_owned())?;
+        let expected_binding = format!(
+            "certificate_sha256={}",
+            resolved.evidence().sha256_hex()
+        );
+        if !review_text.lines().any(|line| line == expected_binding) {
+            return Err("calibration review receipt does not bind the certificate SHA-256".into());
+        }
 
         Ok(resolved)
     }
@@ -766,6 +781,48 @@ fn calibration_resolver_rejects_review_receipts_with_a_wrong_digest() {
             .unwrap_err(),
         AssessmentFailure::CalibrationEvidenceUnresolved(
             "calibration review receipt SHA-256 mismatch".into()
+        )
+    );
+}
+
+#[test]
+fn calibration_resolver_rejects_a_review_bound_to_another_certificate_digest() {
+    let wrong_review_bytes = review_fixture_bytes_for_certificate_digest(SHA_A);
+    let wrong_review = review_artifact_for_bytes(&wrong_review_bytes);
+    let resolved = ResolvedCalibration::new(
+        "calibration-17",
+        instrument_identity(),
+        calibration_artifact(),
+        wrong_review,
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    )
+    .unwrap();
+    let wrong_binding = MockResolver {
+        resolved: Ok(resolved),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
+        calibration_bytes_override: None,
+        review_bytes_override: Some(wrong_review_bytes),
+    };
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &wrong_binding,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::CalibrationEvidenceUnresolved(
+            "calibration review receipt does not bind the certificate SHA-256".into()
         )
     );
 }
