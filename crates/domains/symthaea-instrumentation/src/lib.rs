@@ -207,6 +207,47 @@ impl RawDataReference {
     }
 }
 
+/// Raw acquisition metadata returned only after the integration's resolver has
+/// retrieved the artifact and independently verified its bytes against the
+/// referenced content digest. The constructor checks shape; the caller-owned
+/// resolver remains responsible for actual digest verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRawData {
+    reference: ArtifactReference,
+    byte_length: u64,
+    media_type: String,
+}
+
+impl ResolvedRawData {
+    pub fn new(
+        reference: ArtifactReference,
+        byte_length: u64,
+        media_type: impl Into<String>,
+    ) -> Result<Self, ContractError> {
+        if byte_length == 0 {
+            return Err(ContractError::EmptyRawDataArtifact);
+        }
+        let media_type = non_empty(media_type.into(), "raw_data_media_type")?;
+        Ok(Self {
+            reference,
+            byte_length,
+            media_type,
+        })
+    }
+
+    pub fn artifact(&self) -> &ArtifactReference {
+        &self.reference
+    }
+
+    pub fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+}
+
 /// Explicit acquisition-quality flags. Every flag blocks the strict
 /// quantitative-use gate; a future policy may distinguish safe warning classes
 /// only with evidence and tests for the intended use.
@@ -228,6 +269,7 @@ pub enum QualityFlag {
 pub enum ContractError {
     EmptyIdentifier(&'static str),
     InvalidSha256,
+    EmptyRawDataArtifact,
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
     NonFiniteValue(&'static str),
@@ -242,6 +284,9 @@ impl fmt::Display for ContractError {
             Self::EmptyIdentifier(field) => write!(f, "{field} must not be empty"),
             Self::InvalidSha256 => {
                 write!(f, "SHA-256 must contain exactly 64 hexadecimal characters")
+            }
+            Self::EmptyRawDataArtifact => {
+                write!(f, "raw-data evidence artifact must not be empty")
             }
             Self::InvalidValidityInterval => {
                 write!(f, "validity interval must satisfy start < end")
@@ -391,7 +436,7 @@ impl MeasurementEnvelope {
         &self,
         now_ns: u64,
         policy: &MeasurementPolicy,
-        resolver: &dyn CalibrationEvidenceResolver,
+        resolver: &dyn InstrumentEvidenceResolver,
         stream_guard: &mut MeasurementStreamGuard,
     ) -> Result<MeasurementAssessment, AssessmentFailure> {
         stream_guard
@@ -407,16 +452,24 @@ impl MeasurementEnvelope {
         if !self.quality_flags.is_empty() {
             return Err(AssessmentFailure::QualityFlagsPresent(self.quality_flags.clone()));
         }
-        let raw_data = self
+        let raw_reference = self
             .raw_data
-            .clone()
+            .as_ref()
             .ok_or(AssessmentFailure::MissingRawDataReference)?;
         let reference = self
             .calibration
             .as_ref()
             .ok_or(AssessmentFailure::MissingCalibrationReference)?;
+
+        let resolved_raw = resolver
+            .resolve_raw_data(raw_reference)
+            .map_err(AssessmentFailure::RawDataEvidenceUnresolved)?;
+        if resolved_raw.artifact() != raw_reference.artifact() {
+            return Err(AssessmentFailure::RawDataReferenceMismatch);
+        }
+
         let resolved = resolver
-            .resolve(reference)
+            .resolve_calibration(reference)
             .map_err(AssessmentFailure::CalibrationEvidenceUnresolved)?;
 
         if resolved.record_id != reference.record_id
@@ -445,7 +498,7 @@ impl MeasurementEnvelope {
             calibration_standard_uncertainty: resolved.standard_uncertainty,
             calibration_record_id: resolved.record_id,
             calibration_review_receipt: resolved.review_receipt,
-            raw_data,
+            raw_data: resolved_raw,
             processing_chain_version: self.processing_chain_version.clone(),
         })
     }
@@ -515,10 +568,30 @@ impl ResolvedCalibration {
 /// applicability, and traceability-chain information; a lookup by ID alone is
 /// not enough. The caller must configure and test this trust boundary.
 pub trait CalibrationEvidenceResolver {
-    fn resolve(
+    fn resolve_calibration(
         &self,
         reference: &CalibrationReference,
     ) -> Result<ResolvedCalibration, String>;
+}
+
+/// Resolve raw acquisition bytes from an immutable reference and independently
+/// verify that their SHA-256 digest matches the reference. Return metadata only
+/// after the bytes have been read/verified; a database row lookup is insufficient.
+pub trait RawDataEvidenceResolver {
+    fn resolve_raw_data(
+        &self,
+        reference: &RawDataReference,
+    ) -> Result<ResolvedRawData, String>;
+}
+
+/// The quantitative-use gate requires both trust-boundary resolvers. The same
+/// adapter may implement both traits, but deployments should document how raw
+/// byte integrity and calibration authority are independently established.
+pub trait InstrumentEvidenceResolver: CalibrationEvidenceResolver + RawDataEvidenceResolver {}
+
+impl<T> InstrumentEvidenceResolver for T where
+    T: CalibrationEvidenceResolver + RawDataEvidenceResolver
+{
 }
 
 /// Conservative thresholds for a particular consumer and intended use.
@@ -561,7 +634,7 @@ pub struct MeasurementAssessment {
     pub calibration_standard_uncertainty: f64,
     pub calibration_record_id: String,
     pub calibration_review_receipt: ArtifactReference,
-    pub raw_data: RawDataReference,
+    pub raw_data: ResolvedRawData,
     pub processing_chain_version: String,
 }
 
@@ -573,6 +646,8 @@ pub enum AssessmentFailure {
     QualityFlagsPresent(Vec<QualityFlag>),
     MissingRawDataReference,
     MissingCalibrationReference,
+    RawDataEvidenceUnresolved(String),
+    RawDataReferenceMismatch,
     CalibrationEvidenceUnresolved(String),
     CalibrationReferenceMismatch,
     CalibrationUnitMismatch,
