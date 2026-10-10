@@ -243,10 +243,26 @@
     {
       "id": "acceptance_limit_above_coupler_capacity_blocks",
       "status": "passed"
+    },
+    {
+      "id": "missing_transform_direction_metadata_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_energy_term_inventory_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_momentum_term_inventory_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "transform_target_frame_mismatch_blocks",
+      "status": "passed"
     }
   ],
   "checks_failed": 0,
-  "checks_passed": 61,
+  "checks_passed": 65,
   "interpretation": "Contract and provenance checks only; review-ready does not mean physically validated or safe.",
   "schema": "luminous-dynamics.orbital-ring-manifest-self-test/v1"
 }
