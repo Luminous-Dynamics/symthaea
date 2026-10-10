@@ -150,7 +150,7 @@ impl ReviewTrustStore {
                     .map_or_else(|| "none".to_owned(), |value| value.to_string())
             ));
         }
-        crate::sha256_hex(format!("{}\\n", fields.join("\\n")).as_bytes())
+        crate::sha256_hex(format!("{}\n", fields.join("\n")).as_bytes())
     }
 
     pub fn verify(
