@@ -358,7 +358,7 @@ impl EngineeringManager {
     }
 
     /// Generate a reproducible 12-run Plackett–Burman main-effect screening proposal for
-    /// 2–11 numeric factors. Effects can be confounded with two-factor interactions; this
+    /// 5–11 numeric factors. Smaller factor sets retain full-factorial options; PB effects
     /// does not replace a resolution-IV/V design where interactions matter.
     pub fn generate_regenerative_plackett_burman_design(
         &self,
