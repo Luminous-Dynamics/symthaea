@@ -70,6 +70,31 @@
       "tolerance": 1e-12
     },
     {
+      "id": "table8.orbital_length_positive",
+      "observed": 44166666.66666667,
+      "status": "passed"
+    },
+    {
+      "id": "table8.geosynchronous_length_positive",
+      "observed": 44000000.0,
+      "status": "passed"
+    },
+    {
+      "expected": 0.0,
+      "id": "table8.inferred_ring_lengths_agree_within_1pct",
+      "observed": 0.0037807183364840444,
+      "status": "passed",
+      "tolerance": 0.01
+    },
+    {
+      "expected": 500000000.0,
+      "id": "table8.10w_per_m_reconstructs_500mw_total",
+      "note": "Uses the mean length implied by the table's total per-ring superconductor mass divided by its mass-per-length row.",
+      "observed": 440833333.3333334,
+      "status": "passed",
+      "tolerance": 75000000.0
+    },
+    {
       "id": "stored_energy_finite_positive",
       "observed": 1.792e+16,
       "status": "passed"
@@ -84,7 +109,7 @@
     }
   ],
   "checks_failed": 0,
-  "checks_passed": 12,
+  "checks_passed": 16,
   "conditional_stored_energy": {
     "caveat": "Not a failure-release or damage prediction.",
     "mass_kg": 560000000.0,
@@ -137,5 +162,18 @@
     "url": "https://nss.org/wp-content/uploads/Orbital-Rings.pdf",
     "year": 1982
   },
-  "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1 but the absolute scale differs by 5x. This script does not resolve whether scenario, length basis, or normalization differs."
+  "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1 but the absolute scale differs by 5x. This script does not resolve whether scenario, length basis, or normalization differs.",
+  "table8_length_reconstruction": {
+    "caveat": "Algebraic consistency with the table rows only; does not independently establish the actual geometry or explain the p. 483 100 MW estimate.",
+    "cryogenic_heat_loss_per_length_w_m": 10.0,
+    "geosynchronous_ring_length_implied_m": 44000000.0,
+    "geosynchronous_superconductor_mass_per_length_kg_m": 2.0,
+    "geosynchronous_superconductor_mass_per_ring_kg": 88000000.0,
+    "length_based_heat_load_w": 440833333.3333334,
+    "mean_length_implied_m": 44083333.333333336,
+    "orbital_ring_length_implied_m": 44166666.66666667,
+    "orbital_superconductor_mass_per_length_kg_m": 1.2,
+    "orbital_superconductor_mass_per_ring_kg": 53000000.0,
+    "table_reported_total_heat_load_w": 500000000.0
+  }
 }
