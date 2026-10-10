@@ -240,18 +240,22 @@ pub struct ResolvedRawData {
 }
 
 impl ResolvedRawData {
-    pub fn new(
-        reference: ArtifactReference,
-        byte_length: u64,
+    /// Build raw-data metadata only from a digest-verified read.
+    ///
+    /// This prevents constructing resolved metadata from a digest string and byte
+    /// count alone. The resolver must still preserve the immutability/identity of
+    /// the referenced source object after verification.
+    pub fn from_verified_digest(
+        verified: VerifiedArtifactDigest,
         media_type: impl Into<String>,
     ) -> Result<Self, ContractError> {
-        if byte_length == 0 {
+        if verified.byte_length() == 0 {
             return Err(ContractError::EmptyRawDataArtifact);
         }
         let media_type = non_empty(media_type.into(), "raw_data_media_type")?;
         Ok(Self {
-            reference,
-            byte_length,
+            reference: verified.reference().clone(),
+            byte_length: verified.byte_length(),
             media_type,
         })
     }
