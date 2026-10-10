@@ -518,13 +518,15 @@ mod tests {
         let mut req = requirements();
         req.include_climate_objective = true;
         let mut input = intervals();
-        let options = vec![option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0)];
+        let mut options = vec![option("climate-inventory", MeasurementMetric::NetClimate, 8.0, 0.6, 1.0)];
         assert!(prioritize_measurements(
             &input, &req, "USD_2026_per_measurement", &options,
         ).is_err());
 
         input.net_climate_kg_co2e_per_kg_dry_feedstock =
             Some(metric_interval(-1.0, 1.0, "climate-range"));
+        req.max_net_climate_kg_co2e_per_kg_dry_feedstock = Some(0.0);
+        options[0].benefit_basis = MeasurementBenefitBasis::MissingRequiredDataAcquisition;
         assert!(prioritize_measurements(
             &input, &req, "USD_2026_per_measurement", &options,
         ).is_err());
