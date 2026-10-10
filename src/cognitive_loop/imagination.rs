@@ -153,6 +153,9 @@ impl CognitiveLoopService {
                 return Err(ImagineFutureError::NoGeodesic);
             }
 
+            // Report the same measured local-transition proxy used by the manifold.
+            let trajectory_coherence = manifold.measure_path_coherence(&path).unwrap_or(0.0);
+
             // 5. Decode and return the "Dream"
             let frames = manifold.decode_geodesic_to_frames_improved(&path);
             if frames.is_empty() {
@@ -167,7 +170,8 @@ impl CognitiveLoopService {
                 height: self.config.vision_frame_height,
                 channels: bridge.manifold().last_frame_channels(),
                 path_length: path.len(),
-                semantic_coherence: 0.5, // Collaborative dreams are inherently uncertain
+                // Legacy field name retained; 0.0 means no proxy score was available.
+                semantic_coherence: trajectory_coherence,
                 trajectory: path,
             })
         }
@@ -240,6 +244,9 @@ impl CognitiveLoopService {
             return Err(ImagineFutureError::NoGeodesic);
         }
 
+        // Report measured local transition continuity, not a fixed semantic score.
+        let trajectory_coherence = manifold.measure_path_coherence(&path).unwrap_or(0.0);
+
         // Decode the path into a viewable mental movie
         let frames = manifold.decode_geodesic_to_frames_improved(&path);
         if frames.is_empty() {
@@ -254,7 +261,8 @@ impl CognitiveLoopService {
             height: self.config.vision_frame_height,
             channels: bridge.manifold().last_frame_channels(),
             path_length: path.len(),
-            semantic_coherence: 0.0, // TODO: Compute from score_path_with_fep results if needed
+            // Legacy field name retained; this is geometric continuity, not semantics.
+            semantic_coherence: trajectory_coherence,
             trajectory: path,
         };
 
