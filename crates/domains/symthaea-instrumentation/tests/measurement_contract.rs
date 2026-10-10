@@ -9,7 +9,7 @@ use symthaea_instrumentation::{
     MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
     ResolvedCalibration, ResolvedRawData, StreamOrderFailure, Unit, VerifiedArtifactBytes,
-    VerifiedArtifactDigest,
+    VerifiedArtifactDigest, VerifiedCalibrationEvidence,
 };
 
 const SAMPLE_TIME_NS: u64 = 1_000_000_000;
@@ -157,16 +157,17 @@ struct MockResolver {
 impl CalibrationEvidenceResolver for MockResolver {
     fn resolve_calibration(
         &self,
-        reference: &CalibrationReference,
-    ) -> Result<ResolvedCalibration, String> {
+        _reference: &CalibrationReference,
+    ) -> Result<VerifiedCalibrationEvidence, String> {
+        let resolved = self.resolved.clone()?;
         let certificate_bytes = self
             .calibration_bytes_override
             .clone()
             .unwrap_or_else(calibration_fixture_bytes);
-        VerifiedArtifactBytes::verify(reference.evidence().clone(), certificate_bytes)
-            .map_err(|_| "calibration certificate SHA-256 mismatch".to_owned())?;
+        let verified_certificate =
+            VerifiedArtifactBytes::verify(resolved.evidence().clone(), certificate_bytes)
+                .map_err(|_| "calibration certificate SHA-256 mismatch".to_owned())?;
 
-        let resolved = self.resolved.clone()?;
         let review_bytes = self
             .review_bytes_override
             .clone()
@@ -176,15 +177,13 @@ impl CalibrationEvidenceResolver for MockResolver {
                 .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
         let review_text = std::str::from_utf8(verified_review.bytes())
             .map_err(|_| "calibration review receipt is not UTF-8".to_owned())?;
-        let expected_binding = format!(
-            "certificate_sha256={}",
-            resolved.evidence().sha256_hex()
-        );
+        let expected_binding = format!("certificate_sha256={}", resolved.evidence().sha256_hex());
         if !review_text.lines().any(|line| line == expected_binding.as_str()) {
             return Err("calibration review receipt does not bind the certificate SHA-256".into());
         }
 
-        Ok(resolved)
+        VerifiedCalibrationEvidence::new(resolved, verified_certificate, verified_review)
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -791,6 +790,41 @@ fn calibration_resolver_rejects_review_receipts_with_a_wrong_digest() {
         AssessmentFailure::CalibrationEvidenceUnresolved(
             "calibration review receipt SHA-256 mismatch".into()
         )
+    );
+}
+
+#[test]
+fn verified_calibration_requires_exact_certificate_and_review_artifact_references() {
+    let calibration = resolved_calibration();
+    let wrong_certificate = VerifiedArtifactBytes::verify(
+        artifact("another-certificate-id", &calibration_digest_hex()),
+        calibration_fixture_bytes(),
+    )
+    .unwrap();
+    let verified_review =
+        VerifiedArtifactBytes::verify(review_artifact(), review_fixture_bytes()).unwrap();
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(
+            calibration.clone(),
+            wrong_certificate,
+            verified_review,
+        )
+        .unwrap_err(),
+        ContractError::VerifiedArtifactReferenceMismatch("calibration_certificate")
+    );
+
+    let verified_certificate =
+        VerifiedArtifactBytes::verify(calibration_artifact(), calibration_fixture_bytes())
+            .unwrap();
+    let wrong_review = VerifiedArtifactBytes::verify(
+        artifact("another-review-id", &review_digest_hex()),
+        review_fixture_bytes(),
+    )
+    .unwrap();
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(calibration, verified_certificate, wrong_review)
+            .unwrap_err(),
+        ContractError::VerifiedArtifactReferenceMismatch("calibration_review_receipt")
     );
 }
 
