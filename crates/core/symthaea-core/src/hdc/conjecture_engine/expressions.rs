@@ -60,13 +60,19 @@ impl Expr {
                     BinOp::Sub => l - r,
                     BinOp::Mul => l * r,
                     BinOp::Div => {
-                        if r.abs() > 1e-15 {
+                        if r != 0.0 {
                             l / r
                         } else {
                             f64::NAN
                         }
                     }
-                    BinOp::Pow => l.powf(r),
+                    BinOp::Pow => {
+                        if l == 0.0 && r == 0.0 {
+                            f64::NAN
+                        } else {
+                            l.powf(r)
+                        }
+                    }
                 }
             }
             Expr::Func(f, arg) => {
@@ -398,6 +404,47 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
     }
 }
 
+/// Conservative domain analysis used to avoid rewriting away undefined subexpressions.
+fn expr_is_total_over_reals(expr: &Expr) -> bool {
+    match expr {
+        Expr::Var(_) => true,
+        Expr::Const(value) => value.is_finite(),
+        Expr::BinOp(BinOp::Add | BinOp::Sub | BinOp::Mul, left, right) => {
+            expr_is_total_over_reals(left) && expr_is_total_over_reals(right)
+        }
+        Expr::BinOp(BinOp::Div, numerator, denominator) => {
+            expr_is_total_over_reals(numerator)
+                && matches!(
+                    denominator.as_ref(),
+                    Expr::Const(value) if value.is_finite() && *value != 0.0
+                )
+        }
+        Expr::BinOp(BinOp::Pow, base, exponent) => {
+            matches!(
+                exponent.as_ref(),
+                Expr::Const(value)
+                    if value.is_finite() && *value >= 1.0 && value.fract() == 0.0
+            ) && expr_is_total_over_reals(base)
+        }
+        Expr::Func(UnaryFn::Sqrt, arg) => matches!(
+            arg.as_ref(),
+            Expr::Const(value) if value.is_finite() && *value >= 0.0
+        ),
+        Expr::Func(UnaryFn::Log, arg) => matches!(
+            arg.as_ref(),
+            Expr::Const(value) if value.is_finite() && *value > 0.0
+        ),
+        Expr::Func(_, arg) => expr_is_total_over_reals(arg),
+        // The current Sum evaluator casts a floating binding to usize and has
+        // no checked range contract, so do not erase it through algebraic rules.
+        Expr::Sum(_, _) => false,
+    }
+}
+
+fn expr_is_provably_nonzero(expr: &Expr) -> bool {
+    matches!(expr, Expr::Const(value) if value.is_finite() && *value != 0.0)
+}
+
 /// Simplify an expression tree by applying algebraic rewriting rules.
 pub fn simplify(expr: &Expr) -> Expr {
     match expr {
@@ -419,16 +466,32 @@ pub fn simplify(expr: &Expr) -> Expr {
                 (BinOp::Sub, _, Expr::Const(c)) if *c == 0.0 => sl,
                 (BinOp::Mul, _, Expr::Const(c)) if *c == 1.0 => sl,
                 (BinOp::Mul, Expr::Const(c), _) if *c == 1.0 => sr,
-                (BinOp::Mul, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(0.0),
-                (BinOp::Mul, Expr::Const(c), _) if *c == 0.0 => Expr::Const(0.0),
+                (BinOp::Mul, _, Expr::Const(c))
+                    if *c == 0.0 && expr_is_total_over_reals(&sl) =>
+                {
+                    Expr::Const(0.0)
+                }
+                (BinOp::Mul, Expr::Const(c), _)
+                    if *c == 0.0 && expr_is_total_over_reals(&sr) =>
+                {
+                    Expr::Const(0.0)
+                }
                 (BinOp::Div, _, Expr::Const(c)) if *c == 1.0 => sl,
                 (BinOp::Pow, _, Expr::Const(c)) if *c == 1.0 => sl,
-                (BinOp::Pow, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(1.0),
-                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c)) => simplify(&Expr::BinOp(
-                    BinOp::Div,
-                    Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
-                    b.clone(),
-                )),
+                (BinOp::Pow, _, Expr::Const(c))
+                    if *c == 0.0 && expr_is_provably_nonzero(&sl) =>
+                {
+                    Expr::Const(1.0)
+                }
+                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c))
+                    if expr_is_provably_nonzero(b) && expr_is_provably_nonzero(c) =>
+                {
+                    simplify(&Expr::BinOp(
+                        BinOp::Div,
+                        Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
+                        b.clone(),
+                    ))
+                }
                 _ => Expr::BinOp(*op, Box::new(sl), Box::new(sr)),
             }
         }
@@ -659,4 +722,75 @@ fn lcg_step(state: u64) -> u64 {
     state
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407)
+}
+
+#[cfg(test)]
+mod domain_safe_simplification_tests {
+    use super::*;
+
+    #[test]
+    fn eval_divides_by_small_nonzero_denominator() {
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Const(1e-16)),
+        );
+        assert_eq!(expr.eval(&[]), 1e16);
+    }
+
+    #[test]
+    fn zero_product_does_not_erase_log_domain() {
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(0.0)),
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())))),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(simplified, Expr::BinOp(BinOp::Mul, _, _)));
+        assert!(simplified.eval(&[("x", -1.0)]).is_nan());
+    }
+
+    #[test]
+    fn zero_exponent_does_not_erase_zero_base_domain() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.0)),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(simplified, Expr::BinOp(BinOp::Pow, _, _)));
+        assert!(simplified.eval(&[("x", 0.0)]).is_nan());
+    }
+
+    #[test]
+    fn zero_to_zero_constant_does_not_fold_to_one() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Const(0.0)),
+            Box::new(Expr::Const(0.0)),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(simplified, Expr::BinOp(BinOp::Pow, _, _)));
+        assert!(simplified.eval(&[]).is_nan());
+    }
+
+    #[test]
+    fn nested_division_rewrite_preserves_inner_denominator_domain() {
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("a".into())),
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Var("b".into())),
+                Box::new(Expr::Var("c".into())),
+            )),
+        );
+        let simplified = simplify(&expr);
+        assert!(matches!(
+            simplified,
+            Expr::BinOp(BinOp::Div, _, ref right)
+                if matches!(right.as_ref(), Expr::BinOp(BinOp::Div, _, _))
+        ));
+        assert!(simplified.eval(&[("a", 1.0), ("b", 1.0), ("c", 0.0)]).is_nan());
+    }
 }
