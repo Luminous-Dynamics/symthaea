@@ -390,7 +390,11 @@ impl MeasurementEnvelope {
         now_ns: u64,
         policy: &MeasurementPolicy,
         resolver: &dyn CalibrationEvidenceResolver,
+        stream_guard: &mut MeasurementStreamGuard,
     ) -> Result<MeasurementAssessment, AssessmentFailure> {
+        stream_guard
+            .observe(self)
+            .map_err(AssessmentFailure::StreamOrder)?;
         if now_ns < self.captured_at_ns {
             return Err(AssessmentFailure::ClockInFuture);
         }
@@ -561,6 +565,7 @@ pub struct MeasurementAssessment {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AssessmentFailure {
+    StreamOrder(StreamOrderFailure),
     ClockInFuture,
     Stale { age_ns: u64, max_age_ns: u64 },
     QualityFlagsPresent(Vec<QualityFlag>),
