@@ -1,0 +1,13 @@
+Title: Resistive divider operating point analytical reference
+Date: Sat Oct 10 00:00:00 2026
+Plotname: Operating Point
+Flags: real
+No. Variables: 2
+No. Points: 1
+Variables:
+  0  v(in)   voltage
+  1  v(out)  voltage
+Values:
+ 0
+    1.200000000000000e+01
+    3.000000000000000e+00
