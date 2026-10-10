@@ -76,7 +76,7 @@ pub struct MeasurementOption {
     pub method_or_experiment_id: String,
     pub estimated_cost: f64,
     pub cost_unit: String,
-    /// Caller-supplied expected fraction reduction in the target interval width, in (0, 1].
+    /// Declared expected benefit fraction in (0, 1]; meaning depends on benefit_basis.
     pub benefit_basis: MeasurementBenefitBasis,
     pub expected_benefit_fraction: f64,
     /// Caller-supplied decision relevance weight in [0, 1], chosen by the study owner.
@@ -190,7 +190,8 @@ pub struct MeasurementPriority {
     pub heuristic_score: Option<f64>,
     pub estimated_cost: f64,
     pub cost_unit: String,
-    pub expected_interval_width_reduction_fraction: f64,
+    pub benefit_basis: MeasurementBenefitBasis,
+    pub expected_benefit_fraction: f64,
     pub decision_relevance_weight: f64,
     pub cost_evidence: EvidenceRef,
     pub expected_reduction_evidence: EvidenceRef,
@@ -335,7 +336,8 @@ pub fn prioritize_measurements(
             heuristic_score: score,
             estimated_cost: option.estimated_cost,
             cost_unit: option.cost_unit.clone(),
-            expected_interval_width_reduction_fraction: option.expected_interval_width_reduction_fraction,
+            benefit_basis: option.benefit_basis,
+            expected_benefit_fraction: option.expected_benefit_fraction,
             decision_relevance_weight: option.decision_relevance_weight,
             cost_evidence: option.cost_evidence.clone(),
             expected_reduction_evidence: option.expected_reduction_evidence.clone(),
