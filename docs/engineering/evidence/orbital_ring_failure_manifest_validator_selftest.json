@@ -287,10 +287,14 @@
     {
       "id": "missing_path_constraint_fails_structural_gate",
       "status": "passed"
+    },
+    {
+      "id": "scenario_version_mismatch_fails_structural_gate",
+      "status": "passed"
     }
   ],
   "checks_failed": 0,
-  "checks_passed": 72,
+  "checks_passed": 73,
   "interpretation": "Contract and provenance checks only; review-ready does not mean physically validated or safe.",
   "schema": "luminous-dynamics.orbital-ring-manifest-self-test/v1"
 }
