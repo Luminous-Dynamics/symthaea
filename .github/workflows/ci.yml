@@ -42,6 +42,27 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-actionir-authority-focused:
+    name: Nixward ActionIR Authority Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check ActionIR authority boundary formatting
+        run: cargo fmt --check -- src/action/mod.rs src/action/primitives.rs
+
+      - name: Run ActionIR authority regressions
+        run: |
+          cargo test -p symthaea executor_authority_tests --lib
+          cargo test -p symthaea test_executor_real_exec_blocks_governed_authority_commands --lib
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
