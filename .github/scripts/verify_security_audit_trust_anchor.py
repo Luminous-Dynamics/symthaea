@@ -156,15 +156,22 @@ def check_run_pr_binding(run: dict[str, Any], repo: str, pr: dict[str, Any],
     base = associated.get("base") or {}
     head_repo = head.get("repo") or {}
     base_repo = base.get("repo") or {}
+    run_head_repo = run.get("head_repository") or {}
+    run_base_repo = run.get("repository") or {}
+    if str(run_head_repo.get("full_name", "")).lower() != repo.lower():
+        raise VerificationError("workflow run head repository differs from the trusted repository")
+    if str(run_base_repo.get("full_name", "")).lower() != repo.lower():
+        raise VerificationError("workflow run base repository differs from the trusted repository")
+    head_repo_id = run_head_repo.get("id")
+    base_repo_id = run_base_repo.get("id")
+    if not isinstance(head_repo_id, int) or head_repo_id <= 0 or not isinstance(base_repo_id, int) or base_repo_id <= 0:
+        raise VerificationError("workflow run repository IDs are missing or invalid")
+    if head_repo.get("id") != head_repo_id or base_repo.get("id") != base_repo_id:
+        raise VerificationError("workflow run PR association repository IDs do not match the authoritative run")
     if head.get("sha") != subject or head.get("ref") != branch:
         raise VerificationError("workflow run PR association has a mismatched head SHA or branch")
     if base.get("ref") != default_branch:
         raise VerificationError("workflow run PR association does not target the default branch")
-    if str(head_repo.get("full_name", "")).lower() != repo.lower():
-        raise VerificationError("workflow run PR association is fork-originated")
-    if str(base_repo.get("full_name", "")).lower() != repo.lower():
-        raise VerificationError("workflow run PR base repository differs from the trusted repository")
-
 
 def check_binding(run: dict[str, Any], repo: str, policy: dict[str, Any],
                   branch: str, expected_sha: str, expected_attempt: int | None) -> str:
