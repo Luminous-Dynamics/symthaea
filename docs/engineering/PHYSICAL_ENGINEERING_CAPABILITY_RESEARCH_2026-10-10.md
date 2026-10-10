@@ -38,6 +38,65 @@ Concrete findings from the current source:
 6. **CAD/manufacturing is not a blank slate.** The roadmap records existing STEP/NURBS/mesh and STL/3MF/toolpath work. External CAD should extend that foundation rather than replace it prematurely.
 7. **ROS integration is not equivalent to qualified hardware control.** Use ROS 2 and `ros2_control` as interoperability layers where useful, but keep actuation authority in bounded, separately enforced control and interlock paths. A bridge, message type, or simulated controller is not proof of real hardware behavior.
 
+## Source-level execution audit
+
+A follow-up source review of the current `main` branch found concrete gaps that should shape the first implementation. These are code observations, not guesses about future behavior.
+
+### What the current contracts already do well
+
+- `CommandSolver` starts processes without invoking a shell, validates that command/timeout/output limits are non-empty and bounded, drains stdout/stderr without blocking forever on inherited pipes, terminates on timeout/output-limit breaches, and rejects a non-zero process exit.
+- `SimulationResult::dry_run` stamps results with `ExecutionMode::DryRun` and a warning that the metrics are fixtures.
+- `SimulationResult::is_engineering_evidence()` refuses to recognize a result with invalid normalized values, no metrics, no convergence claim, a non-`ExternalSolver` mode, or absent provenance fields.
+- MuJoCo, OpenFOAM, and ngspice bridges deliberately refuse to promote a successful external process to engineering evidence until real result parsing is implemented.
+
+These should be preserved as invariants during refactoring.
+
+### Specific gaps visible in the current code
+
+- `SimulationEvidence` currently stores mode, backend, solver version, input digest, output digest and parser version. Its completeness check requires these fields to be non-empty strings; it does not validate digest encoding, re-compute digests against retained artifacts, or bind the executable/environment/parser artifacts by digest.
+- `SimulationResult` has a single `converged: bool`. It does not itself represent separate process, parse, convergence and requested-output statuses. `is_engineering_evidence()` also does not receive the originating request and therefore cannot prove that every requested metric was present; the adapter must enforce that before creating an accepted normalized result.
+- `CommandSolver::execute()` captures stderr but returns only stdout on success. stderr is included in an error string for non-zero exit, but successful-run warnings are not returned as a first-class artifact. The process also inherits the calling process environment because the code adds configured environment variables without clearing the ambient environment.
+- `CommandSolver` does not expose a per-run working directory. The current ngspice adapter invokes `ngspice -b input.sp` using a fixed relative filename; it does not pass explicit raw-output/log paths and does not archive the raw result. A result left over from an earlier run must never be able to satisfy the current run.
+- The adapter currently discards successful stdout content after measuring its length in the placeholder error. It therefore has no parser-consumable evidence output yet.
+- String-valued units and metric names are convenient for prototypes but cannot prevent dimensionally invalid coupling. Work #6870 should own the typed physical semantics rather than creating a second unit system here.
+
+### First vertical-slice execution contract
+
+For each run, create a unique workspace and a frozen manifest. Pin the absolute solver executable/package identity and version, bind the Nix closure/container image or other environment manifest, and use a controlled environment with an explicit allowlist. Use no shell interpolation; pass arguments as separate values. The working directory, solver inputs, all transitive `.include`/`.lib` dependencies, command arguments, configuration files, and output paths must be explicit and included in the run manifest.
+
+The ngspice Version 45 manual documents batch output using a rawfile and log, e.g. `ngspice -b -r result.raw -o result.log input.cir`. Use a supported, deterministic output format and parse the actual raw/log artifacts; do not infer convergence from process exit or scrape an unconstrained terminal transcript alone. Pin the chosen solver version and validate the parser against that version's actual outputs.
+
+Keep an execution report even for failed runs, separately tracking:
+
+- **Process:** `NotStarted`, `Exited(code)`, `TimedOut`, `OutputLimitExceeded`, or `Terminated`.
+- **Parsing:** `NotAttempted`, `Passed(parser_digest)`, or `Failed(reason)`.
+- **Convergence:** `Unknown`, `Converged(criteria_id)`, or `NotConverged(reason)`.
+- **Requested metrics:** `Complete` or `Missing(names)`, including units and source vector/column.
+- **Artifacts:** digests and retrievable references for the request, dependency bundle, stdout, stderr, solver log, raw numerical output, parser, and normalized result.
+
+A failed process or parser should still produce an auditable failure report, never a synthetic successful `SimulationResult`. Keep this run report distinct from a later engineering acceptance or safety-case decision.
+
+### Failure-oriented test matrix for #5633 / #4440
+
+The ngspice parser should not be considered ready from a single happy-path fixture. Its tests should include:
+
+| Case | Required disposition |
+|---|---|
+| RC step-response netlist; expected outputs present | Parse, converge classification, units, and independent analytic comparison all succeed within declared tolerances |
+| RLC/DC fixtures with independently calculated expected values | Golden numeric values and units match the declared solver/parser version |
+| Invalid netlist or solver exits non-zero | Process failure recorded; no normalized engineering result |
+| Solver exits zero but emits a convergence failure/warning for the requested analysis | Process success recorded separately; convergence remains failed/unknown unless solver-specific rules prove otherwise |
+| Raw/log file missing, truncated, malformed, or from a previous run | Parser failure; stale artifacts rejected by unique workspace plus manifest/digest checks |
+| Requested metric absent or renamed | Explicit missing-metric result; no partial pass for the full request |
+| NaN/Inf, duplicate/conflicting metric, unsupported vector, or unit ambiguity | Fail closed or mark the individual metric invalid; do not silently coerce |
+| stdout/stderr/raw/log exceed configured bounds or process times out | Run terminates within policy; failure artifacts/status are retained as allowed |
+| Same netlist but changed included model library, solver binary, parser, or environment | The corresponding provenance identity changes; a previous result cannot be reused as if identical |
+| Ambient `.spiceinit` or unrelated environment variable changes solver behavior | Isolated run remains deterministic or the changed configuration is explicitly bound |
+| Dry-run produces numerically plausible fixture values | Test orchestration works, but result remains `DryRun` and cannot satisfy external-solver evidence |
+| Tampered input/output bytes under an existing digest | Digest verification fails; no engineering evidence accepted |
+
+The minimum numerical benchmark should be intentionally small. For example, an ideal first-order RC step response has time constant \\(\\tau = RC\\) and capacitor voltage \\(V_C(t)=V_{step}(1-e^{-t/\\tau})\\) for zero initial voltage. Compare a declared sample/measurement at \\(t=\\tau\\) to \\(1-e^{-1}\\approx0.6321\\) of the step, while accounting for the exact source, initial conditions, transient time-step settings, tolerances, and any model simplifications. This proves only that specific circuit model and parser path; it says nothing about hardware qualification.
+
 ## Proposed external toolchain
 
 Treat every external program as an independently versioned instrument behind a typed adapter. Keep native/heavy solver dependencies out of default workspace builds; run them in explicit development or deployment environments with pinned versions and reproducible inputs.
@@ -185,7 +244,7 @@ Primary documentation reviewed for the tool shortlist:
 
 - [MuJoCo model formats and model editing](https://mujoco.readthedocs.io/en/stable/modeling.html) — programmable multibody model boundary.
 - [ROS 2 control hardware components](https://control.ros.org/jazzy/doc/ros2_control/hardware_interface/doc/hardware_components_userdoc.html) — actuator/sensor/system interfaces and lifecycle.
-- [ngspice manual: batch analyses and raw output](https://ngspice.sourceforge.io/docs/ngspice-44-manual.pdf) — batch execution and machine-readable rawfile support.
+- [ngspice Version 45 manual: batch analyses and raw output](https://ngspice.sourceforge.io/docs/ngspice-45-manual.pdf) — batch execution and rawfile/log support.
 - [OpenFOAM residuals and convergence](https://doc.openfoam.com/2306/tools/processing/numerics/solvers/residuals/) — solver-specific residual semantics; do not reduce all convergence to process exit.
 - [OpenFOAM user guide](https://www.openfoam.com/documentation/user-guide) — cases, meshes, boundary conditions, solvers, monitoring and post-processing.
 - [OpenMDAO documentation](https://openmdao.org/newdocs/versions/latest/) — multidisciplinary optimization over coupled analysis components.
@@ -193,6 +252,13 @@ Primary documentation reviewed for the tool shortlist:
 - [k-Wave documentation](https://www.k-wave.org/documentation.php) and [k-Wave-II status](https://github.com/ucl-bug/k-wave-ii) — acoustics/ultrasound wave simulation; the successor project is under active development and should not be treated as API-stable.
 - [PICLas documentation](https://piclas.readthedocs.io/en/latest/) — specialized PIC/DSMC and field/particle modeling. The project documentation notes that parts of its species/reaction database are still being verified, so data provenance and model-specific validation are particularly important.
 - [ISO 12100:2010](https://www.iso.org/standard/51528.html) — machinery hazard assessment and risk reduction.
+
+- [ngspice Version 45 User's Manual](https://ngspice.sourceforge.io/docs/ngspice-45-manual.pdf) — explicit rawfile and log output options for batch runs.
+- [Meep licensing](https://meep.readthedocs.io/en/latest/License_and_Copyright/) — GPL-2-or-later; evaluate packaging/distribution consequences before bundling binaries or linking native code.
+- [PICLas documentation](https://piclas.readthedocs.io/en/latest/) — particle-in-cell / DSMC plasma-flow methods, GPLv3, and high-order electromagnetic field solvers.
+- [k-Wave-II project status](https://github.com/ucl-bug/k-wave-ii) — active rewrite/pre-release and requires MATLAB R2023b or newer; not an assumed portable, self-contained runtime.
+- [ROS 2 control hardware components (Kilted)](https://control.ros.org/kilted/doc/ros2_control/hardware_interface/doc/hardware_components_userdoc.html) — useful interface/lifecycle model, but not a substitute for independent physical safety enforcement.
+- [FMI 3.0.2 specification](https://fmi-standard.org/docs/3.0.2/) — Model Exchange and Co-Simulation interchange boundaries for later coupled-model integration.
 
 ## Exit criterion for this research phase
 
