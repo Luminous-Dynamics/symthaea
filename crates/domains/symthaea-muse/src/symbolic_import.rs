@@ -616,7 +616,7 @@ fn stable_midi_metadata<T: Copy + Eq>(
     Ok(*first_value)
 }
 
-/// Extract only a regular, undotted quarter-note metronome mark. Metric/// Extract only a regular, undotted quarter-note metronome mark. Metric
+/// Extract only a regular, undotted quarter-note metronome mark. Metric
 /// modulations, beat-unit conversions and text/range markings require a richer
 /// tempo representation than Score's single quarter-note BPM value.
 fn musicxml_metronome_tempo(node: roxmltree::Node<'_, '_>) -> Result<f32, String> {
@@ -848,11 +848,21 @@ mod tests {
     }
 
     fn midi_file(track: &[u8]) -> Vec<u8> {
+        midi_file_with_tracks(&[track])
+    }
+
+    fn midi_file_with_tracks(tracks: &[&[u8]]) -> Vec<u8> {
         let mut bytes = b"MThd".to_vec();
-        bytes.extend_from_slice(&[0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0]);
-        bytes.extend_from_slice(b"MTrk");
-        bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
-        bytes.extend_from_slice(track);
+        let format = if tracks.len() > 1 { 1_u16 } else { 0_u16 };
+        bytes.extend_from_slice(&[0, 0, 0, 6]);
+        bytes.extend_from_slice(&format.to_be_bytes());
+        bytes.extend_from_slice(&(tracks.len() as u16).to_be_bytes());
+        bytes.extend_from_slice(&[0x01, 0xE0]);
+        for track in tracks {
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(track);
+        }
         bytes
     }
 
@@ -1061,6 +1071,29 @@ mod tests {
         assert_eq!(score.notes[1].onset, Duration::new(100, 480));
         assert_eq!(score.notes[1].duration, Duration::new(200, 480));
         assert!((score.notes[1].velocity - 80.0 / 127.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn midi_tempo_validation_uses_absolute_tick_order_across_tracks() {
+        // Track 0 is traversed first but contains the later tempo event.
+        // Track 1 supplies the same tempo at tick zero, so the score is
+        // constant-tempo despite traversal order.
+        let later_track = [
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 100
+            0, 0x90, 62, 100,
+            100, 0x80, 62, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let initial_track = [
+            0, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 0
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let tracks: [&[u8]; 2] = [&later_track, &initial_track];
+        let score = parse_midi(&midi_file_with_tracks(&tracks)).unwrap();
+        assert_eq!(score.tempo_bpm, 150.0);
+        assert_eq!(score.notes.len(), 2);
     }
 
     #[test]
