@@ -158,7 +158,9 @@ def explicitly_excludes_pull_request(expression: str | None) -> bool:
         return False
     # Current repository manual/push-only roots use conjunctions. Refuse to
     # infer exclusion through disjunctions because one branch could admit PRs.
-    if "||" in expression:
+    # Also reject a negated event equality: matching the text inside
+    # "!github.event_name == 'workflow_dispatch'" does not exclude PR events.
+    if "||" in expression or re.search(r"(?<![=<>!])!(?!=)", expression):
         return False
     return any(pattern.search(expression) for pattern in EVENT_EQ.values())
 
@@ -390,6 +392,15 @@ jobs:
 """
     pr = pull_request_block(manual)
     assert pr is not None
+    assert explicitly_excludes_pull_request(
+        "github.event_name == 'workflow_dispatch'"
+    )
+    assert not explicitly_excludes_pull_request(
+        "!github.event_name == 'workflow_dispatch'"
+    )
+    assert not explicitly_excludes_pull_request(
+        "github.event_name == 'workflow_dispatch' || false"
+    )
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
     assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
