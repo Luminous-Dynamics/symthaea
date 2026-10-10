@@ -27,6 +27,34 @@ The shared `SimulationRequest` was intentionally not changed. This avoids
 breaking the other solver bridges while the artifact semantics are being
 established.
 
+## Implemented: closed-world static include bundle
+
+`symthaea-ngspice-bridge::bundle::ModelInputBundle` accepts a primary file and
+explicit dependency bytes. It recognizes a deliberately narrow directive
+subset: `.include path`, `.incpslt path`, and external `.lib path section`.
+Paths use canonical relative slash form; absolute/drive paths, backslashes,
+environment-expanded paths, empty components, `.`, and `..` are rejected.
+Quoted paths may contain spaces. Relative nested references are resolved from
+the including file's directory to match the pinned modern ngspice include-path
+behavior; actual execution must still pin a specific ngspice package/version
+and matching sourcepath policy.
+
+Construction fails closed for missing dependencies, duplicate paths, unused
+extra files, include cycles, malformed quoting, unsupported directive operand
+counts, unbalanced in-file `.lib`/`.endl` sections, and mismatched section
+names. File count, aggregate byte count, and include-directive count are
+bounded. The bundle manifest uses length-prefixed, domain-separated BLAKE3
+fields and canonical sorted dependency paths, and re-verifies the request
+identity, per-file digests, closure, and manifest digest before use.
+
+This is **static include closure**, not a proof of full model closure or safe
+execution. The parser does not discover arbitrary data files, control-language
+`source` commands, dynamically generated files, Verilog-A/OSDI modules, or
+other runtime loads. The legacy compatibility interpretation of one-operand
+`.lib filename` is intentionally not supported; controlled execution must pin
+compatible library semantics. No files are read from disk by the bundle API,
+and it does not enable the production adapter.
+
 ## Explicit limitations
 
 The type identifies **one primary file only**. It does not yet represent or
