@@ -77,7 +77,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
 
     def fixture_run(self):
         return {"id": 10, "workflow_id": 42, "name": "Security Audit",
-                "path": ".github/workflows/security-audit.yml@refs/pull/12/merge",
+                "path": ".github/workflows/security-audit.yml",
                 "event": "pull_request", "head_branch": "security/fix",
                 "head_sha": "e" * 40, "run_attempt": 1,
                 "head_repository": {"full_name": "owner/repo"},
@@ -97,6 +97,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         base = self.fixture_run()
         bad_runs = [
             {**base, "path": ".github/workflows/other.yml@refs/pull/12/merge"},
+            {**base, "path": ".github/workflows/security-audit.yml@refs/pull/12/merge"},
             {**base, "head_repository": {"full_name": "fork/repo"}},
             {**base, "head_sha": "f" * 40},
             {**base, "event": "push"},
