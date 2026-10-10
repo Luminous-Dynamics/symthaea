@@ -1461,7 +1461,7 @@ pub fn analyze_system_autonomous(
         );
         for inv in &conserved {
             let symbolic_check = if inv.sampled_residual_passed {
-                " [SYMBOLIC-CHECK]"
+                " [SYMBOLIC+SAMPLED]"
             } else {
                 ""
             };
