@@ -16,6 +16,8 @@ FIELDS = (
     "force_model_reference", "energy_boundary", "momentum_boundary", "acceptance_limits", "independent_reference_case",
 )
 UNKNOWN = {"", "unknown", "tbd", "todo", "unspecified", "not specified", "?"}
+PROVENANCE_CLASSES = {"primary_source", "derived", "engineering_assumption", "measurement", "independent_model", "test_fixture"}
+PROVENANCE_STATES = {"not_reviewed", "independently_reviewed", "rejected"}
 
 
 def finite(v):
@@ -89,16 +91,67 @@ def type_errors(name, v):
     return errors
 
 
+def provenance_errors(name, record):
+    errors = []
+    if not isinstance(record, dict):
+        return [f"{name}: provenance record missing"]
+    if record.get("classification") not in PROVENANCE_CLASSES:
+        errors.append(f"{name}: invalid provenance classification")
+    refs = record.get("evidence_refs")
+    if not isinstance(refs, list) or not refs or not all(isinstance(r, str) and r.strip() and not missing(r) for r in refs):
+        errors.append(f"{name}: evidence_refs must contain at least one explicit reference")
+    if not isinstance(record.get("rationale"), str) or missing(record.get("rationale")):
+        errors.append(f"{name}: provenance rationale missing")
+    if record.get("review_state") not in PROVENANCE_STATES or record.get("review_state") == "rejected":
+        errors.append(f"{name}: review_state must be not_reviewed or independently_reviewed")
+    return errors
+
+
 def assess(m):
     inputs = m.get("required_inputs") if isinstance(m.get("required_inputs"), dict) else {}
+    provenance = m.get("input_provenance") if isinstance(m.get("input_provenance"), dict) else {}
     blocked = [k for k in FIELDS if k not in inputs or missing(inputs.get(k))]
     errors = [e for k in FIELDS if k in inputs and not missing(inputs[k]) for e in type_errors(k, inputs[k])]
+    for field in FIELDS:
+        if field in inputs and not missing(inputs[field]):
+            errors.extend(provenance_errors(field, provenance.get(field)))
+    # Cross-field consistency guards are contract checks, not dynamics.
+    pos, radius = inputs.get("initial_ring_position_m"), inputs.get("ring_radius_m")
+    orientation = inputs.get("ring_plane_orientation")
+    normal = orientation.get("normal_unit_vector_in_inertial_frame") if isinstance(orientation, dict) else None
+    velocity = inputs.get("initial_ring_velocity_m_s")
+    if finite(radius) and vec(pos) and abs(math.sqrt(sum(x*x for x in pos)) - radius) > max(1.0, radius * 1e-6):
+        errors.append("initial_ring_position_m: norm must agree with ring_radius_m within 1e-6 relative or 1 m")
+    if vec(pos) and vec(normal, unit=True) and abs(sum(pos[i] * normal[i] for i in range(3))) > max(1.0, math.sqrt(sum(x*x for x in pos)) * 1e-6):
+        errors.append("initial_ring_position_m: initial position must lie in ring_plane_orientation")
+    if vec(velocity) and vec(normal, unit=True) and abs(sum(velocity[i] * normal[i] for i in range(3))) > max(1e-3, math.sqrt(sum(x*x for x in velocity)) * 1e-6):
+        errors.append("initial_ring_velocity_m_s: initial velocity must lie in ring plane")
+    before, after = inputs.get("support_load_before_n"), inputs.get("support_load_after_n")
+    if vec(before) and vec(after) and math.sqrt(sum(x*x for x in after)) >= math.sqrt(sum(x*x for x in before)):
+        errors.append("support_load_after_n: this scenario requires a strict reduction in load magnitude")
+    supports = inputs.get("skyhook_support_locations_rad")
+    if isinstance(supports, list) and supports and all(finite(x) for x in supports):
+        tau = 2.0 * math.pi
+        if len(supports) < 2 or any(x < 0 or x >= tau for x in supports):
+            errors.append("skyhook_support_locations_rad: require at least two angles in [0, 2π)")
+        elif any(abs(supports[i] - supports[j]) < 1e-9 for i in range(len(supports)) for j in range(i+1, len(supports))):
+            errors.append("skyhook_support_locations_rad: support angles must be unique")
+    inertial = inputs.get("inertial_frame")
+    for field in ("energy_boundary", "momentum_boundary"):
+        boundary = inputs.get(field)
+        if isinstance(boundary, dict) and inertial is not None and boundary.get("reference_frame") != inertial:
+            errors.append(f"{field}: reference_frame must match inertial_frame")
+    limits, max_coupling = inputs.get("acceptance_limits"), inputs.get("rider_max_coupling_force_n")
+    if isinstance(limits, dict) and finite(max_coupling) and finite(limits.get("max_rider_force_n")) and limits["max_rider_force_n"] > max_coupling:
+        errors.append("acceptance_limits: max_rider_force_n cannot exceed rider_max_coupling_force_n")
+
     structural = []
     if m.get("schema") != SCHEMA: structural.append("schema mismatch")
     if m.get("scenario_id") != SCENARIO_ID: structural.append("scenario_id mismatch")
     if m.get("architecture_mode") != "continuous_skyhook_ors": structural.append("architecture mismatch")
     if tuple(m.get("required_fields", ())) != FIELDS: structural.append("required_fields contract mismatch")
     if m.get("analysis_state") != "NotRun": structural.append("analysis_state must remain NotRun")
+    if not isinstance(m.get("input_provenance"), dict): structural.append("input_provenance must be an object")
     if m.get("result_artifacts") != []: structural.append("result_artifacts must be empty")
     blocking_names = set(blocked)
     for error in errors:
@@ -131,30 +184,49 @@ def complete_fixture():
       "independent_reference_case":"fixture://reference"}
 
 
+def fixture_provenance():
+    return {name: {"classification":"test_fixture", "evidence_refs":[f"fixture://{name}"],
+                   "rationale":"Deterministic validator-only fixture; not an engineering value.",
+                   "review_state":"not_reviewed"} for name in FIELDS}
+
+
 def self_test():
     tests=[]
     def check(name, passed): tests.append({"id":name,"status":"passed" if passed else "failed"})
-    m={"schema":SCHEMA,"scenario_id":SCENARIO_ID,"architecture_mode":"continuous_skyhook_ors","declared_state":"Blocked","analysis_state":"NotRun","result_artifacts":[],"required_fields":list(FIELDS),"required_inputs":{k:None for k in FIELDS}}
+    m={"schema":SCHEMA,"scenario_id":SCENARIO_ID,"architecture_mode":"continuous_skyhook_ors","declared_state":"Blocked","analysis_state":"NotRun","result_artifacts":[],"required_fields":list(FIELDS),"required_inputs":{k:None for k in FIELDS},"input_provenance":{k:None for k in FIELDS}}
     a=assess(m)
     check("23_required_fields",len(FIELDS)==23)
     check("template_contract_valid_but_blocked",a["validation_state"]=="passed_contract_checks" and a["expected_gate_state"]=="Blocked")
     check("template_missing_all_required_fields",a["blocking_field_count"]==23)
     check("not_run_is_not_a_physics_claim",a["analysis_state"]=="NotRun" and a["physics_claim"].startswith("none"))
     for field in FIELDS:
-        c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"][field]=None; c["declared_state"]="Blocked"
+        c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"][field]=None; c["declared_state"]="Blocked"
         r=assess(c); check(f"missing_{field}_blocks",r["expected_gate_state"]=="Blocked" and not r["structural_errors"])
-    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["declared_state"]="ReadyForIndependentReview"
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["declared_state"]="ReadyForIndependentReview"
     r=assess(c); check("complete_fixture_review_ready_not_passed",r["expected_gate_state"]=="ReadyForIndependentReview" and r["analysis_state"]=="NotRun")
+    for field in FIELDS:
+        c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["input_provenance"][field]=None; c["declared_state"]="Blocked"
+        r=assess(c); check(f"missing_provenance_{field}_blocks",r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
     c["required_inputs"]["ring_radius_m"]="7000000"; c["declared_state"]="Blocked"; r=assess(c)
     check("wrong_numeric_type_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
-    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"]["rider_force_law"]="TBD"; c["declared_state"]="Blocked"; r=assess(c)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["rider_force_law"]="TBD"; c["declared_state"]="Blocked"; r=assess(c)
     check("tbd_force_law_blocks",r["expected_gate_state"]=="Blocked")
-    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"]["ring_plane_orientation"]["normal_unit_vector_in_inertial_frame"]=[0,0,2]; c["declared_state"]="Blocked"; r=assess(c)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["ring_plane_orientation"]["normal_unit_vector_in_inertial_frame"]=[0,0,2]; c["declared_state"]="Blocked"; r=assess(c)
     check("non_unit_plane_normal_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
-    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"]["load_change_profile"]["transition_duration_s"]=1; c["declared_state"]="Blocked"; r=assess(c)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["load_change_profile"]["transition_duration_s"]=1; c["declared_state"]="Blocked"; r=assess(c)
     check("step_with_nonzero_duration_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
     c=json.loads(json.dumps(m)); c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("premature_gate_upgrade_rejected",r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked")
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["initial_ring_position_m"]=[6e6,0,0]; c["declared_state"]="Blocked"; r=assess(c)
+    check("position_radius_mismatch_blocks",r["expected_gate_state"]=="Blocked")
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["support_load_after_n"]=[0,2e6,0]; c["declared_state"]="Blocked"; r=assess(c)
+    check("load_increase_in_reduction_scenario_blocks",r["expected_gate_state"]=="Blocked")
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["skyhook_support_locations_rad"]=[0,0,2]; c["declared_state"]="Blocked"; r=assess(c)
+    check("duplicate_support_locations_block",r["expected_gate_state"]=="Blocked")
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["energy_boundary"]["reference_frame"]="ITRF"; c["declared_state"]="Blocked"; r=assess(c)
+    check("energy_boundary_frame_mismatch_blocks",r["expected_gate_state"]=="Blocked")
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["acceptance_limits"]["max_rider_force_n"]=2e8; c["declared_state"]="Blocked"; r=assess(c)
+    check("acceptance_limit_above_coupler_capacity_blocks",r["expected_gate_state"]=="Blocked")
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1","checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),"checks":tests,"interpretation":"Contract validation only; review-ready does not mean physically validated or safe."}
     print(json.dumps(report,indent=2,sort_keys=True,allow_nan=False)); return 0 if report["checks_failed"]==0 else 1
 
