@@ -251,14 +251,14 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 
 ### Increment RG-03a — support-load scenario gate
 
-**A fault-scenario contract now exists; the physics case remains blocked.** The template \`docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json\` records the Part II source basis and names 23 required inputs. The validator \`scripts/engineering/validate_orbital_ring_failure_manifest.py\` checks missing/unknown inputs, typed vectors, support-frame quaternion, unit ring-plane normal, step/ramp consistency, rider parameters, and explicit energy/momentum boundaries. The template intentionally has 23 unresolved inputs, \`declared_state = Blocked\`, \`analysis_state = NotRun\`, and no result artifacts.
+**A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, typed vectors, support-frame quaternion, unit ring-plane normal, step/ramp consistency, rider parameters, and explicit energy/momentum boundaries. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
 
-- Local syntax check: \`python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py\` succeeded.
+- Local syntax check: `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
 - Validator self-tests: **33 passed, 0 failed**; every single required field was removed from an otherwise complete typed fixture and independently confirmed to block the gate.
-- Template assessment: contract validation \`passed_contract_checks\`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
-- Both emitted JSON reports were byte-identical on repeat and are preserved under \`docs/engineering/evidence/\`.
-- Validator Git blob SHA: \`5732c5eb656f576feda23102500541a1117fa011\`; source SHA-256: \`2eafdb020349a9760fda6bb9b8034f2254ca78c639fff30a49e20bee3d5c7d37\`.
-- Template Git blob SHA: \`9302886b4c076155100bc6539726822f11fd3ef3\`; manifest-validation report blob: \`2e29acbba4c89973683764e55ce6df1ac3733191\`; self-test report blob: \`b584a648f9c47d8c8fffa059e852fe31ce008a81\`.
+- Template assessment: contract validation `passed_contract_checks`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
+- Both emitted JSON reports were byte-identical on repeat and are preserved under `docs/engineering/evidence/`.
+- Validator Git blob SHA: `b81b0b8365acd3da201d5f42e46a1279edd16872`; source SHA-256: `2a6818ca9c860d40918313bbfda11184a0e0cc0c6f1f919543748a03225dee30`.
+- Template Git blob SHA: `9302886b4c076155100bc6539726822f11fd3ef3`; validation report blob: `1485c06416f5bd4fe47265a782bfc8722efca09f` (SHA-256 `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`); self-test report blob: `b584a648f9c47d8c8fffa059e852fe31ce008a81` (SHA-256 `e404277327622162944da248d710b0ca1a94eea139a693a4edd5271ac848dea6`).
 
 A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
 
