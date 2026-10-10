@@ -416,7 +416,7 @@ fn canonical_token(
     if value.is_empty()
         || value.trim() != value
         || value.len() > maximum_bytes
-        || value.bytes().any(|byte| byte == b'\n' || byte == b'\r' || byte == 0)
+        || value.bytes().any(|byte| byte.is_ascii_control())
     {
         return Err(ReviewVerificationError::InvalidField(field_name));
     }
