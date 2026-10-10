@@ -35,15 +35,18 @@ subset: `.include path`, `.incpslt path`, and external `.lib path section`.
 Paths use canonical relative slash form; absolute/drive paths, backslashes,
 environment-expanded paths, empty components, `.`, and `..` are rejected.
 Quoted paths may contain spaces. Relative nested references are resolved from
-the including file's directory to match the pinned modern ngspice include-path
-behavior; actual execution must still pin a specific ngspice package/version
-and matching sourcepath policy.
+the including file's directory. This aligns with the ngspice 43+ source change
+that adds the path of an included file to the search path for subsequent
+includes; see the upstream [ngspice NEWS](https://github.com/imr/ngspice/blob/master/NEWS).
+Actual execution must still pin a specific ngspice package/version and matching
+sourcepath policy.
 
 Construction fails closed for missing dependencies, duplicate paths, unused
 extra files, include cycles, malformed quoting, unsupported directive operand
 counts, unbalanced in-file `.lib`/`.endl` sections, and mismatched section
 names. File count, aggregate byte count, and include-directive count are
-bounded. The bundle manifest uses length-prefixed, domain-separated BLAKE3
+bounded (256 files including primary, 32 MiB total, and 4,096 static include
+directives). The bundle manifest uses length-prefixed, domain-separated BLAKE3
 fields and canonical sorted dependency paths, and re-verifies the request
 identity, per-file digests, closure, and manifest digest before use.
 
