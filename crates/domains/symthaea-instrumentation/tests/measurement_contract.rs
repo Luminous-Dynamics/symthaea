@@ -51,7 +51,7 @@ fn measurement(sequence: u64, captured_at_ns: u64) -> MeasurementEnvelope {
         value: 5_000_000.0,
         standard_uncertainty: 1_000.0,
         calibration: Some(calibration_reference()),
-        raw_data: Some(RawDataReference::new(artifact("raw-acquisition-1", SHA_B))),
+        raw_data: Some(RawDataReference::new(artifact("raw-acquisition-1", SHA_C))),
         processing_chain_version: "sha256:reconstruction-pipeline-v1".to_owned(),
         quality_flags: vec![],
     })
@@ -258,8 +258,8 @@ fn calibration_evidence_and_review_receipt_must_be_distinct_artifacts() {
 fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_provenance() {
     let assessment = measurement(1, SAMPLE_TIME_NS)
         .assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS + 10,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut MeasurementStreamGuard::default(),
@@ -280,8 +280,8 @@ fn rejects_measurements_from_a_future_clock_or_beyond_freshness_limit() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS - 1,
+                &clock_domain(),
                 &policy(),
                 &resolver(),
                 &mut MeasurementStreamGuard::default(),
@@ -292,8 +292,8 @@ fn rejects_measurements_from_a_future_clock_or_beyond_freshness_limit() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS + 500_000_001,
+                &clock_domain(),
                 &policy(),
                 &resolver(),
                 &mut MeasurementStreamGuard::default(),
@@ -326,8 +326,8 @@ fn any_quality_flag_blocks_strict_quantitative_use() {
     let m = MeasurementEnvelope::new(input).unwrap();
     assert_eq!(
         m.assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut MeasurementStreamGuard::default(),
@@ -359,8 +359,8 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
     let no_raw = MeasurementEnvelope::new(input.clone()).unwrap();
     assert_eq!(
         no_raw.assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut MeasurementStreamGuard::default(),
@@ -373,8 +373,8 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
     let no_cal = MeasurementEnvelope::new(input).unwrap();
     assert_eq!(
         no_cal.assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut MeasurementStreamGuard::default(),
@@ -412,8 +412,8 @@ fn unresolved_raw_acquisition_evidence_fails_closed() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &policy(),
                 &missing_raw,
                 &mut MeasurementStreamGuard::default(),
@@ -440,8 +440,8 @@ fn resolved_raw_data_must_match_the_envelope_digest_and_artifact_id() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &policy(),
                 &mismatched_raw,
                 &mut MeasurementStreamGuard::default(),
@@ -467,8 +467,8 @@ fn unresolved_calibration_evidence_fails_closed() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &policy(),
                 &missing,
                 &mut MeasurementStreamGuard::default(),
@@ -497,8 +497,8 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &policy(),
                 &wrong_artifact,
                 &mut MeasurementStreamGuard::default(),
@@ -527,8 +527,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &policy(),
                 &wrong_unit,
                 &mut MeasurementStreamGuard::default(),
@@ -554,8 +554,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &policy(),
                 &out_of_date,
                 &mut MeasurementStreamGuard::default(),
@@ -571,8 +571,8 @@ fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &tight_measurement_policy,
                 &resolver(),
                 &mut MeasurementStreamGuard::default(),
@@ -585,8 +585,8 @@ fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS,
+                &clock_domain(),
                 &tight_calibration_policy,
                 &resolver(),
                 &mut MeasurementStreamGuard::default(),
@@ -629,8 +629,8 @@ fn quantitative_gate_itself_rejects_a_replayed_measurement() {
     let m = measurement(9, SAMPLE_TIME_NS);
     let mut guard = MeasurementStreamGuard::default();
     m.assess_for_quantitative_use(
-        &clock_domain(),
         SAMPLE_TIME_NS,
+        &clock_domain(),
         &policy(),
         &resolver(),
         &mut guard,
@@ -638,8 +638,8 @@ fn quantitative_gate_itself_rejects_a_replayed_measurement() {
     .unwrap();
     assert_eq!(
         m.assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut guard,
@@ -692,8 +692,8 @@ fn future_timestamp_consumes_sequence_without_poisoning_timestamp_high_water_mar
     let mut guard = MeasurementStreamGuard::default();
     first
         .assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut guard,
@@ -703,8 +703,8 @@ fn future_timestamp_consumes_sequence_without_poisoning_timestamp_high_water_mar
     assert_eq!(
         future
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS + 1_000_000_000,
+                &clock_domain(),
                 &policy(),
                 &resolver(),
                 &mut guard,
@@ -717,8 +717,8 @@ fn future_timestamp_consumes_sequence_without_poisoning_timestamp_high_water_mar
     // usable: the future-dated timestamp did not poison the timestamp high-water mark.
     next_valid
         .assess_for_quantitative_use(
-            &clock_domain(),
             SAMPLE_TIME_NS + 20,
+            &clock_domain(),
             &policy(),
             &resolver(),
             &mut guard,
@@ -729,8 +729,8 @@ fn future_timestamp_consumes_sequence_without_poisoning_timestamp_high_water_mar
     assert_eq!(
         retry_future_sequence
             .assess_for_quantitative_use(
-                &clock_domain(),
                 SAMPLE_TIME_NS + 30,
+                &clock_domain(),
                 &policy(),
                 &resolver(),
                 &mut guard,
