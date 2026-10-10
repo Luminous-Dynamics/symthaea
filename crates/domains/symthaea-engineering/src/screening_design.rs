@@ -1119,6 +1119,10 @@ mod tests {
         assert!(generate_screening_design(&input).is_err());
 
         input = request();
+        input.bench_scale_review.reviewed_design_sha256 = "0".repeat(64);
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
         input.factors[0].high_value += 10.0;
         assert!(generate_screening_design(&input).is_err());
     }
