@@ -2,6 +2,7 @@ name: QC 6-31G BSE Conformance Contract
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-quantum-chemistry/src/basis/basis_631g.rs"
       - ".github/workflows/qc-631g-bse-contract.yml"
@@ -22,6 +23,7 @@ concurrency:
 jobs:
   bse-conformance:
     name: Verify pinned 6-31G shell data
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
