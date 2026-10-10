@@ -230,24 +230,44 @@ impl MagiCodeBridge {
             return CodePredictionResolution::UnknownPrediction;
         };
 
-        if compiled && tests_passed.is_none() {
+        let requirement = self.pending[idx].requirement;
+        if compiled
+            && requirement == CodePredictionRequirement::CompilationAndTests
+            && tests_passed.is_none()
+        {
             return CodePredictionResolution::AwaitingTests;
+        }
+        if !compiled && tests_passed == Some(true) {
+            return CodePredictionResolution::InconsistentEvidence;
         }
 
         let mut pending = self.pending.remove(idx);
 
-        // Determine actual outcome only after an observed test result or a compile failure.
-        let actual_outcome = if compiled && tests_passed == Some(true) {
-            OutcomeCategory::Success
-        } else if compiled && tests_passed == Some(false) {
-            OutcomeCategory::Partial
-        } else {
+        // Preserve partial progress as an outcome category, while scoring the specific claim
+        // against its declared evidence requirement. Test failure cannot qualify a compile-and-test
+        // claim merely because compilation itself succeeded.
+        let actual_outcome = if !compiled {
             OutcomeCategory::SafeFailure
+        } else {
+            match (pending.requirement, tests_passed) {
+                (CodePredictionRequirement::CompilationOnly, _) => OutcomeCategory::Success,
+                (CodePredictionRequirement::CompilationAndTests, Some(true)) => OutcomeCategory::Success,
+                (CodePredictionRequirement::CompilationAndTests, Some(false)) => OutcomeCategory::Partial,
+                (CodePredictionRequirement::CompilationAndTests, None) => {
+                    // The awaiting-tests gate above makes this unreachable; remain fail-closed.
+                    return CodePredictionResolution::AwaitingTests;
+                }
+            }
         };
 
-        // Resolve the prediction
+        // Accuracy and Brier updates score the declared claim, not outcome severity alone.
         let predicted_success = pending.prediction.confidence > 0.5;
-        let actual_success = actual_outcome.is_positive();
+        let actual_success = match pending.requirement {
+            CodePredictionRequirement::CompilationOnly => compiled,
+            CodePredictionRequirement::CompilationAndTests => {
+                compiled && tests_passed == Some(true)
+            }
+        };
         let was_correct = predicted_success == actual_success;
 
         if actual_success {
