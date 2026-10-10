@@ -48,7 +48,10 @@ def sample_report() -> dict:
         "source_revision": "0123456789abcdef0123456789abcdef01234567",
         "source_tree_sha": "89abcdef0123456789abcdef0123456789abcdef",
         "worktree_clean": True,
-        "cases": [sample_case()],
+        "cases": [
+            {**sample_case(), "case_id": case_id}
+            for case_id in qc.EXPECTED_CASE_IDS
+        ],
     }
 
 
@@ -117,6 +120,28 @@ class QcEigenReferenceCompareTests(unittest.TestCase):
                 path.write_text(json.dumps(report), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, "unsupported eigen fixture schema"):
                     qc.load_input(path)
+
+    def test_load_input_requires_complete_unique_frozen_corpus(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.json"
+
+            report = sample_report()
+            report["cases"] = report["cases"][:-1]
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "corpus census mismatch"):
+                qc.load_input(path)
+
+            report = sample_report()
+            report["cases"][1]["case_id"] = report["cases"][0]["case_id"]
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate fixture case IDs"):
+                qc.load_input(path)
+
+            report = sample_report()
+            report["cases"][0]["case_id"] = "unexpected_case"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "corpus census mismatch"):
+                qc.load_input(path)
 
     def test_source_binding_requires_exact_current_head_and_clean_tree(self):
         report = sample_report()
