@@ -269,16 +269,18 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
         ));
     }
-    let mut divisions = 1_i64;
     let mut fifths = 0_i32;
     let mut minor = false;
     let mut meter = 4_u8;
     let mut tempo = 120.0_f32;
-    let mut raw = Vec::<(usize, u8, i64, i64)>::new();
+    let mut raw = Vec::<(usize, u8, Duration, Duration)>::new();
 
     for (part_index, part) in parts.iter().enumerate() {
-        let mut cursor = 0_i64;
-        let mut previous_onset = 0_i64;
+        // Divisions are part-local and can change during a score. Keep the
+        // cursor in exact beats so earlier notes never inherit later divisions.
+        let mut divisions = 1_i64;
+        let mut cursor = Duration::zero();
+        let mut previous_onset = Duration::zero();
         for child in part.descendants().filter(|node| node.is_element()) {
             if child.has_tag_name("divisions") {
                 let value = node_i64(child).unwrap_or(divisions);
@@ -307,10 +309,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 if amount < 0 {
                     return Err("MusicXML backup duration cannot be negative".into());
                 }
+                let amount = Duration::new(amount, divisions);
                 cursor = cursor
                     .checked_sub(amount)
-                    .ok_or_else(|| "MusicXML backup timing overflowed".to_string())?;
-                if cursor < 0 {
+                    .ok_or_else(|| "MusicXML backup timing is not exactly representable".to_string())?;
+                if cursor.num() < 0 {
                     return Err("MusicXML backup moves before the start of a part".into());
                 }
             } else if child.has_tag_name("forward") {
@@ -322,6 +325,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 if amount < 0 {
                     return Err("MusicXML forward duration cannot be negative".into());
                 }
+                let amount = Duration::new(amount, divisions);
                 cursor = cursor
                     .checked_add(amount)
                     .ok_or_else(|| "MusicXML forward timing overflowed".to_string())?;
@@ -334,7 +338,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 if duration < 0 {
                     return Err("MusicXML note duration cannot be negative".into());
                 }
-                let duration = duration.max(1);
+                let duration = Duration::new(duration.max(1), divisions);
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
                 let rest = child.children().any(|node| node.has_tag_name("rest"));
                 let onset = if chord { previous_onset } else { cursor };
@@ -382,8 +386,8 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     .map(PartId)
                     .unwrap_or(PartId::UNASSIGNED),
                 pitch: Pitch::from_midi(midi),
-                onset: Duration::new(onset, divisions),
-                duration: Duration::new(duration, divisions),
+                onset,
+                duration,
                 velocity: 0.72,
                 role,
                 emphasis: Emphasis::Normal,
@@ -615,6 +619,43 @@ mod tests {
         let analysis = analyze(&score);
         assert!(analysis.source_native);
         assert!(analysis.inferred_territory.is_none());
+    }
+
+    #[test]
+    fn musicxml_divisions_are_scoped_to_each_part() {
+        let xml = br#"<score-partwise>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+            <part id="P2"><measure number="1">
+                <attributes><divisions>2</divisions></attributes>
+                <note><pitch><step>E</step><octave>4</octave></pitch><duration>2</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[0].duration, Duration::new(1, 1));
+        assert_eq!(score.notes[1].duration, Duration::new(1, 1));
+    }
+
+    #[test]
+    fn musicxml_division_changes_preserve_the_absolute_cursor() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><divisions>2</divisions></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>2</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[1].onset, Duration::new(1, 1));
+        assert_eq!(score.notes[1].duration, Duration::new(1, 1));
+        assert_eq!(score.total_beats, Duration::new(2, 1));
     }
 
     #[test]
