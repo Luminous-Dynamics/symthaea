@@ -3,6 +3,7 @@
   "scenario_id": "F-SKYHOOK-LOAD-STEP",
   "scenario_version": 1,
   "architecture_mode": "continuous_skyhook_ors",
+  "initial_path_constraint": "circular_reference_path",
   "title": "Sudden skyhook support-load reduction",
   "purpose": "Determine whether a specified continuous-skyhook ORS remains coupled when a support load is reduced rapidly; do not infer survivability from a nominal orbit propagator.",
   "source_basis": [
