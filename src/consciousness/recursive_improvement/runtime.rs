@@ -791,11 +791,18 @@ impl MagiLoopRuntime {
                     reason,
                     ..
                 } => {
-                    // Do not update the model, bridge, Brier score, or resolved-event stream.
+                    // Remove the internal model's copy from the pending queue but preserve it as
+                    // explicitly unclear. This does not update calibration or resolved counts.
+                    let stored_reason = format!("resolver {disposition}: {reason}");
+                    let retained = self
+                        .model
+                        .lock()
+                        .model_mut()
+                        .mark_prediction_unresolved(&pred.prediction.id, stored_reason);
                     self.log(
                         LogLevel::Warning,
                         format!(
-                            "Unresolved: {} (resolver {disposition}): {reason}",
+                            "Unresolved: {} (resolver {disposition}; retained={retained}): {reason}",
                             pred.prediction.claim
                         ),
                     );
