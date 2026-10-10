@@ -429,7 +429,7 @@ impl SignedReviewTrustStoreSnapshot {
 
     /// Parse a signed snapshot and reject alternate/trailing encodings.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
-        const MAGIC: &[u8] = b"SYMRTRSS1\\0";
+        const MAGIC: &[u8] = b"SYMRTRSS1\0";
         if !bytes.starts_with(MAGIC) || bytes.len() < MAGIC.len() + 64 {
             return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
         }
