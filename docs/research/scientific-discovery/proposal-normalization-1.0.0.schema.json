@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/proposal-normalization-1.0.0.json",
+  "title":"Scientific Agent Proposal Normalization",
+  "type":"object",
+  "required":["schema","schema_version","authority","required_fields","non_equivalences"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.proposal_normalization"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"semantic_normalization_only"},
+    "required_fields":{"type":"array","items":{"enum":["claim","mechanism","assumptions","predictions","falsifiers","required_evidence","source_payload_digest"]},"minItems":7,"maxItems":7,"uniqueItems":true},
+    "non_equivalences":{"type":"array","items":{"type":"string"},"minItems":4}
+  }
+}
