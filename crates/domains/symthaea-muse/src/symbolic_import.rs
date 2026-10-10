@@ -535,20 +535,35 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 let duration = musicxml_duration(child, "note")?;
                 let duration = Duration::new(duration, divisions);
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
-                let rest = child.children().any(|node| node.has_tag_name("rest"));
-                let unpitched = child
+                let pitch_count = child
                     .children()
-                    .any(|node| node.has_tag_name("unpitched"));
-                if unpitched {
+                    .filter(|node| node.has_tag_name("pitch"))
+                    .count();
+                let rest_count = child
+                    .children()
+                    .filter(|node| node.has_tag_name("rest"))
+                    .count();
+                let unpitched_count = child
+                    .children()
+                    .filter(|node| node.has_tag_name("unpitched"))
+                    .count();
+                if pitch_count + rest_count + unpitched_count != 1 {
+                    return Err(
+                        "MusicXML note must contain exactly one of <pitch>, <unpitched>, or <rest>"
+                            .into(),
+                    );
+                }
+                if unpitched_count != 0 {
                     return Err(
                         "MusicXML unpitched notes are outside the pitched-note importer; refusing to silently discard percussion or speaking-voice events"
                             .into(),
                     );
                 }
+                let rest = rest_count == 1;
                 let onset = if chord { previous_onset } else { cursor };
                 if !rest {
                     let midi = musicxml_pitch(child)?.ok_or_else(|| {
-                        "MusicXML note must contain a supported <pitch> or an explicit <rest>"
+                        "MusicXML note must contain exactly one of <pitch>, <unpitched>, or <rest>"
                             .to_string()
                     })?;
                     if raw.len() >= MAX_IMPORTED_NOTES {
@@ -1130,6 +1145,39 @@ mod tests {
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
             error.contains("unpitched notes are outside the pitched-note importer"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_note_with_both_pitch_and_rest_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note>
+                <pitch><step>C</step><octave>4</octave></pitch>
+                <rest/><duration>1</duration>
+            </note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("exactly one of <pitch>, <unpitched>, or <rest>"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_note_with_multiple_pitch_elements_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note>
+                <pitch><step>C</step><octave>4</octave></pitch>
+                <pitch><step>D</step><octave>4</octave></pitch>
+                <duration>1</duration>
+            </note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("exactly one of <pitch>, <unpitched>, or <rest>"),
             "{error}"
         );
     }
