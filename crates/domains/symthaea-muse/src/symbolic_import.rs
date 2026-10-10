@@ -216,8 +216,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     }
     let (meter, _denominator_power) =
         stable_midi_metadata(&meter_events, (4_u8, 2_u8), "meter", "single-meter")?;
-    let (fifths, minor) =
-        stable_midi_metadata(&key_events, (0_i8, false), "key", "single-key")?;
+    let (fifths, minor) = stable_midi_key_metadata(&key_events)?;
 
     if notes.is_empty() {
         return Err("the MIDI file contains no pitched note events".into());
@@ -608,10 +607,10 @@ fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
 }
 
-/// Validate a global MIDI metadata stream against the single-value Score
-/// schema. MIDI applies defaults before the first event; if the first explicit
-/// event occurs later at a non-default value, the opening region already has
-/// different metadata and cannot be represented by one Score field.
+/// Validate a MIDI tempo or meter stream against a documented format default
+/// and Score's single-value field. Tempo and time signature have SMF defaults;
+/// key signature is handled separately because an absent key event is not a
+/// reliable statement about the notated key of the opening.
 fn stable_midi_metadata<T: Copy + Eq>(
     events: &[(u64, T)],
     default: T,
@@ -632,6 +631,28 @@ fn stable_midi_metadata<T: Copy + Eq>(
         ));
     }
     Ok(*first_value)
+}
+
+/// Resolve MIDI key-signature events without treating the internal C-major
+/// fallback as proof of opening context. A key event first seen after tick zero
+/// only establishes later metadata and cannot describe the opening in a
+/// single-key Score.
+fn stable_midi_key_metadata(
+    events: &[(u64, (i8, bool))],
+) -> Result<(i8, bool), String> {
+    let Some((first_tick, first_value)) = events.iter().min_by_key(|event| event.0).copied() else {
+        return Ok((0, false));
+    };
+    if first_tick > 0 {
+        return Err(
+            "MIDI key signature first appears at a non-zero tick; opening key is unspecified and cannot be represented by a single-key Score"
+                .into(),
+        );
+    }
+    if events.iter().any(|(_, value)| *value != first_value) {
+        return Err("MIDI key changes cannot be represented by a single-key Score".into());
+    }
+    Ok(first_value)
 }
 
 /// Extract only a regular, undotted quarter-note metronome mark. Metric
@@ -707,9 +728,9 @@ fn stable_musicxml_metadata<T: Copy + PartialEq>(
         }
     }
 
-    if earliest_position.num() > 0 && first_value != default {
+    if earliest_position.num() > 0 {
         return Err(format!(
-            "MusicXML {name} changes from the default at a non-zero beat and cannot be represented by a {schema_field} Score"
+            "MusicXML {name} first appears at a non-zero beat; opening metadata cannot be represented by a single-value {schema_field} Score"
         ));
     }
     Ok(first_value)
@@ -1256,7 +1277,25 @@ mod tests {
             0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+        assert!(
+            error.contains("first appears at a non-zero tick"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn midi_late_default_key_does_not_prove_opening_key_context() {
+        let track = [
+            100, 0xFF, 0x59, 2, 0, 0, // C major appears only at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(
+            error.contains("first appears at a non-zero tick"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1359,6 +1398,44 @@ mod tests {
         </score-partwise>"#;
         let score = parse_musicxml(xml).unwrap();
         assert_eq!(score.tempo_bpm, 96.0);
+    }
+
+    #[test]
+    fn musicxml_late_default_tempo_does_not_prove_opening_tempo() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <direction><direction-type><words>Tempo</words></direction-type><sound tempo="120"/></direction>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("first appears at a non-zero beat"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_late_default_key_does_not_prove_opening_key() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><key><fifths>0</fifths><mode>major</mode></key></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("first appears at a non-zero beat"),
+            "{error}"
+        );
     }
 
     #[test]
