@@ -120,6 +120,9 @@ impl VulkanSyncExecutionReceipt {
 /// Every logical queue in the lowering plan is mapped onto this single actual
 /// Vulkan queue. Cross-logical-queue waits still become real timeline waits.
 pub struct SingleQueueVulkanSyncRuntime {
+    // ash::Entry::load dynamically loads libvulkan; Ash requires the Entry to
+    // outlive every Instance and Device derived from it.
+    _entry: Entry,
     instance: Instance,
     device: Device,
     queue: vk::Queue,
@@ -217,7 +220,7 @@ impl SingleQueueVulkanSyncRuntime {
         };
         let queue = unsafe { device.get_device_queue(queue_family_index, 0) };
 
-        Ok(Self { instance, device, queue, semaphores: Vec::new() })
+        Ok(Self { _entry: entry, instance, device, queue, semaphores: Vec::new() })
     }
 
     /// Execute only after independently verifying that the sync plan is the
