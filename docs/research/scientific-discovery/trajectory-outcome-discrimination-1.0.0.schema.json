@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.dev/schema/scientific-discovery/trajectory-outcome-discrimination-1.0.0",
+  "title": "Scientific trajectory outcome discrimination",
+  "description": "Computational ranking of explicit outcome prototypes by model-implied separation between competing scientific trajectory forecasts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["authority", "inputs", "outputs", "non_equivalences"],
+  "properties": {
+    "authority": {"const": "computational_discrimination_only"},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trajectory_forecasts", "outcome_prototypes", "likelihood_model"],
+      "properties": {
+        "trajectory_forecasts": {"type": "string", "const": "ScientificTrajectoryForecast[]"},
+        "outcome_prototypes": {"type": "string", "const": "ScientificOutcomePrototype[]"},
+        "likelihood_model": {"type": "string", "const": "OutcomeLikelihoodModel"}
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_type", "ranking_key"],
+      "properties": {
+        "candidate_type": {"type": "string", "const": "TrajectoryOutcomeDiscrimination[]"},
+        "ranking_key": {
+          "type": "array",
+          "items": {"type": "string"},
+          "const": ["likelihood_separation_desc", "trajectory_divergence_desc", "outcome_id_asc", "left_model_id_asc", "right_model_id_asc"]
+        }
+      }
+    },
+    "non_equivalences": {
+      "type": "array",
+      "minItems": 6,
+      "items": {"type": "string"},
+      "contains": {"const": "model_implied_likelihood_is_not_experimental_probability"},
+      "uniqueItems": true
+    }
+  }
+}
