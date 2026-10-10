@@ -528,6 +528,7 @@ impl WorldGroundedSelfModel {
             gate: ConstraintGate::new(snapshot.gate_config.clone()),
             contracts: ContractRegistry::with_defaults(),
             pending_predictions: VecDeque::new(),
+            unresolved_predictions: VecDeque::new(),
             attributions: VecDeque::new(),
             loop_state,
             config,
