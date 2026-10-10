@@ -60,6 +60,10 @@ These should be preserved as invariants during refactoring.
 - The adapter currently discards successful stdout content after measuring its length in the placeholder error. It therefore has no parser-consumable evidence output yet.
 - String-valued units and metric names are convenient for prototypes but cannot prevent dimensionally invalid coupling. Work #6870 should own the typed physical semantics rather than creating a second unit system here.
 
+### Version pinning correction
+
+The ngspice documentation index now lists the Version 47 manual as the release-version manual, while Version 45 remains available as a historical release manual. Therefore, **Version 45 is a syntax/reference example, not a recommendation to pin the project to that release**. The implementation must select an explicitly supported ngspice binary/package and use the matching release manual, package digest and parser fixtures. Do not silently follow the continuously updated development manual for a reproducible qualification run.
+
 ### First vertical-slice execution contract
 
 For each run, create a unique workspace and a frozen manifest. Pin the absolute solver executable/package identity and version, bind the Nix closure/container image or other environment manifest, and use a controlled environment with an explicit allowlist. Use no shell interpolation; pass arguments as separate values. The working directory, solver inputs, all transitive `.include`/`.lib` dependencies, command arguments, configuration files, and output paths must be explicit and included in the run manifest.
