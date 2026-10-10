@@ -14,7 +14,7 @@ use std::collections::HashSet;
 
 use symthaea_agribot::soil_process::{EvidenceKind, EvidenceRef};
 
-const DESIGN_ALGORITHM_ID: &str = "full-factorial-2level-blocked-splitmix64-fy-joint-centers-v2";
+const DESIGN_ALGORITHM_ID: &str = "full-factorial-2level-blocked-splitmix64-fy-centerpoints-v3";
 const MIN_FACTORS: usize = 2;
 const MAX_FACTORS: usize = 6;
 const MIN_BLOCKS: usize = 2;
@@ -554,10 +554,22 @@ fn settings_for(
         .collect()
 }
 
+fn center_point_positions(treatment_count: usize, center_count: usize) -> HashSet<usize> {
+    let total = treatment_count + center_count;
+    if center_count == 0 {
+        return HashSet::new();
+    }
+    // A single centerpoint is disallowed by request validation; for 3–5 control runs,
+    // this yields distinct, approximately even positions and includes both endpoints.
+    (0..center_count)
+        .map(|index| index * (total - 1) / (center_count - 1))
+        .collect()
+}
+
 /// Generate a proposed preregistered blocked, randomized two-level full-factorial schedule.
-/// Treatment runs and center-point controls, when enabled, are jointly shuffled within
-/// each complete block. Center points use numeric midpoints. Including controls in the
-/// randomization avoids systematically confounding them with early/late run-order drift.
+/// Treatment runs are shuffled within each complete block. Center-point controls, when
+/// enabled, use numeric midpoints and occupy evenly dispersed, fixed positions including
+/// the beginning and end of each block, following NIST stability-monitoring guidance.
 /// Review status and record references are checked structurally but are not authenticated
 /// against an independent evidence service. This function does not authorize execution.
 pub fn generate_screening_design(
@@ -577,36 +589,37 @@ pub fn generate_screening_design(
     let mut center_run_count = 0_u32;
 
     for block in &request.blocks {
-        // Randomize treatment runs and center-point controls together inside each block.
-        // Fixing controls to start/end positions would alias them with run-order drift.
-        let mut schedule = Vec::with_capacity(treatment_runs_per_block + center_count);
+        let mut treatments = Vec::with_capacity(treatment_runs_per_block);
         for standard_row in 0..combination_count {
             for replicate in 1..=request.replicates_per_setting_per_block {
-                schedule.push(Some((standard_row, replicate)));
+                treatments.push((standard_row, replicate));
             }
         }
-        for _ in 0..center_count {
-            schedule.push(None);
-        }
-        shuffle(&mut schedule, &mut rng_state);
+        shuffle(&mut treatments, &mut rng_state);
 
-        for scheduled_item in schedule {
+        let center_positions = center_point_positions(treatments.len(), center_count);
+        let total_block_runs = treatments.len() + center_count;
+        let mut treatment_cursor = 0;
+
+        for position in 0..total_block_runs {
             let (kind, standard_order, replicate_index, settings) =
-                if let Some((standard_row, replicate)) = scheduled_item {
-                    treatment_run_count += 1;
-                    (
-                        PlannedRunKind::FactorialTreatment,
-                        Some((standard_row + 1) as u32),
-                        Some(replicate),
-                        settings_for(&request.factors, standard_row, false),
-                    )
-                } else {
+                if center_positions.contains(&position) {
                     center_run_count += 1;
                     (
                         PlannedRunKind::CenterPointControl,
                         None,
                         None,
                         settings_for(&request.factors, 0, true),
+                    )
+                } else {
+                    let (standard_row, replicate) = treatments[treatment_cursor];
+                    treatment_cursor += 1;
+                    treatment_run_count += 1;
+                    (
+                        PlannedRunKind::FactorialTreatment,
+                        Some((standard_row + 1) as u32),
+                        Some(replicate),
+                        settings_for(&request.factors, standard_row, false),
                     )
                 };
             let run_id = format!(
@@ -722,6 +735,8 @@ pub fn verify_screening_design(
 
     let treatment_runs_per_block =
         combination_count * request.replicates_per_setting_per_block as usize;
+    let expected_center_positions =
+        center_point_positions(treatment_runs_per_block, center_count);
     let mut run_ids = HashSet::new();
     let mut seen_cells: HashSet<(String, u32, u8)> = HashSet::new();
     let mut current_block_index = 0_usize;
@@ -816,6 +831,12 @@ pub fn verify_screening_design(
                         "replicate index is outside the preregistered range",
                     ));
                 }
+                if expected_center_positions.contains(&local_position) {
+                    return Err(ScreeningDesignError::new(
+                        "runs.center_point_position",
+                        "required center-point control is missing from its fixed stability-monitoring position",
+                    ));
+                }
                 let cell = (run.block_id.clone(), standard_order, replicate);
                 if !seen_cells.insert(cell) {
                     return Err(ScreeningDesignError::new(
@@ -844,6 +865,12 @@ pub fn verify_screening_design(
                 verified_treatments += 1;
             }
             PlannedRunKind::CenterPointControl => {
+                if !expected_center_positions.contains(&local_position) {
+                    return Err(ScreeningDesignError::new(
+                        "runs.center_point_position",
+                        "center-point control is not at a preregistered stability-monitoring position",
+                    ));
+                }
                 if run.standard_order.is_some() || run.replicate_index.is_some() {
                     return Err(ScreeningDesignError::new(
                         "runs.center_point",
@@ -1128,38 +1155,51 @@ mod tests {
     }
 
     #[test]
-    fn center_point_controls_are_randomized_with_treatments() {
-        let mut saw_center_at_start = false;
-        let mut saw_treatment_at_start = false;
-        let mut saw_center_at_end = false;
-        let mut saw_treatment_at_end = false;
+    fn center_points_are_fixed_evenly_spaced_stability_sentinels() {
+        let input = request();
+        let first = generate_screening_design(&input).unwrap();
+        let second = generate_screening_design(&input).unwrap();
+        assert_eq!(first.runs, second.runs);
 
-        for seed in 0..64 {
-            let mut input = request();
-            input.randomization_seed = seed;
-            let plan = generate_screening_design(&input).unwrap();
-
-            for block in &input.blocks {
-                let block_runs: Vec<_> = plan
-                    .runs
-                    .iter()
-                    .filter(|run| run.block_id == block.block_id)
-                    .collect();
-                if block_runs.first().unwrap().kind == PlannedRunKind::CenterPointControl {
-                    saw_center_at_start = true;
-                } else {
-                    saw_treatment_at_start = true;
-                }
-                if block_runs.last().unwrap().kind == PlannedRunKind::CenterPointControl {
-                    saw_center_at_end = true;
-                } else {
-                    saw_treatment_at_end = true;
-                }
-            }
+        for block in &input.blocks {
+            let block_runs: Vec<_> = first
+                .runs
+                .iter()
+                .filter(|run| run.block_id == block.block_id)
+                .collect();
+            assert_eq!(
+                block_runs.first().unwrap().kind,
+                PlannedRunKind::CenterPointControl
+            );
+            assert_eq!(
+                block_runs.last().unwrap().kind,
+                PlannedRunKind::CenterPointControl
+            );
+            assert_eq!(
+                block_runs[3].kind,
+                PlannedRunKind::CenterPointControl
+            );
+            assert!(block_runs
+                .iter()
+                .filter(|run| run.kind == PlannedRunKind::CenterPointControl)
+                .all(|run| run.settings.iter().all(|setting| setting.coded_level == 0)));
         }
 
-        assert!(saw_center_at_start && saw_treatment_at_start);
-        assert!(saw_center_at_end && saw_treatment_at_end);
+        let mut changed = input;
+        changed.randomization_seed += 1;
+        let different = generate_screening_design(&changed).unwrap();
+        assert_ne!(
+            first.runs
+                .iter()
+                .filter(|run| run.kind == PlannedRunKind::FactorialTreatment)
+                .map(|run| (run.block_id.clone(), run.standard_order))
+                .collect::<Vec<_>>(),
+            different.runs
+                .iter()
+                .filter(|run| run.kind == PlannedRunKind::FactorialTreatment)
+                .map(|run| (run.block_id.clone(), run.standard_order))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
