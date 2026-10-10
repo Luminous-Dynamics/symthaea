@@ -102,7 +102,7 @@ def main():
             "interpretation": "Electromagnetic eddy-current drag estimate for the stated conducting-sheet model; distinct from superconducting cryostat wall-plug power."
         },
         "cryogenic_pairs": [{**p, "electrical_to_cold_load_ratio": p["cryostat_electrical_power_w"] / p["cold_side_heat_load_w"]} for p in CRYO_PAIRS],
-        "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1 but the absolute scale differs by 5x. This script does not resolve whether scenario, length basis, or normalization differs.",
+        "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1. Table 8 mass-per-ring divided by mass-per-length implies a mean length of about 44.08 Mm, and 10 W/m implies about 440.83 MW, close to the table total. This internal consistency check does not explain why the earlier paragraph is five times lower or establish the underlying physical geometry/configuration.",
         "table8_length_reconstruction": {
             "orbital_superconductor_mass_per_ring_kg": TABLE8_ORBITAL_SC_MASS_PER_RING_KG,
             "orbital_superconductor_mass_per_length_kg_m": TABLE8_ORBITAL_SC_LINE_MASS_KG_M,
