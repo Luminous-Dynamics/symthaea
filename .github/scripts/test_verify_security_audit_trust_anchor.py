@@ -29,6 +29,13 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         self.assertRegex(module.ENGINE_SHA, r"^[0-9a-f]{40}$")
         self.assertRegex(module.ENGINE_BLOB, r"^[0-9a-f]{40}$")
 
+    def test_verifier_self_tests_require_explicit_success(self):
+        self.assertTrue(module.verifier_tests_passed("success"))
+        for outcome in ("", "failure", "cancelled", "skipped", "unexpected"):
+            with self.subTest(outcome=outcome):
+                self.assertFalse(module.verifier_tests_passed(outcome))
+        self.assertFalse(module.verifier_tests_passed(None))
+
     def test_only_latest_exact_head_run_attempt_is_eligible(self):
         first = {"id": 7, "workflow_id": 42, "event": "pull_request", "head_sha": "a" * 40,
                  "run_number": 15, "run_attempt": 1}
