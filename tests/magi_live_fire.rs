@@ -94,8 +94,14 @@ fn test_live_fire_file_creation() {
 
     println!("\n═══ STEP 4: RESOLVE ═══");
 
-    let overall_success = matches!(exit_result.outcome, Some(OutcomeCategory::Success))
-        && matches!(resource_result.outcome, Some(OutcomeCategory::Success));
+    let exit_outcome = exit_result
+        .outcome
+        .expect("resolver must observe an outcome before calibration");
+    let resource_outcome = resource_result
+        .outcome
+        .expect("resource resolver must observe an outcome before calibration");
+    let overall_success = matches!(exit_outcome, OutcomeCategory::Success)
+        && matches!(resource_outcome, OutcomeCategory::Success);
 
     println!("Overall success: {}", overall_success);
 
@@ -179,7 +185,7 @@ fn test_live_fire_predicted_failure() {
     println!("Result: {:?}", result.outcome);
 
     // The prediction should be correct (file doesn't exist = success for not_exists check)
-    let prediction_correct = matches!(result.outcome, Some(OutcomeCategory::Success));
+    let prediction_correct = matches!(result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
     bridge.observe_resolution(confidence, prediction_correct);
 
@@ -236,7 +242,7 @@ fn test_live_fire_calibration_drift() {
             .with_args(vec![file_path.to_string_lossy().to_string()]);
 
         let result = resolver.execute(Duration::from_secs(5));
-        let success = matches!(result.outcome, Some(OutcomeCategory::Success));
+        let success = matches!(result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
         println!("  Result: {}", if success { "SUCCESS" } else { "FAILURE" });
 
@@ -310,7 +316,7 @@ fn test_live_fire_overconfidence_penalty() {
         .with_args(vec![test_file.to_string_lossy().to_string()]);
 
     let result = resolver.execute(Duration::from_secs(5));
-    let actually_succeeded = matches!(result.outcome, Some(OutcomeCategory::Success));
+    let actually_succeeded = matches!(result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
     println!(
         "Actual result: {}",
@@ -374,7 +380,7 @@ fn test_live_fire_directory_operations() {
         .with_args(vec!["-p".to_string(), subdir.to_string_lossy().to_string()]);
 
     let mkdir_result = mkdir_resolver.execute(Duration::from_secs(5));
-    let mkdir_success = matches!(mkdir_result.outcome, Some(OutcomeCategory::Success));
+    let mkdir_success = matches!(mkdir_result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
     println!("mkdir result: {:?}", mkdir_result.outcome);
     bridge.observe_resolution(0.85, mkdir_success);
@@ -386,7 +392,7 @@ fn test_live_fire_directory_operations() {
         .with_args(vec![nested_file.to_string_lossy().to_string()]);
 
     let touch_result = touch_resolver.execute(Duration::from_secs(5));
-    let touch_success = matches!(touch_result.outcome, Some(OutcomeCategory::Success));
+    let touch_success = matches!(touch_result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
     println!("touch result: {:?}", touch_result.outcome);
     bridge.observe_resolution(0.80, touch_success);
@@ -396,7 +402,7 @@ fn test_live_fire_directory_operations() {
 
     let exists_resolver = ResourceStateResolver::exists(nested_file.to_string_lossy());
     let exists_result = exists_resolver.execute();
-    let exists_success = matches!(exists_result.outcome, Some(OutcomeCategory::Success));
+    let exists_success = matches!(exists_result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
     println!("exists result: {:?}", exists_result.outcome);
     bridge.observe_resolution(0.90, exists_success);
@@ -514,7 +520,7 @@ fn test_magi_full_loop_closure() {
             .with_working_dir(base_path.to_string_lossy().to_string());
 
         let result = resolver.execute(Duration::from_secs(10));
-        let success = matches!(result.outcome, Some(OutcomeCategory::Success));
+        let success = matches!(result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
         println!("      Outcome: {:?}", result.outcome);
         if let Some(ref output) = result.raw_output {
@@ -622,7 +628,7 @@ fn test_live_fire_signal_evolution() {
             .with_args(vec![file_path.to_string_lossy().to_string()]);
 
         let result = resolver.execute(Duration::from_secs(2));
-        let success = matches!(result.outcome, Some(OutcomeCategory::Success));
+        let success = matches!(result.outcome.expect("resolver must observe an outcome before calibration"), OutcomeCategory::Success);
 
         // High confidence predictions that mostly succeed
         let confidence = 0.85 + (i as f64 * 0.005); // Gradually increasing confidence
