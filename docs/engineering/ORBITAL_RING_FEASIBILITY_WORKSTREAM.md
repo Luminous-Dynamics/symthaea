@@ -154,7 +154,7 @@ Command from the repository root:
 python3 scripts/engineering/orbital_ring_reference_check.py
 ```
 
-The program emits deterministic JSON and exits nonzero on any failed check. In the local execution used for this update, all **47/47 checks passed**, and a repeat run emitted byte-identical JSON. This is a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation. The symbolic derivation and fields required before coupling the model are documented in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md).
+The program emits deterministic JSON and exits nonzero on any failed check. In the local execution used for this update, all **47/47 checks passed**, and a repeat run emitted byte-identical JSON. This is a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation. The symbolic derivation and fields required before coupling the model are documented in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md). The source-audit, failure, structural-stability and debris questions are tracked separately in the [research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md).
 
 ### Increment D — structural/electromagnetic/thermal interfaces
 
@@ -193,6 +193,7 @@ This increment must not claim that an orbital ring is stable, cheap, safe, build
 - Symthaea's existing engineering roadmap: https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/SYMTHAEA_ENGINEERING_ROADMAP.md
 - Symthaea orbital model scope: https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-orbital/README.md
 - Monorepo space-automation plan and candid maturity assessment: https://github.com/Luminous-Dynamics/luminous-dynamics/blob/55757dfac7791d6d5d4733f7398f4ca17af215d0/symthaea/SPACE_AUTOMATION_PLAN_2026-07-06.md
+- [Orbital-ring research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md): source-audit priorities, failure-energy questions, debris exposure, and explicit evidence states.
 
 ## 10. Decision requested from reviewers
 
@@ -231,7 +232,7 @@ The kernel intentionally does not implement rotor/support equilibrium, electroma
 
 ### Checks actually performed
 
-- Read back the exact branch versions of all eight changed files.
+- Read back the exact branch versions of all nine changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
@@ -243,4 +244,4 @@ The present execution environment does not have `cargo` installed. The Rust test
 
 ### Next engineering increment
 
-Continue the analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. Increment C2 should now complete the scenario fields in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md), specifying one exact rotor/support geometry and its control volume before writing a coupled equation: inertial frame and support-frame transform, inertial and relative stream velocities, line density or discrete mass elements, path curvature, support motion/acceleration, external forces, and boundary fluxes of mass, energy, and momentum. Derive the vector balance independently, show the assumptions and units, test the inertial circular-path limit covered by C1, and only then implement the bounded equation in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
+Continue analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. The next process increment is split: (a) RG-02, independently reconstruct the cryogenic thermal-load versus electrical-input figures from Birch's original tables and assumptions; and (b) RG-01, complete the scenario fields in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md), specifying one exact rotor/support geometry and its control volume before writing a coupled equation. Track both in the [research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md). inertial frame and support-frame transform, inertial and relative stream velocities, line density or discrete mass elements, path curvature, support motion/acceleration, external forces, and boundary fluxes of mass, energy, and momentum. Derive the vector balance independently, show the assumptions and units, test the inertial circular-path limit covered by C1, and only then implement the bounded equation in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
