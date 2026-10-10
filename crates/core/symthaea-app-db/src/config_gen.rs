@@ -7,7 +7,7 @@
 //! structured inputs. Designed to run in the browser via WASM for the
 //! Sovereign Inoculation installer.
 
-use crate::AppDatabase;
+use crate::{AppDatabase, AppEntry, InstallSource};
 use crate::aliases;
 use std::fmt::Write;
 
@@ -118,11 +118,27 @@ pub fn generate(
     let db = AppDatabase::new();
     let mut warnings: Vec<String> = Vec::new();
 
-    // ── Resolve apps to nix package names ──
+    // ── Resolve apps and collect pinned non-Nixpkgs recipes ──
     let mut nix_pkgs: Vec<&str> = Vec::new();
+    let mut appimage_entries: Vec<&AppEntry> = Vec::new();
     for app_name in selected_apps {
         if let Some(entry) = db.match_app(app_name) {
             nix_pkgs.push(entry.primary.nix_pkg);
+            if let InstallSource::AppImage { version, .. } = entry.install_source {
+                let warning = format!(
+                    "App '{}' uses upstream AppImage v{} pinned by digest, but its generated Nix package recipe has not yet passed a NixOS evaluation and build.",
+                    entry.name, version
+                );
+                if !warnings.contains(&warning) {
+                    warnings.push(warning);
+                }
+                if !appimage_entries
+                    .iter()
+                    .any(|existing| existing.primary.nix_pkg == entry.primary.nix_pkg)
+                {
+                    appimage_entries.push(entry);
+                }
+            }
         } else {
             warnings.push(format!(
                 "App '{}' not found in database — skipped",
@@ -288,6 +304,7 @@ pub fn generate(
         &gpu_vendor,
         &desktop_lower,
         &resolved_custom,
+        &appimage_entries,
     );
 
     // ── Build flake.nix ──
@@ -311,6 +328,7 @@ fn build_configuration_nix(
     gpu_vendor: &str,
     desktop: &str,
     resolved_custom: &[String],
+    appimage_entries: &[&AppEntry],
 ) -> String {
     let mut out = String::with_capacity(4096);
 
@@ -354,6 +372,11 @@ fn build_configuration_nix(
 
     // ── Nix settings (flakes) ──
     write_nix_settings(&mut out);
+
+    // ── Pinned upstream AppImages (only when explicitly selected) ──
+    if !appimage_entries.is_empty() {
+        write_appimage_overlays(&mut out, appimage_entries);
+    }
 
     // ── Packages ──
     write_packages(&mut out, nix_pkgs, resolved_custom);
@@ -1094,6 +1117,41 @@ pub fn validate_nix_syntax(nix: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
+    /// Run Nix's real parser when installed; CI can make its presence mandatory.
+    fn assert_nix_parses_when_available(config: &str) {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let nix_available = Command::new("nix-instantiate")
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if !nix_available {
+            assert!(
+                std::env::var_os("SOVEREIGN_REQUIRE_NIX_PARSER").is_none(),
+                "CI requires nix-instantiate, but it is not available on PATH"
+            );
+            return;
+        }
+
+        let mut child = Command::new("nix-instantiate")
+            .args(["--parse", "-"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("nix-instantiate is available");
+        let mut stdin = child.stdin.take().expect("Nix parser stdin");
+        stdin.write_all(config.as_bytes()).expect("write generated Nix");
+        drop(stdin);
+        let output = child.wait_with_output().expect("wait for Nix parser");
+        assert!(
+            output.status.success(),
+            "nix-instantiate rejected generated Nix: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
     fn test_hw() -> HardwareProfile {
         HardwareProfile {
             gpu_vendor: "nvidia".into(),
@@ -1160,6 +1218,33 @@ mod tests {
     }
 
     #[test]
+    fn nix_string_literal_escapes_interpolation_and_rejects_other_controls() {
+        let slash = char::from_u32(92).unwrap().to_string();
+        let quote = char::from_u32(34).unwrap().to_string();
+        let line_feed = char::from_u32(10).unwrap().to_string();
+        let carriage_return = char::from_u32(13).unwrap().to_string();
+        let tab = char::from_u32(9).unwrap().to_string();
+        let value = ["prefix $", "{injection}", &quote, &slash, &line_feed, &carriage_return, &tab].concat();
+        let quoted = nix_string_literal(&value);
+        let marker = ["$", "{injection}"].concat();
+        assert!(quoted.contains(&format!("{slash}{marker}")));
+        assert!(quoted.contains(&format!("{slash}{quote}")));
+        assert!(quoted.contains(&format!("{slash}{slash}")));
+        assert!(quoted.contains(&format!("{slash}n")));
+        assert!(quoted.contains(&format!("{slash}r")));
+        assert!(quoted.ends_with(&format!("{slash}t{quote}")));
+        assert_nix_parses_when_available(&quoted);
+    }
+
+    #[test]
+    #[should_panic(expected = "unsupported control character U+0008")]
+    fn nix_string_literal_rejects_unsupported_controls() {
+        let bad_control = char::from_u32(8).unwrap().to_string();
+        let value = ["prefix", &bad_control, "suffix"].concat();
+        let _ = nix_string_literal(&value);
+    }
+
+    #[test]
     fn generated_config_does_not_trust_wheel_group() {
         let result = generate(&test_hw(), &test_choices(), &[]);
         assert!(result
@@ -1179,6 +1264,51 @@ mod tests {
         assert!(flake.contains(LANZABOOTE_V042_REV));
         assert!(flake.contains(HOME_MANAGER_2605_REV));
         assert!(flake.contains("lanzaboote"));
+    }
+
+    #[test]
+    fn photocraft_overlay_is_generated_only_when_selected() {
+        let selected = generate(&test_hw(), &test_choices(), &["PhotoCraft".into()]);
+        let nix = &selected.configuration_nix;
+        for expected in [
+            "nixpkgs.overlays = [",
+            "photocraft = prev.appimageTools.wrapType2 {",
+            "version = \"0.5.0\";",
+            "photocraft-0.5.0-linux-x86_64.AppImage",
+            "hash = \"sha256-9U2GOAcFO738/6DWJO9+SdP9QTEMe7Ht5IU29pkp0i8=\";",
+            "license = [ prev.lib.licenses.mit prev.lib.licenses.asl20 ];",
+            "libxkbcommon",
+            "libx11",
+            "libxcb",
+            "libxcursor",
+            "libxi",
+            "wayland",
+            "vulkan-loader",
+            "libglvnd",
+            "mesa",
+            "    photocraft",
+        ] {
+            assert!(nix.contains(expected), "generated PhotoCraft config missing {expected:?}");
+        }
+        assert!(
+            selected.warnings.iter().any(|w| w.contains("PhotoCraft") && w.contains("not yet passed")),
+            "the pinned source should not be described as runtime-qualified"
+        );
+        assert!(validate_nix_syntax(nix).is_empty(), "Nix syntax: {:?}", validate_nix_syntax(nix));
+        assert_nix_parses_when_available(nix);
+
+        if let Some(path) = std::env::var_os("SOVEREIGN_APPIMAGE_OVERLAY_OUT") {
+            let entry = AppDatabase::new().match_app("PhotoCraft").expect("catalog entry");
+            std::fs::write(path, render_appimage_overlay(&[entry]))
+                .expect("write generated PhotoCraft overlay");
+        }
+
+        let unrelated = generate(&test_hw(), &test_choices(), &["Firefox".into()]);
+        assert!(
+            !unrelated.configuration_nix.contains("photocraft"),
+            "unselected PhotoCraft must not change another installation"
+        );
+        assert!(!unrelated.warnings.iter().any(|w| w.contains("PhotoCraft")));
     }
 
     #[test]
@@ -2255,4 +2385,122 @@ mod tests {
             "Dotted package names should be preserved in generated config"
         );
     }
+}
+
+
+/// Quote catalog metadata for a Nix double-quoted string literal.
+///
+/// Common escapes are rendered explicitly. Unknown control characters are rejected
+/// rather than passed into generated Nix source.
+fn nix_string_literal(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    let slash = char::from_u32(92).expect("backslash is a valid Unicode scalar");
+    out.push('"');
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch as u32 {
+            92 => {
+                out.push(slash);
+                out.push(slash);
+            }
+            34 => {
+                out.push(slash);
+                out.push('"');
+            }
+            36 if chars.peek() == Some(&'{') => {
+                out.push(slash);
+                out.push('$');
+                out.push('{');
+                chars.next();
+            }
+            10 => {
+                out.push(slash);
+                out.push('n');
+            }
+            13 => {
+                out.push(slash);
+                out.push('r');
+            }
+            9 => {
+                out.push(slash);
+                out.push('t');
+            }
+            _ if ch.is_control() => panic!(
+                "unsupported control character U+{:04X} in Nix string literal",
+                ch as u32
+            ),
+            _ => out.push(ch),
+        }
+    }
+    out.push('"');
+    out
+}
+
+fn render_appimage_overlay(entries: &[&AppEntry]) -> String {
+    let mut out = String::with_capacity(2048);
+    writeln!(out, "(final: prev: {{").unwrap();
+
+    for entry in entries {
+        let InstallSource::AppImage {
+            version,
+            url,
+            hash_sri,
+            homepage,
+            description,
+            license_attrs,
+            platforms,
+            runtime_packages,
+        } = entry.install_source else {
+            continue;
+        };
+
+        let package = entry.primary.nix_pkg;
+        writeln!(out, "  {package} = prev.appimageTools.wrapType2 {{").unwrap();
+        writeln!(out, "    pname = {};", nix_string_literal(package)).unwrap();
+        writeln!(out, "    version = {};", nix_string_literal(version)).unwrap();
+        writeln!(out, "    src = prev.fetchurl {{").unwrap();
+        writeln!(out, "      url = {};", nix_string_literal(url)).unwrap();
+        writeln!(out, "      hash = {};", nix_string_literal(hash_sri)).unwrap();
+        writeln!(out, "    }};").unwrap();
+        writeln!(out, "    extraPkgs = appPkgs: with appPkgs; [").unwrap();
+        for runtime_package in runtime_packages {
+            writeln!(out, "      {runtime_package}").unwrap();
+        }
+        writeln!(out, "    ];").unwrap();
+        writeln!(out, "    meta = {{").unwrap();
+        writeln!(out, "      description = {};", nix_string_literal(description)).unwrap();
+        writeln!(out, "      homepage = {};", nix_string_literal(homepage)).unwrap();
+        let license_list = license_attrs
+            .iter()
+            .map(|license| format!("prev.lib.licenses.{license}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        writeln!(out, "      license = [ {license_list} ];").unwrap();
+        let platform_list = platforms
+            .iter()
+            .map(|platform| nix_string_literal(platform))
+            .collect::<Vec<_>>()
+            .join(" ");
+        writeln!(out, "      platforms = [ {platform_list} ];").unwrap();
+        writeln!(out, "      mainProgram = {};", nix_string_literal(package)).unwrap();
+        writeln!(out, "    }};").unwrap();
+        writeln!(out, "  }};").unwrap();
+    }
+
+    writeln!(out, "}})").unwrap();
+    out
+}
+
+fn write_appimage_overlays(out: &mut String, entries: &[&AppEntry]) {
+    writeln!(
+        out,
+        "  # Pinned upstream AppImages; each artifact is bound to its content digest."
+    )
+    .unwrap();
+    writeln!(out, "  nixpkgs.overlays = [").unwrap();
+    for line in render_appimage_overlay(entries).lines() {
+        writeln!(out, "    {line}").unwrap();
+    }
+    writeln!(out, "  ];").unwrap();
+    writeln!(out).unwrap();
 }
