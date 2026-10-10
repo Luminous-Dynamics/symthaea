@@ -25,18 +25,23 @@ MAX_RELATIVE_EIGENVALUE_ERROR = 1e-10
 MAX_RELATIVE_EIGENPAIR_RESIDUAL = 1e-10
 MAX_ORTHOGONALITY_RESIDUAL = 1e-10
 
-# Frozen corpus census: a shorter report must never become a green comparison
-# merely because a difficult or failing matrix was silently omitted.
-EXPECTED_CASE_IDS = (
-    "scalar_3_25",
-    "diagonal_3_1",
-    "degenerate_identity_scaled",
-    "dense_symmetric_3x3",
-    "negative_off_diagonal",
-    "near_linear_dependence",
-    "small_scale_symmetric",
-    "subnormal_scale_symmetric",
-)
+# Frozen corpus manifest: IDs bind to the exact matrices emitted by the Rust
+# producer, not just to labels. This catches a complete but relabelled corpus.
+EXPECTED_CASE_MATRICES: dict[str, tuple[int, tuple[float, ...]]] = {
+    "scalar_3_25": (1, (3.25,)),
+    "diagonal_3_1": (2, (3.0, 0.0, 0.0, 1.0)),
+    "degenerate_identity_scaled": (
+        3, (2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 2.0)
+    ),
+    "dense_symmetric_3x3": (
+        3, (4.0, 1.0, 2.0, 1.0, 3.0, 0.5, 2.0, 0.5, 5.0)
+    ),
+    "negative_off_diagonal": (2, (1.0, -0.75, -0.75, 1.0)),
+    "near_linear_dependence": (2, (1.0, 0.9999999, 0.9999999, 1.0)),
+    "small_scale_symmetric": (2, (1e-16, 0.5e-16, 0.5e-16, 1e-16)),
+    "subnormal_scale_symmetric": (2, (1e-310, 0.5e-310, 0.5e-310, 1e-310)),
+}
+EXPECTED_CASE_IDS = tuple(EXPECTED_CASE_MATRICES)
 
 
 def full_sha(value: Any) -> bool:
@@ -150,6 +155,45 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
         )
     if tuple(case_ids) != EXPECTED_CASE_IDS:
         raise ValueError("fixture corpus case order differs from the frozen reference order")
+
+    for index, case in enumerate(cases):
+        case_id = case["case_id"]
+        expected_dimension, expected_matrix = EXPECTED_CASE_MATRICES[case_id]
+        dimension = case.get("dimension")
+        if (
+            isinstance(dimension, bool)
+            or not isinstance(dimension, int)
+            or dimension != expected_dimension
+        ):
+            raise ValueError(
+                f"cases[{index}] {case_id} dimension must be {expected_dimension}"
+            )
+        matrix = case.get("matrix_row_major")
+        if not isinstance(matrix, list) or len(matrix) != expected_dimension * expected_dimension:
+            raise ValueError(
+                f"cases[{index}] {case_id} matrix length does not match dimension {expected_dimension}"
+            )
+        numeric_matrix: list[float] = []
+        for matrix_index, value in enumerate(matrix):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"cases[{index}] {case_id} matrix entry {matrix_index} is not numeric"
+                )
+            try:
+                numeric_value = float(value)
+            except (OverflowError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"cases[{index}] {case_id} matrix entry {matrix_index} cannot be represented as float"
+                ) from exc
+            if not math.isfinite(numeric_value):
+                raise ValueError(
+                    f"cases[{index}] {case_id} matrix entry {matrix_index} is non-finite"
+                )
+            numeric_matrix.append(numeric_value)
+        if tuple(numeric_matrix) != expected_matrix:
+            raise ValueError(
+                f"cases[{index}] {case_id} matrix differs from the frozen matrix manifest"
+            )
     return report, digest
 
 
