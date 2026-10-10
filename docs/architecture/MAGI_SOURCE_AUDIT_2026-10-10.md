@@ -35,19 +35,19 @@ In \`resolution.rs\`, \`ExitCodeResolver::execute(&self, _timeout: Duration)\` i
 
 The synchronous `ExitCodeResolver` in PR #7337 is not the only command-resolution path:
 
-- In `src/consciousness/recursive_improvement/runtime.rs`, `check_auto_resolve` invokes `sh -c ... .output().await` for `CommandSucceeds` and `systemctl ... .output().await` for `ServiceRunning`, without an explicit Tokio timeout. The polling runtime later maps a boolean to `Success`/`SafeFailure` and calls `resolve_prediction(..., 1.0)`. Therefore PR #7337 fixes the standalone resolver, but **does not yet bound the async runtime's separate subprocesses**.
-- In `src/coding_agent/magi_code_bridge.rs`, `compiled && tests_passed.unwrap_or(true)` means `tests_passed: None` is treated as `Success` if compilation succeeded. The API comment says `None` means no tests were run, so absent test evidence is currently promoted to success for this bridge's calibration statistics. This should remain unqualified evidence, or be represented as a distinct partial/unresolved outcome. [PR #7339](https://github.com/Luminous-Dynamics/symthaea/pull/7339) addresses the explicit `None` case by retaining the prediction as pending and withholding calibration updates; callers that pass `Some(bool)` still require independent evidence binding.
-- In `src/coding_agent/generation.rs`, the orchestrator passes `response.accepted` as both the compilation and test result. Its comment asserts that internal verification already happened, but that linkage itself must be traced to independently attributable compile/test receipts before this can qualify expertise.
+- In `src/consciousness/recursive_improvement/runtime.rs`, `check_auto_resolve` invokes `sh -c ... .output().await` for `CommandSucceeds` and `systemctl ... .output().await` for `ServiceRunning`, without an explicit Tokio timeout. The polling runtime later maps a boolean to `Success`/`SafeFailure` and calls `resolve_prediction(..., 1.0)`. PR #7337 fixes the synchronous standalone resolver. [PR #7346](https://github.com/Luminous-Dynamics/symthaea/pull/7346) now proposes the async runtime timeout, process-group cleanup, and no-calibration unresolved path; these changes are still awaiting exact-head qualification.
+- In `src/coding_agent/magi_code_bridge.rs`, `compiled && tests_passed.unwrap_or(true)` means `tests_passed: None` is treated as `Success` if compilation succeeded. The API comment says `None` means no tests were run, so absent test evidence is currently promoted to success for this bridge's calibration statistics. This should remain unqualified evidence, or be represented as a distinct partial/unresolved outcome.
+- In `src/coding_agent/generation.rs`, the orchestrator passes `response.accepted` as both the compilation and test result. The code-orchestrator source says acceptance follows compiler/test verification, so this is not evidence that accepted output was untested. The concern is narrower: the bridge receives one aggregate boolean for two distinct fields and does not retain the response's verification-layer provenance. Qualification should bind the actual verification results, not only the aggregate.
 
 These are call-path findings from source inspection. They do not assert that the orchestrator always accepts untested code; they show that these APIs do not preserve the distinction between “not tested” and “verified successful” in all paths.
 
-Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts](https://github.com/Luminous-Dynamics/symthaea/issues/7336). PR #7337 only addresses `resolution.rs::ExitCodeResolver`; runtime timeout enforcement and the `tests_passed: None` policy remain follow-up work.
+Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts](https://github.com/Luminous-Dynamics/symthaea/issues/7336). PR #7337 addresses the synchronous resolver, PR #7346 addresses async runtime command/port deadlines, and PR #7339 addresses the coding bridge's explicit missing-test and contradictory-evidence cases. These remain unqualified until exact-head checks pass.
 
 ### Gap 3 — the MAGI capability self-model is a generic estimate, not yet qualified expertise
 
 The \`SelfModel\` stub in \`magi_integration.rs\` initializes capability values from a shared prior, updates an estimate through an observed scalar and learning rate, and uses that estimate as the confidence reported by \`predict_behavior\`. It does not, by itself, bind a particular skill claim to a forecast committed before execution and a verified later outcome for the exact source/configuration/evaluation profile.
 
-The new capability-ledger primitive in [PR #7335](https://github.com/Luminous-Dynamics/symthaea/pull/7335) is the first proposed foundation for that missing link. It is intentionally not described as a complete learning loop yet: runtime forecast emission, trusted receipt verification, and end-to-end skill evaluation remain to be integrated.
+The new capability-ledger primitive in [PR #7348](https://github.com/Luminous-Dynamics/symthaea/pull/7348) is the first proposed foundation for that missing link. It is intentionally not described as a complete learning loop yet: runtime forecast emission, trusted receipt verification, and end-to-end skill evaluation remain to be integrated.
 
 ### Gap 4 — the full loop is not qualified by source presence
 
@@ -62,15 +62,17 @@ The following remain required before calling the loop operationally established:
 
 ## Proposed evidence-bound capability lifecycle
 
-The ledger in PR #7335 uses this lifecycle:
+The ledger in PR #7348 uses this lifecycle:
 
 \`Proposed → Discovered → Candidate → Qualified\`
 
 with \`Restricted\`, \`Suspended\`, and \`Retired\` as fail-closed or terminal states. A candidate can only become qualified by passing policy thresholds on resolved held-out/transfer evidence from an explicitly pinned evaluator identity and revision. Training data may inform development, but it cannot promote the claim.
 
-The ledger computes Brier score and ECE for prospective success probabilities, retains expected/actual compute values for later analysis, requires monotonic forecast/outcome sequence numbers, prevents cross-subject resolution and rejects duplicate receipt roots within one ledger. Empty calibration metrics are represented as unavailable, not perfect.
+The ledger computes Brier score and ECE for prospective success probabilities, retains expected/actual compute values for later analysis, enforces a single monotonically increasing event sequence across all accepted forecasts and outcomes, prevents cross-subject resolution and rejects duplicate receipt roots within one ledger. Empty calibration metrics are represented as unavailable, not perfect.
 
 **Trust boundary:** the ledger checks metadata and bindings; it is not a cryptographic artifact verifier. Its input receipt must already have been authenticated by the external evidence pipeline. A caller-supplied digest string alone is not proof that a run occurred.
+
+The existing `symthaea-evidence-plane` crate is a measured-counter/integrity contract (`EvidenceCounters`, `Expectation`, `check_integrity`), not an outcome-signature verifier. Its `config_hash` documentation explicitly states that it uses `DefaultHasher` over a debug representation and is not cryptographic or security-sensitive. It may be useful for recording instrumentation counters, but it must not be repurposed as the trust anchor for resolver receipts. Outcome qualification needs authenticated provenance and exact prediction/subject binding.
 
 ## Next implementation order
 
@@ -78,7 +80,7 @@ The ledger computes Brier score and ECE for prospective success probabilities, r
 2. Preserve `tests_passed: None` as unresolved/not-qualified rather than success; bind compile/test claims to the relevant independent receipts.
 3. Add a resolver result/receipt type that binds outcome to prediction ID, exact subject, evaluator revision, chronology, and evidence root.
 4. Make verified receipt admission—not an arbitrary outcome argument—the only production route into qualification-grade calibration.
-5. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7335.
+5. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7348.
 6. Run focused tests on the exact integrated commit, then measure held-out transfer, calibration, and the actual downstream effect on decision selection.
 
 No formatting, compilation, or test pass is asserted by this document.

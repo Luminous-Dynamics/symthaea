@@ -51,6 +51,7 @@ pub mod types;
 
 // MAGI Loop implementation (World-Grounded Prediction)
 pub mod active_inference_bridge;
+pub mod capability_ledger;
 pub mod calibration;
 pub mod calibration_analytics;
 pub mod constraint_gate;
@@ -64,6 +65,12 @@ pub mod world_prediction;
 // Re-export key types from core infrastructure
 pub use types::{
     ActionContext, InputModality, SemanticInput, TimeWindow, calculate_trend, instant_now,
+};
+
+pub use capability_ledger::{
+    CapabilityClaim, CapabilityForecast, CapabilityLedger, CapabilityLedgerError,
+    CapabilityLifecycle, CapabilityMetrics, CapabilityOutcomeReceipt, CapabilitySplit,
+    QualificationPolicy, SubjectIdentity,
 };
 
 pub use core::{
