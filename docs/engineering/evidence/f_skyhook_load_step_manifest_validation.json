@@ -56,6 +56,8 @@
   "physics_claim": "none; no simulation or equilibrium calculation is performed",
   "required_input_count": 23,
   "scenario_id": "F-SKYHOOK-LOAD-STEP",
+  "scenario_schema": "luminous-dynamics.orbital-ring-failure-scenario/v2",
+  "scenario_version": 2,
   "schema": "luminous-dynamics.orbital-ring-manifest-validation/v1",
   "structural_errors": [],
   "type_errors": [],
