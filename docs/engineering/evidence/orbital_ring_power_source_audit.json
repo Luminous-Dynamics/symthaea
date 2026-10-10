@@ -95,6 +95,24 @@
       "tolerance": 75000000.0
     },
     {
+      "id": "table8.implied_radius_positive_finite",
+      "observed": 7016080.40796772,
+      "status": "passed"
+    },
+    {
+      "id": "table8.implied_altitude_positive_finite",
+      "observed": 637943.4079677202,
+      "status": "passed"
+    },
+    {
+      "expected": 0.0,
+      "id": "table8.mean_length_within_1pct_of_600km_circular_path",
+      "note": "Comparison benchmark only: 600 km is discussed as a representative ORS height in the paper; this does not prove the Table 8 design uses that exact altitude.",
+      "observed": 0.005437469623729136,
+      "status": "passed",
+      "tolerance": 0.01
+    },
+    {
       "id": "stored_energy_finite_positive",
       "observed": 1.792e+16,
       "status": "passed"
@@ -109,7 +127,7 @@
     }
   ],
   "checks_failed": 0,
-  "checks_passed": 16,
+  "checks_passed": 19,
   "conditional_stored_energy": {
     "caveat": "Not a failure-release or damage prediction.",
     "mass_kg": 560000000.0,
@@ -164,8 +182,12 @@
   },
   "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1. Table 8 mass-per-ring divided by mass-per-length implies a mean length of about 44.08 Mm, and 10 W/m implies about 440.83 MW, close to the table total. This internal consistency check does not explain why the earlier paragraph is five times lower or establish the underlying physical geometry/configuration.",
   "table8_length_reconstruction": {
+    "600km_reference_circular_path_length_m": 43844927.869886234,
     "caveat": "Algebraic consistency with the table rows only; does not independently establish the actual geometry or explain the p. 483 100 MW estimate.",
     "cryogenic_heat_loss_per_length_w_m": 10.0,
+    "earth_equatorial_radius_m_assumed_for_altitude": 6378137.0,
+    "equivalent_circular_altitude_m": 637943.4079677202,
+    "equivalent_circular_radius_m": 7016080.40796772,
     "geosynchronous_ring_length_implied_m": 44000000.0,
     "geosynchronous_superconductor_mass_per_length_kg_m": 2.0,
     "geosynchronous_superconductor_mass_per_ring_kg": 88000000.0,
@@ -174,6 +196,7 @@
     "orbital_ring_length_implied_m": 44166666.66666667,
     "orbital_superconductor_mass_per_length_kg_m": 1.2,
     "orbital_superconductor_mass_per_ring_kg": 53000000.0,
+    "relative_length_difference_from_600km_reference": 0.005437469623729136,
     "table_reported_total_heat_load_w": 500000000.0
   }
 }
