@@ -259,6 +259,14 @@ fn calculate_metrics(
         process.carbon_retained_in_char_fraction,
         "process.carbon_retained_in_char_fraction",
     )?;
+    if process.char_carbon_kg > process.char_product_kg
+        + tolerance(process.char_carbon_kg, process.char_product_kg)
+    {
+        return Err(DesignError::new(
+            "process.char_carbon_mass_fraction",
+            "elemental carbon mass cannot exceed total char product mass",
+        ));
+    }
     if process.char_carbon_kg > process.feedstock_carbon_kg
         || !approximately_equal(
             process.char_carbon_kg + process.carbon_not_in_char_kg,
@@ -553,9 +561,9 @@ mod tests {
             feed_water_kg: 0.0,
             char_product_kg: char_kg,
             non_char_dry_products_residual_kg: dry_kg - char_kg,
-            feedstock_carbon_kg: 100.0,
-            char_carbon_kg: 100.0 * carbon_retained,
-            carbon_not_in_char_kg: 100.0 * (1.0 - carbon_retained),
+            feedstock_carbon_kg: 48.0,
+            char_carbon_kg: 48.0 * carbon_retained,
+            carbon_not_in_char_kg: 48.0 * (1.0 - carbon_retained),
             carbon_retained_in_char_fraction: carbon_retained,
             dry_feedstock_sensible_heat_mj: heat_mj,
             water_heating_and_vaporization_heat_mj: 0.0,
@@ -698,6 +706,15 @@ mod tests {
 
         option = candidate("bad-heat", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
         option.process.estimated_supplied_heat_mj = 1.0;
+        assert!(assess_regenerative_candidate(&option, &requirements()).is_err());
+    }
+
+    #[test]
+    fn evaluator_rejects_char_carbon_mass_above_total_char_mass() {
+        let mut option =
+            candidate("impossible-char", 0.25, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
+        // 48 kg feedstock C × 0.60 retention = 28.8 kg char C, impossible in 25 kg char.
+        option.process.char_carbon_kg = 28.8;
         assert!(assess_regenerative_candidate(&option, &requirements()).is_err());
     }
 
