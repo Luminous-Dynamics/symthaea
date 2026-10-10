@@ -758,8 +758,6 @@ fn verifier_expected_treatment_orders(
 /// without calling the generator. This validates the serialized design artifact, but it does
 /// not authenticate cited evidence, independently reproduce the software in another trust
 /// domain, or authorize execution.
-/// This validates the serialized design artifact, but it does not authenticate its cited
-/// evidence, independently reproduce the software in another trust domain, or authorize execution.
 pub fn verify_screening_design(
     plan: &ScreeningDesignPlan,
 ) -> Result<ScreeningDesignVerificationReceipt, ScreeningDesignError> {
