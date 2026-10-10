@@ -107,6 +107,9 @@ pub struct MentalMovie {
     pub channels: usize,
     pub path_length: usize,
     pub semantic_coherence: f32,
+    /// Optional measured continuity proxy; missing on older servers or unavailable paths.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trajectory_continuity: Option<f32>,
 }
 
 /// Snapshot of consciousness metrics from the service
