@@ -939,6 +939,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn live_runtime_observation_does_not_train_world_calibration() {
+        use crate::consciousness::recursive_improvement::{RiskTier, WorldActionContext};
+
+        let config = RuntimeConfig {
+            persistence_config: PersistenceConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let runtime = MagiLoopRuntime::new(config).unwrap();
+
+        let (prediction, calibration_before) = {
+            let mut persistent = runtime.model.lock();
+            let calibration_before = persistent.model().calibration().total_predictions();
+            let prediction = persistent.model_mut().predict(
+                "Command succeeds",
+                OutcomeCategory::Success,
+                0.8,
+                WorldActionContext::new("command", "run a local command")
+                    .with_risk_tier(RiskTier::Observation),
+            );
+            (prediction, calibration_before)
+        };
+
+        runtime.queue_prediction(
+            prediction,
+            Some(AutoResolveType::CommandSucceeds("exit 0".to_string())),
+        );
+        runtime.resolve_pending().await.unwrap();
+
+        let persistent = runtime.model.lock();
+        let model = persistent.model();
+        assert_eq!(model.calibration().total_predictions(), calibration_before);
+        assert_eq!(model.loop_state().predictions_resolved, 1);
+        assert_eq!(model.loop_state().loop_iterations, 0);
+        assert!(model.recent_attributions().is_empty());
+    }
+
+    #[tokio::test]
     async fn test_runtime_creation() {
         let config = RuntimeConfig {
             persistence_config: PersistenceConfig {
