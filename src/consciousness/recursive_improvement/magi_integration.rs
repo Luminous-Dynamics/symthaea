@@ -387,6 +387,7 @@ const UNRESOLVED_PREDICTION_HISTORY_LIMIT: usize = 100;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CalibrationAdmission {
     UnverifiedObservation,
+    #[cfg(any(test, feature = "magi-simulation"))]
     SimulationOnly,
 }
 
@@ -747,12 +748,16 @@ impl WorldGroundedSelfModel {
         // Only the explicit test/simulation path is allowed to feed synthetic outcomes into
         // calibration. Runtime observations remain operational-only until receipt verification
         // is enforced end-to-end. This intentionally trades learning volume for trust integrity.
-        if admission == CalibrationAdmission::SimulationOnly {
-            self.calibration.record_prediction(&prediction);
-            self.update_calibration_quality();
+        match admission {
+            CalibrationAdmission::UnverifiedObservation => {}
+            #[cfg(any(test, feature = "magi-simulation"))]
+            CalibrationAdmission::SimulationOnly => {
+                self.calibration.record_prediction(&prediction);
+                self.update_calibration_quality();
 
-            if !was_correct {
-                self.generate_attribution(&prediction);
+                if !was_correct {
+                    self.generate_attribution(&prediction);
+                }
             }
         }
 
