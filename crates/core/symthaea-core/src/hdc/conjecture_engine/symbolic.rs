@@ -251,7 +251,7 @@ pub fn assess_conservation_symbolic(
     }
     let total_deriv = total_deriv.simplify();
     let symbolic_derivative_simplified_to_zero =
-        matches!(total_deriv, SymExpr::Const(c) if c.abs() < 1e-15);
+        matches!(&total_deriv, SymExpr::Const(c) if *c == 0.0);
     let test_points: Vec<Vec<(&str, f64)>> = vec![
         vec![("x", 1.0), ("v", 0.0)],
         vec![("x", 0.0), ("v", 1.0)],
@@ -402,6 +402,52 @@ mod conservation_evidence_tests {
         assert!(check.sampled_residual_passed);
         assert!(!check.symbolic_derivative_simplified_to_zero);
         assert!(check.max_numerical_residual < 1e-10);
+    }
+
+    #[test]
+    fn fixed_sample_points_can_miss_a_nonzero_derivative() {
+        // Construct a nonzero polynomial whose roots are exactly the assessor's
+        // six fixed sample x-coordinates. This demonstrates why sampled success
+        // cannot be promoted to a universal conservation claim.
+        let roots = [
+            1.0,
+            0.0,
+            std::f64::consts::FRAC_1_SQRT_2,
+            -1.0,
+            0.3,
+            2.0,
+        ];
+        let mut rhs = SymExpr::Const(1.0);
+        for root in roots {
+            let factor = SymExpr::Add(
+                Box::new(SymExpr::Var("x".into())),
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Const(root)))),
+            );
+            rhs = SymExpr::Mul(Box::new(rhs), Box::new(factor));
+        }
+
+        let check = assess_conservation_symbolic(
+            &SymExpr::Var("x".into()),
+            &[("x", rhs.clone())],
+        );
+
+        assert!(check.sampled_residual_passed);
+        assert!(!check.symbolic_derivative_simplified_to_zero);
+        assert!(check.max_numerical_residual == 0.0);
+        assert!(rhs.eval(&[("x", 3.0)]).abs() > 1e-10);
+    }
+
+    #[test]
+    fn tiny_nonzero_constant_is_not_marked_as_structural_zero() {
+        let check = assess_conservation_symbolic(
+            &SymExpr::Var("x".into()),
+            &[("x", SymExpr::Const(1e-16))],
+        );
+
+        // The finite residual threshold accepts this value, but exact structural
+        // zero must not be inferred from an epsilon comparison.
+        assert!(check.sampled_residual_passed);
+        assert!(!check.symbolic_derivative_simplified_to_zero);
     }
 
     #[test]
