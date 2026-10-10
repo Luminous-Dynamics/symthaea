@@ -527,7 +527,8 @@ pub struct ScreeningDesignVerificationReceipt {
     pub algorithm_id: String,
     pub verified_run_count: u32,
     pub verified_block_count: u32,
-    pub verified_treatment_cell_count: u32,
+    pub verified_factorial_combination_count: u32,
+    pub verified_treatment_replicate_cell_count: u32,
     pub verified_center_point_count: u32,
     /// Structural design checks passed. This is not evidence authentication or scientific validation.
     pub scope_note: String,
@@ -752,7 +753,8 @@ pub fn verify_screening_design(
         algorithm_id: plan.algorithm_id.clone(),
         verified_run_count: plan.runs.len() as u32,
         verified_block_count: request.blocks.len() as u32,
-        verified_treatment_cell_count: verified_treatments,
+        verified_factorial_combination_count: combination_count as u32,
+        verified_treatment_replicate_cell_count: verified_treatments,
         verified_center_point_count: verified_centers,
         scope_note: "schedule structure verified; referenced evidence is not authenticated, and this is not power analysis, product release, field authorization, or proof of agronomic efficacy".into(),
     })
@@ -926,7 +928,7 @@ mod tests {
         let receipt = verify_screening_design(&generated).unwrap();
         assert_eq!(receipt.verified_run_count, 14);
         assert_eq!(receipt.verified_block_count, 2);
-        assert_eq!(receipt.verified_treatment_cell_count, 8);
+        assert_eq!(receipt.verified_treatment_replicate_cell_count, 8);
         assert_eq!(receipt.verified_center_point_count, 6);
 
         let mut tampered = generated.clone();
@@ -939,6 +941,18 @@ mod tests {
         let mut incomplete = generated;
         incomplete.runs.pop();
         assert!(verify_screening_design(&incomplete).is_err());
+    }
+
+    #[test]
+    fn serialized_plan_roundtrip_preserves_reproducible_audit_fields() {
+        let plan = generate_screening_design(&request()).unwrap();
+        let encoded = serde_json::to_string(&plan).unwrap();
+        let decoded: ScreeningDesignPlan = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, plan);
+        assert_eq!(
+            verify_screening_design(&decoded).unwrap().verified_factorial_combination_count,
+            4
+        );
     }
 
     #[test]
