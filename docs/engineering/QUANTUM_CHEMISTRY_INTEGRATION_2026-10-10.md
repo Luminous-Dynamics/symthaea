@@ -211,6 +211,12 @@ The proposal adds a serializable request schema, explicit method/basis/environme
 **Verification state:** the PR's current GitHub Actions workflows were queued at the last status query; earlier attempts on prior commits were cancelled when the branch advanced. No build or test pass is claimed. Check the live PR checks for the current head before treating the code as verified.
 
 
+### Action dependency provenance
+
+### Action dependency provenance
+
+The proposed workflows use full commit-SHA pins for checkout (v7.0.1), setup-python (v7.0.0), install-nix-action (v31.11.1), upload-artifact (v7.0.2), and the rust-toolchain action, with compiler version 1.96.0 specified separately. The action releases were checked against their upstream GitHub repositories on 2026-10-10. This improves dependency provenance but does not replace the workflow syntax/build/test run itself.
+
 ## Machine-readable PySCF regression comparison (2026-10-10)
 
 A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous-Dynamics/symthaea/pull/7323):
