@@ -951,6 +951,41 @@ mod tests {
     }
 
     #[test]
+    fn center_point_controls_are_randomized_with_treatments() {
+        let mut saw_center_at_start = false;
+        let mut saw_treatment_at_start = false;
+        let mut saw_center_at_end = false;
+        let mut saw_treatment_at_end = false;
+
+        for seed in 0..64 {
+            let mut input = request();
+            input.randomization_seed = seed;
+            let plan = generate_screening_design(&input).unwrap();
+
+            for block in &input.blocks {
+                let block_runs: Vec<_> = plan
+                    .runs
+                    .iter()
+                    .filter(|run| run.block_id == block.block_id)
+                    .collect();
+                if block_runs.first().unwrap().kind == PlannedRunKind::CenterPointControl {
+                    saw_center_at_start = true;
+                } else {
+                    saw_treatment_at_start = true;
+                }
+                if block_runs.last().unwrap().kind == PlannedRunKind::CenterPointControl {
+                    saw_center_at_end = true;
+                } else {
+                    saw_treatment_at_end = true;
+                }
+            }
+        }
+
+        assert!(saw_center_at_start && saw_treatment_at_start);
+        assert!(saw_center_at_end && saw_treatment_at_end);
+    }
+
+    #[test]
     fn structural_verifier_accepts_valid_plan_and_rejects_corruption() {
         let generated = generate_screening_design(&request()).unwrap();
         let receipt = verify_screening_design(&generated).unwrap();
