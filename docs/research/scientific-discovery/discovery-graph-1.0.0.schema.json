@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.luminousdynamics.io/schemas/scientific-discovery-graph-1.0.0.json",
+  "title": "Symthaea Scientific Discovery Graph",
+  "description": "Domain-neutral provenance graph for scientific discovery. Structural lineage is not scientific truth.",
+  "type": "object",
+  "required": ["schema", "schema_version", "authority", "node_kinds", "edge_kinds", "non_equivalences"],
+  "properties": {
+    "schema": {"const": "symthaea.scientific_discovery.graph"},
+    "schema_version": {"const": "1.0.0"},
+    "authority": {"const": "internal_epistemic_lineage_only"},
+    "node_kinds": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "Quest",
+          "Observation",
+          "MechanismHypothesis",
+          "CausalModel",
+          "Candidate",
+          "ProspectiveCommitment",
+          "IndependentReplication",
+          "OfficialCriterionEvidence",
+          "Failure",
+          "NullResult",
+          "Contradiction"
+        ]
+      },
+      "minItems": 11,
+      "uniqueItems": true
+    },
+    "edge_kinds": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "DerivedFrom",
+          "Predicts",
+          "TestedBy",
+          "Supports",
+          "Contradicts",
+          "Replicates",
+          "SatisfiesCriterion",
+          "Supersedes",
+          "SharesModelAncestry"
+        ]
+      },
+      "minItems": 9,
+      "uniqueItems": true
+    },
+    "non_equivalences": {
+      "type": "array",
+      "const": [
+        "model_output_is_not_observation",
+        "observation_is_not_replication",
+        "replication_is_not_official_criterion_evidence",
+        "model_agreement_is_not_independent_corroboration",
+        "graph_presence_is_not_scientific_truth",
+        "failure_or_null_result_is_not_absence_of_evidence"
+      ]
+    }
+  }
+}
