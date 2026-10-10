@@ -29,6 +29,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master at 2026-10-09
@@ -106,7 +107,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: qc-numerical-diagnostic-${{ github.sha }}
+          name: qc-numerical-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             /tmp/qc-native.json
             /tmp/qc-comparison.json
