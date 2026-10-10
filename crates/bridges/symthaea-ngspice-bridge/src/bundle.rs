@@ -623,7 +623,10 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(bundle.dependency_paths().collect::<Vec<_>>(), vec!["models/device.lib", "models/nested/params.inc"]);
+        assert_eq!(
+            bundle.dependency_paths().collect::<Vec<_>>(),
+            vec!["models/device.lib", "models/nested/params.inc"]
+        );
         assert_eq!(bundle.primary_path(), "main.cir");
         assert_eq!(bundle.manifest_digest().len(), 64);
         let request = SimulationRequest::new(
