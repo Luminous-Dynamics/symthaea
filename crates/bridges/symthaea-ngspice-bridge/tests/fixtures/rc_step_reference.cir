@@ -1,0 +1,13 @@
+* RC step reference circuit for future ngspice-backed integration tests.
+* Assumptions: ideal 1 V source, R=1 kohm, C=1 uF, zero initial capacitor voltage.
+* This is a solver input fixture, not evidence that ngspice has been executed here.
+Vstep in 0 PULSE(0 1 0 1n 1n 10m 20m)
+R1 in out 1k
+C1 out 0 1u IC=0
+.control
+set filetype=ascii
+tran 0.1ms 2ms
+write rc_step_actual.raw time v(out)
+quit
+.endc
+.end
