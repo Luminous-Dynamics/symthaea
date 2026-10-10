@@ -76,19 +76,51 @@ struct TaskResult {
     final_phase: String,
 }
 
+/// Classify benchmark evidence without collapsing distinct failure modes into a
+/// single false result. The order is deliberate: simulated/no-code/compile
+/// failures take precedence over any counters; a missing oracle and missing
+/// test results are not equivalent to a verified pass.
+fn verification_status_for(
+    code_written: bool,
+    compiled: bool,
+    expected_tests: usize,
+    tests_passed: usize,
+    tests_failed: usize,
+    execution_simulated: bool,
+) -> &'static str {
+    if execution_simulated {
+        "simulated_execution"
+    } else if !code_written {
+        "no_code_generated"
+    } else if !compiled {
+        "compilation_failed"
+    } else if expected_tests == 0 {
+        "no_test_oracle"
+    } else if tests_failed > 0 {
+        "test_failures"
+    } else if tests_passed < expected_tests {
+        "incomplete_test_evidence"
+    } else {
+        "verified"
+    }
+}
+
 impl TaskResult {
-    /// A task is correct when every expected test passes and no test fails.
-    /// Additional tests emitted by generated code are allowed.
-    ///
-    /// Compile-only tasks have expected_tests == 0 and may pass on compilation
-    /// alone. For tasks with tests, zero observed results must never be confused
-    /// with an intentionally empty test suite.
+    fn verification_status(&self) -> &'static str {
+        verification_status_for(
+            self.code_written,
+            self.compiled,
+            self.expected_tests,
+            self.tests_passed,
+            self.tests_failed,
+            self.execution_simulated,
+        )
+    }
+
+    /// L3 correctness requires real execution, an explicit test oracle, and
+    /// observed passing results for every expected test with zero failures.
     fn is_correct(&self) -> bool {
-        !self.execution_simulated
-            && self.expected_tests > 0
-            && self.compiled
-            && self.tests_failed == 0
-            && self.tests_passed >= self.expected_tests
+        self.verification_status() == "verified"
     }
 }
 
@@ -992,11 +1024,15 @@ fn run_task(
 
     // L3 correctness requires an actual supplied test oracle. Empty test_source
     // means compile-only evidence: useful for L2, never sufficient for correctness.
-    let correct = expected_tests > 0
-        && compiled
-        && !execution_simulated
-        && tests_failed == 0
-        && tests_passed >= expected_tests;
+    let verification_status = verification_status_for(
+        code_written,
+        compiled,
+        expected_tests,
+        tests_passed,
+        tests_failed,
+        execution_simulated,
+    );
+    let correct = verification_status == "verified";
     let status = if correct {
         "✓"
     } else if execution_simulated {
@@ -1122,6 +1158,17 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║     Symthaea Coding Agent — Hardened Benchmark Results          ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
+
+    println!("── Verification Evidence Gates ───────────────────────────");
+    let mut evidence_counts: std::collections::BTreeMap<&str, usize> =
+        std::collections::BTreeMap::new();
+    for result in results {
+        *evidence_counts.entry(result.verification_status()).or_insert(0) += 1;
+    }
+    for (gate, count) in evidence_counts {
+        println!("  {}: {}", gate, count);
+    }
+    println!();
 
     println!("── Validation Levels ──────────────────────────────────────");
     println!(
@@ -1296,6 +1343,7 @@ fn main() {
                 "tests_failed": r.tests_failed,
                 "expected_tests": r.expected_tests,
                 "execution_simulated": r.execution_simulated,
+                "verification_status": r.verification_status(),
                 "correct": r.is_correct(),
                 "auto_fix_attempted": r.auto_fix_attempted,
                 "auto_fix_succeeded": r.auto_fix_succeeded,
@@ -1308,9 +1356,18 @@ fn main() {
         })
         .collect();
 
+    let mut verification_status_counts: std::collections::BTreeMap<&'static str, usize> =
+        std::collections::BTreeMap::new();
+    for result in &results {
+        *verification_status_counts
+            .entry(result.verification_status())
+            .or_insert(0) += 1;
+    }
+
     let json_report = serde_json::json!({
         "benchmark": "symthaea_coding_agent_hardened",
         "summary": {
+            "verification_status_counts": verification_status_counts,
             "total": stats.total,
             "name_match": stats.name_match,
             "compiled": stats.compiled,
@@ -1405,6 +1462,37 @@ mod tests {
         // The executor's simulation sentinel can set compiled=true while
         // explicitly stating that no compiler or test process ran.
         assert!(!result(true, 0, 0, 0, true).is_correct());
+        // Even counters that look complete cannot establish anything when
+        // the compiler/test process was simulated rather than executed.
+        assert!(!result(true, 3, 0, 3, true).is_correct());
+    }
+
+    #[test]
+    fn verification_status_distinguishes_missing_evidence() {
+        assert_eq!(
+            result(false, 0, 0, 3, false).verification_status(),
+            "compilation_failed"
+        );
+        assert_eq!(
+            result(true, 0, 0, 3, false).verification_status(),
+            "incomplete_test_evidence"
+        );
+        assert_eq!(
+            result(true, 0, 0, 0, false).verification_status(),
+            "no_test_oracle"
+        );
+        assert_eq!(
+            result(true, 3, 1, 3, false).verification_status(),
+            "test_failures"
+        );
+        assert_eq!(
+            result(true, 3, 0, 3, true).verification_status(),
+            "simulated_execution"
+        );
+        assert_eq!(
+            result(true, 3, 0, 3, false).verification_status(),
+            "verified"
+        );
     }
 
     #[test]
