@@ -22,6 +22,7 @@ pub enum SymExprEvalError {
     NonFiniteVariableBinding(String),
     DivisionByZero,
     LogDomain,
+    IndeterminatePower,
     NonFiniteResult,
 }
 
@@ -37,6 +38,7 @@ impl std::fmt::Display for SymExprEvalError {
             }
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::LogDomain => write!(f, "logarithm requires a positive argument"),
+            Self::IndeterminatePower => write!(f, "zero raised to the zero power is indeterminate"),
             Self::NonFiniteResult => write!(f, "expression produced a non-finite result"),
         }
     }
@@ -81,7 +83,16 @@ impl SymExpr {
                 numerator / denominator
             }
             SymExpr::Neg(inner) => -inner.eval_checked(vars)?,
-            SymExpr::Pow(base, exponent) => base.eval_checked(vars)?.powf(*exponent),
+            SymExpr::Pow(base, exponent) => {
+                if !exponent.is_finite() {
+                    return Err(SymExprEvalError::NonFiniteResult);
+                }
+                let base_value = base.eval_checked(vars)?;
+                if *exponent == 0.0 && base_value == 0.0 {
+                    return Err(SymExprEvalError::IndeterminatePower);
+                }
+                base_value.powf(*exponent)
+            },
             SymExpr::Log(inner) => {
                 let argument = inner.eval_checked(vars)?;
                 if argument <= 0.0 {
@@ -173,14 +184,57 @@ impl SymExpr {
         }
     }
 
+    /// Whether the expression is defined over all real-valued variable bindings.
+    ///
+    /// This is deliberately conservative: division by a variable, logarithms
+    /// of variables, negative powers, and non-integer powers may be undefined
+    /// for some real inputs. Zero-product rewrites must not erase those domain
+    /// restrictions.
+    fn is_total_over_reals(&self) -> bool {
+        match self {
+            SymExpr::Var(_) => true,
+            SymExpr::Const(value) => value.is_finite(),
+            SymExpr::Add(a, b) | SymExpr::Mul(a, b) => {
+                a.is_total_over_reals() && b.is_total_over_reals()
+            }
+            SymExpr::Div(numerator, denominator) => {
+                numerator.is_total_over_reals()
+                    && matches!(
+                        denominator.as_ref(),
+                        SymExpr::Const(value) if value.is_finite() && *value != 0.0
+                    )
+            }
+            SymExpr::Neg(inner) => inner.is_total_over_reals(),
+            SymExpr::Pow(base, exponent) => {
+                exponent.is_finite()
+                    && *exponent >= 1.0
+                    && exponent.fract() == 0.0
+                    && base.is_total_over_reals()
+            }
+            SymExpr::Log(inner) => matches!(
+                inner.as_ref(),
+                SymExpr::Const(value) if value.is_finite() && *value > 0.0
+            ),
+            SymExpr::Sin(inner) | SymExpr::Cos(inner) => inner.is_total_over_reals(),
+        }
+    }
+
+    /// Whether the expression is structurally a finite, nonzero constant.
+    fn is_provably_nonzero(&self) -> bool {
+        matches!(self, SymExpr::Const(value) if value.is_finite() && *value != 0.0)
+    }
+
+    /// Apply exact algebraic identities without treating small floating-point
+    /// values as zero or one. Rewrites that discard a subtree preserve the
+    /// domain of partial expressions (for example, 0 * ln(x) is not erased).
     pub fn simplify(&self) -> SymExpr {
         match self {
             SymExpr::Add(a, b) => {
                 let a = a.simplify();
                 let b = b.simplify();
                 match (&a, &b) {
-                    (SymExpr::Const(x), _) if x.abs() < 1e-15 => b,
-                    (_, SymExpr::Const(x)) if x.abs() < 1e-15 => a,
+                    (SymExpr::Const(x), _) if *x == 0.0 => b,
+                    (_, SymExpr::Const(x)) if *x == 0.0 => a,
                     (SymExpr::Const(x), SymExpr::Const(y)) => SymExpr::Const(x + y),
                     _ => SymExpr::Add(Box::new(a), Box::new(b)),
                 }
@@ -189,10 +243,14 @@ impl SymExpr {
                 let a = a.simplify();
                 let b = b.simplify();
                 match (&a, &b) {
-                    (SymExpr::Const(x), _) if x.abs() < 1e-15 => SymExpr::Const(0.0),
-                    (_, SymExpr::Const(x)) if x.abs() < 1e-15 => SymExpr::Const(0.0),
-                    (SymExpr::Const(x), _) if (*x - 1.0).abs() < 1e-15 => b,
-                    (_, SymExpr::Const(x)) if (*x - 1.0).abs() < 1e-15 => a,
+                    (SymExpr::Const(x), _) if *x == 0.0 && b.is_total_over_reals() => {
+                        SymExpr::Const(0.0)
+                    }
+                    (_, SymExpr::Const(x)) if *x == 0.0 && a.is_total_over_reals() => {
+                        SymExpr::Const(0.0)
+                    }
+                    (SymExpr::Const(x), _) if *x == 1.0 => b,
+                    (_, SymExpr::Const(x)) if *x == 1.0 => a,
                     (SymExpr::Const(x), SymExpr::Const(y)) => SymExpr::Const(x * y),
                     _ => SymExpr::Mul(Box::new(a), Box::new(b)),
                 }
@@ -209,24 +267,33 @@ impl SymExpr {
                 let a = a.simplify();
                 let b = b.simplify();
                 match (&a, &b) {
-                    (SymExpr::Const(x), _) if x.abs() < 1e-15 => SymExpr::Const(0.0),
-                    (_, SymExpr::Const(x)) if (*x - 1.0).abs() < 1e-15 => a,
-                    (SymExpr::Const(x), SymExpr::Const(y)) if y.abs() > 1e-15 => {
+                    (SymExpr::Const(x), SymExpr::Const(y))
+                        if y.is_finite() && *y != 0.0 =>
+                    {
                         SymExpr::Const(x / y)
                     }
+                    (SymExpr::Const(x), _) if *x == 0.0 && b.is_provably_nonzero() => {
+                        SymExpr::Const(0.0)
+                    }
+                    (_, SymExpr::Const(x)) if *x == 1.0 => a,
                     _ => SymExpr::Div(Box::new(a), Box::new(b)),
                 }
             }
             SymExpr::Pow(base, exp) => {
                 let base = base.simplify();
-                if (*exp - 1.0).abs() < 1e-15 {
+                if *exp == 1.0 {
                     return base;
                 }
-                if exp.abs() < 1e-15 {
+                if *exp == 0.0 && base.is_provably_nonzero() {
                     return SymExpr::Const(1.0);
                 }
                 match &base {
-                    SymExpr::Const(c) => SymExpr::Const(c.powf(*exp)),
+                    SymExpr::Const(c) if *exp == 0.0 && *c == 0.0 => {
+                        SymExpr::Pow(Box::new(base), *exp)
+                    }
+                    SymExpr::Const(c) if c.is_finite() && exp.is_finite() => {
+                        SymExpr::Const(c.powf(*exp))
+                    }
                     _ => SymExpr::Pow(Box::new(base), *exp),
                 }
             }
@@ -624,6 +691,79 @@ mod conservation_evidence_tests {
         assert!(!check.sampled_evaluations_valid);
         assert!(!check.sampled_residual_passed);
         assert!(check.max_numerical_residual.is_infinite());
+    }
+
+    #[test]
+    fn simplify_preserves_small_nonzero_additive_constant() {
+        let expr = SymExpr::Add(
+            Box::new(SymExpr::Var("x".into())),
+            Box::new(SymExpr::Const(1e-16)),
+        );
+        let simplified = expr.simplify();
+        assert!(matches!(simplified, SymExpr::Add(_, _)));
+        assert_eq!(simplified.eval_checked(&[("x", 0.0)]), Ok(1e-16));
+    }
+
+    #[test]
+    fn simplify_preserves_near_one_multiplicative_constant() {
+        let near_one = 1.0 + f64::EPSILON;
+        let expr = SymExpr::Mul(
+            Box::new(SymExpr::Const(near_one)),
+            Box::new(SymExpr::Var("x".into())),
+        );
+        let simplified = expr.simplify();
+        assert!(matches!(simplified, SymExpr::Mul(_, _)));
+        assert_eq!(simplified.eval_checked(&[("x", 1.0)]), Ok(near_one));
+    }
+
+    #[test]
+    fn simplify_does_not_erase_denominator_domain_of_zero_over_x() {
+        let expr = SymExpr::Div(
+            Box::new(SymExpr::Const(0.0)),
+            Box::new(SymExpr::Var("x".into())),
+        );
+        let simplified = expr.simplify();
+        assert!(matches!(simplified, SymExpr::Div(_, _)));
+        assert_eq!(
+            simplified.eval_checked(&[("x", 0.0)]),
+            Err(SymExprEvalError::DivisionByZero)
+        );
+        assert_eq!(simplified.eval_checked(&[("x", 2.0)]), Ok(0.0));
+    }
+
+    #[test]
+    fn simplify_does_not_erase_log_domain_in_zero_product() {
+        let expr = SymExpr::Mul(
+            Box::new(SymExpr::Const(0.0)),
+            Box::new(SymExpr::Log(Box::new(SymExpr::Var("x".into())))),
+        );
+        let simplified = expr.simplify();
+        assert!(matches!(simplified, SymExpr::Mul(_, _)));
+        assert_eq!(
+            simplified.eval_checked(&[("x", -1.0)]),
+            Err(SymExprEvalError::LogDomain)
+        );
+        assert_eq!(simplified.eval_checked(&[("x", 2.0)]), Ok(0.0));
+    }
+
+    #[test]
+    fn checked_eval_rejects_zero_to_the_zero_power() {
+        let expr = SymExpr::Pow(Box::new(SymExpr::Const(0.0)), 0.0);
+        assert_eq!(
+            expr.eval_checked(&[]),
+            Err(SymExprEvalError::IndeterminatePower)
+        );
+        assert!(matches!(expr.simplify(), SymExpr::Pow(_, _)));
+    }
+
+    #[test]
+    fn small_nonzero_divisor_is_not_treated_as_zero() {
+        let expr = SymExpr::Div(
+            Box::new(SymExpr::Const(1.0)),
+            Box::new(SymExpr::Const(1e-16)),
+        );
+        let simplified = expr.simplify();
+        assert_eq!(simplified.eval_checked(&[]), Ok(1e16));
     }
 
     #[test]
