@@ -6,7 +6,9 @@ pub struct DiscoveredConservation {
     pub expression: String,
     pub variance: f64,
     pub mean_value: f64,
-    /// Six-point residual evidence from the symbolic conservation assessor.\n    /// This is not a universal proof.\n    pub symbolic_check_passed: bool,
+    /// Finite-point residual evidence after symbolic differentiation.
+    /// This is not a universal proof and does not grant formal status.
+    pub symbolic_check_passed: bool,
 }
 
 fn build_invariant_candidates(
@@ -1458,14 +1460,14 @@ pub fn analyze_system_autonomous(
             conserved.len()
         );
         for inv in &conserved {
-            let proven = if inv.symbolic_check_passed {
+            let symbolic_check = if inv.symbolic_check_passed {
                 " [SYMBOLIC-CHECK]"
             } else {
                 ""
             };
             report += &format!(
                 "  {} (var={:.2e}){}\n",
-                inv.formula_str, inv.variance, proven
+                inv.formula_str, inv.variance, symbolic_check
             );
         }
         SystemAnalysis {
