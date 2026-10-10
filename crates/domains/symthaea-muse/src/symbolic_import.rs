@@ -36,6 +36,18 @@ struct RawNote {
     velocity: u8,
 }
 
+/// One note edge on the globally merged SMF timeline. A velocity means
+/// note-on; None represents note-off (including velocity-zero note-on).
+#[derive(Clone, Copy, Debug)]
+struct RawMidiNoteEvent {
+    tick: u64,
+    track: usize,
+    event_index: usize,
+    channel: u8,
+    pitch: u8,
+    velocity: Option<u8>,
+}
+
 pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Score, String> {
     if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
         return Err(format!(
@@ -106,15 +118,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     let mut tempo_events = Vec::<(u64, u32)>::new();
     let mut meter_events = Vec::<(u64, (u8, u8))>::new();
     let mut key_events = Vec::<(u64, (i8, bool))>::new();
+    let mut midi_note_events = Vec::<RawMidiNoteEvent>::new();
     let mut notes = Vec::new();
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0_u64;
-        // Repeated note-ons for the same pitch/channel are valid in MIDI.
-        // Queue their starts rather than overwriting an earlier still-active
-        // note; each matching note-off closes the oldest outstanding onset.
-        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
-        for event in track {
+        for (event_index, event) in track.iter().enumerate() {
             tick = tick
                 .checked_add(u64::from(event.delta.as_int()))
                 .ok_or_else(|| "MIDI absolute tick position overflowed".to_string())?;
@@ -161,53 +170,79 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 }
                 TrackEventKind::Midi { channel, message } if channel.as_int() != 9 => {
                     let channel = channel.as_int();
-                    match message {
+                    let note_event = match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            pending
-                                .entry((channel, key.as_int()))
-                                .or_default()
-                                .push_back((tick, vel.as_int()));
+                            Some((key.as_int(), Some(vel.as_int())))
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
-                            let note_key = (channel, key.as_int());
-                            let (onset, velocity) = pending
-                                .get_mut(&note_key)
-                                .and_then(VecDeque::pop_front)
-                                .ok_or_else(|| {
-                                    "MIDI note-off has no matching active note-on".to_string()
-                                })?;
-                            if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
-                                pending.remove(&note_key);
-                            }
-                            let duration = tick
-                                .checked_sub(onset)
-                                .filter(|duration| *duration > 0)
-                                .ok_or_else(|| {
-                                    "MIDI note-on/off pair must span at least one tick".to_string()
-                                })?;
-                            push_raw_note(
-                                &mut notes,
-                                RawNote {
-                                    track: track_index,
-                                    pitch: key.as_int(),
-                                    onset,
-                                    duration,
-                                    velocity,
-                                },
-                            )?;
+                            Some((key.as_int(), None))
                         }
-                        _ => {}
+                        _ => None,
+                    };
+                    if let Some((pitch, velocity)) = note_event {
+                        midi_note_events.push(RawMidiNoteEvent {
+                            tick,
+                            track: track_index,
+                            event_index,
+                            channel,
+                            pitch,
+                            velocity,
+                        });
                     }
                 }
                 _ => {}
             }
         }
-        if pending.values().any(|starts| !starts.is_empty()) {
-            return Err(format!(
-                "MIDI track {track_index} ends with unmatched note-on events; refusing to infer note durations"
-            ));
-        }
     }
+
+    // In Format 1, tracks are simultaneous streams. Pair by absolute tick,
+    // channel and pitch across tracks, retaining the note-on track as the
+    // score part. For equal-tick cross-track events use track/event order as
+    // a deterministic tie-break; zero-length pairs still fail closed.
+    midi_note_events.sort_by_key(|event| (event.tick, event.track, event.event_index));
+    let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8, usize)>> = HashMap::new();
+    for event in midi_note_events {
+        let note_key = (event.channel, event.pitch);
+        if let Some(velocity) = event.velocity {
+            pending
+                .entry(note_key)
+                .or_default()
+                .push_back((event.tick, velocity, event.track));
+            continue;
+        }
+
+        let (onset, velocity, onset_track) = pending
+            .get_mut(&note_key)
+            .and_then(VecDeque::pop_front)
+            .ok_or_else(|| "MIDI note-off has no matching active note-on in the merged track timeline".to_string())?;
+        if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
+            pending.remove(&note_key);
+        }
+        let duration = event
+            .tick
+            .checked_sub(onset)
+            .filter(|duration| *duration > 0)
+            .ok_or_else(|| {
+                "MIDI note-on/off pair must span at least one tick".to_string()
+            })?;
+        push_raw_note(
+            &mut notes,
+            RawNote {
+                track: onset_track,
+                pitch: event.pitch,
+                onset,
+                duration,
+                velocity,
+            },
+        )?;
+    }
+    if pending.values().any(|starts| !starts.is_empty()) {
+        return Err(
+            "MIDI file ends with unmatched note-on events; refusing to infer note durations"
+                .into(),
+        );
+    }
+
     let tempo_microseconds_per_quarter =
         stable_midi_metadata(&tempo_events, 500_000_u32, "tempo", "single-tempo")?;
     let tempo_bpm = 60_000_000.0 / tempo_microseconds_per_quarter as f32;
@@ -974,6 +1009,26 @@ mod tests {
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("ends with unmatched note-on events"), "{error}");
+    }
+
+    #[test]
+    fn midi_note_on_and_note_off_pair_across_format_one_tracks() {
+        let note_on_track = [
+            0, 0x90, 60, 100,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let note_off_track = [
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&midi_file_with_tracks(&[
+            &note_off_track,
+            &note_on_track,
+        ])).unwrap();
+        assert_eq!(score.notes.len(), 1);
+        assert_eq!(score.notes[0].part, PartId(1));
+        assert_eq!(score.notes[0].onset, Duration::zero());
+        assert_eq!(score.notes[0].duration, Duration::new(100, 480));
     }
 
     #[test]
