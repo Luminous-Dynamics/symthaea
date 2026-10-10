@@ -32,10 +32,10 @@ The strict assessment checks sequence/time ordering using a caller-maintained `M
 - raw acquisition bytes that cannot be resolved, are empty, or do not match the envelope's artifact ID/digest;
 - unresolved calibration evidence;
 - resolver results whose calibration record ID or evidence artifact differs from the measurement reference;
-- calibration evidence for a different quantity/unit or whose validity interval excludes the acquisition time;
+- calibration evidence for a different instrument/channel, quantity/unit, validity interval, or calibrated value range;
 - measurement or calibration uncertainty above the consumer's explicit limits.
 
-The raw-data and calibration resolvers are explicit trust boundaries. The raw-data resolver must actually retrieve the referenced bytes, compute/verify their digest, and return non-empty artifact metadata; merely looking up a database row or echoing the supplied reference is insufficient. The calibration resolver must resolve and review artifact bytes/digests, the review receipt, applicability, validity dates, calibration chain and uncertainty contributions. The crate checks returned IDs/digests against the observation, but cannot prove either resolver is independent or authoritative by itself. Configure and test both implementations independently.
+The raw-data and calibration resolvers are explicit trust boundaries. The raw-data resolver must actually retrieve the referenced bytes, compute/verify their digest, and return non-empty artifact metadata; merely looking up a database row or echoing the supplied reference is insufficient. The calibration resolver must resolve and review artifact bytes/digests, the review receipt, exact instrument/channel identity, supported quantity/unit, validity dates, calibrated value range, calibration chain and uncertainty contributions. The crate checks returned IDs/digests against the observation, but cannot prove either resolver is independent or authoritative by itself. Configure and test both implementations independently.
 
 Measurement and calibration standard uncertainties are reported separately. The crate does not combine them by root-sum-square because doing so requires explicit assumptions about independence and all material uncertainty contributors. Traceability is a property of a measurement result connected through an unbroken, documented calibration chain in which each link contributes to uncertainty; a certificate reference alone does not establish traceability.
 
@@ -46,7 +46,7 @@ Measurement and calibration standard uncertainties are reported separately. The 
 ## Validation strategy
 
 1. Unit tests reject bad dimensions, non-finite values, negative uncertainty, malformed identifiers and digests.
-2. Gate tests exercise freshness, quality flags, absent provenance, missing/unresolved calibration, mismatched evidence, wrong units, validity windows and uncertainty limits.
+2. Gate tests exercise freshness, quality flags, clock epochs, absent provenance, unresolved raw/calibration artifacts, evidence mismatch, instrument/channel mismatch, wrong units, validity windows, calibrated-range enforcement and uncertainty limits.
 3. Clock-domain tests verify mismatched caller clocks fail before consuming stream state and unexpected source epoch changes are rejected by an existing guard. Raw-evidence tests exercise empty artifacts, unresolved acquisition bytes and artifact-ID/digest mismatch; calibration tests exercise certificate/review separation and applicability.
 4. Stream tests exercise duplicate/replayed sequence numbers, time reversal and rejection of future timestamps without poisoning the accepted timestamp floor.
 5. In the next integration step, connect this contract to synthetic biomedical signals and ultrasound simulator output, then use independently generated raw-acquisition and calibration-review fixtures. The current crate does not acquire hardware or claim a clinical use is safe.
