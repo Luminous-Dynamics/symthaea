@@ -130,6 +130,33 @@ def find_pr(repo: str, subject: str, branch: str, default_branch: str, token: st
     return matches[0] if matches else None
 
 
+def fetch_authoritative_pr_merge_sha(repo: str, pr: dict[str, Any], subject: str,
+                                branch: str, default_branch: str, token: str) -> str:
+    """Read the current PR test-merge SHA from GitHub and bind it to this exact run."""
+    number = pr.get("number")
+    if not isinstance(number, int) or number <= 0:
+        raise VerificationError("matched PR has an invalid number")
+    owner, name = repo.split("/", 1)
+    current = api("GET", f"/repos/{owner}/{name}/pulls/{number}", token)
+    if not isinstance(current, dict) or current.get("number") != number:
+        raise VerificationError("authoritative PR lookup returned a missing or mismatched PR")
+    if current.get("state") != "open":
+        raise VerificationError("PR is no longer open")
+    head = current.get("head") or {}
+    base = current.get("base") or {}
+    head_repo = head.get("repo") or {}
+    base_repo = base.get("repo") or {}
+    if head.get("sha") != subject or head.get("ref") != branch:
+        raise VerificationError("authoritative PR head differs from the audited subject")
+    if str(head_repo.get("full_name", "")).lower() != repo.lower():
+        raise VerificationError("authoritative PR head is not from the trusted repository")
+    if base.get("ref") != default_branch or str(base_repo.get("full_name", "")).lower() != repo.lower():
+        raise VerificationError("authoritative PR base differs from the trusted default branch")
+    if current.get("mergeable") is not True:
+        raise VerificationError("GitHub has not confirmed a mergeable PR test-merge commit")
+    return sha(current.get("merge_commit_sha"), "pr.merge_commit_sha")
+
+
 def is_latest(candidate: dict[str, Any], runs: list[dict[str, Any]], policy: dict[str, Any], subject: str) -> bool:
     eligible = [r for r in runs if r.get("workflow_id") == policy["workflow_id"]
                 and r.get("event") == "pull_request" and r.get("head_sha") == subject
@@ -252,7 +279,8 @@ def download_artifact_zip(repo: str, artifact_id: int, token: str) -> bytes:
 
 
 def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[str, Any],
-                    expected_pr_number: int | None = None) -> None:
+                    expected_pr_number: int | None = None,
+                    expected_workflow_sha: str | None = None) -> None:
     if not isinstance(verdict, dict):
         raise VerificationError("verdict artifact is not a JSON object")
     expected_keys = {
@@ -292,7 +320,9 @@ def validate_verdict(verdict: Any, repo: str, policy: dict[str, Any], run: dict[
         raise VerificationError("verdict workflow_ref is not the expected pull-request merge ref")
     if expected_pr_number is not None and int(ref_match.group(1)) != expected_pr_number:
         raise VerificationError("verdict workflow_ref PR number differs from the independently matched open PR")
-    sha(verdict.get("workflow_sha"), "verdict.workflow_sha")
+    workflow_sha = sha(verdict.get("workflow_sha"), "verdict.workflow_sha")
+    if expected_workflow_sha is not None and workflow_sha != sha(expected_workflow_sha, "authoritative PR merge_commit_sha"):
+        raise VerificationError("verdict workflow SHA differs from the authoritative PR test-merge commit")
     if verdict.get("workflow_run_url") != run.get("html_url") or not isinstance(run.get("html_url"), str):
         raise VerificationError("verdict run URL does not match the authoritative GitHub run")
 
@@ -396,7 +426,11 @@ def validate_evidence_manifest(zf: zipfile.ZipFile, entries: list[zipfile.ZipInf
 
 
 def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, Any], token: str,
-                            expected_pr_number: int | None = None) -> None:
+                            expected_pr_number: int | None = None,
+                            expected_workflow_sha: str | None = None) -> None:
+    if expected_workflow_sha is None:
+        raise VerificationError("authoritative PR test-merge SHA is required for artifact verification")
+    expected_workflow_sha = sha(expected_workflow_sha, "authoritative PR merge_commit_sha")
     owner, name = repo.split("/", 1)
     run_id = run["id"]
     subject = sha(run.get("head_sha"), "run.head_sha")
@@ -457,9 +491,8 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
         raise
     except Exception as exc:
         raise VerificationError(f"verdict artifact ZIP/JSON is invalid: {type(exc).__name__}: {exc}") from exc
-    validate_verdict(verdict, repo, policy, run, expected_pr_number)
-    workflow_sha = sha(verdict.get("workflow_sha"), "verdict.workflow_sha")
-    check_blob(repo, policy["workflow_path"], workflow_sha, policy["workflow_blob"], token)
+    validate_verdict(verdict, repo, policy, run, expected_pr_number, expected_workflow_sha)
+    check_blob(repo, policy["workflow_path"], expected_workflow_sha, policy["workflow_blob"], token)
 
 
 def verifier_tests_passed(outcome: Any) -> bool:
@@ -529,7 +562,9 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
         pr_number = pr.get("number")
         if not isinstance(pr_number, int) or pr_number <= 0:
             raise VerificationError("matched open PR has an invalid number")
-        verify_verdict_artifact(repo, policy, run, token, expected_pr_number=pr_number)
+        expected_workflow_sha = fetch_authoritative_pr_merge_sha(repo, pr, subject, branch, default_branch, token)
+        verify_verdict_artifact(repo, policy, run, token, expected_pr_number=pr_number,
+                                expected_workflow_sha=expected_workflow_sha)
     except VerificationError as exc:
         failure = str(exc)
 
