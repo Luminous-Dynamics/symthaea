@@ -962,6 +962,14 @@ impl GridPhysicsInfrastructureSimulator {
         let one_way_eff = self.battery.round_trip_efficiency.sqrt();
         let actual_ac_kw_for_charge = if dt_hours > 0.0 && one_way_eff > 0.0 {
             (charge_accepted_dc_kwh / one_way_eff) / dt_hours
+        } else if dt_hours > 0.0
+            && self.battery.effective_capacity_kwh() > 0.0
+            && self.battery.soc() < 1.0
+        {
+            // A zero-efficiency battery stores no energy, but charging still
+            // draws input power while usable headroom exists. Keep that loss
+            // in grid demand and the charge-conversion-loss receipt.
+            charge_power_kw
         } else {
             0.0
         };
@@ -2043,6 +2051,41 @@ mod failure_mode_tests {
             0.005,
             GridPhysicsStepError::ActuatorOutOfRange { index: 0 },
         );
+    }
+
+    #[test]
+    fn zero_efficiency_battery_charge_consumes_grid_energy_only_with_headroom() {
+        let mut charging = GridPhysicsInfrastructureSimulator::new();
+        charging.battery_mut().round_trip_efficiency = 0.0;
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[0] = 0.5;
+        cmd.torques[4] = 1.0; // grid-tied
+        assert_eq!(charging.try_step(&cmd, 0.005), Ok(()));
+
+        let report = charging.load_service_report();
+        assert!(report.battery_charge_input_kwh > 0.0);
+        assert_eq!(report.battery_charge_stored_kwh, 0.0);
+        assert_eq!(
+            report.battery_charge_conversion_loss_kwh,
+            report.battery_charge_input_kwh
+        );
+        assert_eq!(
+            report.grid_supply_to_battery_kwh,
+            report.battery_charge_input_kwh
+        );
+
+        let mut full = GridPhysicsInfrastructureSimulator::new();
+        full.battery = Battery::new(
+            BATTERY_CAPACITY_KWH,
+            BATTERY_POWER_RATING_KW,
+            0.0,
+        )
+        .with_soc(1.0);
+        let before_report_input = full.load_service_report().battery_charge_input_kwh;
+        assert_eq!(full.try_step(&cmd, 0.005), Ok(()));
+        assert_eq!(full.load_service_report().battery_charge_input_kwh, 0.0);
+        assert_eq!(full.load_service_report().battery_charge_stored_kwh, 0.0);
+        assert_eq!(before_report_input, 0.0);
     }
 
     #[test]
