@@ -689,8 +689,11 @@ pub enum ConstraintDirection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RobustFeasibilityStatus {
-    RobustlyFeasible,
-    RobustlyInfeasible,
+    /// All numeric threshold intervals are entirely within their permitted regions.
+    NumericConstraintsRobustlySatisfied,
+    /// At least one numeric threshold interval is entirely outside its permitted region.
+    NumericConstraintsRobustlyViolated,
+    /// At least one interval crosses a threshold or required interval data are missing.
     Indeterminate,
 }
 
@@ -844,14 +847,14 @@ pub fn assess_regenerative_uncertainty(
         .iter()
         .any(|c| c.status == IntervalConstraintStatus::RobustFail)
     {
-        RobustFeasibilityStatus::RobustlyInfeasible
+        RobustFeasibilityStatus::NumericConstraintsRobustlyViolated
     } else if constraints
         .iter()
         .any(|c| c.status == IntervalConstraintStatus::Unresolved)
     {
         RobustFeasibilityStatus::Indeterminate
     } else {
-        RobustFeasibilityStatus::RobustlyFeasible
+        RobustFeasibilityStatus::NumericConstraintsRobustlySatisfied
     };
 
     Ok(RegenerativeUncertaintyAssessment {
@@ -860,7 +863,7 @@ pub fn assess_regenerative_uncertainty(
         status,
         constraints,
         field_validation_required: true,
-        scope_note: "interval-based design screen only; interval meaning depends on cited evidence and it is not proof of field efficacy or authorization to apply material".into(),
+        scope_note: "numeric-constraint interval screen only; this function does not assess product-quality gates, prove field efficacy, or authorize application; interval meaning depends on cited evidence".into(),
     })
 }
 
@@ -910,7 +913,7 @@ mod uncertainty_tests {
     fn interval_screen_requires_the_entire_range_to_pass() {
         let req = requirements();
         let result = assess_regenerative_uncertainty(&intervals(), &req).unwrap();
-        assert_eq!(result.status, RobustFeasibilityStatus::RobustlyFeasible);
+        assert_eq!(result.status, RobustFeasibilityStatus::NumericConstraintsRobustlySatisfied);
         assert!(result.constraints.iter().all(|c| {
             c.status == IntervalConstraintStatus::RobustPass
         }));
@@ -936,7 +939,7 @@ mod uncertainty_tests {
         let mut input = intervals();
         input.supplied_heat_mj_per_kg_dry_feedstock = interval(8.1, 9.0, "heat-fail-v1");
         let result = assess_regenerative_uncertainty(&input, &req).unwrap();
-        assert_eq!(result.status, RobustFeasibilityStatus::RobustlyInfeasible);
+        assert_eq!(result.status, RobustFeasibilityStatus::NumericConstraintsRobustlyViolated);
         assert_eq!(
             result.constraints.iter().find(|c| c.constraint_id == "supplied_heat_maximum").unwrap().status,
             IntervalConstraintStatus::RobustFail
