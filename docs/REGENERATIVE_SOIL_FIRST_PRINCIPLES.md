@@ -209,7 +209,7 @@ Methodological sources:
 
 ## Preliminary power planning
 
-The optional `symthaea-engineering::screening_power` module adds a first-pass power check for **main effects only**. It requires an evidence-backed lower/upper residual-standard-deviation range in the same unit as the predeclared primary endpoint, a named source context and method, familywise alpha, and target power. Scenario-only variance inputs are rejected, and the upper SD bound is used for projected power and required replication. The formula adjusts familywise alpha with Bonferroni over the (k) main effects and uses the factorial-contrast variance relationship
+The optional `symthaea-engineering::screening_power` module adds a first-pass power check for **main effects only**. It requires an evidence-backed lower/upper residual-standard-deviation range in the same unit as the predeclared primary endpoint, a named source context and method, familywise alpha, and target power. Scenario-only variance inputs are rejected, and the upper SD bound is used for projected power and required replication. The formula adjusts familywise alpha with Bonferroni over the k main effects and uses the factorial-contrast variance relationship
 
 [
 \operatorname{Var}(\widehat{\text{main effect}})=\frac{\sigma^2}{n\,2^{k-2}},
@@ -217,7 +217,7 @@ The optional `symthaea-engineering::screening_power` module adds a first-pass po
 
 where (n) is the number of complete-factorial replicates (blocks multiplied by within-setting replicates). It estimates current power and required complete-factorial replications using a two-sided normal approximation.
 
-This is a **preliminary screen, not a claim of adequate power**. The computation treats the supplied residual SD as known; it does not calculate exact finite-sample noncentral-(t) power or uncertainty in the variance estimate, account for block-by-treatment interaction, evaluate interaction effects, include center points in the factorial contrast, or correct for secondary endpoints and post-hoc exploration. It assumes independent, balanced, common-variance errors and additive block effects. Use context-relevant pilot data and a defensible upper SD bound; the interval is not automatically a confidence interval. Obtain statistical review before selecting replication or declaring a confirmatory trial adequately powered.
+This is a **preliminary screen, not a claim of adequate power**. The computation uses the upper SD bound conservatively but treats that bound as known; it does not calculate exact finite-sample noncentral-t power or establish statistical coverage for the SD bounds, account for block-by-treatment interaction, evaluate interaction effects, include center points in the factorial contrast, or correct for secondary endpoints and post-hoc exploration. It assumes independent, balanced, common-variance errors and additive block effects. Use context-relevant pilot data and a defensible upper SD bound; the interval is not automatically a confidence interval. Obtain statistical review before selecting replication or declaring a confirmatory trial adequately powered.
 
 Useful methodological sources:
 - NIST's [sample size guide](https://itl.nist.gov/div898/handbook/prc/section2/prc222.htm) explains that sample size depends on alpha, beta/power, effect size and standard deviation; it warns that a standard-deviation assumption is required.
