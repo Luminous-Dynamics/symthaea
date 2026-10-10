@@ -977,12 +977,13 @@ pub fn analyze_plackett_burman_responses(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::screening_design::{
-        FactorRandomizationClass, ScreeningFactor,
-    };
+    use crate::screening_design::FactorRandomizationClass;
 
     fn ev(id: &str, kind: EvidenceKind) -> EvidenceRef {
-        EvidenceRef { evidence_id: id.into(), kind }
+        EvidenceRef {
+            evidence_id: id.into(),
+            kind,
+        }
     }
 
     fn factor(index: usize) -> ScreeningFactor {
@@ -994,7 +995,10 @@ mod tests {
             low_value: 10.0,
             high_value: 20.0 + index as f64,
             max_absolute_deviation: 1.0,
-            deviation_tolerance_evidence: ev(&format!("{id}-tol"), EvidenceKind::Published),
+            deviation_tolerance_evidence: ev(
+                &format!("{id}-tol"),
+                EvidenceKind::Published,
+            ),
             randomization_class: FactorRandomizationClass::RandomizablePerRun,
             low_level_evidence: ev(&format!("{id}-low"), EvidenceKind::Published),
             high_level_evidence: ev(&format!("{id}-high"), EvidenceKind::Published),
@@ -1031,7 +1035,10 @@ mod tests {
                 unit: "kg_per_kg".into(),
                 measurement_method_id: "mass-method-v1".into(),
                 minimum_practically_meaningful_difference: 0.03,
-                difference_rationale_evidence: ev("difference-rationale", EvidenceKind::Published),
+                difference_rationale_evidence: ev(
+                    "difference-rationale",
+                    EvidenceKind::Published,
+                ),
             },
             bench_scale_review: BenchScaleReview {
                 status: BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol,
@@ -1048,16 +1055,91 @@ mod tests {
         request
     }
 
+    fn observations_for(
+        plan: &PlackettBurmanDesignPlan,
+        scenario_outcomes: bool,
+    ) -> Vec<PlackettBurmanResponseObservation> {
+        let matrix = canonical_pb12_matrix();
+        plan.runs
+            .iter()
+            .map(|run| {
+                let actual_factor_settings = run
+                    .settings
+                    .iter()
+                    .map(|setting| ObservedFactorSetting {
+                        factor_id: setting.factor_id.clone(),
+                        value: setting.value,
+                        unit: setting.unit.clone(),
+                        evidence: ev(
+                            &format!("achieved-{}", run.run_id),
+                            EvidenceKind::Measured,
+                        ),
+                    })
+                    .collect();
+                let block_index = plan
+                    .request_snapshot
+                    .blocks
+                    .iter()
+                    .position(|block| block.block_id == run.block_id)
+                    .unwrap_or(0);
+                let outcome_value = match run.kind {
+                    PlackettBurmanRunKind::CenterPointControl => {
+                        100.0 + 13.0 * block_index as f64
+                    }
+                    PlackettBurmanRunKind::MainEffectScreening => {
+                        let row = run.standard_order.unwrap() as usize - 1;
+                        100.0
+                            + 13.0 * block_index as f64
+                            + run
+                                .settings
+                                .iter()
+                                .enumerate()
+                                .map(|(index, _)| 2.5 * matrix[row][index] as f64)
+                                .sum::<f64>()
+                    }
+                };
+                PlackettBurmanResponseObservation {
+                    observation_id: format!("obs-{}", run.run_id),
+                    run_id: run.run_id.clone(),
+                    request_sha256: plan.request_sha256.clone(),
+                    schedule_sha256: plan.schedule_sha256.clone(),
+                    actual_factor_settings,
+                    endpoint_id: "yield".into(),
+                    outcome_value,
+                    outcome_unit: "kg_per_kg".into(),
+                    measurement_method_id: "mass-method-v1".into(),
+                    evidence: ev(
+                        &format!("outcome-{}", run.run_id),
+                        if scenario_outcomes {
+                            EvidenceKind::Scenario
+                        } else {
+                            EvidenceKind::Measured
+                        },
+                    ),
+                }
+            })
+            .collect()
+    }
+
     #[test]
     fn canonical_matrix_is_balanced_and_pairwise_orthogonal() {
         let matrix = canonical_pb12_matrix();
         assert_eq!(matrix.len(), 12);
         assert!(matrix.iter().all(|row| row.len() == 11));
-        for i in 0..11 {
-            assert_eq!(matrix.iter().map(|row| row[i] as i32).sum::<i32>(), 0);
-            for j in (i + 1)..11 {
-                let dot = matrix.iter().map(|row| row[i] as i32 * row[j] as i32).sum::<i32>();
-                assert_eq!(dot, 0, "columns {i} and {j} are not orthogonal");
+        for first in 0..11 {
+            assert_eq!(
+                matrix.iter().map(|row| row[first] as i32).sum::<i32>(),
+                0
+            );
+            for second in (first + 1)..11 {
+                let dot = matrix
+                    .iter()
+                    .map(|row| row[first] as i32 * row[second] as i32)
+                    .sum::<i32>();
+                assert_eq!(
+                    dot, 0,
+                    "columns {first} and {second} are not orthogonal"
+                );
             }
         }
     }
@@ -1069,8 +1151,12 @@ mod tests {
         assert_eq!(small.treatment_run_count, 24);
         assert_eq!(large.treatment_run_count, 24);
         assert_eq!(large.total_planned_run_count, 24);
-        assert_eq!(1_usize << 11, 2048);
+        assert_eq!(1_usize << 11, 2_048);
         assert!(verify_plackett_burman_design(&large).is_ok());
+
+        let with_centers = generate_plackett_burman_design(&request(11, 5)).unwrap();
+        assert_eq!(with_centers.total_planned_run_count, 34);
+        assert!(verify_plackett_burman_design(&with_centers).is_ok());
     }
 
     #[test]
@@ -1079,9 +1165,14 @@ mod tests {
         let first = generate_plackett_burman_design(&input).unwrap();
         let second = generate_plackett_burman_design(&input).unwrap();
         assert_eq!(first, second);
-        assert_eq!(verify_plackett_burman_design(&first).unwrap().verified_treatment_rows, 24);
+        assert_eq!(
+            verify_plackett_burman_design(&first)
+                .unwrap()
+                .verified_treatment_rows,
+            24
+        );
 
-        let mut changed = input.clone();
+        let mut changed = input;
         changed.randomization_seed += 1;
         let changed_digest = plackett_burman_design_sha256(&changed).unwrap();
         changed.bench_scale_review.reviewed_design_sha256 = changed_digest;
@@ -1093,65 +1184,64 @@ mod tests {
     fn checksum_recalculation_does_not_hide_seed_order_tampering() {
         let input = request(5, 0);
         let mut plan = generate_plackett_burman_design(&input).unwrap();
-        let positions = plan.runs.iter().enumerate()
-            .filter(|(_, run)| run.block_id == "day-1" && run.kind == PlackettBurmanRunKind::MainEffectScreening)
+        let positions = plan
+            .runs
+            .iter()
+            .enumerate()
+            .filter(|(_, run)| {
+                run.block_id == "day-1"
+                    && run.kind == PlackettBurmanRunKind::MainEffectScreening
+            })
             .map(|(index, _)| index)
             .take(2)
             .collect::<Vec<_>>();
-        let (a,b) = (positions[0],positions[1]);
-        let row_a=plan.runs[a].standard_order;
-        let settings_a=plan.runs[a].settings.clone();
-        plan.runs[a].standard_order=plan.runs[b].standard_order;
-        plan.runs[a].settings=plan.runs[b].settings.clone();
-        plan.runs[b].standard_order=row_a;
-        plan.runs[b].settings=settings_a;
-        plan.schedule_sha256=schedule_sha256(&plan.algorithm_id,&plan.request_sha256,&plan.runs).unwrap();
-        assert_eq!(verify_plackett_burman_design(&plan).unwrap_err().field,"runs.randomization");
+        let (first, second) = (positions[0], positions[1]);
+        let first_row = plan.runs[first].standard_order;
+        let first_settings = plan.runs[first].settings.clone();
+
+        plan.runs[first].standard_order = plan.runs[second].standard_order;
+        plan.runs[first].settings = plan.runs[second].settings.clone();
+        plan.runs[second].standard_order = first_row;
+        plan.runs[second].settings = first_settings;
+        plan.schedule_sha256 = schedule_sha256(
+            &plan.algorithm_id,
+            &plan.request_sha256,
+            &plan.runs,
+        )
+        .unwrap();
+
+        let error = verify_plackett_burman_design(&plan).unwrap_err();
+        assert_eq!(error.field, "runs.randomization");
     }
 
     #[test]
     fn descriptive_analysis_recovers_additive_main_effects() {
-        let plan=generate_plackett_burman_design(&request(4,0)).unwrap();
-        let matrix=canonical_pb12_matrix();
-        let observations=plan.runs.iter().map(|run| {
-            let settings=run.settings.iter().map(|setting| ObservedFactorSetting {
-                factor_id: setting.factor_id.clone(),
-                value: setting.value,
-                unit: setting.unit.clone(),
-                evidence: ev(&format!("achieved-{}",run.run_id),EvidenceKind::Measured),
-            }).collect::<Vec<_>>();
-            let outcome=if run.kind==PlackettBurmanRunKind::CenterPointControl {
-                100.0
-            } else {
-                let row=run.standard_order.unwrap() as usize-1;
-                100.0+run.settings.iter().enumerate().map(|(i,s)| 2.5*matrix[row][i] as f64).sum::<f64>()
-            };
-            PlackettBurmanResponseObservation {
-                observation_id:format!("obs-{}",run.run_id),
-                run_id:run.run_id.clone(),
-                request_sha256:plan.request_sha256.clone(),
-                schedule_sha256:plan.schedule_sha256.clone(),
-                actual_factor_settings:settings,
-                endpoint_id:"yield".into(),
-                outcome_value:outcome,
-                outcome_unit:"kg_per_kg".into(),
-                measurement_method_id:"mass-method-v1".into(),
-                evidence:ev(&format!("outcome-{}",run.run_id),EvidenceKind::Measured),
-            }
-        }).collect::<Vec<_>>();
-        let result=analyze_plackett_burman_responses(&plan,&observations).unwrap();
-        assert_eq!(result.main_effects.len(),4);
+        let plan = generate_plackett_burman_design(&request(4, 0)).unwrap();
+        let observations = observations_for(&plan, false);
+        let result = analyze_plackett_burman_responses(&plan, &observations).unwrap();
+
+        assert_eq!(result.main_effects.len(), 4);
         for effect in result.main_effects {
-            assert!((effect.effect_estimate-5.0).abs()<1e-9, "{}",effect.factor_id);
+            assert!(
+                (effect.effect_estimate - 5.0).abs() < 1e-9,
+                "{}",
+                effect.factor_id
+            );
         }
     }
 
     #[test]
-    fn missing_responses_and_unknown_review_fail_closed() {
-        let plan=generate_plackett_burman_design(&request(3,0)).unwrap();
-        assert!(analyze_plackett_burman_responses(&plan,&[]).is_err());
-        let mut unapproved=request(3,0);
-        unapproved.bench_scale_review.status=BenchScaleReviewStatus::Unknown;
+    fn missing_and_scenario_responses_fail_closed() {
+        let plan = generate_plackett_burman_design(&request(3, 0)).unwrap();
+        assert!(analyze_plackett_burman_responses(&plan, &[]).is_err());
+
+        let scenario_observations = observations_for(&plan, true);
+        assert!(
+            analyze_plackett_burman_responses(&plan, &scenario_observations).is_err()
+        );
+
+        let mut unapproved = request(3, 0);
+        unapproved.bench_scale_review.status = BenchScaleReviewStatus::Unknown;
         let unapproved_digest = plackett_burman_design_sha256(&unapproved).unwrap();
         unapproved.bench_scale_review.reviewed_design_sha256 = unapproved_digest;
         assert!(generate_plackett_burman_design(&unapproved).is_err());
