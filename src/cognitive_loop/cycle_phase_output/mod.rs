@@ -463,37 +463,48 @@ impl CognitiveLoopService {
                         };
 
                         if let Some(goal) = goal {
-                            let path = manifold.select_best_geodesic(&current_state, &goal, 8, 3);
-                            // Account for the search even when it returns an empty path.
-                            self.thermodynamic_load += estimate.geodesic;
+                            // The manifold's persistent compute counter may reject work
+                            // independently of the service-level budget. Check before the
+                            // call so a rejected search is not charged as consumed work.
+                            if manifold.can_compute_geodesic(8, 3) {
+                                let path = manifold.select_best_geodesic(&current_state, &goal, 8, 3);
+                                // Account for the search even when it returns an empty path.
+                                self.thermodynamic_load += estimate.geodesic;
 
-                            let latest_telemetry = manifold.telemetry().clone();
-                            perception.vision_telemetry = Some(latest_telemetry.clone());
-                            metadata.vision = Some(latest_telemetry);
+                                let latest_telemetry = manifold.telemetry().clone();
+                                perception.vision_telemetry = Some(latest_telemetry.clone());
+                                metadata.vision = Some(latest_telemetry);
 
-                            if !path.is_empty() {
-                                let trajectory_continuity =
-                                    manifold.measure_path_coherence(&path);
-                                let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
-                                let frames = manifold.decode_geodesic_to_frames_improved(&path);
-                                if !frames.is_empty() {
-                                    feedback.mental_movie =
-                                        Some(crate::cognitive_loop::types::MentalMovie {
-                                            frames,
-                                            width: self.config.vision_frame_width,
-                                            height: self.config.vision_frame_height,
-                                            channels: manifold.last_frame_channels(),
-                                            path_length: path.len(),
-                                            // Legacy field name: local continuity proxy, not semantics.
-                                            semantic_coherence: trajectory_coherence,
-                                            trajectory_continuity,
-                                            trajectory: path,
-                                        });
+                                if !path.is_empty() {
+                                    let trajectory_continuity =
+                                        manifold.measure_path_coherence(&path);
+                                    let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
+                                    let frames = manifold.decode_geodesic_to_frames_improved(&path);
+                                    if !frames.is_empty() {
+                                        feedback.mental_movie =
+                                            Some(crate::cognitive_loop::types::MentalMovie {
+                                                frames,
+                                                width: self.config.vision_frame_width,
+                                                height: self.config.vision_frame_height,
+                                                channels: manifold.last_frame_channels(),
+                                                path_length: path.len(),
+                                                // Legacy field name: local continuity proxy, not semantics.
+                                                semantic_coherence: trajectory_coherence,
+                                                trajectory_continuity,
+                                                trajectory: path,
+                                            });
+                                    } else {
+                                        self.carryover.quality.last_request_geodesic = false;
+                                    }
                                 } else {
                                     self.carryover.quality.last_request_geodesic = false;
                                 }
                             } else {
                                 self.carryover.quality.last_request_geodesic = false;
+                                tracing::debug!(
+                                    cycle = self.stats.total_cycles,
+                                    "Subsystem REQUEST_GEODESIC: manifold compute budget rejected search"
+                                );
                             }
                         } else {
                             // No current goal means no new movie; avoid exposing the previous
