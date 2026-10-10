@@ -483,10 +483,11 @@ mod tests {
 
         // ngspice treats line 1 as a title even if it looks like a device.
         // Reject it instead of validating a circuit different from the solver's.
-        let no_title = valid.lines().skip(1).collect::<Vec<_>>().join("\n") + "\n";
+        let remaining_lines = valid.lines().skip(1).collect::<Vec<_>>().join("\n");
+        let no_title = format!("{remaining_lines}\n");
         assert!(validate_qualified_netlist(&no_title, &requested).is_err());
 
-        let blank_title = format!("\n{}", valid.lines().skip(1).collect::<Vec<_>>().join("\n")) + "\n";
+        let blank_title = format!("\n{remaining_lines}\n");
         assert!(validate_qualified_netlist(&blank_title, &requested).is_err());
 
         let missing_end = valid.replace(".end\n", "");
