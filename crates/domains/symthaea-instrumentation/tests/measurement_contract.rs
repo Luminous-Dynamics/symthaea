@@ -1,15 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use ed25519_dalek::{Signer, SigningKey};
 use std::io::Cursor;
 use symthaea_instrumentation::{
     sha256_hex, ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver,
-    CalibrationReference,
-    ClockDomainId, ContractError, InstrumentIdentity, MeasurementEnvelope, MeasurementInput,
-    MeasurementPolicy,
+    CalibrationReference, CalibrationReviewPayload, ClockDomainId, ContractError,
+    InstrumentIdentity, MeasurementEnvelope, MeasurementInput, MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
-    ResolvedCalibration, ResolvedRawData, StreamOrderFailure, Unit, VerifiedArtifactBytes,
-    VerifiedArtifactDigest, VerifiedCalibrationEvidence,
+    ResolvedCalibration, ResolvedRawData, ReviewTrustKey, ReviewTrustStore,
+    ReviewVerificationError, SignedCalibrationReviewReceipt, StreamOrderFailure, Unit,
+    VerifiedArtifactBytes, VerifiedArtifactDigest, VerifiedCalibrationEvidence,
+    VerifiedCalibrationReviewReceipt,
 };
 
 const SAMPLE_TIME_NS: u64 = 1_000_000_000;
@@ -46,33 +48,49 @@ fn calibration_fixture_bytes() -> Vec<u8> {
     .into_bytes()
 }
 
-fn review_fixture_bytes_for_certificate_digest(certificate_digest: &str) -> Vec<u8> {
-    let mut content = [
-        "symthaea-independent-calibration-review-fixture-v1",
-        "review=passed",
-        "reviewer=fixture-reviewer-01",
-    ]
-    .join("\n");
-    content.push_str("\ncertificate_sha256=");
-    content.push_str(certificate_digest);
-    content.push('\n');
-    content.into_bytes()
+const REVIEW_NOW_UNIX_S: u64 = 1_750_000_000;
+
+fn review_signing_key() -> SigningKey {
+    SigningKey::from_bytes(&[0x42; 32])
 }
 
 fn calibration_digest_hex() -> String {
     sha256_hex(&calibration_fixture_bytes())
 }
 
+fn calibration_artifact() -> ArtifactReference {
+    artifact("calibration-certificate", &calibration_digest_hex())
+}
+
+fn signed_review_fixture_bytes(
+    certificate: &ArtifactReference,
+    record_id: &str,
+) -> Vec<u8> {
+    let payload = CalibrationReviewPayload::new(
+        "fixture-reviewer-01",
+        record_id,
+        certificate,
+        REVIEW_NOW_UNIX_S - 1,
+        REVIEW_NOW_UNIX_S + 50,
+    )
+    .unwrap();
+    let signature = review_signing_key()
+        .sign(&payload.signing_bytes())
+        .to_bytes();
+    SignedCalibrationReviewReceipt::new(payload, signature).to_canonical_bytes()
+}
+
+fn review_fixture_bytes_for_certificate_digest(certificate_digest: &str) -> Vec<u8> {
+    let certificate = artifact("calibration-certificate", certificate_digest);
+    signed_review_fixture_bytes(&certificate, "calibration-17")
+}
+
 fn review_fixture_bytes() -> Vec<u8> {
-    review_fixture_bytes_for_certificate_digest(&calibration_digest_hex())
+    signed_review_fixture_bytes(&calibration_artifact(), "calibration-17")
 }
 
 fn review_digest_hex() -> String {
     sha256_hex(&review_fixture_bytes())
-}
-
-fn calibration_artifact() -> ArtifactReference {
-    artifact("calibration-certificate", &calibration_digest_hex())
 }
 
 fn review_artifact() -> ArtifactReference {
@@ -81,6 +99,49 @@ fn review_artifact() -> ArtifactReference {
 
 fn review_artifact_for_bytes(bytes: &[u8]) -> ArtifactReference {
     artifact("independent-review-receipt", &sha256_hex(bytes))
+}
+
+fn review_trust_store() -> ReviewTrustStore {
+    ReviewTrustStore::new(
+        4,
+        REVIEW_NOW_UNIX_S - 10,
+        REVIEW_NOW_UNIX_S + 100,
+        vec![
+            ReviewTrustKey::new(
+                "fixture-reviewer-01",
+                review_signing_key().verifying_key().to_bytes(),
+                REVIEW_NOW_UNIX_S - 100,
+                Some(REVIEW_NOW_UNIX_S + 500),
+                None,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap()
+}
+
+fn verify_review_bytes(
+    bytes: Vec<u8>,
+    certificate: &ArtifactReference,
+    record_id: &str,
+    artifact_id: &str,
+) -> Result<VerifiedCalibrationReviewReceipt, String> {
+    let reference = artifact(artifact_id, &sha256_hex(&bytes));
+    let verified = VerifiedArtifactBytes::verify(reference, bytes)
+        .map_err(|error| error.to_string())?;
+    VerifiedCalibrationReviewReceipt::verify(
+        verified,
+        &review_trust_store(),
+        record_id,
+        certificate,
+        REVIEW_NOW_UNIX_S,
+    )
+    .map_err(|error| match error {
+        ReviewVerificationError::CertificateReferenceMismatch => {
+            "calibration review receipt does not bind the certificate SHA-256".to_owned()
+        }
+        other => format!("calibration review verification failed: {other}"),
+    })
 }
 
 fn clock_domain() -> ClockDomainId {
@@ -171,16 +232,13 @@ impl CalibrationEvidenceResolver for MockResolver {
         let review_bytes = self
             .review_bytes_override
             .clone()
-            .unwrap_or_else(review_fixture_bytes);
-        let verified_review =
-            VerifiedArtifactBytes::verify(resolved.review_receipt().clone(), review_bytes)
-                .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
-        let review_text = std::str::from_utf8(verified_review.bytes())
-            .map_err(|_| "calibration review receipt is not UTF-8".to_owned())?;
-        let expected_binding = format!("certificate_sha256={}", resolved.evidence().sha256_hex());
-        if !review_text.lines().any(|line| line == expected_binding.as_str()) {
-            return Err("calibration review receipt does not bind the certificate SHA-256".into());
-        }
+            .unwrap_or_else(|| signed_review_fixture_bytes(resolved.evidence(), "calibration-17"));
+        let verified_review = verify_review_bytes(
+            review_bytes,
+            resolved.evidence(),
+            "calibration-17",
+            resolved.review_receipt().artifact_id(),
+        )?;
 
         VerifiedCalibrationEvidence::new(resolved, verified_certificate, verified_review)
             .map_err(|error| error.to_string())
