@@ -31,6 +31,18 @@ Tracking item: [#7336 — enforce resolver-backed outcome admission and real tim
 
 In \`resolution.rs\`, \`ExitCodeResolver::execute(&self, _timeout: Duration)\` ignores its timeout argument and calls \`Command::output()\`. A hung child can therefore block resolution indefinitely. The timeout needs to be a real execution bound, with child cleanup/reaping and bounded output handling; timeout or ambiguous execution must not be relabelled success.
 
+### Additional call-path findings — async resolution and untested code
+
+The synchronous `ExitCodeResolver` in PR #7337 is not the only command-resolution path:
+
+- In `src/consciousness/recursive_improvement/runtime.rs`, `check_auto_resolve` invokes `sh -c ... .output().await` for `CommandSucceeds` and `systemctl ... .output().await` for `ServiceRunning`, without an explicit Tokio timeout. The polling runtime later maps a boolean to `Success`/`SafeFailure` and calls `resolve_prediction(..., 1.0)`. Therefore PR #7337 fixes the standalone resolver, but **does not yet bound the async runtime's separate subprocesses**.
+- In `src/coding_agent/magi_code_bridge.rs`, `compiled && tests_passed.unwrap_or(true)` means `tests_passed: None` is treated as `Success` if compilation succeeded. The API comment says `None` means no tests were run, so absent test evidence is currently promoted to success for this bridge's calibration statistics. This should remain unqualified evidence, or be represented as a distinct partial/unresolved outcome.
+- In `src/coding_agent/generation.rs`, the orchestrator passes `response.accepted` as both the compilation and test result. Its comment asserts that internal verification already happened, but that linkage itself must be traced to independently attributable compile/test receipts before this can qualify expertise.
+
+These are call-path findings from source inspection. They do not assert that the orchestrator always accepts untested code; they show that these APIs do not preserve the distinction between “not tested” and “verified successful” in all paths.
+
+Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts](https://github.com/Luminous-Dynamics/symthaea/issues/7336). PR #7337 only addresses `resolution.rs::ExitCodeResolver`; runtime timeout enforcement and the `tests_passed: None` policy remain follow-up work.
+
 ### Gap 3 — the MAGI capability self-model is a generic estimate, not yet qualified expertise
 
 The \`SelfModel\` stub in \`magi_integration.rs\` initializes capability values from a shared prior, updates an estimate through an observed scalar and learning rate, and uses that estimate as the confidence reported by \`predict_behavior\`. It does not, by itself, bind a particular skill claim to a forecast committed before execution and a verified later outcome for the exact source/configuration/evaluation profile.
@@ -62,10 +74,11 @@ The ledger computes Brier score and ECE for prospective success probabilities, r
 
 ## Next implementation order
 
-1. Repair and test timeout enforcement in the external command resolver.
-2. Add a resolver result/receipt type that binds outcome to prediction ID, exact subject, evaluator revision, chronology, and evidence root.
-3. Make verified receipt admission—not an arbitrary outcome argument—the only production route into qualification-grade calibration.
-4. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7335.
-5. Run focused tests on the exact integrated commit, then measure held-out transfer, calibration, and the actual downstream effect on decision selection.
+1. Enforce timeouts and unresolved results in both the synchronous resolver and the async runtime subprocess path.
+2. Preserve `tests_passed: None` as unresolved/not-qualified rather than success; bind compile/test claims to the relevant independent receipts.
+3. Add a resolver result/receipt type that binds outcome to prediction ID, exact subject, evaluator revision, chronology, and evidence root.
+4. Make verified receipt admission—not an arbitrary outcome argument—the only production route into qualification-grade calibration.
+5. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7335.
+6. Run focused tests on the exact integrated commit, then measure held-out transfer, calibration, and the actual downstream effect on decision selection.
 
 No formatting, compilation, or test pass is asserted by this document.
