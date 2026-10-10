@@ -799,7 +799,9 @@ impl VerifiedCalibrationEvidence {
         .map_err(|error| {
             ContractError::InvalidReferenceStandardCertificate(error.to_string())
         })?;
-        if parsed_reference_standard.record_id() != parsed_certificate.reference_standard().artifact_id() {
+        if parsed_reference_standard.record_id()
+            != parsed_certificate.reference_standard().artifact_id()
+        {
             return Err(ContractError::ReferenceStandardClaimMismatch("record_id"));
         }
         if parsed_reference_standard.quantity() != parsed_certificate.quantity() {
