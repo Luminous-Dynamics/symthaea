@@ -421,7 +421,9 @@ impl Px4ReadinessAssessmentV1 {
                     hasher.update(&[1]);
                     feed_str(&mut hasher, evidence_id);
                 }
-                None => hasher.update(&[0]),
+                None => {
+                    hasher.update(&[0]);
+                }
             }
         }
         digest_hex(hasher.finalize().as_bytes())
