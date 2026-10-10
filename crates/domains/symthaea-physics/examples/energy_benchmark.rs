@@ -29,11 +29,11 @@ const WARMUP_ITERATIONS: usize = 100;
 const ENCODING_SAMPLES: usize = 10_000;
 const PREDICTION_ITERATIONS: usize = 1000;
 
-// Assumed CPU TDP values (watts)
+// Illustrative power inputs for scenarios; not measured CPU power.
 const POWER_ASSUMPTION_DESKTOP_W: f64 = 65.0;
 const POWER_ASSUMPTION_LAPTOP_W: f64 = 15.0;
 
-// Published transformer reference points
+// Illustrative transformer assumptions; no common measurement protocol.
 struct TransformerRef {
     name: &'static str,
     power_watts: f64,
@@ -81,7 +81,7 @@ struct EnergyComparison {
     power_watts: f64,
     time_per_inference_ms: f64,
     energy_per_inference_joules: f64,
-    ratio_vs_gpt3: f64,
+    modeled_ratio_vs_gpt3: f64,
     /// Evidence label: all values in this table are power × latency models.
     basis: String,
 }
@@ -343,7 +343,7 @@ fn build_energy_comparisons(
         power_watts: tdp,
         time_per_inference_ms: symthaea_pipeline_time_ms,
         energy_per_inference_joules: sym_energy,
-        ratio_vs_gpt3: sym_energy / gpt3_energy,
+        modeled_ratio_vs_gpt3: sym_energy / gpt3_energy,
         basis: "Modeled from configured power assumption × measured pipeline latency; not metered energy.".into(),
     });
 
@@ -355,7 +355,7 @@ fn build_energy_comparisons(
             power_watts: t.power_watts,
             time_per_inference_ms: t.time_per_inference_ms,
             energy_per_inference_joules: e,
-            ratio_vs_gpt3: e / gpt3_energy,
+            modeled_ratio_vs_gpt3: e / gpt3_energy,
             basis: "Illustrative power/latency assumptions; workload, hardware, and measurement comparability not established.".into(),
         });
     }
@@ -376,7 +376,7 @@ fn print_energy_table(comparisons: &[EnergyComparison]) {
             c.power_watts,
             c.time_per_inference_ms,
             c.energy_per_inference_joules,
-            c.ratio_vs_gpt3,
+            c.modeled_ratio_vs_gpt3,
         );
         println!("    Basis: {}", c.basis);
     }
@@ -594,11 +594,11 @@ fn main() {
     let pipeline_time_ms = pipeline_result.us_per_op / 1000.0;
 
     println!("\n--- Phase 5: Energy Efficiency Comparison ---");
-    println!("\n  Desktop CPU ({POWER_ASSUMPTION_DESKTOP_W}W TDP):");
+    println!("\n  Desktop power scenario ({POWER_ASSUMPTION_DESKTOP_W}W assumed):");
     let desktop_comparisons = build_energy_comparisons(pipeline_time_ms, POWER_ASSUMPTION_DESKTOP_W, "desktop");
     print_energy_table(&desktop_comparisons);
 
-    println!("\n  Laptop CPU ({POWER_ASSUMPTION_LAPTOP_W}W TDP):");
+    println!("\n  Laptop power scenario ({POWER_ASSUMPTION_LAPTOP_W}W assumed):");
     let laptop_comparisons = build_energy_comparisons(pipeline_time_ms, POWER_ASSUMPTION_LAPTOP_W, "laptop");
     print_energy_table(&laptop_comparisons);
 
@@ -686,4 +686,61 @@ fn main() {
         "\nTotal benchmark wall-clock time: {:.2}s",
         total_elapsed.as_secs_f64()
     );
+}
+
+
+#[cfg(test)]
+mod package_energy_counter_tests {
+    use super::*;
+
+    fn reading(name: &str, energy_uj: u64, max_energy_range_uj: u64) -> EnergyCounterReading {
+        EnergyCounterReading {
+            name: name.into(),
+            energy_uj,
+            max_energy_range_uj,
+        }
+    }
+
+    #[test]
+    fn energy_delta_handles_regular_counter_progress() {
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 100, 1_000)], &[reading("package-0", 145, 1_000)]),
+            Some(45)
+        );
+    }
+
+    #[test]
+    fn energy_delta_handles_one_counter_wrap() {
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 990, 1_000)], &[reading("package-0", 20, 1_000)]),
+            Some(30)
+        );
+    }
+
+    #[test]
+    fn energy_delta_rejects_changed_domains_or_ranges() {
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 100, 1_000)], &[reading("package-1", 145, 1_000)]),
+            None
+        );
+        assert_eq!(
+            package_energy_delta_uj(&[reading("package-0", 100, 1_000)], &[reading("package-0", 145, 2_000)]),
+            None
+        );
+    }
+
+    #[test]
+    fn direct_measurement_is_unavailable_without_counters() {
+        assert!(build_package_energy_measurement(None, None, 1.0, 10).is_none());
+    }
+
+    #[test]
+    fn direct_measurement_reports_package_energy_and_call_count() {
+        let before = Some(vec![reading("package-0", 1_000, 10_000)]);
+        let after = Some(vec![reading("package-0", 3_500, 10_000)]);
+        let measurement = build_package_energy_measurement(before, after, 2.0, 25).unwrap();
+        assert_eq!(measurement.package_energy_joules, 0.0025);
+        assert_eq!(measurement.executed_calls_including_warmup, 25);
+        assert!((measurement.package_energy_joules_per_call - 0.0001).abs() < 1e-12);
+    }
 }
