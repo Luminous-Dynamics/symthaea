@@ -483,7 +483,7 @@ mod tests {
         // /tmp always exists
         let resolver = ResourceStateResolver::exists("/tmp");
         let result = resolver.execute();
-        assert!(matches!(result.outcome, OutcomeCategory::Success));
+        assert!(matches!(result.outcome, Some(OutcomeCategory::Success)));
     }
 
     #[test]
@@ -491,6 +491,6 @@ mod tests {
         let resolver =
             ResourceStateResolver::not_exists("/nonexistent_path_that_should_not_exist_12345");
         let result = resolver.execute();
-        assert!(matches!(result.outcome, OutcomeCategory::Success));
+        assert!(matches!(result.outcome, Some(OutcomeCategory::Success)));
     }
 }
