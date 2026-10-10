@@ -4,6 +4,9 @@
 
 #![deny(unsafe_code)]
 
+/// Strict numeric parsing primitives for single-plot ASCII rawfiles.
+pub mod rawfile;
+
 use symthaea_sim_bridge::{
     CommandSolver, EngineeringDomain, SimulationBackend, SimulationError, SimulationRequest,
     SimulationResult, SolverKind,
@@ -76,11 +79,11 @@ impl SimulationBackend for NgspiceBridge {
 
         let output = cmd.execute()?;
 
-        // TODO(#solver-output-parsing): CommandSolver::execute now genuinely
-        // spawns ngspice, but this adapter does not yet parse its rawfile/
-        // stdout output to determine real convergence/voltage metrics.
-        // Returning a fabricated "converged" result would let a caller make
-        // a decision against numbers that were never actually verified.
+        // The strict ASCII parser in the rawfile module is covered by golden
+        // fixtures, but this execution path still lacks frozen per-run input
+        // identity, raw/log artifact capture, solver/version provenance, and
+        // independently justified convergence semantics. Keep failing closed:
+        // parsed numbers alone would not be sufficient engineering evidence.
         Err(SimulationError::Adapter(format!(
             "ngspice ran successfully but real-output parsing is not yet \
              implemented; cannot report convergence/voltage metrics without \
