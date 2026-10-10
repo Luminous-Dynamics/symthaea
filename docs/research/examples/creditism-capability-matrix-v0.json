@@ -1,0 +1,45 @@
+{
+  "schema_version": "creditism-capability-matrix-v0",
+  "semantic_frontier": "creditism-research-v0",
+  "types": {
+    "PersonalCredit": {
+      "individual_spend": true,
+      "group_spend": false,
+      "person_to_person_transfer": false,
+      "interest_bearing": false,
+      "collateralizable": false,
+      "autonomous_investment_return": false,
+      "inherited_as_concentrated_power": false
+    },
+    "CommunityCredit": {
+      "individual_spend": false,
+      "group_spend": true,
+      "person_to_person_transfer": false,
+      "directed_by_equal_personal_share": true,
+      "interest_bearing": false,
+      "collateralizable": false,
+      "autonomous_investment_return": false,
+      "inherited_as_concentrated_power": false
+    },
+    "BonusPersonalCredit": {
+      "individual_spend": true,
+      "group_spend": false,
+      "person_to_person_transfer": false,
+      "requires_explicit_bonus_recognition": true
+    }
+  },
+  "conversion_policy": {
+    "implicit_conversion": false,
+    "unknown_conversion_is_rejected": true,
+    "explicit_profile_required": true
+  },
+  "accounting_policy": {
+    "reconcile_each_type_independently": true,
+    "silent_cross_type_netting": false
+  },
+  "claims": {
+    "typed_capabilities_are_profile_bound": true,
+    "legal_fungibility_established": false,
+    "political_legitimacy_established": false
+  }
+}
