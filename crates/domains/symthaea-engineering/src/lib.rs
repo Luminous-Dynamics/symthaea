@@ -30,6 +30,7 @@ pub mod regenerative;
 pub mod measurement_planner;
 pub mod screening_design;
 pub mod screening_power;
+pub mod screening_analysis;
 
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
@@ -339,6 +340,20 @@ impl EngineeringManager {
             familywise_alpha,
             target_power,
         )
+    }
+
+    /// Analyze measured primary-endpoint observations against a verified screening plan.
+    /// This returns descriptive factorial contrasts and block-level center-point diagnostics,
+    /// not p-values, confidence intervals, safety approvals, or agronomic claims.
+    pub fn analyze_regenerative_screening_responses(
+        &self,
+        plan: &screening_design::ScreeningDesignPlan,
+        observations: &[screening_analysis::ScreeningResponseObservation],
+    ) -> Result<
+        screening_analysis::ScreeningResponseAnalysis,
+        screening_analysis::ScreeningAnalysisError,
+    > {
+        screening_analysis::analyze_screening_responses(plan, observations)
     }
 
     pub fn evaluate_material(
