@@ -21,6 +21,10 @@
 use std::collections::HashMap;
 use std::fmt;
 
+mod certificate;
+pub use certificate::{
+    CALIBRATION_CERTIFICATE_SCHEMA, CalibrationCertificate, CalibrationCertificateError,
+};
 mod evidence;
 pub use evidence::{
     ArtifactVerificationError, VerifiedArtifactBytes, VerifiedArtifactDigest, sha256_hex,
@@ -304,6 +308,8 @@ pub enum ContractError {
     CalibrationReviewMustBeDistinct,
     VerifiedArtifactReferenceMismatch(&'static str),
     VerifiedReviewReceiptBindingMismatch,
+    InvalidCalibrationCertificate(String),
+    CalibrationCertificateClaimMismatch(&'static str),
     EmptyEvidenceArtifact(&'static str),
     InvalidCalibrationRange,
     NonFiniteValue(&'static str),
@@ -335,6 +341,12 @@ impl fmt::Display for ContractError {
                 f,
                 "verified review receipt must bind the resolved calibration record and certificate"
             ),
+            Self::InvalidCalibrationCertificate(reason) => {
+                write!(f, "calibration certificate is invalid: {reason}")
+            }
+            Self::CalibrationCertificateClaimMismatch(field) => {
+                write!(f, "resolved calibration claim does not match certificate field {field}")
+            }
             Self::EmptyEvidenceArtifact(artifact) => {
                 write!(f, "{artifact} evidence must not be empty")
             }
@@ -672,6 +684,34 @@ impl ResolvedCalibration {
         &self.evidence
     }
 
+    pub fn record_id(&self) -> &str {
+        &self.record_id
+    }
+
+    pub fn instrument(&self) -> &InstrumentIdentity {
+        &self.instrument
+    }
+
+    pub fn quantity(&self) -> Quantity {
+        self.quantity
+    }
+
+    pub fn unit(&self) -> Unit {
+        self.unit
+    }
+
+    pub fn range(&self) -> (f64, f64) {
+        (self.range_min_value, self.range_max_value)
+    }
+
+    pub fn validity_window_ns(&self) -> (u64, u64) {
+        (self.valid_from_ns, self.valid_until_ns)
+    }
+
+    pub fn standard_uncertainty(&self) -> f64 {
+        self.standard_uncertainty
+    }
+
     pub fn review_receipt(&self) -> &ArtifactReference {
         &self.review_receipt
     }
@@ -710,6 +750,25 @@ impl VerifiedCalibrationEvidence {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
                 "calibration_certificate",
             ));
+        }
+        let parsed_certificate = CalibrationCertificate::from_canonical_bytes(
+            certificate.bytes(),
+        )
+        .map_err(|error| ContractError::InvalidCalibrationCertificate(error.to_string()))?;
+        let (range_min_value, range_max_value) = calibration.range();
+        let (valid_from_ns, valid_until_ns) = calibration.validity_window_ns();
+        if let Some(field) = parsed_certificate.first_metadata_mismatch(
+            calibration.record_id(),
+            calibration.instrument(),
+            calibration.quantity(),
+            calibration.unit(),
+            range_min_value,
+            range_max_value,
+            valid_from_ns,
+            valid_until_ns,
+            calibration.standard_uncertainty(),
+        ) {
+            return Err(ContractError::CalibrationCertificateClaimMismatch(field));
         }
         if review_receipt.artifact().reference() != &calibration.review_receipt {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
