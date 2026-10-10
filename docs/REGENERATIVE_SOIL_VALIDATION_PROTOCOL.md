@@ -123,6 +123,16 @@ The software should provide:
 
 A model can recommend the next measurement or experiment. It cannot certify its own assumptions, approve its own product, or turn a scenario into a measured fact.
 
+## How uncertainty intervals are interpreted by the engineering screen
+
+The current Symthaea engineering implementation can accept evidence-linked intervals for char yield, retained carbon, supplied heat, cost, water use, and (when included) net climate impact. It makes a deliberately conservative threshold decision:
+
+- **Robust pass:** the full interval satisfies the requirement.
+- **Robust fail:** the full interval violates the requirement.
+- **Indeterminate:** the interval overlaps the threshold, or a required climate interval is missing.
+
+This is interval-bound screening only. Do not call an interval a 95% confidence interval unless the analysis that produced it supports that interpretation. Preserve the interval-generation method, sample size, calibration domain, date, units, dependence assumptions, and evidence ID in the referenced record. Scenario ranges can support exploration but cannot be silently relabelled as measurements or probabilistic coverage. The method currently does not propagate dependence/covariance across inputs and must not be interpreted as a Bayesian or Monte Carlo uncertainty model.
+
 ## Decision gates
 
 - **G0 — provenance:** feedstock and site metadata are complete enough to plan sampling.
