@@ -750,6 +750,36 @@ mod tests {
     }
 
     #[test]
+    fn rlc_and_dc_solver_inputs_are_valid_closed_world_primary_artifacts() {
+        let fixtures = [
+            (
+                "rlc_step_reference.cir",
+                include_str!("../tests/fixtures/rlc_step_reference.cir"),
+            ),
+            (
+                "dc_operating_point_reference.cir",
+                include_str!("../tests/fixtures/dc_operating_point_reference.cir"),
+            ),
+        ];
+        for (path, source) in fixtures {
+            let artifact = ModelInputBundle::new(
+                "solver-input-fixture",
+                path,
+                source.as_bytes().to_vec(),
+                Vec::<(String, Vec<u8>)>::new(),
+            )
+            .expect("fixture should have no unbound static file dependencies");
+            assert_eq!(artifact.primary_path(), path);
+            assert_eq!(artifact.primary_bytes(), source.as_bytes());
+            assert_eq!(artifact.dependency_paths().count(), 0);
+            let manifest_digest = blake3::hash(&artifact.canonical_manifest_bytes())
+                .to_hex()
+                .to_string();
+            assert_eq!(artifact.manifest_digest(), manifest_digest);
+        }
+    }
+
+    #[test]
     fn file_iterator_exposes_exact_bytes_and_digests_in_manifest_order() {
         let bundle = bundle(
             "main.cir",
