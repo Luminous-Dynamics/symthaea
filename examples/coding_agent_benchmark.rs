@@ -897,7 +897,13 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     (false, result.compile_errors, 0, 0, false, false)
 }
 
-fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -> TaskResult {
+fn run_task(
+    task: &BenchTask,
+    task_idx: usize,
+    task_total: usize,
+    use_llm: bool,
+    use_cloud: bool,
+) -> TaskResult {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let config = CodingAgentConfig {
         max_iterations: task.max_iterations,
@@ -966,8 +972,9 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     };
 
     eprint!(
-        "\r  [{:>2}/50] {} {} {} ",
+        "\r  [{:>2}/{}] {} {} {} ",
         task_idx + 1,
+        task_total,
         task.difficulty,
         status,
         task.description
@@ -1230,7 +1237,7 @@ fn main() {
     let results: Vec<TaskResult> = tasks
         .iter()
         .enumerate()
-        .map(|(i, task)| run_task(task, i, use_llm, use_cloud))
+        .map(|(i, task)| run_task(task, i, tasks.len(), use_llm, use_cloud))
         .collect();
 
     let stats = compute_stats(&results);
