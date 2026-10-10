@@ -130,12 +130,27 @@ impl CognitiveLoopService {
             let peer_dim = peer_msg.consciousness_hv.dim();
             let peer_intent_dim = peer_msg.intent_hv.dim();
             let local_dim = bridge.manifold().hdc_dim();
+            let local_state = bridge.manifold().state();
             let dilation_target_dim =
                 symthaea_core::hdc::HdcDimensionality::Ultra.dimension();
             if peer_dim == 0
                 || peer_intent_dim != peer_dim
                 || peer_dim > dilation_target_dim
+                || !peer_msg
+                    .consciousness_hv
+                    .values
+                    .iter()
+                    .all(|value| value.is_finite())
+                || !peer_msg
+                    .intent_hv
+                    .values
+                    .iter()
+                    .all(|value| value.is_finite())
+                || local_state.dim() != local_dim
+                || !local_state.values.iter().all(|value| value.is_finite())
             {
+                // Peer state is external input; do not resize or bundle non-finite
+                // vectors into local cognitive state.
                 return Err(ImagineFutureError::NoGeodesic);
             }
 
