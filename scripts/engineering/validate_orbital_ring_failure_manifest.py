@@ -100,13 +100,19 @@ def assess(m):
     if tuple(m.get("required_fields", ())) != FIELDS: structural.append("required_fields contract mismatch")
     if m.get("analysis_state") != "NotRun": structural.append("analysis_state must remain NotRun")
     if m.get("result_artifacts") != []: structural.append("result_artifacts must be empty")
-    expected = "Blocked" if blocked or errors else "ReadyForIndependentReview"
+    blocking_names = set(blocked)
+    for error in errors:
+        root = error.split(":", 1)[0].split(".", 1)[0]
+        if root in FIELDS:
+            blocking_names.add(root)
+    expected = "Blocked" if blocking_names else "ReadyForIndependentReview"
     if m.get("declared_state") != expected: structural.append("declared_state inconsistent with completeness/type checks")
     return {"schema":"luminous-dynamics.orbital-ring-manifest-validation/v1",
             "validation_state":"passed_contract_checks" if not structural else "failed_contract_checks",
             "scenario_id":m.get("scenario_id"), "expected_gate_state":expected, "declared_gate_state":m.get("declared_state"),
             "analysis_state":m.get("analysis_state"), "required_input_count":len(FIELDS),
-            "missing_or_unknown_fields":blocked, "type_errors":errors, "blocking_field_count":len(blocked),
+            "missing_or_unknown_fields":blocked, "type_errors":errors, "blocking_fields":sorted(blocking_names),
+            "blocking_field_count":len(blocking_names),
             "structural_errors":structural, "physics_claim":"none; no simulation or equilibrium calculation is performed"}
 
 
@@ -140,13 +146,13 @@ def self_test():
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["declared_state"]="ReadyForIndependentReview"
     r=assess(c); check("complete_fixture_review_ready_not_passed",r["expected_gate_state"]=="ReadyForIndependentReview" and r["analysis_state"]=="NotRun")
     c["required_inputs"]["ring_radius_m"]="7000000"; c["declared_state"]="Blocked"; r=assess(c)
-    check("wrong_numeric_type_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]))
+    check("wrong_numeric_type_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"]["rider_force_law"]="TBD"; c["declared_state"]="Blocked"; r=assess(c)
     check("tbd_force_law_blocks",r["expected_gate_state"]=="Blocked")
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"]["ring_plane_orientation"]["normal_unit_vector_in_inertial_frame"]=[0,0,2]; c["declared_state"]="Blocked"; r=assess(c)
-    check("non_unit_plane_normal_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]))
+    check("non_unit_plane_normal_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["required_inputs"]["load_change_profile"]["transition_duration_s"]=1; c["declared_state"]="Blocked"; r=assess(c)
-    check("step_with_nonzero_duration_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]))
+    check("step_with_nonzero_duration_blocks",r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
     c=json.loads(json.dumps(m)); c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("premature_gate_upgrade_rejected",r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked")
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1","checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),"checks":tests,"interpretation":"Contract validation only; review-ready does not mean physically validated or safe."}
