@@ -2,7 +2,7 @@
 
 **Status:** research engineering contract; not a medical device or clinical validation.  
 **Crate:** `symthaea-instrumentation`  
-**Scope:** scalar measurement envelopes, provenance references, calibration-evidence resolution, freshness, quality gates, and stream ordering.
+**Scope:** scalar measurement envelopes, raw-data and calibration-evidence resolution, freshness, quality gates, and stream ordering.
 
 ## Why this is a separate crate
 
@@ -29,12 +29,13 @@ The strict assessment checks sequence/time ordering using a caller-maintained `M
 - future-dated or stale data;
 - any declared quality flag (saturation, motion artifact, lead-off, missing samples, unsynchronized clock, failed self-test, out-of-range values, unknown signal quality, etc.);
 - missing raw-data or calibration references;
+- raw acquisition bytes that cannot be resolved, are empty, or do not match the envelope's artifact ID/digest;
 - unresolved calibration evidence;
-- a resolver result whose record ID or evidence artifact differs from the measurement reference;
+- resolver results whose calibration record ID or evidence artifact differs from the measurement reference;
 - calibration evidence for a different quantity/unit or whose validity interval excludes the acquisition time;
 - measurement or calibration uncertainty above the consumer's explicit limits.
 
-The calibration resolver is a trust boundary. Its implementation must resolve and review artifact bytes/digests, the review receipt, applicability, validity dates, calibration chain and uncertainty contributions. Looking up an identifier is not sufficient. This crate checks the returned record against the observation but cannot prove resolver independence or authority by itself. Configure and test that implementation independently.
+The raw-data and calibration resolvers are explicit trust boundaries. The raw-data resolver must actually retrieve the referenced bytes, compute/verify their digest, and return non-empty artifact metadata; merely looking up a database row or echoing the supplied reference is insufficient. The calibration resolver must resolve and review artifact bytes/digests, the review receipt, applicability, validity dates, calibration chain and uncertainty contributions. The crate checks returned IDs/digests against the observation, but cannot prove either resolver is independent or authoritative by itself. Configure and test both implementations independently.
 
 Measurement and calibration standard uncertainties are reported separately. The crate does not combine them by root-sum-square because doing so requires explicit assumptions about independence and all material uncertainty contributors. Traceability is a property of a measurement result connected through an unbroken, documented calibration chain in which each link contributes to uncertainty; a certificate reference alone does not establish traceability.
 
@@ -46,8 +47,9 @@ Measurement and calibration standard uncertainties are reported separately. The 
 
 1. Unit tests reject bad dimensions, non-finite values, negative uncertainty, malformed identifiers and digests.
 2. Gate tests exercise freshness, quality flags, absent provenance, missing/unresolved calibration, mismatched evidence, wrong units, validity windows and uncertainty limits.
-3. Stream tests exercise duplicate/replayed sequence numbers and time reversal.
-4. In the next integration step, connect this contract to synthetic biomedical signals and ultrasound simulator output, then use independently generated calibration-review fixtures. The current crate does not acquire hardware or claim a clinical use is safe.
+3. Raw-evidence tests exercise empty artifacts, unresolved acquisition bytes and artifact-ID/digest mismatch; calibration tests exercise certificate/review separation and applicability.
+4. Stream tests exercise duplicate/replayed sequence numbers, time reversal and rejection of future timestamps without poisoning the accepted timestamp floor.
+5. In the next integration step, connect this contract to synthetic biomedical signals and ultrasound simulator output, then use independently generated raw-acquisition and calibration-review fixtures. The current crate does not acquire hardware or claim a clinical use is safe.
 
 Run in the workspace:
 
