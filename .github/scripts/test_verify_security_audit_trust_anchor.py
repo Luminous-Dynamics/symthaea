@@ -131,7 +131,8 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             "non_blocking_findings_present": False, "non_blocking_finding_sources": [],
             "evidence_files": [{"path": "workflows/test.txt", "sha256": hashlib.sha256(b"evidence").hexdigest()}],
         }
-        run = {"id": run_id, "run_attempt": attempt, "head_sha": subject, "html_url": workflow_url}
+        run = {"id": run_id, "run_attempt": attempt, "head_sha": subject, "html_url": workflow_url,
+               "path": "{}@refs/pull/12/merge".format(policy["workflow_path"])}
         return payload, run
 
     def test_verdict_accepts_only_exact_subject_and_required_lanes(self):
@@ -150,6 +151,13 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             with self.subTest(broken=broken):
                 with self.assertRaises(module.VerificationError):
                     module.validate_verdict(broken, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+
+    def test_verdict_workflow_ref_must_match_authoritative_run_path(self):
+        payload, run = self.make_verdict()
+        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+        run["path"] = ".github/workflows/security-audit.yml@refs/pull/13/merge"
+        with self.assertRaises(module.VerificationError):
+            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
 
     def test_verdict_engine_commit_is_policy_bound(self):
         payload, run = self.make_verdict()
