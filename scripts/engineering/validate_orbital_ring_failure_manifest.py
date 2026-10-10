@@ -63,6 +63,10 @@ def field_errors(k, v):
             e.append(f"{k}: expected object")
         else:
             e.extend(f"{k}.{name}: missing/invalid" for name, rule in rules.items() if name not in v or not rule(v[name]))
+            if k == "support_frame_transform":
+                for name in ("from_frame", "to_frame", "epoch", "quaternion_convention"):
+                    if not isinstance(v.get(name), str) or missing(v.get(name)):
+                        e.append(f"{k}.{name}: missing/invalid")
     elif k == "load_change_profile":
         if not isinstance(v, dict) or v.get("kind") not in {"step", "ramp"}:
             e.append(f"{k}: kind must be step/ramp")
@@ -77,6 +81,7 @@ def field_errors(k, v):
             "reference_frame": lambda x: isinstance(x, str) and not missing(x),
             "included_bodies": lambda x: isinstance(x, list) and bool(x) and all(isinstance(y, str) and not missing(y) for y in x),
             "scope_complete": lambda x: x is True,
+            "term_inventory_ref": lambda x: isinstance(x, str) and not missing(x),
         }
         if k == "energy_boundary":
             rules.update({"external_work_terms": lambda x: isinstance(x, list), "boundary_flux_terms": lambda x: isinstance(x, list)})
@@ -143,6 +148,9 @@ def assess(m):
         elif any(abs(supports[i]-supports[j]) < 1e-9 for i in range(len(supports)) for j in range(i+1, len(supports))):
             errors.append("skyhook_support_locations_rad: support angles must be unique")
     inertial = inputs.get("inertial_frame")
+    transform = inputs.get("support_frame_transform")
+    if isinstance(transform, dict) and inertial is not None and transform.get("to_frame") != inertial:
+        errors.append("support_frame_transform: to_frame must match inertial_frame")
     for k in ("energy_boundary", "momentum_boundary"):
         b = inputs.get(k)
         if isinstance(b, dict) and inertial is not None and b.get("reference_frame") != inertial:
@@ -181,15 +189,15 @@ def assess(m):
 def complete_fixture():
     return {
         "inertial_frame":"GCRF",
-        "support_frame_transform":{"origin_position_m":[0,0,0],"origin_velocity_m_s":[0,0,0],"orientation_quaternion_xyzw":[0,0,0,1],"angular_velocity_rad_s":[0,0,0],"angular_acceleration_rad_s2":[0,0,0]},
+        "support_frame_transform":{"from_frame":"support-fixed","to_frame":"GCRF","epoch":"fixture://epoch","quaternion_convention":"Hamilton active rotation, scalar-last xyzw","origin_position_m":[0,0,0],"origin_velocity_m_s":[0,0,0],"orientation_quaternion_xyzw":[0,0,0,1],"angular_velocity_rad_s":[0,0,0],"angular_acceleration_rad_s2":[0,0,0]},
         "ring_radius_m":7e6,"ring_plane_orientation":{"normal_unit_vector_in_inertial_frame":[0,0,1],"plane_reference":"declared inertial axes"},
         "initial_ring_position_m":[7e6,0,0],"initial_ring_velocity_m_s":[0,7500,0],"initial_equilibrium_evidence_ref":"fixture://equilibrium",
         "skyhook_support_locations_rad":[0,1,2],"support_load_before_n":[0,1e6,0],"support_load_after_n":[0,5e5,0],
         "load_change_profile":{"kind":"step","transition_duration_s":0,"profile_reference":"fixture://load-step"},"load_step_time_s":10,
         "rider_spacing_m":1e4,"rider_force_law":"fixture://rider-law","rider_stiffness_n_per_m":1e6,"rider_damping_n_s_per_m":1e4,
         "rider_max_coupling_force_n":1e8,"actuation_measurement_delay_s":0.1,"force_model_reference":"fixture://force-model",
-        "energy_boundary":{"reference_frame":"GCRF","included_bodies":["ring","support","riders"],"external_work_terms":[],"boundary_flux_terms":[],"scope_complete":True},
-        "momentum_boundary":{"reference_frame":"GCRF","included_bodies":["ring","support","riders"],"external_force_terms":[],"mass_momentum_flux_terms":[],"scope_complete":True},
+        "energy_boundary":{"reference_frame":"GCRF","included_bodies":["ring","support","riders"],"external_work_terms":[],"boundary_flux_terms":[],"term_inventory_ref":"fixture://energy-term-inventory","scope_complete":True},
+        "momentum_boundary":{"reference_frame":"GCRF","included_bodies":["ring","support","riders"],"external_force_terms":[],"mass_momentum_flux_terms":[],"term_inventory_ref":"fixture://momentum-term-inventory","scope_complete":True},
         "acceptance_limits":{"max_ring_offset_m":100,"max_support_miss_distance_m":1000,"max_rider_force_n":1e8,"max_energy_residual_j":1e6,"max_momentum_residual_kg_m_s":1e6},
         "independent_reference_case":"fixture://reference"
     }
@@ -252,6 +260,18 @@ def self_test():
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
     c["required_inputs"]["acceptance_limits"]["max_rider_force_n"]=2e8; c["declared_state"]="Blocked"; r=assess(c)
     check("acceptance_limit_above_coupler_capacity_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    del c["required_inputs"]["support_frame_transform"]["from_frame"]; c["declared_state"]="Blocked"; r=assess(c)
+    check("missing_transform_direction_metadata_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    del c["required_inputs"]["energy_boundary"]["term_inventory_ref"]; c["declared_state"]="Blocked"; r=assess(c)
+    check("missing_energy_term_inventory_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    del c["required_inputs"]["momentum_boundary"]["term_inventory_ref"]; c["declared_state"]="Blocked"; r=assess(c)
+    check("missing_momentum_term_inventory_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    c["required_inputs"]["support_frame_transform"]["to_frame"]="ITRF"; c["declared_state"]="Blocked"; r=assess(c)
+    check("transform_target_frame_mismatch_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1",
             "checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),
             "checks":tests,"interpretation":"Contract and provenance checks only; review-ready does not mean physically validated or safe."}
