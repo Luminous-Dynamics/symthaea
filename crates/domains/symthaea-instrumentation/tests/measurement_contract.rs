@@ -204,14 +204,96 @@ fn resolved_calibration() -> ResolvedCalibration {
     .unwrap()
 }
 
+fn calibration_fixture_for(
+    record_id: &str,
+    instrument: InstrumentIdentity,
+    quantity: Quantity,
+    unit: Unit,
+    range_min_value: f64,
+    range_max_value: f64,
+    valid_from_ns: u64,
+    valid_until_ns: u64,
+    standard_uncertainty: f64,
+) -> (ResolvedCalibration, Vec<u8>, Vec<u8>) {
+    let certificate = CalibrationCertificate::new(
+        record_id,
+        instrument.clone(),
+        quantity,
+        unit,
+        range_min_value,
+        range_max_value,
+        valid_from_ns,
+        valid_until_ns,
+        standard_uncertainty,
+        "calibration-lab-01",
+        "ultrasound-frequency-procedure-v1",
+        artifact(
+            "reference-standard-01",
+            &sha256_hex(b"traceable frequency reference standard fixture v1"),
+        ),
+    )
+    .unwrap();
+    let certificate_bytes = certificate.to_canonical_bytes();
+    let certificate_reference =
+        artifact("calibration-certificate", &sha256_hex(&certificate_bytes));
+    let review_bytes = signed_review_fixture_bytes(&certificate_reference, record_id);
+    let review_reference = review_artifact_for_bytes(&review_bytes);
+    let resolved = ResolvedCalibration::new(
+        record_id,
+        instrument,
+        certificate_reference,
+        review_reference,
+        quantity,
+        unit,
+        range_min_value,
+        range_max_value,
+        valid_from_ns,
+        valid_until_ns,
+        standard_uncertainty,
+    )
+    .unwrap();
+    (resolved, certificate_bytes, review_bytes)
+}
+
 fn measurement(sequence: u64, captured_at_ns: u64) -> MeasurementEnvelope {
-    measurement_in_clock_domain(sequence, captured_at_ns, clock_domain())
+    measurement_with_calibration(
+        sequence,
+        captured_at_ns,
+        calibration_reference(),
+    )
+}
+
+fn measurement_with_calibration(
+    sequence: u64,
+    captured_at_ns: u64,
+    calibration: CalibrationReference,
+) -> MeasurementEnvelope {
+    measurement_with_calibration_in_clock_domain(
+        sequence,
+        captured_at_ns,
+        clock_domain(),
+        calibration,
+    )
 }
 
 fn measurement_in_clock_domain(
     sequence: u64,
     captured_at_ns: u64,
     clock_domain: ClockDomainId,
+) -> MeasurementEnvelope {
+    measurement_with_calibration_in_clock_domain(
+        sequence,
+        captured_at_ns,
+        clock_domain,
+        calibration_reference(),
+    )
+}
+
+fn measurement_with_calibration_in_clock_domain(
+    sequence: u64,
+    captured_at_ns: u64,
+    clock_domain: ClockDomainId,
+    calibration: CalibrationReference,
 ) -> MeasurementEnvelope {
     MeasurementEnvelope::new(MeasurementInput {
         identity: instrument_identity(),
@@ -222,7 +304,7 @@ fn measurement_in_clock_domain(
         unit: Unit::Hertz,
         value: 5_000_000.0,
         standard_uncertainty: 1_000.0,
-        calibration: Some(calibration_reference()),
+        calibration: Some(calibration),
         raw_data: Some(raw_reference()),
         processing_chain_version: "sha256:reconstruction-pipeline-v1".to_owned(),
         quality_flags: vec![],
