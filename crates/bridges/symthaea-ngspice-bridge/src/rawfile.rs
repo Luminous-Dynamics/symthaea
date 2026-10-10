@@ -522,4 +522,41 @@ mod tests {
         let malformed = format!("{RC_FIXTURE}\nPlotname: AC Analysis\n");
         assert!(AsciiRawfile::parse(&malformed).is_err());
     }
+
+    #[test]
+    fn rejects_duplicate_variable_names() {
+        let malformed = RC_FIXTURE.replace("v(out)  voltage", "time  voltage");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_required_headers() {
+        let malformed = RC_FIXTURE.replace(
+            "Flags: real",
+            "Flags: real\nFlags: real",
+        );
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_non_numeric_trailing_data_after_declared_points() {
+        let malformed = format!("{RC_FIXTURE}\nsolver warning: converged?\n");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn nearest_sample_rejects_non_finite_target() {
+        let raw = AsciiRawfile::parse(RC_FIXTURE).unwrap();
+        assert!(raw.value_nearest_to("time", f64::NAN, "v(out)").is_err());
+        assert!(raw.value_nearest_to("time", f64::INFINITY, "v(out)").is_err());
+    }
+
+    #[test]
+    fn rejects_extra_scalar_after_a_complete_point() {
+        let malformed = RC_FIXTURE.replace(
+            "    0.000000000000000e+00\n 1  1.000000000000000e-03",
+            "    0.000000000000000e+00\n    1.000000000000000e-01\n 1  1.000000000000000e-03",
+        );
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
 }
