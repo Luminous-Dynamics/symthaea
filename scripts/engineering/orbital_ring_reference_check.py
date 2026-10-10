@@ -116,7 +116,7 @@ def main():
     failed = [c["id"] for c in checks if c["status"] != "passed"]
     report = {
         "schema": SCHEMA,
-        "model": "earth_point_mass_circular_orbit",
+        "model": "t0_orbit_reference_and_circular_stream_limit",
         "evidence_state": "passed_at_specified_fidelity" if not failed else "failed",
         "scope": {
             "fidelity": "T0 analytical arithmetic / fixture cross-check",
