@@ -472,6 +472,12 @@ mod tests {
     }
 
     #[test]
+    fn rejects_declared_variable_count_mismatch() {
+        let malformed = RC_FIXTURE.replace("No. Variables: 2", "No. Variables: 3");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
     fn rejects_truncated_last_point() {
         let malformed = RC_FIXTURE.replace("    8.646647167633873e-01\n", "");
         assert!(AsciiRawfile::parse(&malformed).is_err());
