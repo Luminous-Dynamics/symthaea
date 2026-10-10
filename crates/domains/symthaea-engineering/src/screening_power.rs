@@ -123,6 +123,28 @@ pub enum ScreeningPowerStatus {
     RequiredReplicationExceedsPlannerBounds,
 }
 
+/// A block/replication-count combination supported by the current schedule generator.
+///
+/// These are capacity-envelope options, not newly approved plans: any option that changes
+/// the current block count or within-block replication requires a changed design fingerprint
+/// and fresh bench-scale review. Block identities and evidence must be supplied in the new
+/// request; this type does not synthesize them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FeasibleReplicationOption {
+    pub block_count: u32,
+    pub replicates_per_setting_per_block: u32,
+    /// Complete factorial replications = block_count × within-block replication.
+    pub complete_factorial_replicates: u32,
+    pub treatment_run_count: u32,
+    pub center_point_run_count: u32,
+    pub total_run_count: u32,
+    /// True when this count reaches the normal-approximation lower-bound requirement.
+    pub meets_approximate_replication_target: bool,
+    /// True only when the block and replication counts equal those in the current request.
+    pub matches_current_request_counts: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScreeningPowerAssessment {
@@ -142,6 +164,9 @@ pub struct ScreeningPowerAssessment {
     pub maximum_full_factorial_replicates_supported: u32,
     pub required_full_factorial_replicates_approx: u32,
     pub additional_full_factorial_replicates_approx: u32,
+    /// All 14 currently supported block × within-block replication count combinations,
+    /// with run-budget consequences. Not every integer from 2 through 16 is realizable.
+    pub feasible_replication_options: Vec<FeasibleReplicationOption>,
     pub familywise_alpha: f64,
     pub bonferroni_alpha_per_main_effect: f64,
     pub target_power: f64,
@@ -230,6 +255,57 @@ pub fn assess_screening_power(
     let required_replicates = required_replicates_f as usize;
     let additional_replicates = required_replicates.saturating_sub(current_full_factorial_replicates);
 
+    // The analytical replication lower bound is an integer, but the generator supports
+    // only B × r where B ∈ [2, 8] complete blocks and r ∈ [1, 2] runs per treatment cell
+    // within each block. Therefore counts such as 9, 11, 13, and 15 cannot be instantiated
+    // without rounding up to a feasible configuration. Expose every feasible budget rather
+    // than implying that an unattainable integer is an executable schedule.
+    let center_points_per_block = request.center_point_runs_per_block as usize;
+    let current_total_run_count = validated_schedule.total_planned_run_count as usize;
+    let mut feasible_replication_options = Vec::with_capacity(
+        (MAX_BLOCKS - MIN_BLOCKS + 1) * MAX_REPLICATES_PER_SETTING_PER_BLOCK as usize,
+    );
+    for candidate_block_count in MIN_BLOCKS..=MAX_BLOCKS {
+        for candidate_replicates_per_setting in 1..=MAX_REPLICATES_PER_SETTING_PER_BLOCK {
+            let candidate_full_factorial_replicates =
+                candidate_block_count * candidate_replicates_per_setting as usize;
+            let treatment_run_count = combinations * candidate_full_factorial_replicates;
+            let center_point_run_count = center_points_per_block * candidate_block_count;
+            let total_run_count = treatment_run_count + center_point_run_count;
+            let matches_current_request_counts = candidate_block_count == block_count
+                && candidate_replicates_per_setting as usize == within_block_replicates;
+            feasible_replication_options.push(FeasibleReplicationOption {
+                block_count: candidate_block_count as u32,
+                replicates_per_setting_per_block: candidate_replicates_per_setting as u32,
+                complete_factorial_replicates: candidate_full_factorial_replicates as u32,
+                treatment_run_count: treatment_run_count as u32,
+                center_point_run_count: center_point_run_count as u32,
+                total_run_count: total_run_count as u32,
+                meets_approximate_replication_target: candidate_full_factorial_replicates
+                    >= required_replicates,
+                matches_current_request_counts,
+            });
+        }
+    }
+    feasible_replication_options.sort_by(|left, right| {
+        left.complete_factorial_replicates
+            .cmp(&right.complete_factorial_replicates)
+            .then_with(|| right.block_count.cmp(&left.block_count))
+            .then_with(|| {
+                left.replicates_per_setting_per_block
+                    .cmp(&right.replicates_per_setting_per_block)
+            })
+    });
+
+    debug_assert_eq!(
+        feasible_replication_options
+            .iter()
+            .filter(|option| option.matches_current_request_counts)
+            .map(|option| option.total_run_count as usize)
+            .next(),
+        Some(current_total_run_count)
+    );
+
     let status = if required_replicates > MAX_FULL_FACTORIAL_REPLICATES {
         ScreeningPowerStatus::RequiredReplicationExceedsPlannerBounds
     } else if projected_power >= target_power {
@@ -252,6 +328,7 @@ pub fn assess_screening_power(
         maximum_full_factorial_replicates_supported: MAX_FULL_FACTORIAL_REPLICATES as u32,
         required_full_factorial_replicates_approx: required_replicates as u32,
         additional_full_factorial_replicates_approx: additional_replicates.min(u32::MAX as usize) as u32,
+        feasible_replication_options,
         familywise_alpha,
         bonferroni_alpha_per_main_effect: alpha_per_main_effect,
         target_power,
@@ -272,7 +349,7 @@ pub fn assess_screening_power(
             "Bonferroni adjustment covers the k main effects only, not interactions or secondary endpoints.".into(),
             "Center-point runs are not used to estimate the factorial main-effect contrast or residual variance.".into(),
         ],
-        scope_note: "preliminary normal-approximation planning screen only; not exact finite-sample power, proof of adequate power, a causal conclusion, an agronomic validation, or permission to execute/apply material".into(),
+        scope_note: "preliminary normal-approximation planning screen only; not exact finite-sample power, proof of adequate power, a causal conclusion, an agronomic validation, or permission to execute/apply material. Feasible block/replication count options expose run-budget consequences; changing counts requires a new preregistration fingerprint and review.".into(),
     })
 }
 
@@ -477,6 +554,75 @@ mod tests {
             high.status,
             ScreeningPowerStatus::RequiredReplicationExceedsPlannerBounds
         );
+        assert!(high
+            .feasible_replication_options
+            .iter()
+            .all(|option| !option.meets_approximate_replication_target));
+    }
+
+    #[test]
+    fn feasible_replication_options_round_up_unrealizable_counts_and_include_center_point_cost() {
+        let mut input = request();
+        input.center_point_runs_per_block = 3;
+        input.bench_scale_review.reviewed_design_sha256 =
+            crate::screening_design::screening_design_sha256(&input).unwrap();
+
+        // For these values, the normal approximation produces a lower-bound requirement
+        // of 9 complete factorial replicates. The generator cannot express 9: B × r must
+        // use B ∈ [2, 8] and r ∈ [1, 2]. Its first feasible count above 9 is 10 (5 × 2).
+        let result = assess_screening_power(
+            &input,
+            &variation(0.008, 0.028, EvidenceKind::Measured, &input.primary_endpoint.unit),
+            0.05,
+            0.80,
+        )
+        .unwrap();
+
+        assert_eq!(result.required_full_factorial_replicates_approx, 9);
+        assert_eq!(result.feasible_replication_options.len(), 14);
+        assert!(!result.feasible_replication_options.iter().any(|option| {
+            option.complete_factorial_replicates == 9
+        }));
+        let min_feasible_target = result
+            .feasible_replication_options
+            .iter()
+            .filter(|option| option.meets_approximate_replication_target)
+            .map(|option| option.complete_factorial_replicates)
+            .min();
+        assert_eq!(min_feasible_target, Some(10));
+
+        let ten_replicate_option = result
+            .feasible_replication_options
+            .iter()
+            .find(|option| option.complete_factorial_replicates == 10)
+            .unwrap();
+        assert_eq!(ten_replicate_option.block_count, 5);
+        assert_eq!(ten_replicate_option.replicates_per_setting_per_block, 2);
+        assert_eq!(ten_replicate_option.treatment_run_count, 40);
+        assert_eq!(ten_replicate_option.center_point_run_count, 15);
+        assert_eq!(ten_replicate_option.total_run_count, 55);
+        assert!(!ten_replicate_option.matches_current_request_counts);
+
+        for option in &result.feasible_replication_options {
+            assert!((2..=8).contains(&option.block_count));
+            assert!((1..=2).contains(&option.replicates_per_setting_per_block));
+            assert_eq!(
+                option.complete_factorial_replicates,
+                option.block_count * option.replicates_per_setting_per_block
+            );
+            assert_eq!(
+                option.total_run_count,
+                option.treatment_run_count + option.center_point_run_count
+            );
+            assert_eq!(
+                option.center_point_run_count,
+                option.block_count * input.center_point_runs_per_block as u32
+            );
+            assert!(option.total_run_count <= 1_100);
+            if option.meets_approximate_replication_target {
+                assert!(option.complete_factorial_replicates >= 9);
+            }
+        }
     }
 
     #[test]
