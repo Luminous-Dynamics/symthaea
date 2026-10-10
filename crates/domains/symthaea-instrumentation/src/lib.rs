@@ -22,7 +22,9 @@ use std::collections::HashMap;
 use std::fmt;
 
 mod evidence;
-pub use evidence::{ArtifactVerificationError, VerifiedArtifactBytes, sha256_hex};
+pub use evidence::{
+    ArtifactVerificationError, VerifiedArtifactBytes, VerifiedArtifactDigest, sha256_hex,
+};
 
 /// Stable instrument and channel identifiers. Patient identity does not belong
 /// in this measurement envelope.
