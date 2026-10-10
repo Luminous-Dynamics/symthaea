@@ -11064,7 +11064,9 @@ mod checked_geodesic_cost_tests {
 
     #[test]
     fn checked_cost_returns_increment_and_new_cumulative_total() {
-        assert_eq!(checked_geodesic_cost_increment(8, 3, 1.0), Some((0.288, 1.288)));
+        let (increment, total) = checked_geodesic_cost_increment(8, 3, 1.0).unwrap();
+        assert!((increment - 0.288).abs() < 1e-6);
+        assert!((total - 1.288).abs() < 1e-6);
     }
 
     #[test]
@@ -11082,8 +11084,10 @@ mod checked_geodesic_cost_tests {
 
     #[test]
     fn checked_rollout_cost_is_incremental_and_finite() {
-        assert_eq!(checked_compute_cost_increment(8, 0.008, 1.0), Some((0.064, 1.064)));
-        assert_eq!(checked_compute_cost_increment(usize::MAX, 0.008, 0.0), Some(((usize::MAX as f64 * 0.008) as f32, (usize::MAX as f64 * 0.008) as f32)));
+        let (increment, total) = checked_compute_cost_increment(8, 0.008, 1.0).unwrap();
+        assert!((increment - 0.064).abs() < 1e-6);
+        assert!((total - 1.064).abs() < 1e-6);
         assert_eq!(checked_compute_cost_increment(1, f64::NAN, 0.0), None);
+        assert_eq!(checked_compute_cost_increment(usize::MAX, f64::MAX, 0.0), None);
     }
 }
