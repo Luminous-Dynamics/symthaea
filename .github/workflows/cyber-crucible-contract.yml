@@ -46,6 +46,27 @@ jobs:
               print(f"valid JSON: {path}")
           PY
 
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.26.0"
+
+      - name: Validate corpus against its JSON Schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("validation/cyber_crucible_public_v1.schema.json").read_text(encoding="utf-8"))
+          manifest = json.loads(Path("validation/cyber_crucible_public_v1.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(Draft202012Validator(schema).iter_errors(manifest), key=lambda error: list(error.absolute_path))
+          if errors:
+              for error in errors:
+                  print(f"{'/'.join(map(str, error.absolute_path))}: {error.message}")
+              raise SystemExit(f"JSON Schema validation failed with {len(errors)} error(s)")
+          print(f"JSON Schema PASS: {manifest['corpus_id']} revision {manifest['revision']}")
+          PY
+
       - name: Validate scenario identities, evidence, and scoring policy
         run: python3 scripts/validate_cyber_crucible_public.py
 
