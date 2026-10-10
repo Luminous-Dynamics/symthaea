@@ -880,6 +880,20 @@ mod uncertainty_tests {
         }
     }
 
+    fn requirements() -> RegenerativeDesignRequirements {
+        RegenerativeDesignRequirements {
+            specification_id: "screening-spec-v1".into(),
+            cost_unit: "USD_2026_per_kg_dry".into(),
+            min_char_yield_fraction: 0.20,
+            min_carbon_retained_fraction: 0.40,
+            max_supplied_heat_mj_per_kg_dry_feedstock: 8.0,
+            max_cost_per_kg_dry_feedstock: 10.0,
+            max_water_l_per_kg_dry_feedstock: 8.0,
+            include_climate_objective: false,
+            max_net_climate_kg_co2e_per_kg_dry_feedstock: None,
+        }
+    }
+
     fn intervals() -> RegenerativeMetricIntervals {
         RegenerativeMetricIntervals {
             candidate_id: "candidate-interval-v1".into(),
