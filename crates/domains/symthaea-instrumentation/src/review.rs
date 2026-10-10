@@ -145,7 +145,7 @@ impl ReviewTrustStore {
 
     /// Decode and enforce the canonical binary snapshot representation.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
-        const MAGIC: &[u8] = b"SYMRTRS1\\0";
+        const MAGIC: &[u8] = b"SYMRTRS1\0";
         if !bytes.starts_with(MAGIC) {
             return Err(ReviewVerificationError::UnsupportedSchemaOrLayout);
         }
@@ -421,7 +421,7 @@ impl SignedReviewTrustStoreSnapshot {
 
     /// Encode the signed snapshot with a fixed magic, canonical store body and signature.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        let mut bytes = b"SYMRTRSS1\\0".to_vec();
+        let mut bytes = b"SYMRTRSS1\0".to_vec();
         bytes.extend_from_slice(&self.trust_store.canonical_bytes());
         bytes.extend_from_slice(&self.signature);
         bytes
@@ -875,6 +875,50 @@ mod tests {
             bytes,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn trust_store_canonical_bytes_roundtrip_and_reject_trailing_data() {
+        let store = trust_store();
+        let bytes = store.canonical_bytes();
+        let parsed = ReviewTrustStore::from_canonical_bytes(&bytes).unwrap();
+        assert_eq!(parsed.canonical_bytes(), bytes);
+        assert_eq!(parsed.sequence(), store.sequence());
+
+        let mut trailing = bytes;
+        trailing.push(0);
+        assert_eq!(
+            ReviewTrustStore::from_canonical_bytes(&trailing).unwrap_err(),
+            ReviewVerificationError::NonCanonicalEncoding
+        );
+    }
+
+    #[test]
+    fn signed_trust_snapshot_roundtrips_and_rejects_mutation() {
+        let store = trust_store();
+        let authority = authority_signing_key();
+        let signature = authority
+            .sign(&SignedReviewTrustStoreSnapshot::signing_message(&store))
+            .to_bytes();
+        let snapshot = SignedReviewTrustStoreSnapshot::new(store, signature);
+        let bytes = snapshot.to_canonical_bytes();
+        let parsed = SignedReviewTrustStoreSnapshot::from_canonical_bytes(&bytes).unwrap();
+        let verified = parsed.verify(&authority.verifying_key()).unwrap();
+        assert_eq!(verified.sequence(), TRUST_SEQUENCE);
+
+        let mut tampered = bytes.clone();
+        tampered[15] ^= 1;
+        let parsed_tampered = SignedReviewTrustStoreSnapshot::from_canonical_bytes(&tampered)
+            .unwrap();
+        assert_eq!(
+            parsed_tampered.verify(&authority.verifying_key()).unwrap_err(),
+            ReviewVerificationError::InvalidTrustSnapshotSignature
+        );
+
+        tampered.push(0);
+        assert!(
+            SignedReviewTrustStoreSnapshot::from_canonical_bytes(&tampered).is_err()
+        );
     }
 
     #[test]
