@@ -23,6 +23,62 @@ pub enum ImagineFutureError {
     PeerNotFound(String),
 }
 
+
+/// Cost model used by the three mental-imagination entry points.
+/// These are deterministic admission estimates, not measurements of wall-clock work.
+#[cfg(feature = "vision-manifold")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ImaginationWorkEstimate {
+    rollout: f32,
+    geodesic: f32,
+}
+
+#[cfg(feature = "vision-manifold")]
+impl ImaginationWorkEstimate {
+    fn total(self) -> Option<f32> {
+        let total = self.rollout + self.geodesic;
+        total.is_finite().then_some(total)
+    }
+}
+
+#[cfg(feature = "vision-manifold")]
+fn estimate_imagination_work(
+    rollout_steps: usize,
+    geodesic_steps: usize,
+    candidate_count: usize,
+) -> Option<ImaginationWorkEstimate> {
+    let candidate_evaluations = geodesic_steps.checked_mul(candidate_count)?;
+    let rollout = (rollout_steps as f64 * 0.008) as f32;
+    let geodesic = (candidate_evaluations as f64 * 0.012) as f32;
+    if !rollout.is_finite() || !geodesic.is_finite() {
+        return None;
+    }
+    let estimate = ImaginationWorkEstimate { rollout, geodesic };
+    estimate.total()?;
+    Some(estimate)
+}
+
+#[cfg(feature = "vision-manifold")]
+fn preflight_imagination_work(
+    current_load: f32,
+    estimate: ImaginationWorkEstimate,
+) -> Result<(), f32> {
+    let Some(total) = estimate.total() else {
+        return Err(f32::INFINITY);
+    };
+    let projected_load = current_load + total;
+    if !current_load.is_finite()
+        || !(0.0..=0.95).contains(&current_load)
+        || !projected_load.is_finite()
+    {
+        return Err(f32::INFINITY);
+    }
+    if projected_load > 0.95 {
+        return Err(projected_load);
+    }
+    Ok(())
+}
+
 impl CognitiveLoopService {
     /// Perform "Swarm Imagination": Run a mental simulation on behalf of a peer.
     ///
@@ -56,6 +112,13 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "swarm")]
         {
+            // Admission must happen before dilation or path search. Lifetime manifold
+            // telemetry is not a per-request budget and must never gate this request.
+            let estimate = estimate_imagination_work(0, steps, 4)
+                .ok_or(ImagineFutureError::ThermodynamicOverload(f32::INFINITY))?;
+            preflight_imagination_work(self.thermodynamic_load, estimate)
+                .map_err(ImagineFutureError::ThermodynamicOverload)?;
+
             let manifold = bridge.manifold_mut();
 
             // 2. Auto-dilate if peer is at higher resolution (Phase 3 optimization)
@@ -82,13 +145,13 @@ impl CognitiveLoopService {
             // 4. Run RK4 Geodesic simulation
             let path = manifold.select_best_geodesic(&collaborative_start, &goal, steps, 4);
 
+            // Charge this request's estimated geodesic work even when no usable path
+            // is returned. The computation has already happened at this point.
+            self.thermodynamic_load += estimate.geodesic;
+
             if path.is_empty() {
                 return Err(ImagineFutureError::NoGeodesic);
             }
-
-            // Apply thermodynamic cost (helping others costs energy!)
-            let cost = manifold.telemetry().last_geodesic_cost;
-            self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
 
             // 5. Decode and return the "Dream"
             let frames = manifold.decode_geodesic_to_frames_improved(&path);
@@ -137,31 +200,26 @@ impl CognitiveLoopService {
                 !goal.values.is_empty() && goal.values.iter().all(|value| value.is_finite())
             });
 
-        // Preflight the deterministic work budget before running either rollout.
-        // Keep these rates aligned with dream_ahead (0.008 per step) and
-        // select_best_geodesic (0.012 per step-candidate evaluation).
-        let candidate_count = 4usize;
-        let Some(candidate_evaluations) = steps.checked_mul(candidate_count) else {
-            return Err(ImagineFutureError::ThermodynamicOverload(f32::INFINITY));
-        };
-        let geodesic_cost = candidate_evaluations as f32 * 0.012;
-        let rollout_cost = if remembered_goal.is_some() {
-            0.0
-        } else {
-            steps as f32 * 0.008
-        };
-        let estimated_cost = geodesic_cost + rollout_cost;
-        let projected_load = self.thermodynamic_load + estimated_cost;
-        if !estimated_cost.is_finite() || !projected_load.is_finite() || projected_load > 0.95 {
-            return Err(ImagineFutureError::ThermodynamicOverload(projected_load));
-        }
+        // A remembered scene is usable only at the current manifold dimension.
+        let remembered_goal = remembered_goal
+            .filter(|goal| goal.dim() == manifold.hdc_dim());
+
+        // Preflight both phases before the first rollout/search mutation.
+        let rollout_steps = if remembered_goal.is_some() { 0 } else { steps };
+        let estimate = estimate_imagination_work(rollout_steps, steps, 4)
+            .ok_or(ImagineFutureError::ThermodynamicOverload(f32::INFINITY))?;
+        preflight_imagination_work(self.thermodynamic_load, estimate)
+            .map_err(ImagineFutureError::ThermodynamicOverload)?;
 
         let (goal, goal_source) = if let Some(goal) = remembered_goal {
             (goal, "remembered_scene")
         } else {
             let rollout = manifold.dream_ahead(steps, 0.1);
+            // Rollout work has been consumed even if its output is unusable.
+            self.thermodynamic_load += estimate.rollout;
             let Some(goal) = rollout.into_iter().last().filter(|goal| {
                 goal.dim() == manifold.hdc_dim()
+                    && !goal.values.is_empty()
                     && goal.values.iter().all(|value| value.is_finite())
             }) else {
                 return Err(ImagineFutureError::NoGeodesic);
@@ -171,15 +229,13 @@ impl CognitiveLoopService {
 
         // Refine the selected target over multiple candidate paths.
         let path = manifold.select_best_geodesic(&current, &goal, steps, 4);
+        // Charge geodesic work immediately after the search, including empty results.
+        self.thermodynamic_load += estimate.geodesic;
         tracing::debug!(goal_source, steps, "Imagination target selected");
 
         if path.is_empty() {
             return Err(ImagineFutureError::NoGeodesic);
         }
-
-        // Charge only this call's deterministic work estimate. Never charge the
-        // manifold's lifetime accumulated telemetry as though it were per-call cost.
-        self.thermodynamic_load = (self.thermodynamic_load + estimated_cost).min(1.0);
 
         // Decode the path into a viewable mental movie
         let frames = manifold.decode_geodesic_to_frames_improved(&path);
@@ -207,5 +263,45 @@ impl CognitiveLoopService {
     pub fn imagine_future(&mut self, steps: usize) -> Result<(), ImagineFutureError> {
         let _ = steps;
         Err(ImagineFutureError::NoVisionBridge)
+    }
+}
+
+#[cfg(all(test, feature = "vision-manifold"))]
+mod work_budget_tests {
+    use super::*;
+
+    #[test]
+    fn estimator_is_deterministic_and_separates_phases() {
+        let first = estimate_imagination_work(10, 10, 4).unwrap();
+        let second = estimate_imagination_work(10, 10, 4).unwrap();
+        assert_eq!(first, second);
+        assert!((first.rollout - 0.08).abs() < 1e-6);
+        assert!((first.geodesic - 0.48).abs() < 1e-6);
+
+        let remembered_goal = estimate_imagination_work(0, 10, 4).unwrap();
+        assert_eq!(remembered_goal.rollout, 0.0);
+        assert!((first.total().unwrap() - remembered_goal.total().unwrap() - 0.08).abs() < 1e-6);
+    }
+
+    #[test]
+    fn estimator_fails_closed_on_candidate_multiplication_overflow() {
+        assert!(estimate_imagination_work(0, usize::MAX, 4).is_none());
+    }
+
+    #[test]
+    fn preflight_rejects_invalid_load_and_over_budget_request() {
+        let small = estimate_imagination_work(0, 1, 4).unwrap();
+        assert!(preflight_imagination_work(f32::NAN, small).is_err());
+        assert!(preflight_imagination_work(f32::INFINITY, small).is_err());
+        assert!(preflight_imagination_work(-0.01, small).is_err());
+        assert!(preflight_imagination_work(0.90, small).is_err());
+    }
+
+    #[test]
+    fn preflight_does_not_mutate_load() {
+        let load = 0.90;
+        let estimate = estimate_imagination_work(10, 10, 4).unwrap();
+        assert!(preflight_imagination_work(load, estimate).is_err());
+        assert_eq!(load, 0.90);
     }
 }
