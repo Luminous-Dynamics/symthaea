@@ -30,6 +30,7 @@ pub enum PhantomError {
     SampleBudgetZero,
     SampleCountExceedsBudget,
     DerivedValueNonFinite(&'static str),
+    SerializationSizeOverflow,
     AllocationFailed,
 }
 
@@ -54,6 +55,9 @@ impl fmt::Display for PhantomError {
             }
             Self::DerivedValueNonFinite(name) => {
                 write!(f, "derived value {name} is not finite")
+            }
+            Self::SerializationSizeOverflow => {
+                write!(f, "canonical serialization size overflowed")
             }
             Self::AllocationFailed => write!(f, "could not reserve memory for synthetic trace"),
         }
@@ -330,6 +334,71 @@ impl SyntheticRfTrace {
     pub fn expected_echoes(&self) -> &[ExpectedEcho] {
         &self.expected_echoes
     }
+
+    /// Encode this synthetic fixture in a versioned, canonical little-endian format.
+    ///
+    /// The byte stream includes the format magic, generation parameters, counts,
+    /// analytic echo truth and all RF samples, so a content digest commits to both
+    /// observed data and the parameters needed to interpret it. This format is for
+    /// synthetic research fixtures only; it is not DICOM or a real-device wire format.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, PhantomError> {
+        const MAGIC: &[u8; 8] = b"SYMRF001";
+        const HEADER_BYTES: usize = 8 + (5 * 8) + (2 * 8);
+        const ECHO_BYTES: usize = 4 * 8;
+        const SAMPLE_BYTES: usize = 8;
+
+        let echo_bytes = self
+            .expected_echoes
+            .len()
+            .checked_mul(ECHO_BYTES)
+            .ok_or(PhantomError::SerializationSizeOverflow)?;
+        let sample_bytes = self
+            .samples
+            .len()
+            .checked_mul(SAMPLE_BYTES)
+            .ok_or(PhantomError::SerializationSizeOverflow)?;
+        let total_bytes = HEADER_BYTES
+            .checked_add(echo_bytes)
+            .and_then(|n| n.checked_add(sample_bytes))
+            .ok_or(PhantomError::SerializationSizeOverflow)?;
+
+        let echo_count = u64::try_from(self.expected_echoes.len())
+            .map_err(|_| PhantomError::SerializationSizeOverflow)?;
+        let sample_count = u64::try_from(self.samples.len())
+            .map_err(|_| PhantomError::SerializationSizeOverflow)?;
+
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(total_bytes)
+            .map_err(|_| PhantomError::AllocationFailed)?;
+        bytes.extend_from_slice(MAGIC);
+        for value in [
+            self.sound_speed_m_s,
+            self.center_frequency_hz,
+            self.sample_rate_hz,
+            self.pulse_cycles,
+            self.duration_s,
+        ] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.extend_from_slice(&sample_count.to_le_bytes());
+        bytes.extend_from_slice(&echo_count.to_le_bytes());
+        for echo in &self.expected_echoes {
+            for value in [
+                echo.depth_m,
+                echo.amplitude,
+                echo.arrival_time_s,
+                echo.fractional_sample_index,
+            ] {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+        for sample in &self.samples {
+            bytes.extend_from_slice(&sample.to_le_bytes());
+        }
+        debug_assert_eq!(bytes.len(), total_bytes);
+        Ok(bytes)
+    }
 }
 
 #[cfg(test)]
@@ -379,6 +448,20 @@ mod tests {
             .unwrap();
         assert!((peak_index as f64 - first.expected_echoes()[0].fractional_sample_index()).abs()
             <= 1.0);
+    }
+
+    #[test]
+    fn canonical_bytes_bind_parameters_ground_truth_and_samples_deterministically() {
+        let phantom = single_reflector_phantom();
+        let trace = phantom
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .unwrap();
+        let first = trace.canonical_bytes().unwrap();
+        let second = trace.canonical_bytes().unwrap();
+
+        assert_eq!(&first[..8], b"SYMRF001");
+        assert_eq!(first.len(), 64 + 32 + 500 * 8);
+        assert_eq!(first, second);
     }
 
     #[test]
