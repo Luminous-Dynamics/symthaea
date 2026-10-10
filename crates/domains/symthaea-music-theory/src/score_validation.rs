@@ -19,6 +19,10 @@ pub const THEORY_VALIDATION_VERSION: &str = "theory-validation-v1";
 /// than allowing caller-supplied timing to create an effectively unbounded
 /// validation loop.
 const MAX_PER_BEAT_VALIDATION_BEATS: i64 = 10_000;
+// Per-beat rules rescan the score for each sampled beat. Bound their aggregate
+// note-by-beat work as well as duration so a dense score cannot multiply two
+// individually bounded inputs into an unbounded validation cost.
+const MAX_PER_BEAT_VALIDATION_NOTE_PROBES: u128 = 5_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ValidationSeverity {
@@ -106,7 +110,7 @@ pub fn validate_score(score: &Score, config: &ScoreValidationConfig) -> TheoryVa
     // duration. validate_metadata emits a fatal ScoreMetadata issue for this
     // condition, so skipping these optional measurements cannot look like a
     // successful validation.
-    let within_per_beat_budget = within_per_beat_validation_budget(score.total_beats);
+    let within_per_beat_budget = within_per_beat_validation_budget(score);
     if config.check_strong_beat_consonance && within_per_beat_budget {
         validate_strong_beats(score, &mut issues);
     }
@@ -206,7 +210,7 @@ fn validate_metadata(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
             "score duration must be finite and positive",
         );
     }
-    if !within_per_beat_validation_budget(score.total_beats) {
+    if !within_per_beat_validation_budget(score) {
         issue(
             issues,
             ScoreValidationRule::ScoreMetadata,
@@ -215,7 +219,7 @@ fn validate_metadata(score: &Score, issues: &mut Vec<ScoreValidationIssue>) {
             None,
             None,
             format!(
-                "score duration exceeds the per-beat validation budget of {MAX_PER_BEAT_VALIDATION_BEATS} beats"
+                "score exceeds the per-beat validation budget of at most {MAX_PER_BEAT_VALIDATION_BEATS} beats and {MAX_PER_BEAT_VALIDATION_NOTE_PROBES} note-beat probes"
             ),
         );
     }
@@ -540,9 +544,26 @@ fn sounding_all(score: &Score, role: VoiceRole, time: f64) -> Vec<(usize, &Score
         .collect()
 }
 
-fn within_per_beat_validation_budget(total_beats: Duration) -> bool {
-    i128::from(total_beats.num())
-        <= i128::from(MAX_PER_BEAT_VALIDATION_BEATS) * i128::from(total_beats.den())
+fn within_per_beat_validation_budget(score: &Score) -> bool {
+    let total_beats = score.total_beats;
+    let numerator = i128::from(total_beats.num());
+    let denominator = i128::from(total_beats.den());
+    if denominator <= 0
+        || numerator < 0
+        || numerator > i128::from(MAX_PER_BEAT_VALIDATION_BEATS) * denominator
+    {
+        return false;
+    }
+
+    // validate_strong_beats samples 0..=floor(total_beats), so include the
+    // terminal probe. The parallel-motion pass uses no more beat samples.
+    let Some(beat_samples) = u128::try_from(numerator / denominator + 1).ok() else {
+        return false;
+    };
+    let note_count = score.notes.len() as u128;
+    beat_samples
+        .checked_mul(note_count)
+        .is_some_and(|probes| probes <= MAX_PER_BEAT_VALIDATION_NOTE_PROBES)
 }
 
 fn role_name(role: VoiceRole) -> &'static str {
@@ -653,6 +674,44 @@ mod tests {
                     && issue.message.contains("per-beat validation budget")
             }),
             "over-budget scores must be rejected explicitly: {:?}",
+            report.issues
+        );
+        assert!(!report.issues.iter().any(|issue| {
+            issue.rule == ScoreValidationRule::StrongBeatConsonance
+                || issue.rule == ScoreValidationRule::ParallelPerfectMotion
+        }));
+    }
+
+    #[test]
+    fn excessive_note_by_beat_work_is_rejected_before_per_beat_scans() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for _ in 0..5_000 {
+            score
+                .try_push(note(60, 0, 1, VoiceRole::Harmony))
+                .unwrap();
+        }
+        score
+            .try_push(note(48, 0, 999, VoiceRole::Bass))
+            .unwrap();
+        score
+            .try_push(note(60, 0, 999, VoiceRole::Melody))
+            .unwrap();
+
+        assert_eq!(score.total_beats, Duration::new(999, 1));
+        assert!(
+            score.notes.len() as u128 * 1_000
+                > MAX_PER_BEAT_VALIDATION_NOTE_PROBES
+        );
+
+        let report = validate_score(&score, &ScoreValidationConfig::default());
+        assert!(
+            report.issues.iter().any(|issue| {
+                issue.rule == ScoreValidationRule::ScoreMetadata
+                    && issue.severity == ValidationSeverity::Fatal
+                    && issue.message.contains("per-beat validation budget")
+                    && issue.message.contains("note-beat probes")
+            }),
+            "scores over the aggregate scan budget must fail explicitly: {:?}",
             report.issues
         );
         assert!(!report.issues.iter().any(|issue| {
