@@ -110,7 +110,9 @@ pub enum Unit {
 impl Unit {
     pub const fn quantity(self) -> Quantity {
         match self {
-            Self::Meter | Self::Centimeter | Self::Millimeter | Self::Micrometer => Quantity::Length,
+            Self::Meter | Self::Centimeter | Self::Millimeter | Self::Micrometer => {
+                Quantity::Length
+            }
             Self::Second | Self::Millisecond | Self::Microsecond => Quantity::Time,
             Self::Hertz | Self::Kilohertz | Self::Megahertz => Quantity::Frequency,
             Self::Pascal | Self::Kilopascal => Quantity::AcousticPressure,
@@ -236,7 +238,9 @@ impl fmt::Display for ContractError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyIdentifier(field) => write!(f, "{field} must not be empty"),
-            Self::InvalidSha256 => write!(f, "SHA-256 must contain exactly 64 hexadecimal characters"),
+            Self::InvalidSha256 => {
+                write!(f, "SHA-256 must contain exactly 64 hexadecimal characters")
+            }
             Self::InvalidValidityInterval => {
                 write!(f, "validity interval must satisfy start < end")
             }
@@ -405,7 +409,9 @@ impl MeasurementEnvelope {
             .calibration
             .as_ref()
             .ok_or(AssessmentFailure::MissingCalibrationReference)?;
-        let resolved = resolver.resolve(reference).map_err(AssessmentFailure::CalibrationEvidenceUnresolved)?;
+        let resolved = resolver
+            .resolve(reference)
+            .map_err(AssessmentFailure::CalibrationEvidenceUnresolved)?;
 
         if resolved.record_id != reference.record_id
             || resolved.evidence != reference.evidence
@@ -471,7 +477,9 @@ impl ResolvedCalibration {
         if valid_from_ns >= valid_until_ns {
             return Err(ContractError::InvalidValidityInterval);
         }
-        if evidence == review_receipt {
+        if evidence.artifact_id() == review_receipt.artifact_id()
+            || evidence.sha256_hex() == review_receipt.sha256_hex()
+        {
             return Err(ContractError::CalibrationReviewMustBeDistinct);
         }
         if quantity != unit.quantity() {
@@ -590,7 +598,9 @@ pub enum StreamOrderFailure {
 impl MeasurementStreamGuard {
     pub fn observe(&mut self, measurement: &MeasurementEnvelope) -> Result<(), StreamOrderFailure> {
         let identity = measurement.identity.clone();
-        if let Some((previous_sequence, previous_timestamp_ns)) = self.last.get(&identity).copied() {
+        if let Some((previous_sequence, previous_timestamp_ns)) =
+            self.last.get(&identity).copied()
+        {
             if measurement.sequence <= previous_sequence {
                 return Err(StreamOrderFailure::SequenceNotIncreasing {
                     previous: previous_sequence,
