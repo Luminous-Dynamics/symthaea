@@ -374,7 +374,7 @@ fn simple_vector_argument<'a>(expression: &'a str, prefix: &str) -> Option<&'a s
         || argument.chars().any(|ch| {
             matches!(
                 ch,
-                '(' | ')' | '+' | '-' | '*' | '/' | ' ' | '\\t' | ',' | '='
+                '(' | ')' | '+' | '-' | '*' | '/' | ' ' | '\t' | ',' | '='
             )
         })
     {
