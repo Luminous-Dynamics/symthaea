@@ -271,10 +271,26 @@
     {
       "id": "empty_provenance_references_block",
       "status": "passed"
+    },
+    {
+      "id": "circular_reference_tangent_state_review_ready",
+      "status": "passed"
+    },
+    {
+      "id": "circular_reference_radial_speed_over_limit_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "circular_reference_missing_radial_tolerance_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "missing_path_constraint_fails_structural_gate",
+      "status": "passed"
     }
   ],
   "checks_failed": 0,
-  "checks_passed": 68,
+  "checks_passed": 72,
   "interpretation": "Contract and provenance checks only; review-ready does not mean physically validated or safe.",
   "schema": "luminous-dynamics.orbital-ring-manifest-self-test/v1"
 }
