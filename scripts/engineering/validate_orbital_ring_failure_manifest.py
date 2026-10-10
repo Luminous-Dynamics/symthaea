@@ -5,7 +5,7 @@ import json
 import math
 from pathlib import Path
 
-SCHEMA = "luminous-dynamics.orbital-ring-failure-scenario/v1"
+SCHEMA = "luminous-dynamics.orbital-ring-failure-scenario/v2"
 SCENARIO_ID = "F-SKYHOOK-LOAD-STEP"
 FIELDS = (
     "inertial_frame", "support_frame_transform", "ring_radius_m", "ring_plane_orientation",
