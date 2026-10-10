@@ -76,6 +76,8 @@ jobs:
                   print(f"corpus {'/'.join(map(str, error.absolute_path))}: {error.message}")
               raise SystemExit(f"Corpus schema failed with {len(corpus_errors)} error(s)")
 
+          # Synthetic schema-shape fixture only: this placeholder digest is
+          # not an actual evidence receipt and cannot qualify any real outcome.
           passing_result = {
               "scenario_id": manifest["scenarios"][0]["scenario_id"],
               "scenario_revision": manifest["scenarios"][0]["revision"],
