@@ -158,25 +158,75 @@ def explicitly_excludes_pull_request(expression: str | None) -> bool:
         return False
     # Current repository manual/push-only roots use conjunctions. Refuse to
     # infer exclusion through disjunctions because one branch could admit PRs.
-    if "||" in expression:
+    # Also reject a negated event equality: matching the text inside
+    # "!github.event_name == 'workflow_dispatch'" does not exclude PR events.
+    if "||" in expression or re.search(r"(?<![=<>!])!(?!=)", expression):
         return False
     return any(pattern.search(expression) for pattern in EVENT_EQ.values())
 
 
 def has_draft_guard(expression: str | None) -> bool:
-    return expression is not None and DRAFT_FALSE.search(expression) is not None
+    if expression is None:
+        return False
+    normalized = " ".join(expression.split())
+
+    # Refuse unary negation of any subexpression; a textual occurrence of a
+    # positive draft predicate under "!" is not a guard.
+    if re.search(r"(?<![=<>!])!(?!=)", normalized):
+        return False
+    if DRAFT_FALSE.search(normalized) is None:
+        return False
+
+    # Without disjunction, a positive draft==false term can only restrict
+    # admission further. With disjunction, accept only the two explicit safe
+    # forms that make the alternate branch exclude pull_request altogether.
+    if "||" not in normalized:
+        return True
+    if normalized.count("||") != 1:
+        return False
+    safe_event_exclusion = re.compile(
+        r"(?:"
+        r"github\.event_name\s*!=\s*['\"]pull_request['\"]\s*\|\|\s*"
+        r"github\.event\.pull_request\.draft\s*==\s*false"
+        r"|"
+        r"github\.event\.pull_request\.draft\s*==\s*false\s*\|\|\s*"
+        r"github\.event_name\s*!=\s*['\"]pull_request['\"]"
+        r")"
+    )
+    return safe_event_exclusion.search(normalized) is not None
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
+    # Inspect the actual event type list, not arbitrary occurrences in paths,
+    # comments, or unrelated values. Current repository workflows use an inline
+    # flow list; unsupported representations fail closed until explicitly handled.
+    type_lines = [line for line in pr_block if re.match(r"^    types:", line)]
+    if len(type_lines) != 1:
         raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
+            f"{path}: runner-capable pull_request workflow must declare exactly one "
+            "inline pull_request.types list including ready_for_review"
+        )
+    match = re.fullmatch(r"    types:\s*\[([^\]]*)\]\s*(?:#.*)?", type_lines[0])
+    if match is None:
+        raise SafetyError(
+            f"{path}: pull_request.types must use the supported inline list form"
+        )
+    event_types = {
+        item.strip().strip("'\"").strip()
+        for item in match.group(1).split(",")
+        if item.strip()
+    }
+    if "ready_for_review" not in event_types:
+        raise SafetyError(
+            f"{path}: runner-capable pull_request workflow must include "
+            "ready_for_review in pull_request.types"
         )
 
 
 def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
     jobs = parse_jobs(text)
     runner_jobs = 0
+    pull_request_runner_jobs = 0
     draft_guarded = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
@@ -185,6 +235,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
         expression = job_level_if_expression(block, job)
         if explicitly_excludes_pull_request(expression):
             continue
+        pull_request_runner_jobs += 1
         if not has_draft_guard(expression):
             raise SafetyError(
                 f"{path}: runner-capable job {job!r} lacks a job-level "
@@ -192,7 +243,10 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # Only jobs that can actually run for pull_request require the
+    # ready_for_review trigger. Manual/push-only jobs may share a workflow
+    # with an empty pull_request trigger without allocating PR runners.
+    if pull_request_runner_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
@@ -274,6 +328,22 @@ jobs:
     pr = pull_request_block(safe)
     assert pr is not None
     assert validate_generic(Path("safe.yml"), safe, pr) == (1, 1)
+    assert has_draft_guard("github.event.pull_request.draft == false")
+    assert has_draft_guard(
+        "github.repository == 'Luminous-Dynamics/symthaea' && "
+        "(github.event_name != 'pull_request' || "
+        "github.event.pull_request.draft == false)"
+    )
+    assert not has_draft_guard(
+        "always() || github.event.pull_request.draft == false"
+    )
+    assert not has_draft_guard(
+        "!github.event.pull_request.draft == false"
+    )
+    assert not has_draft_guard(
+        "github.event_name != 'pull_request' || "
+        "github.event.pull_request.draft == false || always()"
+    )
 
     unsafe = safe.replace(
         "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
@@ -294,6 +364,22 @@ jobs:
     else:
         raise AssertionError("runner workflow without ready_for_review was accepted")
 
+    # A path or comment containing the event token is not an event trigger.
+    disguised = safe.replace(
+        "types: [opened, synchronize, reopened, ready_for_review]",
+        "types: [opened, synchronize, reopened]\n    paths:\n      - ready_for_review.yml",
+    )
+    try:
+        validate_generic(
+            Path("disguised-ready.yml"),
+            disguised,
+            pull_request_block(disguised) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("ready_for_review path text was mistaken for an event type")
+
     manual = """on:
   pull_request:
   workflow_dispatch:
@@ -306,9 +392,55 @@ jobs:
 """
     pr = pull_request_block(manual)
     assert pr is not None
+    assert explicitly_excludes_pull_request(
+        "github.event_name == 'workflow_dispatch'"
+    )
+    assert not explicitly_excludes_pull_request(
+        "!github.event_name == 'workflow_dispatch'"
+    )
+    assert not explicitly_excludes_pull_request(
+        "github.event_name == 'workflow_dispatch' || false"
+    )
     # A workflow whose only runner root explicitly excludes PR does not need a
     # ready_for_review event because no PR runner can ever be allocated.
     assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+
+    # Mixed workflows must still require ready_for_review when any one
+    # runner job can execute on PR events; a separate manual-only runner
+    # cannot suppress that requirement.
+    mixed = """on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+jobs:
+  manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+  pull-request:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(mixed)
+    assert pr is not None
+    assert validate_generic(Path("mixed.yml"), mixed, pr) == (2, 1)
+
+    mixed_no_ready = mixed.replace(", ready_for_review", "")
+    try:
+        validate_generic(
+            Path("mixed-no-ready.yml"),
+            mixed_no_ready,
+            pull_request_block(mixed_no_ready) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError(
+            "manual-only runner incorrectly masked missing ready_for_review for a PR runner"
+        )
 
 
 def main() -> int:
