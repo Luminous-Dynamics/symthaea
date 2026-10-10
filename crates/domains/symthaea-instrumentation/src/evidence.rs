@@ -300,7 +300,7 @@ mod tests {
                         std::io::ErrorKind::Interrupted,
                     ));
                 }
-                self.inner.read(buffer)
+                std::io::Read::read(&mut self.inner, buffer)
             }
         }
 
