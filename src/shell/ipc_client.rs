@@ -1380,3 +1380,18 @@ mod tests {
         server_task.await.unwrap();
     }
 }
+
+
+#[cfg(test)]
+mod trajectory_continuity_compat_tests {
+    use super::MentalMovie;
+
+    #[test]
+    fn legacy_movie_payload_without_continuity_still_deserializes() {
+        let legacy = r#"{"frames":[],"width":64,"height":64,"channels":3,"path_length":0,"semantic_coherence":0.2}"#;
+        let movie: MentalMovie =
+            serde_json::from_str(legacy).expect("legacy mental-movie payload");
+        assert_eq!(movie.trajectory_continuity, None);
+        assert_eq!(movie.semantic_coherence, 0.2);
+    }
+}
