@@ -19,6 +19,11 @@ CRYO_PAIRS = [
 ]
 ORS_MASS_KG = 5.6e8
 INERTIAL_SPEED_M_S = 8.0e3
+TABLE8_ORBITAL_SC_MASS_PER_RING_KG = 5.3e7
+TABLE8_ORBITAL_SC_LINE_MASS_KG_M = 1.2
+TABLE8_GEO_SC_MASS_PER_RING_KG = 8.8e7
+TABLE8_GEO_SC_LINE_MASS_KG_M = 2.0
+TABLE8_CRYO_HEAT_LOSS_PER_LENGTH_W_M = 10.0
 
 
 def main():
@@ -26,6 +31,10 @@ def main():
     example_eddy_power_w = EXAMPLE_SKYHOOK_LIFT_FORCE_N * equivalent_drag_speed_m_s
     eddy_power_w = PRECESSING_FORCE_N * equivalent_drag_speed_m_s
     stored_energy_j = 0.5 * ORS_MASS_KG * INERTIAL_SPEED_M_S**2
+    table8_orbital_length_m = TABLE8_ORBITAL_SC_MASS_PER_RING_KG / TABLE8_ORBITAL_SC_LINE_MASS_KG_M
+    table8_geo_length_m = TABLE8_GEO_SC_MASS_PER_RING_KG / TABLE8_GEO_SC_LINE_MASS_KG_M
+    table8_mean_length_m = 0.5 * (table8_orbital_length_m + table8_geo_length_m)
+    table8_length_based_heat_load_w = TABLE8_CRYO_HEAT_LOSS_PER_LENGTH_W_M * table8_mean_length_m
     checks = []
 
     def record(check_id, passed, observed=None, expected=None, tolerance=None, note=None):
@@ -61,6 +70,14 @@ def main():
     power_scale = CRYO_PAIRS[1]["cryostat_electrical_power_w"] / CRYO_PAIRS[0]["cryostat_electrical_power_w"]
     record("cryo_reported_cold_load_scale_factor_5", abs(heat_scale - 5.0) < 1e-12, heat_scale, 5.0, 1e-12)
     record("cryo_reported_wall_plug_scale_factor_5", abs(power_scale - 5.0) < 1e-12, power_scale, 5.0, 1e-12)
+    record("table8.orbital_length_positive", math.isfinite(table8_orbital_length_m) and table8_orbital_length_m > 0, table8_orbital_length_m)
+    record("table8.geosynchronous_length_positive", math.isfinite(table8_geo_length_m) and table8_geo_length_m > 0, table8_geo_length_m)
+    length_relative_difference = abs(table8_orbital_length_m - table8_geo_length_m) / table8_mean_length_m
+    record("table8.inferred_ring_lengths_agree_within_1pct", length_relative_difference <= 0.01,
+           length_relative_difference, 0.0, 0.01)
+    record("table8.10w_per_m_reconstructs_500mw_total", abs(table8_length_based_heat_load_w - CRYO_PAIRS[1]["cold_side_heat_load_w"]) <= 0.15 * CRYO_PAIRS[1]["cold_side_heat_load_w"],
+           table8_length_based_heat_load_w, CRYO_PAIRS[1]["cold_side_heat_load_w"], 0.15 * CRYO_PAIRS[1]["cold_side_heat_load_w"],
+           "Uses the mean length implied by the table's total per-ring superconductor mass divided by its mass-per-length row.")
     record("stored_energy_finite_positive", math.isfinite(stored_energy_j) and stored_energy_j > 0, stored_energy_j)
     record("stored_energy_reference_17_92_PJ", abs(stored_energy_j - 17.92e15) < 1.0,
            stored_energy_j, 17.92e15, 1.0,
@@ -86,6 +103,19 @@ def main():
         },
         "cryogenic_pairs": [{**p, "electrical_to_cold_load_ratio": p["cryostat_electrical_power_w"] / p["cold_side_heat_load_w"]} for p in CRYO_PAIRS],
         "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1 but the absolute scale differs by 5x. This script does not resolve whether scenario, length basis, or normalization differs.",
+        "table8_length_reconstruction": {
+            "orbital_superconductor_mass_per_ring_kg": TABLE8_ORBITAL_SC_MASS_PER_RING_KG,
+            "orbital_superconductor_mass_per_length_kg_m": TABLE8_ORBITAL_SC_LINE_MASS_KG_M,
+            "orbital_ring_length_implied_m": table8_orbital_length_m,
+            "geosynchronous_superconductor_mass_per_ring_kg": TABLE8_GEO_SC_MASS_PER_RING_KG,
+            "geosynchronous_superconductor_mass_per_length_kg_m": TABLE8_GEO_SC_LINE_MASS_KG_M,
+            "geosynchronous_ring_length_implied_m": table8_geo_length_m,
+            "mean_length_implied_m": table8_mean_length_m,
+            "cryogenic_heat_loss_per_length_w_m": TABLE8_CRYO_HEAT_LOSS_PER_LENGTH_W_M,
+            "length_based_heat_load_w": table8_length_based_heat_load_w,
+            "table_reported_total_heat_load_w": CRYO_PAIRS[1]["cold_side_heat_load_w"],
+            "caveat": "Algebraic consistency with the table rows only; does not independently establish the actual geometry or explain the p. 483 100 MW estimate."
+        },
         "conditional_stored_energy": {"mass_kg": ORS_MASS_KG, "speed_m_s": INERTIAL_SPEED_M_S,
                                       "specific_kinetic_energy_j_kg": 0.5 * INERTIAL_SPEED_M_S**2,
                                       "total_energy_j": stored_energy_j, "total_energy_pj": stored_energy_j / 1e15,
