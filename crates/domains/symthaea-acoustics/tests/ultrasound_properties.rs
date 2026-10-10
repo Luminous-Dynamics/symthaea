@@ -143,6 +143,24 @@ fn synthetic_rf_fixture_preserves_known_echo_time_and_sample_position() {
 }
 
 #[test]
+fn canonical_rf_bytes_commit_to_parameters_echo_truth_and_samples() {
+    let phantom = PointReflectorPhantom::new(
+        SOUND_SPEED_M_S,
+        vec![PointReflector::new(0.01, 0.5).unwrap()],
+    )
+    .unwrap();
+    let trace = phantom
+        .simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 1_000)
+        .unwrap();
+    let first = trace.canonical_bytes().unwrap();
+    let second = trace.canonical_bytes().unwrap();
+
+    assert_eq!(&first[..8], b"SYMRF001");
+    assert_eq!(first.len(), 64 + 32 + 500 * 8);
+    assert_eq!(first, second);
+}
+
+#[test]
 fn synthetic_rf_fixture_rejects_unbounded_or_undersampled_requests() {
     let phantom = PointReflectorPhantom::new(
         SOUND_SPEED_M_S,
