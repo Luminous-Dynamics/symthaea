@@ -437,24 +437,15 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 }
                 seen_meter = Some(numerator);
                 meter = numerator;
+            } else if child.has_tag_name("metronome") {
+                let bpm = musicxml_metronome_tempo(child)?;
+                register_musicxml_tempo(bpm, &mut seen_tempo, &mut tempo)?;
             } else if child.has_tag_name("sound") {
                 if let Some(value) = child.attribute("tempo") {
                     let bpm = value.parse::<f32>().map_err(|_| {
                         "MusicXML tempo must be a number between 20 and 320 BPM".to_string()
                     })?;
-                    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
-                        return Err(
-                            "MusicXML tempo must be finite and between 20 and 320 BPM".into(),
-                        );
-                    }
-                    if seen_tempo.is_some_and(|previous| previous != bpm) {
-                        return Err(
-                            "MusicXML tempo changes cannot be represented by a single-tempo Score"
-                                .into(),
-                        );
-                    }
-                    seen_tempo = Some(bpm);
-                    tempo = bpm;
+                    register_musicxml_tempo(bpm, &mut seen_tempo, &mut tempo)?;
                 }
             } else if child.has_tag_name("backup") {
                 let amount = musicxml_duration(child, "backup")?;
@@ -611,6 +602,72 @@ fn validate_imported_score(score: &Score) -> Result<(), String> {
 
 fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
+}
+
+/// Extract only a regular, undotted quarter-note metronome mark. Metric
+/// modulations, beat-unit conversions and text/range markings require a richer
+/// tempo representation than Score's single quarter-note BPM value.
+fn musicxml_metronome_tempo(node: roxmltree::Node<'_, '_>) -> Result<f32, String> {
+    let beat_units: Vec<_> = node
+        .children()
+        .filter(|child| child.has_tag_name("beat-unit"))
+        .collect();
+    let per_minutes: Vec<_> = node
+        .children()
+        .filter(|child| child.has_tag_name("per-minute"))
+        .collect();
+    let unsupported_form = node.children().any(|child| {
+        child.has_tag_name("beat-unit-dot")
+            || child.has_tag_name("beat-unit-tied")
+            || child.has_tag_name("metronome-note")
+            || child.has_tag_name("metronome-relation")
+            || child.has_tag_name("metronome-tied")
+            || child.has_tag_name("metronome-tuplet")
+    });
+    if unsupported_form || beat_units.len() != 1 || per_minutes.len() != 1 {
+        return Err(
+            "MusicXML only undotted quarter-note metronome marks with one numeric per-minute value are supported"
+                .into(),
+        );
+    }
+    if beat_units[0].text().unwrap_or("").trim() != "quarter" {
+        return Err(
+            "MusicXML metronome beat units other than undotted quarter notes are not supported"
+                .into(),
+        );
+    }
+    let value = per_minutes[0].text().unwrap_or("").trim();
+    let bpm = value.parse::<f32>().map_err(|_| {
+        "MusicXML metronome per-minute value must be a single numeric BPM".to_string()
+    })?;
+    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+        return Err(
+            "MusicXML metronome tempo must be finite and between 20 and 320 BPM".into(),
+        );
+    }
+    Ok(bpm)
+}
+
+/// Keep all tempo indicators aligned with Score's single-tempo contract.
+/// A changing or disagreeing indicator must not win merely because it appears
+/// later in document traversal.
+fn register_musicxml_tempo(
+    bpm: f32,
+    seen_tempo: &mut Option<f32>,
+    tempo: &mut f32,
+) -> Result<(), String> {
+    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+        return Err("MusicXML tempo must be finite and between 20 and 320 BPM".into());
+    }
+    if seen_tempo.is_some_and(|previous| previous != bpm) {
+        return Err(
+            "MusicXML tempo changes cannot be represented by a single-tempo Score; conflicting tempo indicators are also rejected"
+                .into(),
+        );
+    }
+    *seen_tempo = Some(bpm);
+    *tempo = bpm;
+    Ok(())
 }
 
 /// MusicXML durations use positive integer division units. Required values
@@ -1030,6 +1087,78 @@ mod tests {
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("key changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_quarter_note_metronome_mark_sets_score_tempo() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.tempo_bpm, 96.0);
+    }
+
+    #[test]
+    fn musicxml_matching_metronome_and_sound_tempo_are_accepted() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction>
+                <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type>
+                <sound tempo="96"/>
+            </direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.tempo_bpm, 96.0);
+    }
+
+    #[test]
+    fn musicxml_conflicting_metronome_and_sound_tempo_are_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction>
+                <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type>
+                <sound tempo="90"/>
+            </direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("conflicting tempo indicators"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_non_quarter_metronome_mark_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><beat-unit>eighth</beat-unit><per-minute>180</per-minute></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("beat units other than undotted quarter notes"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_dotted_metronome_mark_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><beat-unit>quarter</beat-unit><beat-unit-dot/><per-minute>72</per-minute></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("only undotted quarter-note metronome marks"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_metric_modulation_metronome_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><metronome><metronome-note><metronome-type>eighth</metronome-type></metronome-note><metronome-relation>equals</metronome-relation><metronome-note><metronome-type>quarter</metronome-type><metronome-dot/></metronome-note></metronome></direction-type></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("only undotted quarter-note metronome marks"), "{error}");
     }
 
     #[test]
