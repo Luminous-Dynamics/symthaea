@@ -23,6 +23,75 @@ pub enum ImagineFutureError {
     PeerNotFound(String),
 }
 
+
+/// Cost model used by the three mental-imagination entry points.
+/// These are deterministic admission estimates, not measurements of wall-clock work.
+#[cfg(feature = "vision-manifold")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct ImaginationWorkEstimate {
+    pub(super) rollout: f32,
+    pub(super) geodesic: f32,
+    /// Expected one-time cost of a required manifold dilation.
+    pub(super) dilation: f32,
+}
+
+#[cfg(feature = "vision-manifold")]
+impl ImaginationWorkEstimate {
+    fn total(self) -> Option<f32> {
+        let total = self.rollout + self.geodesic + self.dilation;
+        (self.rollout.is_finite()
+            && self.geodesic.is_finite()
+            && self.dilation.is_finite()
+            && self.rollout >= 0.0
+            && self.geodesic >= 0.0
+            && self.dilation >= 0.0
+            && total.is_finite())
+        .then_some(total)
+    }
+}
+
+#[cfg(feature = "vision-manifold")]
+pub(super) fn estimate_imagination_work(
+    rollout_steps: usize,
+    geodesic_steps: usize,
+    candidate_count: usize,
+) -> Option<ImaginationWorkEstimate> {
+    let candidate_evaluations = geodesic_steps.checked_mul(candidate_count)?;
+    let rollout = (rollout_steps as f64 * 0.008) as f32;
+    let geodesic = (candidate_evaluations as f64 * 0.012) as f32;
+    if !rollout.is_finite() || !geodesic.is_finite() {
+        return None;
+    }
+    let estimate = ImaginationWorkEstimate {
+        rollout,
+        geodesic,
+        dilation: 0.0,
+    };
+    estimate.total()?;
+    Some(estimate)
+}
+
+#[cfg(feature = "vision-manifold")]
+pub(super) fn preflight_imagination_work(
+    current_load: f32,
+    estimate: ImaginationWorkEstimate,
+) -> Result<(), f32> {
+    let Some(total) = estimate.total() else {
+        return Err(f32::INFINITY);
+    };
+    let projected_load = current_load + total;
+    if !current_load.is_finite()
+        || !(0.0..=0.95).contains(&current_load)
+        || !projected_load.is_finite()
+    {
+        return Err(f32::INFINITY);
+    }
+    if projected_load > 0.95 {
+        return Err(projected_load);
+    }
+    Ok(())
+}
+
 impl CognitiveLoopService {
     /// Perform "Swarm Imagination": Run a mental simulation on behalf of a peer.
     ///
@@ -56,39 +125,116 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "swarm")]
         {
+            // Inspect peer/local shape and reserve the one-time dilation budget before
+            // any manifold mutation. HDC bundling requires identical dimensions.
+            let peer_dim = peer_msg.consciousness_hv.dim();
+            let peer_intent_dim = peer_msg.intent_hv.dim();
+            let local_dim = bridge.manifold().hdc_dim();
+            let local_state = bridge.manifold().state();
+            let dilation_target_dim =
+                symthaea_core::hdc::HdcDimensionality::Ultra.dimension();
+            if peer_dim == 0
+                || peer_intent_dim != peer_dim
+                || peer_dim > dilation_target_dim
+                || !peer_msg
+                    .consciousness_hv
+                    .values
+                    .iter()
+                    .all(|value| value.is_finite())
+                || !peer_msg
+                    .intent_hv
+                    .values
+                    .iter()
+                    .all(|value| value.is_finite())
+                || local_state.dim() != local_dim
+                || !local_state.values.iter().all(|value| value.is_finite())
+            {
+                // Peer state is external input; do not resize or bundle non-finite
+                // vectors into local cognitive state.
+                return Err(ImagineFutureError::NoGeodesic);
+            }
+
+            let needs_dilation = peer_dim > local_dim;
+            let target_dim = if needs_dilation {
+                dilation_target_dim
+            } else {
+                local_dim
+            };
+            if target_dim < local_dim || peer_dim > target_dim {
+                // Do not request an unsupported resolution or bundle mismatched vectors.
+                return Err(ImagineFutureError::NoGeodesic);
+            }
+
+            let mut estimate = estimate_imagination_work(0, steps, 4)
+                .ok_or(ImagineFutureError::ThermodynamicOverload(f32::INFINITY))?;
+            if needs_dilation {
+                estimate.dilation = 0.08;
+            }
+            preflight_imagination_work(self.thermodynamic_load, estimate)
+                .map_err(ImagineFutureError::ThermodynamicOverload)?;
+
             let manifold = bridge.manifold_mut();
 
-            // 2. Auto-dilate if peer is at higher resolution (Phase 3 optimization)
-            let peer_dim = peer_msg.consciousness_hv.values.len();
-            if peer_dim > manifold.hdc_dim() {
+            // Dilation is performed only after budget admission. Charge its one-time
+            // estimated cost after the operation, including an unsuccessful attempt.
+            if needs_dilation {
                 tracing::info!(
                     peer_dim,
-                    local_dim = manifold.hdc_dim(),
+                    local_dim,
                     "Collaborative Dreaming: Dilating to match peer resolution"
                 );
                 manifold.dilate(symthaea_core::hdc::HdcDimensionality::Ultra);
+                self.thermodynamic_load += estimate.dilation;
+                if manifold.hdc_dim() != dilation_target_dim
+                    || peer_dim > manifold.hdc_dim()
+                    || manifold.state().dim() != manifold.hdc_dim()
+                    || !manifold.state().values.iter().all(|value| value.is_finite())
+                {
+                    return Err(ImagineFutureError::NoGeodesic);
+                }
             }
-            // 3. Co-opt the manifold: Bundle peer consciousness into local state            // This effectively projects the "Self" into the "Other's" perspective.
+            // 3. Co-opt the manifold: expand peer encodings to the admitted target
+            // resolution before bundling. Never invoke HDC bundle on mismatched dims.
+            let peer_consciousness = if peer_dim == manifold.hdc_dim() {
+                peer_msg.consciousness_hv.clone()
+            } else {
+                peer_msg.consciousness_hv.dilate(manifold.hdc_dim())
+            };
+            let peer_intent = if peer_intent_dim == manifold.hdc_dim() {
+                peer_msg.intent_hv.clone()
+            } else {
+                peer_msg.intent_hv.dilate(manifold.hdc_dim())
+            };
             let mut collaborative_start = manifold.state().clone();
             collaborative_start = symthaea_core::core::ContinuousHV::bundle(&[
                 &collaborative_start,
-                &peer_msg.consciousness_hv,
+                &peer_consciousness,
             ]);
             collaborative_start.normalize();
 
-            // 3. Goal is the peer's intent
-            let goal = peer_msg.intent_hv.clone();
+            // 3. Goal is the peer's intent at the local admitted resolution.
+            let goal = peer_intent;
 
-            // 4. Run RK4 Geodesic simulation
+            // Do not charge path work if the manifold's cumulative counter cannot
+            // safely admit this search. Dilation (if any) has already been accounted.
+            if !manifold.can_compute_geodesic(steps, 4) {
+                return Err(ImagineFutureError::NoGeodesic);
+            }
+
+            // 4. Run RK4 Geodesic simulation.
             let path = manifold.select_best_geodesic(&collaborative_start, &goal, steps, 4);
+
+            // Charge this request's estimated geodesic work even when no usable path
+            // is returned. The computation has already been admitted and invoked.
+            self.thermodynamic_load += estimate.geodesic;
 
             if path.is_empty() {
                 return Err(ImagineFutureError::NoGeodesic);
             }
 
-            // Apply thermodynamic cost (helping others costs energy!)
-            let cost = manifold.telemetry().last_geodesic_cost;
-            self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
+            // Report the same measured local-transition proxy used by the manifold.
+            let trajectory_continuity = manifold.measure_path_coherence(&path);
+            let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
 
             // 5. Decode and return the "Dream"
             let frames = manifold.decode_geodesic_to_frames_improved(&path);
@@ -104,7 +250,9 @@ impl CognitiveLoopService {
                 height: self.config.vision_frame_height,
                 channels: bridge.manifold().last_frame_channels(),
                 path_length: path.len(),
-                semantic_coherence: 0.5, // Collaborative dreams are inherently uncertain
+                // Legacy field name retained; 0.0 means no proxy score was available.
+                semantic_coherence: trajectory_coherence,
+                trajectory_continuity,
                 trajectory: path,
             })
         }
@@ -137,31 +285,29 @@ impl CognitiveLoopService {
                 !goal.values.is_empty() && goal.values.iter().all(|value| value.is_finite())
             });
 
-        // Preflight the deterministic work budget before running either rollout.
-        // Keep these rates aligned with dream_ahead (0.008 per step) and
-        // select_best_geodesic (0.012 per step-candidate evaluation).
-        let candidate_count = 4usize;
-        let Some(candidate_evaluations) = steps.checked_mul(candidate_count) else {
-            return Err(ImagineFutureError::ThermodynamicOverload(f32::INFINITY));
-        };
-        let geodesic_cost = candidate_evaluations as f32 * 0.012;
-        let rollout_cost = if remembered_goal.is_some() {
-            0.0
-        } else {
-            steps as f32 * 0.008
-        };
-        let estimated_cost = geodesic_cost + rollout_cost;
-        let projected_load = self.thermodynamic_load + estimated_cost;
-        if !estimated_cost.is_finite() || !projected_load.is_finite() || projected_load > 0.95 {
-            return Err(ImagineFutureError::ThermodynamicOverload(projected_load));
-        }
+        // A remembered scene is usable only at the current manifold dimension.
+        let remembered_goal = remembered_goal
+            .filter(|goal| goal.dim() == manifold.hdc_dim());
+
+        // Preflight both phases before the first rollout/search mutation.
+        let rollout_steps = if remembered_goal.is_some() { 0 } else { steps };
+        let estimate = estimate_imagination_work(rollout_steps, steps, 4)
+            .ok_or(ImagineFutureError::ThermodynamicOverload(f32::INFINITY))?;
+        preflight_imagination_work(self.thermodynamic_load, estimate)
+            .map_err(ImagineFutureError::ThermodynamicOverload)?;
 
         let (goal, goal_source) = if let Some(goal) = remembered_goal {
             (goal, "remembered_scene")
         } else {
             let rollout = manifold.dream_ahead(steps, 0.1);
+            // A full-length response proves the rollout ran, even if its values are
+            // invalid. An empty response can be a fail-closed manifold guard.
+            if rollout.len() == steps {
+                self.thermodynamic_load += estimate.rollout;
+            }
             let Some(goal) = rollout.into_iter().last().filter(|goal| {
                 goal.dim() == manifold.hdc_dim()
+                    && !goal.values.is_empty()
                     && goal.values.iter().all(|value| value.is_finite())
             }) else {
                 return Err(ImagineFutureError::NoGeodesic);
@@ -169,17 +315,24 @@ impl CognitiveLoopService {
             (goal, "model_rollout_endpoint")
         };
 
-        // Refine the selected target over multiple candidate paths.
+        // Refine the selected target over multiple candidate paths. The manifold's
+        // own cumulative compute counter may independently fail closed; in that case
+        // the rollout remains charged, but an unstarted geodesic search is not.
+        if !manifold.can_compute_geodesic(steps, 4) {
+            return Err(ImagineFutureError::NoGeodesic);
+        }
         let path = manifold.select_best_geodesic(&current, &goal, steps, 4);
+        // Charge geodesic work immediately after the search, including empty results.
+        self.thermodynamic_load += estimate.geodesic;
         tracing::debug!(goal_source, steps, "Imagination target selected");
 
         if path.is_empty() {
             return Err(ImagineFutureError::NoGeodesic);
         }
 
-        // Charge only this call's deterministic work estimate. Never charge the
-        // manifold's lifetime accumulated telemetry as though it were per-call cost.
-        self.thermodynamic_load = (self.thermodynamic_load + estimated_cost).min(1.0);
+        // Report measured local transition continuity, not a fixed semantic score.
+        let trajectory_continuity = manifold.measure_path_coherence(&path);
+        let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
 
         // Decode the path into a viewable mental movie
         let frames = manifold.decode_geodesic_to_frames_improved(&path);
@@ -195,7 +348,9 @@ impl CognitiveLoopService {
             height: self.config.vision_frame_height,
             channels: bridge.manifold().last_frame_channels(),
             path_length: path.len(),
-            semantic_coherence: 0.0, // TODO: Compute from score_path_with_fep results if needed
+            // Legacy field name retained; this is geometric continuity, not semantics.
+            semantic_coherence: trajectory_coherence,
+            trajectory_continuity,
             trajectory: path,
         };
 
@@ -208,4 +363,46 @@ impl CognitiveLoopService {
         let _ = steps;
         Err(ImagineFutureError::NoVisionBridge)
     }
+}
+
+#[cfg(all(test, feature = "vision-manifold"))]
+mod work_budget_tests {
+    use super::*;
+
+    #[test]
+    fn estimator_is_deterministic_and_separates_phases() {
+        let first = estimate_imagination_work(10, 10, 4).unwrap();
+        let second = estimate_imagination_work(10, 10, 4).unwrap();
+        assert_eq!(first, second);
+        assert!((first.rollout - 0.08).abs() < 1e-6);
+        assert!((first.geodesic - 0.48).abs() < 1e-6);
+
+        let remembered_goal = estimate_imagination_work(0, 10, 4).unwrap();
+        assert_eq!(remembered_goal.rollout, 0.0);
+        assert!((first.total().unwrap() - remembered_goal.total().unwrap() - 0.08).abs() < 1e-6);
+    }
+
+    #[test]
+    fn dilation_cost_is_included_in_admission() {
+        let mut estimate = estimate_imagination_work(0, 2, 4).unwrap();
+        assert!(preflight_imagination_work(0.80, estimate).is_ok());
+        estimate.dilation = 0.08;
+        assert!((estimate.total().unwrap() - 0.176).abs() < 1e-6);
+        assert!(preflight_imagination_work(0.80, estimate).is_err());
+    }
+
+    #[test]
+    fn estimator_fails_closed_on_candidate_multiplication_overflow() {
+        assert!(estimate_imagination_work(0, usize::MAX, 4).is_none());
+    }
+
+    #[test]
+    fn preflight_rejects_invalid_load_and_over_budget_request() {
+        let small = estimate_imagination_work(0, 1, 4).unwrap();
+        assert!(preflight_imagination_work(f32::NAN, small).is_err());
+        assert!(preflight_imagination_work(f32::INFINITY, small).is_err());
+        assert!(preflight_imagination_work(-0.01, small).is_err());
+        assert!(preflight_imagination_work(0.91, small).is_err());
+    }
+
 }

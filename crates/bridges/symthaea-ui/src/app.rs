@@ -80,7 +80,7 @@ struct Movie {
     frames_rgba: Vec<Vec<u8>>,
     width: u32,
     height: u32,
-    semantic_coherence: f32,
+    trajectory_continuity: Option<f32>,
 }
 
 /// Generous upper bound on a single "mental movie" frame's pixel count
@@ -132,7 +132,10 @@ impl Movie {
             frames_rgba,
             width,
             height,
-            semantic_coherence: m["semantic_coherence"].as_f64().unwrap_or(0.0) as f32,
+            trajectory_continuity: m["trajectory_continuity"]
+                .as_f64()
+                .filter(|score| score.is_finite() && (0.0..=1.0).contains(score))
+                .map(|score| score as f32),
         })
     }
 }
@@ -379,7 +382,13 @@ pub fn App() -> impl IntoView {
                     ></canvas>
                     {move || movie.with(|m| m.as_ref().map(|m| view! {
                         <p class="movie-note" style="font-size:0.8em;opacity:0.6;">
-                            {format!("{} frames · coherence {:.2}", m.frames_rgba.len(), m.semantic_coherence)}
+                            {format!(
+                                "{} frames · trajectory continuity proxy {}",
+                                m.frames_rgba.len(),
+                                m.trajectory_continuity
+                                    .map(|score| format!("{score:.2}"))
+                                    .unwrap_or_else(|| "unavailable".to_string())
+                            )}
                         </p>
                     }))}
                 </div>

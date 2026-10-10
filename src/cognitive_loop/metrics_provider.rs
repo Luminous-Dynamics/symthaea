@@ -42,6 +42,7 @@ impl MetricsProvider for CognitiveLoopService {
                     channels: m.channels,
                     path_length: m.path_length,
                     semantic_coherence: m.semantic_coherence,
+                    trajectory_continuity: m.trajectory_continuity,
                 }
             }),
             last_observed_frame: None,

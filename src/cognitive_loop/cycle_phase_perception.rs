@@ -287,11 +287,10 @@ impl CognitiveLoopService {
                 self.thermodynamic_load = (self.thermodynamic_load + 0.08).min(1.0);
             }
 
-            // Apply accumulated vision compute costs (geodesics, dreaming, etc.)
-            let cost = bridge.manifold().telemetry().last_geodesic_cost;
-            if cost > 0.0 {
-                self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
-            }
+            // Do not charge `last_geodesic_cost` here: telemetry is a sticky
+            // observation, not a consumable event. The proactive, collaborative, and
+            // REQUEST_GEODESIC entry points account for their own work by phase; reading
+            // this field on every perception cycle would charge the same computation again.
 
             // Sync metrics for snapshot visibility
             let manifold = bridge.manifold();

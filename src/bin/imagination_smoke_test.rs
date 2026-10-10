@@ -59,7 +59,10 @@ fn main() {
                 movie.width, movie.height, movie.channels
             );
             println!("   | Horizon:    {} steps", movie.path_length);
-            println!("   | Coherence:  {:.4}", movie.semantic_coherence);
+            match movie.trajectory_continuity {
+                Some(score) => println!("   | Trajectory Continuity (proxy): {score:.4}"),
+                None => println!("   | Trajectory Continuity (proxy): unavailable"),
+            }
             println!(
                 "   | Total Size: {} bytes",
                 movie.frames.iter().map(|f| f.len()).sum::<usize>()

@@ -916,7 +916,11 @@ impl SymthaeaGui {
         };
 
         ui.horizontal(|ui| {
-            ui.label(format!("Path Coherence: {:.3}", movie.semantic_coherence));
+            if let Some(score) = movie.trajectory_continuity {
+                ui.label(format!("Trajectory Continuity (proxy): {:.3}", score));
+            } else {
+                ui.label("Trajectory Continuity (proxy): unavailable");
+            }
             ui.separator();
             ui.label(format!("Horizon: {} steps", movie.path_length));
             ui.separator();

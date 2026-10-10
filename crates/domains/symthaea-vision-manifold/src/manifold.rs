@@ -299,7 +299,7 @@ pub struct VisionManifold {
     transition_model: Option<Box<dyn TransitionModel>>,
     /// Latest generated geodesic path on the manifold.
     last_geodesic: Vec<ContinuousHV>,
-    /// Accumulated thermodynamic cost of geodesic computation.
+    /// Cumulative manifold-local compute-cost diagnostic for rollouts, geodesics, and actions.
     pub geodesic_compute_cost: f32,
     /// Reference frame storage for mental movie decoding.
     last_observed_frame: Option<Vec<u8>>,
@@ -1204,6 +1204,7 @@ impl VisionManifold {
         // Preserve training_triggered/training_loss set by observe_encoded
         let training_triggered = self.telemetry.training_triggered;
         let training_loss = self.telemetry.training_loss;
+        let last_geodesic_cost = self.telemetry.last_geodesic_cost;
         self.telemetry = VisionTelemetry {
             encode_time_us: encode_us,
             evolve_time_us: evolve_us,
@@ -1235,7 +1236,7 @@ impl VisionManifold {
                 .iter()
                 .map(|hv| hv.values.clone())
                 .collect(),
-            last_geodesic_cost: self.geodesic_compute_cost,
+            last_geodesic_cost,
             last_geodesic_length: self.last_geodesic.len(),
             last_fep_action: self.telemetry.last_fep_action.clone(),
         };
@@ -1395,6 +1396,7 @@ impl VisionManifold {
 
         let training_triggered = self.telemetry.training_triggered;
         let training_loss = self.telemetry.training_loss;
+        let last_geodesic_cost = self.telemetry.last_geodesic_cost;
         self.telemetry = VisionTelemetry {
             encode_time_us: 0,
             evolve_time_us: evolve_us,
@@ -1426,7 +1428,7 @@ impl VisionManifold {
                 .iter()
                 .map(|hv| hv.values.clone())
                 .collect(),
-            last_geodesic_cost: self.geodesic_compute_cost,
+            last_geodesic_cost,
             last_geodesic_length: self.last_geodesic.len(),
             last_fep_action: self.telemetry.last_fep_action.clone(),
         };
@@ -1599,7 +1601,6 @@ impl VisionManifold {
             .iter()
             .map(|hv| hv.values.clone())
             .collect();
-        self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
         self.telemetry.last_geodesic_length = self.last_geodesic.len();
 
         // Reset compute cost for next cycle
@@ -1880,6 +1881,12 @@ impl VisionManifold {
     /// Simulation evolves a local copy of the visual state under the learned
     /// autonomous dynamics. The live perceptual state and FEP belief remain unchanged.
     pub fn dream_ahead(&mut self, steps: usize, dt: f32) -> Vec<ContinuousHV> {
+        // Reject impossible accounting before allocating or computing the rollout.
+        let Some((_, projected_compute_cost)) =
+            checked_compute_cost_increment(steps, 0.008, self.geodesic_compute_cost)
+        else {
+            return Vec::new();
+        };
         let mut predictions = Vec::with_capacity(steps);
         let mut dream_state = self.state.clone();
         let safe_dt = if dt.is_finite() && dt > 0.0 { dt } else { 0.0 };
@@ -1897,7 +1904,7 @@ impl VisionManifold {
         }
 
         // Account for simulated work without changing sensory or belief state.
-        self.geodesic_compute_cost += steps as f32 * 0.008;
+        self.geodesic_compute_cost = projected_compute_cost;
         predictions
     }
 
@@ -1936,6 +1943,12 @@ impl VisionManifold {
             return Vec::new();
         }
 
+        let Some((geodesic_call_cost, projected_compute_cost)) =
+            checked_geodesic_cost_increment(steps, 1, self.geodesic_compute_cost)
+        else {
+            return Vec::new();
+        };
+
         let mut path = Vec::with_capacity(steps);
         // Start point
         path.push(from.clone());
@@ -1963,11 +1976,21 @@ impl VisionManifold {
             .collect();
         self.telemetry.last_geodesic_length = self.last_geodesic.len();
 
-        // Update thermodynamic cost (Phase 3)
-        self.geodesic_compute_cost += steps as f32 * 0.012;
-        self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
+        // Keep cumulative diagnostics separate from the per-call telemetry value.
+        self.geodesic_compute_cost = projected_compute_cost;
+        self.telemetry.last_geodesic_cost = geodesic_call_cost;
 
         path
+    }
+
+    /// Check whether this manifold can account for the requested path cost before
+    /// any search work begins. The cumulative counter is diagnostic and may have
+    /// reached a non-finite value independently of the caller's service-level load.
+    pub fn can_compute_geodesic(&self, steps: usize, num_candidates: usize) -> bool {
+        if steps == 0 || num_candidates == 0 {
+            return true;
+        }
+        checked_geodesic_cost_increment(steps, num_candidates, self.geodesic_compute_cost).is_some()
     }
 
     /// Select the best geodesic path using Expected Free Energy (G).
@@ -1984,6 +2007,15 @@ impl VisionManifold {
         if steps == 0 || num_candidates == 0 {
             return Vec::new();
         }
+
+        // Fail closed before path generation or telemetry mutation when the per-call
+        // cost cannot be represented safely. The persistent counter is cumulative;
+        // the telemetry field below records this request's incremental cost.
+        let Some((geodesic_call_cost, projected_compute_cost)) =
+            checked_geodesic_cost_increment(steps, num_candidates, self.geodesic_compute_cost)
+        else {
+            return Vec::new();
+        };
 
         let mut final_goal = goal.clone();
         if final_goal.values.len() != self.hdc_dim() {
@@ -2012,10 +2044,10 @@ impl VisionManifold {
         self.telemetry.last_geodesic_path = best_path.iter().map(|hv| hv.values.clone()).collect();
         self.telemetry.last_geodesic_length = best_path.len();
 
-        // Update thermodynamic cost (Phase 3)
-        // Science: metabolic cost of high-res mental simulation.
-        self.geodesic_compute_cost += (steps * num_candidates) as f32 * 0.012;
-        self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
+        // Update thermodynamic cost (Phase 3). Keep the cumulative counter for
+        // diagnostics, but expose only this call's incremental cost as "last".
+        self.geodesic_compute_cost = projected_compute_cost;
+        self.telemetry.last_geodesic_cost = geodesic_call_cost;
 
         // Store intent for swarm broadcast (Phase 5)
         self.last_intent_hv = final_goal;
@@ -2059,6 +2091,36 @@ impl VisionManifold {
         }
 
         coherent
+    }
+
+    /// Measure mean local transition coherence across a latent trajectory.
+    ///
+    /// This uses the same geometric proxy as `enforce_sheaf_coherence` so the
+    /// report describes the local transition property the path validator checks.
+    /// It measures latent-state continuity, not semantic correctness, predictive
+    /// accuracy, or subjective experience. Paths with fewer than two states or
+    /// invalid transitions have no available score.
+    pub fn measure_path_coherence(&self, path: &[ContinuousHV]) -> Option<f32> {
+        if path.len() < 2 {
+            return None;
+        }
+
+        let mut total = 0.0f32;
+        for pair in path.windows(2) {
+            if pair[0].dim() != pair[1].dim() {
+                return None;
+            }
+            let score = self.compute_local_coherence(&pair[0], &pair[1]);
+            if !score.is_finite() {
+                return None;
+            }
+            total += score;
+            if !total.is_finite() {
+                return None;
+            }
+        }
+
+        Some((total / (path.len() - 1) as f32).clamp(0.0, 1.0))
     }
 
     fn compute_local_coherence(&self, a: &ContinuousHV, b: &ContinuousHV) -> f32 {
@@ -11002,5 +11064,166 @@ mod tests {
         let mut invalid = saved.clone();
         invalid.modality_contexts[0].next_track_id = 0;
         assert!(restored.validate_checkpoint_state(&invalid).is_err());
+    }
+
+    #[test]
+    fn path_coherence_is_unavailable_without_a_transition() {
+        let manifold = test_manifold();
+        let state = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0001);
+        assert_eq!(manifold.measure_path_coherence(&[]), None);
+        assert_eq!(manifold.measure_path_coherence(std::slice::from_ref(&state)), None);
+    }
+
+    #[test]
+    fn path_coherence_fails_closed_on_mismatched_dimensions() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(8, 0xC0DE_0010);
+        let b = ContinuousHV::random(9, 0xC0DE_0011);
+        assert_eq!(manifold.measure_path_coherence(&[a, b]), None);
+    }
+
+    #[test]
+    fn path_coherence_fails_closed_on_non_finite_scores() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(8, 0xC0DE_0012);
+        let mut b = ContinuousHV::random(8, 0xC0DE_0013);
+        b.values[0] = f32::NAN;
+        assert_eq!(manifold.measure_path_coherence(&[a, b]), None);
+    }
+
+    #[test]
+    fn path_coherence_is_the_mean_of_local_transition_scores() {
+        let manifold = test_manifold();
+        let a = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0002);
+        let b = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0003);
+        let c = ContinuousHV::random(manifold.hdc_dim(), 0xC0DE_0004);
+        let path = [a.clone(), b.clone(), c.clone()];
+        let expected = (manifold.compute_local_coherence(&a, &b)
+            + manifold.compute_local_coherence(&b, &c))
+            / 2.0;
+        let actual = manifold
+            .measure_path_coherence(&path)
+            .expect("two-transition path must be measurable");
+        assert!(actual.is_finite());
+        assert!((0.0..=1.0).contains(&actual));
+        assert!((actual - expected).abs() <= f32::EPSILON);
+    }
+}
+
+ 
+/// Compute an incremental cost and projected cumulative total before work begins.
+fn checked_compute_cost_increment(
+    work_units: usize,
+    unit_cost: f64,
+    cumulative_cost: f32,
+) -> Option<(f32, f32)> {
+    // Every public simulation path is bounded by the same maximum per-request
+    // work budget as the cognitive-loop admission layer. This also rejects
+    // enormous step counts before Vec::with_capacity or path generation.
+    const MAX_CALL_COST: f32 = 0.95;
+
+    let exact_call_cost = work_units as f64 * unit_cost;
+    let call_cost = exact_call_cost as f32;
+    if !unit_cost.is_finite()
+        || unit_cost < 0.0
+        || !exact_call_cost.is_finite()
+        || !call_cost.is_finite()
+        || call_cost > MAX_CALL_COST
+        || !cumulative_cost.is_finite()
+        || cumulative_cost < 0.0
+        || (work_units > 0 && unit_cost > 0.0 && call_cost == 0.0)
+    {
+        return None;
+    }
+    let projected = cumulative_cost + call_cost;
+    // Reject increments that disappear entirely at the accumulator's current
+    // precision. A finite unchanged total is not successful cost accounting.
+    if !projected.is_finite() || (call_cost > 0.0 && projected <= cumulative_cost) {
+        return None;
+    }
+    Some((call_cost, projected))
+}
+
+/// Compute per-call and projected cumulative geodesic cost with checked
+/// candidate multiplication and finite accumulation.
+fn checked_geodesic_cost_increment(
+    steps: usize,
+    num_candidates: usize,
+    cumulative_cost: f32,
+) -> Option<(f32, f32)> {
+    let evaluations = steps.checked_mul(num_candidates)?;
+    checked_compute_cost_increment(evaluations, 0.012, cumulative_cost)
+}
+
+#[cfg(test)]
+mod checked_geodesic_cost_tests {
+    use super::{
+        checked_compute_cost_increment, checked_geodesic_cost_increment, VisionConfig,
+        VisionManifold,
+    };
+
+    #[test]
+    fn checked_cost_returns_increment_and_new_cumulative_total() {
+        let (increment, total) = checked_geodesic_cost_increment(8, 3, 1.0).unwrap();
+        assert!((increment - 0.288).abs() < 1e-6);
+        assert!((total - 1.288).abs() < 1e-6);
+    }
+
+    #[test]
+    fn checked_cost_rejects_multiplication_overflow() {
+        assert_eq!(checked_geodesic_cost_increment(usize::MAX, 4, 0.0), None);
+    }
+
+    #[test]
+    fn checked_cost_rejects_invalid_or_overflowing_accumulator() {
+        assert_eq!(checked_geodesic_cost_increment(1, 1, f32::NAN), None);
+        assert_eq!(checked_geodesic_cost_increment(1, 1, f32::INFINITY), None);
+        assert_eq!(checked_geodesic_cost_increment(1, 1, f32::MAX), None);
+        assert_eq!(checked_geodesic_cost_increment(1, 1, -1.0), None);
+    }
+
+    #[test]
+    fn checked_cost_rejects_per_call_budget_excess_before_allocation() {
+        assert_eq!(checked_compute_cost_increment(100, 0.012, 0.0), None);
+        assert_eq!(checked_compute_cost_increment(200, 0.008, 0.0), None);
+    }
+
+    #[test]
+    fn checked_rollout_cost_is_incremental_and_finite() {
+        let (increment, total) = checked_compute_cost_increment(8, 0.008, 1.0).unwrap();
+        assert!((increment - 0.064).abs() < 1e-6);
+        assert!((total - 1.064).abs() < 1e-6);
+        assert_eq!(checked_compute_cost_increment(1, f64::NAN, 0.0), None);
+        assert_eq!(checked_compute_cost_increment(usize::MAX, f64::MAX, 0.0), None);
+    }
+
+    #[test]
+    fn manifold_admission_refuses_non_finite_cumulative_counter() {
+        let mut manifold = VisionManifold::new(VisionConfig::default(), 64, 64);
+        assert!(manifold.can_compute_geodesic(8, 3));
+        manifold.geodesic_compute_cost = f32::MAX;
+        assert!(!manifold.can_compute_geodesic(8, 3));
+    }
+
+    #[test]
+    fn observation_refresh_preserves_incremental_geodesic_cost() {
+        use super::ContinuousHV;
+
+        let mut manifold = VisionManifold::new(VisionConfig::default(), 16, 16);
+        let from = ContinuousHV::random(manifold.hdc_dim(), 0xC057_0001);
+        let goal = ContinuousHV::random(manifold.hdc_dim(), 0xC057_0002);
+        let path = manifold.find_geodesic(&from, &goal, 8);
+        assert_eq!(path.len(), 8);
+
+        let expected = 8.0 * 0.012;
+        assert!((manifold.telemetry.last_geodesic_cost - expected).abs() < 1e-6);
+
+        // Non-geodesic work belongs to the cycle counter, not the last-call field.
+        manifold.geodesic_compute_cost += 0.05;
+        manifold
+            .observe_frame_checked(&vec![23; 16 * 16], 16, 16, 1, 0.033)
+            .expect("valid observation");
+        assert!((manifold.telemetry.last_geodesic_cost - expected).abs() < 1e-6);
+        assert_eq!(manifold.geodesic_compute_cost, 0.0);
     }
 }

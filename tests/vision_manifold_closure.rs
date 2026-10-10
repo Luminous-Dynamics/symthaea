@@ -55,6 +55,12 @@ mod tests {
                 "Manifold should generate mental simulation frames"
             );
             assert!(movie.semantic_coherence > 0.0);
+            let continuity = movie
+                .trajectory_continuity
+                .expect("generated movie should have a measurable transition");
+            assert!(continuity.is_finite());
+            assert!((0.0..=1.0).contains(&continuity));
+            assert_eq!(movie.semantic_coherence, continuity);
         }
     }
 }
