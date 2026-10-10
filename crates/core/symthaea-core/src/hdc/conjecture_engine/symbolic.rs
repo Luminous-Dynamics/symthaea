@@ -14,7 +14,95 @@ pub enum SymExpr {
     Cos(Box<SymExpr>),
 }
 
+/// Failure modes for strict symbolic-expression evaluation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SymExprEvalError {
+    MissingVariable(String),
+    DuplicateVariableBinding(String),
+    NonFiniteVariableBinding(String),
+    DivisionByZero,
+    LogDomain,
+    NonFiniteResult,
+}
+
+impl std::fmt::Display for SymExprEvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingVariable(name) => write!(f, "missing variable binding: {name}"),
+            Self::DuplicateVariableBinding(name) => {
+                write!(f, "duplicate variable binding: {name}")
+            }
+            Self::NonFiniteVariableBinding(name) => {
+                write!(f, "non-finite variable binding: {name}")
+            }
+            Self::DivisionByZero => write!(f, "division by zero"),
+            Self::LogDomain => write!(f, "logarithm requires a positive argument"),
+            Self::NonFiniteResult => write!(f, "expression produced a non-finite result"),
+        }
+    }
+}
+
+impl std::error::Error for SymExprEvalError {}
+
 impl SymExpr {
+    /// Evaluate without silently replacing missing variables with zero.
+    ///
+    /// This checked API rejects missing/duplicate/non-finite bindings,
+    /// division by zero, invalid logarithm arguments, and non-finite results.
+    /// It is the required path for evidence-producing mathematical checks.
+    pub fn eval_checked(
+        &self,
+        vars: &[(&str, f64)],
+    ) -> Result<f64, SymExprEvalError> {
+        let value = match self {
+            SymExpr::Var(name) => {
+                let mut matches = vars.iter().filter(|(candidate, _)| *candidate == name);
+                let (_, value) = matches
+                    .next()
+                    .ok_or_else(|| SymExprEvalError::MissingVariable(name.clone()))?;
+                if matches.next().is_some() {
+                    return Err(SymExprEvalError::DuplicateVariableBinding(name.clone()));
+                }
+                if !value.is_finite() {
+                    return Err(SymExprEvalError::NonFiniteVariableBinding(name.clone()));
+                }
+                *value
+            }
+            SymExpr::Const(value) => *value,
+            SymExpr::Add(left, right) => {
+                left.eval_checked(vars)? + right.eval_checked(vars)?
+            }
+            SymExpr::Mul(left, right) => {
+                left.eval_checked(vars)? * right.eval_checked(vars)?
+            }
+            SymExpr::Div(left, right) => {
+                let numerator = left.eval_checked(vars)?;
+                let denominator = right.eval_checked(vars)?;
+                if denominator == 0.0 {
+                    return Err(SymExprEvalError::DivisionByZero);
+                }
+                numerator / denominator
+            }
+            SymExpr::Neg(inner) => -inner.eval_checked(vars)?,
+            SymExpr::Pow(base, exponent) => base.eval_checked(vars)?.powf(*exponent),
+            SymExpr::Log(inner) => {
+                let argument = inner.eval_checked(vars)?;
+                if argument <= 0.0 {
+                    return Err(SymExprEvalError::LogDomain);
+                }
+                argument.ln()
+            }
+            SymExpr::Sin(inner) => inner.eval_checked(vars)?.sin(),
+            SymExpr::Cos(inner) => inner.eval_checked(vars)?.cos(),
+        };
+
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(SymExprEvalError::NonFiniteResult)
+        }
+    }
+
     pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
         match self {
             SymExpr::Var(name) => vars
@@ -210,9 +298,9 @@ pub struct ConservationCheck {
     /// constant numerical zero. This is structural evidence about the current
     /// simplifier, not a universal proof.
     pub symbolic_derivative_simplified_to_zero: bool,
-    /// True only when the derived expression evaluates to a finite value at
-    /// every fixed sample point. Non-finite evaluations invalidate the sample.
-    pub sampled_values_finite: bool,
+    /// True only when every sample has complete bindings, respects expression
+    /// domains, and evaluates to a finite value. Any evaluation error fails closed.
+    pub sampled_evaluations_valid: bool,
     /// True when every sample is finite and its absolute residual is below
     /// 1e-10 at all six fixed numeric test points.
     pub sampled_residual_passed: bool,
@@ -231,8 +319,8 @@ impl fmt::Display for ConservationCheck {
         )?;
         writeln!(
             f,
-            "  Sample values finite: {}",
-            if self.sampled_values_finite { "YES" } else { "NO" }
+            "  Sample evaluations valid: {}",
+            if self.sampled_evaluations_valid { "YES" } else { "NO" }
         )?;
         writeln!(
             f,
@@ -261,40 +349,51 @@ pub fn assess_conservation_symbolic(
     let total_deriv = total_deriv.simplify();
     let symbolic_derivative_simplified_to_zero =
         matches!(&total_deriv, SymExpr::Const(c) if *c == 0.0);
-    let test_points: Vec<Vec<(&str, f64)>> = vec![
-        vec![("x", 1.0), ("v", 0.0)],
-        vec![("x", 0.0), ("v", 1.0)],
-        vec![
-            ("x", std::f64::consts::FRAC_1_SQRT_2),
-            ("v", std::f64::consts::FRAC_1_SQRT_2),
-        ],
-        vec![("x", -1.0), ("v", 0.5)],
-        vec![("x", 0.3), ("v", -0.9)],
-        vec![("x", 2.0), ("v", -1.5)],
+    // Bind every declared state variable at every sample point. Each variable
+    // receives a deterministic rotation of the base values to avoid restricting
+    // all multivariate checks to the x=v diagonal. Unmentioned symbols cause
+    // checked evaluation to fail rather than silently defaulting to zero.
+    const BASE_SAMPLE_VALUES: [f64; 6] = [
+        1.0,
+        0.0,
+        std::f64::consts::FRAC_1_SQRT_2,
+        -1.0,
+        0.3,
+        2.0,
     ];
-    let sampled_residuals: Vec<f64> = test_points
-        .iter()
-        .map(|pt| total_deriv.eval(pt))
+    let test_points: Vec<Vec<(&str, f64)>> = (0..BASE_SAMPLE_VALUES.len())
+        .map(|sample_index| {
+            dynamics
+                .iter()
+                .enumerate()
+                .map(|(variable_index, (name, _))| {
+                    (
+                        *name,
+                        BASE_SAMPLE_VALUES
+                            [(sample_index + variable_index) % BASE_SAMPLE_VALUES.len()],
+                    )
+                })
+                .collect()
+        })
         .collect();
-    let sampled_values_finite = sampled_residuals.iter().all(|value| value.is_finite());
-    // f64::max ignores a NaN operand, which could otherwise turn an
-    // undefined residual into an apparent zero. Fail closed if any sample is
-    // non-finite and make that failure visible in the reported residual.
-    let max_residual = if sampled_values_finite {
-        sampled_residuals
-            .iter()
-            .map(|value| value.abs())
-            .fold(0.0f64, f64::max)
-    } else {
-        f64::INFINITY
+    let sampled_residuals: Result<Vec<f64>, SymExprEvalError> = test_points
+        .iter()
+        .map(|point| total_deriv.eval_checked(point))
+        .collect();
+    let (sampled_evaluations_valid, max_residual) = match sampled_residuals {
+        Ok(values) if !dynamics.is_empty() => (
+            true,
+            values.iter().map(|value| value.abs()).fold(0.0f64, f64::max),
+        ),
+        _ => (false, f64::INFINITY),
     };
 
     ConservationCheck {
         quantity: format!("{}", energy),
         total_derivative: format!("{}", total_deriv),
         symbolic_derivative_simplified_to_zero,
-        sampled_values_finite,
-        sampled_residual_passed: sampled_values_finite && max_residual < 1e-10,
+        sampled_evaluations_valid,
+        sampled_residual_passed: sampled_evaluations_valid && max_residual < 1e-10,
         max_numerical_residual: max_residual,
     }
 }
@@ -427,6 +526,43 @@ mod conservation_evidence_tests {
     }
 
     #[test]
+    fn checked_eval_rejects_missing_variable_binding() {
+        let expr = SymExpr::Var("y".into());
+        assert_eq!(
+            expr.eval_checked(&[("x", 1.0)]),
+            Err(SymExprEvalError::MissingVariable("y".into()))
+        );
+    }
+
+    #[test]
+    fn checked_eval_rejects_duplicate_and_non_finite_bindings() {
+        let expr = SymExpr::Var("x".into());
+        assert_eq!(
+            expr.eval_checked(&[("x", 1.0), ("x", 2.0)]),
+            Err(SymExprEvalError::DuplicateVariableBinding("x".into()))
+        );
+        assert_eq!(
+            expr.eval_checked(&[("x", f64::NAN)]),
+            Err(SymExprEvalError::NonFiniteVariableBinding("x".into()))
+        );
+    }
+
+    #[test]
+    fn conservation_assessment_fails_when_a_state_variable_is_unbound() {
+        let energy = SymExpr::Mul(
+            Box::new(SymExpr::Var("x".into())),
+            Box::new(SymExpr::Var("y".into())),
+        );
+        let dynamics = [("x", SymExpr::Const(1.0))];
+
+        let check = assess_conservation_symbolic(&energy, &dynamics);
+
+        assert!(!check.sampled_evaluations_valid);
+        assert!(!check.sampled_residual_passed);
+        assert!(check.max_numerical_residual.is_infinite());
+    }
+
+    #[test]
     fn fixed_sample_points_can_miss_a_nonzero_derivative() {
         // Construct a nonzero polynomial whose roots are exactly the assessor's
         // six fixed sample x-coordinates. This demonstrates why sampled success
@@ -489,7 +625,7 @@ mod conservation_evidence_tests {
             &[("x", rhs)],
         );
 
-        assert!(!check.sampled_values_finite);
+        assert!(!check.sampled_evaluations_valid);
         assert!(!check.sampled_residual_passed);
         assert!(check.max_numerical_residual.is_infinite());
     }
