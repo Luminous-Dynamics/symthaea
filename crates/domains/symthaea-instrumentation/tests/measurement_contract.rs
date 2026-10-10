@@ -41,11 +41,19 @@ fn resolved_calibration() -> ResolvedCalibration {
 }
 
 fn measurement(sequence: u64, captured_at_ns: u64) -> MeasurementEnvelope {
+    measurement_in_clock_domain(sequence, captured_at_ns, clock_domain())
+}
+
+fn measurement_in_clock_domain(
+    sequence: u64,
+    captured_at_ns: u64,
+    clock_domain: ClockDomainId,
+) -> MeasurementEnvelope {
     MeasurementEnvelope::new(MeasurementInput {
         identity: InstrumentIdentity::new("ultrasound-research-rig-01", "rf-channel-0").unwrap(),
         sequence,
         captured_at_ns,
-        clock_domain: clock_domain(),
+        clock_domain,
         quantity: Quantity::Frequency,
         unit: Unit::Hertz,
         value: 5_000_000.0,
@@ -109,6 +117,7 @@ fn creates_a_unit_consistent_measurement_envelope() {
     assert_eq!(m.quantity(), Quantity::Frequency);
     assert_eq!(m.unit(), Unit::Hertz);
     assert_eq!(m.value(), 5_000_000.0);
+    assert_eq!(m.clock_domain().as_str(), "ultrasound-rig-boot-epoch-01");
     assert_eq!(m.identity().instrument_id(), "ultrasound-research-rig-01");
     assert_eq!(m.processing_chain_version(), "sha256:reconstruction-pipeline-v1");
 }
@@ -680,6 +689,44 @@ fn clock_domain_mismatch_fails_before_consuming_the_measurement_sequence() {
         &mut guard,
     )
     .unwrap();
+}
+
+#[test]
+fn clock_epoch_change_is_rejected_by_an_existing_stream_guard() {
+    let first = measurement(1, SAMPLE_TIME_NS);
+    let next_epoch_id = ClockDomainId::new("ultrasound-rig-boot-epoch-02").unwrap();
+    let second_epoch = measurement_in_clock_domain(
+        2,
+        SAMPLE_TIME_NS + 1,
+        next_epoch_id.clone(),
+    );
+    let mut guard = MeasurementStreamGuard::default();
+
+    first
+        .assess_for_quantitative_use(
+            SAMPLE_TIME_NS,
+            &clock_domain(),
+            &policy(),
+            &resolver(),
+            &mut guard,
+        )
+        .unwrap();
+
+    assert_eq!(
+        second_epoch
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS + 2,
+                &next_epoch_id,
+                &policy(),
+                &resolver(),
+                &mut guard,
+            )
+            .unwrap_err(),
+        AssessmentFailure::StreamOrder(StreamOrderFailure::ClockDomainChanged {
+            previous: clock_domain(),
+            received: next_epoch_id,
+        })
+    );
 }
 
 #[test]
