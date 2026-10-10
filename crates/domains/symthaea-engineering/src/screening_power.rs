@@ -328,7 +328,7 @@ mod tests {
     }
 
     fn request() -> ScreeningDesignRequest {
-        ScreeningDesignRequest {
+        let mut request = ScreeningDesignRequest {
             experiment_id: "power-screen-001".into(),
             preregistration_id: "prereg-power-v1".into(),
             input_snapshot_id: "power-inputs-v1".into(),
@@ -385,11 +385,15 @@ mod tests {
                 status: BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol,
                 protocol_id: "bench-power-v1".into(),
                 reviewed_input_snapshot_id: "power-inputs-v1".into(),
+                reviewed_design_sha256: String::new(),
                 review_id: "review-power-v1".into(),
                 reviewer_role: "qualified bench-scale reviewer".into(),
                 evidence: evidence("review-record", EvidenceKind::Measured),
             },
-        }
+        };
+        request.bench_scale_review.reviewed_design_sha256 =
+            crate::screening_design::screening_design_sha256(&request).unwrap();
+        request
     }
 
     fn variation(
