@@ -214,6 +214,21 @@ class TrustAnchorPolicyTests(unittest.TestCase):
                     module.fetch_authoritative_pr_merge_sha(
                         repo, pr, subject, "security/fix", "main", "token")
 
+    def test_pr_test_merge_sha_recheck_accepts_unchanged_commit(self):
+        repo = "owner/repo"
+        pr = {"number": 12}
+        with patch.object(module, "fetch_authoritative_pr_merge_sha", return_value="c" * 40):
+            module.recheck_authoritative_pr_merge_sha(
+                repo, pr, "a" * 40, "security/fix", "main", "c" * 40, "token")
+
+    def test_pr_test_merge_sha_recheck_rejects_changed_commit(self):
+        repo = "owner/repo"
+        pr = {"number": 12}
+        with patch.object(module, "fetch_authoritative_pr_merge_sha", return_value="d" * 40):
+            with self.assertRaisesRegex(module.VerificationError, "changed while"):
+                module.recheck_authoritative_pr_merge_sha(
+                    repo, pr, "a" * 40, "security/fix", "main", "c" * 40, "token")
+
     def test_verdict_workflow_sha_must_match_authoritative_merge_sha(self):
         repo = "Luminous-Dynamics/mycelix"
         payload, run = self.make_verdict(repo)
