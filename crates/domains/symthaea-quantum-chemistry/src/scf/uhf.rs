@@ -95,7 +95,6 @@ pub struct UhfResult {
     /// expected). See the module doc and `compute_spin_squared` below.
     pub spin_squared_computed: f64,
     /// Present when a required checked eigensolve or energy validation failed.
-    /// Present when a required checked eigensolve or energy validation failed.
     /// A failed calculation always has converged=false and non-finite energies.
     pub solver_error: Option<String>,
     /// Residual receipt for every required checked eigensolve and overlap transform.
