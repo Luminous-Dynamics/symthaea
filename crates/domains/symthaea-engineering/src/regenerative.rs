@@ -190,6 +190,10 @@ fn validate_fraction(value: f64, field: &'static str) -> Result<(), DesignError>
     Ok(())
 }
 
+fn approximately_equal(a: f64, b: f64) -> bool {
+    (a - b).abs() <= tolerance(a, b)
+}
+
 fn validate_evidence(evidence: &EvidenceRef, field: &'static str) -> Result<(), DesignError> {
     if evidence.evidence_id.trim().is_empty() {
         return Err(DesignError::new(field, "requires a non-empty evidence ID"));
@@ -229,14 +233,90 @@ fn calculate_metrics(
             "cannot exceed dry feedstock mass",
         ));
     }
+    validate_nonnegative(
+        process.non_char_dry_products_residual_kg,
+        "process.non_char_dry_products_residual_kg",
+    )?;
+    if !approximately_equal(
+        process.char_product_kg + process.non_char_dry_products_residual_kg,
+        process.dry_feedstock_kg,
+    ) {
+        return Err(DesignError::new(
+            "process.mass_balance",
+            "char plus residual dry products must equal dry feedstock",
+        ));
+    }
+
+    validate_nonnegative(process.feedstock_carbon_kg, "process.feedstock_carbon_kg")?;
+    validate_nonnegative(process.char_carbon_kg, "process.char_carbon_kg")?;
+    validate_nonnegative(
+        process.carbon_not_in_char_kg,
+        "process.carbon_not_in_char_kg",
+    )?;
     validate_fraction(
         process.carbon_retained_in_char_fraction,
         "process.carbon_retained_in_char_fraction",
+    )?;
+    if process.char_carbon_kg > process.feedstock_carbon_kg
+        || !approximately_equal(
+            process.char_carbon_kg + process.carbon_not_in_char_kg,
+            process.feedstock_carbon_kg,
+        )
+    {
+        return Err(DesignError::new(
+            "process.carbon_balance",
+            "carbon streams must close and char carbon cannot exceed feedstock carbon",
+        ));
+    }
+    let expected_carbon_retention = if process.feedstock_carbon_kg == 0.0 {
+        0.0
+    } else {
+        process.char_carbon_kg / process.feedstock_carbon_kg
+    };
+    if !approximately_equal(
+        process.carbon_retained_in_char_fraction,
+        expected_carbon_retention,
+    ) {
+        return Err(DesignError::new(
+            "process.carbon_retained_in_char_fraction",
+            "retention ratio is inconsistent with elemental carbon masses",
+        ));
+    }
+
+    validate_nonnegative(
+        process.dry_feedstock_sensible_heat_mj,
+        "process.dry_feedstock_sensible_heat_mj",
+    )?;
+    validate_nonnegative(
+        process.water_heating_and_vaporization_heat_mj,
+        "process.water_heating_and_vaporization_heat_mj",
+    )?;
+    validate_nonnegative(
+        process.reactor_sensible_heat_mj,
+        "process.reactor_sensible_heat_mj",
+    )?;
+    validate_nonnegative(
+        process.declared_terms_heat_duty_mj,
+        "process.declared_terms_heat_duty_mj",
     )?;
     validate_nonnegative(
         process.estimated_supplied_heat_mj,
         "process.estimated_supplied_heat_mj",
     )?;
+    let recomputed_duty = process.dry_feedstock_sensible_heat_mj
+        + process.water_heating_and_vaporization_heat_mj
+        + process.reactor_sensible_heat_mj;
+    if !approximately_equal(process.declared_terms_heat_duty_mj, recomputed_duty)
+        || process.estimated_supplied_heat_mj + tolerance(
+            process.estimated_supplied_heat_mj,
+            process.declared_terms_heat_duty_mj,
+        ) < process.declared_terms_heat_duty_mj
+    {
+        return Err(DesignError::new(
+            "process.heat_balance",
+            "declared heat duty must match component duties and supplied heat cannot be lower",
+        ));
+    }
 
     for (field, id) in [
         (
@@ -474,7 +554,7 @@ mod tests {
             char_carbon_kg: 100.0 * carbon_retained,
             carbon_not_in_char_kg: 100.0 * (1.0 - carbon_retained),
             carbon_retained_in_char_fraction: carbon_retained,
-            dry_feedstock_sensible_heat_mj: 0.0,
+            dry_feedstock_sensible_heat_mj: heat_mj,
             water_heating_and_vaporization_heat_mj: 0.0,
             reactor_sensible_heat_mj: 0.0,
             declared_terms_heat_duty_mj: heat_mj,
