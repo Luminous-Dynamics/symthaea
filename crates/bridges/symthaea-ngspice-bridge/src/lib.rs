@@ -8,8 +8,8 @@
 pub mod rawfile;
 
 use symthaea_sim_bridge::{
-    CommandSolver, EngineeringDomain, SimulationBackend, SimulationError, SimulationRequest,
-    SimulationResult, SolverKind,
+    EngineeringDomain, SimulationBackend, SimulationError, SimulationRequest, SimulationResult,
+    SolverKind,
 };
 
 /// ngspice backend descriptor.
@@ -72,24 +72,18 @@ impl SimulationBackend for NgspiceBridge {
                 .with_metric("settling_time", 0.032, "s"));
         }
 
-        // Real path: execute command
-        let cmd = CommandSolver::new(&self.solver_cmd)
-            .arg("-b") // Batch mode
-            .arg("input.sp");
-
-        let output = cmd.execute()?;
-
-        // The strict ASCII parser in the rawfile module is covered by golden
-        // fixtures, but this execution path still lacks frozen per-run input
-        // identity, raw/log artifact capture, solver/version provenance, and
-        // independently justified convergence semantics. Keep failing closed:
-        // parsed numbers alone would not be sufficient engineering evidence.
-        Err(SimulationError::Adapter(format!(
-            "ngspice ran successfully but real-output parsing is not yet \
-             implemented; cannot report convergence/voltage metrics without \
-             parsing rawfile output. Raw stdout ({} bytes) was discarded.",
-            output.len()
-        )))
+        // Refuse to execute ambient input.sp. SimulationRequest currently
+        // carries intent/parameters/metric names, but no immutable netlist
+        // artifact, digest, include closure, or working-directory identity.
+        // Running a fixed relative path would execute an input not bound to
+        // this request and make provenance unverifiable. Add a typed netlist
+        // artifact to the execution contract before enabling the real path.
+        Err(SimulationError::Adapter(
+            "ngspice execution requires an explicit immutable netlist artifact, but \
+             SimulationRequest does not carry one; refusing to execute ambient ./input.sp. \
+             The bridge remains fail-closed until input identity, raw/log artifacts, \
+             solver identity, and separate convergence evidence are wired.".into(),
+        ))
     }
 }
 
@@ -107,5 +101,29 @@ mod tests {
             "screen transient response",
         );
         assert!(backend.run(&request).unwrap().converged);
+    }
+
+    #[test]
+    fn real_path_refuses_to_execute_unbound_ambient_netlist() {
+        let backend = NgspiceBridge {
+            dry_run: false,
+            // This executable intentionally does not need to exist. The bridge
+            // must reject the missing request artifact before attempting spawn.
+            solver_cmd: "symthaea-test-must-not-spawn".into(),
+        };
+        let request = SimulationRequest::new(
+            "spice-unbound-input",
+            EngineeringDomain::Electrical,
+            SolverKind::Circuit,
+            "screen transient response",
+        );
+        let error = backend.run(&request).expect_err("unbound input must fail closed");
+        match error {
+            SimulationError::Adapter(message) => {
+                assert!(message.contains("explicit immutable netlist artifact"));
+                assert!(message.contains("refusing to execute ambient ./input.sp"));
+            }
+            other => panic!("expected an adapter error, got {other:?}"),
+        }
     }
 }
