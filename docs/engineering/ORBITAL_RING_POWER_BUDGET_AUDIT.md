@@ -17,7 +17,7 @@ The paper contains three relevant power estimates from different stated contexts
 
 The 500 GW estimate is **not** the Table 8 cryostat power. It is an electromagnetic drag loss estimate for the conducting-sheet model. Birch says the superconducting surface would reduce drag-related dissipation to cryogenic losses, and also notes a linear-induction-motor approach could cancel much of the eddy current. A modern design would need to model those alternatives, their controls, and power recovery consistently.
 
-The two cryogenic pairs each imply a roughly 100:1 ratio of wall-plug input to the stated cold-side load. Their absolute values differ by a factor of five. The arithmetic is clear; whether the difference comes from configuration, length basis, table normalization, or a substantive inconsistency requires a source-level reconstruction. Do not silently pick one pair or average them. An additional Table 8 consistency check divides the reported superconductor mass per ring by its mass per length: 5.3 × 10⁷ kg / 1.2 kg m⁻¹ = 44.17 Mm for the orbital ring, and 8.8 × 10⁷ kg / 2.0 kg m⁻¹ = 44.00 Mm for the geosynchronous-ring entry. Their mean is 44.08 Mm; at the listed 10 W/m this implies 440.8 MW, within about 12% of the rounded 500 MW total. This makes the Table 8 values look internally consistent at the stated precision, but still does not explain why the earlier paragraph gives 100 MW for the whole ORS.
+The two cryogenic pairs each imply a roughly 100:1 ratio of wall-plug input to the stated cold-side load. Their absolute values differ by a factor of five. The arithmetic is clear; whether the difference comes from configuration, length basis, table normalization, or a substantive inconsistency requires a source-level reconstruction. Do not silently pick one pair or average them. An additional Table 8 consistency check divides the reported superconductor mass per ring by its mass per length: 5.3 × 10⁷ kg / 1.2 kg m⁻¹ = 44.17 Mm for the orbital ring, and 8.8 × 10⁷ kg / 2.0 kg m⁻¹ = 44.00 Mm for the geosynchronous-ring entry. Their mean is 44.08 Mm. If treated as a circular centerline, that is an equivalent radius of about 7,016 km or about 638 km altitude using the WGS-84 equatorial radius. Its circumference is only 0.54% longer than the nominal 600 km circular-path circumference discussed as a representative height in the paper. At the listed 10 W/m, the mean length implies 440.8 MW, within about 12% of the rounded 500 MW total. This makes the Table 8 entries internally consistent at the stated precision and broadly compatible with a ~600 km reference path, but does not prove that exact geometry or explain why the earlier paragraph gives 100 MW for the whole ORS.
 
 ## Reproduced conducting-sheet arithmetic
 
@@ -87,23 +87,25 @@ This is not a failure-release, impact-damage, or structural-load prediction. Cou
 
 ## Reproducibility and evidence state
 
+The 600 km comparison is a geometric consistency reference only, not proof that Table 8 specifies an exact 600 km altitude.
+
 Run from the repository root:
 
 ```sh
 python3 scripts/engineering/orbital_ring_power_source_audit.py
 ```
 
-The standard-library script computes the drag coefficients, checks the smaller and larger drag-power estimates and paired cryogenic ratios, and reconstructs the Table 8 length/heat-load scale. The recorded run passed **16/16 checks** and emitted byte-identical JSON on repeat. The captured report is checked into [the evidence directory](evidence/orbital_ring_power_source_audit.json) for review.
+The standard-library script computes the drag coefficients, checks the smaller and larger drag-power estimates and paired cryogenic ratios, and reconstructs the Table 8 length/heat-load scale and checks the implied circle against a 600 km reference path. The recorded run passed **19/19 checks** and emitted byte-identical JSON on repeat. The captured report is checked into [the evidence directory](evidence/orbital_ring_power_source_audit.json) for review.
 
-- Source Git blob: `5b6e23922027c64b604158b2557fc68673a4ecc9`
-- Source SHA-256: `adab9dcdd4bd8fc6f8ffa99d5fb42035849054d68852ddaca631da63c9ad7514`
-- Deterministic JSON SHA-256: `b353bdf568f2f1358cfff49cb5d2bf334e37b137d41876bbd79a193e7aa8df5d`
+- Source Git blob: `8a5b9e7c2cde299bf4a26ed2b85f2f01fe3f3470`
+- Source SHA-256: `b1c7a5b1f3cd74fc98427e22fa6243052f15e80a25ba438fbe53fac232a83395`
+- Deterministic JSON SHA-256: `1d637037f5e1d21cabb5cdd5d80acec95e8f5866aa681ccff10f2fc47c2e1c42`
 
 This evidence verifies only the arithmetic of transcribed source values. It does not establish a valid current design, cryocooler performance, heat-rejection feasibility, structural stability, safe failure behavior, costs, or buildability.
 
 ## Next closure artifacts
 
-1. Verify the physical interpretation of Table 8's implied ~44 Mm path length, and explain why the p. 483 whole-system heat-loss estimate is five times lower than the Table 8-derived scale.
+1. Confirm Table 8's exact design geometry/row scope; its line-mass data imply a ~638 km circular-equivalent altitude, close to the 600 km comparison benchmark, but explain why the p. 483 whole-system heat-loss estimate is five times lower than the Table 8-derived scale.
 2. Model conducting-sheet eddy-current drag, superconducting track alternatives, and linear-motor cancellation as separate architectures with explicit boundaries.
 3. Include energy recovery and control overhead rather than representing the approximate drag power as a mandatory net electrical demand.
 4. Carry the resulting source assumptions and uncertainty intervals into the T0/T1 manifest before comparing power, throughput or lifecycle costs.
