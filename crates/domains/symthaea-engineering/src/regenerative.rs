@@ -12,7 +12,11 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
-use symthaea_agribot::soil_process::{EvidenceRef, PyrolysisBatchResult};
+use symthaea_agribot::soil_process::{
+    assess_biochar_climate, BiocharClimateAssessment, BiocharClimateInput, CharStorageEligibility,
+    ClimateFlow, ClimateFlowKind, ClimateInventoryStatus, EvidenceKind, EvidenceRef,
+    PyrolysisBatchResult,
+};
 
 const RELATIVE_EPSILON: f64 = 1e-9;
 
@@ -86,6 +90,8 @@ pub struct RegenerativeDesignCandidate {
     pub water_l_per_kg_dry_feedstock: f64,
     pub water_evidence: EvidenceRef,
     pub quality_gate: ProductQualityGate,
+    /// Optional, explicit lifecycle inventory. Required when climate is an objective or hard constraint.
+    pub climate_input: Option<BiocharClimateInput>,
 }
 
 /// Requirements are scenario- or stakeholder-defined hard constraints, not universal
@@ -100,6 +106,10 @@ pub struct RegenerativeDesignRequirements {
     pub max_supplied_heat_mj_per_kg_dry_feedstock: f64,
     pub max_cost_per_kg_dry_feedstock: f64,
     pub max_water_l_per_kg_dry_feedstock: f64,
+    /// Include complete net climate impact as a Pareto objective. Unknown/incomplete climate inputs become indeterminate.
+    pub include_climate_objective: bool,
+    /// Optional hard limit on net kg CO2e per kg dry feedstock; may be negative.
+    pub max_net_climate_kg_co2e_per_kg_dry_feedstock: Option<f64>,
 }
 
 impl RegenerativeDesignRequirements {
@@ -133,6 +143,20 @@ impl RegenerativeDesignRequirements {
             self.max_water_l_per_kg_dry_feedstock,
             "max_water_l_per_kg_dry_feedstock",
         )?;
+        if let Some(limit) = self.max_net_climate_kg_co2e_per_kg_dry_feedstock {
+            if !limit.is_finite() {
+                return Err(DesignError::new(
+                    "max_net_climate_kg_co2e_per_kg_dry_feedstock",
+                    "must be finite",
+                ));
+            }
+            if !self.include_climate_objective {
+                return Err(DesignError::new(
+                    "include_climate_objective",
+                    "a climate limit requires complete climate accounting to be enabled",
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -145,6 +169,8 @@ pub struct RegenerativeDesignMetrics {
     pub supplied_heat_mj_per_kg_dry_feedstock: f64,
     pub cost_per_kg_dry_feedstock: f64,
     pub water_l_per_kg_dry_feedstock: f64,
+    /// Net kg CO2e per kg dry feedstock; None means lifecycle data is absent/incomplete.
+    pub net_climate_kg_co2e_per_kg_dry_feedstock: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -169,6 +195,7 @@ pub struct RegenerativeDesignAssessment {
     pub metrics: RegenerativeDesignMetrics,
     pub failed_constraints: Vec<String>,
     pub quality_gate_status: QualityGateStatus,
+    pub climate_assessment: Option<BiocharClimateAssessment>,
     /// Always true: design screening is not proof of field efficacy.
     pub field_validation_required: bool,
     pub scope_note: String,
@@ -206,6 +233,7 @@ fn validate_evidence(evidence: &EvidenceRef, field: &'static str) -> Result<(), 
 fn calculate_metrics(
     candidate: &RegenerativeDesignCandidate,
     requirements: &RegenerativeDesignRequirements,
+    climate_assessment: Option<&BiocharClimateAssessment>,
 ) -> Result<RegenerativeDesignMetrics, DesignError> {
     if candidate.candidate_id.trim().is_empty() {
         return Err(DesignError::new("candidate_id", "cannot be empty"));
@@ -372,6 +400,9 @@ fn calculate_metrics(
             / process.dry_feedstock_kg,
         cost_per_kg_dry_feedstock: candidate.cost_per_kg_dry_feedstock,
         water_l_per_kg_dry_feedstock: candidate.water_l_per_kg_dry_feedstock,
+        net_climate_kg_co2e_per_kg_dry_feedstock: climate_assessment
+            .and_then(|assessment| assessment.net_kg_co2e)
+            .map(|net| net / process.dry_feedstock_kg),
     };
     for (field, value) in [
         (
@@ -388,6 +419,15 @@ fn calculate_metrics(
     ] {
         validate_nonnegative(value, field)?;
     }
+    if result
+        .net_climate_kg_co2e_per_kg_dry_feedstock
+        .is_some_and(|value| !value.is_finite())
+    {
+        return Err(DesignError::new(
+            "metrics.net_climate_kg_co2e_per_kg_dry_feedstock",
+            "must be finite",
+        ));
+    }
     Ok(result)
 }
 
@@ -398,7 +438,15 @@ pub fn assess_regenerative_candidate(
     requirements: &RegenerativeDesignRequirements,
 ) -> Result<RegenerativeDesignAssessment, DesignError> {
     requirements.validate()?;
-    let metrics = calculate_metrics(candidate, requirements)?;
+    let climate_assessment = candidate
+        .climate_input
+        .as_ref()
+        .map(|input| {
+            assess_biochar_climate(&candidate.process, input)
+                .map_err(|error| DesignError::new(error.field, error.reason))
+        })
+        .transpose()?;
+    let metrics = calculate_metrics(candidate, requirements, climate_assessment.as_ref())?;
     let mut failed_constraints = Vec::new();
 
     if metrics.char_yield_fraction_dry_basis < requirements.min_char_yield_fraction {
@@ -421,10 +469,20 @@ pub fn assess_regenerative_candidate(
     if candidate.quality_gate.status == QualityGateStatus::Fail {
         failed_constraints.push("product_quality_gate_failed".to_string());
     }
+    if let (Some(limit), Some(net)) = (
+        requirements.max_net_climate_kg_co2e_per_kg_dry_feedstock,
+        metrics.net_climate_kg_co2e_per_kg_dry_feedstock,
+    ) {
+        if net > limit {
+            failed_constraints.push("net_climate_above_maximum".to_string());
+        }
+    }
 
+    let climate_indeterminate = requirements.include_climate_objective
+        && metrics.net_climate_kg_co2e_per_kg_dry_feedstock.is_none();
     let eligibility = if !failed_constraints.is_empty() {
         CandidateEligibility::Ineligible
-    } else if candidate.quality_gate.status == QualityGateStatus::Unknown {
+    } else if candidate.quality_gate.status == QualityGateStatus::Unknown || climate_indeterminate {
         CandidateEligibility::Indeterminate
     } else {
         CandidateEligibility::EligibleForDesignComparison
@@ -437,6 +495,7 @@ pub fn assess_regenerative_candidate(
         metrics,
         failed_constraints,
         quality_gate_status: candidate.quality_gate.status,
+        climate_assessment,
         field_validation_required: true,
         scope_note: "design-screen result only; not an amendment certification or field recommendation".into(),
     })
@@ -446,7 +505,11 @@ fn tolerance(a: f64, b: f64) -> f64 {
     RELATIVE_EPSILON * a.abs().max(b.abs()).max(1.0)
 }
 
-fn dominates(a: RegenerativeDesignMetrics, b: RegenerativeDesignMetrics) -> bool {
+fn dominates(
+    a: RegenerativeDesignMetrics,
+    b: RegenerativeDesignMetrics,
+    include_climate: bool,
+) -> bool {
     // Maximize char yield and carbon retention; minimize heat, cost and water.
     let no_worse = a.char_yield_fraction_dry_basis
         + tolerance(a.char_yield_fraction_dry_basis, b.char_yield_fraction_dry_basis)
@@ -492,7 +555,20 @@ fn dominates(a: RegenerativeDesignMetrics, b: RegenerativeDesignMetrics) -> bool
             + tolerance(a.water_l_per_kg_dry_feedstock, b.water_l_per_kg_dry_feedstock)
             < b.water_l_per_kg_dry_feedstock;
 
-    no_worse && strictly_better
+    if include_climate {
+        let (Some(a_climate), Some(b_climate)) = (
+            a.net_climate_kg_co2e_per_kg_dry_feedstock,
+            b.net_climate_kg_co2e_per_kg_dry_feedstock,
+        ) else {
+            return false;
+        };
+        let climate_no_worse = a_climate <= b_climate + tolerance(a_climate, b_climate);
+        let climate_strictly_better =
+            a_climate + tolerance(a_climate, b_climate) < b_climate;
+        no_worse && climate_no_worse && (strictly_better || climate_strictly_better)
+    } else {
+        no_worse && strictly_better
+    }
 }
 
 /// Return the sorted non-dominated set among candidates passing all numeric constraints
@@ -521,7 +597,7 @@ pub fn regenerative_pareto_frontier(
     let mut frontier = Vec::new();
     for (i, (candidate_id, candidate_metrics)) in eligible.iter().enumerate() {
         let is_dominated = eligible.iter().enumerate().any(|(j, (_, other_metrics))| {
-            i != j && dominates(*other_metrics, *candidate_metrics)
+            i != j && dominates(*other_metrics, *candidate_metrics, requirements.include_climate_objective)
         });
         if !is_dominated {
             frontier.push(candidate_id.clone());
@@ -596,6 +672,7 @@ mod tests {
                 evidence_id: format!("{id}-quality"),
                 method_or_standard_id: "scenario-quality-gate-v1".into(),
             },
+            climate_input: None,
         }
     }
 
@@ -608,6 +685,8 @@ mod tests {
             max_supplied_heat_mj_per_kg_dry_feedstock: 8.0,
             max_cost_per_kg_dry_feedstock: 10.0,
             max_water_l_per_kg_dry_feedstock: 8.0,
+            include_climate_objective: false,
+            max_net_climate_kg_co2e_per_kg_dry_feedstock: None,
         }
     }
 
