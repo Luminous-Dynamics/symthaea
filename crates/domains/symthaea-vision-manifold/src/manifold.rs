@@ -1880,6 +1880,12 @@ impl VisionManifold {
     /// Simulation evolves a local copy of the visual state under the learned
     /// autonomous dynamics. The live perceptual state and FEP belief remain unchanged.
     pub fn dream_ahead(&mut self, steps: usize, dt: f32) -> Vec<ContinuousHV> {
+        // Reject impossible accounting before allocating or computing the rollout.
+        let Some((rollout_cost, projected_compute_cost)) =
+            checked_compute_cost_increment(steps, 0.008, self.geodesic_compute_cost)
+        else {
+            return Vec::new();
+        };
         let mut predictions = Vec::with_capacity(steps);
         let mut dream_state = self.state.clone();
         let safe_dt = if dt.is_finite() && dt > 0.0 { dt } else { 0.0 };
@@ -1897,7 +1903,8 @@ impl VisionManifold {
         }
 
         // Account for simulated work without changing sensory or belief state.
-        self.geodesic_compute_cost += steps as f32 * 0.008;
+        self.geodesic_compute_cost = projected_compute_cost;
+        let _ = rollout_cost;
         predictions
     }
 
@@ -1936,6 +1943,12 @@ impl VisionManifold {
             return Vec::new();
         }
 
+        let Some((geodesic_call_cost, projected_compute_cost)) =
+            checked_geodesic_cost_increment(steps, 1, self.geodesic_compute_cost)
+        else {
+            return Vec::new();
+        };
+
         let mut path = Vec::with_capacity(steps);
         // Start point
         path.push(from.clone());
@@ -1963,9 +1976,9 @@ impl VisionManifold {
             .collect();
         self.telemetry.last_geodesic_length = self.last_geodesic.len();
 
-        // Update thermodynamic cost (Phase 3)
-        self.geodesic_compute_cost += steps as f32 * 0.012;
-        self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
+        // Keep cumulative diagnostics separate from the per-call telemetry value.
+        self.geodesic_compute_cost = projected_compute_cost;
+        self.telemetry.last_geodesic_cost = geodesic_call_cost;
 
         path
     }
@@ -11015,25 +11028,39 @@ mod tests {
 }
 
 
-/// Compute per-call and projected cumulative cost without unchecked integer
-/// multiplication or non-finite float accumulation.
-fn checked_geodesic_cost_increment(
-    steps: usize,
-    num_candidates: usize,
+/// Compute an incremental cost and projected cumulative total before work begins.
+fn checked_compute_cost_increment(
+    work_units: usize,
+    unit_cost: f64,
     cumulative_cost: f32,
 ) -> Option<(f32, f32)> {
-    let evaluations = steps.checked_mul(num_candidates)?;
-    let call_cost = (evaluations as f64 * 0.012) as f32;
-    if !call_cost.is_finite() || !cumulative_cost.is_finite() || cumulative_cost < 0.0 {
+    let call_cost = (work_units as f64 * unit_cost) as f32;
+    if !unit_cost.is_finite()
+        || unit_cost < 0.0
+        || !call_cost.is_finite()
+        || !cumulative_cost.is_finite()
+        || cumulative_cost < 0.0
+    {
         return None;
     }
     let projected = cumulative_cost + call_cost;
     projected.is_finite().then_some((call_cost, projected))
 }
 
+/// Compute per-call and projected cumulative geodesic cost with checked
+/// candidate multiplication and finite accumulation.
+fn checked_geodesic_cost_increment(
+    steps: usize,
+    num_candidates: usize,
+    cumulative_cost: f32,
+) -> Option<(f32, f32)> {
+    let evaluations = steps.checked_mul(num_candidates)?;
+    checked_compute_cost_increment(evaluations, 0.012, cumulative_cost)
+}
+
 #[cfg(test)]
 mod checked_geodesic_cost_tests {
-    use super::checked_geodesic_cost_increment;
+    use super::{checked_compute_cost_increment, checked_geodesic_cost_increment};
 
     #[test]
     fn checked_cost_returns_increment_and_new_cumulative_total() {
@@ -11051,5 +11078,12 @@ mod checked_geodesic_cost_tests {
         assert_eq!(checked_geodesic_cost_increment(1, 1, f32::INFINITY), None);
         assert_eq!(checked_geodesic_cost_increment(1, 1, f32::MAX), None);
         assert_eq!(checked_geodesic_cost_increment(1, 1, -1.0), None);
+    }
+
+    #[test]
+    fn checked_rollout_cost_is_incremental_and_finite() {
+        assert_eq!(checked_compute_cost_increment(8, 0.008, 1.0), Some((0.064, 1.064)));
+        assert_eq!(checked_compute_cost_increment(usize::MAX, 0.008, 0.0), Some(((usize::MAX as f64 * 0.008) as f32, (usize::MAX as f64 * 0.008) as f32)));
+        assert_eq!(checked_compute_cost_increment(1, f64::NAN, 0.0), None);
     }
 }
