@@ -1,0 +1,141 @@
+{
+  "checks": [
+    {
+      "id": "eddy_drag.equivalent_speed_positive_finite",
+      "note": "Computed using the paper's Eq. (73) coefficient with its stated aluminium conductivity and illustrative 5 cm sheet.",
+      "observed": 0.8991804694457363,
+      "status": "passed"
+    },
+    {
+      "expected": 0.9,
+      "id": "eddy_drag.equivalent_speed_reference",
+      "observed": 0.8991804694457363,
+      "status": "passed",
+      "tolerance": 0.02
+    },
+    {
+      "id": "eddy_drag.example_power_finite_positive",
+      "observed": 179836093.88914725,
+      "status": "passed"
+    },
+    {
+      "expected": 200000000.0,
+      "id": "eddy_drag.example_power_reproduced",
+      "note": "Uses the paper's rounded example lift force of 2e8 N; compares to the stated ~0.2 GW example.",
+      "observed": 179836093.88914725,
+      "status": "passed",
+      "tolerance": 30000000.0
+    },
+    {
+      "id": "eddy_drag.power_finite_positive",
+      "observed": 449590234722.8681,
+      "status": "passed"
+    },
+    {
+      "expected": 500000000000.0,
+      "id": "eddy_drag.power_scale_reproduced",
+      "note": "Within 12% of the paper's approximate 500 GW statement; inputs include a rounded force estimate.",
+      "observed": 449590234722.8681,
+      "status": "passed",
+      "tolerance": 60000000000.0
+    },
+    {
+      "expected": 100.0,
+      "id": "cryo_pair_1.ratio_is_100",
+      "note": "Birch 1982, p. 483, \u00a73.4; source numbers are transcribed as published, not assumed to share identical normalization.",
+      "observed": 100.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "expected": 100.0,
+      "id": "cryo_pair_2.ratio_is_100",
+      "note": "Birch 1982, p. 485, Table 8; source numbers are transcribed as published, not assumed to share identical normalization.",
+      "observed": 100.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "expected": 5.0,
+      "id": "cryo_reported_cold_load_scale_factor_5",
+      "observed": 5.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "expected": 5.0,
+      "id": "cryo_reported_wall_plug_scale_factor_5",
+      "observed": 5.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "id": "stored_energy_finite_positive",
+      "observed": 1.792e+16,
+      "status": "passed"
+    },
+    {
+      "expected": 1.792e+16,
+      "id": "stored_energy_reference_17_92_PJ",
+      "note": "Conditional arithmetic only: assign the cited 8 km/s speed magnitude to the entire cited 5.6e8 kg mass.",
+      "observed": 1.792e+16,
+      "status": "passed",
+      "tolerance": 1.0
+    }
+  ],
+  "checks_failed": 0,
+  "checks_passed": 12,
+  "conditional_stored_energy": {
+    "caveat": "Not a failure-release or damage prediction.",
+    "mass_kg": 560000000.0,
+    "specific_kinetic_energy_j_kg": 32000000.0,
+    "speed_m_s": 8000.0,
+    "total_energy_j": 1.792e+16,
+    "total_energy_pj": 17.92
+  },
+  "cryogenic_pairs": [
+    {
+      "cold_side_heat_load_w": 100000000.0,
+      "cryostat_electrical_power_w": 10000000000.0,
+      "electrical_to_cold_load_ratio": 100.0,
+      "source_location": "Birch 1982, p. 483, \u00a73.4"
+    },
+    {
+      "cold_side_heat_load_w": 500000000.0,
+      "cryostat_electrical_power_w": 50000000000.0,
+      "electrical_to_cold_load_ratio": 100.0,
+      "source_location": "Birch 1982, p. 485, Table 8"
+    }
+  ],
+  "eddy_drag_example": {
+    "aluminum_conductivity_s_m": 35400000.0,
+    "calculated_power_gw": 449.5902347228681,
+    "calculated_power_w": 449590234722.8681,
+    "equivalent_drag_speed_m_s": 0.8991804694457363,
+    "example_calculated_power_gw": 0.17983609388914726,
+    "example_skyhook_lift_force_n": 200000000.0,
+    "example_source_approximation_gw": 0.2,
+    "formula_from_paper": "P_E = F_L * 2/(mu_0 * sigma * delta)",
+    "interpretation": "Electromagnetic eddy-current drag estimate for the stated conducting-sheet model; distinct from superconducting cryostat wall-plug power.",
+    "mu_0_h_m": 1.2566370614359173e-06,
+    "precessing_force_n": 500000000000.0,
+    "sheet_thickness_m": 0.05,
+    "source_approximation_gw": 500.0
+  },
+  "evidence_state": "passed_at_specified_fidelity",
+  "failed_check_ids": [],
+  "schema": "luminous-dynamics.orbital-ring-power-source-audit/v1",
+  "scope": "Source-number arithmetic audit only; not full source reconstruction or engineering feasibility analysis.",
+  "source": {
+    "author": "Paul Birch",
+    "pages": {
+      "cryogenic_paragraph": 483,
+      "electromagnetic_drag": 482,
+      "table_8": 485
+    },
+    "title": "Orbital Ring Systems and Jacob's Ladders \u2014 I",
+    "url": "https://nss.org/wp-content/uploads/Orbital-Rings.pdf",
+    "year": 1982
+  },
+  "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1 but the absolute scale differs by 5x. This script does not resolve whether scenario, length basis, or normalization differs."
+}
