@@ -1,0 +1,65 @@
+name: Repository Trust Policy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: repository-trust-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-effective-main-rules:
+    name: Effective main rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact verifier, policy, and recipe
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SUBJECT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/${REPOSITORY}/${SUBJECT_SHA}"
+          curl --fail --location --silent --show-error \
+            "${base}/.github/scripts/check-repository-trust-policy.py" \
+            --output /tmp/check-repository-trust-policy.py
+          curl --fail --location --silent --show-error \
+            "${base}/.github/repository-trust-policy.json" \
+            --output /tmp/repository-trust-policy.json
+          curl --fail --location --silent --show-error \
+            "${base}/.github/rulesets/main-trusted-root-v1.json" \
+            --output /tmp/main-trusted-root-v1.json
+
+      - name: Self-test verifier
+        run: python3 /tmp/check-repository-trust-policy.py --self-test
+
+      - name: Fetch effective active rules for main
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          url="https://api.github.com/repos/${REPOSITORY}/rules/branches/main"
+          status="$({ curl --location --silent --show-error \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            --output /tmp/effective-main-rules.json \
+            --write-out '%{http_code}' \
+            "$url"; } || true)"
+          if [ "$status" != "200" ]; then
+            echo "repository_trust_readback=UNAVAILABLE"
+            echo "http_status=$status"
+            exit 2
+          fi
+
+      - name: Verify recipe and minimum active rules
+        run: |
+          python3 /tmp/check-repository-trust-policy.py \
+            --policy /tmp/repository-trust-policy.json \
+            --recipe /tmp/main-trusted-root-v1.json \
+            --rules /tmp/effective-main-rules.json
