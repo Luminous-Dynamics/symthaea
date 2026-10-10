@@ -39,6 +39,16 @@ def calculate(h_km):
             "period_min": t_s / 60.0, "specific_kinetic_energy_mj_kg": e_j_kg / 1e6}
 
 
+def normal_force_per_length(line_density_kg_m, inertial_speed_m_s, path_radius_m):
+    """Net normal force per unit arc length for a steady circular stream."""
+    values = (line_density_kg_m, inertial_speed_m_s, path_radius_m)
+    if not all(math.isfinite(x) for x in values):
+        raise ValueError("inputs must be finite")
+    if line_density_kg_m < 0 or inertial_speed_m_s < 0 or path_radius_m <= 0:
+        raise ValueError("density/speed must be non-negative and radius positive")
+    return line_density_kg_m * inertial_speed_m_s**2 / path_radius_m
+
+
 def main():
     rows, checks = [calculate(h) for h in ALTITUDES_KM], []
 
@@ -79,6 +89,30 @@ def main():
     ):
         check(f"trend.{name}", ok)
 
+    # Hand-checkable inertial-frame limit for a steady stream on a fixed circle.
+    # This is a net normal resultant, not the load assigned to a specific actuator.
+    base = normal_force_per_length(1.0, 3.0, 10.0)  # 1 kg/m * (3 m/s)^2 / 10 m = 0.9 N/m
+    check("circular_stream.base_case_n_per_m", base, 0.9, 1e-12,
+          "Fixed circular path; inertial speed, constant line density, no tangential acceleration.")
+    check("circular_stream.zero_speed_is_zero", normal_force_per_length(1.0, 0.0, 10.0), 0.0, 0.0)
+    check("circular_stream.speed_doubling_quadruples_resultant",
+          normal_force_per_length(1.0, 6.0, 10.0), 4.0 * base, 1e-12)
+    check("circular_stream.radius_doubling_halves_resultant",
+          normal_force_per_length(1.0, 3.0, 20.0), 0.5 * base, 1e-12)
+    check("circular_stream.density_doubling_doubles_resultant",
+          normal_force_per_length(2.0, 3.0, 10.0), 2.0 * base, 1e-12)
+    for name, args in (
+        ("negative_density_rejected", (-1.0, 3.0, 10.0)),
+        ("nonfinite_speed_rejected", (1.0, math.inf, 10.0)),
+        ("nonpositive_radius_rejected", (1.0, 3.0, 0.0)),
+    ):
+        try:
+            normal_force_per_length(*args)
+            rejected = False
+        except ValueError:
+            rejected = True
+        check(f"circular_stream.input_guard.{name}", rejected)
+
     failed = [c["id"] for c in checks if c["status"] != "passed"]
     report = {
         "schema": SCHEMA,
@@ -94,6 +128,13 @@ def main():
                         "omitted": ["drag", "J2", "third bodies", "Earth rotation", "ring-support physics"]},
         "formulae": {"radius": "r = R_E + h", "circumference": "C = 2*pi*r", "speed": "v = sqrt(mu/r)",
                      "period": "T = 2*pi*sqrt(r^3/mu)", "specific_kinetic_energy": "e_k = 0.5*v^2"},
+        "stream_kinematics_limit": {
+            "geometry": "steady mass stream following a fixed circular path in an inertial frame",
+            "line_density_kg_m": 1.0, "inertial_speed_m_s": 3.0, "path_radius_m": 10.0,
+            "net_normal_force_per_length_n_m": base,
+            "formula": "q_n = lambda * v_inertial^2 / R",
+            "boundary": "Net normal resultant only; not a magnetic/support actuator load or orbital-ring equilibrium proof.",
+        },
         "rows": rows, "check_count": len(checks), "checks": checks, "failed_check_ids": failed,
     }
     print(json.dumps(report, indent=2, sort_keys=True, allow_nan=False))
