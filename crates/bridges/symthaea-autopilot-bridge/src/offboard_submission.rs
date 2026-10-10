@@ -183,6 +183,9 @@ pub struct Px4OffboardSubmissionProfileV1 {
     pub profile_id: String,
     /// Bound target instance identity; this profile does not authenticate that binding.
     pub target_instance_id: String,
+    /// Exact controller firmware, vehicle class, and control-profile qualification ID.
+    /// This is a declared binding, not authenticated firmware measurement.
+    pub controller_profile_id: String,
     /// Local publisher/adapter identity expected to produce every record.
     pub producer_profile_id: String,
     /// The proof-of-life transport family this profile evaluates.
@@ -210,6 +213,7 @@ impl Px4OffboardSubmissionProfileV1 {
     pub fn new(
         profile_id: impl Into<String>,
         target_instance_id: impl Into<String>,
+        controller_profile_id: impl Into<String>,
         producer_profile_id: impl Into<String>,
         transport: Px4OffboardTransportV1,
         submission_clock_domain: ClockDomainId,
@@ -224,6 +228,7 @@ impl Px4OffboardSubmissionProfileV1 {
             schema_version: PX4_OFFBOARD_SUBMISSION_SCHEMA_V1,
             profile_id: profile_id.into(),
             target_instance_id: target_instance_id.into(),
+            controller_profile_id: controller_profile_id.into(),
             producer_profile_id: producer_profile_id.into(),
             transport,
             submission_clock_domain,
@@ -253,6 +258,7 @@ impl Px4OffboardSubmissionProfileV1 {
         validate_schema(self.schema_version)?;
         validate_identifier(&self.profile_id, "profile_id")?;
         validate_identifier(&self.target_instance_id, "target_instance_id")?;
+        validate_identifier(&self.controller_profile_id, "controller_profile_id")?;
         validate_identifier(&self.producer_profile_id, "producer_profile_id")?;
         self.submission_clock_domain
             .validate()
@@ -302,6 +308,7 @@ impl Px4OffboardSubmissionProfileV1 {
         hasher.update(&self.schema_version.to_le_bytes());
         feed_str(&mut hasher, &self.profile_id);
         feed_str(&mut hasher, &self.target_instance_id);
+        feed_str(&mut hasher, &self.controller_profile_id);
         feed_str(&mut hasher, &self.producer_profile_id);
         hasher.update(&[match self.transport {
             Px4OffboardTransportV1::MavlinkSetpoint => 0,
@@ -707,6 +714,7 @@ mod tests {
         Px4OffboardSubmissionProfileV1::new(
             "px4.offboard.publisher.fixture.v1",
             "vehicle.slot-a",
+            "px4.firmware-vehicle-control.fixture.v1",
             "companion.publisher.fixture.v1",
             Px4OffboardTransportV1::MavlinkSetpoint,
             clock(),
@@ -910,6 +918,7 @@ mod tests {
         let ros_profile = Px4OffboardSubmissionProfileV1::new(
             "px4.offboard.ros2.fixture.v1",
             "vehicle.slot-a",
+            "px4.firmware-vehicle-control.ros2-fixture.v1",
             "companion.ros2.fixture.v1",
             Px4OffboardTransportV1::Ros2OffboardControlMode,
             clock(),
@@ -954,6 +963,7 @@ mod tests {
         let unsorted = Px4OffboardSubmissionProfileV1::new(
             "px4.offboard.publisher.fixture.v1",
             "vehicle.slot-a",
+            "px4.firmware-vehicle-control.fixture.v1",
             "companion.publisher.fixture.v1",
             Px4OffboardTransportV1::MavlinkSetpoint,
             clock(),
@@ -968,6 +978,7 @@ mod tests {
         let other_policy = Px4OffboardSubmissionProfileV1::new(
             "px4.offboard.publisher.fixture.v1",
             "vehicle.slot-a",
+            "px4.firmware-vehicle-control.fixture.v1",
             "companion.publisher.fixture.v1",
             Px4OffboardTransportV1::MavlinkSetpoint,
             clock(),
@@ -1005,6 +1016,7 @@ mod tests {
             Px4OffboardSubmissionProfileV1::new(
                 "bad.profile",
                 "vehicle.slot-a",
+                "px4.firmware-vehicle-control.fixture.v1",
                 "sender",
                 Px4OffboardTransportV1::MavlinkSetpoint,
                 clock(),
