@@ -99,17 +99,17 @@ impl VerifiedArtifactDigest {
                 break;
             }
 
-            let count = u64::try_from(count).map_err(|_| {
+            let count_u64 = u64::try_from(count).map_err(|_| {
                 ArtifactVerificationError::LengthOverflow {
                     artifact_id: artifact_id.clone(),
                 }
             })?;
-            byte_length = byte_length.checked_add(count).ok_or_else(|| {
+            byte_length = byte_length.checked_add(count_u64).ok_or_else(|| {
                 ArtifactVerificationError::LengthOverflow {
                     artifact_id: artifact_id.clone(),
                 }
             })?;
-            hasher.update(&buffer[..count as usize]);
+            hasher.update(&buffer[..count]);
         }
 
         let actual_sha256 = hasher
@@ -263,7 +263,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(verified.reference(), &reference);
-        assert_eq!(verified.byte_length(), bytes.len() as u64);
+        assert_eq!(verified.byte_length(), u64::try_from(bytes.len()).unwrap());
     }
 
     #[test]
