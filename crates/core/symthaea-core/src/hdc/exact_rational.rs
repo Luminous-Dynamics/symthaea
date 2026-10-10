@@ -49,7 +49,7 @@ impl RationalBudget {
         // malformed inputs such as a very long "-----1" run evade the size
         // preflight before BigInt parsing eventually rejects them.
         let digits = match text.as_bytes().first() {
-            Some(b'+' | b'-') => &text[1..],
+            Some(&b'+') | Some(&b'-') => &text[1..],
             _ => text,
         };
 
