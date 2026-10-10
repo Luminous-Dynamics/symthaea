@@ -246,7 +246,16 @@ pub fn prioritize_measurements(
             ));
         }
 
-        let target_constraint_id = option.metric.constraint_id();
+        let target_constraint_id = if option.metric == MeasurementMetric::NetClimate
+            && assessment
+                .constraints
+                .iter()
+                .any(|constraint| constraint.constraint_id == "net_climate_maximum")
+        {
+            "net_climate_maximum"
+        } else {
+            option.metric.constraint_id()
+        };
         let target_constraint = assessment
             .constraints
             .iter()
@@ -471,6 +480,23 @@ mod tests {
         assert_eq!(plan.options[0].target_constraint_id, "climate_objective_interval_available");
         assert_eq!(plan.options[0].rank, Some(1));
         assert!(plan.options[0].currently_decision_relevant);
+    }
+
+    #[test]
+    fn climate_measurement_targets_an_active_climate_threshold() {
+        let mut req = requirements();
+        req.include_climate_objective = true;
+        req.max_net_climate_kg_co2e_per_kg_dry_feedstock = Some(0.0);
+        let mut input = intervals();
+        input.net_climate_kg_co2e_per_kg_dry_feedstock =
+            Some(metric_interval(-1.0, 1.0, "climate-range"));
+        let options = vec![option("climate-assay", MeasurementMetric::NetClimate, 3.0, 0.5, 1.0)];
+        let plan = prioritize_measurements(
+            &input, &req, "USD_2026_per_measurement", &options,
+        ).unwrap();
+        assert_eq!(plan.options[0].target_constraint_id, "net_climate_maximum");
+        assert_eq!(plan.options[0].current_constraint_status, Some(IntervalConstraintStatus::Unresolved));
+        assert_eq!(plan.options[0].rank, Some(1));
     }
 
     #[test]
