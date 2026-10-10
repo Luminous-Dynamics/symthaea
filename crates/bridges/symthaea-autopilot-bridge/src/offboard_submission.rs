@@ -192,8 +192,8 @@ pub struct Px4OffboardSubmissionProfileV1 {
     pub submission_clock_domain: ClockDomainId,
     /// Number of consecutive captured submission attempts required.
     pub min_samples: u16,
-    /// Minimum elapsed span from the first to last submission in the pre-entry window.
-    pub min_pre_entry_window_ns: u64,
+    /// Minimum elapsed span from the first to last submission in this observed window.
+    pub min_observation_window_ns: u64,
     /// Maximum permitted interval between adjacent submissions.
     pub max_inter_submission_gap_ns: u64,
     /// Maximum age of the newest local submission at assessment time.
@@ -215,7 +215,7 @@ impl Px4OffboardSubmissionProfileV1 {
         transport: Px4OffboardTransportV1,
         submission_clock_domain: ClockDomainId,
         min_samples: u16,
-        min_pre_entry_window_ns: u64,
+        min_observation_window_ns: u64,
         max_inter_submission_gap_ns: u64,
         max_latest_submission_age_ns: u64,
         mut allowed_mavlink_setpoint_message_ids: Vec<u32>,
@@ -229,7 +229,7 @@ impl Px4OffboardSubmissionProfileV1 {
             transport,
             submission_clock_domain,
             min_samples,
-            min_pre_entry_window_ns,
+            min_observation_window_ns,
             max_inter_submission_gap_ns,
             max_latest_submission_age_ns,
             allowed_mavlink_setpoint_message_ids,
@@ -261,7 +261,7 @@ impl Px4OffboardSubmissionProfileV1 {
         if self.min_samples < 2 {
             return Err(Px4OffboardSubmissionError::MinimumSamplesTooSmall);
         }
-        if self.min_pre_entry_window_ns == 0 {
+        if self.min_observation_window_ns == 0 {
             return Err(Px4OffboardSubmissionError::ZeroPreEntryWindow);
         }
         if self.max_inter_submission_gap_ns == 0 {
@@ -310,7 +310,7 @@ impl Px4OffboardSubmissionProfileV1 {
         }]);
         feed_str(&mut hasher, self.submission_clock_domain.as_str());
         hasher.update(&self.min_samples.to_le_bytes());
-        hasher.update(&self.min_pre_entry_window_ns.to_le_bytes());
+        hasher.update(&self.min_observation_window_ns.to_le_bytes());
         hasher.update(&self.max_inter_submission_gap_ns.to_le_bytes());
         hasher.update(&self.max_latest_submission_age_ns.to_le_bytes());
         hasher.update(&(self.allowed_mavlink_setpoint_message_ids.len() as u64).to_le_bytes());
@@ -331,8 +331,8 @@ pub enum Px4OffboardSubmissionFailureV1 {
     LatestSubmissionStale,
     /// An adjacent local submission interval exceeds the profile limit.
     InterSubmissionGapExceeded,
-    /// The observed stream span is shorter than the configured pre-entry window.
-    PreEntryWindowTooShort,
+    /// The observed stream span is shorter than the configured observation window.
+    ObservationWindowTooShort,
 }
 
 /// Derived outcome for local submission cadence; it is not Offboard readiness.
@@ -449,8 +449,8 @@ impl Px4OffboardSubmissionCadenceV1 {
             failures.push(Px4OffboardSubmissionFailureV1::InterSubmissionGapExceeded);
         }
         let observed_window_ns = latest.submitted_at.nanoseconds - first.submitted_at.nanoseconds;
-        if observed_window_ns < self.profile.min_pre_entry_window_ns {
-            failures.push(Px4OffboardSubmissionFailureV1::PreEntryWindowTooShort);
+        if observed_window_ns < self.profile.min_observation_window_ns {
+            failures.push(Px4OffboardSubmissionFailureV1::ObservationWindowTooShort);
         }
 
         if failures.is_empty() {
@@ -627,8 +627,8 @@ pub enum Px4OffboardSubmissionError {
     /// Profile requires at least two observations.
     #[error("Offboard submission min_samples must be at least 2")]
     MinimumSamplesTooSmall,
-    /// Pre-entry stream window must be non-zero and be selected by a qualified profile.
-    #[error("Offboard pre-entry observation window must be non-zero")]
+    /// Observation window must be non-zero and selected by a qualified profile.
+    #[error("Offboard observation window must be non-zero")]
     ZeroPreEntryWindow,
     /// A zero interval cannot qualify a recurring stream.
     #[error("Offboard maximum inter-submission gap must be non-zero")]
