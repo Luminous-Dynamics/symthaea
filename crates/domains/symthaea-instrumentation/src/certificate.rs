@@ -491,8 +491,7 @@ mod tests {
         let reordered = format!("{}\n", lines.join("\n")).into_bytes();
         assert_eq!(
             CalibrationCertificate::from_canonical_bytes(&reordered).unwrap_err(),
-            CalibrationCertificateError::InvalidInstrumentIdentity
-                .max(CalibrationCertificateError::UnsupportedSchemaOrLayout)
+            CalibrationCertificateError::UnsupportedSchemaOrLayout
         );
         let mut extra = bytes;
         extra.extend_from_slice(b"extra=field\n");
