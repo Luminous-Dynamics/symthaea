@@ -454,7 +454,9 @@ mod tests {
         assert_eq!(raw.points.len(), 3);
         assert_eq!(raw.si_unit("time").unwrap(), "s");
         assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
-        assert!((raw.value_nearest_to("time", 0.001, "v(out)").unwrap() - 0.6321205588).abs() < 1e-9);
+        assert!(
+            (raw.value_nearest_to("time", 0.001, "v(out)").unwrap() - 0.6321205588).abs() < 1e-9
+        );
         assert!((raw.final_value("v(out)").unwrap() - 0.8646647168).abs() < 1e-9);
         assert!((raw.peak_abs_value("v(out)").unwrap() - 0.8646647168).abs() < 1e-9);
     }
