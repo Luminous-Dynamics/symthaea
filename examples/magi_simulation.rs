@@ -149,7 +149,7 @@ fn main() {
 
     // Resolve the prediction - f(3) is ODD, so "is_even" prediction is wrong
     // We expected Success (even) but got SafeFailure (not even)
-    magi.resolve_prediction(
+    magi.resolve_prediction_from_unverified_observation(
         &prediction_3.id,
         OutcomeCategory::SafeFailure, // Actually odd, not even
         0.99,                         // High confidence in the resolution
@@ -240,7 +240,7 @@ fn main() {
     println!("  System predicted: f(4) is even");
     println!("  RESULT: ✅ PREDICTION SUCCEEDED\n");
 
-    magi.resolve_prediction(
+    magi.resolve_prediction_from_unverified_observation(
         &prediction_4.id,
         OutcomeCategory::Success, // Correct - it is even
         0.99,
@@ -308,7 +308,7 @@ fn main() {
         };
 
         let was_correct = predict_even == is_actually_even;
-        magi.resolve_prediction(&prediction.id, actual_outcome, 0.99);
+        magi.resolve_prediction_from_unverified_observation(&prediction.id, actual_outcome, 0.99);
 
         let symbol = if was_correct { "✅" } else { "❌" };
         println!(
