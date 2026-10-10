@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
-use symthaea_agribot::soil_process::{EvidenceKind, EvidenceRef, PyrolysisBatchResult};
+use symthaea_agribot::soil_process::{EvidenceRef, PyrolysisBatchResult};
 
 const RELATIVE_EPSILON: f64 = 1e-9;
 
@@ -169,7 +169,7 @@ pub struct RegenerativeDesignAssessment {
     pub quality_gate_status: QualityGateStatus,
     /// Always true: design screening is not proof of field efficacy.
     pub field_validation_required: bool,
-    pub scope_note: &'static str,
+    pub scope_note: String,
 }
 
 fn validate_nonnegative(value: f64, field: &'static str) -> Result<(), DesignError> {
@@ -347,7 +347,7 @@ pub fn assess_regenerative_candidate(
         failed_constraints,
         quality_gate_status: candidate.quality_gate.status,
         field_validation_required: true,
-        scope_note: "design-screen result only; not an amendment certification or field recommendation",
+        scope_note: "design-screen result only; not an amendment certification or field recommendation".into(),
     })
 }
 
@@ -443,7 +443,7 @@ pub fn regenerative_pareto_frontier(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_agribot::soil_process::PyrolysisEvidence;
+    use symthaea_agribot::soil_process::{EvidenceKind, PyrolysisEvidence};
 
     fn evidence(id: &str) -> EvidenceRef {
         EvidenceRef {
