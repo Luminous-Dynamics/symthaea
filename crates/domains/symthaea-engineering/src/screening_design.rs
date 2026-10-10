@@ -517,6 +517,252 @@ pub fn generate_screening_design(
     })
 }
 
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScreeningDesignVerificationReceipt {
+    pub experiment_id: String,
+    pub input_snapshot_id: String,
+    pub algorithm_id: String,
+    pub verified_run_count: u32,
+    pub verified_block_count: u32,
+    pub verified_treatment_cell_count: u32,
+    pub verified_center_point_count: u32,
+    /// Structural design checks passed. This is not evidence authentication or scientific validation.
+    pub scope_note: String,
+}
+
+/// Recheck a generated schedule's structural invariants without calling the generator.
+/// This validates the serialized design artifact, but it does not authenticate its cited
+/// evidence, independently reproduce the software in another trust domain, or authorize execution.
+pub fn verify_screening_design(
+    plan: &ScreeningDesignPlan,
+) -> Result<ScreeningDesignVerificationReceipt, ScreeningDesignError> {
+    let request = &plan.request_snapshot;
+    let expected_total = request.validate()?;
+    if plan.algorithm_id != DESIGN_ALGORITHM_ID {
+        return Err(ScreeningDesignError::new(
+            "algorithm_id",
+            "unknown or mismatched design-generation algorithm",
+        ));
+    }
+    let factor_count = request.factors.len();
+    let combination_count = 1_usize << factor_count;
+    let expected_treatment_runs = combination_count
+        * request.blocks.len()
+        * request.replicates_per_setting_per_block as usize;
+    let center_count = request.center_point_runs_per_block as usize;
+    let expected_center_runs = center_count * request.blocks.len();
+
+    if plan.treatment_combination_count as usize != combination_count
+        || plan.treatment_run_count as usize != expected_treatment_runs
+        || plan.center_point_run_count as usize != expected_center_runs
+        || plan.total_planned_run_count as usize != expected_total
+        || plan.runs.len() != expected_total
+    {
+        return Err(ScreeningDesignError::new(
+            "plan.run_counts",
+            "stored run counts do not match the declared design",
+        ));
+    }
+
+    let treatment_runs_per_block =
+        combination_count * request.replicates_per_setting_per_block as usize;
+    let expected_center_positions = center_slots(treatment_runs_per_block, center_count);
+    let mut run_ids = HashSet::new();
+    let mut seen_cells: HashSet<(String, u32, u8)> = HashSet::new();
+    let mut seen_centers: HashSet<String> = HashSet::new();
+    let mut current_block_index = 0_usize;
+    let mut local_position = 0_usize;
+    let mut current_block_run_count = 0_usize;
+    let mut previous_block_id: Option<&str> = None;
+    let mut verified_treatments = 0_u32;
+    let mut verified_centers = 0_u32;
+
+    for (index, run) in plan.runs.iter().enumerate() {
+        let expected_order = (index + 1) as u32;
+        if run.run_order != expected_order {
+            return Err(ScreeningDesignError::new(
+                "runs.run_order",
+                "run order must be contiguous and one-based",
+            ));
+        }
+        let expected_id = format!(
+            "{}-{}-{:04}",
+            request.experiment_id, run.block_id, run.run_order
+        );
+        if run.run_id != expected_id || !run_ids.insert(run.run_id.as_str()) {
+            return Err(ScreeningDesignError::new(
+                "runs.run_id",
+                "run IDs must match the declared naming scheme and be unique",
+            ));
+        }
+
+        let block_index = request
+            .blocks
+            .iter()
+            .position(|block| block.block_id == run.block_id)
+            .ok_or_else(|| ScreeningDesignError::new("runs.block_id", "run references an unknown block"))?;
+        if previous_block_id != Some(run.block_id.as_str()) {
+            if previous_block_id.is_some() {
+                if local_position != treatment_runs_per_block + center_count {
+                    return Err(ScreeningDesignError::new(
+                        "runs.block_sequence",
+                        "previous block is incomplete",
+                    ));
+                }
+                if block_index != current_block_index + 1 {
+                    return Err(ScreeningDesignError::new(
+                        "runs.block_sequence",
+                        "blocks must appear in preregistered order and remain contiguous",
+                    ));
+                }
+            } else if block_index != 0 {
+                return Err(ScreeningDesignError::new(
+                    "runs.block_sequence",
+                    "first scheduled block must be the first preregistered block",
+                ));
+            }
+            current_block_index = block_index;
+            local_position = 0;
+            current_block_run_count = 0;
+            previous_block_id = Some(run.block_id.as_str());
+        }
+
+        if run.settings.len() != factor_count {
+            return Err(ScreeningDesignError::new(
+                "runs.settings",
+                "each run must carry one setting for every declared factor",
+            ));
+        }
+
+        match run.kind {
+            PlannedRunKind::FactorialTreatment => {
+                let standard_order = run.standard_order.ok_or_else(|| {
+                    ScreeningDesignError::new("runs.standard_order", "treatment requires a standard-order row")
+                })?;
+                let replicate = run.replicate_index.ok_or_else(|| {
+                    ScreeningDesignError::new("runs.replicate_index", "treatment requires a replicate index")
+                })?;
+                if standard_order == 0 || standard_order as usize > combination_count {
+                    return Err(ScreeningDesignError::new(
+                        "runs.standard_order",
+                        "treatment standard-order row is outside the factorial design",
+                    ));
+                }
+                if replicate == 0 || replicate > request.replicates_per_setting_per_block {
+                    return Err(ScreeningDesignError::new(
+                        "runs.replicate_index",
+                        "replicate index is outside the preregistered range",
+                    ));
+                }
+                if expected_center_positions.contains(&local_position) {
+                    return Err(ScreeningDesignError::new(
+                        "runs.center_point_position",
+                        "center-point control is missing from a required scheduled position",
+                    ));
+                }
+                let cell = (run.block_id.clone(), standard_order, replicate);
+                if !seen_cells.insert(cell) {
+                    return Err(ScreeningDesignError::new(
+                        "runs.factorial_coverage",
+                        "a block contains a duplicate treatment/replicate cell",
+                    ));
+                }
+                let row = standard_order as usize - 1;
+                for (factor_index, (setting, factor)) in
+                    run.settings.iter().zip(&request.factors).enumerate()
+                {
+                    let is_high = row & (1_usize << factor_index) != 0;
+                    let expected_code = if is_high { 1 } else { -1 };
+                    let expected_value = if is_high { factor.high_value } else { factor.low_value };
+                    if setting.factor_id != factor.factor_id
+                        || setting.unit != factor.unit
+                        || setting.coded_level != expected_code
+                        || setting.value != expected_value
+                    {
+                        return Err(ScreeningDesignError::new(
+                            "runs.settings",
+                            "treatment factor IDs, units, coded levels, or values do not match the design row",
+                        ));
+                    }
+                }
+                verified_treatments += 1;
+            }
+            PlannedRunKind::CenterPointControl => {
+                if run.standard_order.is_some() || run.replicate_index.is_some() {
+                    return Err(ScreeningDesignError::new(
+                        "runs.center_point",
+                        "center-point control must not masquerade as a factorial treatment",
+                    ));
+                }
+                if !expected_center_positions.contains(&local_position) {
+                    return Err(ScreeningDesignError::new(
+                        "runs.center_point_position",
+                        "center-point control is not at a preregistered control position",
+                    ));
+                }
+                for (setting, factor) in run.settings.iter().zip(&request.factors) {
+                    if setting.factor_id != factor.factor_id
+                        || setting.unit != factor.unit
+                        || setting.coded_level != 0
+                        || setting.value != factor.midpoint()
+                    {
+                        return Err(ScreeningDesignError::new(
+                            "runs.center_point.settings",
+                            "center-point factors must use their declared numeric midpoints and units",
+                        ));
+                    }
+                }
+                if !seen_centers.insert(run.block_id.clone()) {
+                    // One center-point is permitted at each scheduled center position, so
+                    // the set is only used for unique block tracking elsewhere. Do not reject repeats.
+                }
+                verified_centers += 1;
+            }
+        }
+        local_position += 1;
+        current_block_run_count += 1;
+        if current_block_run_count > treatment_runs_per_block + center_count {
+            return Err(ScreeningDesignError::new(
+                "runs.block_sequence",
+                "block contains too many scheduled runs",
+            ));
+        }
+    }
+
+    if previous_block_id.is_none()
+        || current_block_index + 1 != request.blocks.len()
+        || local_position != treatment_runs_per_block + center_count
+    {
+        return Err(ScreeningDesignError::new(
+            "runs.block_sequence",
+            "one or more preregistered blocks are missing or incomplete",
+        ));
+    }
+    if verified_treatments as usize != expected_treatment_runs
+        || verified_centers as usize != expected_center_runs
+        || seen_cells.len() != expected_treatment_runs
+    {
+        return Err(ScreeningDesignError::new(
+            "runs.factorial_coverage",
+            "treatment replicate cells or center-point counts are incomplete",
+        ));
+    }
+
+    Ok(ScreeningDesignVerificationReceipt {
+        experiment_id: request.experiment_id.clone(),
+        input_snapshot_id: request.input_snapshot_id.clone(),
+        algorithm_id: plan.algorithm_id.clone(),
+        verified_run_count: plan.runs.len() as u32,
+        verified_block_count: request.blocks.len() as u32,
+        verified_treatment_cell_count: verified_treatments,
+        verified_center_point_count: verified_centers,
+        scope_note: "schedule structure verified; referenced evidence is not authenticated, and this is not power analysis, product release, field authorization, or proof of agronomic efficacy".into(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
