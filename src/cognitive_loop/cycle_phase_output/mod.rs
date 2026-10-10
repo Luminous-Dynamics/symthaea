@@ -446,9 +446,12 @@ impl CognitiveLoopService {
                             (Some(goal), "remembered_scene")
                         } else {
                             let rollout = manifold.dream_ahead(8, 0.1);
-                            // Charge the completed rollout even when it yields no valid
-                            // endpoint. The predicted endpoint is a hypothesis, not truth.
-                            self.thermodynamic_load += estimate.rollout;
+                            // Charge only when the rollout executed all requested steps.
+                            // Invalid values still count as work; an empty response may
+                            // indicate a fail-closed manifold guard before computation.
+                            if rollout.len() == 8 {
+                                self.thermodynamic_load += estimate.rollout;
+                            }
                             (
                                 rollout.into_iter().last().filter(|goal| {
                                     goal.dim() == manifold.hdc_dim()
