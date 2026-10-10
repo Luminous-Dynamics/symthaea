@@ -143,6 +143,12 @@ class QcEigenReferenceCompareTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "corpus census mismatch"):
                 qc.load_input(path)
 
+            report = sample_report()
+            report["cases"].reverse()
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "case order differs"):
+                qc.load_input(path)
+
     def test_source_binding_requires_exact_current_head_and_clean_tree(self):
         report = sample_report()
         commit = report["source_revision"]
