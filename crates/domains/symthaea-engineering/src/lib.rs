@@ -29,6 +29,7 @@ use symthaea_workspace::GlobalWorkspace;
 pub mod regenerative;
 pub mod measurement_planner;
 pub mod screening_design;
+pub mod screening_power;
 
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
@@ -317,6 +318,27 @@ impl EngineeringManager {
         screening_design::ScreeningDesignError,
     > {
         screening_design::verify_screening_design(plan)
+    }
+
+    /// Estimate preliminary normal-approximation power for factorial main effects
+    /// from an explicit residual-variation estimate. This is a design-risk screen,
+    /// not exact finite-sample power or a claim that the trial is adequately powered.
+    pub fn assess_regenerative_screening_power(
+        &self,
+        request: &screening_design::ScreeningDesignRequest,
+        residual_variation: &screening_power::ResidualVariationEstimate,
+        familywise_alpha: f64,
+        target_power: f64,
+    ) -> Result<
+        screening_power::ScreeningPowerAssessment,
+        screening_power::ScreeningPowerError,
+    > {
+        screening_power::assess_screening_power(
+            request,
+            residual_variation,
+            familywise_alpha,
+            target_power,
+        )
     }
 
     pub fn evaluate_material(
