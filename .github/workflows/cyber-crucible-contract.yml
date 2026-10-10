@@ -1,0 +1,53 @@
+name: Cyber Crucible Public Contract
+
+on:
+  pull_request:
+    paths:
+      - "validation/cyber_crucible_public_v1.json"
+      - "validation/cyber_crucible_public_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_PUBLIC_CALIBRATION.md"
+      - "scripts/validate_cyber_crucible_public.py"
+      - "tests/test_cyber_crucible_public.py"
+      - ".github/workflows/cyber-crucible-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "validation/cyber_crucible_public_v1.json"
+      - "validation/cyber_crucible_public_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_PUBLIC_CALIBRATION.md"
+      - "scripts/validate_cyber_crucible_public.py"
+      - "tests/test_cyber_crucible_public.py"
+      - ".github/workflows/cyber-crucible-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-contract:
+    name: Manifest contract and fail-closed regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Check JSON syntax
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          for path in (
+              Path("validation/cyber_crucible_public_v1.json"),
+              Path("validation/cyber_crucible_public_v1.schema.json"),
+          ):
+              json.loads(path.read_text(encoding="utf-8"))
+              print(f"valid JSON: {path}")
+          PY
+
+      - name: Validate scenario identities, evidence, and scoring policy
+        run: python3 scripts/validate_cyber_crucible_public.py
+
+      - name: Exercise fail-closed contract regressions
+        run: python3 -m unittest discover -s tests -p "test_cyber_crucible_public.py" -v
