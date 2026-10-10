@@ -1,0 +1,13 @@
+* Resistive divider operating-point reference.
+* Ideal 12 V source, Rtop=3 kohm, Rbottom=1 kohm.
+* Analytical node voltages: v(in)=12 V; v(out)=3 V.
+V1 in 0 DC 12
+R1 in out 3k
+R2 out 0 1k
+.control
+op
+set filetype=ascii
+write dc_operating_point_actual.raw v(in) v(out)
+quit
+.endc
+.end
