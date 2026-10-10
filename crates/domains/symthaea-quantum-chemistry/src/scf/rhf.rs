@@ -23,7 +23,10 @@
 //! - Pulay, P. (1980). Chem. Phys. Lett. 73, 393 (DIIS).
 
 use crate::basis::BasisSet;
-use crate::constants::{MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD, SCF_ENERGY_THRESHOLD};
+use crate::constants::{
+    CANONICAL_ORTH_THRESHOLD, MAX_SCF_ITERATIONS, SCF_DENSITY_THRESHOLD,
+    SCF_ENERGY_THRESHOLD,
+};
 use crate::integrals::eri::{compute_eri_tensor, compute_schwarz_bounds};
 use crate::integrals::kinetic::kinetic_matrix;
 use crate::integrals::nuclear::nuclear_matrix;
@@ -32,7 +35,10 @@ use crate::molecule::Molecule;
 use crate::scf::density::{build_density_matrix, density_rms_change};
 use crate::scf::diis::Diis;
 use crate::scf::fock::{build_fock_matrix, build_fock_matrix_direct, electronic_energy};
-use crate::scf::generalized_eigen::{canonical_orthogonalization, solve_generalized_eigen};
+use crate::scf::generalized_eigen::{
+    ScfSolveError, ScfSolverDiagnostics, canonical_orthogonalization_checked,
+    solve_generalized_eigen_checked,
+};
 
 /// Configuration for the RHF solver.
 #[derive(Debug, Clone)]
@@ -99,6 +105,13 @@ pub struct RhfResult {
     /// Number of ERIs screened out. Same `direct = true` caveat as
     /// `eri_computed`.
     pub eri_screened: usize,
+    /// Present when a required checked eigensolve or energy validation failed.
+    /// Present when a required checked eigensolve or energy validation failed.
+    /// A failed calculation always has converged=false and non-finite energies.
+    pub solver_error: Option<String>,
+    /// Residual receipt for every required checked eigensolve and overlap transform.
+    /// None on numerical failure; a present receipt does not imply SCF fixed-point convergence.
+    pub solver_diagnostics: Option<ScfSolverDiagnostics>,
 }
 
 /// Run a Restricted Hartree-Fock calculation.
@@ -117,6 +130,7 @@ pub fn restricted_hartree_fock(
     basis: &BasisSet,
     config: &RhfConfig,
 ) -> RhfResult {
+    // Preserve the established panic contract for using RHF on an open-shell state.
     assert_eq!(
         molecule.multiplicity, 1,
         "restricted_hartree_fock only supports closed-shell (multiplicity=1) molecules; \
@@ -124,8 +138,63 @@ pub fn restricted_hartree_fock(
          systems; ROHF is not yet implemented.",
         molecule.multiplicity
     );
+    // Preserve the legacy panic contract for charge exceeding nuclear charge.
+    let _ = molecule.n_electrons();
+    match try_restricted_hartree_fock(molecule, basis, config) {
+        Ok(result) => result,
+        Err(error) => RhfResult {
+            total_energy: f64::NAN,
+            electronic_energy: f64::NAN,
+            nuclear_repulsion: f64::NAN,
+            orbital_energies: Vec::new(),
+            orbital_coefficients: Vec::new(),
+            n_iterations: 0,
+            converged: false,
+            n_basis: basis.n_basis(),
+            n_independent: 0,
+            n_occupied: 0,
+            eri_computed: 0,
+            eri_screened: 0,
+            solver_error: Some(error.to_string()),
+            solver_diagnostics: None,
+        },
+    }
+}
+
+/// Fallible RHF entry point. Any required overlap/Fock eigensolve that fails its
+/// residual contracts aborts the calculation instead of allowing a later SCF
+/// energy/density iteration to report convergence.
+pub fn try_restricted_hartree_fock(
+    molecule: &Molecule,
+    basis: &BasisSet,
+    config: &RhfConfig,
+) -> Result<RhfResult, ScfSolveError> {
+    try_restricted_hartree_fock_with_eigensolver_budget(molecule, basis, config, None)
+}
+
+/// Internal budget override makes iteration-exhaustion propagation testable without
+/// changing the production SCF configuration or weakening any numerical threshold.
+fn try_restricted_hartree_fock_with_eigensolver_budget(
+    molecule: &Molecule,
+    basis: &BasisSet,
+    config: &RhfConfig,
+    eigensolver_iteration_budget: Option<usize>,
+) -> Result<RhfResult, ScfSolveError> {
+    if molecule.multiplicity != 1 {
+        return Err(ScfSolveError::UnsupportedMultiplicity {
+            method: "RHF",
+            multiplicity: molecule.multiplicity,
+        });
+    }
+    let electron_count = super::checked_electron_count(molecule)?;
+    if electron_count % 2 != 0 {
+        return Err(ScfSolveError::InconsistentElectronicState {
+            electron_count,
+            multiplicity: molecule.multiplicity,
+        });
+    }
     let n = basis.n_basis();
-    let n_occ = molecule.n_occupied();
+    let n_occ = electron_count / 2;
     let v_nn = molecule.nuclear_repulsion_energy();
 
     // Step 1: One-electron integrals
@@ -139,7 +208,29 @@ pub fn restricted_hartree_fock(
         h_core[i] = t_mat[i] + v_mat[i];
     }
 
-    // Step 2: Two-electron integrals -- dense-tensor (default) or direct
+    if !v_nn.is_finite() {
+        return Err(ScfSolveError::NonFiniteEnergy {
+            stage: "nuclear repulsion",
+        });
+    }
+
+    // Step 2: Checked canonical orthogonalization happens before the expensive ERI
+    // build, so an invalid/indefinite overlap matrix fails before SCF work begins.
+    let overlap_iterations = n.saturating_mul(n).saturating_mul(100).max(1);
+    let checked_orthogonalization = canonical_orthogonalization_checked(
+        &s_mat,
+        n,
+        CANONICAL_ORTH_THRESHOLD,
+        overlap_iterations,
+    )?;
+    let mut solver_diagnostics =
+        ScfSolverDiagnostics::from_overlap_residual(checked_orthogonalization.orthogonality_residual);
+    let x_mat = checked_orthogonalization.transformation;
+    let n_ind = checked_orthogonalization.n_independent;
+    let eigensolver_iterations = eigensolver_iteration_budget
+        .unwrap_or_else(|| n_ind.saturating_mul(n_ind).saturating_mul(100).max(1));
+
+    // Step 3: Two-electron integrals -- dense-tensor (default) or direct
     // (Phase Q3, 2026-07-16) mode, see `RhfConfig::direct`'s doc comment.
     let (eri, eri_computed, eri_screened) = if config.direct {
         (Vec::new(), 0, 0)
@@ -159,13 +250,18 @@ pub fn restricted_hartree_fock(
         }
     };
 
-    // Step 3: Canonical orthogonalization
-    let (x_mat, n_ind, _n_disc) = canonical_orthogonalization(&s_mat, n);
-
-    // Step 4: Initial guess — diagonalize H_core
-    let initial = solve_generalized_eigen(&h_core, &x_mat, n, n_ind);
-    let mut coefficients = initial.coefficients;
-    let mut orbital_energies = initial.eigenvalues;
+    // Step 4: Initial guess — a required checked generalized eigensolve.
+    let initial = solve_generalized_eigen_checked(
+        &h_core,
+        &s_mat,
+        &x_mat,
+        n,
+        n_ind,
+        eigensolver_iterations,
+    )?;
+    solver_diagnostics.record_generalized_solve(&initial);
+    let mut coefficients = initial.generalized.coefficients;
+    let mut orbital_energies = initial.generalized.eigenvalues;
 
     // Step 5: SCF loop
     let mut density = build_density_matrix(&coefficients, n, n_ind, n_occ);
@@ -192,11 +288,24 @@ pub fn restricted_hartree_fock(
         // 5c: Compute electronic energy
         let e_elec = electronic_energy(&density, &h_core, &fock, n);
         let e_total = e_elec + v_nn;
+        if !e_elec.is_finite() || !e_total.is_finite() {
+            return Err(ScfSolveError::NonFiniteEnergy {
+                stage: "RHF SCF iteration",
+            });
+        }
 
-        // 5d: Solve FC = SCε
-        let result = solve_generalized_eigen(&fock, &x_mat, n, n_ind);
-        coefficients = result.coefficients;
-        orbital_energies = result.eigenvalues;
+        // 5d: Solve FC = SCε. Failure propagates out of the SCF loop.
+        let result = solve_generalized_eigen_checked(
+            &fock,
+            &s_mat,
+            &x_mat,
+            n,
+            n_ind,
+            eigensolver_iterations,
+        )?;
+        solver_diagnostics.record_generalized_solve(&result);
+        coefficients = result.generalized.coefficients;
+        orbital_energies = result.generalized.eigenvalues;
 
         // 5e: New density matrix
         let density_new = build_density_matrix(&coefficients, n, n_ind, n_occ);
@@ -216,9 +325,15 @@ pub fn restricted_hartree_fock(
     // Final energy
     let fock_final = build_fock(&h_core, &density);
     let e_elec = electronic_energy(&density, &h_core, &fock_final, n);
+    let total_energy = e_elec + v_nn;
+    if !e_elec.is_finite() || !total_energy.is_finite() {
+        return Err(ScfSolveError::NonFiniteEnergy {
+            stage: "final RHF energy",
+        });
+    }
 
-    RhfResult {
-        total_energy: e_elec + v_nn,
+    Ok(RhfResult {
+        total_energy,
         electronic_energy: e_elec,
         nuclear_repulsion: v_nn,
         orbital_energies,
@@ -230,7 +345,9 @@ pub fn restricted_hartree_fock(
         n_occupied: n_occ,
         eri_computed,
         eri_screened,
-    }
+        solver_error: None,
+        solver_diagnostics: Some(solver_diagnostics),
+    })
 }
 
 #[cfg(test)]
@@ -253,6 +370,115 @@ mod tests {
         let basis = Sto3g::build(&mol);
         let config = RhfConfig::default();
         let _ = restricted_hartree_fock(&mol, &basis, &config);
+    }
+
+    #[test]
+    fn test_fallible_rhf_rejects_invalid_electronic_inputs_without_panicking() {
+        let hydrogen = crate::molecule::Atom::new(1, 0.0, 0.0, 0.0);
+        let invalid_charge = Molecule::with_charge(vec![hydrogen.clone()], 2, 1);
+        let invalid_charge_basis = Sto3g::build(&invalid_charge);
+        assert!(matches!(
+            try_restricted_hartree_fock(
+                &invalid_charge,
+                &invalid_charge_basis,
+                &RhfConfig::default()
+            ),
+            Err(ScfSolveError::InvalidCharge {
+                charge: 2,
+                nuclear_charge: 1
+            })
+        ));
+
+        let odd_electron_singlet = Molecule::new(vec![hydrogen]);
+        let odd_basis = Sto3g::build(&odd_electron_singlet);
+        assert!(matches!(
+            try_restricted_hartree_fock(
+                &odd_electron_singlet,
+                &odd_basis,
+                &RhfConfig::default()
+            ),
+            Err(ScfSolveError::InconsistentElectronicState {
+                electron_count: 1,
+                multiplicity: 1
+            })
+        ));
+
+        let zero_electron = Molecule::with_charge(
+            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
+            1,
+            1,
+        );
+        let zero_electron_basis = Sto3g::build(&zero_electron);
+        assert!(matches!(
+            try_restricted_hartree_fock(
+                &zero_electron,
+                &zero_electron_basis,
+                &RhfConfig::default()
+            ),
+            Err(ScfSolveError::NoElectrons)
+        ));
+
+        let empty = Molecule::new(Vec::new());
+        let empty_basis = BasisSet {
+            name: "empty-test".to_string(),
+            functions: Vec::new(),
+        };
+        assert!(matches!(
+            try_restricted_hartree_fock(&empty, &empty_basis, &RhfConfig::default()),
+            Err(ScfSolveError::EmptyMolecule)
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid molecule: charge")]
+    fn test_legacy_rhf_keeps_invalid_charge_panic_contract() {
+        let molecule = Molecule::with_charge(
+            vec![crate::molecule::Atom::new(1, 0.0, 0.0, 0.0)],
+            2,
+            1,
+        );
+        let basis = Sto3g::build(&molecule);
+        let _ = restricted_hartree_fock(&molecule, &basis, &RhfConfig::default());
+    }
+
+    #[test]
+    fn test_failed_checked_overlap_never_returns_converged_energy() {
+        let molecule = Molecule::h2();
+        let mut basis = Sto3g::build(&molecule);
+        basis.functions[0].primitives[0].alpha = f64::NAN;
+        let config = RhfConfig::default();
+
+        let fallible = try_restricted_hartree_fock(&molecule, &basis, &config);
+        assert!(matches!(
+            fallible,
+            Err(ScfSolveError::CanonicalOrthogonalization(_))
+        ));
+
+        let legacy = restricted_hartree_fock(&molecule, &basis, &config);
+        assert!(!legacy.converged);
+        assert!(legacy.total_energy.is_nan());
+        assert!(legacy.electronic_energy.is_nan());
+        assert!(legacy.solver_error.as_deref().is_some_and(|message| message.contains("non-finite")));
+        assert!(legacy.solver_diagnostics.is_none());
+    }
+
+    #[test]
+    fn test_fock_eigensolver_iteration_exhaustion_propagates_as_error() {
+        let molecule = Molecule::water();
+        let basis = Sto3g::build(&molecule);
+        let error = try_restricted_hartree_fock_with_eigensolver_budget(
+            &molecule,
+            &basis,
+            &RhfConfig::default(),
+            Some(0),
+        )
+        .expect_err("a zero-rotation budget must not produce an unchecked RHF result");
+        assert!(matches!(
+            error,
+            ScfSolveError::GeneralizedEigen(
+                crate::scf::generalized_eigen::CheckedGeneralizedEigenError::EigensolverNotConverged(_)
+            )
+        ));
     }
 
     #[test]
@@ -288,6 +514,21 @@ mod tests {
         let result = restricted_hartree_fock(&mol, &basis, &config);
 
         assert!(result.converged, "SCF should converge");
+        let diagnostics = result
+            .solver_diagnostics
+            .as_ref()
+            .expect("successful RHF must expose a solver residual receipt");
+        assert_eq!(
+            diagnostics.generalized_eigensolve_count,
+            result.n_iterations + 1,
+            "RHF performs one core-guess solve plus one checked solve per SCF iteration"
+        );
+        assert!(diagnostics.total_jacobi_rotations < 1_000_000);
+        assert!(diagnostics.max_transformed_off_diagonal_hartree.is_finite());
+        assert!(diagnostics.max_transformed_eigenpair_residual <= 1e-10);
+        assert!(diagnostics.max_eigenvector_orthogonality_residual <= 1e-10);
+        assert!(diagnostics.max_generalized_eigenpair_residual <= 1e-8);
+        assert!(diagnostics.overlap_orthogonality_residual <= 1e-8);
         assert!(
             (result.total_energy - (-1.1175)).abs() < 0.01,
             "H2 energy = {:.6}, expected ≈ -1.1175",

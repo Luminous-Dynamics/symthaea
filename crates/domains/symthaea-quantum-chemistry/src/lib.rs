@@ -108,7 +108,8 @@ pub use post_hf::mp2::{
     scs_mp2_correlation_energy, total_frozen_core,
 };
 pub use scf::generalized_eigen::GeneralizedEigenResult;
-pub use scf::rhf::{RhfConfig, RhfResult, restricted_hartree_fock};
+pub use scf::rhf::{RhfConfig, RhfResult, restricted_hartree_fock, try_restricted_hartree_fock};
+pub use scf::uhf::{UhfConfig, UhfResult, try_unrestricted_hartree_fock, unrestricted_hartree_fock};
 pub use vibrational::{
     Frequency, ThermoConfig, ThermoResult, VibConfig, VibrationalResult,
     compute_thermochemistry_linear, normal_mode_analysis,

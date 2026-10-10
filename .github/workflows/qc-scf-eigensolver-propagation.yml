@@ -1,0 +1,41 @@
+name: QC SCF Eigensolver Propagation
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/scf/mod.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/scf/rhf.rs"
+      - "crates/domains/symthaea-quantum-chemistry/src/scf/uhf.rs"
+      - ".github/workflows/qc-scf-eigensolver-propagation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qc-scf-eigensolver-propagation-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checked-scf-contract:
+    name: Checked RHF/UHF numerical contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # upstream action commit at 2026-10-09
+        with:
+          toolchain: 1.96.0
+
+      - name: Test checked Jacobi and generalized eigen contracts
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib scf::generalized_eigen::tests
+
+      - name: Test RHF checked solver propagation and residual receipt
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib scf::rhf::tests
+
+      - name: Test UHF checked alpha/beta propagation and residual receipt
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib scf::uhf::tests
