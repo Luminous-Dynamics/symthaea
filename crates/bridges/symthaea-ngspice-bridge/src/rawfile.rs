@@ -449,8 +449,8 @@ mod tests {
     #[test]
     fn rejects_non_sequential_point_indices() {
         let malformed = RC_FIXTURE.replace(
-            "1   1.000000000000000e-03",
-            "2   1.000000000000000e-03",
+            " 1  1.000000000000000e-03",
+            " 2  1.000000000000000e-03",
         );
         assert!(AsciiRawfile::parse(&malformed).is_err());
     }
