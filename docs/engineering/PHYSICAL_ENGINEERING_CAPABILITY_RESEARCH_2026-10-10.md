@@ -119,6 +119,32 @@ This is only a tranche-one whitelist, not a general SPICE expression type system
 
 The recorded CI run from 2026-09-25 passed the workspace nextest job, the default-feature `symthaea` library tests, security audit, and PR-governance check, but the overall run was red due to other workspace jobs (unrelated orphan modules, formatting, Clippy, Muse-theory, and Spore-size failures). Those results are historical and do not qualify the current PR head.
 
+## Existing domain ownership discovered in follow-up research
+
+A new repository pass shows that photonics, plasma engineering, and shared device composition already have dedicated owners. Future work should follow this issue graph rather than add separate parallel domain frameworks:
+
+- [PHOT-ENG-000 #5668](https://github.com/Luminous-Dynamics/symthaea/issues/5668) owns photonics/laser design and solver architecture; [PHOT-001 #5679](https://github.com/Luminous-Dynamics/symthaea/issues/5679) owns exact photonic assembly/model semantics; [FIELD-004 #3593](https://github.com/Luminous-Dynamics/symthaea/issues/3593) owns read-only calibrated optical observations.
+- [PLASMA-ENG-000 #5669](https://github.com/Luminous-Dynamics/symthaea/issues/5669) owns regime-explicit plasma engineering from cold atmospheric plasma through kinetic and fusion regimes; [FIELD-005 #3594](https://github.com/Luminous-Dynamics/symthaea/issues/3594) owns calibrated plasma diagnostic observations.
+- [ENG-DEVICE-000 #5670](https://github.com/Luminous-Dynamics/symthaea/issues/5670) owns reusable power, magnetics, vacuum/gas, thermal, mechanical and component subjects shared across device families; [ENG-THERM-001 #5681](https://github.com/Luminous-Dynamics/symthaea/issues/5681) owns thermal networks and boundary/evidence semantics.
+- [ENG-DEVICE-001 #5684](https://github.com/Luminous-Dynamics/symthaea/issues/5684) is the natural first *cross-domain composition benchmark*. It deliberately proposes two benign fixtures rather than one artificial machine: (A) a passive/low-power magneto-optic sensor bench using permanent-magnet bias, and (B) a low-energy vacuum/gas-manifold characterization bench using inert gas/air only. It can demonstrate canonical component identity → subsystem topology → prediction → as-built configuration → calibrated observation → preserved discrepancy, without requiring laser-source optimization or plasma ignition.
+
+The implication is that the near-term physical systems program should have **one evidence and device-composition spine**, with physics-specific modules plugged into it. For an initial built instrument, choose #5684 fixture A if optical/magnetic/thermal measurement is available; otherwise start with the single-joint robotics lab #4814 to establish actuator identity and sim-to-real mechanics. Fixture B is a separate gas/vacuum capability and should not be bundled into fixture A merely to increase the number of subsystems exercised.
+
+### Regime-aware solver hierarchy
+
+The existing [PLASMA-ENG-000 issue](https://github.com/Luminous-Dynamics/symthaea/issues/5669) correctly forbids one generic "plasma solver" capability. The adapter contract should include a mandatory regime profile (cold atmospheric, low-pressure low-temperature, thermal arc/jet, magnetized-fluid/MHD, kinetic/PIC, high-temperature fusion, laser-plasma interaction, or a specifically qualified profile), and each model/solver should declare its applicable regime, assumptions, species/chemistry coverage, collision/closure model, geometry/boundary assumptions, and evidence maturity.
+
+The current repository's preferred initial solver progression is more precise than a generic PICLas-first strategy:
+
+1. **Analytical and reduced-order checks:** existing Symthaea equations plus [PlasmaPy](https://docs.plasmapy.org/en/latest/) for documented formulary, particles, dispersion and diagnostic calculations. Treat it as a formula/analysis adapter, not a general high-fidelity plasma device simulator.
+2. **Optical design / ray path:** [Optiland](https://www.optiland.org/docs/) for lenses, mirrors, ray tracing, tolerancing and optimization. Keep it distinct from full-wave EM simulation.
+3. **Full-wave optics:** [Meep](https://meep.readthedocs.io/en/master/) for FDTD problems within its supported material/geometry models, and [MPB](https://mpb.readthedocs.io/en/stable/) for supported eigenmode/band-structure problems. They are complementary—not interchangeable—and GPL licensing/distribution implications must be reviewed before packaging.
+4. **Fluid plasma / fusion edge cases:** evaluate [BOUT++](https://bout-dev.readthedocs.io/en/stable/user_docs/introduction.html) where its fluid equations and curvilinear/fusion-plasma domain fit. Evaluate Gkeyll separately for appropriate kinetic/fluid models.
+5. **Particle-in-cell:** adopt a [PICMI](https://picmi.readthedocs.io/en/latest/) interchange projection with an explicit capability/loss report; the standard is still evolving and implementations need not support every option. Then qualify one concrete backend—[WarpX](https://warpx.readthedocs.io/) is the current issue's first candidate—before considering a second PIC backend.
+6. **Acoustics/ultrasound:** keep existing acoustic domain ownership and FIELD measurement ownership; use k-Wave for the use cases its model supports, noting that k-Wave-II currently describes itself as under construction and in pre-release, with MATLAB R2023b or later required ([project status](https://github.com/ucl-bug/k-wave-ii)).
+
+This order is based on the domain-owner issues and current public tool documentation, not a claim that these adapters are implemented or qualified. A regime/model compatibility error should block dispatch before compute resources are spent.
+
 ## Proposed external toolchain
 
 Treat every external program as an independently versioned instrument behind a typed adapter. Keep native/heavy solver dependencies out of default workspace builds; run them in explicit development or deployment environments with pinned versions and reproducible inputs.
