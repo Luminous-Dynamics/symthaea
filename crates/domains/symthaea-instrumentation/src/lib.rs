@@ -51,6 +51,22 @@ impl InstrumentIdentity {
     }
 }
 
+/// Identifier for a specific monotonic clock domain/epoch. Use a new identifier
+/// when the clock origin is reset (for example, after reboot). A timestamp from
+/// one domain must never be compared to "now" from another domain.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ClockDomainId(String);
+
+impl ClockDomainId {
+    pub fn new(value: impl Into<String>) -> Result<Self, ContractError> {
+        Ok(Self(non_empty(value.into(), "clock_domain_id")?))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Physical quantity named independently of the unit used to express it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Quantity {
@@ -317,6 +333,7 @@ pub struct MeasurementEnvelope {
     identity: InstrumentIdentity,
     sequence: u64,
     captured_at_ns: u64,
+    clock_domain: ClockDomainId,
     quantity: Quantity,
     unit: Unit,
     value: f64,
@@ -331,8 +348,9 @@ pub struct MeasurementEnvelope {
 pub struct MeasurementInput {
     pub identity: InstrumentIdentity,
     pub sequence: u64,
-    /// Monotonic acquisition timestamp in nanoseconds, from a documented clock.
+    /// Monotonic acquisition timestamp in nanoseconds, from the named clock domain.
     pub captured_at_ns: u64,
+    pub clock_domain: ClockDomainId,
     pub quantity: Quantity,
     pub unit: Unit,
     pub value: f64,
@@ -371,6 +389,7 @@ impl MeasurementEnvelope {
             identity: input.identity,
             sequence: input.sequence,
             captured_at_ns: input.captured_at_ns,
+            clock_domain: input.clock_domain,
             quantity: input.quantity,
             unit: input.unit,
             value: input.value,
@@ -392,6 +411,10 @@ impl MeasurementEnvelope {
 
     pub fn captured_at_ns(&self) -> u64 {
         self.captured_at_ns
+    }
+
+    pub fn clock_domain(&self) -> &ClockDomainId {
+        &self.clock_domain
     }
 
     pub fn quantity(&self) -> Quantity {
@@ -435,10 +458,14 @@ impl MeasurementEnvelope {
     pub fn assess_for_quantitative_use(
         &self,
         now_ns: u64,
+        now_clock_domain: &ClockDomainId,
         policy: &MeasurementPolicy,
         resolver: &dyn InstrumentEvidenceResolver,
         stream_guard: &mut MeasurementStreamGuard,
     ) -> Result<MeasurementAssessment, AssessmentFailure> {
+        if &self.clock_domain != now_clock_domain {
+            return Err(AssessmentFailure::ClockDomainMismatch);
+        }
         stream_guard
             .observe_at(self, now_ns)
             .map_err(|failure| match failure {
@@ -642,6 +669,7 @@ pub struct MeasurementAssessment {
 pub enum AssessmentFailure {
     StreamOrder(StreamOrderFailure),
     ClockInFuture,
+    ClockDomainMismatch,
     Stale { age_ns: u64, max_age_ns: u64 },
     QualityFlagsPresent(Vec<QualityFlag>),
     MissingRawDataReference,
