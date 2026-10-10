@@ -636,6 +636,21 @@ mod tests {
     }
 
     #[test]
+    fn actual_rc_fixture_can_be_bound_as_a_primary_artifact() {
+        let source = include_str!("../tests/fixtures/rc_step_reference.cir");
+        let bundle = ModelInputBundle::new(
+            "rc-fixture-run",
+            "rc_step_reference.cir",
+            source.as_bytes().to_vec(),
+            Vec::<(String, Vec<u8>)>::new(),
+        )
+        .expect("fixture has a valid primary-file identity and no static includes");
+        assert_eq!(bundle.primary_path(), "rc_step_reference.cir");
+        assert_eq!(bundle.dependency_paths().count(), 0);
+        assert_eq!(bundle.primary_bytes(), source.as_bytes());
+    }
+
+    #[test]
     fn manifest_digest_is_independent_of_dependency_input_order() {
         let deps_a = vec![("b.inc", ".param b=2\n"), ("a.inc", ".param a=1\n")];
         let deps_b = vec![("a.inc", ".param a=1\n"), ("b.inc", ".param b=2\n")];
