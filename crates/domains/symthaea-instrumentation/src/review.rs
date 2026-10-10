@@ -238,7 +238,7 @@ impl CalibrationReviewPayload {
 
     /// Canonical domain-separated bytes to sign; independent of receipt encoding.
     pub fn signing_bytes(&self) -> Vec<u8> {
-        [
+        let fields = [
             CALIBRATION_REVIEW_SCHEMA.to_owned(),
             format!("key_id={}", self.key_id),
             format!("record_id={}", self.record_id),
@@ -246,17 +246,8 @@ impl CalibrationReviewPayload {
             format!("certificate_sha256={}", self.certificate_sha256_hex),
             format!("issued_at_unix_s={}", self.issued_at_unix_s),
             format!("expires_at_unix_s={}", self.expires_at_unix_s),
-        ]
-        .join("\n")
-        format!("{}\n", [
-            CALIBRATION_REVIEW_SCHEMA.to_owned(),
-            format!("key_id={}", self.key_id),
-            format!("record_id={}", self.record_id),
-            format!("certificate_artifact_id={}", self.certificate_artifact_id),
-            format!("certificate_sha256={}", self.certificate_sha256_hex),
-            format!("issued_at_unix_s={}", self.issued_at_unix_s),
-            format!("expires_at_unix_s={}", self.expires_at_unix_s),
-        ].join("\n")).into_bytes()
+        ];
+        format!("{}\n", fields.join("\n")).into_bytes()
     }
 }
 
@@ -268,10 +259,7 @@ pub struct SignedCalibrationReviewReceipt {
 }
 
 impl SignedCalibrationReviewReceipt {
-    pub fn new(
-        payload: CalibrationReviewPayload,
-        signature: [u8; 64],
-    ) -> Self {
+    pub fn new(payload: CalibrationReviewPayload, signature: [u8; 64]) -> Self {
         Self { payload, signature }
     }
 
@@ -286,8 +274,7 @@ impl SignedCalibrationReviewReceipt {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
-        let payload = &self.payload;
-        let mut bytes = payload_signing_bytes(&payload);
+        let mut bytes = self.payload.signing_bytes();
         bytes.extend_from_slice(format!("signature_hex={signature_hex}\n").as_bytes());
         bytes
     }
@@ -311,11 +298,9 @@ impl SignedCalibrationReviewReceipt {
             .map_err(|_| ReviewVerificationError::InvalidTimestamp)?;
         let signature_hex = field(lines[7], "signature_hex")?;
         let signature = decode_signature(signature_hex)?;
-        let certificate = ArtifactReference::new(
-            certificate_artifact_id,
-            certificate_sha256_hex,
-        )
-        .map_err(|_| ReviewVerificationError::InvalidCertificateReference)?;
+        let certificate =
+            ArtifactReference::new(certificate_artifact_id, certificate_sha256_hex)
+                .map_err(|_| ReviewVerificationError::InvalidCertificateReference)?;
         let payload = CalibrationReviewPayload::new(
             key_id,
             record_id,
