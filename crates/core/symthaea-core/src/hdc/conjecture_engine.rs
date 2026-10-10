@@ -436,14 +436,11 @@ impl ConjectureEngine {
     /// distance kernels, cross-products, and Hamiltonian skeletons extracted
     /// from trajectory-based discoveries.
     ///
-    /// For each invariant, status is assigned based on whether it was
-    /// symbolically checked through symbolic differentiation plus sampled residuals:
-    /// - `symbolic_check_passed == true` → `ConjectureStatus::SymbolicallyChecked`
-    ///   (eligible for fast-track macro promotion)
-    /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
-    ///   and `MacroPromotionTier::Quarantined`, so unproven trajectory fits
-    ///   cannot enter the permanent macro pool through either fast-track or
-    ///   recurrent promotion.
+    /// The `symbolic_check_passed` flag records symbolic differentiation plus
+    /// finite-point residual sampling. It is useful diagnostic evidence, but is
+    /// not a universal proof and cannot grant formal status or macro authority.
+    /// Autonomous candidates remain `NumericallyTested` and quarantined until
+    /// an independent proof receipt is available.
     ///
     /// The `source` field is set to the caller-provided tag so later
     /// filtering (e.g. "what macros did the Kepler discovery contribute?")
@@ -3611,7 +3608,7 @@ mod tests {
     /// But SymExpr doesn't support ln, so we test numerically at specific points instead.
     #[test]
     fn test_conservation_assessment_display() {
-        // Just verify the proof infrastructure works and produces readable output
+        // Just verify the assessment infrastructure works and produces readable output
         let energy = SymExpr::Add(
             Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
             Box::new(SymExpr::Mul(
@@ -4507,10 +4504,10 @@ mod tests {
     // AUTOMATED CONSERVATION LAW DISCOVERY
     // ════════════════════════════════════════════════════════════════════
 
-    /// The fully automated physicist: given an ODE, discover and prove conservation laws.
+    /// The automated physicist: given an ODE, discover conservation-law candidates.
     ///
     /// Input: dx/dt = v, dv/dt = -x (harmonic oscillator)
-    /// Output: discovers E = x² + v² is conserved, with symbolic proof.
+    /// Output: discovers E = x² + v² as a candidate and reports symbolic/sample evidence.
     /// No human guidance — pure automated discovery.
     #[test]
     fn test_automated_conservation_discovery_harmonic() {
@@ -5920,18 +5917,7 @@ mod tests {
 
     #[cfg(feature = "abstract_thought")]
     #[test]
-    fn test_multivariate_macro_bridge_kepler() {
-        // Safe multivariate bridge: run Kepler autonomous discovery WITH
-        // symbolic dynamics, ingest the proven invariants, reflect, and assert
-        // that at least one genuinely multivariate macro lands in M₁.
-        //
-        // Success criterion: ≥1 macro whose template references at least
-        // TWO distinct variable names from {x, y, vx, vy}. Such a macro is
-        // irreducibly multivariate and would be architecturally unreachable
-        // via the 1D `ObservedSequence` path. If this passes, the safe
-        // multivariate bridge is functional: formally-proven autonomous
-        // discoveries can feed the macro pool without reopening the numeric
-        // singleton poisoning path.
+    fn test_multivariate_autonomous_checks_remain_quarantined_without_proof_receipt() {
         use super::super::primitive_system::PrimitiveSystem;
 
         fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
@@ -5979,8 +5965,6 @@ mod tests {
             seed: 42,
             ..RegressorConfig::default()
         };
-
-        // 1. Run autonomous multivariate discovery on Kepler
         let invariants = discover_invariants_autonomous(
             kepler_rhs,
             &[1.0, 0.0, 0.0, 0.8],
@@ -5990,72 +5974,40 @@ mod tests {
             20.0,
             0.001,
         );
-        assert!(
-            !invariants.is_empty(),
-            "Kepler discovery should find invariants"
-        );
+        assert!(!invariants.is_empty(), "Kepler discovery should find invariant candidates");
         assert!(
             invariants.iter().any(|inv| inv.symbolic_check_passed),
-            "Kepler discovery should produce at least one symbolic/sample check passed invariant for safe macro promotion"
+            "Kepler discovery should retain at least one symbolic/sample check result"
         );
 
-        // 2. Ingest into the ConjectureEngine's pool and reflect
         let mut engine = ConjectureEngine::new();
         engine.enable_abstract_thought();
+        let macro_count_before = engine.macro_operators().len();
         engine.ingest_autonomous_invariants("kepler_autonomous", MathDomain::Physics, &invariants);
+
+        let ingested: Vec<_> = engine
+            .conjectures
+            .iter()
+            .filter(|candidate| candidate.source == "kepler_autonomous")
+            .collect();
+        assert_eq!(ingested.len(), invariants.len());
+        for candidate in ingested {
+            assert!(
+                matches!(&candidate.status, ConjectureStatus::NumericallyTested { .. }),
+                "sampled-only invariant must not receive SymbolicallyChecked status"
+            );
+            assert_eq!(
+                candidate.macro_promotion_tier,
+                MacroPromotionTier::Quarantined
+            );
+        }
 
         let prims = PrimitiveSystem::new();
         engine.reflect(&prims);
-
-        // 3. Inspect macro pool for multivariate shapes
-        let macros = engine.macro_operators();
-        eprintln!(
-            "Multivariate bridge test — {} macros in pool:",
-            macros.len()
-        );
-        for (i, m) in macros.iter().enumerate() {
-            eprintln!("  {}. {}", i + 1, m.template);
-        }
-
-        // Count variable names referenced in each macro's template
-        fn collect_vars(expr: &Expr, out: &mut std::collections::HashSet<String>) {
-            match expr {
-                Expr::Var(name) => {
-                    out.insert(name.clone());
-                }
-                Expr::Const(_) => {}
-                Expr::BinOp(_, l, r) => {
-                    collect_vars(l, out);
-                    collect_vars(r, out);
-                }
-                Expr::Func(_, arg) => collect_vars(arg, out),
-                Expr::Sum(body, _) => collect_vars(body, out),
-            }
-        }
-
-        let kepler_vars: std::collections::HashSet<&'static str> =
-            ["x", "y", "vx", "vy"].iter().copied().collect();
-        let mut multivariate_macros = 0;
-        for m in macros {
-            let mut vars = std::collections::HashSet::new();
-            collect_vars(&m.template, &mut vars);
-            let kepler_var_count = vars
-                .iter()
-                .filter(|v| kepler_vars.contains(v.as_str()))
-                .count();
-            if kepler_var_count >= 2 {
-                multivariate_macros += 1;
-                eprintln!(
-                    "  ✓ multivariate: {} (uses {} vars)",
-                    m.template, kepler_var_count
-                );
-            }
-        }
-
-        assert!(
-            multivariate_macros >= 1,
-            "expected at least 1 multivariate macro (using ≥2 distinct Kepler vars), got {}",
-            multivariate_macros
+        assert_eq!(
+            engine.macro_operators().len(),
+            macro_count_before,
+            "sampled-only autonomous results must not add macro operators"
         );
     }
 
