@@ -1,0 +1,16 @@
+Title: RC step reference
+Date: Sat Oct 10 09:00:00 2026
+Plotname: Transient Analysis
+Flags: real
+No. Variables: 2
+No. Points: 3
+Variables:
+  0  time    time
+  1  v(out)  voltage
+Values:
+0   0.000000000000000e+00
+    0.000000000000000e+00
+1   1.000000000000000e-03
+    6.321205588285577e-01
+2   2.000000000000000e-03
+    8.646647167633873e-01
