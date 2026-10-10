@@ -1785,7 +1785,9 @@ mod tests {
     #[test]
     fn test_photocraft_is_pinned_optional_upstream_appimage() {
         let db = AppDatabase::new();
-        let photocraft = db.match_app("PhotoCraft").expect("PhotoCraft should be catalogued");
+        let photocraft = db
+            .match_app("PhotoCraft")
+            .expect("PhotoCraft should be catalogued");
         assert_eq!(photocraft.name, "PhotoCraft");
         assert_eq!(photocraft.primary.nix_pkg, "photocraft");
         assert_eq!(photocraft.primary.display_name, "PhotoCraft (early alpha)");
@@ -1797,19 +1799,43 @@ mod tests {
         );
         match photocraft.install_source {
             InstallSource::AppImage {
-                version, url, hash_sri, homepage, license_attrs, platforms, runtime_packages, ..
+                version,
+                url,
+                hash_sri,
+                homepage,
+                license_attrs,
+                platforms,
+                runtime_packages,
             } => {
                 assert_eq!(version, "0.5.0");
-                assert_eq!(url, "https://github.com/storytold/photocraft/releases/download/v0.5.0/photocraft-0.5.0-linux-x86_64.AppImage");
+                assert_eq!(
+                    url,
+                    "https://github.com/storytold/photocraft/releases/download/v0.5.0/photocraft-0.5.0-linux-x86_64.AppImage"
+                );
                 assert_eq!(hash_sri, "sha256-9U2GOAcFO738/6DWJO9+SdP9QTEMe7Ht5IU29pkp0i8=");
                 assert_eq!(homepage, "https://getartcraft.com/apps/photocraft");
                 assert_eq!(license_attrs, &["mit", "asl20"][..]);
                 assert_eq!(platforms, &["x86_64-linux"][..]);
-                for package in ["libxkbcommon", "libx11", "libxcb", "libxcursor", "libxi", "wayland", "vulkan-loader", "libglvnd", "mesa"] {
-                    assert!(runtime_packages.contains(&package), "missing runtime package: {package}");
+                for package in [
+                    "libxkbcommon",
+                    "libx11",
+                    "libxcb",
+                    "libxcursor",
+                    "libxi",
+                    "wayland",
+                    "vulkan-loader",
+                    "libglvnd",
+                    "mesa",
+                ] {
+                    assert!(
+                        runtime_packages.contains(&package),
+                        "missing runtime package: {package}"
+                    );
                 }
             }
-            InstallSource::Nixpkgs => panic!("PhotoCraft must retain its pinned AppImage source"),
+            InstallSource::Nixpkgs => {
+                panic!("PhotoCraft must retain its pinned AppImage source")
+            }
         }
         assert!(db.match_app("photocraft").is_some());
         assert!(!is_potentially_stale(photocraft, "25.05"));
