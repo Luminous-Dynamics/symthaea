@@ -300,7 +300,10 @@ pub fn calculate_pyrolysis_batch(
     let carbon_not_in_char_kg = (feedstock_carbon_kg - char_carbon_kg).max(0.0);
     let carbon_retained_in_char_fraction = if feedstock_carbon_kg == 0.0 {
         if char_carbon_kg > 0.0 {
-            return Err(SoilProcessError::new("carbon_balance", "positive char carbon from zero feedstock carbon"));
+            return Err(SoilProcessError::new(
+                "carbon_balance",
+                "positive char carbon from zero feedstock carbon",
+            ));
         }
         0.0
     } else {
@@ -735,7 +738,8 @@ pub fn assess_biochar_climate(
         CharStorageEligibility::Unknown => None,
     };
 
-    let net_kg_co2e = if input.inventory_status == ClimateInventoryStatus::CompleteForDeclaredBoundary {
+    let net_kg_co2e =
+        if input.inventory_status == ClimateInventoryStatus::CompleteForDeclaredBoundary {
         durable_char_storage_kg_co2e.map(|storage| emissions - removals - avoided - storage)
     } else {
         None
@@ -767,7 +771,8 @@ pub fn assess_biochar_climate(
         char_storage: input.char_storage.clone(),
         inventory_evidence: input.inventory_evidence.clone(),
         process_evidence: process.evidence.clone(),
-        scope_note: "scenario/batch accounting within declared boundary; not an ISO-conformant LCA, carbon-credit issuance, or proof of net removal".into(),
+        scope_note: "scenario/batch accounting within declared boundary; not an ISO-conformant LCA, carbon-credit issuance, or proof of net removal"
+            .into(),
     })
 }
 
@@ -934,7 +939,8 @@ pub fn assess_observed_mass_balance(
         input_evidence: input.input_evidence.clone(),
         output_streams: input.output_streams.clone(),
         tolerance_evidence: input.tolerance_evidence.clone(),
-        scope_note: "observed mass closure only; not product-quality, emissions, safety, nutrient-availability, or agronomic approval".into(),
+        scope_note: "observed mass closure only; not product-quality, emissions, safety, nutrient-availability, or agronomic approval"
+            .into(),
     })
 }
 
@@ -1048,10 +1054,22 @@ mod tests {
     fn pyrolysis_input() -> PyrolysisBatchInput {
         PyrolysisBatchInput {
             evidence: PyrolysisEvidence {
-                feedstock: EvidenceRef { evidence_id: "scenario-feedstock-001".into(), kind: EvidenceKind::Scenario },
-                process_parameters: EvidenceRef { evidence_id: "scenario-pyrolysis-yield-001".into(), kind: EvidenceKind::Scenario },
-                thermophysical_properties: EvidenceRef { evidence_id: "reference-properties-001".into(), kind: EvidenceKind::Literature },
-                reactor_design: EvidenceRef { evidence_id: "scenario-reactor-001".into(), kind: EvidenceKind::Scenario },
+                feedstock: EvidenceRef {
+                    evidence_id: "scenario-feedstock-001".into(),
+                    kind: EvidenceKind::Scenario,
+                },
+                process_parameters: EvidenceRef {
+                    evidence_id: "scenario-pyrolysis-yield-001".into(),
+                    kind: EvidenceKind::Scenario,
+                },
+                thermophysical_properties: EvidenceRef {
+                    evidence_id: "reference-properties-001".into(),
+                    kind: EvidenceKind::Literature,
+                },
+                reactor_design: EvidenceRef {
+                    evidence_id: "scenario-reactor-001".into(),
+                    kind: EvidenceKind::Scenario,
+                },
                 input_snapshot_id: "scenario-run-001".into(),
             },
             wet_feedstock_kg: 1_000.0,
@@ -1148,9 +1166,18 @@ mod tests {
     #[test]
     fn recovered_nutrients_are_element_specific_and_bounded() {
         let evidence = NutrientRecoveryEvidence {
-            influent_composition: EvidenceRef { evidence_id: "scenario-influent-001".into(), kind: EvidenceKind::Scenario },
-            recovery_parameters: EvidenceRef { evidence_id: "scenario-recovery-001".into(), kind: EvidenceKind::Scenario },
-            plant_availability_parameters: EvidenceRef { evidence_id: "scenario-availability-001".into(), kind: EvidenceKind::Scenario },
+            influent_composition: EvidenceRef {
+                evidence_id: "scenario-influent-001".into(),
+                kind: EvidenceKind::Scenario,
+            },
+            recovery_parameters: EvidenceRef {
+                evidence_id: "scenario-recovery-001".into(),
+                kind: EvidenceKind::Scenario,
+            },
+            plant_availability_parameters: EvidenceRef {
+                evidence_id: "scenario-availability-001".into(),
+                kind: EvidenceKind::Scenario,
+            },
             input_snapshot_id: "scenario-nutrient-run-001".into(),
         };
         let result = calculate_recovered_nutrients(
@@ -1209,7 +1236,13 @@ mod tests {
         fractions.nitrogen_recovered = 1.1;
         assert!(calculate_recovered_nutrients(10.0, concentrations, fractions, &evidence).is_err());
         fractions.nitrogen_recovered = 0.8;
-        assert!(calculate_recovered_nutrients(f64::MAX, concentrations, fractions, &evidence).is_err());
+        assert!(calculate_recovered_nutrients(
+            f64::MAX,
+            concentrations,
+            fractions,
+            &evidence
+        )
+        .is_err());
     }
 
     fn climate_evidence(id: &str, kind: EvidenceKind) -> EvidenceRef {
