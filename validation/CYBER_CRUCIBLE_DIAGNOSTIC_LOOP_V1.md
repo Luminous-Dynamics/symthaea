@@ -23,7 +23,7 @@ Evidence and evaluator receipts carry SHA-256 digests over canonical UTF-8 JSON:
 
 This verifies content-to-digest consistency, not cryptographic authenticity. Signature validation, evaluator credential validation, authorization of the evaluator, trusted timestamping, and signer-to-role policy must be handled by the upstream trusted evidence verifier. A digest supplied by the same untrusted actor is not proof of authenticity.
 
-A proposed action does not imply approval or execution. An action marked approved or executed must reference a passing authorization-decision receipt bound to that exact proposal and scenario. Diagnosis and benchmark results remain non-authorizing. Even an internally consistent report does not prove that a live system is safe.
+A proposed action does not imply approval or execution. Every proposal carries a canonical content digest over its immutable action intent, excluding mutable lifecycle status and the authorization-receipt pointer. An action marked approved or executed must reference a passing authorization-decision receipt that binds the exact scenario identity, proposal ID, and proposal content digest; the authority-check step must bind that same proposal and receipt. Changing action scope after approval therefore invalidates the binding even if the proposal ID is unchanged. Diagnosis and benchmark results remain non-authorizing. Even an internally consistent report does not prove that a live system is safe.
 
 ## Public-versus-held-out split
 
