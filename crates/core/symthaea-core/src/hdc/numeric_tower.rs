@@ -225,13 +225,15 @@ impl Number {
                 }
             }
             Number::Integer(n) if n >= 0 => Number::Natural(n as u64),
-            Number::Real(x) if x.fract().abs() < 1e-12 && x >= 0.0 && x <= u64::MAX as f64 => {
-                Number::Natural(x.round() as u64)
+            // Narrow only exact integral floats. A tolerance here can silently
+            // change a nearby fractional value into a different integer.
+            Number::Real(x) if x.fract() == 0.0 && x >= 0.0 && x < u64::MAX as f64 => {
+                Number::Natural(x as u64)
             }
             Number::Real(x)
-                if x.fract().abs() < 1e-12 && x >= i64::MIN as f64 && x <= i64::MAX as f64 =>
+                if x.fract() == 0.0 && x >= i64::MIN as f64 && x < i64::MAX as f64 =>
             {
-                Number::Integer(x.round() as i64)
+                Number::Integer(x as i64)
             }
             other => other,
         }
@@ -404,12 +406,16 @@ impl NumericTower {
     /// Create a Number from an f64 (attempts to narrow to most specific domain).
     pub fn from_f64(x: f64) -> Number {
         // Try to represent as an exact integer first
-        if x.is_finite() && x.fract().abs() < 1e-12 {
-            if x >= 0.0 && x <= u64::MAX as f64 {
-                return Number::Natural(x.round() as u64);
+        if x.is_finite() && x.fract() == 0.0 {
+            // u64::MAX as f64 rounds to 2^64, which is an exclusive upper
+            // bound for values that can be cast back without saturation.
+            if x >= 0.0 && x < u64::MAX as f64 {
+                return Number::Natural(x as u64);
             }
-            if x >= i64::MIN as f64 && x <= i64::MAX as f64 {
-                return Number::Integer(x.round() as i64);
+            // i64::MAX as f64 similarly rounds to 2^63; keep that boundary
+            // exclusive while allowing i64::MIN exactly.
+            if x >= i64::MIN as f64 && x < i64::MAX as f64 {
+                return Number::Integer(x as i64);
             }
         }
         Number::Real(x)
@@ -1213,6 +1219,32 @@ mod tests {
     fn test_from_i64_negative() {
         let n = NumericTower::from_i64(-3);
         assert!(matches!(n, Number::Integer(-3)));
+    }
+
+    #[test]
+    fn test_from_f64_near_integer_stays_real() {
+        let value = 1.0 - 5e-13;
+        assert!(matches!(NumericTower::from_f64(value), Number::Real(actual) if actual == value));
+
+        let narrowed = Number::Real(value).narrow();
+        assert!(matches!(narrowed, Number::Real(actual) if actual == value));
+    }
+
+    #[test]
+    fn test_from_f64_upper_cast_boundaries_do_not_saturate() {
+        let u64_upper_exclusive = u64::MAX as f64;
+        assert!(matches!(
+            NumericTower::from_f64(u64_upper_exclusive),
+            Number::Real(value) if value == u64_upper_exclusive
+        ));
+        assert!(matches!(
+            Number::Real(u64_upper_exclusive).narrow(),
+            Number::Real(value) if value == u64_upper_exclusive
+        ));
+
+        let i64_min = i64::MIN as f64;
+        assert!(matches!(NumericTower::from_f64(i64_min), Number::Integer(i64::MIN)));
+        assert!(matches!(Number::Real(i64_min).narrow(), Number::Integer(i64::MIN)));
     }
 
     #[test]
