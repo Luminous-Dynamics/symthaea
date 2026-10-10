@@ -427,6 +427,9 @@ fn validate_imported_score(score: &Score) -> Result<(), String> {
     if score.meter == 0 {
         return Err("symbolic score meter must be positive".into());
     }
+    if score.key.tonic.value() >= 12 {
+        return Err("symbolic score tonic pitch class must be in 0..=11".into());
+    }
     if score.total_beats.den() <= 0 || score.total_beats.num() <= 0 {
         return Err("symbolic score duration must be positive".into());
     }
@@ -443,6 +446,11 @@ fn validate_imported_score(score: &Score) -> Result<(), String> {
     }
 
     for (index, note) in score.notes.iter().enumerate() {
+        if note.pitch.midi() > 127 {
+            return Err(format!(
+                "symbolic score note {index} has a MIDI pitch outside 0..=127"
+            ));
+        }
         if note.onset.den() <= 0
             || note.duration.den() <= 0
             || note.onset.num() < 0
@@ -669,6 +677,26 @@ mod tests {
         assert_eq!(score.notes[1].onset, Duration::new(1, 1));
         assert_eq!(score.notes[1].duration, Duration::new(1, 1));
         assert_eq!(score.total_beats, Duration::new(2, 1));
+    }
+
+    #[test]
+    fn invalid_musescore_tonic_pitch_class_is_rejected_before_analysis() {
+        let mut value = serde_json::to_value(json_score_with_one_note()).unwrap();
+        value["key"]["tonic"] = serde_json::json!(255);
+        let bytes = serde_json::to_vec(&value).unwrap();
+
+        let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
+        assert!(error.contains("tonic pitch class"), "{error}");
+    }
+
+    #[test]
+    fn invalid_musescore_midi_pitch_is_rejected_before_rendering() {
+        let mut value = serde_json::to_value(json_score_with_one_note()).unwrap();
+        value["notes"][0]["pitch"]["midi"] = serde_json::json!(255);
+        let bytes = serde_json::to_vec(&value).unwrap();
+
+        let error = parse_symbolic(&bytes, SymbolicImportFormat::MuseScore).unwrap_err();
+        assert!(error.contains("MIDI pitch outside 0..=127"), "{error}");
     }
 
     #[test]
