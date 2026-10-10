@@ -1,0 +1,29 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+# Each run preserves evidence for its exact subject commit.
+concurrency:
+  group: security-audit-${{ github.event.pull_request.number || github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Shared security audit
+    uses: Luminous-Dynamics/luminous-platform/.github/workflows/security-audit.yml@dfccbd97e72463b2513c79912ca868490114b47f
+    with:
+      subject_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      audit_engine_sha: dfccbd97e72463b2513c79912ca868490114b47f
+      audit_rust: true
+      
