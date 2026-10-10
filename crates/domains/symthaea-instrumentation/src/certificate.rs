@@ -65,6 +65,21 @@ impl CalibrationCertificate {
             "calibration_procedure_id",
             MAX_CERTIFICATE_PROCEDURE_ID_BYTES,
         )?;
+        canonical_token(
+            instrument.instrument_id().to_owned(),
+            "instrument_id",
+            MAX_CERTIFICATE_RECORD_ID_BYTES,
+        )?;
+        canonical_token(
+            instrument.channel_id().to_owned(),
+            "channel_id",
+            MAX_CERTIFICATE_RECORD_ID_BYTES,
+        )?;
+        canonical_token(
+            reference_standard.artifact_id().to_owned(),
+            "reference_standard_artifact_id",
+            MAX_CERTIFICATE_RECORD_ID_BYTES,
+        )?;
 
         if quantity != unit.quantity() {
             return Err(CalibrationCertificateError::QuantityUnitMismatch);
@@ -514,6 +529,51 @@ mod tests {
         assert_eq!(
             CalibrationCertificate::from_canonical_bytes(&bytes).unwrap_err(),
             CalibrationCertificateError::InvalidNumber("float")
+        );
+    }
+
+    #[test]
+    fn control_characters_in_instrument_and_reference_ids_are_rejected() {
+        assert_eq!(
+            CalibrationCertificate::new(
+                "calibration-17",
+                InstrumentIdentity::new("instrument\\nforged", "channel-a").unwrap(),
+                Quantity::Frequency,
+                Unit::Hertz,
+                4_000_000.0,
+                6_000_000.0,
+                10,
+                100,
+                900.0,
+                "lab",
+                "procedure",
+                certificate().reference_standard().clone(),
+            )
+            .unwrap_err(),
+            CalibrationCertificateError::InvalidField("instrument_id")
+        );
+
+        assert_eq!(
+            CalibrationCertificate::new(
+                "calibration-17",
+                InstrumentIdentity::new("instrument-1", "channel-a").unwrap(),
+                Quantity::Frequency,
+                Unit::Hertz,
+                4_000_000.0,
+                6_000_000.0,
+                10,
+                100,
+                900.0,
+                "lab",
+                "procedure",
+                ArtifactReference::new(
+                    "reference\\nforged",
+                    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                )
+                .unwrap(),
+            )
+            .unwrap_err(),
+            CalibrationCertificateError::InvalidField("reference_standard_artifact_id")
         );
     }
 
