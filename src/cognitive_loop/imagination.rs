@@ -265,6 +265,7 @@ impl CognitiveLoopService {
             path_length: path.len(),
             // Legacy field name retained; this is geometric continuity, not semantics.
             semantic_coherence: trajectory_coherence,
+            trajectory_continuity,
             trajectory: path,
         };
 
