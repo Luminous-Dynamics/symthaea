@@ -49,6 +49,17 @@ For a freely orbiting object in a circular two-body Earth orbit, with geocentric
 
 Use these equations only for the stated circular-orbit model. A stationary supported ring is not a circular Kepler orbit, so the equations do not establish its equilibrium or its required rotor speed.
 
+Using \u03bc = 3.986004418\u00d710\u00b9\u2074 m\u00b3/s\u00b2 and an equatorial reference radius of 6,378.137 km gives this independently evaluated *two-body circular-orbit* sanity table:
+
+| Altitude h (km) | Radius r (km) | Circumference (km) | Circular speed (km/s) | Period (min) | Orbital kinetic energy per kg (MJ/kg) |
+|---:|---:|---:|---:|---:|---:|
+| 200 | 6,578.137 | 41,331.65 | 7.78426 | 88.494 | 30.297 |
+| 300 | 6,678.137 | 41,959.97 | 7.72576 | 90.520 | 29.844 |
+| 400 | 6,778.137 | 42,588.29 | 7.66856 | 92.560 | 29.403 |
+| 500 | 6,878.137 | 43,216.61 | 7.61261 | 94.616 | 28.976 |
+
+These numbers are reference fixtures for formula/unit tests only. They omit atmosphere, oblateness, lunar/solar perturbations, inclination, attitude, and all ring-support physics; they are **not** a claim that any listed altitude is suitable for a long-lived infrastructure ring. The table's kinetic-energy column is the ideal orbital specific kinetic energy, not the rotor's energy and not the energy required to build, deploy, or support a ring.
+
 For a curved moving mass stream, the local normal-force requirement is related to mass flow, curvature, and **inertial** velocity. A first-principles model must derive this from the actual control volume and velocity field. Do not substitute rotor speed relative to the sheath directly into (a_n=v^2/r) unless the reference frame and transformation justify it.
 
 If a local continuous-stream approximation is used, record line density λ, curvature κ, relative velocity, support-frame velocity and acceleration, and control-volume assumptions. Then derive the vector acceleration/force balance in the chosen frame. In a rotating body frame this must account for transport terms (including Coriolis, centrifugal and angular-acceleration terms as applicable). Validate the resulting expression against a small, independently hand-checkable limiting case.
