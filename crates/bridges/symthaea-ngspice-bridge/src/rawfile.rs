@@ -511,7 +511,9 @@ mod tests {
                 "RC mismatch at t={time}: actual={actual}, expected={expected}"
             );
         }
-        assert!((raw.peak_abs_value("v(out)").unwrap() - (1.0 - (-0.002 / tau).exp())).abs() < 1e-9);
+        assert!(
+            (raw.peak_abs_value("v(out)").unwrap() - (1.0 - (-0.002 / tau).exp())).abs() < 1e-9
+        );
     }
 
     #[test]
