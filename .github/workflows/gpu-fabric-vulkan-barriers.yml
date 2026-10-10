@@ -3,12 +3,20 @@ name: GPU Fabric Vulkan Barrier Qualification
 permissions:
   contents: read
 
+# Only the newest exact-head qualification for a PR is useful. Cancel stale
+# attempts on that same PR, without cancelling qualifications for other PRs.
+concurrency:
+  group: gpu-fabric-vulkan-barriers-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'crates/core/symthaea-gpu-fabric/**'
       - '.github/workflows/gpu-fabric-vulkan-barriers.yml'
+      - '.github/scripts/verify-gpu-fabric-vulkan-qualification.py'
+      - '.github/scripts/check-workflow-draft-safety.py'
   workflow_dispatch:
 
 jobs:
@@ -19,6 +27,9 @@ jobs:
     timeout-minutes: 20
     env:
       VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+      # Synchronization validation is disabled by default in the Khronos layer.
+      # Use only the current layer setting; do not combine it with deprecated VK_LAYER_ENABLES.
+      VK_LAYER_VALIDATE_SYNC: "1"
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -54,7 +65,7 @@ jobs:
           cp -R crates/core/symthaea-gpu-fabric/src/. .ci/gpu-fabric-workspace/src/
           cp .github/scripts/verify-gpu-fabric-vulkan-qualification.py .ci/gpu-fabric-workspace/qualification-independent-verifier.py
           cp crates/core/symthaea-gpu-fabric/Cargo.toml .ci/gpu-fabric-workspace/Cargo.toml
-          sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "=1.8.5"/' -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' .ci/gpu-fabric-workspace/Cargo.toml
+          sed -i -e 's/edition.workspace = true/edition = "2024"/' -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' -e 's/blake3 = { workspace = true }/blake3 = "=1.8.5"/' -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' -e 's/sha2 = { workspace = true }/sha2 = "=0.10.9"/' .ci/gpu-fabric-workspace/Cargo.toml
           printf '\n[workspace]\nresolver = "2"\n' >> .ci/gpu-fabric-workspace/Cargo.toml
 
       - name: Resolve isolated dependency lock
@@ -74,6 +85,10 @@ jobs:
             exit 1
           fi
 
+      - name: Self-test independent witness verifier parsing
+        working-directory: .ci/gpu-fabric-workspace
+        run: python3 qualification-independent-verifier.py --self-test
+
       - name: Record qualification environment
         working-directory: .ci/gpu-fabric-workspace
         run: |
@@ -83,6 +98,10 @@ jobs:
             echo "runner_os=$RUNNER_OS"
             echo "runner_arch=$RUNNER_ARCH"
             echo "runner_name=$RUNNER_NAME"
+            echo "validation_layer=VK_LAYER_KHRONOS_validation"
+            echo "validation_sync_requested=VK_LAYER_VALIDATE_SYNC=1"
+            echo "validation_sync_env=VK_LAYER_VALIDATE_SYNC"
+            echo "validation_sync_activation=not_proven_without_hazard_sentinel"
             rustc -Vv
             cargo -V
             gdb --version | head -n 1
@@ -124,7 +143,7 @@ jobs:
           EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -o pipefail
-          timeout --foreground --kill-after=15s 60s python3 qualification-independent-verifier.py --runtime qualification-runtime.txt --environment qualification-environment.txt --source-sha256 source-sha256.txt --lock Cargo.lock --lock-sha256 dependency-lock.sha256 --metadata metadata.json --cargo-toml Cargo.toml --package-versions vulkan-package-versions.txt --input-sha256 qualification-input-sha256.txt --expected-commit "$EXPECTED_QUALIFICATION_SHA" 2>&1 | tee qualification-independent-verifier.txt
+          timeout --foreground --kill-after=15s 60s python3 qualification-independent-verifier.py --runtime qualification-runtime.txt --environment qualification-environment.txt --source-sha256 source-sha256.txt --lock Cargo.lock --lock-sha256 dependency-lock.sha256 --metadata metadata.json --cargo-toml Cargo.toml --package-versions vulkan-package-versions.txt --input-sha256 qualification-input-sha256.txt --workflow "${GITHUB_WORKSPACE}/.github/workflows/gpu-fabric-vulkan-barriers.yml" --expected-commit "$EXPECTED_QUALIFICATION_SHA" 2>&1 | tee qualification-independent-verifier.txt
       - name: Capture native crash backtrace
         if: ${{ failure() && (steps.runtime_preflight.outcome == 'failure' || steps.execute_runtime.outcome == 'failure') }}
         working-directory: .ci/gpu-fabric-workspace

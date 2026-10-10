@@ -1,5 +1,6 @@
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 use ash::{vk, Device, Entry, Instance};
@@ -8,18 +9,31 @@ use naga::back::spv;
 use naga::front::wgsl;
 use naga::valid::{Capabilities, ValidationFlags, Validator};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
     AccessKind, BinaryHypervector, DependencyKind, ExecutionGraph, ExecutionNode,
-    ExecutionSchedule, GpuOperation, ResourceId, VulkanBarrierRequirement, VulkanSyncPlan,
+    ExecutionSchedule, GpuOperation, HDC_BIND_XOR_KERNEL_ID, ResourceId, VulkanBarrierRequirement,
+    VulkanSyncPlan,
 };
 
 const MAX_WORKLOAD_NODES: usize = 64;
 const WORKGROUP_SIZE: u32 = 64;
 const VULKAN_API_VERSION: u32 = vk::API_VERSION_1_3;
 const VULKAN_TIMELINE_TIMEOUT_NS: u64 = 5_000_000_000;
-const RECEIPT_VERSION: u16 = 4;
+const GPU_FABRIC_DESCRIPTOR_TYPE: vk::DescriptorType = vk::DescriptorType::STORAGE_BUFFER;
+const GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS: vk::ShaderStageFlags = vk::ShaderStageFlags::COMPUTE;
+const GPU_FABRIC_PIPELINE_BIND_POINT: vk::PipelineBindPoint = vk::PipelineBindPoint::COMPUTE;
+const RECEIPT_VERSION: u16 = 12;
+const VULKAN_IMPLEMENTATION_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-implementation.v1";
+const WGSL_ABI_MARKER: &str = "symthaea.hdc.bind_xor.storage-u32.v1";
+const VULKAN_ENTRY_POINT: &str = "main";
+const VULKAN_SHADER_STAGE: &str = "compute";
+const DRIVER_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-driver.v1";
+const QUEUE_FAMILY_IDENTITY_VERSION: &str = "symthaea.gpu-fabric.vulkan-queue-family.v1";
+const SYNCHRONIZATION_FEATURE_IDENTITY_VERSION: &str =
+    "symthaea.gpu-fabric.vulkan-sync-features.v1";
 
 #[cfg(test)]
 fn qualification_stage(label: &str) {
@@ -29,21 +43,7 @@ fn qualification_stage(label: &str) {
 #[cfg(not(test))]
 fn qualification_stage(_label: &str) {}
 
-const WGSL: &str = r#"
-@group(0) @binding(0)
-var<storage, read> lhs: array<u32>;
-@group(0) @binding(1)
-var<storage, read> rhs: array<u32>;
-@group(0) @binding(2)
-var<storage, read_write> output: array<u32>;
-
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    if (id.x < arrayLength(&output)) {
-        output[id.x] = lhs[id.x] ^ rhs[id.x];
-    }
-}
-"#;
+const WGSL: &str = include_str!("hdc_bind_xor.wgsl");
 
 #[derive(Debug, Error)]
 pub enum VulkanBarrierError {
@@ -133,6 +133,30 @@ pub enum VulkanBarrierReceiptError {
     QueueFamilyBinding,
     #[error("receipt physical-device UUID is all zeroes")]
     DeviceUuidMissing,
+    #[error("receipt implementation identity digest is missing or malformed")]
+    ImplementationIdentity,
+    #[error("receipt physical-device identity digest is missing or malformed")]
+    PhysicalDeviceIdentity,
+    #[error("receipt implementation identity does not match the execution runtime")]
+    ImplementationIdentityBinding,
+    #[error("receipt physical-device identity does not match the execution runtime")]
+    PhysicalDeviceIdentityBinding,
+    #[error("receipt driver identity digest is missing or malformed")]
+    DriverIdentity,
+    #[error("receipt driver identity does not match the execution runtime")]
+    DriverIdentityBinding,
+    #[error("receipt driver UUID does not match the execution runtime")]
+    DriverUuidBinding,
+    #[error("receipt driver ID does not match the execution runtime")]
+    DriverIdBinding,
+    #[error("receipt queue-family identity digest is missing, malformed, or inconsistent")]
+    QueueFamilyIdentity,
+    #[error("receipt queue-family identity does not match the execution runtime")]
+    QueueFamilyIdentityBinding,
+    #[error("receipt synchronization feature profile is missing, malformed, or unqualified")]
+    SynchronizationFeatureIdentity,
+    #[error("receipt synchronization feature profile does not match the execution runtime")]
+    SynchronizationFeatureIdentityBinding,
     #[error("receipt physical-device UUID does not match the execution runtime")]
     DeviceUuidBinding,
     #[error("receipt expected timeline value does not match the synchronization plan")]
@@ -141,11 +165,365 @@ pub enum VulkanBarrierReceiptError {
     MultipleLogicalQueues,
     #[error("receipt completion lowering digest mismatch")]
     CompletionLoweringDigest,
+    #[error("receipt descriptor/dispatch lowering digest mismatch")]
+    ExecutionLoweringDigest,
+    #[error("receipt resource memory profile is missing or inconsistent for {0}")]
+    ResourceMemoryProfile(ResourceId),
+    #[error("receipt memory-lowering digest mismatch")]
+    MemoryLoweringDigest,
+    #[error("receipt Vulkan memory topology is missing, malformed, or inconsistent")]
+    MemoryTopology,
+    #[error("receipt Vulkan memory topology does not match the execution runtime")]
+    MemoryTopologyBinding,
     #[error("receipt observed timeline value {observed} does not equal expected {expected}")]
     TimelineCompletion { expected: u64, observed: u64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanSynchronizationFeatureProfile {
+    pub timeline_semaphore_supported: bool,
+    pub synchronization2_supported: bool,
+    pub timeline_semaphore_enabled: bool,
+    pub synchronization2_enabled: bool,
+    pub identity_digest: String,
+}
+
+impl VulkanSynchronizationFeatureProfile {
+    fn new(
+        timeline_semaphore_supported: bool,
+        synchronization2_supported: bool,
+        timeline_semaphore_enabled: bool,
+        synchronization2_enabled: bool,
+    ) -> Self {
+        Self {
+            timeline_semaphore_supported,
+            synchronization2_supported,
+            timeline_semaphore_enabled,
+            synchronization2_enabled,
+            identity_digest: synchronization_feature_identity_digest(
+                timeline_semaphore_supported,
+                synchronization2_supported,
+                timeline_semaphore_enabled,
+                synchronization2_enabled,
+            ),
+        }
+    }
+
+    fn verify(&self) -> Result<(), VulkanBarrierReceiptError> {
+        if !self.timeline_semaphore_supported
+            || !self.synchronization2_supported
+            || !self.timeline_semaphore_enabled
+            || !self.synchronization2_enabled
+        {
+            return Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity);
+        }
+        if !is_sha256_hex(&self.identity_digest)
+            || self.identity_digest
+                != synchronization_feature_identity_digest(
+                    self.timeline_semaphore_supported,
+                    self.synchronization2_supported,
+                    self.timeline_semaphore_enabled,
+                    self.synchronization2_enabled,
+                )
+        {
+            return Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity);
+        }
+        Ok(())
+    }
+}
+
+fn synchronization_feature_profile_from_device_create(
+    timeline_semaphore_supported: bool,
+    synchronization2_supported: bool,
+    timeline_semaphore_enabled: vk::Bool32,
+    synchronization2_enabled: vk::Bool32,
+) -> VulkanSynchronizationFeatureProfile {
+    VulkanSynchronizationFeatureProfile::new(
+        timeline_semaphore_supported,
+        synchronization2_supported,
+        timeline_semaphore_enabled != 0,
+        synchronization2_enabled != 0,
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanMemoryTypeRecord {
+    pub index: u32,
+    pub property_flags: u32,
+    pub heap_index: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanMemoryHeapRecord {
+    pub index: u32,
+    pub flags: u32,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanMemoryTopologyProfile {
+    pub memory_type_count: u32,
+    pub memory_heap_count: u32,
+    pub memory_types: Vec<VulkanMemoryTypeRecord>,
+    pub memory_heaps: Vec<VulkanMemoryHeapRecord>,
+    pub identity_digest: String,
+}
+
+impl VulkanMemoryTopologyProfile {
+    fn from_vulkan(properties: &vk::PhysicalDeviceMemoryProperties) -> Self {
+        let memory_types = properties.memory_types
+            .iter()
+            .take(properties.memory_type_count as usize)
+            .enumerate()
+            .map(|(index, record)| VulkanMemoryTypeRecord {
+                index: index as u32,
+                property_flags: record.property_flags.as_raw(),
+                heap_index: record.heap_index,
+            })
+            .collect::<Vec<_>>();
+        let memory_heaps = properties.memory_heaps
+            .iter()
+            .take(properties.memory_heap_count as usize)
+            .enumerate()
+            .map(|(index, record)| VulkanMemoryHeapRecord {
+                index: index as u32,
+                flags: record.flags.as_raw(),
+                size: record.size,
+            })
+            .collect::<Vec<_>>();
+        let identity_digest = memory_topology_identity_digest(
+            properties.memory_type_count,
+            properties.memory_heap_count,
+            &memory_types,
+            &memory_heaps,
+        );
+        Self {
+            memory_type_count: properties.memory_type_count,
+            memory_heap_count: properties.memory_heap_count,
+            memory_types,
+            memory_heaps,
+            identity_digest,
+        }
+    }
+
+    fn verify(&self) -> Result<(), VulkanBarrierReceiptError> {
+        if self.memory_type_count == 0
+            || self.memory_type_count > 32
+            || self.memory_heap_count == 0
+            || self.memory_heap_count > 16
+            || self.memory_types.len() != self.memory_type_count as usize
+            || self.memory_heaps.len() != self.memory_heap_count as usize
+        {
+            return Err(VulkanBarrierReceiptError::MemoryTopology);
+        }
+        for (index, record) in self.memory_types.iter().enumerate() {
+            if record.index != index as u32 || record.heap_index >= self.memory_heap_count {
+                return Err(VulkanBarrierReceiptError::MemoryTopology);
+            }
+        }
+        for (index, record) in self.memory_heaps.iter().enumerate() {
+            if record.index != index as u32 {
+                return Err(VulkanBarrierReceiptError::MemoryTopology);
+            }
+        }
+        if !is_sha256_hex(&self.identity_digest)
+            || self.identity_digest
+                != memory_topology_identity_digest(
+                    self.memory_type_count,
+                    self.memory_heap_count,
+                    &self.memory_types,
+                    &self.memory_heaps,
+                )
+        {
+            return Err(VulkanBarrierReceiptError::MemoryTopology);
+        }
+        Ok(())
+    }
+}
+
+fn memory_topology_identity_digest(
+    memory_type_count: u32,
+    memory_heap_count: u32,
+    memory_types: &[VulkanMemoryTypeRecord],
+    memory_heaps: &[VulkanMemoryHeapRecord],
+) -> String {
+    let mut fields = vec![
+        "topology_version=1".to_owned(),
+        format!("memory_type_count={memory_type_count}"),
+        format!("memory_heap_count={memory_heap_count}"),
+    ];
+    for record in memory_types {
+        fields.extend([
+            "memory_type".to_owned(),
+            format!("index={}", record.index),
+            format!("property_flags={}", record.property_flags),
+            format!("heap_index={}", record.heap_index),
+        ]);
+    }
+    for record in memory_heaps {
+        fields.extend([
+            "memory_heap".to_owned(),
+            format!("index={}", record.index),
+            format!("flags={}", record.flags),
+            format!("size={}", record.size),
+        ]);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-memory-topology.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulkanResourceMemoryProfile {
+    pub memory_type_index: u32,
+    pub memory_type_bits: u32,
+    pub memory_property_flags: u32,
+    pub memory_heap_index: u32,
+    pub memory_heap_flags: u32,
+    pub memory_heap_size: u64,
+    pub memory_requirement_alignment: u64,
+    pub memory_requirement_size: u64,
+    pub allocation_size: u64,
+    pub storage_size: u64,
+    pub buffer_usage_flags: u32,
+    pub sharing_mode_raw: i32,
+    pub binding_offset: u64,
+    pub map_offset: u64,
+    pub map_size: u64,
+    pub write_flush_performed: bool,
+    pub write_flush_offset: u64,
+    pub write_flush_size: u64,
+    pub read_invalidate_performed: bool,
+    pub read_invalidate_offset: u64,
+    pub read_invalidate_size: u64,
+}
+
+impl VulkanResourceMemoryProfile {
+    fn is_consistent_with_topology(&self, topology: &VulkanMemoryTopologyProfile) -> bool {
+        let Some(memory_type) = topology.memory_types.get(self.memory_type_index as usize) else {
+            return false;
+        };
+        let Some(memory_heap) = topology.memory_heaps.get(memory_type.heap_index as usize) else {
+            return false;
+        };
+        let valid_type_mask = if topology.memory_type_count == 32 {
+            u32::MAX
+        } else {
+            (1_u32 << topology.memory_type_count) - 1
+        };
+        self.memory_type_bits & !valid_type_mask == 0
+            && self.memory_property_flags == memory_type.property_flags
+            && self.memory_heap_index == memory_type.heap_index
+            && self.memory_heap_flags == memory_heap.flags
+            && self.memory_heap_size == memory_heap.size
+    }
+
+    fn is_consistent_with_storage_size(&self, expected_storage_size: u64) -> bool {
+        let host_visible = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        let host_coherent = vk::MemoryPropertyFlags::HOST_COHERENT.as_raw();
+        let coherent = self.memory_property_flags & host_coherent != 0;
+        let selected_type_bit = 1_u32.checked_shl(self.memory_type_index).unwrap_or(0);
+        let expected_flush_size = if coherent { 0 } else { vk::WHOLE_SIZE };
+        self.memory_type_index < 32
+            && selected_type_bit != 0
+            && self.memory_type_bits & selected_type_bit != 0
+            && self.memory_property_flags & host_visible != 0
+            && self.memory_heap_index < 16
+            && self.memory_heap_size > 0
+            && self.memory_requirement_alignment > 0
+            && self.memory_requirement_size == self.allocation_size
+            && self.allocation_size >= expected_storage_size
+            && self.allocation_size <= self.memory_heap_size
+            && self.storage_size == expected_storage_size
+            && self.buffer_usage_flags == vk::BufferUsageFlags::STORAGE_BUFFER.as_raw()
+            && self.sharing_mode_raw == vk::SharingMode::EXCLUSIVE.as_raw()
+            && self.binding_offset == 0
+            && self.map_offset == 0
+            && self.map_size == self.allocation_size
+            && self.write_flush_performed == !coherent
+            && self.write_flush_offset == 0
+            && self.write_flush_size == expected_flush_size
+            && self.read_invalidate_performed == !coherent
+            && self.read_invalidate_offset == 0
+            && self.read_invalidate_size == expected_flush_size
+    }
+}
+
+fn inconsistent_memory_profile_resource(
+    profiles: &BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
+) -> Option<ResourceId> {
+    let mut memory_types = BTreeMap::<u32, (u32, u32)>::new();
+    let mut memory_heaps = BTreeMap::<u32, (u32, u64)>::new();
+    for (resource, profile) in profiles {
+        let type_identity = (profile.memory_property_flags, profile.memory_heap_index);
+        if let Some(previous) = memory_types.get(&profile.memory_type_index) {
+            if *previous != type_identity {
+                return Some(resource.clone());
+            }
+        } else {
+            memory_types.insert(profile.memory_type_index, type_identity);
+        }
+
+        let heap_identity = (profile.memory_heap_flags, profile.memory_heap_size);
+        if let Some(previous) = memory_heaps.get(&profile.memory_heap_index) {
+            if *previous != heap_identity {
+                return Some(resource.clone());
+            }
+        } else {
+            memory_heaps.insert(profile.memory_heap_index, heap_identity);
+        }
+    }
+    None
+}
+
+fn resource_memory_profiles_digest(
+    profiles: &BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
+) -> String {
+    let mut fields = vec![format!("resource_profile_count:{}", profiles.len())];
+    for (resource, profile) in profiles {
+        fields.extend([
+            "resource_profile".to_owned(),
+            format!("resource={}", resource.as_str()),
+            format!("memory_type_index={}", profile.memory_type_index),
+            format!("memory_type_bits={}", profile.memory_type_bits),
+            format!("memory_property_flags={}", profile.memory_property_flags),
+            format!("memory_heap_index={}", profile.memory_heap_index),
+            format!("memory_heap_flags={}", profile.memory_heap_flags),
+            format!("memory_heap_size={}", profile.memory_heap_size),
+            format!("memory_requirement_alignment={}", profile.memory_requirement_alignment),
+            format!("memory_requirement_size={}", profile.memory_requirement_size),
+            format!("allocation_size={}", profile.allocation_size),
+            format!("storage_size={}", profile.storage_size),
+            format!("buffer_usage_flags={}", profile.buffer_usage_flags),
+            format!("sharing_mode_raw={}", profile.sharing_mode_raw),
+            format!("binding_offset={}", profile.binding_offset),
+            format!("map_offset={}", profile.map_offset),
+            format!("map_size={}", profile.map_size),
+            format!("write_flush_performed={}", u8::from(profile.write_flush_performed)),
+            format!("write_flush_offset={}", profile.write_flush_offset),
+            format!("write_flush_size={}", profile.write_flush_size),
+            format!("read_invalidate_performed={}", u8::from(profile.read_invalidate_performed)),
+            format!("read_invalidate_offset={}", profile.read_invalidate_offset),
+            format!("read_invalidate_size={}", profile.read_invalidate_size),
+        ]);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-memory-lowering.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
+}
+
 pub struct VulkanBarrierExecutionReceipt {
     pub version: u16,
     pub graph_digest: String,
@@ -154,16 +532,31 @@ pub struct VulkanBarrierExecutionReceipt {
     pub barrier_digest: String,
     pub barrier_lowering_digest: String,
     pub completion_lowering_digest: String,
+    pub execution_lowering_digest: String,
     pub node_count: u32,
     pub barrier_count: u32,
     pub resource_digests: BTreeMap<ResourceId, String>,
     pub resource_storage_sizes: BTreeMap<ResourceId, u64>,
+    pub resource_memory_profiles: BTreeMap<ResourceId, VulkanResourceMemoryProfile>,
+    pub memory_lowering_digest: String,
+    pub memory_topology: VulkanMemoryTopologyProfile,
     pub completion_expected: u64,
     pub completion_observed: u64,
     pub vulkan_api_version: u32,
     pub physical_device_api_version: u32,
     pub queue_family_index: u32,
+    pub synchronization_features: VulkanSynchronizationFeatureProfile,
+    pub queue_family_identity_digest: String,
+    pub queue_family_queue_flags: u32,
+    pub queue_family_queue_count: u32,
+    pub queue_family_timestamp_valid_bits: u32,
+    pub queue_family_min_image_transfer_granularity: [u32; 3],
     pub device_uuid: [u8; 16],
+    pub implementation_identity_digest: String,
+    pub physical_device_identity_digest: String,
+    pub driver_identity_digest: String,
+    pub driver_uuid: [u8; 16],
+    pub driver_id: i32,
 }
 
 impl VulkanBarrierExecutionReceipt {
@@ -175,6 +568,33 @@ impl VulkanBarrierExecutionReceipt {
         final_resources: &BTreeMap<ResourceId, BinaryHypervector>,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.version != RECEIPT_VERSION { return Err(VulkanBarrierReceiptError::Version(self.version)); }
+        if !is_sha256_hex(&self.implementation_identity_digest) {
+            return Err(VulkanBarrierReceiptError::ImplementationIdentity);
+        }
+        if !is_sha256_hex(&self.physical_device_identity_digest) {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentity);
+        }
+        if !is_sha256_hex(&self.driver_identity_digest) {
+            return Err(VulkanBarrierReceiptError::DriverIdentity);
+        }
+        self.synchronization_features.verify()?;
+        if !is_sha256_hex(&self.queue_family_identity_digest)
+            || self.queue_family_queue_count == 0
+            || (self.queue_family_queue_flags & vk::QueueFlags::COMPUTE.as_raw()) == 0
+        {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentity);
+        }
+        if self.queue_family_identity_digest
+            != queue_family_identity_digest_from_fields(
+                self.queue_family_index,
+                self.queue_family_queue_flags,
+                self.queue_family_queue_count,
+                self.queue_family_timestamp_valid_bits,
+                self.queue_family_min_image_transfer_granularity,
+            )
+        {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentity);
+        }
         if schedule.nodes.is_empty() { return Err(VulkanBarrierReceiptError::EmptyWorkload); }
         if self.graph_digest != graph.digest_hex().map_err(|_| VulkanBarrierReceiptError::GraphDigest)? {
             return Err(VulkanBarrierReceiptError::GraphDigest);
@@ -254,6 +674,37 @@ impl VulkanBarrierExecutionReceipt {
                 observed: self.completion_observed,
             });
         }
+        let expected_dispatch_records =
+            materialized_dispatch_records_from_graph(graph, schedule, &expected_storage_sizes)
+                .ok_or(VulkanBarrierReceiptError::ExecutionLoweringDigest)?;
+        if self.execution_lowering_digest
+            != materialized_dispatch_records_digest(&expected_dispatch_records)
+        {
+            return Err(VulkanBarrierReceiptError::ExecutionLoweringDigest);
+        }
+        self.memory_topology.verify()?;
+        if self.resource_memory_profiles.len() != expected_storage_sizes.len() {
+            return Err(VulkanBarrierReceiptError::ResourceCount);
+        }
+        for (resource, expected_size) in &expected_storage_sizes {
+            let profile = self.resource_memory_profiles.get(resource)
+                .ok_or_else(|| VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()))?;
+            if !profile.is_consistent_with_storage_size(*expected_size)
+                || !profile.is_consistent_with_topology(&self.memory_topology)
+            {
+                return Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource.clone()));
+            }
+        }
+        if let Some(resource) =
+            inconsistent_memory_profile_resource(&self.resource_memory_profiles)
+        {
+            return Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource));
+        }
+        if !is_sha256_hex(&self.memory_lowering_digest)
+            || self.memory_lowering_digest != resource_memory_profiles_digest(&self.resource_memory_profiles)
+        {
+            return Err(VulkanBarrierReceiptError::MemoryLoweringDigest);
+        }
         Ok(())
     }
 
@@ -262,6 +713,18 @@ impl VulkanBarrierExecutionReceipt {
         physical_device_api_version: u32,
         queue_family_index: u32,
         device_uuid: [u8; 16],
+        implementation_identity_digest: &str,
+        physical_device_identity_digest: &str,
+        driver_identity_digest: &str,
+        driver_uuid: [u8; 16],
+        driver_id: i32,
+        synchronization_features: &VulkanSynchronizationFeatureProfile,
+        queue_family_identity_digest: &str,
+        queue_family_queue_flags: u32,
+        queue_family_queue_count: u32,
+        queue_family_timestamp_valid_bits: u32,
+        queue_family_min_image_transfer_granularity: [u32; 3],
+        memory_topology: &VulkanMemoryTopologyProfile,
     ) -> Result<(), VulkanBarrierReceiptError> {
         if self.physical_device_api_version != physical_device_api_version {
             return Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding);
@@ -271,6 +734,39 @@ impl VulkanBarrierExecutionReceipt {
         }
         if self.device_uuid != device_uuid {
             return Err(VulkanBarrierReceiptError::DeviceUuidBinding);
+        }
+        if self.implementation_identity_digest != implementation_identity_digest {
+            return Err(VulkanBarrierReceiptError::ImplementationIdentityBinding);
+        }
+        if self.physical_device_identity_digest != physical_device_identity_digest {
+            return Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding);
+        }
+        if self.driver_identity_digest != driver_identity_digest {
+            return Err(VulkanBarrierReceiptError::DriverIdentityBinding);
+        }
+        if self.driver_uuid != driver_uuid {
+            return Err(VulkanBarrierReceiptError::DriverUuidBinding);
+        }
+        if self.driver_id != driver_id {
+            return Err(VulkanBarrierReceiptError::DriverIdBinding);
+        }
+        if self.synchronization_features != *synchronization_features {
+            return Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentityBinding);
+        }
+        if self.queue_family_identity_digest != queue_family_identity_digest {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding);
+        }
+        if self.queue_family_queue_flags != queue_family_queue_flags
+            || self.queue_family_queue_count != queue_family_queue_count
+            || self.queue_family_timestamp_valid_bits != queue_family_timestamp_valid_bits
+            || self.queue_family_min_image_transfer_granularity
+                != queue_family_min_image_transfer_granularity
+        {
+            return Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding);
+        }
+        memory_topology.verify()?;
+        if self.memory_topology != *memory_topology {
+            return Err(VulkanBarrierReceiptError::MemoryTopologyBinding);
         }
         Ok(())
     }
@@ -291,7 +787,29 @@ pub struct VulkanBarrierWorkloadRuntime {
     max_compute_workgroup_count_x: u32,
     physical_device_api_version: u32,
     queue_family_index: u32,
+    synchronization_features: VulkanSynchronizationFeatureProfile,
+    queue_family_identity_digest: String,
+    queue_family_queue_flags: u32,
+    queue_family_queue_count: u32,
+    queue_family_timestamp_valid_bits: u32,
+    queue_family_min_image_transfer_granularity: [u32; 3],
     device_uuid: [u8; 16],
+    implementation_identity_digest: String,
+    shader_spirv_sha256: String,
+    implementation_wgsl_sha256: String,
+    implementation_wgsl_hex: String,
+    shader_spirv_hex: String,
+    physical_device_vendor_id: u32,
+    physical_device_device_id: u32,
+    physical_device_type: u32,
+    physical_device_driver_version: u32,
+    physical_device_name_hex: String,
+    physical_device_identity_digest: String,
+    driver_identity_digest: String,
+    driver_uuid: [u8; 16],
+    driver_id: i32,
+    driver_name_hex: String,
+    driver_info_hex: String,
     // Must be dropped after Instance/Device because ash requires Entry to outlive them.
     _entry: Entry,
 }
@@ -337,11 +855,33 @@ impl VulkanBarrierWorkloadRuntime {
             let family = unsafe { instance.get_physical_device_queue_family_properties(physical) }
                 .iter().enumerate()
                 .find(|(_, q)| q.queue_flags.contains(vk::QueueFlags::COMPUTE))
-                .map(|(i, _)| i as u32);
-            if let Some(family) = family { selected = Some((physical, family)); break; }
+                .map(|(i, q)| {
+                    (
+                        i as u32,
+                        *q,
+                        timeline.timeline_semaphore != 0,
+                        sync2.synchronization2 != 0,
+                    )
+                });
+            if let Some((family, queue_properties, timeline_supported, synchronization2_supported)) = family {
+                selected = Some((
+                    physical,
+                    family,
+                    queue_properties,
+                    timeline_supported,
+                    synchronization2_supported,
+                ));
+                break;
+            }
         }
 
-        let (physical, family) = match selected {
+        let (
+            physical,
+            family,
+            queue_family_properties,
+            timeline_semaphore_supported,
+            synchronization2_supported,
+        ) = match selected {
             Some(value) => value,
             None => {
                 unsafe { instance.destroy_instance(None); }
@@ -349,10 +889,35 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         let props = unsafe { instance.get_physical_device_properties(physical) };
+        let queue_family_identity_digest =
+            queue_family_identity_digest(family, &queue_family_properties);
+        let queue_family_queue_flags = queue_family_properties.queue_flags.as_raw();
+        let queue_family_queue_count = queue_family_properties.queue_count;
+        let queue_family_timestamp_valid_bits = queue_family_properties.timestamp_valid_bits;
+        let queue_family_min_image_transfer_granularity = [
+            queue_family_properties.min_image_transfer_granularity.width,
+            queue_family_properties.min_image_transfer_granularity.height,
+            queue_family_properties.min_image_transfer_granularity.depth,
+        ];
+        let physical_device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
+        let physical_device_identity_digest = physical_device_identity_digest(&props);
         let mut id_properties = vk::PhysicalDeviceIDProperties::default();
-        let mut properties2 = vk::PhysicalDeviceProperties2::default().push_next(&mut id_properties);
+        let mut driver_properties = vk::PhysicalDeviceDriverProperties::default();
+        let mut properties2 = vk::PhysicalDeviceProperties2::default()
+            .push_next(&mut id_properties)
+            .push_next(&mut driver_properties);
         unsafe { instance.get_physical_device_properties2(physical, &mut properties2); }
         let device_uuid = id_properties.device_uuid;
+        let driver_uuid = id_properties.driver_uuid;
+        let driver_id = driver_properties.driver_id.as_raw();
+        let driver_name = unsafe { CStr::from_ptr(driver_properties.driver_name.as_ptr()) }.to_bytes();
+        let driver_info = unsafe { CStr::from_ptr(driver_properties.driver_info.as_ptr()) }.to_bytes();
+        let driver_identity_digest = driver_identity_digest(
+            driver_uuid,
+            driver_id,
+            driver_name,
+            driver_info,
+        );
         if device_uuid.iter().all(|byte| *byte == 0) {
             unsafe { instance.destroy_instance(None); }
             return Err(VulkanBarrierError::NoQualifiedDevice);
@@ -362,11 +927,20 @@ impl VulkanBarrierWorkloadRuntime {
             vk::api_version_major(props.api_version),
             vk::api_version_minor(props.api_version),
             vk::api_version_patch(props.api_version)));
+        qualification_stage(&format!("driver_identity_sha256={driver_identity_digest}"));
+        qualification_stage(&format!("driver_id={driver_id}"));
 
         let priorities = [1.0_f32];
         let queue_info = vk::DeviceQueueCreateInfo::default().queue_family_index(family).queue_priorities(&priorities);
         let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
         let mut sync2 = vk::PhysicalDeviceSynchronization2Features::default().synchronization2(true);
+        // Bind the receipt to the exact feature values passed through this device-create pNext chain.
+        let synchronization_features = synchronization_feature_profile_from_device_create(
+            timeline_semaphore_supported,
+            synchronization2_supported,
+            timeline.timeline_semaphore,
+            sync2.synchronization2,
+        );
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(std::slice::from_ref(&queue_info))
             .push_next(&mut timeline)
@@ -387,7 +961,15 @@ impl VulkanBarrierWorkloadRuntime {
             }
             error
         })?;
+        let shader_spirv_bytes = spirv_to_bytes(&spirv);
+        let shader_spirv_hex = hex_bytes(&shader_spirv_bytes);
+        let shader_spirv_sha256 = sha256_hex(&shader_spirv_bytes);
+        let implementation_wgsl_hex = hex_bytes(WGSL.as_bytes());
+        let implementation_wgsl_sha256 = sha256_hex(WGSL.as_bytes());
+        let implementation_identity_digest = vulkan_implementation_identity_digest(&spirv);
         qualification_stage("shader_spirv_compiled");
+        qualification_stage(&format!("shader_spirv_sha256={shader_spirv_sha256}"));
+        qualification_stage(&format!("implementation_identity_sha256={implementation_identity_digest}"));
         let shader = match create_shader_module(&device, &spirv) {
             Ok(shader) => shader,
             Err(error) => {
@@ -400,9 +982,9 @@ impl VulkanBarrierWorkloadRuntime {
         };
         qualification_stage("shader_module_created");
         let bindings = [
-            vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
-            vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
-            vk::DescriptorSetLayoutBinding::default().binding(2).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).descriptor_count(1).stage_flags(vk::ShaderStageFlags::COMPUTE),
+            vk::DescriptorSetLayoutBinding::default().binding(0).descriptor_type(GPU_FABRIC_DESCRIPTOR_TYPE).descriptor_count(1).stage_flags(GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS),
+            vk::DescriptorSetLayoutBinding::default().binding(1).descriptor_type(GPU_FABRIC_DESCRIPTOR_TYPE).descriptor_count(1).stage_flags(GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS),
+            vk::DescriptorSetLayoutBinding::default().binding(2).descriptor_type(GPU_FABRIC_DESCRIPTOR_TYPE).descriptor_count(1).stage_flags(GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS),
         ];
         let layout_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
         let descriptor_layout = match unsafe {
@@ -435,7 +1017,7 @@ impl VulkanBarrierWorkloadRuntime {
             }
         };
         qualification_stage("pipeline_layout_created");
-        let entry_point = CString::new("main").unwrap();
+        let entry_point = CString::new(VULKAN_ENTRY_POINT).expect("static Vulkan entry point has no NUL bytes");
         let stage = vk::PipelineShaderStageCreateInfo::default().stage(vk::ShaderStageFlags::COMPUTE).module(shader).name(&entry_point);
         let pipeline_info = vk::ComputePipelineCreateInfo::default().stage(stage).layout(pipeline_layout);
         let pipeline = unsafe {
@@ -517,7 +1099,29 @@ impl VulkanBarrierWorkloadRuntime {
             max_compute_workgroup_count_x: props.limits.max_compute_work_group_count[0],
             physical_device_api_version: props.api_version,
             queue_family_index: family,
+            synchronization_features,
+            queue_family_identity_digest,
+            queue_family_queue_flags,
+            queue_family_queue_count,
+            queue_family_timestamp_valid_bits,
+            queue_family_min_image_transfer_granularity,
             device_uuid,
+            implementation_identity_digest,
+            shader_spirv_sha256,
+            implementation_wgsl_sha256,
+            implementation_wgsl_hex,
+            shader_spirv_hex,
+            physical_device_vendor_id: props.vendor_id,
+            physical_device_device_id: props.device_id,
+            physical_device_type: props.device_type.as_raw() as u32,
+            physical_device_driver_version: props.driver_version,
+            physical_device_name_hex: hex_bytes(physical_device_name),
+            physical_device_identity_digest,
+            driver_identity_digest,
+            driver_uuid,
+            driver_id,
+            driver_name_hex: hex_bytes(driver_name),
+            driver_info_hex: hex_bytes(driver_info),
             _entry: entry,
         })
     }
@@ -538,6 +1142,12 @@ impl VulkanBarrierWorkloadRuntime {
 
         let _resources = validate_initial_resources(graph, initial)?;
         let expected = simulate(graph, schedule, initial)?;
+        let completion_expected = expected_final_timeline_value(plan);
+        let submission_contract = MaterializedSubmissionContract::from_plan(
+            plan,
+            completion_expected,
+            self.queue_family_index,
+        );
         let mut buffers = BTreeMap::new();
         for (resource, value) in initial {
             let physical = rounded_storage_bytes(value.as_bytes().len() as u64);
@@ -577,6 +1187,8 @@ impl VulkanBarrierWorkloadRuntime {
 
         let mut set_guard =
             DescriptorSetGuard::new(self.device.clone(), self.descriptor_pool);
+        let mut materialized_barrier_batches = Vec::new();
+        let mut materialized_dispatch_records = Vec::new();
         for scheduled in &schedule.nodes {
             let node = graph
                 .nodes
@@ -594,51 +1206,93 @@ impl VulkanBarrierWorkloadRuntime {
                 .find(|s| s.node_id == node.id)
                 .ok_or(VulkanBarrierError::UnsupportedNodeShape(node.id))?;
 
-            record_barriers(
+            if let Some(batch) = record_barriers(
                 &self.device,
                 command_guard.command(),
+                scheduled.id,
                 &submission.barriers,
                 &buffers,
-            )?;
+            )? {
+                materialized_barrier_batches.push(batch);
+            }
 
             let range = buffers[&writes[0].resource].storage_size;
+            let groups = dispatch_group_count(range, self.max_compute_workgroup_count_x)
+                .ok_or_else(|| VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone()))?
+                .max(1);
+            let dispatch_record = MaterializedDispatchRecord::new(
+                node.id,
+                scheduled.ordinal,
+                [
+                    reads[0].resource.clone(),
+                    reads[1].resource.clone(),
+                    writes[0].resource.clone(),
+                ],
+                [
+                    buffers[&reads[0].resource].storage_size,
+                    buffers[&reads[1].resource].storage_size,
+                    buffers[&writes[0].resource].storage_size,
+                ],
+                [groups, 1, 1],
+            );
+            let descriptor_buffers = [
+                buffers
+                    .get(&dispatch_record.descriptor_bindings[0].resource)
+                    .ok_or_else(|| VulkanBarrierError::MissingResource(
+                        dispatch_record.descriptor_bindings[0].resource.clone(),
+                    ))?,
+                buffers
+                    .get(&dispatch_record.descriptor_bindings[1].resource)
+                    .ok_or_else(|| VulkanBarrierError::MissingResource(
+                        dispatch_record.descriptor_bindings[1].resource.clone(),
+                    ))?,
+                buffers
+                    .get(&dispatch_record.descriptor_bindings[2].resource)
+                    .ok_or_else(|| VulkanBarrierError::MissingResource(
+                        dispatch_record.descriptor_bindings[2].resource.clone(),
+                    ))?,
+            ];
             let set = allocate_set(
                 &self.device,
                 self.descriptor_pool,
                 self.descriptor_layout,
-                [
-                    &buffers[&reads[0].resource],
-                    &buffers[&reads[1].resource],
-                    &buffers[&writes[0].resource],
-                ],
-                range,
+                descriptor_buffers,
+                &dispatch_record.descriptor_bindings,
             )?;
             set_guard.push(set);
 
-            let groups = dispatch_group_count(range, self.max_compute_workgroup_count_x)
-                .ok_or_else(|| VulkanBarrierError::DispatchTooLarge(writes[0].resource.clone()))?;
             qualification_stage(&format!("node_{}_dispatch_begin", node.id));
+            let descriptor_sets = [set];
             unsafe {
                 self.device.cmd_bind_pipeline(
                     command_guard.command(),
-                    vk::PipelineBindPoint::COMPUTE,
+                    dispatch_record.pipeline_bind_point,
                     self.pipeline,
                 );
                 self.device.cmd_bind_descriptor_sets(
                     command_guard.command(),
-                    vk::PipelineBindPoint::COMPUTE,
+                    dispatch_record.pipeline_bind_point,
                     self.pipeline_layout,
-                    0,
-                    &[set],
+                    dispatch_record.pipeline_layout_set_index,
+                    &descriptor_sets,
                     &[],
                 );
-                self.device
-                    .cmd_dispatch(command_guard.command(), groups.max(1), 1, 1);
+                self.device.cmd_dispatch(
+                    command_guard.command(),
+                    dispatch_record.dispatch_groups[0],
+                    dispatch_record.dispatch_groups[1],
+                    dispatch_record.dispatch_groups[2],
+                );
             }
+            materialized_dispatch_records.push(dispatch_record);
             qualification_stage(&format!("node_{}_dispatch_recorded", node.id));
         }
 
-        record_host_readback_barrier(&self.device, command_guard.command());
+        record_host_readback_barrier(
+            &self.device,
+            command_guard.command(),
+            &submission_contract,
+        );
         qualification_stage("host_readback_barrier_recorded");
 
         unsafe {
@@ -647,12 +1301,13 @@ impl VulkanBarrierWorkloadRuntime {
                 .map_err(VulkanBarrierError::Vk)?;
         }
         qualification_stage("command_buffer_ended");
-        let completion_expected = expected_final_timeline_value(plan);
 
         let mut timeline_info = vk::SemaphoreTypeCreateInfo::default()
-            .semaphore_type(vk::SemaphoreType::TIMELINE)
-            .initial_value(0);
-        let semaphore_info = vk::SemaphoreCreateInfo::default().push_next(&mut timeline_info);
+            .semaphore_type(submission_contract.semaphore_type)
+            .initial_value(submission_contract.timeline_initial_value);
+        let semaphore_info = vk::SemaphoreCreateInfo::default()
+            .flags(submission_contract.semaphore_create_flags)
+            .push_next(&mut timeline_info);
         let semaphore = unsafe {
             self.device
                 .create_semaphore(&semaphore_info, None)
@@ -663,13 +1318,15 @@ impl VulkanBarrierWorkloadRuntime {
 
         let command_buffer_info = vk::CommandBufferSubmitInfo::default()
             .command_buffer(command_guard.command())
-            .device_mask(1);
+            .device_mask(submission_contract.command_buffer_device_mask);
         let signal_info = vk::SemaphoreSubmitInfo::default()
             .semaphore(semaphore)
-            .value(completion_expected)
-            .stage_mask(vk::PipelineStageFlags2::ALL_COMMANDS)
-            .device_index(0);
+            .value(submission_contract.signal_value)
+            .stage_mask(submission_contract.signal_stage_mask)
+            .device_index(submission_contract.semaphore_device_index);
         let submit = vk::SubmitInfo2::default()
+            .flags(submission_contract.submit_flags)
+            .wait_semaphore_infos(&[])
             .command_buffer_infos(std::slice::from_ref(&command_buffer_info))
             .signal_semaphore_infos(std::slice::from_ref(&signal_info));
 
@@ -682,11 +1339,12 @@ impl VulkanBarrierWorkloadRuntime {
         semaphore_guard.mark_submitted();
 
         let wait_info = vk::SemaphoreWaitInfo::default()
+            .flags(submission_contract.semaphore_wait_flags)
             .semaphores(std::slice::from_ref(&semaphore))
-            .values(std::slice::from_ref(&completion_expected));
+            .values(std::slice::from_ref(&submission_contract.signal_value));
         unsafe {
             self.device
-                .wait_semaphores(&wait_info, VULKAN_TIMELINE_TIMEOUT_NS)
+                .wait_semaphores(&wait_info, submission_contract.timeout_ns)
                 .map_err(VulkanBarrierError::TimelineWait)?;
         }
         qualification_stage("timeline_wait_completed");
@@ -722,23 +1380,28 @@ impl VulkanBarrierWorkloadRuntime {
             digests.insert(resource.clone(), resource_digest(value));
             storage_sizes.insert(resource.clone(), buffers[resource].storage_size);
         }
+        let memory_topology = VulkanMemoryTopologyProfile::from_vulkan(&self.memory_properties);
+        let resource_memory_profiles = buffers
+            .iter()
+            .map(|(resource, buffer)| (resource.clone(), buffer.memory_profile()))
+            .collect::<BTreeMap<_, _>>();
+        let memory_lowering_digest = resource_memory_profiles_digest(&resource_memory_profiles);
         let receipt = VulkanBarrierExecutionReceipt {
             version: RECEIPT_VERSION,
             graph_digest: graph.digest_hex().map_err(VulkanBarrierError::Graph)?,
             schedule_digest: schedule.digest_hex().map_err(VulkanBarrierError::Schedule)?,
             sync_plan_digest: plan.digest_hex().map_err(|e| VulkanBarrierError::SyncPlan(e))?,
             barrier_digest: barrier_digest(plan),
-            barrier_lowering_digest: barrier_lowering_digest(plan, &storage_sizes)
-                .map_err(|resource| {
-                    VulkanBarrierError::Receipt(
-                        VulkanBarrierReceiptError::MissingResourceStorageSize(resource),
-                    )
-                })?,
-            completion_lowering_digest: completion_lowering_digest(
-                plan,
-                completion_expected,
-                self.queue_family_index,
+            barrier_lowering_digest: materialized_barrier_batches_digest(
+                &materialized_barrier_batches,
             ),
+            completion_lowering_digest: submission_contract.digest(),
+            execution_lowering_digest: materialized_dispatch_records_digest(
+                &materialized_dispatch_records,
+            ),
+            resource_memory_profiles,
+            memory_lowering_digest,
+            memory_topology: memory_topology.clone(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -748,12 +1411,39 @@ impl VulkanBarrierWorkloadRuntime {
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: self.physical_device_api_version,
             queue_family_index: self.queue_family_index,
+            synchronization_features: self.synchronization_features.clone(),
+            queue_family_identity_digest: self.queue_family_identity_digest.clone(),
+            queue_family_queue_flags: self.queue_family_queue_flags,
+            queue_family_queue_count: self.queue_family_queue_count,
+            queue_family_timestamp_valid_bits: self.queue_family_timestamp_valid_bits,
+            queue_family_min_image_transfer_granularity: self.queue_family_min_image_transfer_granularity,
             device_uuid: self.device_uuid,
+            implementation_identity_digest: self.implementation_identity_digest.clone(),
+            physical_device_identity_digest: self.physical_device_identity_digest.clone(),
+            driver_identity_digest: self.driver_identity_digest.clone(),
+            driver_uuid: self.driver_uuid,
+            driver_id: self.driver_id,
         };
         receipt.verify_against(graph, schedule, plan, &observed).map_err(VulkanBarrierError::Receipt)?;
         qualification_stage("receipt_verified");
         receipt
-            .verify_runtime_binding(self.physical_device_api_version, self.queue_family_index)
+            .verify_runtime_binding(
+                self.physical_device_api_version,
+                self.queue_family_index,
+                self.device_uuid,
+                &self.implementation_identity_digest,
+                &self.physical_device_identity_digest,
+                &self.driver_identity_digest,
+                self.driver_uuid,
+                self.driver_id,
+                &self.synchronization_features,
+                &self.queue_family_identity_digest,
+                self.queue_family_queue_flags,
+                self.queue_family_queue_count,
+                self.queue_family_timestamp_valid_bits,
+                self.queue_family_min_image_transfer_granularity,
+                &memory_topology,
+            )
             .map_err(VulkanBarrierError::Receipt)?;
         Ok((observed, receipt))
     }
@@ -838,49 +1528,355 @@ fn simulate(
     Ok(state)
 }
 
-fn record_host_readback_barrier(device: &Device, command: vk::CommandBuffer) {
+fn record_host_readback_barrier(
+    device: &Device,
+    command: vk::CommandBuffer,
+    contract: &MaterializedSubmissionContract,
+) {
     let barrier = vk::MemoryBarrier2::default()
-        .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-        .src_access_mask(vk::AccessFlags2::SHADER_STORAGE_WRITE)
-        .dst_stage_mask(vk::PipelineStageFlags2::HOST)
-        .dst_access_mask(vk::AccessFlags2::HOST_READ);
-    let dependency = vk::DependencyInfo::default().memory_barriers(std::slice::from_ref(&barrier));
+        .src_stage_mask(contract.host_readback_src_stage_mask)
+        .src_access_mask(contract.host_readback_src_access_mask)
+        .dst_stage_mask(contract.host_readback_dst_stage_mask)
+        .dst_access_mask(contract.host_readback_dst_access_mask);
+    let dependency = vk::DependencyInfo::default()
+        .dependency_flags(vk::DependencyFlags::empty())
+        .memory_barriers(std::slice::from_ref(&barrier));
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedDescriptorBinding {
+    binding: u32,
+    resource: ResourceId,
+    offset: u64,
+    range: u64,
+    descriptor_type: vk::DescriptorType,
+    stage_flags: vk::ShaderStageFlags,
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedDispatchRecord {
+    node_id: u32,
+    schedule_ordinal: u32,
+    pipeline_bind_point: vk::PipelineBindPoint,
+    pipeline_layout_set_index: u32,
+    descriptor_set_count: u32,
+    dynamic_offset_count: u32,
+    descriptor_bindings: Vec<MaterializedDescriptorBinding>,
+    dispatch_groups: [u32; 3],
+}
+
+impl MaterializedDispatchRecord {
+    fn new(
+        node_id: u32,
+        schedule_ordinal: u32,
+        resources: [ResourceId; 3],
+        ranges: [u64; 3],
+        dispatch_groups: [u32; 3],
+    ) -> Self {
+        let descriptor_bindings = resources
+            .into_iter()
+            .enumerate()
+            .map(|(binding, resource)| MaterializedDescriptorBinding {
+                binding: binding as u32,
+                resource,
+                offset: 0,
+                range: ranges[binding],
+                descriptor_type: GPU_FABRIC_DESCRIPTOR_TYPE,
+                stage_flags: GPU_FABRIC_DESCRIPTOR_STAGE_FLAGS,
+            })
+            .collect();
+        Self {
+            node_id,
+            schedule_ordinal,
+            pipeline_bind_point: GPU_FABRIC_PIPELINE_BIND_POINT,
+            pipeline_layout_set_index: 0,
+            descriptor_set_count: 1,
+            dynamic_offset_count: 0,
+            descriptor_bindings,
+            dispatch_groups,
+        }
+    }
+}
+
+fn materialized_dispatch_records_from_graph(
+    graph: &ExecutionGraph,
+    schedule: &ExecutionSchedule,
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> Option<Vec<MaterializedDispatchRecord>> {
+    let mut records = Vec::with_capacity(schedule.nodes.len());
+    for scheduled in &schedule.nodes {
+        let node = graph.nodes.iter().find(|node| node.id == scheduled.id)?;
+        let (reads, writes) = canonical_workload_resources(node);
+        if reads.len() != 2 || writes.len() != 1 || node.resources.len() != 3 {
+            return None;
+        }
+        let ranges = [
+            *resource_storage_sizes.get(&reads[0].resource)?,
+            *resource_storage_sizes.get(&reads[1].resource)?,
+            *resource_storage_sizes.get(&writes[0].resource)?,
+        ];
+        let groups = dispatch_group_count(ranges[2], u32::MAX)?.max(1);
+        records.push(MaterializedDispatchRecord::new(
+            node.id,
+            scheduled.ordinal,
+            [
+                reads[0].resource.clone(),
+                reads[1].resource.clone(),
+                writes[0].resource.clone(),
+            ],
+            ranges,
+            [groups, 1, 1],
+        ));
+    }
+    Some(records)
+}
+
+fn materialized_dispatch_records_digest(records: &[MaterializedDispatchRecord]) -> String {
+    let mut fields = vec![format!("dispatch_record_count:{}", records.len())];
+    for record in records {
+        fields.extend([
+            "dispatch_record".to_owned(),
+            format!("node_id={}", record.node_id),
+            format!("schedule_ordinal={}", record.schedule_ordinal),
+            format!("pipeline_bind_point_raw={}", record.pipeline_bind_point.as_raw()),
+            format!("pipeline_layout_set_index={}", record.pipeline_layout_set_index),
+            format!("descriptor_set_count={}", record.descriptor_set_count),
+            format!("dynamic_offset_count={}", record.dynamic_offset_count),
+            format!("descriptor_binding_count={}", record.descriptor_bindings.len()),
+        ]);
+        for binding in &record.descriptor_bindings {
+            fields.extend([
+                "descriptor_binding".to_owned(),
+                format!("binding={}", binding.binding),
+                format!("resource={}", binding.resource.as_str()),
+                format!("offset={}", binding.offset),
+                format!("range={}", binding.range),
+                format!("descriptor_type_raw={}", binding.descriptor_type.as_raw()),
+                format!("stage_flags_raw={}", binding.stage_flags.as_raw()),
+            ]);
+        }
+        fields.extend([
+            format!("dispatch_group_count_x={}", record.dispatch_groups[0]),
+            format!("dispatch_group_count_y={}", record.dispatch_groups[1]),
+            format!("dispatch_group_count_z={}", record.dispatch_groups[2]),
+        ]);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-materialized-dispatch.v1");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedBarrierRecord {
+    from: u32,
+    to: u32,
+    resource: ResourceId,
+    kind: DependencyKind,
+    buffer_memory: bool,
+    storage_size: u64,
+}
+
+#[derive(Debug, Clone)]
+struct MaterializedBarrierBatch {
+    node_id: u32,
+    records: Vec<MaterializedBarrierRecord>,
+}
+
+fn dependency_kind_label(kind: DependencyKind) -> &'static str {
+    match kind {
+        DependencyKind::ReadAfterWrite => "read_after_write",
+        DependencyKind::WriteAfterRead => "write_after_read",
+        DependencyKind::WriteAfterWrite => "write_after_write",
+    }
+}
+
+fn access_mask_labels(kind: DependencyKind) -> (&'static str, &'static str) {
+    match kind {
+        DependencyKind::ReadAfterWrite => ("shader_storage_write", "shader_storage_read"),
+        DependencyKind::WriteAfterRead => ("empty", "empty"),
+        DependencyKind::WriteAfterWrite => ("shader_storage_write", "shader_storage_write"),
+    }
+}
+
+fn materialized_barrier_batch(
+    node_id: u32,
+    requirements: &[VulkanBarrierRequirement],
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> Result<Option<MaterializedBarrierBatch>, ResourceId> {
+    if requirements.is_empty() {
+        return Ok(None);
+    }
+
+    let mut records = Vec::with_capacity(requirements.len());
+    for requirement in requirements {
+        let buffer_memory = requirement.requires_memory_dependency();
+        let storage_size = if buffer_memory {
+            resource_storage_sizes
+                .get(&requirement.resource)
+                .copied()
+                .ok_or_else(|| requirement.resource.clone())?
+        } else {
+            0
+        };
+        records.push(MaterializedBarrierRecord {
+            from: requirement.from,
+            to: requirement.to,
+            resource: requirement.resource.clone(),
+            kind: requirement.kind,
+            buffer_memory,
+            storage_size,
+        });
+    }
+    Ok(Some(MaterializedBarrierBatch { node_id, records }))
+}
+
+fn materialized_barrier_batches_from_plan(
+    plan: &VulkanSyncPlan,
+    resource_storage_sizes: &BTreeMap<ResourceId, u64>,
+) -> Result<Vec<MaterializedBarrierBatch>, ResourceId> {
+    let mut batches = Vec::new();
+    for submission in &plan.submissions {
+        if let Some(batch) = materialized_barrier_batch(
+            submission.node_id,
+            &submission.barriers,
+            resource_storage_sizes,
+        )? {
+            batches.push(batch);
+        }
+    }
+    Ok(batches)
+}
+
+fn materialized_barrier_batches_digest(batches: &[MaterializedBarrierBatch]) -> String {
+    let mut fields = vec![format!("batch_count:{}", batches.len())];
+    for batch in batches {
+        let memory_count = batch.records.iter().filter(|record| !record.buffer_memory).count();
+        let buffer_count = batch.records.iter().filter(|record| record.buffer_memory).count();
+        fields.extend([
+            "batch".to_owned(),
+            format!("node_id={}", batch.node_id),
+            "dependency_structure=VkDependencyInfo".to_owned(),
+            "pnext=null".to_owned(),
+            "dependency_flags=0".to_owned(),
+            format!("memory_barrier_count={memory_count}"),
+            format!("buffer_memory_barrier_count={buffer_count}"),
+            "image_memory_barrier_count=0".to_owned(),
+        ]);
+        for (ordinal, record) in batch.records.iter().enumerate() {
+            let (src_access, dst_access) = access_mask_labels(record.kind);
+            let (src_access_mask, dst_access_mask) = barrier_access_masks(record.kind);
+            let stage_mask = vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw();
+            let (barrier_type, src_queue_family_index, dst_queue_family_index) =
+                if record.buffer_memory {
+                    (
+                        "VkBufferMemoryBarrier2",
+                        vk::QUEUE_FAMILY_IGNORED.to_string(),
+                        vk::QUEUE_FAMILY_IGNORED.to_string(),
+                    )
+                } else {
+                    (
+                        "VkMemoryBarrier2",
+                        "not_applicable".to_owned(),
+                        "not_applicable".to_owned(),
+                    )
+                };
+            fields.extend([
+                "barrier".to_owned(),
+                format!("ordinal={ordinal}"),
+                format!("from={}", record.from),
+                format!("to={}", record.to),
+                format!("resource={}", record.resource.as_str()),
+                format!("kind={}", dependency_kind_label(record.kind)),
+                format!("type={barrier_type}"),
+                "pnext=null".to_owned(),
+                "src_stage=compute_shader".to_owned(),
+                format!("src_stage_mask={stage_mask}"),
+                format!("src_access={src_access}"),
+                format!("src_access_mask={}", src_access_mask.as_raw()),
+                "dst_stage=compute_shader".to_owned(),
+                format!("dst_stage_mask={stage_mask}"),
+                format!("dst_access={dst_access}"),
+                format!("dst_access_mask={}", dst_access_mask.as_raw()),
+                format!("src_queue_family_index={src_queue_family_index}"),
+                format!("dst_queue_family_index={dst_queue_family_index}"),
+                "offset=0".to_owned(),
+                format!("size={}", record.storage_size),
+            ]);
+        }
+    }
+
+    let mut digest = Sha256::new();
+    digest.update(b"symthaea.gpu-fabric.vulkan-materialized-barriers.v2");
+    digest.update([0]);
+    for field in fields {
+        let bytes = field.as_bytes();
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(bytes);
+    }
+    format!("{:x}", digest.finalize())
 }
 
 fn record_barriers(
     device: &Device,
     command: vk::CommandBuffer,
+    node_id: u32,
     requirements: &[VulkanBarrierRequirement],
     buffers: &BTreeMap<ResourceId, WorkloadBuffer>,
-) -> Result<(), VulkanBarrierError> {
-    if requirements.is_empty() { return Ok(()); }
+) -> Result<Option<MaterializedBarrierBatch>, VulkanBarrierError> {
+    if requirements.is_empty() {
+        return Ok(None);
+    }
+    let storage_sizes = buffers
+        .iter()
+        .map(|(resource, buffer)| (resource.clone(), buffer.storage_size))
+        .collect::<BTreeMap<_, _>>();
+    let batch = materialized_barrier_batch(node_id, requirements, &storage_sizes)
+        .map_err(VulkanBarrierError::MissingResource)?
+        .ok_or(VulkanBarrierError::AllocationOverflow)?;
+
     let mut buffer_barriers = Vec::new();
     let mut execution_barriers = Vec::new();
-    for req in requirements {
-        if req.requires_memory_dependency() {
-            let buffer = buffers.get(&req.resource).ok_or(VulkanBarrierError::MissingResource(req.resource.clone()))?;
-            let (src_access, dst_access) = barrier_access_masks(req.kind);
-            buffer_barriers.push(vk::BufferMemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .src_access_mask(src_access)
-                .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .dst_access_mask(dst_access)
-                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .buffer(buffer.buffer)
-                .offset(0).size(buffer.storage_size));
+    for record in &batch.records {
+        let (src_access, dst_access) = barrier_access_masks(record.kind);
+        if record.buffer_memory {
+            let buffer = buffers
+                .get(&record.resource)
+                .ok_or_else(|| VulkanBarrierError::MissingResource(record.resource.clone()))?;
+            buffer_barriers.push(
+                vk::BufferMemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .src_access_mask(src_access)
+                    .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .dst_access_mask(dst_access)
+                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .buffer(buffer.buffer)
+                    .offset(0)
+                    .size(record.storage_size),
+            );
         } else {
-            execution_barriers.push(vk::MemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .src_access_mask(vk::AccessFlags2::empty())
-                .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
-                .dst_access_mask(vk::AccessFlags2::empty()));
+            execution_barriers.push(
+                vk::MemoryBarrier2::default()
+                    .src_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .src_access_mask(src_access)
+                    .dst_stage_mask(vk::PipelineStageFlags2::COMPUTE_SHADER)
+                    .dst_access_mask(dst_access),
+            );
         }
     }
-    let dependency = vk::DependencyInfo::default().memory_barriers(&execution_barriers).buffer_memory_barriers(&buffer_barriers);
+    let dependency = vk::DependencyInfo::default()
+        .dependency_flags(vk::DependencyFlags::empty())
+        .memory_barriers(&execution_barriers)
+        .buffer_memory_barriers(&buffer_barriers);
     unsafe { device.cmd_pipeline_barrier2(command, &dependency); }
-    Ok(())
+    Ok(Some(batch))
 }
 
 struct CommandBufferGuard {
@@ -942,11 +1938,32 @@ struct WorkloadBuffer {
     allocation_size: vk::DeviceSize,
     storage_size: vk::DeviceSize,
     coherent: bool,
+    memory_type_index: u32,
+    memory_type_bits: u32,
+    memory_property_flags: u32,
+    memory_heap_index: u32,
+    memory_heap_flags: u32,
+    memory_heap_size: u64,
+    memory_requirement_alignment: u64,
+    buffer_usage_flags: u32,
+    sharing_mode_raw: i32,
+    binding_offset: u64,
+    map_offset: Cell<u64>,
+    map_size: Cell<u64>,
+    write_flush_completed: Cell<bool>,
+    write_flush_offset: Cell<u64>,
+    write_flush_size: Cell<u64>,
+    read_invalidate_completed: Cell<bool>,
+    read_invalidate_offset: Cell<u64>,
+    read_invalidate_size: Cell<u64>,
 }
 
 impl WorkloadBuffer {
     fn new(device: &Device, props: &vk::PhysicalDeviceMemoryProperties, size: u64) -> Result<Self, VulkanBarrierError> {
-        let info = vk::BufferCreateInfo::default().size(size).usage(vk::BufferUsageFlags::STORAGE_BUFFER).sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let info = vk::BufferCreateInfo::default()
+            .size(size)
+            .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let buffer = unsafe { device.create_buffer(&info, None).map_err(VulkanBarrierError::Vk)? };
         let req = unsafe { device.get_buffer_memory_requirements(buffer) };
         let mut selected = None;
@@ -967,30 +1984,99 @@ impl WorkloadBuffer {
                 return Err(VulkanBarrierError::NoHostVisibleMemory);
             }
         };
+        let memory_type = props.memory_types[index as usize];
+        let memory_heap_index = memory_type.heap_index;
+        let memory_heap = props.memory_heaps[memory_heap_index as usize];
         let alloc = vk::MemoryAllocateInfo::default().allocation_size(req.size).memory_type_index(index);
         let memory = match unsafe { device.allocate_memory(&alloc, None) } {
             Ok(m) => m,
             Err(error) => { unsafe { device.destroy_buffer(buffer, None); } return Err(VulkanBarrierError::Vk(error)); }
         };
-        if let Err(error) = unsafe { device.bind_buffer_memory(buffer, memory, 0) } {
+        let binding_offset = 0_u64;
+        if let Err(error) = unsafe { device.bind_buffer_memory(buffer, memory, binding_offset) } {
             unsafe { device.free_memory(memory, None); device.destroy_buffer(buffer, None); }
             return Err(VulkanBarrierError::Vk(error));
         }
-        Ok(Self { device: device.clone(), buffer, memory, allocation_size: req.size, storage_size: size, coherent })
+        Ok(Self {
+            device: device.clone(),
+            buffer,
+            memory,
+            allocation_size: req.size,
+            storage_size: size,
+            coherent,
+            memory_type_index: index,
+            memory_type_bits: req.memory_type_bits,
+            memory_property_flags: memory_type.property_flags.as_raw(),
+            memory_heap_index,
+            memory_heap_flags: memory_heap.flags.as_raw(),
+            memory_heap_size: memory_heap.size,
+            memory_requirement_alignment: req.alignment,
+            buffer_usage_flags: info.usage.as_raw(),
+            sharing_mode_raw: info.sharing_mode.as_raw(),
+            binding_offset,
+            map_offset: Cell::new(0),
+            map_size: Cell::new(0),
+            write_flush_completed: Cell::new(false),
+            write_flush_offset: Cell::new(0),
+            write_flush_size: Cell::new(0),
+            read_invalidate_completed: Cell::new(false),
+            read_invalidate_offset: Cell::new(0),
+            read_invalidate_size: Cell::new(0),
+        })
+    }
+
+    fn memory_profile(&self) -> VulkanResourceMemoryProfile {
+        let flush_performed = self.write_flush_completed.get();
+        let invalidate_performed = self.read_invalidate_completed.get();
+        VulkanResourceMemoryProfile {
+            memory_type_index: self.memory_type_index,
+            memory_type_bits: self.memory_type_bits,
+            memory_property_flags: self.memory_property_flags,
+            memory_heap_index: self.memory_heap_index,
+            memory_heap_flags: self.memory_heap_flags,
+            memory_heap_size: self.memory_heap_size,
+            memory_requirement_alignment: self.memory_requirement_alignment,
+            memory_requirement_size: self.allocation_size,
+            allocation_size: self.allocation_size,
+            storage_size: self.storage_size,
+            buffer_usage_flags: self.buffer_usage_flags,
+            sharing_mode_raw: self.sharing_mode_raw,
+            binding_offset: self.binding_offset,
+            map_offset: self.map_offset.get(),
+            map_size: self.map_size.get(),
+            write_flush_performed: flush_performed,
+            write_flush_offset: self.write_flush_offset.get(),
+            write_flush_size: self.write_flush_size.get(),
+            read_invalidate_performed: invalidate_performed,
+            read_invalidate_offset: self.read_invalidate_offset.get(),
+            read_invalidate_size: self.read_invalidate_size.get(),
+        }
     }
 
     fn write(&self, device: &Device, bytes: &[u8]) -> Result<(), VulkanBarrierError> {
         if bytes.len() as u64 > self.allocation_size { return Err(VulkanBarrierError::AllocationOverflow); }
-        let mapped = unsafe { device.map_memory(self.memory, 0, self.allocation_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        let map_offset = 0_u64;
+        let map_size = self.allocation_size;
+        let mapped = unsafe { device.map_memory(self.memory, map_offset, map_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        self.map_offset.set(map_offset);
+        self.map_size.set(map_size);
         unsafe {
             ptr::copy_nonoverlapping(bytes.as_ptr(), mapped.cast::<u8>(), bytes.len());
             if bytes.len() < self.allocation_size as usize { ptr::write_bytes(mapped.cast::<u8>().add(bytes.len()), 0, self.allocation_size as usize - bytes.len()); }
             if !self.coherent {
-                let range = vk::MappedMemoryRange::default().memory(self.memory).offset(0).size(vk::WHOLE_SIZE);
+                let range_offset = 0_u64;
+                let range_size = vk::WHOLE_SIZE;
+                let range = vk::MappedMemoryRange::default()
+                    .memory(self.memory)
+                    .offset(range_offset)
+                    .size(range_size);
                 if let Err(error) = device.flush_mapped_memory_ranges(std::slice::from_ref(&range)) {
                     device.unmap_memory(self.memory);
                     return Err(VulkanBarrierError::Vk(error));
                 }
+                self.write_flush_offset.set(range_offset);
+                self.write_flush_size.set(range_size);
+                self.write_flush_completed.set(true);
             }
             device.unmap_memory(self.memory);
         }
@@ -999,13 +2085,25 @@ impl WorkloadBuffer {
 
     fn read(&self, device: &Device, len: usize) -> Result<Vec<u8>, VulkanBarrierError> {
         if len as u64 > self.allocation_size { return Err(VulkanBarrierError::AllocationOverflow); }
-        let mapped = unsafe { device.map_memory(self.memory, 0, self.allocation_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        let map_offset = 0_u64;
+        let map_size = self.allocation_size;
+        let mapped = unsafe { device.map_memory(self.memory, map_offset, map_size, vk::MemoryMapFlags::empty()).map_err(VulkanBarrierError::Vk)? };
+        self.map_offset.set(map_offset);
+        self.map_size.set(map_size);
         if !self.coherent {
-            let range = vk::MappedMemoryRange::default().memory(self.memory).offset(0).size(vk::WHOLE_SIZE);
+            let range_offset = 0_u64;
+            let range_size = vk::WHOLE_SIZE;
+            let range = vk::MappedMemoryRange::default()
+                .memory(self.memory)
+                .offset(range_offset)
+                .size(range_size);
             if let Err(error) = unsafe { device.invalidate_mapped_memory_ranges(std::slice::from_ref(&range)) } {
                 unsafe { device.unmap_memory(self.memory); }
                 return Err(VulkanBarrierError::Vk(error));
             }
+            self.read_invalidate_offset.set(range_offset);
+            self.read_invalidate_size.set(range_size);
+            self.read_invalidate_completed.set(true);
         }
         let mut bytes = vec![0_u8; len];
         unsafe { ptr::copy_nonoverlapping(mapped.cast::<u8>(), bytes.as_mut_ptr(), len); device.unmap_memory(self.memory); }
@@ -1024,9 +2122,14 @@ fn allocate_set(
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
     buffers: [&WorkloadBuffer; 3],
-    range: u64,
+    bindings: &[MaterializedDescriptorBinding],
 ) -> Result<vk::DescriptorSet, VulkanBarrierError> {
-    let info = vk::DescriptorSetAllocateInfo::default().descriptor_pool(pool).set_layouts(std::slice::from_ref(&layout));
+    if bindings.len() != 3 {
+        return Err(VulkanBarrierError::AllocationOverflow);
+    }
+    let info = vk::DescriptorSetAllocateInfo::default()
+        .descriptor_pool(pool)
+        .set_layouts(std::slice::from_ref(&layout));
     let set = unsafe {
         match device
             .allocate_descriptor_sets(&info)
@@ -1039,14 +2142,35 @@ fn allocate_set(
         }
     };
     let infos = [
-        vk::DescriptorBufferInfo::default().buffer(buffers[0].buffer).offset(0).range(range),
-        vk::DescriptorBufferInfo::default().buffer(buffers[1].buffer).offset(0).range(range),
-        vk::DescriptorBufferInfo::default().buffer(buffers[2].buffer).offset(0).range(range),
+        vk::DescriptorBufferInfo::default()
+            .buffer(buffers[0].buffer)
+            .offset(bindings[0].offset)
+            .range(bindings[0].range),
+        vk::DescriptorBufferInfo::default()
+            .buffer(buffers[1].buffer)
+            .offset(bindings[1].offset)
+            .range(bindings[1].range),
+        vk::DescriptorBufferInfo::default()
+            .buffer(buffers[2].buffer)
+            .offset(bindings[2].offset)
+            .range(bindings[2].range),
     ];
     let writes = [
-        vk::WriteDescriptorSet::default().dst_set(set).dst_binding(0).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(std::slice::from_ref(&infos[0])),
-        vk::WriteDescriptorSet::default().dst_set(set).dst_binding(1).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(std::slice::from_ref(&infos[1])),
-        vk::WriteDescriptorSet::default().dst_set(set).dst_binding(2).descriptor_type(vk::DescriptorType::STORAGE_BUFFER).buffer_info(std::slice::from_ref(&infos[2])),
+        vk::WriteDescriptorSet::default()
+            .dst_set(set)
+            .dst_binding(bindings[0].binding)
+            .descriptor_type(bindings[0].descriptor_type)
+            .buffer_info(std::slice::from_ref(&infos[0])),
+        vk::WriteDescriptorSet::default()
+            .dst_set(set)
+            .dst_binding(bindings[1].binding)
+            .descriptor_type(bindings[1].descriptor_type)
+            .buffer_info(std::slice::from_ref(&infos[1])),
+        vk::WriteDescriptorSet::default()
+            .dst_set(set)
+            .dst_binding(bindings[2].binding)
+            .descriptor_type(bindings[2].descriptor_type)
+            .buffer_info(std::slice::from_ref(&infos[2])),
     ];
     unsafe { device.update_descriptor_sets(&writes, &[]); }
     Ok(set)
@@ -1077,6 +2201,125 @@ fn resource_digest(value: &BinaryHypervector) -> String {
     h.update(&value.dimensions.to_le_bytes());
     h.update(value.as_bytes());
     h.finalize().to_hex().to_string()
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn sha256_len_prefixed_update(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
+fn spirv_to_bytes(spirv: &[u32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(spirv.len() * std::mem::size_of::<u32>());
+    for word in spirv {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    bytes
+}
+
+fn vulkan_implementation_identity_digest(spirv: &[u32]) -> String {
+    let spirv_bytes = spirv_to_bytes(spirv);
+    let mut hasher = Sha256::new();
+    hasher.update(VULKAN_IMPLEMENTATION_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    sha256_len_prefixed_update(&mut hasher, WGSL_ABI_MARKER.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, HDC_BIND_XOR_KERNEL_ID.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, VULKAN_ENTRY_POINT.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, VULKAN_SHADER_STAGE.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, WGSL.as_bytes());
+    sha256_len_prefixed_update(&mut hasher, &spirv_bytes);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn physical_device_identity_digest(props: &vk::PhysicalDeviceProperties) -> String {
+    let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_bytes();
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.gpu-fabric.vulkan-device.v1\0");
+    hasher.update(&props.vendor_id.to_le_bytes());
+    hasher.update(&props.device_id.to_le_bytes());
+    hasher.update(&(props.device_type.as_raw() as u32).to_le_bytes());
+    hasher.update(&props.api_version.to_le_bytes());
+    hasher.update(&props.driver_version.to_le_bytes());
+    sha256_len_prefixed_update(&mut hasher, device_name);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn synchronization_feature_identity_digest(
+    timeline_semaphore_supported: bool,
+    synchronization2_supported: bool,
+    timeline_semaphore_enabled: bool,
+    synchronization2_enabled: bool,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(SYNCHRONIZATION_FEATURE_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    hasher.update([
+        u8::from(timeline_semaphore_supported),
+        u8::from(synchronization2_supported),
+        u8::from(timeline_semaphore_enabled),
+        u8::from(synchronization2_enabled),
+    ]);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn queue_family_identity_digest(index: u32, properties: &vk::QueueFamilyProperties) -> String {
+    queue_family_identity_digest_from_fields(
+        index,
+        properties.queue_flags.as_raw(),
+        properties.queue_count,
+        properties.timestamp_valid_bits,
+        [
+            properties.min_image_transfer_granularity.width,
+            properties.min_image_transfer_granularity.height,
+            properties.min_image_transfer_granularity.depth,
+        ],
+    )
+}
+
+fn queue_family_identity_digest_from_fields(
+    index: u32,
+    queue_flags: u32,
+    queue_count: u32,
+    timestamp_valid_bits: u32,
+    min_image_transfer_granularity: [u32; 3],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(QUEUE_FAMILY_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    hasher.update(&index.to_le_bytes());
+    hasher.update(&queue_flags.to_le_bytes());
+    hasher.update(&queue_count.to_le_bytes());
+    hasher.update(&timestamp_valid_bits.to_le_bytes());
+    for value in min_image_transfer_granularity {
+        hasher.update(&value.to_le_bytes());
+    }
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn driver_identity_digest(
+    driver_uuid: [u8; 16],
+    driver_id: i32,
+    driver_name: &[u8],
+    driver_info: &[u8],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(DRIVER_IDENTITY_VERSION.as_bytes());
+    hasher.update([0]);
+    sha256_len_prefixed_update(&mut hasher, &driver_uuid);
+    hasher.update(&driver_id.to_le_bytes());
+    sha256_len_prefixed_update(&mut hasher, driver_name);
+    sha256_len_prefixed_update(&mut hasher, driver_info);
+    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| (b'0'..=b'9').contains(&byte) || (b'a'..=b'f').contains(&byte))
 }
 
 fn barrier_access_masks(kind: DependencyKind) -> (vk::AccessFlags2, vk::AccessFlags2) {
@@ -1115,97 +2358,160 @@ fn expected_final_timeline_value(plan: &VulkanSyncPlan) -> u64 {
         .unwrap_or(0)
 }
 
+#[derive(Debug, Clone)]
+struct PlannedSubmissionRecord {
+    node_id: u32,
+    ordinal: u32,
+    queue_index: u32,
+    signal_value: u64,
+}
+
+struct MaterializedSubmissionContract {
+    queue_family_index: u32,
+    queue_index: u32,
+    semaphore_type: vk::SemaphoreType,
+    semaphore_create_flags: vk::SemaphoreCreateFlags,
+    timeline_initial_value: u64,
+    command_buffer_device_mask: u32,
+    submit_flags: vk::SubmitFlags,
+    signal_value: u64,
+    signal_stage_mask: vk::PipelineStageFlags2,
+    semaphore_device_index: u32,
+    semaphore_wait_flags: vk::SemaphoreWaitFlags,
+    timeout_ns: u64,
+    host_readback_src_stage_mask: vk::PipelineStageFlags2,
+    host_readback_src_access_mask: vk::AccessFlags2,
+    host_readback_dst_stage_mask: vk::PipelineStageFlags2,
+    host_readback_dst_access_mask: vk::AccessFlags2,
+    planned_submissions: Vec<PlannedSubmissionRecord>,
+}
+
+impl MaterializedSubmissionContract {
+    fn from_plan(
+        plan: &VulkanSyncPlan,
+        signal_value: u64,
+        queue_family_index: u32,
+    ) -> Self {
+        Self {
+            queue_family_index,
+            queue_index: 0,
+            semaphore_type: vk::SemaphoreType::TIMELINE,
+            semaphore_create_flags: vk::SemaphoreCreateFlags::empty(),
+            timeline_initial_value: 0,
+            command_buffer_device_mask: 1,
+            submit_flags: vk::SubmitFlags::empty(),
+            signal_value,
+            signal_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
+            semaphore_device_index: 0,
+            semaphore_wait_flags: vk::SemaphoreWaitFlags::empty(),
+            timeout_ns: VULKAN_TIMELINE_TIMEOUT_NS,
+            host_readback_src_stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
+            host_readback_src_access_mask: vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            host_readback_dst_stage_mask: vk::PipelineStageFlags2::HOST,
+            host_readback_dst_access_mask: vk::AccessFlags2::HOST_READ,
+            planned_submissions: plan
+                .submissions
+                .iter()
+                .map(|submission| PlannedSubmissionRecord {
+                    node_id: submission.node_id,
+                    ordinal: submission.ordinal,
+                    queue_index: submission.queue.get() as u32,
+                    signal_value: submission.signal.value,
+                })
+                .collect(),
+        }
+    }
+
+    fn digest(&self) -> String {
+        let mut fields = vec![
+            "contract_version=v1".to_owned(),
+            format!("queue_family_index={}", self.queue_family_index),
+            format!("queue_index={}", self.queue_index),
+            "semaphore_create_structure=VkSemaphoreCreateInfo".to_owned(),
+            format!("semaphore_create_flags={}", self.semaphore_create_flags.as_raw()),
+            "semaphore_create_pnext=VkSemaphoreTypeCreateInfo".to_owned(),
+            format!("semaphore_type_raw={}", self.semaphore_type.as_raw()),
+            "semaphore_type=timeline".to_owned(),
+            format!("timeline_initial_value={}", self.timeline_initial_value),
+            "host_readback_dependency_structure=VkDependencyInfo".to_owned(),
+            "host_readback_dependency_pnext=null".to_owned(),
+            "host_readback_dependency_flags=0".to_owned(),
+            "host_readback_memory_barrier_count=1".to_owned(),
+            "host_readback_buffer_memory_barrier_count=0".to_owned(),
+            "host_readback_image_memory_barrier_count=0".to_owned(),
+            "host_readback_barrier_structure=VkMemoryBarrier2".to_owned(),
+            "host_readback_barrier_pnext=null".to_owned(),
+            "host_readback_src_stage=compute_shader".to_owned(),
+            format!("host_readback_src_stage_mask={}", self.host_readback_src_stage_mask.as_raw()),
+            "host_readback_src_access=shader_storage_write".to_owned(),
+            format!("host_readback_src_access_mask={}", self.host_readback_src_access_mask.as_raw()),
+            "host_readback_dst_stage=host".to_owned(),
+            format!("host_readback_dst_stage_mask={}", self.host_readback_dst_stage_mask.as_raw()),
+            "host_readback_dst_access=host_read".to_owned(),
+            format!("host_readback_dst_access_mask={}", self.host_readback_dst_access_mask.as_raw()),
+            "host_readback_queue_family_indices=not_applicable".to_owned(),
+            "host_readback_offset=0".to_owned(),
+            "host_readback_size=0".to_owned(),
+            "submit_structure=VkSubmitInfo2".to_owned(),
+            "submit_pnext=null".to_owned(),
+            format!("submit_flags={}", self.submit_flags.as_raw()),
+            "wait_semaphore_count=0".to_owned(),
+            "command_buffer_count=1".to_owned(),
+            "signal_semaphore_count=1".to_owned(),
+            "command_buffer_structure=VkCommandBufferSubmitInfo".to_owned(),
+            "command_buffer_pnext=null".to_owned(),
+            format!("command_buffer_device_mask={}", self.command_buffer_device_mask),
+            "signal_structure=VkSemaphoreSubmitInfo".to_owned(),
+            "signal_pnext=null".to_owned(),
+            format!("signal_value={}", self.signal_value),
+            "signal_stage=all_commands".to_owned(),
+            format!("signal_stage_mask={}", self.signal_stage_mask.as_raw()),
+            format!("signal_device_index={}", self.semaphore_device_index),
+            "wait_structure=VkSemaphoreWaitInfo".to_owned(),
+            "wait_pnext=null".to_owned(),
+            format!("wait_flags={}", self.semaphore_wait_flags.as_raw()),
+            "wait_semaphore_count=1".to_owned(),
+            format!("wait_value={}", self.signal_value),
+            format!("timeout_ns={}", self.timeout_ns),
+            "counter_query=vkGetSemaphoreCounterValue".to_owned(),
+            format!("planned_submission_count={}", self.planned_submissions.len()),
+        ];
+        for submission in &self.planned_submissions {
+            fields.extend([
+                "planned_submission".to_owned(),
+                format!("node_id={}", submission.node_id),
+                format!("ordinal={}", submission.ordinal),
+                format!("queue_index={}", submission.queue_index),
+                format!("signal_value={}", submission.signal_value),
+            ]);
+        }
+
+        let mut digest = Sha256::new();
+        digest.update(b"symthaea.gpu-fabric.vulkan-materialized-submission.v1");
+        digest.update([0]);
+        for field in fields {
+            let bytes = field.as_bytes();
+            digest.update((bytes.len() as u64).to_le_bytes());
+            digest.update(bytes);
+        }
+        format!("{:x}", digest.finalize())
+    }
+}
+
 fn completion_lowering_digest(
     plan: &VulkanSyncPlan,
     completion_expected: u64,
     queue_family_index: u32,
 ) -> String {
-    let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-completion-lowering.v4\0");
-    h.update(b"semaphore-type:timeline\0");
-    h.update(b"initial-value:0\0");
-    h.update(b"recording-policy:single-primary-command-buffer\0");
-    h.update(b"submission-policy:single-vkQueueSubmit2-batch\0");
-    h.update(b"signal-policy:single-final-signal\0");
-    h.update(b"completion-policy:max-plan-signal-value\0");
-    h.update(b"submit-api:vkQueueSubmit2\0");
-    h.update(b"signal-api:VkSemaphoreSubmitInfo\0");
-    h.update(b"signal-scope:all-commands-after-host-readback-barrier\0");
-    h.update(&vk::PipelineStageFlags2::ALL_COMMANDS.as_raw().to_le_bytes());
-    h.update(b"host-readback-barrier:compute-shader-storage-write-to-host-read\0");
-    h.update(&vk::PipelineStageFlags2::COMPUTE_SHADER.as_raw().to_le_bytes());
-    h.update(&vk::AccessFlags2::SHADER_STORAGE_WRITE.as_raw().to_le_bytes());
-    h.update(&vk::PipelineStageFlags2::HOST.as_raw().to_le_bytes());
-    h.update(&vk::AccessFlags2::HOST_READ.as_raw().to_le_bytes());
-    h.update(b"wait-api:vkWaitSemaphores\0");
-    h.update(b"counter-api:vkGetSemaphoreCounterValue\0");
-    h.update(&VULKAN_TIMELINE_TIMEOUT_NS.to_le_bytes());
-    h.update(&queue_family_index.to_le_bytes());
-    h.update(&0_u32.to_le_bytes()); // queue index within selected family
-    h.update(&0_u32.to_le_bytes()); // semaphore device index
-    h.update(&1_u32.to_le_bytes()); // command-buffer device mask
-    h.update(&completion_expected.to_le_bytes());
-    h.update(&(plan.submissions.len() as u32).to_le_bytes());
-    for submission in &plan.submissions {
-        h.update(&submission.node_id.to_le_bytes());
-        h.update(&submission.ordinal.to_le_bytes());
-        h.update(&submission.queue.get().to_le_bytes());
-        h.update(&submission.signal.value.to_le_bytes());
-    }
-    h.update(&1_u32.to_le_bytes()); // command-buffer count
-    h.update(&1_u32.to_le_bytes()); // queue-submit batch count
-    h.update(&1_u32.to_le_bytes()); // final signal count
-    h.finalize().to_hex().to_string()
+    MaterializedSubmissionContract::from_plan(plan, completion_expected, queue_family_index).digest()
 }
 
 fn barrier_lowering_digest(
     plan: &VulkanSyncPlan,
     resource_storage_sizes: &BTreeMap<ResourceId, u64>,
 ) -> Result<String, ResourceId> {
-    let mut h = Hasher::new();
-    h.update(b"symthaea.gpu-fabric.vulkan-barrier-lowering.v2\0");
-    h.update(b"src-stage:compute-shader\0");
-    h.update(b"dst-stage:compute-shader\0");
-    h.update(b"range-policy:rounded-storage-bytes\0");
-    h.update(b"queue-family:ignored\0");
-    h.update(b"descriptor-policy:reads-sorted-by-resource-id\0");
-    h.update(b"descriptor-policy:single-write-slot\0");
-    h.update(b"offset-policy:zero\0");
-
-    for kind in [
-        DependencyKind::ReadAfterWrite,
-        DependencyKind::WriteAfterRead,
-        DependencyKind::WriteAfterWrite,
-    ] {
-        h.update(&[match kind {
-            DependencyKind::ReadAfterWrite => 1,
-            DependencyKind::WriteAfterRead => 2,
-            DependencyKind::WriteAfterWrite => 3,
-        }]);
-        let (src_access, dst_access) = barrier_access_masks(kind);
-        h.update(&src_access.as_raw().to_le_bytes());
-        h.update(&dst_access.as_raw().to_le_bytes());
-    }
-
-    for submission in &plan.submissions {
-        for barrier in &submission.barriers {
-            h.update(&barrier.from.to_le_bytes());
-            h.update(&barrier.to.to_le_bytes());
-            h.update(&(barrier.resource.as_str().len() as u32).to_le_bytes());
-            h.update(barrier.resource.as_str().as_bytes());
-            h.update(&[match barrier.kind {
-                DependencyKind::ReadAfterWrite => 1,
-                DependencyKind::WriteAfterRead => 2,
-                DependencyKind::WriteAfterWrite => 3,
-            }]);
-            let size = resource_storage_sizes
-                .get(&barrier.resource)
-                .copied()
-                .ok_or_else(|| barrier.resource.clone())?;
-            h.update(&size.to_le_bytes());
-        }
-    }
-    Ok(h.finalize().to_hex().to_string())
+    let batches = materialized_barrier_batches_from_plan(plan, resource_storage_sizes)?;
+    Ok(materialized_barrier_batches_digest(&batches))
 }
 
 fn barrier_digest(plan: &VulkanSyncPlan) -> String {
@@ -1278,6 +2584,15 @@ impl Drop for VulkanBarrierWorkloadRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const TEST_DRIVER_IDENTITY_DIGEST: &str =
+        "2222222222222222222222222222222222222222222222222222222222222222";
+
+    const TEST_IMPLEMENTATION_IDENTITY_DIGEST: &str =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+    const TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST: &str =
+        "1111111111111111111111111111111111111111111111111111111111111111";
+    const TEST_QUEUE_FAMILY_IDENTITY_DIGEST: &str =
+        "6994094896a7f07fa1248d36af11e388aa7c0e6eb0ed2f99fff9b4beb4fd2978";
 
     fn fixture() -> (
         ExecutionGraph,
@@ -1432,6 +2747,165 @@ mod tests {
     }
 
     #[test]
+    fn memory_topology_rejects_tampered_digest_and_invalid_heap_association() {
+        let mut topology = test_memory_topology();
+        assert_eq!(topology.verify(), Ok(()));
+        let baseline = topology.identity_digest.clone();
+
+        topology.memory_heaps[0].size += 1;
+        assert_ne!(baseline, memory_topology_identity_digest(
+            topology.memory_type_count,
+            topology.memory_heap_count,
+            &topology.memory_types,
+            &topology.memory_heaps,
+        ));
+        assert_eq!(topology.verify(), Err(VulkanBarrierReceiptError::MemoryTopology));
+
+        topology = test_memory_topology();
+        topology.memory_types[0].heap_index = 1;
+        topology.identity_digest = memory_topology_identity_digest(
+            topology.memory_type_count,
+            topology.memory_heap_count,
+            &topology.memory_types,
+            &topology.memory_heaps,
+        );
+        assert_eq!(topology.verify(), Err(VulkanBarrierReceiptError::MemoryTopology));
+    }
+
+    #[test]
+    fn resource_memory_profile_must_match_sealed_topology() {
+        let (_, _, _, final_state) = fixture();
+        let sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let topology = test_memory_topology();
+        let mut profiles = test_resource_memory_profiles(&sizes);
+        assert!(profiles.values().all(|profile| profile.is_consistent_with_topology(&topology)));
+        let lhs = ResourceId::new("lhs").unwrap();
+        profiles.get_mut(&lhs).unwrap().memory_property_flags =
+            vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        assert!(!profiles[&lhs].is_consistent_with_topology(&topology));
+    }
+
+    #[test]
+    fn receipt_rejects_memory_topology_runtime_mismatch() {
+        let receipt = minimal_receipt_for_binding_tests();
+        let mut other_topology = test_memory_topology();
+        other_topology.memory_heaps[0].size += 1;
+        other_topology.identity_digest = memory_topology_identity_digest(
+            other_topology.memory_type_count,
+            other_topology.memory_heap_count,
+            &other_topology.memory_types,
+            &other_topology.memory_heaps,
+        );
+        assert_eq!(other_topology.verify(), Ok(()));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &other_topology,
+            ),
+            Err(VulkanBarrierReceiptError::MemoryTopologyBinding)
+        ));
+    }
+
+    #[test]
+    fn memory_profile_digest_binds_selection_and_cache_maintenance() {
+        let (_, _, _, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut profiles = test_resource_memory_profiles(&storage_sizes);
+        let baseline = resource_memory_profiles_digest(&profiles);
+        let lhs = ResourceId::new("lhs").unwrap();
+
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.memory_type_index = 1;
+            profile.memory_type_bits = 2;
+        }
+        assert_ne!(baseline, resource_memory_profiles_digest(&profiles));
+
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.memory_type_index = 0;
+            profile.memory_type_bits = 1;
+            assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        }
+        let coherent_digest = resource_memory_profiles_digest(&profiles);
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.memory_property_flags = vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+            profile.write_flush_performed = true;
+            profile.write_flush_size = vk::WHOLE_SIZE;
+            profile.read_invalidate_performed = true;
+            profile.read_invalidate_size = vk::WHOLE_SIZE;
+            assert!(profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        }
+        assert_ne!(coherent_digest, resource_memory_profiles_digest(&profiles));
+
+        {
+            let profile = profiles.get_mut(&lhs).unwrap();
+            profile.write_flush_size = 4;
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+            profile.write_flush_size = vk::WHOLE_SIZE;
+            profile.read_invalidate_size = 4;
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+            profile.read_invalidate_size = vk::WHOLE_SIZE;
+            profile.memory_heap_size = storage_sizes[&lhs] - 1;
+            assert!(!profile.is_consistent_with_storage_size(storage_sizes[&lhs]));
+        }
+    }
+
+    #[test]
+    fn memory_profiles_reject_cross_resource_type_and_heap_inconsistency() {
+        let (_, _, _, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut profiles = test_resource_memory_profiles(&storage_sizes);
+        assert_eq!(inconsistent_memory_profile_resource(&profiles), None);
+
+        let rhs = ResourceId::new("rhs").unwrap();
+        profiles.get_mut(&rhs).unwrap().memory_heap_size += 1;
+        assert_eq!(
+            inconsistent_memory_profile_resource(&profiles),
+            Some(rhs.clone())
+        );
+
+        profiles.get_mut(&rhs).unwrap().memory_heap_size -= 1;
+        profiles.get_mut(&rhs).unwrap().memory_property_flags =
+            vk::MemoryPropertyFlags::HOST_VISIBLE.as_raw();
+        assert_eq!(inconsistent_memory_profile_resource(&profiles), Some(rhs));
+    }
+
+    #[test]
     fn dispatch_group_count_rejects_u64_to_u32_truncation() {
         let range = (u64::from(u32::MAX) + 1)
             .saturating_mul(u64::from(WORKGROUP_SIZE))
@@ -1462,6 +2936,36 @@ mod tests {
                 vk::AccessFlags2::empty(),
             )
         );
+    }
+
+    #[test]
+    fn materialized_barrier_digest_binds_concrete_call_fields() {
+        let (_, _, plan, final_state) = fixture();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| {
+                (
+                    resource.clone(),
+                    rounded_storage_bytes(value.as_bytes().len() as u64),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut batches =
+            materialized_barrier_batches_from_plan(&plan, &storage_sizes).unwrap();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].records.len(), 1);
+        let baseline = materialized_barrier_batches_digest(&batches);
+
+        batches[0].records[0].storage_size += 4;
+        assert_ne!(baseline, materialized_barrier_batches_digest(&batches));
+        batches[0].records[0].storage_size -= 4;
+
+        batches[0].records[0].kind = DependencyKind::WriteAfterWrite;
+        assert_ne!(baseline, materialized_barrier_batches_digest(&batches));
+        batches[0].records[0].kind = DependencyKind::ReadAfterWrite;
+
+        batches[0].node_id += 1;
+        assert_ne!(baseline, materialized_barrier_batches_digest(&batches));
     }
 
     #[test]
@@ -1634,6 +3138,10 @@ mod tests {
             barrier_digest: String::new(),
             barrier_lowering_digest: String::new(),
             completion_lowering_digest: String::new(),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
             resource_digests: BTreeMap::new(),
@@ -1642,8 +3150,19 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert_eq!(
             receipt.verify_against(&graph, &schedule, &plan, &BTreeMap::new()),
@@ -1678,6 +3197,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1686,8 +3209,19 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         let expected = expected_final_timeline_value(&plan);
         assert!(matches!(
@@ -1726,6 +3260,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1734,8 +3272,19 @@ mod tests {
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.vulkan_api_version = vk::API_VERSION_1_2;
         assert!(matches!(
@@ -1771,6 +3320,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1779,8 +3332,19 @@ mod tests {
             completion_observed: 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: vk::API_VERSION_1_2,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -1818,6 +3382,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1826,8 +3394,19 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.barrier_lowering_digest = String::from("tampered");
 
@@ -1867,6 +3446,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1875,8 +3458,19 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
 
         storage_sizes.insert(ResourceId::new("mid").unwrap(), 8);
@@ -1919,6 +3513,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1927,8 +3525,19 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         receipt.barrier_digest = String::from("tampered");
 
@@ -1936,6 +3545,58 @@ mod tests {
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::BarrierDigest)
         ));
+    }
+
+    #[test]
+    fn materialized_dispatch_digest_binds_descriptor_mapping_and_group_counts() {
+        let (graph, schedule, _, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let storage_sizes = final_state
+            .iter()
+            .map(|(resource, value)| (
+                resource.clone(),
+                rounded_storage_bytes(value.as_bytes().len() as u64),
+            ))
+            .collect::<BTreeMap<_, _>>();
+        let mut records =
+            materialized_dispatch_records_from_graph(&graph, &schedule, &storage_sizes).unwrap();
+        assert_eq!(records.len(), schedule.nodes.len());
+        assert_eq!(records[0].descriptor_bindings.len(), 3);
+        let baseline = materialized_dispatch_records_digest(&records);
+
+        records[0].descriptor_bindings[0].range += 4;
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+        records[0].descriptor_bindings[0].range -= 4;
+
+        records[0].descriptor_bindings[0].resource = ResourceId::new("rhs").unwrap();
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+        records[0].descriptor_bindings[0].resource = ResourceId::new("lhs").unwrap();
+
+        records[0].dispatch_groups[0] += 1;
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+        records[0].dispatch_groups[0] -= 1;
+
+        records[0].schedule_ordinal += 1;
+        assert_ne!(baseline, materialized_dispatch_records_digest(&records));
+    }
+
+    #[test]
+    fn materialized_submission_digest_binds_concrete_call_fields() {
+        let (_, _, plan, _) = fixture();
+        let completion = expected_final_timeline_value(&plan);
+        let mut contract = MaterializedSubmissionContract::from_plan(&plan, completion, 7);
+        let baseline = contract.digest();
+
+        contract.signal_value += 1;
+        assert_ne!(baseline, contract.digest());
+        contract.signal_value -= 1;
+
+        contract.host_readback_dst_access_mask = vk::AccessFlags2::empty();
+        assert_ne!(baseline, contract.digest());
+        contract.host_readback_dst_access_mask = vk::AccessFlags2::HOST_READ;
+
+        contract.queue_family_index += 1;
+        assert_ne!(baseline, contract.digest());
     }
 
     #[test]
@@ -1990,6 +3651,10 @@ mod tests {
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -1998,8 +3663,19 @@ mod tests {
             completion_observed: expected + 1,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2046,6 +3722,10 @@ mod tests {
             barrier_digest: barrier_digest(&plan),
             barrier_lowering_digest: barrier_lowering_digest(&plan, &storage_sizes).unwrap(),
             completion_lowering_digest: completion_lowering_digest(&plan, expected, 0),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: plan.submissions.iter().map(|s| s.barriers.len() as u32).sum(),
             resource_digests: digests,
@@ -2054,8 +3734,19 @@ mod tests {
             completion_observed: expected,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
@@ -2064,7 +3755,7 @@ mod tests {
     }
 
     #[test]
-    fn receipt_rejects_tampered_completion_lowering_digest() {
+    fn receipt_rejects_tampered_completion_and_execution_lowering_digests() {
         let (graph, schedule, plan, initial) = fixture();
         let final_state = simulate(&graph, &schedule, &initial).unwrap();
         let digests = final_state
@@ -2090,6 +3781,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2098,32 +3793,327 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
-        device_uuid: [1; 16],
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
+            device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
+        receipt.resource_memory_profiles = test_resource_memory_profiles(&receipt.resource_storage_sizes);
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        let expected_dispatch_records = materialized_dispatch_records_from_graph(
+            &graph,
+            &schedule,
+            &receipt.resource_storage_sizes,
+        )
+        .unwrap();
+        receipt.execution_lowering_digest = String::from("tampered");
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ExecutionLoweringDigest)
+        ));
+        receipt.execution_lowering_digest =
+            materialized_dispatch_records_digest(&expected_dispatch_records);
+
         receipt.completion_lowering_digest = String::from("tampered");
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
+        ));
+        receipt.completion_lowering_digest =
+            completion_lowering_digest(&plan, expected_final_timeline_value(&plan), 0);
+        receipt.memory_lowering_digest = String::from("tampered");
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::MemoryLoweringDigest)
+        ));
+
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        let lhs = ResourceId::new("lhs").unwrap();
+        receipt.resource_memory_profiles.get_mut(&lhs).unwrap().memory_type_index = 1;
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ResourceMemoryProfile(resource))
+                if resource == lhs
+        ));
+
+        receipt.resource_memory_profiles =
+            test_resource_memory_profiles(&receipt.resource_storage_sizes);
+        receipt.memory_lowering_digest =
+            resource_memory_profiles_digest(&receipt.resource_memory_profiles);
+        receipt.resource_memory_profiles.remove(&lhs);
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ResourceCount)
         ));
     }
 
     #[test]
     fn receipt_rejects_runtime_device_and_queue_binding_mismatch() {
         let mut receipt = minimal_receipt_for_binding_tests();
-        assert!(receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]).is_ok());
+        assert!(receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()).is_ok());
 
         receipt.physical_device_api_version = VULKAN_API_VERSION + 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]),
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::PhysicalDeviceApiVersionBinding)
         ));
 
         receipt.physical_device_api_version = VULKAN_API_VERSION;
         receipt.queue_family_index = 1;
         assert!(matches!(
-            receipt.verify_runtime_binding(VULKAN_API_VERSION, 0, [1; 16]),
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
             Err(VulkanBarrierReceiptError::QueueFamilyBinding)
+        ));
+    }
+
+    #[test]
+    fn receipt_rejects_runtime_provenance_binding_mismatch() {
+        let mut receipt = minimal_receipt_for_binding_tests();
+        assert!(receipt
+            .verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology())
+            .is_ok());
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                "2222222222222222222222222222222222222222222222222222222222222222",
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::ImplementationIdentityBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                "3333333333333333333333333333333333333333333333333333333333333333",
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::PhysicalDeviceIdentityBinding)
+        ));
+
+        receipt.device_uuid = [9; 16];
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::DeviceUuidBinding)
+        ));
+
+        receipt.device_uuid = [1; 16];
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [9; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::DriverUuidBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                9,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::DriverIdBinding)
+        ));
+
+        let mut tampered_features = test_synchronization_feature_profile();
+        tampered_features.synchronization2_supported = false;
+        tampered_features.identity_digest = synchronization_feature_identity_digest(
+            tampered_features.timeline_semaphore_supported,
+            tampered_features.synchronization2_supported,
+            tampered_features.timeline_semaphore_enabled,
+            tampered_features.synchronization2_enabled,
+        );
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &tampered_features,
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentityBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                "4444444444444444444444444444444444444444444444444444444444444444",
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
+        ));
+
+        assert!(matches!(
+            receipt.verify_runtime_binding(
+                VULKAN_API_VERSION,
+                0,
+                [1; 16],
+                TEST_IMPLEMENTATION_IDENTITY_DIGEST,
+                TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST,
+                TEST_DRIVER_IDENTITY_DIGEST,
+                [2; 16],
+                1,
+                &test_synchronization_feature_profile(),
+                TEST_QUEUE_FAMILY_IDENTITY_DIGEST,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                2,
+                0,
+                [1, 1, 1],
+                &test_memory_topology()),
+            Err(VulkanBarrierReceiptError::QueueFamilyIdentityBinding)
         ));
     }
 
@@ -2154,6 +4144,10 @@ mod tests {
                 expected_final_timeline_value(&plan),
                 0,
             ),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: schedule.nodes.len() as u32,
             barrier_count: 1,
             resource_digests: digests,
@@ -2162,13 +4156,99 @@ mod tests {
             completion_observed: expected_final_timeline_value(&plan),
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 7,
+            queue_family_identity_digest: queue_family_identity_digest_from_fields(
+                7,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+            ),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
             device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         };
         assert!(matches!(
             receipt.verify_against(&graph, &schedule, &plan, &final_state),
             Err(VulkanBarrierReceiptError::CompletionLoweringDigest)
         ));
+    }
+
+    fn test_memory_topology() -> VulkanMemoryTopologyProfile {
+        let memory_types = vec![VulkanMemoryTypeRecord {
+            index: 0,
+            property_flags: (
+                vk::MemoryPropertyFlags::HOST_VISIBLE
+                    | vk::MemoryPropertyFlags::HOST_COHERENT
+            ).as_raw(),
+            heap_index: 0,
+        }];
+        let memory_heaps = vec![VulkanMemoryHeapRecord {
+            index: 0,
+            flags: vk::MemoryHeapFlags::DEVICE_LOCAL.as_raw(),
+            size: 1024,
+        }];
+        VulkanMemoryTopologyProfile {
+            memory_type_count: memory_types.len() as u32,
+            memory_heap_count: memory_heaps.len() as u32,
+            identity_digest: memory_topology_identity_digest(
+                memory_types.len() as u32,
+                memory_heaps.len() as u32,
+                &memory_types,
+                &memory_heaps,
+            ),
+            memory_types,
+            memory_heaps,
+        }
+    }
+
+    fn test_resource_memory_profiles(
+        storage_sizes: &BTreeMap<ResourceId, u64>,
+    ) -> BTreeMap<ResourceId, VulkanResourceMemoryProfile> {
+        storage_sizes
+            .iter()
+            .map(|(resource, size)| (
+                resource.clone(),
+                VulkanResourceMemoryProfile {
+                    memory_type_index: 0,
+                    memory_type_bits: 1,
+                    memory_property_flags: (
+                        vk::MemoryPropertyFlags::HOST_VISIBLE
+                            | vk::MemoryPropertyFlags::HOST_COHERENT
+                    ).as_raw(),
+                    memory_heap_index: 0,
+                    memory_heap_flags: vk::MemoryHeapFlags::DEVICE_LOCAL.as_raw(),
+                    memory_heap_size: 1024,
+                    memory_requirement_alignment: 4,
+                    memory_requirement_size: *size,
+                    allocation_size: *size,
+                    storage_size: *size,
+                    buffer_usage_flags: vk::BufferUsageFlags::STORAGE_BUFFER.as_raw(),
+                    sharing_mode_raw: vk::SharingMode::EXCLUSIVE.as_raw(),
+                    binding_offset: 0,
+                    map_offset: 0,
+                    map_size: *size,
+                    write_flush_performed: false,
+                    write_flush_offset: 0,
+                    write_flush_size: 0,
+                    read_invalidate_performed: false,
+                    read_invalidate_offset: 0,
+                    read_invalidate_size: 0,
+                },
+            ))
+            .collect()
+    }
+
+    fn test_synchronization_feature_profile() -> VulkanSynchronizationFeatureProfile {
+        VulkanSynchronizationFeatureProfile::new(true, true, true, true)
     }
 
     fn minimal_receipt_for_binding_tests() -> VulkanBarrierExecutionReceipt {
@@ -2180,6 +4260,10 @@ mod tests {
             barrier_digest: String::new(),
             barrier_lowering_digest: String::new(),
             completion_lowering_digest: String::new(),
+            execution_lowering_digest: String::new(),
+            resource_memory_profiles: BTreeMap::new(),
+            memory_topology: test_memory_topology(),
+            memory_lowering_digest: String::new(),
             node_count: 0,
             barrier_count: 0,
             resource_digests: BTreeMap::new(),
@@ -2188,8 +4272,19 @@ mod tests {
             completion_observed: 0,
             vulkan_api_version: VULKAN_API_VERSION,
             physical_device_api_version: VULKAN_API_VERSION,
+            synchronization_features: test_synchronization_feature_profile(),
             queue_family_index: 0,
+            queue_family_identity_digest: TEST_QUEUE_FAMILY_IDENTITY_DIGEST.to_owned(),
+            queue_family_queue_flags: vk::QueueFlags::COMPUTE.as_raw(),
+            queue_family_queue_count: 1,
+            queue_family_timestamp_valid_bits: 0,
+            queue_family_min_image_transfer_granularity: [1, 1, 1],
             device_uuid: [1; 16],
+            implementation_identity_digest: TEST_IMPLEMENTATION_IDENTITY_DIGEST.to_owned(),
+            physical_device_identity_digest: TEST_PHYSICAL_DEVICE_IDENTITY_DIGEST.to_owned(),
+            driver_identity_digest: TEST_DRIVER_IDENTITY_DIGEST.to_owned(),
+            driver_uuid: [2; 16],
+            driver_id: 1,
         }
     }
 
@@ -2198,6 +4293,7 @@ mod tests {
         initial: &BTreeMap<ResourceId, BinaryHypervector>,
         observed: &BTreeMap<ResourceId, BinaryHypervector>,
         receipt: &VulkanBarrierExecutionReceipt,
+        runtime: &VulkanBarrierWorkloadRuntime,
     ) {
         println!("qualification_witness_version=1");
         println!("qualification_claim=workload_execution+synchronization_only");
@@ -2209,6 +4305,45 @@ mod tests {
         println!("barrier_digest={}", receipt.barrier_digest);
         println!("barrier_lowering_digest={}", receipt.barrier_lowering_digest);
         println!("completion_lowering_digest={}", receipt.completion_lowering_digest);
+        println!("execution_lowering_digest={}", receipt.execution_lowering_digest);
+        println!("memory_lowering_digest={}", receipt.memory_lowering_digest);
+        println!("memory_topology_version=1");
+        println!("memory_topology_identity_sha256={}", receipt.memory_topology.identity_digest);
+        println!("memory_type_count={}", receipt.memory_topology.memory_type_count);
+        println!("memory_heap_count={}", receipt.memory_topology.memory_heap_count);
+        for record in &receipt.memory_topology.memory_types {
+            println!("memory_type_record={}:{}:{}", record.index, record.property_flags, record.heap_index);
+        }
+        for record in &receipt.memory_topology.memory_heaps {
+            println!("memory_heap_record={}:{}:{}", record.index, record.flags, record.size);
+        }
+        for (resource, profile) in &receipt.resource_memory_profiles {
+            println!(
+                "resource_memory_profile={}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+                resource.as_str(),
+                profile.memory_type_index,
+                profile.memory_type_bits,
+                profile.memory_property_flags,
+                profile.memory_heap_index,
+                profile.memory_heap_flags,
+                profile.memory_heap_size,
+                profile.memory_requirement_alignment,
+                profile.memory_requirement_size,
+                profile.allocation_size,
+                profile.storage_size,
+                profile.buffer_usage_flags,
+                profile.sharing_mode_raw,
+                profile.binding_offset,
+                profile.map_offset,
+                profile.map_size,
+                u8::from(profile.write_flush_performed),
+                profile.write_flush_offset,
+                profile.write_flush_size,
+                u8::from(profile.read_invalidate_performed),
+                profile.read_invalidate_offset,
+                profile.read_invalidate_size,
+            );
+        }
         println!("node_count={}", receipt.node_count);
         println!("barrier_count={}", receipt.barrier_count);
         println!("resource_storage_sizes={:?}", receipt.resource_storage_sizes);
@@ -2218,13 +4353,176 @@ mod tests {
         println!("vulkan_api_version={}", receipt.vulkan_api_version);
         println!("physical_device_api_version={}", receipt.physical_device_api_version);
         println!("queue_family_index={}", receipt.queue_family_index);
+        println!("synchronization_feature_identity_version=1");
+        println!("timeline_semaphore_supported={}", u8::from(receipt.synchronization_features.timeline_semaphore_supported));
+        println!("synchronization2_supported={}", u8::from(receipt.synchronization_features.synchronization2_supported));
+        println!("timeline_semaphore_enabled={}", u8::from(receipt.synchronization_features.timeline_semaphore_enabled));
+        println!("synchronization2_enabled={}", u8::from(receipt.synchronization_features.synchronization2_enabled));
+        println!("synchronization_feature_identity_sha256={}", receipt.synchronization_features.identity_digest);
+        println!("queue_family_identity_version=1");
+        println!("queue_family_identity_sha256={}", receipt.queue_family_identity_digest);
+        println!("queue_family_queue_flags={}", receipt.queue_family_queue_flags);
+        println!("queue_family_queue_count={}", receipt.queue_family_queue_count);
+        println!("queue_family_timestamp_valid_bits={}", receipt.queue_family_timestamp_valid_bits);
+        println!(
+            "queue_family_min_image_transfer_granularity={},{},{}",
+            receipt.queue_family_min_image_transfer_granularity[0],
+            receipt.queue_family_min_image_transfer_granularity[1],
+            receipt.queue_family_min_image_transfer_granularity[2],
+        );
         println!("device_uuid={}", hex_bytes(&receipt.device_uuid));
+        println!("implementation_identity_version=1");
+        println!("implementation_identity_sha256={}", receipt.implementation_identity_digest);
+        println!("implementation_abi_marker={}", WGSL_ABI_MARKER);
+        println!("implementation_kernel_id={}", HDC_BIND_XOR_KERNEL_ID);
+        println!("implementation_entry_point={}", VULKAN_ENTRY_POINT);
+        println!("implementation_shader_stage={}", VULKAN_SHADER_STAGE);
+        println!("implementation_wgsl_sha256={}", runtime.implementation_wgsl_sha256);
+        println!("implementation_wgsl_hex={}", runtime.implementation_wgsl_hex);
+        println!("shader_spirv_sha256={}", runtime.shader_spirv_sha256);
+        println!("shader_spirv_hex={}", runtime.shader_spirv_hex);
+        println!("physical_device_identity_version=1");
+        println!("physical_device_identity_sha256={}", receipt.physical_device_identity_digest);
+        println!("physical_device_vendor_id={}", runtime.physical_device_vendor_id);
+        println!("physical_device_device_id={}", runtime.physical_device_device_id);
+        println!("physical_device_type={}", runtime.physical_device_type);
+        println!("physical_device_driver_version={}", runtime.physical_device_driver_version);
+        println!("physical_device_name_hex={}", runtime.physical_device_name_hex);
+        println!("driver_identity_version=1");
+        println!("driver_identity_sha256={}", receipt.driver_identity_digest);
+        println!("driver_uuid={}", hex_bytes(&receipt.driver_uuid));
+        println!("driver_id={}", receipt.driver_id);
+        println!("driver_name_hex={}", runtime.driver_name_hex);
+        println!("driver_info_hex={}", runtime.driver_info_hex);
         for (resource, value) in initial {
             println!("resource_initial_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
         for (resource, value) in observed {
             println!("resource_observed_hex={}:{}:{}", resource.as_str(), value.dimensions, hex_bytes(value.as_bytes()));
         }
+    }
+
+    #[test]
+    fn implementation_identity_digest_is_deterministic_and_spirv_bound() {
+        let baseline = vulkan_implementation_identity_digest(&[0x07230203, 0x00010000]);
+        assert_eq!(
+            baseline,
+            vulkan_implementation_identity_digest(&[0x07230203, 0x00010000])
+        );
+        assert_ne!(
+            baseline,
+            vulkan_implementation_identity_digest(&[0x07230203, 0x00010001])
+        );
+    }
+
+    #[test]
+    fn physical_device_identity_digest_binds_device_and_driver_fields() {
+        let mut props = vk::PhysicalDeviceProperties::default();
+        props.vendor_id = 1;
+        props.device_id = 2;
+        props.device_type = vk::PhysicalDeviceType::CPU;
+        props.api_version = VULKAN_API_VERSION;
+        props.driver_version = 3;
+        let baseline = physical_device_identity_digest(&props);
+
+        props.driver_version += 1;
+        assert_ne!(baseline, physical_device_identity_digest(&props));
+
+        props.driver_version = 3;
+        props.vendor_id += 1;
+        assert_ne!(baseline, physical_device_identity_digest(&props));
+    }
+
+    #[test]
+    fn receipt_rejects_malformed_provenance_identity() {
+        let (graph, schedule, plan, initial) = fixture();
+        let final_state = simulate(&graph, &schedule, &initial).unwrap();
+        let mut receipt = minimal_receipt_for_binding_tests();
+        receipt.implementation_identity_digest = "tampered".to_owned();
+        assert!(matches!(
+            receipt.verify_against(&graph, &schedule, &plan, &final_state),
+            Err(VulkanBarrierReceiptError::ImplementationIdentity)
+        ));
+    }
+
+    #[test]
+    fn synchronization_feature_profile_is_derived_from_device_create_values() {
+        let timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default()
+            .timeline_semaphore(true);
+        let sync2 = vk::PhysicalDeviceSynchronization2Features::default()
+            .synchronization2(true);
+
+        let enabled = synchronization_feature_profile_from_device_create(
+            true,
+            true,
+            timeline.timeline_semaphore,
+            sync2.synchronization2,
+        );
+        assert!(enabled.verify().is_ok());
+
+        let disabled = synchronization_feature_profile_from_device_create(
+            true,
+            true,
+            timeline.timeline_semaphore,
+            0,
+        );
+        assert_ne!(enabled.identity_digest, disabled.identity_digest);
+        assert!(!disabled.synchronization2_enabled);
+        assert_eq!(
+            disabled.verify(),
+            Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity)
+        );
+    }
+
+    #[test]
+    fn queue_family_identity_digest_binds_capability_tuple() {
+        let mut properties = vk::QueueFamilyProperties::default()
+            .queue_flags(vk::QueueFlags::COMPUTE)
+            .queue_count(1)
+            .timestamp_valid_bits(0)
+            .min_image_transfer_granularity(vk::Extent3D { width: 1, height: 1, depth: 1 });
+        let baseline = queue_family_identity_digest(3, &properties);
+
+        properties.queue_flags |= vk::QueueFlags::TRANSFER;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        properties.queue_flags = vk::QueueFlags::COMPUTE;
+
+        properties.queue_count += 1;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        properties.queue_count = 1;
+
+        properties.timestamp_valid_bits = 64;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        properties.timestamp_valid_bits = 0;
+
+        let mut unsupported = test_synchronization_feature_profile();
+        unsupported.timeline_semaphore_supported = false;
+        assert_eq!(
+            unsupported.verify(),
+            Err(VulkanBarrierReceiptError::SynchronizationFeatureIdentity)
+        );
+
+        properties.min_image_transfer_granularity.width = 2;
+        assert_ne!(baseline, queue_family_identity_digest(3, &properties));
+        assert_ne!(
+            baseline,
+            queue_family_identity_digest_from_fields(
+                4,
+                vk::QueueFlags::COMPUTE.as_raw(),
+                1,
+                0,
+                [1, 1, 1],
+            )
+        );
+    }
+
+    #[test]
+    fn driver_identity_digest_binds_uuid_id_and_metadata() {
+        let baseline = driver_identity_digest([1; 16], 7, b"driver", b"info");
+        assert_ne!(baseline, driver_identity_digest([2; 16], 7, b"driver", b"info"));
+        assert_ne!(baseline, driver_identity_digest([1; 16], 8, b"driver", b"info"));
+        assert_ne!(baseline, driver_identity_digest([1; 16], 7, b"driver2", b"info"));
+        assert_ne!(baseline, driver_identity_digest([1; 16], 7, b"driver", b"info2"));
     }
 
     #[test]
@@ -2261,6 +4559,7 @@ mod tests {
                 &initial,
                 &observed,
                 &receipt,
+                &runtime,
             );
         }
 
