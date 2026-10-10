@@ -87,5 +87,30 @@
     "No load-loss event is claimed to be survivable or unsurvivable.",
     "Historical rider/coupler descriptions are not a validated force law.",
     "Passing manifest validation will only permit independent review, not certify safety."
-  ]
+  ],
+  "input_provenance": {
+    "inertial_frame": null,
+    "support_frame_transform": null,
+    "ring_radius_m": null,
+    "ring_plane_orientation": null,
+    "initial_ring_position_m": null,
+    "initial_ring_velocity_m_s": null,
+    "initial_equilibrium_evidence_ref": null,
+    "skyhook_support_locations_rad": null,
+    "support_load_before_n": null,
+    "support_load_after_n": null,
+    "load_change_profile": null,
+    "load_step_time_s": null,
+    "rider_spacing_m": null,
+    "rider_force_law": null,
+    "rider_stiffness_n_per_m": null,
+    "rider_damping_n_s_per_m": null,
+    "rider_max_coupling_force_n": null,
+    "actuation_measurement_delay_s": null,
+    "force_model_reference": null,
+    "energy_boundary": null,
+    "momentum_boundary": null,
+    "acceptance_limits": null,
+    "independent_reference_case": null
+  }
 }
