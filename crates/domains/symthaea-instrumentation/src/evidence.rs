@@ -90,11 +90,15 @@ impl VerifiedArtifactDigest {
         let mut buffer = [0_u8; 64 * 1024];
 
         loop {
-            let count = reader.read(&mut buffer).map_err(|_| {
-                ArtifactVerificationError::ReadFailure {
-                    artifact_id: artifact_id.clone(),
+            let count = match reader.read(&mut buffer) {
+                Ok(count) => count,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => {
+                    return Err(ArtifactVerificationError::ReadFailure {
+                        artifact_id: artifact_id.clone(),
+                    });
                 }
-            })?;
+            };
             if count == 0 {
                 break;
             }
@@ -282,10 +286,40 @@ mod tests {
     }
 
     #[test]
+    fn streaming_verifier_retries_interrupted_reads() {
+        struct InterruptedOnceReader {
+            interrupted: bool,
+            inner: std::io::Cursor<Vec<u8>>,
+        }
+
+        impl std::io::Read for InterruptedOnceReader {
+            fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(std::io::Error::from(
+                        std::io::ErrorKind::Interrupted,
+                    ));
+                }
+                self.inner.read(buffer)
+            }
+        }
+
+        let bytes = b"resumed stream".to_vec();
+        let reference = reference("interrupted-once", &sha256_hex(&bytes));
+        let reader = InterruptedOnceReader {
+            interrupted: false,
+            inner: std::io::Cursor::new(bytes.clone()),
+        };
+
+        let verified = VerifiedArtifactDigest::verify_reader(reference, reader).unwrap();
+        assert_eq!(verified.byte_length(), u64::try_from(bytes.len()).unwrap());
+    }
+
+    #[test]
     fn streaming_verifier_fails_closed_when_the_reader_errors() {
         struct FailingReader;
 
-        impl Read for FailingReader {
+        impl std::io::Read for FailingReader {
             fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
                 Err(std::io::Error::other("fixture read failure"))
             }
