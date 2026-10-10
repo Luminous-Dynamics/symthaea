@@ -1,0 +1,118 @@
+name: SYM-FV-001A Aeneas BinaryHV Bind
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-core/src/hdc/binary_hv.rs'
+      - 'docs/formal/sym-fv-001a-aeneas-bind-scalar-v1.json'
+      - 'scripts/qualify_sym_fv_001a.py'
+      - 'scripts/validate_sym_fv_001a_contract.py'
+      - '.github/workflows/sym-fv-001a-aeneas-bind.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-001a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    name: Exact Rust -> Aeneas -> Lean extraction
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Record exact Git subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/sym-fv-001a
+          {
+            echo "head=$(git rev-parse HEAD)"
+            echo "tree=$(git rev-parse HEAD^{tree})"
+            echo "source_subject=2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9"
+            echo "source_blob=$(git rev-parse 2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9:crates/core/symthaea-core/src/hdc/binary_hv.rs)"
+            echo "head_source_blob=$(git rev-parse HEAD:crates/core/symthaea-core/src/hdc/binary_hv.rs)"
+          } | tee .artifacts/sym-fv-001a/git-subject.txt
+
+      - name: Validate frozen extraction contract
+        run: python3 scripts/validate_sym_fv_001a_contract.py
+
+      - name: Execute receipt-first extraction probe
+        run: python3 scripts/qualify_sym_fv_001a.py
+
+      - name: Render semantic classification
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f .artifacts/sym-fv-001a/receipt.json ]]; then
+            echo "No SYM-FV-001A receipt was produced" | tee .artifacts/sym-fv-001a/classification.txt
+            exit 1
+          fi
+          python3 - <<'PY' | tee .artifacts/sym-fv-001a/classification.txt
+          import json
+          r = json.load(open('.artifacts/sym-fv-001a/receipt.json'))
+          print('result_class=' + str(r.get('result_class')))
+          print('semantic_success=' + str(r.get('semantic_success')))
+          print('failure_detail=' + str(r.get('failure_detail')))
+          print('llbc_sha256=' + str(r.get('llbc_sha256')))
+          print('generated_lean_files=' + str(len(r.get('generated_lean', []))))
+          print('external_model_templates=' + str(len(r.get('external_model_templates', []))))
+          PY
+
+      - name: Hash retained evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find .artifacts/sym-fv-001a -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > .artifacts/sym-fv-001a/SHA256SUMS
+          cat .artifacts/sym-fv-001a/SHA256SUMS
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-001a-${{ github.sha }}
+          path: .artifacts/sym-fv-001a
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify tracked-tree immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Enforce semantic success gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          r = json.load(open('.artifacts/sym-fv-001a/receipt.json'))
+          cls = r.get('result_class')
+          success = r.get('semantic_success')
+          print(f'SYM-FV-001A result: {cls}; semantic_success={success}')
+          if cls != 'ExtractedAndLeanTypechecked' or success is not True:
+              raise SystemExit(2)
+          PY
