@@ -6,8 +6,9 @@
 //! This module observes locally timestamped submission attempts for either a
 //! supported MAVLink setpoint or ROS 2 OffboardControlMode. A local transport
 //! acceptance is not proof of wire delivery or PX4 receipt. The assessment does
-//! not establish Offboard mode, estimator validity, authorization, failsafe
-//! behavior, or physical response and deliberately does not lower into readiness.
+//! not establish Offboard mode, whether a mode-entry event happened after this
+//! window, estimator validity, authorization, failsafe behavior, or physical
+//! response. It deliberately does not lower into readiness.
 
 use std::collections::HashSet;
 use std::fmt::Write as _;
