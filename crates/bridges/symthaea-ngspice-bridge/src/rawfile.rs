@@ -472,6 +472,12 @@ mod tests {
     }
 
     #[test]
+    fn rejects_truncated_last_point() {
+        let malformed = RC_FIXTURE.replace("    8.646647167633873e-01\\n", "");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
     fn rejects_hostile_oversized_counts_before_allocating_point_storage() {
         let malformed = RC_FIXTURE.replace("No. Points: 3", "No. Points: 18446744073709551615");
         assert!(AsciiRawfile::parse(&malformed).is_err());
