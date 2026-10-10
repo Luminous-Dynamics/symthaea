@@ -94,6 +94,32 @@ GitHub GraphQL updateRefs is a stronger expected-OID primitive for cases that re
 
 The async pull-request merge API supports exact expected PR-head SHA binding, asynchronous provider UUIDs, duplicate-pending UUID recovery, and distinct enqueued versus merged states. Provider result retention is bounded, so durable PR merged state remains a reconciliation surface.
 
+## Provider effect observation versus causal attribution
+
+External effect state and operation-level causality are separate propositions.
+
+A provider result may establish a narrow causal edge only when the durable dispatch intent already binds the exact local promotion operation identity to the provider operation identity, and the provider result itself reports the corresponding successful effect.
+
+The following do not establish that causal edge by themselves:
+
+    expected PR head matches
+    merge commit is non-empty
+    local receipt carries a promotion operation ID
+    a provider UUID exists or once existed
+    durable PR state later reports merged
+
+In particular, an asynchronous result of enqueued is final for the merge-queue request, while the eventual merged PR state is a separate durable observation. An expired provider UUID followed by an observed merged PR is therefore effect evidence without automatic causal attribution. An already-merged retry likewise observes the effect state but must not backdate the retry as the historical causal operation.
+
+The dedicated provider-effect attribution qualifier records two explicit classes:
+
+    DirectProviderResult + exact local/provider operation binding
+        -> narrow causal attribution may be established
+
+    DurableSubjectObservation
+        -> effect observed; causal attribution remains unestablished
+
+A locally authored reconciliation record is not independent provider evidence.
+
 ## Independent oracle integrity
 
 The Python oracle is itself subject to the same execution-evidence discipline as the Rust reference.
@@ -154,4 +180,4 @@ A passing lab establishes only internal consistency of the synthetic local reser
 
 It does not establish production implementation correctness, atomicity between the ledger and GitHub, provider truthfulness, governance legitimacy, scientific correctness, or successful external promotion without independently observed effect evidence.
 
-Related: #7067, #7068, #7080, #7085.
+Related: #7067, #7068, #7080, #7085, #7101, #7113.
