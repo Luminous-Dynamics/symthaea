@@ -31,8 +31,9 @@ pub use evidence::{
 };
 mod review;
 pub use review::{
-    CALIBRATION_REVIEW_SCHEMA, CalibrationReviewPayload, ReviewTrustKey, ReviewTrustStore,
-    ReviewVerificationError, SignedCalibrationReviewReceipt, VerifiedCalibrationReviewReceipt,
+    CALIBRATION_REVIEW_SCHEMA, REVIEW_TRUST_STORE_SCHEMA, CalibrationReviewPayload,
+    ReviewTrustKey, ReviewTrustStore, ReviewTrustStoreGuard, ReviewVerificationError,
+    SignedCalibrationReviewReceipt, VerifiedCalibrationReviewReceipt,
 };
 
 /// Stable instrument and channel identifiers. Patient identity does not belong
