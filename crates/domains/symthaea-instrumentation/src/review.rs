@@ -121,36 +121,31 @@ impl ReviewTrustStore {
         self.sequence
     }
 
-    /// Content digest for this canonical in-memory trust snapshot.
+    /// Canonical, deterministic binary encoding of this trust snapshot.
     ///
-    /// A digest helps detect same-sequence substitution, but does not authenticate
-    /// the snapshot source or make sequence state durable.
-    pub fn canonical_digest(&self) -> String {
-        let mut fields = vec![
-            REVIEW_TRUST_STORE_SCHEMA.to_owned(),
-            format!("sequence={}", self.sequence),
-            format!("issued_at_unix_s={}", self.issued_at_unix_s),
-            format!("expires_at_unix_s={}", self.expires_at_unix_s),
-        ];
+    /// Keys are emitted in their canonical key-ID order. The schema tag, all
+    /// validity/revocation windows, public keys, and sequence are signed together.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"SYMRTRS1\\0");
+        append_len_prefixed(&mut bytes, REVIEW_TRUST_STORE_SCHEMA.as_bytes());
+        bytes.extend_from_slice(&self.sequence.to_le_bytes());
+        bytes.extend_from_slice(&self.issued_at_unix_s.to_le_bytes());
+        bytes.extend_from_slice(&self.expires_at_unix_s.to_le_bytes());
+        bytes.extend_from_slice(&(self.keys.len() as u32).to_le_bytes());
         for key in self.keys.values() {
-            fields.push(format!("key_id={}", key.key_id));
-            fields.push(format!(
-                "public_key_hex={}",
-                encode_hex(&key.public_key_bytes())
-            ));
-            fields.push(format!("not_before_unix_s={}", key.not_before_unix_s));
-            fields.push(format!(
-                "not_after_unix_s={}",
-                key.not_after_unix_s
-                    .map_or_else(|| "none".to_owned(), |value| value.to_string())
-            ));
-            fields.push(format!(
-                "revoked_at_unix_s={}",
-                key.revoked_at_unix_s
-                    .map_or_else(|| "none".to_owned(), |value| value.to_string())
-            ));
+            append_len_prefixed(&mut bytes, key.key_id.as_bytes());
+            bytes.extend_from_slice(&key.public_key_bytes());
+            bytes.extend_from_slice(&key.not_before_unix_s.to_le_bytes());
+            append_optional_u64(&mut bytes, key.not_after_unix_s);
+            append_optional_u64(&mut bytes, key.revoked_at_unix_s);
         }
-        crate::sha256_hex(format!("{}\n", fields.join("\n")).as_bytes())
+        bytes
+    }
+
+    /// Digest the canonical trust contents (not the authority signature).
+    pub fn canonical_digest(&self) -> String {
+        crate::sha256_hex(&self.canonical_bytes())
     }
 
     fn verify(
@@ -354,6 +349,92 @@ impl SignedCalibrationReviewReceipt {
     }
 }
 
+/// Signed canonical trust-store snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignedReviewTrustStoreSnapshot {
+    trust_store: ReviewTrustStore,
+    signature: [u8; 64],
+}
+
+impl SignedReviewTrustStoreSnapshot {
+    pub fn new(trust_store: ReviewTrustStore, signature: [u8; 64]) -> Self {
+        Self {
+            trust_store,
+            signature,
+        }
+    }
+
+    /// Canonical domain-separated bytes an authority signs out of process.
+    pub fn signing_message(trust_store: &ReviewTrustStore) -> Vec<u8> {
+        let mut message = b"symthaea.calibration-review-trust-signature.v1\\0".to_vec();
+        message.extend_from_slice(&trust_store.canonical_bytes());
+        message
+    }
+
+    /// Authenticate the snapshot against an authority key pinned by the caller.
+    pub fn verify(
+        self,
+        authority_key: &VerifyingKey,
+    ) -> Result<VerifiedReviewTrustStore, ReviewVerificationError> {
+        let signature = Signature::from_bytes(&self.signature);
+        authority_key
+            .verify_strict(&Self::signing_message(&self.trust_store), &signature)
+            .map_err(|_| ReviewVerificationError::InvalidTrustSnapshotSignature)?;
+        Ok(VerifiedReviewTrustStore {
+            trust_store: self.trust_store,
+            authority_key_sha256: crate::sha256_hex(authority_key.as_bytes()),
+        })
+    }
+}
+
+/// Authenticated trust snapshot. Its private fields ensure receipt verification
+/// cannot be passed a mutable-looking snapshot that has not passed root-key
+/// signature validation.
+#[derive(Debug, Clone)]
+pub struct VerifiedReviewTrustStore {
+    trust_store: ReviewTrustStore,
+    authority_key_sha256: String,
+}
+
+impl VerifiedReviewTrustStore {
+    pub fn trust_store(&self) -> &ReviewTrustStore {
+        &self.trust_store
+    }
+
+    pub fn sequence(&self) -> u64 {
+        self.trust_store.sequence()
+    }
+
+    pub fn authority_key_sha256(&self) -> &str {
+        &self.authority_key_sha256
+    }
+
+    /// Bind both the snapshot contents and the authority that authenticated them.
+    pub fn canonical_digest(&self) -> String {
+        let mut bytes =
+            b"symthaea.calibration-review-verified-trust.v1\\0".to_vec();
+        bytes.extend_from_slice(&self.trust_store.canonical_bytes());
+        bytes.extend_from_slice(self.authority_key_sha256.as_bytes());
+        crate::sha256_hex(&bytes)
+    }
+}
+
+fn append_len_prefixed(bytes: &mut Vec<u8>, value: &[u8]) {
+    // Schema strings and key IDs are bounded by constants before reaching here.
+    bytes.extend_from_slice(&(value.len() as u16).to_le_bytes());
+    bytes.extend_from_slice(value);
+}
+
+fn append_optional_u64(bytes: &mut Vec<u8>, value: Option<u64>) {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        None => bytes.push(0),
+    }
+}
+
 /// Tracks monotonic trust-store sequence/digest admission within one process.
 ///
 /// Persist and authenticate the last sequence and digest across restarts when
@@ -398,23 +479,24 @@ impl ReviewTrustStoreGuard {
     /// Validate a candidate without changing the high-water mark.
     fn check_candidate(
         &self,
-        trust_store: &ReviewTrustStore,
+        trust_store: &VerifiedReviewTrustStore,
         now_unix_s: u64,
     ) -> Result<(), ReviewVerificationError> {
-        if now_unix_s < trust_store.issued_at_unix_s
-            || now_unix_s >= trust_store.expires_at_unix_s
+        let store = trust_store.trust_store();
+        if now_unix_s < store.issued_at_unix_s
+            || now_unix_s >= store.expires_at_unix_s
         {
             return Err(ReviewVerificationError::TrustSnapshotStale);
         }
         let digest = trust_store.canonical_digest();
         if let Some(highest) = self.last_sequence {
-            if trust_store.sequence < highest {
+            if trust_store.sequence() < highest {
                 return Err(ReviewVerificationError::TrustSnapshotRollback {
                     highest_sequence: highest,
-                    received_sequence: trust_store.sequence,
+                    received_sequence: trust_store.sequence(),
                 });
             }
-            if trust_store.sequence == highest
+            if trust_store.sequence() == highest
                 && self.last_digest.as_deref() != Some(digest.as_str())
             {
                 return Err(ReviewVerificationError::TrustSnapshotSequenceReused {
@@ -426,8 +508,8 @@ impl ReviewTrustStoreGuard {
     }
 
     /// Commit a trust snapshot only after a receipt verified successfully.
-    fn record_verified(&mut self, trust_store: &ReviewTrustStore) {
-        self.last_sequence = Some(trust_store.sequence);
+    fn record_verified(&mut self, trust_store: &VerifiedReviewTrustStore) {
+        self.last_sequence = Some(trust_store.sequence());
         self.last_digest = Some(trust_store.canonical_digest());
     }
 }
@@ -444,7 +526,7 @@ pub struct VerifiedCalibrationReviewReceipt {
 impl VerifiedCalibrationReviewReceipt {
     pub fn verify(
         artifact: VerifiedArtifactBytes,
-        trust_store: &ReviewTrustStore,
+        trust_store: &VerifiedReviewTrustStore,
         trust_store_guard: &mut ReviewTrustStoreGuard,
         expected_record_id: &str,
         expected_certificate: &ArtifactReference,
@@ -455,7 +537,7 @@ impl VerifiedCalibrationReviewReceipt {
         }
         let receipt = SignedCalibrationReviewReceipt::from_canonical_bytes(artifact.bytes())?;
         trust_store_guard.check_candidate(trust_store, now_unix_s)?;
-        trust_store.verify(
+        trust_store.trust_store().verify(
             &receipt,
             expected_record_id,
             expected_certificate,
@@ -501,6 +583,7 @@ pub enum ReviewVerificationError {
     TooManyTrustKeys { actual: usize, maximum: usize },
     DuplicateTrustKey(String),
     DuplicateTrustPublicKey(String),
+    InvalidTrustSnapshotSignature,
     TrustSnapshotRollback {
         highest_sequence: u64,
         received_sequence: u64,
