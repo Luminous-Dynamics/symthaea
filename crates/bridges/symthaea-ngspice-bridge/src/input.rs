@@ -80,7 +80,7 @@ impl NetlistArtifact {
         if request_id.trim().is_empty() {
             return Err(NetlistArtifactError::EmptyRequestId);
         }
-        if request_id.trim() != request_id {
+        if request_id.trim() != request_id.as_str() {
             return Err(NetlistArtifactError::NonCanonicalRequestId);
         }
         if request_id.len() > MAX_REQUEST_ID_BYTES {
