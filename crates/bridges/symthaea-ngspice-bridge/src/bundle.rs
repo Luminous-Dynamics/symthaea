@@ -24,6 +24,19 @@ pub const MAX_BUNDLE_BYTES: usize = 32 * 1024 * 1024;
 /// Maximum static include directives examined across the bundle.
 pub const MAX_INCLUDE_DIRECTIVES: usize = 4096;
 
+/// A borrowed file entry in canonical bundle iteration order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BundleFileRef<'a> {
+    /// Canonical relative slash path used in the manifest.
+    pub path: &'a str,
+    /// Exact UTF-8 source bytes, without normalization.
+    pub bytes: &'a [u8],
+    /// Lowercase hexadecimal BLAKE3 digest of exact bytes.
+    pub blake3_digest: &'a str,
+    /// Whether this is the primary netlist rather than a dependency.
+    pub is_primary: bool,
+}
+
 /// One closed-world input bundle, bound to one request and deterministic over
 /// exact file bytes plus canonical relative paths.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,6 +189,23 @@ impl ModelInputBundle {
     /// Digest of the exact primary netlist bytes.
     pub fn primary_digest(&self) -> &str {
         self.primary.blake3_digest()
+    }
+
+    /// Borrow every file in manifest order: primary file first, then
+    /// dependencies sorted by canonical path. No bytes are copied.
+    pub fn files(&self) -> impl Iterator<Item = BundleFileRef<'_>> {
+        std::iter::once(BundleFileRef {
+            path: &self.primary_path,
+            bytes: self.primary.bytes(),
+            blake3_digest: self.primary.blake3_digest(),
+            is_primary: true,
+        })
+        .chain(self.dependencies.iter().map(|(path, artifact)| BundleFileRef {
+            path,
+            bytes: artifact.bytes(),
+            blake3_digest: artifact.blake3_digest(),
+            is_primary: false,
+        }))
     }
 
     /// Sorted dependency paths (the primary file is excluded).
@@ -659,6 +689,33 @@ mod tests {
         assert_eq!(bundle.primary_path(), "rc_step_reference.cir");
         assert_eq!(bundle.dependency_paths().count(), 0);
         assert_eq!(bundle.primary_bytes(), source.as_bytes());
+    }
+
+    #[test]
+    fn file_iterator_exposes_exact_bytes_and_digests_in_manifest_order() {
+        let bundle = bundle(
+            "main.cir",
+            ".include b.inc\n.include a.inc\n",
+            vec![
+                ("b.inc", ".param b=2\n"),
+                ("a.inc", ".param a=1\n"),
+            ],
+        )
+        .unwrap();
+        let files = bundle.files().collect::<Vec<_>>();
+        assert_eq!(files.len(), 3);
+        assert!(files[0].is_primary);
+        assert_eq!(files[0].path, "main.cir");
+        assert!(!files[1].is_primary);
+        assert_eq!(files[1].path, "a.inc");
+        assert!(!files[2].is_primary);
+        assert_eq!(files[2].path, "b.inc");
+        for file in files {
+            assert_eq!(
+                blake3::hash(file.bytes).to_hex().as_str(),
+                file.blake3_digest
+            );
+        }
     }
 
     #[test]
