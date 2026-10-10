@@ -438,6 +438,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     let bpm = value.parse::<f32>().map_err(|_| {
                         "MusicXML tempo must be a number between 20 and 320 BPM".to_string()
                     })?;
+                    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+                        return Err(
+                            "MusicXML tempo must be finite and between 20 and 320 BPM".into(),
+                        );
+                    }
                     let position = musicxml_tempo_position(child, cursor)?;
                     tempo_events.push((position, bpm));
                 }
@@ -1315,6 +1320,45 @@ mod tests {
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("key changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_sound_tempo_outside_supported_range_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><words>Tempo</words></direction-type><sound tempo="10"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("finite and between 20 and 320 BPM"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_tempo_resolution_uses_earliest_position_across_parts() {
+        // The first XML part has its only tempo mark at beat 1. A later part
+        // supplies the same value at beat 0. Temporal resolution must not
+        // mistake the earlier document traversal for the earlier music event.
+        let xml = br#"<score-partwise>
+            <part id="P1">
+                <measure number="1">
+                    <attributes><divisions>1</divisions></attributes>
+                    <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+                </measure>
+                <measure number="2">
+                    <direction><direction-type><words>Tempo</words></direction-type><sound tempo="96"/></direction>
+                    <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+                </measure>
+            </part>
+            <part id="P2">
+                <measure number="1">
+                    <attributes><divisions>1</divisions></attributes>
+                    <direction><direction-type><words>Tempo</words></direction-type><sound tempo="96"/></direction>
+                    <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
+                </measure>
+            </part>
+        </score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.tempo_bpm, 96.0);
     }
 
     #[test]
