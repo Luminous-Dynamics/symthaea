@@ -380,7 +380,11 @@ impl MomentumLedger {
         if tolerance_kg_m_s < 0.0 {
             return Err(T0Error::NegativeInput("momentum_tolerance_kg_m_s"));
         }
-        Ok(self.residual_kg_m_s()?.magnitude_kg_m_s() <= tolerance_kg_m_s)
+        let magnitude = self.residual_kg_m_s()?.magnitude_kg_m_s();
+        if !magnitude.is_finite() {
+            return Err(T0Error::NonFiniteResult("momentum_residual_magnitude"));
+        }
+        Ok(magnitude <= tolerance_kg_m_s)
     }
 }
 
@@ -576,6 +580,21 @@ mod tests {
         assert_eq!(ledger.residual_kg_m_s().unwrap_err(), T0Error::NonInertialFrame(ReferenceFrame::LocalOrbital));
         assert!(ledger.is_balanced(f64::NAN).is_err());
         assert!(ledger.is_balanced(-1.0).is_err());
+    }
+
+    #[test]
+    fn overflowing_momentum_residual_magnitude_fails_closed() {
+        let ledger = MomentumLedger::new(
+            ReferenceFrame::EarthCenteredInertial,
+            MomentumVector::new(f64::MAX, f64::MAX, 0.0).unwrap(),
+            MomentumVector::new(0.0, 0.0, 0.0).unwrap(),
+            MomentumVector::new(0.0, 0.0, 0.0).unwrap(),
+            MomentumVector::new(0.0, 0.0, 0.0).unwrap(),
+        );
+        assert_eq!(
+            ledger.is_balanced(1.0).unwrap_err(),
+            T0Error::NonFiniteResult("momentum_residual_magnitude")
+        );
     }
 
     #[test]
