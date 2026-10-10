@@ -17,8 +17,93 @@ assert SPEC is not None and SPEC.loader is not None
 VALIDATOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VALIDATOR)
 
+VERDICT_PATH = ROOT / "scripts" / "cyber_crucible_verdict.py"
+VERDICT_SPEC = importlib.util.spec_from_file_location("cyber_crucible_verdict", VERDICT_PATH)
+assert VERDICT_SPEC is not None and VERDICT_SPEC.loader is not None
+VERDICT = importlib.util.module_from_spec(VERDICT_SPEC)
+VERDICT_SPEC.loader.exec_module(VERDICT)
+
 
 class PublicCyberCrucibleContractTests(unittest.TestCase):
+    @staticmethod
+    def valid_checks():
+        return [
+            {
+                "check_id": "signature-check",
+                "status": "pass",
+                "evidence_refs": ["E1"],
+                "receipt_digest": "a" * 64,
+            },
+            {
+                "check_id": "authorization-scope-check",
+                "status": "pass",
+                "evidence_refs": ["E2"],
+                "receipt_digest": "b" * 64,
+            },
+        ]
+
+    def test_combined_verdict_requires_both_passes_real_execution_and_evidence(self):
+        self.assertTrue(
+            VERDICT.is_correct_and_secure(
+                "pass", "pass", "real", ["E1", "E2"], self.valid_checks()
+            )
+        )
+
+    def test_functional_failure_cannot_be_offset_by_security_pass(self):
+        self.assertFalse(
+            VERDICT.is_correct_and_secure(
+                "fail", "pass", "real", ["E1", "E2"], self.valid_checks()
+            )
+        )
+
+    def test_security_inconclusive_cannot_be_offset_by_functional_pass(self):
+        self.assertFalse(
+            VERDICT.is_correct_and_secure(
+                "pass", "inconclusive", "real", ["E1", "E2"], self.valid_checks()
+            )
+        )
+
+    def test_simulated_execution_never_qualifies(self):
+        self.assertFalse(
+            VERDICT.is_correct_and_secure(
+                "pass", "pass", "simulated", ["E1", "E2"], self.valid_checks()
+            )
+        )
+
+    def test_missing_required_evidence_never_qualifies(self):
+        self.assertFalse(
+            VERDICT.is_correct_and_secure(
+                "pass", "pass", "real", ["E1", "E2", "E3"], self.valid_checks()
+            )
+        )
+
+    def test_failed_or_inconclusive_evidence_check_never_qualifies(self):
+        checks = self.valid_checks()
+        checks[1]["status"] = "inconclusive"
+        self.assertFalse(
+            VERDICT.is_correct_and_secure("pass", "pass", "real", ["E1", "E2"], checks)
+        )
+
+    def test_missing_receipt_digest_never_qualifies(self):
+        checks = self.valid_checks()
+        checks[0]["receipt_digest"] = ""
+        self.assertFalse(
+            VERDICT.is_correct_and_secure("pass", "pass", "real", ["E1", "E2"], checks)
+        )
+
+    def test_duplicate_check_ids_never_qualify(self):
+        checks = self.valid_checks()
+        checks[1]["check_id"] = checks[0]["check_id"]
+        self.assertFalse(
+            VERDICT.is_correct_and_secure("pass", "pass", "real", ["E1", "E2"], checks)
+        )
+
+    def test_truthy_non_boolean_receipt_status_is_not_a_pass(self):
+        checks = self.valid_checks()
+        checks[0]["status"] = True
+        self.assertFalse(
+            VERDICT.is_correct_and_secure("pass", "pass", "real", ["E1", "E2"], checks)
+        )
     @classmethod
     def setUpClass(cls) -> None:
         cls.manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
