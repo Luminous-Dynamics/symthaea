@@ -94,7 +94,8 @@ def field_errors(k, v):
     elif k == "acceptance_limits":
         rules = {"max_ring_offset_m": lambda x: finite(x) and x > 0, "max_support_miss_distance_m": lambda x: finite(x) and x > 0,
                  "max_rider_force_n": lambda x: finite(x) and x > 0, "max_energy_residual_j": lambda x: finite(x) and x >= 0,
-                 "max_momentum_residual_kg_m_s": lambda x: finite(x) and x >= 0}
+                 "max_momentum_residual_kg_m_s": lambda x: finite(x) and x >= 0,
+                 "max_initial_radial_velocity_m_s": lambda x: finite(x) and x >= 0}
         if not isinstance(v, dict):
             e.append(f"{k}: expected object")
         else:
@@ -160,11 +161,21 @@ def assess(m):
     limits, max_coupling = inputs.get("acceptance_limits"), inputs.get("rider_max_coupling_force_n")
     if isinstance(limits, dict) and finite(max_coupling) and finite(limits.get("max_rider_force_n")) and limits["max_rider_force_n"] > max_coupling:
         errors.append("acceptance_limits: max_rider_force_n cannot exceed rider_max_coupling_force_n")
+    if m.get("initial_path_constraint") == "circular_reference_path" and vec(pos) and vec(velocity):
+        r_norm = math.sqrt(sum(x*x for x in pos))
+        radial_limit = limits.get("max_initial_radial_velocity_m_s") if isinstance(limits, dict) else None
+        if r_norm <= 0 or not finite(radial_limit) or radial_limit < 0:
+            errors.append("acceptance_limits.max_initial_radial_velocity_m_s: required finite nonnegative radial-speed tolerance")
+        else:
+            radial_speed = abs(sum(pos[i] * velocity[i] for i in range(3))) / r_norm
+            if radial_speed > radial_limit:
+                errors.append("initial_ring_velocity_m_s: radial component exceeds max_initial_radial_velocity_m_s")
 
     structural = []
     if m.get("schema") != SCHEMA: structural.append("schema mismatch")
     if m.get("scenario_id") != SCENARIO_ID: structural.append("scenario_id mismatch")
     if m.get("architecture_mode") != "continuous_skyhook_ors": structural.append("architecture mismatch")
+    if m.get("initial_path_constraint") != "circular_reference_path": structural.append("initial_path_constraint must be circular_reference_path")
     if tuple(m.get("required_fields", ())) != FIELDS: structural.append("required_fields contract mismatch")
     if m.get("analysis_state") != "NotRun": structural.append("analysis_state must remain NotRun")
     if m.get("result_artifacts") != []: structural.append("result_artifacts must be empty")
@@ -200,7 +211,7 @@ def complete_fixture():
         "rider_max_coupling_force_n":1e8,"actuation_measurement_delay_s":0.1,"force_model_reference":"fixture://force-model",
         "energy_boundary":{"reference_frame":"GCRF","included_bodies":["ring","support","riders"],"external_work_terms":[],"boundary_flux_terms":[],"term_inventory_ref":"fixture://energy-term-inventory","scope_complete":True},
         "momentum_boundary":{"reference_frame":"GCRF","included_bodies":["ring","support","riders"],"external_force_terms":[],"mass_momentum_flux_terms":[],"term_inventory_ref":"fixture://momentum-term-inventory","scope_complete":True},
-        "acceptance_limits":{"max_ring_offset_m":100,"max_support_miss_distance_m":1000,"max_rider_force_n":1e8,"max_energy_residual_j":1e6,"max_momentum_residual_kg_m_s":1e6},
+        "acceptance_limits":{"max_ring_offset_m":100,"max_support_miss_distance_m":1000,"max_rider_force_n":1e8,"max_energy_residual_j":1e6,"max_momentum_residual_kg_m_s":1e6,"max_initial_radial_velocity_m_s":0.01},
         "independent_reference_case":"fixture://reference"
     }
 
@@ -215,6 +226,7 @@ def self_test():
     tests = []
     def check(name, condition): tests.append({"id": name, "status": "passed" if condition else "failed"})
     m = {"schema":SCHEMA,"scenario_id":SCENARIO_ID,"architecture_mode":"continuous_skyhook_ors",
+         "initial_path_constraint":"circular_reference_path",
          "declared_state":"Blocked","analysis_state":"NotRun","result_artifacts":[],
          "required_fields":list(FIELDS),"required_inputs":{k:None for k in FIELDS},
          "input_provenance":{k:None for k in FIELDS}}
@@ -283,6 +295,16 @@ def self_test():
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
     c["input_provenance"]["force_model_reference"]["evidence_refs"]=[]; c["declared_state"]="Blocked"; r=assess(c)
     check("empty_provenance_references_block", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
+    check("circular_reference_tangent_state_review_ready", r["expected_gate_state"]=="ReadyForIndependentReview" and not any("radial component" in e for e in r["type_errors"]))
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    c["required_inputs"]["initial_ring_velocity_m_s"]=[0.02,7500,0]; c["declared_state"]="Blocked"; r=assess(c)
+    check("circular_reference_radial_speed_over_limit_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1 and any("radial component" in e for e in r["type_errors"]))
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    del c["required_inputs"]["acceptance_limits"]["max_initial_radial_velocity_m_s"]; c["declared_state"]="Blocked"; r=assess(c)
+    check("circular_reference_missing_radial_tolerance_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["initial_path_constraint"]="unspecified"; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
+    check("missing_path_constraint_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and bool(r["structural_errors"]))
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1",
             "checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),
             "checks":tests,"interpretation":"Contract and provenance checks only; review-ready does not mean physically validated or safe."}
