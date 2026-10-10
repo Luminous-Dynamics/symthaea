@@ -130,21 +130,23 @@ impl CognitiveLoopService {
             let peer_dim = peer_msg.consciousness_hv.dim();
             let peer_intent_dim = peer_msg.intent_hv.dim();
             let local_dim = bridge.manifold().hdc_dim();
-            if peer_dim == 0 || peer_intent_dim != peer_dim {
+            let dilation_target_dim =
+                symthaea_core::hdc::HdcDimensionality::Ultra.dimension();
+            if peer_dim == 0
+                || peer_intent_dim != peer_dim
+                || peer_dim > dilation_target_dim
+            {
                 return Err(ImagineFutureError::NoGeodesic);
             }
 
-            let dilation_target_dim =
-                symthaea_core::hdc::HdcDimensionality::Ultra.dimension();
             let needs_dilation = peer_dim > local_dim;
-            let compatible_target_dim = if needs_dilation {
+            let target_dim = if needs_dilation {
                 dilation_target_dim
             } else {
                 local_dim
             };
-            if peer_dim != compatible_target_dim {
-                // Do not bundle mismatched vectors or request a resolution the
-                // manifold cannot represent exactly.
+            if target_dim < local_dim || peer_dim > target_dim {
+                // Do not request an unsupported resolution or bundle mismatched vectors.
                 return Err(ImagineFutureError::NoGeodesic);
             }
 
@@ -172,16 +174,27 @@ impl CognitiveLoopService {
                     return Err(ImagineFutureError::NoGeodesic);
                 }
             }
-            // 3. Co-opt the manifold: Bundle peer consciousness into local state            // This effectively projects the "Self" into the "Other's" perspective.
+            // 3. Co-opt the manifold: expand peer encodings to the admitted target
+            // resolution before bundling. Never invoke HDC bundle on mismatched dims.
+            let peer_consciousness = if peer_dim == manifold.hdc_dim() {
+                peer_msg.consciousness_hv.clone()
+            } else {
+                peer_msg.consciousness_hv.dilate(manifold.hdc_dim())
+            };
+            let peer_intent = if peer_intent_dim == manifold.hdc_dim() {
+                peer_msg.intent_hv.clone()
+            } else {
+                peer_msg.intent_hv.dilate(manifold.hdc_dim())
+            };
             let mut collaborative_start = manifold.state().clone();
             collaborative_start = symthaea_core::core::ContinuousHV::bundle(&[
                 &collaborative_start,
-                &peer_msg.consciousness_hv,
+                &peer_consciousness,
             ]);
             collaborative_start.normalize();
 
-            // 3. Goal is the peer's intent
-            let goal = peer_msg.intent_hv.clone();
+            // 3. Goal is the peer's intent at the local admitted resolution.
+            let goal = peer_intent;
 
             // 4. Run RK4 Geodesic simulation
             let path = manifold.select_best_geodesic(&collaborative_start, &goal, steps, 4);
