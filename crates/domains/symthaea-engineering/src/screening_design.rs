@@ -421,23 +421,10 @@ fn settings_for(
         .collect()
 }
 
-fn center_slots(treatment_count: usize, center_count: usize) -> HashSet<usize> {
-    let total = treatment_count + center_count;
-    if center_count == 0 {
-        return HashSet::new();
-    }
-    (0..center_count)
-        .map(|index| {
-            // Distinct and evenly spaced for the supported min/max run counts.
-            index * (total - 1) / (center_count - 1)
-        })
-        .collect()
-}
-
 /// Generate a proposed preregistered blocked, randomized two-level full-factorial schedule.
-/// Treatment order is independently shuffled within each complete block. Center points,
-/// when enabled, use numeric midpoints and are placed deterministically at evenly spaced
-/// positions beginning and ending each block; they are not shuffled with treatment runs.
+/// Treatment runs and center-point controls, when enabled, are jointly shuffled within
+/// each complete block. Center points use numeric midpoints. Including controls in the
+/// randomization avoids systematically confounding them with early/late run-order drift.
 /// Review status and record references are checked structurally but are not authenticated
 /// against an independent evidence service. This function does not authorize execution.
 pub fn generate_screening_design(
@@ -456,36 +443,36 @@ pub fn generate_screening_design(
     let mut center_run_count = 0_u32;
 
     for block in &request.blocks {
-        let mut treatments = Vec::with_capacity(treatment_runs_per_block);
+        // Randomize treatment runs and center-point controls together inside each block.
+        // Fixing controls to start/end positions would alias them with run-order drift.
+        let mut schedule = Vec::with_capacity(treatment_runs_per_block + center_count);
         for standard_row in 0..combination_count {
             for replicate in 1..=request.replicates_per_setting_per_block {
-                treatments.push((standard_row, replicate));
+                schedule.push(Some((standard_row, replicate)));
             }
         }
-        shuffle(&mut treatments, &mut rng_state);
-        let center_positions = center_slots(treatments.len(), center_count);
-        let total_block_runs = treatments.len() + center_count;
-        let mut treatment_cursor = 0;
+        for _ in 0..center_count {
+            schedule.push(None);
+        }
+        shuffle(&mut schedule, &mut rng_state);
 
-        for position in 0..total_block_runs {
+        for scheduled_item in schedule {
             let (kind, standard_order, replicate_index, settings) =
-                if center_positions.contains(&position) {
-                    center_run_count += 1;
-                    (
-                        PlannedRunKind::CenterPointControl,
-                        None,
-                        None,
-                        settings_for(&request.factors, 0, true),
-                    )
-                } else {
-                    let (standard_row, replicate) = treatments[treatment_cursor];
-                    treatment_cursor += 1;
+                if let Some((standard_row, replicate)) = scheduled_item {
                     treatment_run_count += 1;
                     (
                         PlannedRunKind::FactorialTreatment,
                         Some((standard_row + 1) as u32),
                         Some(replicate),
                         settings_for(&request.factors, standard_row, false),
+                    )
+                } else {
+                    center_run_count += 1;
+                    (
+                        PlannedRunKind::CenterPointControl,
+                        None,
+                        None,
+                        settings_for(&request.factors, 0, true),
                     )
                 };
             let run_id = format!(
@@ -580,7 +567,6 @@ pub fn verify_screening_design(
 
     let treatment_runs_per_block =
         combination_count * request.replicates_per_setting_per_block as usize;
-    let expected_center_positions = center_slots(treatment_runs_per_block, center_count);
     let mut run_ids = HashSet::new();
     let mut seen_cells: HashSet<(String, u32, u8)> = HashSet::new();
     let mut current_block_index = 0_usize;
@@ -675,12 +661,6 @@ pub fn verify_screening_design(
                         "replicate index is outside the preregistered range",
                     ));
                 }
-                if expected_center_positions.contains(&local_position) {
-                    return Err(ScreeningDesignError::new(
-                        "runs.center_point_position",
-                        "center-point control is missing from a required scheduled position",
-                    ));
-                }
                 let cell = (run.block_id.clone(), standard_order, replicate);
                 if !seen_cells.insert(cell) {
                     return Err(ScreeningDesignError::new(
@@ -713,12 +693,6 @@ pub fn verify_screening_design(
                     return Err(ScreeningDesignError::new(
                         "runs.center_point",
                         "center-point control must not masquerade as a factorial treatment",
-                    ));
-                }
-                if !expected_center_positions.contains(&local_position) {
-                    return Err(ScreeningDesignError::new(
-                        "runs.center_point_position",
-                        "center-point control is not at a preregistered control position",
                     ));
                 }
                 for (setting, factor) in run.settings.iter().zip(&request.factors) {
