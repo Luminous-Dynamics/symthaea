@@ -25,6 +25,11 @@ mod evidence;
 pub use evidence::{
     ArtifactVerificationError, VerifiedArtifactBytes, VerifiedArtifactDigest, sha256_hex,
 };
+mod review;
+pub use review::{
+    CALIBRATION_REVIEW_SCHEMA, CalibrationReviewPayload, ReviewTrustKey, ReviewTrustStore,
+    ReviewVerificationError, SignedCalibrationReviewReceipt, VerifiedCalibrationReviewReceipt,
+};
 
 /// Stable instrument and channel identifiers. Patient identity does not belong
 /// in this measurement envelope.
@@ -298,6 +303,7 @@ pub enum ContractError {
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
     VerifiedArtifactReferenceMismatch(&'static str),
+    VerifiedReviewReceiptBindingMismatch,
     EmptyEvidenceArtifact(&'static str),
     InvalidCalibrationRange,
     NonFiniteValue(&'static str),
@@ -324,6 +330,9 @@ impl fmt::Display for ContractError {
             }
             Self::VerifiedArtifactReferenceMismatch(artifact) => {
                 write!(f, "verified bytes must match the resolved {artifact} reference")
+            }
+            Self::VerifiedReviewReceiptBindingMismatch => {
+                write!(f, "verified review receipt must bind the resolved calibration record and certificate")
             }
             Self::EmptyEvidenceArtifact(artifact) => {
                 write!(f, "{artifact} evidence must not be empty")
@@ -677,21 +686,21 @@ impl ResolvedCalibration {
 pub struct VerifiedCalibrationEvidence {
     calibration: ResolvedCalibration,
     certificate: VerifiedArtifactBytes,
-    review_receipt: VerifiedArtifactBytes,
+    review_receipt: VerifiedCalibrationReviewReceipt,
 }
 
 impl VerifiedCalibrationEvidence {
     pub fn new(
         calibration: ResolvedCalibration,
         certificate: VerifiedArtifactBytes,
-        review_receipt: VerifiedArtifactBytes,
+        review_receipt: VerifiedCalibrationReviewReceipt,
     ) -> Result<Self, ContractError> {
         if certificate.byte_length() == 0 {
             return Err(ContractError::EmptyEvidenceArtifact(
                 "calibration_certificate",
             ));
         }
-        if review_receipt.byte_length() == 0 {
+        if review_receipt.artifact().byte_length() == 0 {
             return Err(ContractError::EmptyEvidenceArtifact(
                 "calibration_review_receipt",
             ));
@@ -701,10 +710,18 @@ impl VerifiedCalibrationEvidence {
                 "calibration_certificate",
             ));
         }
-        if review_receipt.reference() != &calibration.review_receipt {
+        if review_receipt.artifact().reference() != &calibration.review_receipt {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
                 "calibration_review_receipt",
             ));
+        }
+        if review_receipt.payload().record_id() != calibration.record_id
+            || review_receipt.payload().certificate_artifact_id()
+                != calibration.evidence.artifact_id()
+            || review_receipt.payload().certificate_sha256_hex()
+                != calibration.evidence.sha256_hex()
+        {
+            return Err(ContractError::VerifiedReviewReceiptBindingMismatch);
         }
         Ok(Self {
             calibration,
@@ -721,7 +738,7 @@ impl VerifiedCalibrationEvidence {
         &self.certificate
     }
 
-    pub fn review_receipt(&self) -> &VerifiedArtifactBytes {
+    pub fn review_receipt(&self) -> &VerifiedCalibrationReviewReceipt {
         &self.review_receipt
     }
 }
