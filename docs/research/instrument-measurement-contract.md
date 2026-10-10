@@ -39,6 +39,12 @@ The raw-data and calibration resolvers are explicit trust boundaries. The raw-da
 
 Measurement and calibration standard uncertainties are reported separately. The crate does not combine them by root-sum-square because doing so requires explicit assumptions about independence and all material uncertainty contributors. Traceability is a property of a measurement result connected through an unbroken, documented calibration chain in which each link contributes to uncertainty; a certificate reference alone does not establish traceability.
 
+## Shared content-integrity primitive
+
+The crate exports `VerifiedArtifactBytes` and `sha256_hex` so adapters can verify a supplied artifact's exact bytes against its `ArtifactReference` using one implementation. The verified wrapper retains those same bytes, allowing a parser to consume the bytes that were checked instead of reopening a mutable path. Four unit tests cover the standard SHA-256 `abc` vector, byte/reference retention, a one-byte mutation, and the digest of empty content. The 31 measurement-contract integration tests exercise the same primitive for raw acquisition, calibration certificate, and review-receipt fixtures.
+
+This primitive establishes content integrity relative to a supplied digest only. It does not authenticate the source, verify a signature, bind a parsed claim to a certificate, establish reviewer independence, or make a review receipt authoritative. It currently owns the full byte buffer; production adapters handling large raw acquisitions should use an incremental hash over the exact immutable read stream and ensure the consumer uses that same object/stream, never verify a mutable path and then reopen it.
+
 ## Production resolver admission gate
 
 The test double is an interface-level control, not evidence that a deployed resolver is trustworthy. Before a production resolver can support a quantitative-use claim, qualify the resolver implementation separately against this admission gate:
