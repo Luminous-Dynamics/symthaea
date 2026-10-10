@@ -24,6 +24,7 @@ mod conceptual_tests;
 mod core_tests;
 mod iit4_tests;
 mod invariant_tests;
+mod mip_objective_characterization;
 mod optimized_tests;
 #[cfg(feature = "parallel")]
 mod parallel_tests;
