@@ -616,7 +616,10 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 pitch: Pitch::from_midi(midi),
                 onset,
                 duration,
-                velocity: 0.72,
+                // MusicXML's default playback dynamics are MIDI velocity 90
+                // (forte). Store the normalized value instead of an arbitrary
+                // nearby float.
+                velocity: 90.0 / 127.0,
                 role,
                 emphasis: Emphasis::Normal,
                 section_intensity: 1.0,
@@ -828,12 +831,26 @@ fn stable_musicxml_metadata<T: Copy + PartialEq>(
 }
 
 /// Return the current beat position for a tempo indicator only when its
-/// containing direction has no non-zero offset. Offsets require a richer
-/// timeline than the current importer exposes, so do not silently ignore them.
+/// effective sound/direction offset is zero. MusicXML's sound-level offset
+/// overrides a containing direction offset, so inspect it first.
 fn musicxml_tempo_position(
     node: roxmltree::Node<'_, '_>,
     position: Duration,
 ) -> Result<Duration, String> {
+    if let Some(offset) = node.children().find(|child| child.has_tag_name("offset")) {
+        let value = node_i64(offset).ok_or_else(|| {
+            "MusicXML sound tempo offset must be an integer".to_string()
+        })?;
+        if value != 0 {
+            return Err(
+                "MusicXML non-zero sound or direction tempo offsets are not supported by the single-tempo Score importer"
+                    .into(),
+            );
+        }
+        // A sound-level offset takes precedence, including an explicit zero.
+        return Ok(position);
+    }
+
     let mut ancestor = node.parent();
     while let Some(parent) = ancestor {
         if parent.has_tag_name("direction") {
@@ -846,7 +863,7 @@ fn musicxml_tempo_position(
                 })?;
                 if value != 0 {
                     return Err(
-                        "MusicXML non-zero tempo direction offsets are not supported by the single-tempo Score importer"
+                        "MusicXML non-zero sound or direction tempo offsets are not supported by the single-tempo Score importer"
                             .into(),
                     );
                 }
@@ -1149,6 +1166,49 @@ mod tests {
         let tracks: [&[u8]; 2] = [&first, &second];
         let error = parse_midi(&midi_file_with_format(0, &tracks)).unwrap_err();
         assert!(error.contains("requires exactly one track"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_default_note_velocity_matches_midi_forte_90() {
+        let score = parse_musicxml(minimal_musicxml()).unwrap();
+        assert!(
+            score
+                .notes
+                .iter()
+                .all(|note| (note.velocity - 90.0_f32 / 127.0).abs() < 1e-7),
+            "MusicXML default velocity should map to MIDI forte 90"
+        );
+    }
+
+    #[test]
+    fn musicxml_sound_level_nonzero_tempo_offset_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction>
+                <offset>0</offset>
+                <sound tempo="90"><offset>1</offset></sound>
+            </direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("non-zero sound or direction tempo offsets are not supported"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_zero_sound_tempo_offset_overrides_direction_offset() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction>
+                <offset>1</offset>
+                <sound tempo="90"><offset>0</offset></sound>
+            </direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.tempo_bpm, 90.0);
     }
 
     #[test]
