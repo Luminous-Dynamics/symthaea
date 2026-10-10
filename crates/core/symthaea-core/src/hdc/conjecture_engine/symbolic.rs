@@ -38,7 +38,9 @@ impl std::fmt::Display for SymExprEvalError {
             }
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::LogDomain => write!(f, "logarithm requires a positive argument"),
-            Self::IndeterminatePower => write!(f, "zero raised to the zero power is indeterminate"),
+            Self::IndeterminatePower => {
+                write!(f, "zero raised to the zero power is indeterminate")
+            }
             Self::NonFiniteResult => write!(f, "expression produced a non-finite result"),
         }
     }
@@ -55,7 +57,9 @@ impl SymExpr {
     pub fn eval_checked(&self, vars: &[(&str, f64)]) -> Result<f64, SymExprEvalError> {
         let value = match self {
             SymExpr::Var(name) => {
-                let mut matches = vars.iter().filter(|(candidate, _)| *candidate == name.as_str());
+                let mut matches = vars
+                    .iter()
+                    .filter(|(candidate, _)| *candidate == name.as_str());
                 let (_, value) = matches
                     .next()
                     .ok_or_else(|| SymExprEvalError::MissingVariable(name.clone()))?;
@@ -291,7 +295,11 @@ impl SymExpr {
                     SymExpr::Const(c) if *exp == 0.0 && *c == 0.0 => {
                         SymExpr::Pow(Box::new(base), *exp)
                     }
-                    SymExpr::Const(c) if c.is_finite() && exp.is_finite() => {
+                    SymExpr::Const(c)
+                        if c.is_finite()
+                            && exp.is_finite()
+                            && c.powf(*exp).is_finite() =>
+                    {
                         SymExpr::Const(c.powf(*exp))
                     }
                     _ => SymExpr::Pow(Box::new(base), *exp),
@@ -300,21 +308,23 @@ impl SymExpr {
             SymExpr::Log(a) => {
                 let a = a.simplify();
                 match &a {
-                    SymExpr::Const(c) if *c > 0.0 => SymExpr::Const(c.ln()),
+                    SymExpr::Const(c) if c.is_finite() && *c > 0.0 => {
+                        SymExpr::Const(c.ln())
+                    }
                     _ => SymExpr::Log(Box::new(a)),
                 }
             }
             SymExpr::Sin(a) => {
                 let a = a.simplify();
                 match &a {
-                    SymExpr::Const(c) => SymExpr::Const(c.sin()),
+                    SymExpr::Const(c) if c.is_finite() => SymExpr::Const(c.sin()),
                     _ => SymExpr::Sin(Box::new(a)),
                 }
             }
             SymExpr::Cos(a) => {
                 let a = a.simplify();
                 match &a {
-                    SymExpr::Const(c) => SymExpr::Const(c.cos()),
+                    SymExpr::Const(c) if c.is_finite() => SymExpr::Const(c.cos()),
                     _ => SymExpr::Cos(Box::new(a)),
                 }
             }
@@ -365,10 +375,11 @@ pub struct ConservationCheck {
     /// True only when every sample has complete bindings, respects expression
     /// domains, and evaluates to a finite value. Any evaluation error fails closed.
     pub sampled_evaluations_valid: bool,
-    /// True when every sample is finite and its absolute residual is below
-    /// 1e-10 at all six fixed numeric test points.
+    /// True when every sample evaluation is valid and its absolute residual is
+    /// below 1e-10 at all six fixed numeric test points.
     pub sampled_residual_passed: bool,
-    /// Infinity denotes that at least one sample was non-finite.
+    /// Infinity denotes invalid sampling (for example, a missing binding or
+    /// a non-finite/domain-invalid residual), not a successful zero residual.
     pub max_numerical_residual: f64,
 }
 
@@ -433,7 +444,8 @@ pub fn assess_conservation_symbolic(
                 .map(|(variable_index, (name, _))| {
                     (
                         *name,
-                        BASE_SAMPLE_VALUES[(sample_index + variable_index) % BASE_SAMPLE_VALUES.len()],
+                            BASE_SAMPLE_VALUES
+                                [(sample_index + variable_index) % BASE_SAMPLE_VALUES.len()],
                     )
                 })
                 .collect()
@@ -744,6 +756,18 @@ mod conservation_evidence_tests {
             Err(SymExprEvalError::LogDomain)
         );
         assert_eq!(simplified.eval_checked(&[("x", 2.0)]), Ok(0.0));
+    }
+
+    #[test]
+    fn simplify_preserves_undefined_constant_power() {
+        let expr = SymExpr::Pow(Box::new(SymExpr::Const(-1.0)), 0.5);
+        let simplified = expr.simplify();
+
+        assert!(matches!(simplified, SymExpr::Pow(_, exponent) if exponent == 0.5));
+        assert_eq!(
+            simplified.eval_checked(&[]),
+            Err(SymExprEvalError::NonFiniteResult)
+        );
     }
 
     #[test]
