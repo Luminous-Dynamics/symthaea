@@ -190,3 +190,12 @@ Symthaea's engineering layer should become open public infrastructure for solver
 - Multi-physics request objects that describe coupling before execution.
 - CAD/geometry interchange based first on existing STEP/NURBS/mesh work, then FreeCAD integration.
 - Strict separation between reasoning crates and native solver dependencies.
+
+## October 2026: first-principles chemical engineering
+
+The current cross-cutting research audit is tracked in [`FIRST_PRINCIPLES_CHEMICAL_ENGINEERING_PHYSICS_AUDIT_2026-10-10.md`](FIRST_PRINCIPLES_CHEMICAL_ENGINEERING_PHYSICS_AUDIT_2026-10-10.md), reviewed in [PR #7317](https://github.com/Luminous-Dynamics/symthaea/pull/7317).
+
+It composes existing owners rather than creating a parallel solver/evidence stack: physics types (#6868), maturity envelopes (#6871), engineering V&V (#3697), coupling contracts (#6173), solver input closure (#5659), SEC-002B assurance work (#5124), process semantics (#5686), and the water systems owner (#5966).
+
+Current bounded follow-up: [CFD-QUAL-001 #7316](https://github.com/Luminous-Dynamics/symthaea/issues/7316) qualifies the native `NavierStokes2D` prototype before its results can be used as engineering evidence. The audit is documentation and source review only; it does not claim tests passed or that any solver is now qualified.
+
