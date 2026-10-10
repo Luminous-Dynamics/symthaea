@@ -20,7 +20,7 @@ Each measurement binds:
 - optional raw-data and calibration references, each identified by an ID and SHA-256 digest;
 - explicit acquisition-quality flags.
 
-The initial unit set covers common engineering signals and research-healthcare prototypes: distance, time, frequency, acoustic pressure, temperature, electrical potential/current, heart rate, respiratory rate, oxygen saturation, speed, acceleration, angular velocity, sound-pressure level referenced to 20 µPa, and dimensionless values. Values are never silently converted. Extending the unit vocabulary requires an explicit quantity mapping and tests.
+The initial unit set covers common engineering signals and research-healthcare prototypes: distance, time, frequency, acoustic pressure, temperature, electrical potential/current, heart rate, respiratory rate, dimensionless percentages and explicitly typed oxygen-saturation percentages, speed, acceleration, angular velocity, sound-pressure level referenced to 20 µPa, and dimensionless values. Values are never silently converted. Extending the unit vocabulary requires an explicit quantity mapping and tests.
 
 ## Fail-closed quantitative gate
 
@@ -40,7 +40,7 @@ Measurement and calibration standard uncertainties are reported separately. The 
 
 ## Stream ordering
 
-`MeasurementStreamGuard` keeps the last accepted (sequence, timestamp) pair per instrument/channel. A replayed or repeated sequence and a backward timestamp are rejected without advancing the stored state. Callers must supply timestamps from a clock domain they have documented and synchronized appropriately; the guard is not itself a clock synchronization service. The quantitative-use API requires the guard, and advances it as soon as an envelope reaches the gate—even if later quality/evidence checks reject that envelope—so a later replay cannot roll back behind a rejected observation. The guard is in-memory state, not a tamper-proof replay ledger; safety-sensitive deployments must persist/reconcile stream checkpoints across restarts and authenticate the source.
+`MeasurementStreamGuard` keeps the highest consumed sequence and the last accepted non-future timestamp per instrument/channel. Repeated or lower sequences are rejected without changing state. A newer sequence with a backward or future timestamp is consumed, but the last accepted timestamp remains unchanged; retrying that sequence cannot turn the rejected sample into an accepted replay, and a future-dated sample cannot poison the timestamp high-water mark. Callers must supply timestamps from a documented, appropriately synchronized clock domain; the guard is not a clock synchronization service. The quantitative-use API requires the guard and advances its sequence state as soon as an envelope reaches the gate—even if subsequent quality or calibration-evidence checks reject it. This is intentionally conservative and means the source must send a new sequence after any rejection. The guard is in-memory, not a tamper-proof replay ledger; safety-sensitive deployments must persist/reconcile stream checkpoints across restarts and authenticate the source.
 
 ## Validation strategy
 
