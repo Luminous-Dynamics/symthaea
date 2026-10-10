@@ -1,7 +1,7 @@
 {
-  "schema": "luminous-dynamics.orbital-ring-failure-scenario/v1",
+  "schema": "luminous-dynamics.orbital-ring-failure-scenario/v2",
   "scenario_id": "F-SKYHOOK-LOAD-STEP",
-  "scenario_version": 1,
+  "scenario_version": 2,
   "architecture_mode": "continuous_skyhook_ors",
   "initial_path_constraint": "circular_reference_path",
   "title": "Sudden skyhook support-load reduction",
