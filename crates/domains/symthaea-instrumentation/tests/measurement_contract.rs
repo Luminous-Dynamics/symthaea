@@ -1173,28 +1173,28 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
 
 #[test]
 fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
+    let (wrong_resolved, wrong_certificate, wrong_review) = calibration_fixture_for(
+        "calibration-17",
+        instrument_identity(),
+        Quantity::AcousticPressure,
+        Unit::Pascal,
+        0.0,
+        10_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    );
+    let wrong_reference =
+        CalibrationReference::new("calibration-17", wrong_resolved.evidence().clone()).unwrap();
     let wrong_unit = MockResolver {
-        resolved: Ok(ResolvedCalibration::new(
-            "calibration-17",
-            instrument_identity(),
-            calibration_artifact(),
-            review_artifact(),
-            Quantity::AcousticPressure,
-            Unit::Pascal,
-            0.0,
-            10_000_000.0,
-            SAMPLE_TIME_NS - 1,
-            SAMPLE_TIME_NS + 2_000_000_000,
-            900.0,
-        )
-        .unwrap()),
+        resolved: Ok(wrong_resolved),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
-        calibration_bytes_override: None,
-        review_bytes_override: None,
+        calibration_bytes_override: Some(wrong_certificate),
+        review_bytes_override: Some(wrong_review),
     };
     assert_eq!(
-        measurement(1, SAMPLE_TIME_NS)
+        measurement_with_calibration(1, SAMPLE_TIME_NS, wrong_reference)
             .assess_for_quantitative_use(
                 SAMPLE_TIME_NS,
                 &clock_domain(),
@@ -1206,28 +1206,28 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         AssessmentFailure::CalibrationUnitMismatch
     );
 
+    let (outdated_resolved, outdated_certificate, outdated_review) = calibration_fixture_for(
+        "calibration-17",
+        instrument_identity(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS + 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    );
+    let outdated_reference =
+        CalibrationReference::new("calibration-17", outdated_resolved.evidence().clone()).unwrap();
     let out_of_date = MockResolver {
-        resolved: Ok(ResolvedCalibration::new(
-            "calibration-17",
-            instrument_identity(),
-            calibration_artifact(),
-            review_artifact(),
-            Quantity::Frequency,
-            Unit::Hertz,
-            4_000_000.0,
-            6_000_000.0,
-            SAMPLE_TIME_NS + 1,
-            SAMPLE_TIME_NS + 2_000_000_000,
-            900.0,
-        )
-        .unwrap()),
+        resolved: Ok(outdated_resolved),
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
-        calibration_bytes_override: None,
-        review_bytes_override: None,
+        calibration_bytes_override: Some(outdated_certificate),
+        review_bytes_override: Some(outdated_review),
     };
     assert_eq!(
-        measurement(1, SAMPLE_TIME_NS)
+        measurement_with_calibration(1, SAMPLE_TIME_NS, outdated_reference)
             .assess_for_quantitative_use(
                 SAMPLE_TIME_NS,
                 &clock_domain(),
@@ -1239,7 +1239,6 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
         AssessmentFailure::CalibrationNotValidAtCapture
     );
 }
-
 #[test]
 fn uncertainty_policy_must_use_the_exact_measurement_unit() {
     let megahertz_policy =
