@@ -277,6 +277,103 @@ fn calibration_evidence_and_review_receipt_must_be_distinct_artifacts() {
 }
 
 #[test]
+fn calibration_range_constructor_rejects_inverted_bounds() {
+    assert_eq!(
+        ResolvedCalibration::new(
+            "bad-range-calibration",
+            instrument_identity(),
+            artifact("certificate", SHA_A),
+            artifact("review", SHA_B),
+            Quantity::Frequency,
+            Unit::Hertz,
+            6_000_000.0,
+            4_000_000.0,
+            SAMPLE_TIME_NS - 1,
+            SAMPLE_TIME_NS + 2_000_000_000,
+            900.0,
+        )
+        .unwrap_err(),
+        ContractError::InvalidCalibrationRange
+    );
+}
+
+#[test]
+fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
+    let wrong_instrument = MockResolver {
+        resolved: Ok(
+            ResolvedCalibration::new(
+                "calibration-17",
+                InstrumentIdentity::new("another-ultrasound-rig", "rf-channel-0").unwrap(),
+                artifact("calibration-certificate", SHA_A),
+                artifact("independent-review-receipt", SHA_B),
+                Quantity::Frequency,
+                Unit::Hertz,
+                4_000_000.0,
+                6_000_000.0,
+                SAMPLE_TIME_NS - 1,
+                SAMPLE_TIME_NS + 2_000_000_000,
+                900.0,
+            )
+            .unwrap(),
+        ),
+        resolved_raw: resolved_raw_data(),
+    };
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &wrong_instrument,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::CalibrationInstrumentMismatch
+    );
+}
+
+#[test]
+fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
+    let narrow_range = MockResolver {
+        resolved: Ok(
+            ResolvedCalibration::new(
+                "calibration-17",
+                instrument_identity(),
+                artifact("calibration-certificate", SHA_A),
+                artifact("independent-review-receipt", SHA_B),
+                Quantity::Frequency,
+                Unit::Hertz,
+                4_000_000.0,
+                4_900_000.0,
+                SAMPLE_TIME_NS - 1,
+                SAMPLE_TIME_NS + 2_000_000_000,
+                900.0,
+            )
+            .unwrap(),
+        ),
+        resolved_raw: resolved_raw_data(),
+    };
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &narrow_range,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::CalibrationRangeExceeded {
+            value: 5_000_000.0,
+            minimum: 4_000_000.0,
+            maximum: 4_900_000.0,
+        }
+    );
+}
+
+#[test]
 fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_provenance() {
     let assessment = measurement(1, SAMPLE_TIME_NS)
         .assess_for_quantitative_use(
