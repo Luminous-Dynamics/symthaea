@@ -35,6 +35,22 @@ MAX_COMPARISON_TOLERANCE_HARTREE = 1e-6
 MAX_OVERLAP_MATRIX_RESIDUAL = 1e-8
 BASIS_ALIASES = {"STO-3G": "sto-3g", "6-31G": "6-31g"}
 
+# Frozen corpus census. A report that silently drops a troublesome molecule
+# must not be able to produce a green comparison for the remaining subset.
+EXPECTED_CASE_IDS = (
+    "H2/STO-3G/RHF",
+    "HeH+/STO-3G/RHF",
+    "H2O/STO-3G/RHF",
+    "NH3/STO-3G/RHF",
+    "CH4/STO-3G/RHF",
+    "HF/STO-3G/RHF",
+    "N2/STO-3G/RHF",
+    "LiH/STO-3G/RHF",
+    "H2/6-31G/RHF",
+    "H2O/6-31G/RHF",
+    "CH4/6-31G/RHF",
+)
+
 
 def finite_float(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -159,8 +175,29 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
         raise ValueError("input report coordinate_unit must be explicitly 'bohr'")
     if data.get("method") != "RHF":
         raise ValueError("input report method must be RHF for this comparator lane")
-    if not isinstance(data.get("cases"), list) or not data["cases"]:
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
         raise ValueError("input report must contain a non-empty cases array")
+    case_ids = []
+    for index, case in enumerate(cases):
+        if not isinstance(case, dict):
+            raise ValueError(f"cases[{index}] must be an object")
+        case_id = case.get("case_id")
+        if not isinstance(case_id, str) or not case_id:
+            raise ValueError(f"cases[{index}].case_id must be a non-empty string")
+        case_ids.append(case_id)
+    if len(set(case_ids)) != len(case_ids):
+        raise ValueError("input report contains duplicate fixture case IDs")
+    expected_ids = set(EXPECTED_CASE_IDS)
+    actual_ids = set(case_ids)
+    if actual_ids != expected_ids:
+        missing = sorted(expected_ids - actual_ids)
+        unexpected = sorted(actual_ids - expected_ids)
+        raise ValueError(
+            f"fixture corpus census mismatch: missing={missing!r}; unexpected={unexpected!r}"
+        )
+    if tuple(case_ids) != EXPECTED_CASE_IDS:
+        raise ValueError("fixture corpus case order differs from the frozen reference order")
     return data, digest
 
 
