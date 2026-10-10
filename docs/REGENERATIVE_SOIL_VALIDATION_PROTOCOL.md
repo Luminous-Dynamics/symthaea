@@ -141,6 +141,23 @@ Symthaea now provides a small utility that filters and ranks measurement options
 
 This utility does **not** produce an optimized experiment design, statistical power calculation, confidence interval, probability of decision change, or calibrated expected value of information. Do not treat assumed reductions or relevance weights as empirical facts without validation. A proper experimental design must still predeclare hypotheses, endpoints, treatment levels, randomization, blocks/replicates, stopping rules, and analysis. NIST's handbook distinguishes screening studies used to identify important factors from response-surface or confirmatory designs: https://www.itl.nist.gov/div898/handbook/pri/section3/pri3346.htm. Sequential Bayesian design is a future option once a defensible likelihood/model and calibrated observations exist: https://www.nist.gov/programs-projects/sequential-bayesian-experiment-design.
 
+## Preregistered two-level screening schedule generator
+
+The engineering crate can generate a reproducible bench-scale schedule when a complete preregistration object is supplied. The supported initial design is a **two-level full factorial** with 2–6 numeric factors. Each factor has finite, strictly ordered low/high values, explicit units and evidence references. Every block includes every treatment combination; at least two complete blocks are required, with 1–2 independently executed units per setting per block. This creates replication across blocks but is not, by itself, proof of adequate statistical power.
+
+Required before generation:
+- a preregistration ID, immutable input-snapshot ID, protocol ID, objective, primary hypothesis, and analysis-plan ID;
+- one primary endpoint, measurement method and a minimum practically meaningful difference with supporting rationale;
+- 2–8 distinct blocks that describe a nuisance stratum (for example, day or feedstock lot);
+- a fixed randomization seed; run order is randomized within each block and the algorithm ID is retained;
+- an evidence-backed reviewer approval for the exact bench-scale protocol. Unknown/rejected review status, a protocol-ID mismatch, or scenario-only approval evidence causes the planner to reject the request.
+
+Optional center-point controls are disabled or 3–5 per block. When enabled, every quantitative factor is set to its numeric midpoint; controls are evenly placed with controls at the beginning and end of each block, while treatment runs remain randomized among themselves. NIST describes center points as a check on stability and curvature, not as a substitute for a response-surface experiment: https://itl.nist.gov/div898/handbook/pri/section3/pri337.htm.
+
+The generated plan stores a full copy of the request, factor settings and units for every run, block ID, run order, factorial standard order, replicate index, seed and algorithm version. Identical input and algorithm versions are expected to produce the same schedule. The maximum design size is bounded at 1,100 runs.
+
+**Limitations:** numerical-factor only; no fractional factorial generator, power/sample-size calculator, statistical response analysis, Bayesian update, automatic stop-rule engine, or field-trial authorization. The primary meaningful difference is not an effect estimate or power claim. Treat the output as a reviewed bench-scale schedule proposal; the experiment owner must separately approve operating conditions, worker/environmental safeguards, measurement-system capability, preregistered analysis and stopping rules. This planner does not authorize product release or soil application.
+
 ## Decision gates
 
 - **G0 — provenance:** feedstock and site metadata are complete enough to plan sampling.
