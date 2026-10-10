@@ -196,11 +196,17 @@ impl CognitiveLoopService {
             // 3. Goal is the peer's intent at the local admitted resolution.
             let goal = peer_intent;
 
-            // 4. Run RK4 Geodesic simulation
+            // Do not charge path work if the manifold's cumulative counter cannot
+            // safely admit this search. Dilation (if any) has already been accounted.
+            if !manifold.can_compute_geodesic(steps, 4) {
+                return Err(ImagineFutureError::NoGeodesic);
+            }
+
+            // 4. Run RK4 Geodesic simulation.
             let path = manifold.select_best_geodesic(&collaborative_start, &goal, steps, 4);
 
             // Charge this request's estimated geodesic work even when no usable path
-            // is returned. The computation has already happened at this point.
+            // is returned. The computation has already been admitted and invoked.
             self.thermodynamic_load += estimate.geodesic;
 
             if path.is_empty() {
@@ -290,7 +296,12 @@ impl CognitiveLoopService {
             (goal, "model_rollout_endpoint")
         };
 
-        // Refine the selected target over multiple candidate paths.
+        // Refine the selected target over multiple candidate paths. The manifold's
+        // own cumulative compute counter may independently fail closed; in that case
+        // the rollout remains charged, but an unstarted geodesic search is not.
+        if !manifold.can_compute_geodesic(steps, 4) {
+            return Err(ImagineFutureError::NoGeodesic);
+        }
         let path = manifold.select_best_geodesic(&current, &goal, steps, 4);
         // Charge geodesic work immediately after the search, including empty results.
         self.thermodynamic_load += estimate.geodesic;
