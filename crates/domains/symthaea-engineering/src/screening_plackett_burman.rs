@@ -1027,11 +1027,11 @@ mod tests {
             max_absolute_deviation: 1.0,
             deviation_tolerance_evidence: ev(
                 &format!("{id}-tol"),
-                EvidenceKind::Published,
+                EvidenceKind::Literature,
             ),
             randomization_class: FactorRandomizationClass::RandomizablePerRun,
-            low_level_evidence: ev(&format!("{id}-low"), EvidenceKind::Published),
-            high_level_evidence: ev(&format!("{id}-high"), EvidenceKind::Published),
+            low_level_evidence: ev(&format!("{id}-low"), EvidenceKind::Literature),
+            high_level_evidence: ev(&format!("{id}-high"), EvidenceKind::Literature),
         }
     }
 
@@ -1050,12 +1050,12 @@ mod tests {
                 ExperimentBlock {
                     block_id: "day-1".into(),
                     description: "First independent bench block".into(),
-                    evidence: ev("day-1-record", EvidenceKind::Published),
+                    evidence: ev("day-1-record", EvidenceKind::Literature),
                 },
                 ExperimentBlock {
                     block_id: "day-2".into(),
                     description: "Second independent bench block".into(),
-                    evidence: ev("day-2-record", EvidenceKind::Published),
+                    evidence: ev("day-2-record", EvidenceKind::Literature),
                 },
             ],
             center_point_runs_per_block: centers,
@@ -1067,7 +1067,7 @@ mod tests {
                 minimum_practically_meaningful_difference: 0.03,
                 difference_rationale_evidence: ev(
                     "difference-rationale",
-                    EvidenceKind::Published,
+                    EvidenceKind::Literature,
                 ),
             },
             bench_scale_review: BenchScaleReview {
