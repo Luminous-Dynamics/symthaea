@@ -85,7 +85,8 @@ impl fmt::Display for ArtifactVerificationError {
                 actual_sha256,
             } => write!(
                 f,
-                "SHA-256 mismatch for artifact {artifact_id}: expected {expected_sha256}, got {actual_sha256}"
+                "SHA-256 mismatch for artifact {artifact_id}: expected {expected_sha256}, got \
+                 {actual_sha256}"
             ),
         }
     }
