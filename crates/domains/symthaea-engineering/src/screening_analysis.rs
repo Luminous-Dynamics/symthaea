@@ -662,8 +662,9 @@ mod tests {
                 evidence: evidence("review-analysis", EvidenceKind::Measured),
             },
         };
-        request.bench_scale_review.reviewed_design_sha256 =
+        let design_digest =
             crate::screening_design::screening_design_sha256(&request).unwrap();
+        request.bench_scale_review.reviewed_design_sha256 = design_digest;
         request
     }
 
