@@ -128,6 +128,8 @@ pub enum ScreeningPowerStatus {
 pub struct ScreeningPowerAssessment {
     pub experiment_id: String,
     pub input_snapshot_id: String,
+    /// SHA-256 of the versioned design-input payload used by the reviewed schedule.
+    pub request_sha256: String,
     pub primary_endpoint_id: String,
     pub endpoint_unit: String,
     pub effect_family: String,
@@ -172,7 +174,7 @@ pub fn assess_screening_power(
 ) -> Result<ScreeningPowerAssessment, ScreeningPowerError> {
     // Re-use full input validation so a power assessment cannot be detached from an
     // invalid or unreviewed design request. This generates a bounded in-memory schedule only.
-    let _validated_schedule = generate_screening_design(request)?;
+    let validated_schedule = generate_screening_design(request)?;
 
     if !familywise_alpha.is_finite() || !(0.0..0.20).contains(&familywise_alpha) || familywise_alpha == 0.0 {
         return Err(ScreeningPowerError::new(
@@ -237,6 +239,7 @@ pub fn assess_screening_power(
     Ok(ScreeningPowerAssessment {
         experiment_id: request.experiment_id.clone(),
         input_snapshot_id: request.input_snapshot_id.clone(),
+        request_sha256: validated_schedule.request_sha256.clone(),
         primary_endpoint_id: endpoint.endpoint_id.clone(),
         endpoint_unit: endpoint.unit.clone(),
         effect_family: "two-sided main effects only; Bonferroni familywise adjustment across all declared factors".into(),
