@@ -214,7 +214,10 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         let (onset, velocity, onset_track) = pending
             .get_mut(&note_key)
             .and_then(VecDeque::pop_front)
-            .ok_or_else(|| "MIDI note-off has no matching active note-on in the merged track timeline".to_string())?;
+            .ok_or_else(|| {
+                "MIDI note-off has no matching active note-on in the merged track timeline"
+                    .to_string()
+            })?;
         if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
             pending.remove(&note_key);
         }
