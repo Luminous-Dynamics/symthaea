@@ -168,7 +168,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     }
                     key_events.push((tick, (sf, is_minor)));
                 }
-                TrackEventKind::Midi { channel, message } if channel.as_int() != 9 => {
+                TrackEventKind::Midi { channel, message } => {
                     let channel = channel.as_int();
                     let note_event = match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
@@ -180,6 +180,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                         _ => None,
                     };
                     if let Some((pitch, velocity)) = note_event {
+                        if channel == 9 {
+                            return Err(
+                                "MIDI channel 10 note events are outside the pitched-note importer; refusing to silently discard them"
+                                    .into(),
+                            );
+                        }
                         midi_note_events.push(RawMidiNoteEvent {
                             tick,
                             track: track_index,
@@ -1012,6 +1018,26 @@ mod tests {
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("ends with unmatched note-on events"), "{error}");
+    }
+
+    #[test]
+    fn midi_channel_ten_notes_are_rejected_instead_of_silently_dropped() {
+        let pitched_track = [
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let channel_ten_track = [
+            0, 0x99, 35, 100,
+            100, 0x89, 35, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let tracks: [&[u8]; 2] = [&pitched_track, &channel_ten_track];
+        let error = parse_midi(&midi_file_with_tracks(&tracks)).unwrap_err();
+        assert!(
+            error.contains("channel 10 note events are outside the pitched-note importer"),
+            "{error}"
+        );
     }
 
     #[test]
