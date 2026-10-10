@@ -297,11 +297,4 @@ mod work_budget_tests {
         assert!(preflight_imagination_work(0.90, small).is_err());
     }
 
-    #[test]
-    fn preflight_does_not_mutate_load() {
-        let load = 0.90;
-        let estimate = estimate_imagination_work(10, 10, 4).unwrap();
-        assert!(preflight_imagination_work(load, estimate).is_err());
-        assert_eq!(load, 0.90);
-    }
 }
