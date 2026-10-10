@@ -4,6 +4,9 @@
 
 #![deny(unsafe_code)]
 
+/// Immutable, request-bound primary netlist identity.
+pub mod input;
+
 /// Strict numeric parsing primitives for single-plot ASCII rawfiles.
 pub mod rawfile;
 
