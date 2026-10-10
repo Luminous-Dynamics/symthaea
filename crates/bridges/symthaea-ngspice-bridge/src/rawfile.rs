@@ -457,19 +457,21 @@ mod tests {
         assert_eq!(raw.points.len(), 5);
         assert_eq!(raw.si_unit("time").unwrap(), "s");
         assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
-        assert!(
-            (raw.value_nearest_to("time", 0.0001, "v(out)").unwrap() - 0.2642411176571153)
-                .abs()
-                < 1e-9
-        );
-        assert!(
-            (raw.value_nearest_to("time", 0.0002, "v(out)").unwrap() - 0.5939941502901619)
-                .abs()
-                < 1e-9
-        );
-        assert!(
-            (raw.final_value("v(out)").unwrap() - 0.9995006007726127).abs() < 1e-9
-        );
+
+        // Series RLC: R=200 ohm, L=10 mH, C=1 uF gives zeta=1 and
+        // omega_n=1/sqrt(LC)=10,000 rad/s. The capacitor step response is
+        // 1 - (1 + omega_n*t)*exp(-omega_n*t) V.
+        let omega_n = 1.0 / (10e-3_f64 * 1e-6_f64).sqrt();
+        assert!((omega_n - 10_000.0).abs() < 1e-9);
+        for time in [0.0, 1e-4, 2e-4, 5e-4, 1e-3] {
+            let omega_t = omega_n * time;
+            let expected = 1.0 - (1.0 + omega_t) * (-omega_t).exp();
+            let actual = raw.value_nearest_to("time", time, "v(out)").unwrap();
+            assert!(
+                (actual - expected).abs() < 1e-9,
+                "RLC mismatch at t={time}: actual={actual}, expected={expected}"
+            );
+        }
     }
 
     #[test]
@@ -480,8 +482,15 @@ mod tests {
         assert_eq!(raw.points.len(), 1);
         assert_eq!(raw.si_unit("v(in)").unwrap(), "V");
         assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
-        assert!((raw.final_value("v(in)").unwrap() - 12.0).abs() < 1e-12);
-        assert!((raw.final_value("v(out)").unwrap() - 3.0).abs() < 1e-12);
+
+        // Ideal divider: 12 V * 1 kOhm / (3 kOhm + 1 kOhm) = 3 V.
+        let supply = 12.0_f64;
+        let top_resistance = 3_000.0_f64;
+        let bottom_resistance = 1_000.0_f64;
+        let expected_vout = supply * bottom_resistance / (top_resistance + bottom_resistance);
+        assert!((raw.final_value("v(in)").unwrap() - supply).abs() < 1e-12);
+        assert!((expected_vout - 3.0).abs() < 1e-12);
+        assert!((raw.final_value("v(out)").unwrap() - expected_vout).abs() < 1e-12);
     }
 
     #[test]
@@ -493,11 +502,16 @@ mod tests {
         assert_eq!(raw.points.len(), 3);
         assert_eq!(raw.si_unit("time").unwrap(), "s");
         assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
-        assert!(
-            (raw.value_nearest_to("time", 0.001, "v(out)").unwrap() - 0.6321205588).abs() < 1e-9
-        );
-        assert!((raw.final_value("v(out)").unwrap() - 0.8646647168).abs() < 1e-9);
-        assert!((raw.peak_abs_value("v(out)").unwrap() - 0.8646647168).abs() < 1e-9);
+        let tau = 1_000.0_f64 * 1e-6_f64;
+        for time in [0.0, 0.001, 0.002] {
+            let expected = 1.0 - (-time / tau).exp();
+            let actual = raw.value_nearest_to("time", time, "v(out)").unwrap();
+            assert!(
+                (actual - expected).abs() < 1e-9,
+                "RC mismatch at t={time}: actual={actual}, expected={expected}"
+            );
+        }
+        assert!((raw.peak_abs_value("v(out)").unwrap() - (1.0 - (-0.002 / tau).exp())).abs() < 1e-9);
     }
 
     #[test]
