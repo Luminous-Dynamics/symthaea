@@ -106,20 +106,21 @@ computes the total derivative
 \[
 \frac{\mathrm{d}C}{\mathrm{d}t} = \sum_i \frac{\partial C}{\partial x_i} f_i
 \]
-via symbolic differentiation and then normalizes (polynomial expansion, common-
-factor cancellation, logarithmic identity simplification). If the normalized
-form is exactly zero, the candidate is marked \texttt{PROVEN} without calling Z3.
+via symbolic differentiation and the current local simplifier. The assessor
+records whether the derivative expression simplifies to constant zero and
+whether it has finite residual below tolerance at six fixed points. The
+showcase status \texttt{SYMBOLIC-CHECK} denotes this bounded evidence; neither
+a local rewrite nor six samples is a universal proof.
 
 \subsection{Two-tier verification}
 
 Symthaea reports two evidence tiers, kept distinct to avoid overclaiming:
 
-\textbf{Tier A (showcase \texttt{PROVEN}).} Symbolic chain-rule derivation
-via \texttt{SymExpr::diff} + \texttt{SymExpr::simplify}, followed by a
-numerical residual check at six generic sample points in phase space. A
-polynomial that simplifies to zero and evaluates to numerical zero at six
-unrelated points is strong evidence of identity; however, in isolation this
-is not a formal proof.
+\textbf{Tier A (showcase \texttt{SYMBOLIC-CHECK}).} Symbolic chain-rule
+derivation via \texttt{SymExpr::diff} + \texttt{SymExpr::simplify}, followed
+by a numerical residual check at six fixed sample points in phase space. This
+is bounded supporting evidence, not a universal identity proof. A nonzero
+derivative can vanish at finitely many sample points.
 
 \textbf{Tier B (formal \texttt{unsat}).} For polynomial invariants, the
 companion binary \texttt{verify\_invariants\_formal} emits the SMT-LIB2
@@ -194,13 +195,11 @@ The headline table below is produced verbatim by the showcase binary:
 Of seven problems:
 
 \begin{itemize}
-  \item \textbf{Six} showcase candidates receive Tier-A \texttt{PROVEN}
-        status under the project's current evidence vocabulary: symbolic
-        chain-rule derivation plus six-point numerical residual agreement.
-        This is strong evidence, not a universal proof. Polynomial cases that
-        are inside the QF\_NRA formal fragment also receive independent
-        Tier-B Z3 \texttt{unsat} witnesses; the Lotka--Volterra logarithmic
-        invariant is explicitly out of scope for that formal backend.
+  \item \textbf{Six} showcase candidates receive Tier-A \texttt{SYMBOLIC-CHECK}
+        status: symbolic chain-rule derivation plus six-point numerical residual
+        agreement. This is not a universal proof. Four supported polynomial
+        cases have separate Tier-B Z3 \texttt{unsat} witnesses; the Lotka--Volterra
+        logarithmic invariant remains outside the QF\_NRA formal backend.
   \item \textbf{One} (PCR3BP) returns \texttt{Numeric} status: the fitness
         landscape is low (variance $2.7 \times 10^{-10}$) but the discovered
         expression $\cos(y/e)^{x^3}$ is transparently wrong --- it matches
@@ -244,9 +243,11 @@ cd papers/ramanujan
 ./reproduce.sh
 \end{verbatim}
 
-The Z3 proof witnesses for each \texttt{PROVEN} invariant are committed under
-\texttt{papers/ramanujan/proofs/}. A reader with any SMT-LIB2-compliant solver
-can re-check them without running any Rust code.
+The formal Z3 witness files for the supported polynomial invariants are
+committed under \texttt{papers/physics-math/ramanujan/proofs/}. A reader with
+an SMT-LIB2-compliant solver can check those obligations independently.
+The committed numerical table is a historical snapshot until regenerated and
+qualified against the exact source head.
 
 % ═════════════════════════════════════════════════════════════════════════
 \section{Limitations}
