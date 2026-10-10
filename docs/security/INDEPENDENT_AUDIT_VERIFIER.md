@@ -47,3 +47,10 @@ The external verifier requires the exact luminous.security-audit.verdict.v1 fiel
 ## Required-check semantics for reruns
 
 GitHub documents that `workflow_run: requested` is not emitted for a re-run; `in_progress` is the early invalidation event for reruns. If a rerun is queued, an older commit status might remain until the trusted receiver can publish its next state. Therefore a production ruleset must require the repository's **producer audit workflow check** as well as the `Security Audit / Independent Verifier` commit status, and must not treat the receiver's own default-branch job as a substitute for a PR-head check. The producer check holds the PR while a new audit attempt is queued/running; the custom status only turns green after independent verification. Test-run status on the PR head before authorizing merge.
+
+
+## Latest TOCTOU hardening — 2026-10-11
+
+After the verdict artifact's ZIP digest, schema, manifest, and member hashes have been validated, the verifier fetches the authoritative PR state again immediately before publishing success. The second read must still identify the same open same-repository PR head/base and the same canonical `merge_commit_sha`; a changed test-merge SHA fails closed. The regression suite now contains 33 test methods. Current synchronized Git blobs are verifier `78a096eebc98f6aeb51a5b6773bcffb90e9189f8` and tests `7d72105363ab2c538bdbebbeeab5313bddae994d`.
+
+This narrows the intra-run time-of-check/time-of-use window; it does not expire a previously published status if the base branch changes after verification. Ongoing enforcement still needs current producer checks and a trusted base-update/status-reconciliation design. Hosted qualification for the latest code head is queued, so no test pass is claimed.
