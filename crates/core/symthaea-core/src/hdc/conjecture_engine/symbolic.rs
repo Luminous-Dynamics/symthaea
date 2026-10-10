@@ -424,17 +424,18 @@ pub fn assess_conservation_symbolic(
     let total_deriv = total_deriv.simplify();
     let symbolic_derivative_simplified_to_zero =
         matches!(&total_deriv, SymExpr::Const(c) if *c == 0.0);
-    // Bind every declared state variable at every sample point. Each variable
-    // receives a deterministic rotation of the base values to avoid restricting
-    // all multivariate checks to the x=v diagonal. Unmentioned symbols cause
-    // checked evaluation to fail rather than silently defaulting to zero.
+    // Bind every declared state variable at every sample point. Positive,
+    // nonzero base values support common restricted domains (logs and negative
+    // powers); each variable receives a deterministic rotation to avoid
+    // restricting multivariate checks to the x=v diagonal. This is not full
+    // domain inference: invalid or unbound evaluations still fail closed.
     const BASE_SAMPLE_VALUES: [f64; 6] = [
         1.0,
-        0.0,
+        0.5,
         std::f64::consts::FRAC_1_SQRT_2,
-        -1.0,
-        0.3,
         2.0,
+        0.3,
+        3.0,
     ];
     let test_points: Vec<Vec<(&str, f64)>> = (0..BASE_SAMPLE_VALUES.len())
         .map(|sample_index| {
@@ -644,11 +645,11 @@ mod conservation_evidence_tests {
         // cannot be promoted to a universal conservation claim.
         let roots = [
             1.0,
-            0.0,
+            0.5,
             std::f64::consts::FRAC_1_SQRT_2,
-            -1.0,
-            0.3,
             2.0,
+            0.3,
+            3.0,
         ];
         let mut rhs = SymExpr::Const(1.0);
         for root in roots {
@@ -667,7 +668,7 @@ mod conservation_evidence_tests {
         assert!(check.sampled_residual_passed);
         assert!(!check.symbolic_derivative_simplified_to_zero);
         assert!(check.max_numerical_residual == 0.0);
-        assert!(rhs.eval(&[("x", 3.0)]).abs() > 1e-10);
+        assert!(rhs.eval(&[("x", 4.0)]).abs() > 1e-10);
     }
 
     #[test]
