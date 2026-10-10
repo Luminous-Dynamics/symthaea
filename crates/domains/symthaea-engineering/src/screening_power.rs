@@ -139,7 +139,13 @@ pub struct FeasibleReplicationOption {
     pub treatment_run_count: u32,
     pub center_point_run_count: u32,
     pub total_run_count: u32,
-    /// True when this count reaches the normal-approximation lower-bound requirement.
+    /// Upper-bound standard error for the main effect at this feasible replication count.
+    pub standard_error_main_effect_upper_bound: f64,
+    /// Projected two-sided power using the same normal approximation as the current design.
+    pub projected_power_normal_approx: f64,
+    /// True when this configuration's calculated projected power meets target_power.
+    pub meets_target_power_normal_approx: bool,
+    /// True when this count reaches the rounded normal-approximation replication lower bound.
     pub meets_approximate_replication_target: bool,
     /// True only when the block and replication counts equal those in the current request.
     pub matches_current_request_counts: bool,
@@ -274,6 +280,15 @@ pub fn assess_screening_power(
             let treatment_run_count = combinations * candidate_full_factorial_replicates;
             let center_point_run_count = center_points_per_block * candidate_block_count;
             let total_run_count = treatment_run_count + center_point_run_count;
+            let option_contrast_scale = (candidate_full_factorial_replicates as f64
+                * 2_f64.powi(factor_count as i32 - 2))
+                .sqrt();
+            let option_standard_error = sd / option_contrast_scale;
+            let option_noncentrality = delta / option_standard_error;
+            let option_projected_power = (normal_cdf(-critical_z - option_noncentrality)
+                + 1.0
+                - normal_cdf(critical_z - option_noncentrality))
+            .clamp(0.0, 1.0);
             let matches_current_request_counts = candidate_block_count == block_count
                 && candidate_replicates_per_setting as usize == within_block_replicates;
             feasible_replication_options.push(FeasibleReplicationOption {
@@ -283,6 +298,9 @@ pub fn assess_screening_power(
                 treatment_run_count: treatment_run_count as u32,
                 center_point_run_count: center_point_run_count as u32,
                 total_run_count: total_run_count as u32,
+                standard_error_main_effect_upper_bound: option_standard_error,
+                projected_power_normal_approx: option_projected_power,
+                meets_target_power_normal_approx: option_projected_power >= target_power,
                 meets_approximate_replication_target: candidate_full_factorial_replicates
                     >= required_replicates,
                 matches_current_request_counts,
@@ -604,6 +622,9 @@ mod tests {
         assert_eq!(ten_replicate_option.treatment_run_count, 40);
         assert_eq!(ten_replicate_option.center_point_run_count, 15);
         assert_eq!(ten_replicate_option.total_run_count, 55);
+        assert!(ten_replicate_option.standard_error_main_effect_upper_bound.is_finite());
+        assert!(ten_replicate_option.projected_power_normal_approx >= 0.80);
+        assert!(ten_replicate_option.meets_target_power_normal_approx);
         assert!(!ten_replicate_option.matches_current_request_counts);
 
         for option in &result.feasible_replication_options {
@@ -622,6 +643,12 @@ mod tests {
                 option.block_count * input.center_point_runs_per_block as u32
             );
             assert!(option.total_run_count <= 1_100);
+            assert!(option.projected_power_normal_approx.is_finite());
+            assert!((0.0..=1.0).contains(&option.projected_power_normal_approx));
+            assert_eq!(
+                option.meets_target_power_normal_approx,
+                option.projected_power_normal_approx >= result.target_power
+            );
             if option.meets_approximate_replication_target {
                 assert!(option.complete_factorial_replicates >= 9);
             }
