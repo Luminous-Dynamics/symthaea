@@ -79,17 +79,21 @@ impl RawDataEvidenceResolver for MockResolver {
     }
 }
 
+fn resolved_raw_data() -> Result<ResolvedRawData, String> {
+    Ok(
+        ResolvedRawData::new(
+            artifact("raw-acquisition-1", SHA_C),
+            4_096,
+            "application/octet-stream",
+        )
+        .unwrap(),
+    )
+}
+
 fn resolver() -> MockResolver {
     MockResolver {
         resolved: Ok(resolved_calibration()),
-        resolved_raw: Ok(
-            ResolvedRawData::new(
-                artifact("raw-acquisition-1", SHA_C),
-                4_096,
-                "application/octet-stream",
-            )
-            .unwrap(),
-        ),
+        resolved_raw: resolved_raw_data(),
     }
 }
 
@@ -381,7 +385,7 @@ fn unresolved_calibration_evidence_fails_closed() {
                 &mut MeasurementStreamGuard::default(),
             )
             .unwrap_err(),
-        AssessmentFailure::CalibrationEvidenceUnresolved("evidence artifact not found".into())
+        AssessmentFailure::CalibrationEvidenceUnresolved("calibration artifact not found".into())
     );
 }
 
@@ -399,6 +403,7 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
             900.0,
         )
         .unwrap()),
+        resolved_raw: resolved_raw_data(),
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -427,6 +432,7 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
             900.0,
         )
         .unwrap()),
+        resolved_raw: resolved_raw_data(),
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -452,6 +458,7 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
             900.0,
         )
         .unwrap()),
+        resolved_raw: resolved_raw_data(),
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
