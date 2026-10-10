@@ -31,13 +31,22 @@ pub enum ImagineFutureError {
 pub(super) struct ImaginationWorkEstimate {
     pub(super) rollout: f32,
     pub(super) geodesic: f32,
+    /// Expected one-time cost of a required manifold dilation.
+    pub(super) dilation: f32,
 }
 
 #[cfg(feature = "vision-manifold")]
 impl ImaginationWorkEstimate {
     fn total(self) -> Option<f32> {
-        let total = self.rollout + self.geodesic;
-        total.is_finite().then_some(total)
+        let total = self.rollout + self.geodesic + self.dilation;
+        (self.rollout.is_finite()
+            && self.geodesic.is_finite()
+            && self.dilation.is_finite()
+            && self.rollout >= 0.0
+            && self.geodesic >= 0.0
+            && self.dilation >= 0.0
+            && total.is_finite())
+        .then_some(total)
     }
 }
 
@@ -53,7 +62,11 @@ pub(super) fn estimate_imagination_work(
     if !rollout.is_finite() || !geodesic.is_finite() {
         return None;
     }
-    let estimate = ImaginationWorkEstimate { rollout, geodesic };
+    let estimate = ImaginationWorkEstimate {
+        rollout,
+        geodesic,
+        dilation: 0.0,
+    };
     estimate.total()?;
     Some(estimate)
 }
