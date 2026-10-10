@@ -870,6 +870,9 @@ struct MentalMovieWire {
     height: u32,
     channels: usize,
     semantic_coherence: f32,
+    /// Omitted when no valid continuity measurement is available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trajectory_continuity: Option<f32>,
     /// Each entry is one frame: base64 of `width*height*channels` raw bytes.
     frames_b64: Vec<String>,
 }
@@ -886,6 +889,7 @@ impl LiveTelemetry {
                 height: m.height,
                 channels: m.channels,
                 semantic_coherence: m.semantic_coherence,
+                trajectory_continuity: m.trajectory_continuity,
                 frames_b64: m.frames.iter().map(|f| engine.encode(f)).collect(),
             }
         });
