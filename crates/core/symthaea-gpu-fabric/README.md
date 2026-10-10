@@ -90,3 +90,24 @@ a memory dependency. WAR remains an execution dependency without unnecessary
 memory visibility scope. The backend runtime must eventually translate these
 requirements into concrete vkCmdPipelineBarrier2 scopes for the resources it
 actually binds.
+
+
+## Real Vulkan synchronization qualification
+
+The `SingleQueueVulkanSyncRuntime` binds a `VulkanSyncPlan` to actual Vulkan 1.3
+timeline semaphores and `vkQueueSubmit2`, then waits on and queries the
+resulting timeline values from the host.
+
+This lane is intentionally synchronization-only. It maps all logical lanes
+onto one actual compute queue, so its result proves real timeline
+submission/wait/completion behavior but does not claim independent hardware
+queue execution.
+
+The qualification workflow installs the Vulkan validation layer and runs the
+ignored real-device test separately from ordinary unit tests. A skipped or
+queued workflow is not treated as a qualification result.
+The runtime returns a synchronization execution receipt containing the
+sync-plan digest, submitted-node count, expected final timeline values,
+observed final timeline values, and Vulkan API version. The receipt can be
+verified independently against the lowering plan and is not an acceleration
+receipt.

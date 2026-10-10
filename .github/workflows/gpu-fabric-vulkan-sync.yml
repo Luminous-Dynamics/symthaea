@@ -1,0 +1,238 @@
+name: GPU Fabric Vulkan Synchronization Qualification
+
+permissions:
+  contents: read
+
+# Keep only the newest exact-head qualification for each PR.
+concurrency:
+  group: gpu-fabric-vulkan-sync-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'crates/core/symthaea-gpu-fabric/**'
+      - '.github/workflows/gpu-fabric-vulkan-sync.yml'
+  workflow_dispatch:
+
+jobs:
+  vulkan-sync:
+    name: Vulkan synchronization2 + timeline qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VK_INSTANCE_LAYERS: VK_LAYER_KHRONOS_validation
+      # Request SyncVal using the current setting; do not use deprecated VK_LAYER_ENABLES.
+      # The setting request alone does not prove SyncVal activation.
+      VK_LAYER_VALIDATE_SYNC: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact qualification checkout
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p .ci/vulkan-sync-qualification
+          ACTUAL_QUALIFICATION_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_QUALIFICATION_SHA" = "$EXPECTED_QUALIFICATION_SHA"
+          echo "qualification_head=$ACTUAL_QUALIFICATION_SHA"
+
+      - name: Install Vulkan runtime and validation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers
+
+      - name: Verify Vulkan validation layer
+        run: |
+          vulkaninfo --summary
+          vulkaninfo --summary | grep -q 'VK_LAYER_KHRONOS_validation' || {
+            echo 'Validation layer was not reported by vulkaninfo'
+            exit 1
+          }
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
+
+      - name: Prepare isolated GPU Fabric workspace
+        run: |
+          rm -rf .ci/vulkan-sync-workspace
+          mkdir -p .ci/vulkan-sync-workspace/src
+          cp -R crates/core/symthaea-gpu-fabric/src/. .ci/vulkan-sync-workspace/src/
+          cp crates/core/symthaea-gpu-fabric/Cargo.toml .ci/vulkan-sync-workspace/Cargo.toml
+          sed -i \
+            -e 's/edition.workspace = true/edition = "2024"/' \
+            -e 's/license.workspace = true/license = "AGPL-3.0-or-later"/' \
+            -e 's/blake3 = { workspace = true }/blake3 = "=1.8.5"/' \
+            -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' \
+            -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' \
+            .ci/vulkan-sync-workspace/Cargo.toml
+          printf '\n[workspace]\nresolver = "2"\n' >> .ci/vulkan-sync-workspace/Cargo.toml
+
+      - name: Resolve isolated dependency lock
+        working-directory: .ci/vulkan-sync-workspace
+        run: |
+          cargo generate-lockfile
+          test -s Cargo.lock
+          cargo metadata --locked --no-deps --format-version 1 > "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/metadata.json"
+          grep -q '"name":"symthaea-gpu-fabric"' "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/metadata.json"
+          if grep -q 'symthaea-observation-attestation' "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/metadata.json"; then
+            echo 'isolated workspace unexpectedly resolved unrelated observation-attestation crate' >&2
+            exit 1
+          fi
+          cp Cargo.toml "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/isolated-Cargo.toml"
+          cp Cargo.lock "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/isolated-Cargo.lock"
+
+      - name: Record qualification environment and exact inputs
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          EVIDENCE_DIR=.ci/vulkan-sync-qualification
+          {
+            echo "qualification_commit=$EXPECTED_QUALIFICATION_SHA"
+            echo "qualification_tree=$(git rev-parse HEAD^{tree})"
+            echo "workflow_sha=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "validation_layer=VK_LAYER_KHRONOS_validation"
+            echo "validation_sync_requested=VK_LAYER_VALIDATE_SYNC=1"
+            echo "validation_sync_activation=unproven_by_setting_request_alone"
+            rustc -Vv
+            cargo -V
+            echo "--- vulkaninfo --summary ---"
+            vulkaninfo --summary
+          } > "$EVIDENCE_DIR/qualification-environment.txt"
+          dpkg-query -W -f='${Package}\t${Version}\n' \
+            libvulkan1 mesa-vulkan-drivers vulkan-tools vulkan-validationlayers \
+            > "$EVIDENCE_DIR/vulkan-package-versions.txt"
+          find .ci/vulkan-sync-workspace/src -type f -print0 | sort -z | xargs -0 sha256sum \
+            > "$EVIDENCE_DIR/source-sha256.txt"
+          sha256sum .ci/vulkan-sync-workspace/Cargo.toml .ci/vulkan-sync-workspace/Cargo.lock \
+            crates/core/symthaea-gpu-fabric/Cargo.toml .github/workflows/gpu-fabric-vulkan-sync.yml \
+            > "$EVIDENCE_DIR/qualification-input-sha256.txt"
+
+      - name: Compile Vulkan synchronization runtime
+        id: compile
+        working-directory: .ci/vulkan-sync-workspace
+        run: |
+          set -o pipefail
+          cargo test --locked --features vulkan --lib 2>&1 \
+            | tee "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/compile.log"
+
+      - name: Execute real Vulkan synchronization qualification
+        id: runtime
+        working-directory: .ci/vulkan-sync-workspace
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 180s \
+            cargo test --locked --features vulkan --lib \
+              -- --ignored --nocapture --test-threads=1 real_vulkan_timeline_submission_reaches_completion 2>&1 \
+            | tee "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/runtime.log"
+
+      - name: SyncVal known-hazard positive control
+        id: syncval_hazard
+        working-directory: .ci/vulkan-sync-workspace
+        env:
+          SYNCVAL_PROBE_CASE: hazard
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 180s \
+            cargo test --locked --features vulkan --lib \
+              -- --ignored --nocapture --test-threads=1 real_vulkan_syncval_activation_probe 2>&1 \
+            | tee "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/syncval-hazard.log"
+          HAZARD_LOG="$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/syncval-hazard.log"
+          EXPECTED_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$HAZARD_LOG" || true)"
+          ALL_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$HAZARD_LOG" || true)"
+          test "$EXPECTED_HAZARD_COUNT" -eq 1 || {
+            echo "Expected exactly one READ-AFTER-WRITE sentinel diagnostic, found $EXPECTED_HAZARD_COUNT" >&2
+            exit 1
+          }
+          test "$ALL_HAZARD_COUNT" -eq 1 || {
+            echo "Expected exactly one total SyncVal hazard diagnostic, found $ALL_HAZARD_COUNT" >&2
+            exit 1
+          }
+          grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' "$HAZARD_LOG"
+
+      - name: SyncVal safe negative control
+        id: syncval_safe
+        working-directory: .ci/vulkan-sync-workspace
+        env:
+          SYNCVAL_PROBE_CASE: safe
+        run: |
+          set -o pipefail
+          timeout --foreground --kill-after=15s 180s \
+            cargo test --locked --features vulkan --lib \
+              -- --ignored --nocapture --test-threads=1 real_vulkan_syncval_activation_probe 2>&1 \
+            | tee "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/syncval-safe.log"
+          grep -Fq 'SYNCVAL_SENTINEL_END case=safe result=completed' \
+            "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/syncval-safe.log"
+          if grep -Fq 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' \
+              "$GITHUB_WORKSPACE/.ci/vulkan-sync-qualification/syncval-safe.log"; then
+            echo 'SyncVal reported a hazard in the safe control' >&2
+            exit 1
+          fi
+
+      - name: Seal qualification evidence
+        if: always()
+        env:
+          EXPECTED_QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          EVIDENCE_DIR=.ci/vulkan-sync-qualification
+          test -d "$EVIDENCE_DIR" || mkdir -p "$EVIDENCE_DIR"
+          test -s "$EVIDENCE_DIR/qualification-environment.txt" || \
+            printf 'qualification_environment=not_reached\n' > "$EVIDENCE_DIR/qualification-environment.txt"
+          test -s "$EVIDENCE_DIR/vulkan-package-versions.txt" || \
+            printf 'vulkan_package_versions=not_reached\n' > "$EVIDENCE_DIR/vulkan-package-versions.txt"
+          test -s "$EVIDENCE_DIR/source-sha256.txt" || \
+            printf 'source_hashes=not_reached\n' > "$EVIDENCE_DIR/source-sha256.txt"
+          test -s "$EVIDENCE_DIR/qualification-input-sha256.txt" || \
+            printf 'input_hashes=not_reached\n' > "$EVIDENCE_DIR/qualification-input-sha256.txt"
+          test -s "$EVIDENCE_DIR/compile.log" || \
+            printf 'compile=not_reached\n' > "$EVIDENCE_DIR/compile.log"
+          test -s "$EVIDENCE_DIR/runtime.log" || \
+            printf 'runtime=not_reached\n' > "$EVIDENCE_DIR/runtime.log"
+          test -s "$EVIDENCE_DIR/syncval-hazard.log" || \
+            printf 'syncval_hazard_probe=not_reached\n' > "$EVIDENCE_DIR/syncval-hazard.log"
+          test -s "$EVIDENCE_DIR/syncval-safe.log" || \
+            printf 'syncval_safe_control=not_reached\n' > "$EVIDENCE_DIR/syncval-safe.log"
+          HAZARD_OUTCOME='${{ steps.syncval_hazard.outcome }}'
+          SAFE_OUTCOME='${{ steps.syncval_safe.outcome }}'
+          EXPECTED_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-READ-AFTER-WRITE' "$EVIDENCE_DIR/syncval-hazard.log" || true)"
+          ALL_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$EVIDENCE_DIR/syncval-hazard.log" || true)"
+          SAFE_HAZARD_COUNT="$(grep -F -c 'SYNCVAL_PROBE_DIAGNOSTIC id=SYNC-HAZARD-' "$EVIDENCE_DIR/syncval-safe.log" || true)"
+          SYNCVAL_ACTIVATION=not_proven_without_hazard_sentinel
+          if [[ "$HAZARD_OUTCOME" == success && "$SAFE_OUTCOME" == success ]] \
+            && [[ "$EXPECTED_HAZARD_COUNT" -eq 1 && "$ALL_HAZARD_COUNT" -eq 1 && "$SAFE_HAZARD_COUNT" -eq 0 ]] \
+            && grep -Fq 'SYNCVAL_SENTINEL_END case=hazard result=completed' "$EVIDENCE_DIR/syncval-hazard.log" \
+            && grep -Fq 'SYNCVAL_SENTINEL_END case=safe result=completed' "$EVIDENCE_DIR/syncval-safe.log"; then
+            SYNCVAL_ACTIVATION=confirmed_by_positive_and_negative_controls
+          fi
+          {
+            echo "qualification_commit=$EXPECTED_QUALIFICATION_SHA"
+            echo "compile_outcome=${{ steps.compile.outcome }}"
+            echo "runtime_outcome=${{ steps.runtime.outcome }}"
+            echo "syncval_hazard_outcome=$HAZARD_OUTCOME"
+            echo "syncval_safe_outcome=$SAFE_OUTCOME"
+            echo "syncval_hazard_expected_diagnostic_count=$EXPECTED_HAZARD_COUNT"
+            echo "syncval_hazard_total_diagnostic_count=$ALL_HAZARD_COUNT"
+            echo "syncval_safe_hazard_diagnostic_count=$SAFE_HAZARD_COUNT"
+            echo "syncval_activation=$SYNCVAL_ACTIVATION"
+          } > "$EVIDENCE_DIR/qualification-status.txt"
+          (cd "$EVIDENCE_DIR" && sha256sum \
+            qualification-environment.txt vulkan-package-versions.txt source-sha256.txt \
+            qualification-input-sha256.txt compile.log runtime.log syncval-hazard.log \
+            syncval-safe.log qualification-status.txt \
+            > evidence-sha256.txt)
+
+      - name: Upload immutable qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gpu-fabric-vulkan-sync-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: error
+          path: .ci/vulkan-sync-qualification/
