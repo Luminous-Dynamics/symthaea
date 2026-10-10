@@ -85,6 +85,7 @@ impl TaskResult {
     /// with an intentionally empty test suite.
     fn is_correct(&self) -> bool {
         !self.execution_simulated
+            && self.expected_tests > 0
             && self.compiled
             && self.tests_failed == 0
             && self.tests_passed >= self.expected_tests
@@ -989,9 +990,13 @@ fn run_task(
 
     let expected_tests = count_expected_tests(task.test_source);
 
-    // Status symbols: ✓ = all expected tests passed, ◐ = compiled but correctness
-    // evidence is incomplete or failing, ✗ = didn't compile.
-    let correct = compiled && tests_failed == 0 && tests_passed >= expected_tests;
+    // L3 correctness requires an actual supplied test oracle. Empty test_source
+    // means compile-only evidence: useful for L2, never sufficient for correctness.
+    let correct = expected_tests > 0
+        && compiled
+        && !execution_simulated
+        && tests_failed == 0
+        && tests_passed >= expected_tests;
     let status = if correct {
         "✓"
     } else if execution_simulated {
@@ -1384,8 +1389,10 @@ mod tests {
     }
 
     #[test]
-    fn compile_only_task_can_pass_without_tests() {
-        assert!(result(true, 0, 0, 0, false).is_correct());
+    fn compile_only_task_is_not_reported_as_correct() {
+        // Compilation is a useful L2 signal, but without a supplied oracle it
+        // cannot establish L3 functional correctness.
+        assert!(!result(true, 0, 0, 0, false).is_correct());
     }
 
     #[test]
@@ -1398,6 +1405,12 @@ mod tests {
         // The executor's simulation sentinel can set compiled=true while
         // explicitly stating that no compiler or test process ran.
         assert!(!result(true, 0, 0, 0, true).is_correct());
+    }
+
+    #[test]
+    fn testless_task_cannot_claim_functional_correctness() {
+        // Even real compilation cannot substitute for behavioral evidence.
+        assert!(!result(true, 0, 0, 0, false).is_correct());
     }
 
     #[test]
