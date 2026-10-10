@@ -42,6 +42,25 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-remote-classifier-focused:
+    name: Nixward Remote Classifier Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check remote classifier formatting
+        run: cargo fmt --check -- src/action/mod.rs
+
+      - name: Run remote wrapper regressions
+        run: cargo test -p symthaea test_remote_command_capability_rejects_wrapper_escape_programs --lib
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
