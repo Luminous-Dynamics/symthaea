@@ -14,7 +14,7 @@ use std::collections::HashSet;
 
 use symthaea_agribot::soil_process::{EvidenceKind, EvidenceRef};
 
-const DESIGN_ALGORITHM_ID: &str = "full-factorial-2level-blocked-splitmix64-fy-v1";
+const DESIGN_ALGORITHM_ID: &str = "full-factorial-2level-blocked-splitmix64-fy-joint-centers-v2";
 const MIN_FACTORS: usize = 2;
 const MAX_FACTORS: usize = 6;
 const MIN_BLOCKS: usize = 2;
@@ -173,6 +173,7 @@ impl ExperimentBlock {
 #[derive(Serialize)]
 struct ScreeningDesignReviewPayload<'a> {
     schema_id: &'static str,
+    design_algorithm_id: &'static str,
     experiment_id: &'a str,
     preregistration_id: &'a str,
     input_snapshot_id: &'a str,
@@ -198,6 +199,7 @@ pub fn screening_design_sha256(
 ) -> Result<String, ScreeningDesignError> {
     let payload = ScreeningDesignReviewPayload {
         schema_id: "screening-design-review-payload-v1",
+        design_algorithm_id: DESIGN_ALGORITHM_ID,
         experiment_id: &request.experiment_id,
         preregistration_id: &request.preregistration_id,
         input_snapshot_id: &request.input_snapshot_id,
