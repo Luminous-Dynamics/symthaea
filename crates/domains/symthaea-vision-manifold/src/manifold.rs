@@ -1985,6 +1985,15 @@ impl VisionManifold {
             return Vec::new();
         }
 
+        // Fail closed before path generation or telemetry mutation when the per-call
+        // cost cannot be represented safely. The persistent counter is cumulative;
+        // the telemetry field below records this request's incremental cost.
+        let Some((geodesic_call_cost, projected_compute_cost)) =
+            checked_geodesic_cost_increment(steps, num_candidates, self.geodesic_compute_cost)
+        else {
+            return Vec::new();
+        };
+
         let mut final_goal = goal.clone();
         if final_goal.values.len() != self.hdc_dim() {
             final_goal = final_goal.dilate(self.hdc_dim());
@@ -2012,10 +2021,10 @@ impl VisionManifold {
         self.telemetry.last_geodesic_path = best_path.iter().map(|hv| hv.values.clone()).collect();
         self.telemetry.last_geodesic_length = best_path.len();
 
-        // Update thermodynamic cost (Phase 3)
-        // Science: metabolic cost of high-res mental simulation.
-        self.geodesic_compute_cost += (steps * num_candidates) as f32 * 0.012;
-        self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
+        // Update thermodynamic cost (Phase 3). Keep the cumulative counter for
+        // diagnostics, but expose only this call's incremental cost as "last".
+        self.geodesic_compute_cost = projected_compute_cost;
+        self.telemetry.last_geodesic_cost = geodesic_call_cost;
 
         // Store intent for swarm broadcast (Phase 5)
         self.last_intent_hv = final_goal;
@@ -11002,5 +11011,45 @@ mod tests {
         let mut invalid = saved.clone();
         invalid.modality_contexts[0].next_track_id = 0;
         assert!(restored.validate_checkpoint_state(&invalid).is_err());
+    }
+}
+
+
+/// Compute per-call and projected cumulative cost without unchecked integer
+/// multiplication or non-finite float accumulation.
+fn checked_geodesic_cost_increment(
+    steps: usize,
+    num_candidates: usize,
+    cumulative_cost: f32,
+) -> Option<(f32, f32)> {
+    let evaluations = steps.checked_mul(num_candidates)?;
+    let call_cost = (evaluations as f64 * 0.012) as f32;
+    if !call_cost.is_finite() || !cumulative_cost.is_finite() || cumulative_cost < 0.0 {
+        return None;
+    }
+    let projected = cumulative_cost + call_cost;
+    projected.is_finite().then_some((call_cost, projected))
+}
+
+#[cfg(test)]
+mod checked_geodesic_cost_tests {
+    use super::checked_geodesic_cost_increment;
+
+    #[test]
+    fn checked_cost_returns_increment_and_new_cumulative_total() {
+        assert_eq!(checked_geodesic_cost_increment(8, 3, 1.0), Some((0.288, 1.288)));
+    }
+
+    #[test]
+    fn checked_cost_rejects_multiplication_overflow() {
+        assert_eq!(checked_geodesic_cost_increment(usize::MAX, 4, 0.0), None);
+    }
+
+    #[test]
+    fn checked_cost_rejects_invalid_or_overflowing_accumulator() {
+        assert_eq!(checked_geodesic_cost_increment(1, 1, f32::NAN), None);
+        assert_eq!(checked_geodesic_cost_increment(1, 1, f32::INFINITY), None);
+        assert_eq!(checked_geodesic_cost_increment(1, 1, f32::MAX), None);
+        assert_eq!(checked_geodesic_cost_increment(1, 1, -1.0), None);
     }
 }
