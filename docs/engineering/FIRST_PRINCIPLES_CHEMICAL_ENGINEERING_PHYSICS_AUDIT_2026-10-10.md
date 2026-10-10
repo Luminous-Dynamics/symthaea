@@ -203,6 +203,10 @@ External tool capability is not local qualification evidence. Each selected vers
 - No drinking-water/health, process safety, regulatory compliance, production yield, scale-up, or plant-readiness claim is made.
 - No monorepo implementation is silently copied into canonical Symthaea. Source drift is a separate item to resolve through owners and the appropriate existing interfaces.
 
+## Implementation follow-on (2026-10-10)
+
+The first additive code slice is under review in [THERM-VALID-001 #7318](https://github.com/Luminous-Dynamics/symthaea/issues/7318) and [PR #7319](https://github.com/Luminous-Dynamics/symthaea/pull/7319). It adds checked numeric-domain entry points for the existing thermofluid formulas while preserving legacy APIs. This is intentionally narrower than unit/dimensional validation, solver qualification, or model validation; those remain owned by #6868 / #3697 / #6871. As of this update, PR #7319 is ready for review and its CI jobs are queued; no passing test result is claimed.
+
 ## Evidence status at submission
 
 - Canonical Symthaea source inspected at exact HEAD `77b872fd116c7b6f44fedd82bb8c6100240caa73`: process-discovery oracle/certificate/manifest, quantum-chemistry linkage, thermofluids, numerical ODE routines, continuum Navier–Stokes/coarse-graining, materials stability, engineering facade, simulation bridge, OpenFOAM bridge and physics equation catalog.
