@@ -82,7 +82,11 @@ pub use dynamics::observe_gr_correction;
 use dynamics::*;
 /// FEP-flavored active experiment selection. See
 /// `experiment_selection.rs` module docs.
-pub use experiment_selection::{epistemic_value, select_most_informative_experiment};
+pub use experiment_selection::{
+    discriminative_value, epistemic_value, select_most_discriminative_experiment,
+    select_most_discriminative_experiment_with_receipt, select_most_informative_experiment,
+    select_most_informative_experiment_with_receipt,
+};
 pub use expressions::*;
 /// Stage B M2: constrained flux discovery given a known density. See
 /// `flux_discovery.rs` module docs.
