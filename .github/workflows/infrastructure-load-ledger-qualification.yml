@@ -1,0 +1,52 @@
+name: Infrastructure Load Ledger Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-infrastructure/**"
+      - ".github/workflows/infrastructure-load-ledger-qualification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-infrastructure/**"
+      - ".github/workflows/infrastructure-load-ledger-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infrastructure-load-ledger-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  per-load-ledger:
+    name: Per-load ledger integration tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format-check transactional grid physics simulator
+        run: rustfmt --edition 2024 --check crates/core/symthaea-infrastructure/src/grid_physics_simulator.rs
+
+      - name: Run checked grid-physics and per-load ledger regressions
+        run: cargo test --locked -p symthaea-infrastructure --features grid_physics grid_physics_simulator::failure_mode_tests
+
+      - name: Run strict Clippy for the infrastructure library with grid physics
+        run: cargo clippy --locked -p symthaea-infrastructure --features grid_physics --lib -- -D warnings

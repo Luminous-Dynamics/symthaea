@@ -47,6 +47,11 @@ use symthaea_grid_physics::islanding::{
 use symthaea_grid_physics::trip_envelope::VoltageTripEnvelope;
 use tracing::warn;
 
+use crate::load_registry::{
+    ClassificationProvenance, LoadClass, LoadDemand, LoadRegistry, LoadRegistryEntry,
+    LoadServiceLedger,
+};
+use crate::load_registry_verifier::verify_load_service_ledger;
 use crate::simulator::InfrastructurePhysicsSimulator;
 #[cfg(test)]
 use crate::types::InfrastructureOperatingMode;
@@ -80,6 +85,9 @@ const BASE_COMMUNITY_LOAD_KW: f64 = 150.0;
 const LOAD_SWING_KW: f64 = 100.0;
 const LOAD_PERIOD_S: f64 = 300.0;
 const ROUTING_LOAD_SCALE_KW: f64 = 20.0;
+/// Maximum synthetic community demand at peak routing effort.
+const MAX_COMMUNITY_LOAD_KW: f64 =
+    BASE_COMMUNITY_LOAD_KW + LOAD_SWING_KW + ROUTING_LOAD_SCALE_KW * 4.0;
 
 const AMBIENT_TEMP_C: f64 = 22.0;
 const MAX_SAFE_TEMP_C: f64 = 90.0;
@@ -117,6 +125,12 @@ const BASE_RELAY_DECAY_PER_S: f64 = 0.0005;
 const RELAY_DECAY_PER_ABNORMAL_VOLTAGE_S: f64 = 0.002;
 const RELAY_DECAY_PER_THERMAL_RISK_S: f64 = 0.001;
 
+fn ledger_close(left: f64, right: f64) -> bool {
+    left.is_finite()
+        && right.is_finite()
+        && (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
+}
+
 /// Largest supported coarse simulation interval. The synthetic load period is
 /// 300 s and the lumped thermal time constant is about 100 s, so <=1 s keeps
 /// these updates resolved at >=100 steps per thermal time constant and >=300
@@ -131,6 +145,8 @@ pub enum GridPhysicsStepError {
     ActuatorOutOfRange { index: usize },
     InvalidBatteryConfiguration,
     InvalidLoadServicePolicy,
+    InvalidLoadRegistry,
+    LoadLedgerMismatch,
     /// A battery operation rejected its input or configuration.
     BatteryOperation(BatteryError),
     InvalidDerivedPhysics,
@@ -549,12 +565,15 @@ pub struct GridPhysicsInfrastructureSimulator {
     /// mutation-free when it rejects an input.
     last_trait_step_accepted: bool,
     last_load_service_report: LoadServiceReport,
+    last_load_service_ledger: Option<LoadServiceLedger>,
     load_service_policy: LoadServicePolicy,
+    load_registry: LoadRegistry,
 }
 
 impl GridPhysicsInfrastructureSimulator {
     pub fn new() -> Self {
         Self::build_with_load_service_policy(LoadServicePolicy::illustrative_default())
+            .expect("the fixed synthetic load registry must be valid")
     }
 
     /// Build a simulator with an explicit, validated load-priority policy.
@@ -566,11 +585,14 @@ impl GridPhysicsInfrastructureSimulator {
         if !policy.is_valid() {
             return Err(GridPhysicsStepError::InvalidLoadServicePolicy);
         }
-        Ok(Self::build_with_load_service_policy(policy))
+        Self::build_with_load_service_policy(policy)
     }
 
-    fn build_with_load_service_policy(policy: LoadServicePolicy) -> Self {
-        Self {
+    fn build_with_load_service_policy(
+        policy: LoadServicePolicy,
+    ) -> Result<Self, GridPhysicsStepError> {
+        let load_registry = Self::build_load_registry(policy)?;
+        Ok(Self {
             state: InfrastructureState::home(),
             battery: Battery::new(
                 BATTERY_CAPACITY_KWH,
@@ -600,8 +622,148 @@ impl GridPhysicsInfrastructureSimulator {
             elapsed_s: 0.0,
             last_trait_step_accepted: true,
             last_load_service_report: LoadServiceReport::default(),
+            last_load_service_ledger: None,
             load_service_policy: policy,
+            load_registry,
+        })
+    }
+
+    fn build_load_registry(
+        policy: LoadServicePolicy,
+    ) -> Result<LoadRegistry, GridPhysicsStepError> {
+        let version = format!(
+            "grid-physics-load-policy-v1-c{:016x}-d{:016x}-a{:016x}-t{:016x}",
+            policy.critical_community_fraction.to_bits(),
+            policy.deferrable_community_fraction.to_bits(),
+            policy.auxiliary_community_fraction.to_bits(),
+            policy.protected_cooling_thermal_risk_threshold.to_bits(),
+        );
+        let provenance = || ClassificationProvenance::SyntheticScenario {
+            scenario_id: "grid-physics-synthetic-demand-v1".to_string(),
+        };
+        let community_rating = |fraction: f64| {
+            // A zero-share category still needs a positive registry rating.
+            (MAX_COMMUNITY_LOAD_KW * fraction).max(MAX_COMMUNITY_LOAD_KW * 1e-9) + 1e-6
+        };
+        let entry = |load_id: &str,
+                     class: LoadClass,
+                     rated_power_kw: f64,
+                     shed_priority: u16,
+                     restore_priority: u16| LoadRegistryEntry {
+            load_id: load_id.to_string(),
+            class,
+            rated_power_kw,
+            shed_priority,
+            restore_priority,
+            provenance: provenance(),
+        };
+        LoadRegistry::new(
+            version,
+            vec![
+                entry(
+                    "critical-community",
+                    LoadClass::Critical,
+                    community_rating(policy.critical_community_fraction),
+                    10,
+                    0,
+                ),
+                entry("protected-cooling", LoadClass::Critical, COOLING_RATED_KW, 5, 1),
+                entry(
+                    "deferrable-community",
+                    LoadClass::Deferrable,
+                    community_rating(policy.deferrable_community_fraction),
+                    10,
+                    2,
+                ),
+                entry("ordinary-cooling", LoadClass::Deferrable, COOLING_RATED_KW, 5, 3),
+                entry("heating", LoadClass::Auxiliary, HEATING_RATED_KW, 10, 4),
+                entry(
+                    "community-auxiliary",
+                    LoadClass::Auxiliary,
+                    community_rating(policy.auxiliary_community_fraction),
+                    0,
+                    5,
+                ),
+            ],
+        )
+        .map_err(|_| GridPhysicsStepError::InvalidLoadRegistry)
+    }
+
+    pub fn load_registry(&self) -> &LoadRegistry {
+        &self.load_registry
+    }
+
+    /// The last committed per-load ledger. None means no checked step has
+    /// committed since construction or reset.
+    pub fn load_service_ledger(&self) -> Option<&LoadServiceLedger> {
+        self.last_load_service_ledger.as_ref()
+    }
+
+    fn load_ledger_matches_report(
+        ledger: &LoadServiceLedger,
+        report: &LoadServiceReport,
+    ) -> bool {
+        if !ledger_close(ledger.total_demand_kwh, report.total_demand_kwh)
+            || !ledger_close(ledger.total_served_kwh, report.total_served_kwh)
+            || !ledger_close(ledger.intentional_shed_kwh, report.intentional_shed_kwh)
+            || !ledger_close(ledger.total_unserved_kwh, report.total_unserved_kwh)
+        {
+            return false;
         }
+        let matches_record =
+            |load_id: &str, demand: f64, served: f64, shed: f64, unserved: f64| {
+                ledger
+                    .records
+                    .iter()
+                    .find(|record| record.load_id == load_id)
+                    .is_some_and(|record| {
+                        ledger_close(record.requested_kwh, demand)
+                            && ledger_close(record.served_kwh, served)
+                            && ledger_close(record.intentional_shed_kwh, shed)
+                            && ledger_close(record.unserved_kwh, unserved)
+                    })
+            };
+        let ordinary_cooling_demand =
+            (report.cooling_demand_kwh - report.protected_cooling_demand_kwh).max(0.0);
+        let ordinary_cooling_served =
+            (report.cooling_served_kwh - report.protected_cooling_served_kwh).max(0.0);
+        matches_record(
+            "critical-community",
+            report.critical_demand_kwh,
+            report.critical_served_kwh,
+            0.0,
+            report.critical_unserved_kwh,
+        ) && matches_record(
+            "protected-cooling",
+            report.protected_cooling_demand_kwh,
+            report.protected_cooling_served_kwh,
+            0.0,
+            report.protected_cooling_unserved_kwh,
+        ) && matches_record(
+            "deferrable-community",
+            report.deferrable_demand_kwh,
+            report.deferrable_served_kwh,
+            report.deferrable_shed_kwh,
+            0.0,
+        ) && matches_record(
+            "ordinary-cooling",
+            ordinary_cooling_demand,
+            ordinary_cooling_served,
+            report.cooling_shed_kwh,
+            0.0,
+        ) && matches_record(
+            "heating",
+            report.heating_demand_kwh,
+            report.heating_served_kwh,
+            report.heating_shed_kwh,
+            0.0,
+        ) && matches_record(
+            "community-auxiliary",
+            report.community_auxiliary_demand_kwh,
+            report.community_auxiliary_served_kwh,
+            report.community_auxiliary_shed_kwh,
+            0.0,
+        )
     }
 
     pub fn load_service_policy(&self) -> LoadServicePolicy {
@@ -707,6 +869,14 @@ impl GridPhysicsInfrastructureSimulator {
 
         let mut candidate = self.clone();
         candidate.step_candidate(cmd, dt)?;
+        let Some(ledger) = candidate.last_load_service_ledger.as_ref() else {
+            return Err(GridPhysicsStepError::LoadLedgerMismatch);
+        };
+        if verify_load_service_ledger(&candidate.load_registry, ledger).is_err()
+            || !Self::load_ledger_matches_report(ledger, &candidate.last_load_service_report)
+        {
+            return Err(GridPhysicsStepError::LoadLedgerMismatch);
+        }
         if !candidate.state_channels_are_valid()
             || !candidate.last_load_service_report.is_valid()
             || !candidate.battery_configuration_is_valid()
@@ -803,9 +973,9 @@ impl GridPhysicsInfrastructureSimulator {
         let net_battery_injection_kw = discharge_delivered_ac_kw - actual_ac_kw_for_charge;
         let battery_charge_input_kwh = actual_ac_kw_for_charge * dt_hours;
 
-        // Account each load bucket independently. In islanded mode the report
-        // is also the deterministic guard's explicit shed decision and service
-        // receipt. In grid-tied mode the idealized infinite bus serves demand.
+        // Keep the detailed aggregate receipt for API compatibility, but
+        // make the versioned per-load registry the allocation source for the
+        // physical transition below.
         let mut load_report = LoadServiceReport::allocate(
             self.load_service_policy,
             community_load_kw,
@@ -825,27 +995,83 @@ impl GridPhysicsInfrastructureSimulator {
         if !load_report.is_valid() {
             return Err(GridPhysicsStepError::InvalidDerivedPhysics);
         }
-        // The electrical model must consume the amount of load actually
-        // served by the bucket allocator, not requested load that the report
-        // has already classified as involuntarily unserved. In grid-tied mode
-        // the feeder represents net upstream exchange, so battery injection
-        // is subtracted; islanded mode uses the battery as the feeder source,
-        // and subtracting its output from the load here would double-count it.
-        let served_load_kw = if dt_hours > 0.0 {
-            load_report.total_served_kwh / dt_hours
+
+        let thermal_risk_before_step = self.state.channels[THERMAL_RUNAWAY_RISK];
+        let protected_cooling_kw = if thermal_risk_before_step
+            >= self.load_service_policy.protected_cooling_thermal_risk_threshold
+        {
+            cooling_load_kw
         } else {
             0.0
         };
-        let served_cooling_kw = if dt_hours > 0.0 {
-            load_report.cooling_served_kwh / dt_hours
+        let ordinary_cooling_kw = (cooling_load_kw - protected_cooling_kw).max(0.0);
+        let critical_community_kw =
+            community_load_kw * self.load_service_policy.critical_community_fraction;
+        let deferrable_community_kw =
+            community_load_kw * self.load_service_policy.deferrable_community_fraction;
+        let community_auxiliary_kw =
+            community_load_kw * self.load_service_policy.auxiliary_community_fraction;
+        let load_demands = [
+            LoadDemand {
+                load_id: "critical-community".into(),
+                requested_power_kw: critical_community_kw,
+            },
+            LoadDemand {
+                load_id: "protected-cooling".into(),
+                requested_power_kw: protected_cooling_kw,
+            },
+            LoadDemand {
+                load_id: "deferrable-community".into(),
+                requested_power_kw: deferrable_community_kw,
+            },
+            LoadDemand {
+                load_id: "ordinary-cooling".into(),
+                requested_power_kw: ordinary_cooling_kw,
+            },
+            LoadDemand {
+                load_id: "heating".into(),
+                requested_power_kw: heating_load_kw,
+            },
+            LoadDemand {
+                load_id: "community-auxiliary".into(),
+                requested_power_kw: community_auxiliary_kw,
+            },
+        ];
+        let registry_demand_kwh = load_demands
+            .iter()
+            .map(|demand| demand.requested_power_kw * dt_hours)
+            .sum::<f64>();
+        let available_service_energy_kwh = if is_islanded {
+            discharge_delivered_ac_kwh
         } else {
-            0.0
+            registry_demand_kwh
         };
-        let served_heating_kw = if dt_hours > 0.0 {
-            load_report.heating_served_kwh / dt_hours
-        } else {
-            0.0
+        let load_ledger = self
+            .load_registry
+            .allocate(&load_demands, dt_hours, available_service_energy_kwh)
+            .map_err(|_| GridPhysicsStepError::InvalidLoadRegistry)?;
+        verify_load_service_ledger(&self.load_registry, &load_ledger)
+            .map_err(|_| GridPhysicsStepError::LoadLedgerMismatch)?;
+        if !Self::load_ledger_matches_report(&load_ledger, &load_report) {
+            return Err(GridPhysicsStepError::LoadLedgerMismatch);
+        }
+
+        // Allocation by stable registry ID now drives the actual feeder,
+        // thermal, and islanded-frequency quantities. The aggregate report
+        // remains a parity-checked compatibility receipt.
+        let served_load_kw = load_ledger.total_served_kwh / dt_hours;
+        let ledger_served_kwh = |load_id: &str| {
+            load_ledger
+                .records
+                .iter()
+                .find(|record| record.load_id == load_id)
+                .map(|record| record.served_kwh)
+                .ok_or(GridPhysicsStepError::LoadLedgerMismatch)
         };
+        let served_cooling_kw =
+            (ledger_served_kwh("protected-cooling")? + ledger_served_kwh("ordinary-cooling")?)
+                / dt_hours;
+        let served_heating_kw = ledger_served_kwh("heating")? / dt_hours;
         let effective_cooling_frac = (served_cooling_kw / COOLING_RATED_KW).clamp(0.0, 1.0);
         let effective_heating_frac = (served_heating_kw / HEATING_RATED_KW).clamp(0.0, 1.0);
         let node_load_kw = if is_islanded {
@@ -1039,6 +1265,7 @@ impl GridPhysicsInfrastructureSimulator {
         s[RECOVERY_MARGIN] = recovery_margin;
         s[THERMAL_RUNAWAY_RISK] = thermal_runaway_risk;
         self.last_load_service_report = load_report;
+        self.last_load_service_ledger = Some(load_ledger);
         Ok(())
     }
 }
@@ -1075,6 +1302,7 @@ impl InfrastructurePhysicsSimulator for GridPhysicsInfrastructureSimulator {
         self.elapsed_s = 0.0;
         self.last_trait_step_accepted = true;
         self.last_load_service_report = LoadServiceReport::default();
+        self.last_load_service_ledger = None;
     }
 
     fn backend_name(&self) -> &'static str {
@@ -1816,4 +2044,138 @@ mod failure_mode_tests {
             GridPhysicsStepError::ActuatorOutOfRange { index: 0 },
         );
     }
+
+    #[test]
+    fn per_load_registry_ledger_is_committed_and_matches_compatibility_report() {
+        for is_islanded in [true, false] {
+            let mut sim = GridPhysicsInfrastructureSimulator::new();
+            let mut cmd = InfrastructureCommand::zero();
+            if is_islanded {
+                cmd.torques[1] = 0.05;
+            } else {
+                cmd.torques[4] = 1.0;
+            }
+
+            assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+            let ledger = sim.load_service_ledger().expect("committed step ledger");
+            assert_eq!(ledger.registry_digest, sim.load_registry().registry_digest());
+            assert!(verify_load_service_ledger(sim.load_registry(), ledger).is_ok());
+            assert!(GridPhysicsInfrastructureSimulator::load_ledger_matches_report(
+                ledger,
+                sim.load_service_report(),
+            ));
+            assert_eq!(ledger.records.len(), 6);
+            assert!(ledger.records.iter().any(|record| {
+                record.load_id == "critical-community" && record.class == LoadClass::Critical
+            }));
+        }
+    }
+
+    #[test]
+    fn registry_digest_binds_load_service_policy_and_zero_share_buckets_remain_registered() {
+        let default_sim = GridPhysicsInfrastructureSimulator::new();
+        let default_digest = default_sim.load_registry().registry_digest().to_string();
+        let custom_policy = LoadServicePolicy {
+            critical_community_fraction: 0.50,
+            deferrable_community_fraction: 0.50,
+            auxiliary_community_fraction: 0.0,
+            ..LoadServicePolicy::illustrative_default()
+        };
+        let custom_sim =
+            GridPhysicsInfrastructureSimulator::try_new_with_load_service_policy(custom_policy)
+                .unwrap();
+        assert_ne!(default_digest, custom_sim.load_registry().registry_digest());
+        assert!(custom_sim
+            .load_registry()
+            .entries()
+            .iter()
+            .any(|entry| entry.load_id == "community-auxiliary"));
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[4] = 1.0;
+        let mut custom_sim = custom_sim;
+        assert_eq!(custom_sim.try_step(&cmd, 0.25), Ok(()));
+        let ledger = custom_sim.load_service_ledger().unwrap();
+        let auxiliary = ledger
+            .records
+            .iter()
+            .find(|record| record.load_id == "community-auxiliary")
+            .unwrap();
+        assert_eq!(auxiliary.requested_kwh, 0.0);
+        assert!(verify_load_service_ledger(custom_sim.load_registry(), ledger).is_ok());
+    }
+
+    #[test]
+    fn thermal_threshold_routes_cooling_to_the_registered_protection_bucket() {
+        let policy = LoadServicePolicy::illustrative_default();
+        let threshold = policy.protected_cooling_thermal_risk_threshold;
+        for (risk, should_protect) in [(threshold, true), (threshold - 1e-6, false)] {
+            let mut sim =
+                GridPhysicsInfrastructureSimulator::try_new_with_load_service_policy(policy)
+                    .unwrap();
+            sim.state.channels[THERMAL_RUNAWAY_RISK] = risk;
+            let mut cmd = InfrastructureCommand::zero();
+            cmd.torques[1] = 0.05;
+            cmd.torques[2] = 1.0;
+            assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+            let ledger = sim.load_service_ledger().unwrap();
+            let protected = ledger
+                .records
+                .iter()
+                .find(|record| record.load_id == "protected-cooling")
+                .unwrap();
+            let ordinary = ledger
+                .records
+                .iter()
+                .find(|record| record.load_id == "ordinary-cooling")
+                .unwrap();
+            if should_protect {
+                assert!(protected.requested_kwh > 0.0);
+                assert_eq!(ordinary.requested_kwh, 0.0);
+            } else {
+                assert_eq!(protected.requested_kwh, 0.0);
+                assert!(ordinary.requested_kwh > 0.0);
+            }
+            assert!(GridPhysicsInfrastructureSimulator::load_ledger_matches_report(
+                ledger,
+                sim.load_service_report(),
+            ));
+        }
+    }
+
+    #[test]
+    fn rejected_transaction_preserves_the_last_committed_load_ledger() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        assert_eq!(
+            sim.try_step(&InfrastructureCommand::zero(), 0.005),
+            Ok(())
+        );
+        let prior_ledger = sim.load_service_ledger().unwrap().clone();
+        let prior_state = sim.state.channels;
+        let prior_soc = sim.battery().soc();
+        let prior_elapsed = sim.elapsed_s;
+
+        let mut invalid = InfrastructureCommand::zero();
+        invalid.torques[0] = f32::NAN;
+        assert_eq!(
+            sim.try_step(&invalid, 0.005),
+            Err(GridPhysicsStepError::NonFiniteActuator { index: 0 })
+        );
+        assert_eq!(sim.state.channels, prior_state);
+        assert_eq!(sim.battery().soc(), prior_soc);
+        assert_eq!(sim.elapsed_s, prior_elapsed);
+        assert_eq!(sim.load_service_ledger(), Some(&prior_ledger));
+    }
+
+    #[test]
+    fn reset_clears_the_last_committed_per_load_receipt() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        assert_eq!(
+            sim.try_step(&InfrastructureCommand::zero(), 0.005),
+            Ok(())
+        );
+        assert!(sim.load_service_ledger().is_some());
+        sim.reset();
+        assert!(sim.load_service_ledger().is_none());
+    }
+
 }
