@@ -160,6 +160,9 @@ pub enum BenchScaleReviewStatus {
     Unknown,
 }
 
+/// Declared reviewer decision for a named bench-scale protocol. The planner validates
+/// status, evidence-ID presence, non-scenario evidence class, and exact protocol identity;
+/// it does not resolve, authenticate, or independently verify the referenced review record.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BenchScaleReview {
@@ -415,10 +418,12 @@ fn center_slots(treatment_count: usize, center_count: usize) -> HashSet<usize> {
         .collect()
 }
 
-/// Generate the preregistered blocked, randomized two-level full-factorial schedule.
+/// Generate a proposed preregistered blocked, randomized two-level full-factorial schedule.
 /// Treatment order is independently shuffled within each complete block. Center points,
 /// when enabled, use numeric midpoints and are placed deterministically at evenly spaced
 /// positions beginning and ending each block; they are not shuffled with treatment runs.
+/// Review status and record references are checked structurally but are not authenticated
+/// against an independent evidence service. This function does not authorize execution.
 pub fn generate_screening_design(
     request: &ScreeningDesignRequest,
 ) -> Result<ScreeningDesignPlan, ScreeningDesignError> {
