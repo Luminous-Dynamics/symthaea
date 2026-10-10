@@ -495,7 +495,7 @@ pub struct VisionTelemetry {
     /// Stores a sequence of state hypervector values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub last_geodesic_path: Vec<Vec<f32>>,
-    /// Thermodynamic cost of the last geodesic computation.
+    /// Incremental thermodynamic cost of the most recent geodesic call (not cumulative).
     #[serde(default)]
     pub last_geodesic_cost: f32,
     /// Number of steps in the last geodesic path.
