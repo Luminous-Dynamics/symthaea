@@ -15,6 +15,8 @@ use symthaea_sim_bridge::SimulationRequest;
 
 /// Maximum primary-netlist size accepted by this artifact boundary (4 MiB).
 pub const MAX_NETLIST_BYTES: usize = 4 * 1024 * 1024;
+/// Maximum size of a stable request identity.
+pub const MAX_REQUEST_ID_BYTES: usize = 256;
 
 /// A primary netlist bound to one request ID and identified by BLAKE3 of its
 /// exact UTF-8 bytes. Fields are private so callers cannot mutate the bytes or
@@ -30,6 +32,9 @@ pub struct NetlistArtifact {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetlistArtifactError {
     EmptyRequestId,
+    NonCanonicalRequestId,
+    RequestIdTooLarge { actual: usize, maximum: usize },
+    RequestIdControlCharacter,
     RequestIdMismatch { artifact: String, request: String },
     EmptyNetlist,
     NetlistTooLarge { actual: usize, maximum: usize },
@@ -42,6 +47,9 @@ impl fmt::Display for NetlistArtifactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyRequestId => f.write_str("netlist artifact request ID cannot be empty"),
+            Self::NonCanonicalRequestId => f.write_str("request ID must not have leading or trailing whitespace"),
+            Self::RequestIdTooLarge { actual, maximum } => write!(f, "request ID is {actual} bytes; maximum accepted size is {maximum}"),
+            Self::RequestIdControlCharacter => f.write_str("request ID must not contain control characters"),
             Self::RequestIdMismatch { artifact, request } => write!(
                 f,
                 "netlist artifact belongs to request {artifact:?}, not {request:?}"
@@ -71,6 +79,18 @@ impl NetlistArtifact {
         let request_id = request_id.into();
         if request_id.trim().is_empty() {
             return Err(NetlistArtifactError::EmptyRequestId);
+        }
+        if request_id.trim() != request_id {
+            return Err(NetlistArtifactError::NonCanonicalRequestId);
+        }
+        if request_id.len() > MAX_REQUEST_ID_BYTES {
+            return Err(NetlistArtifactError::RequestIdTooLarge {
+                actual: request_id.len(),
+                maximum: MAX_REQUEST_ID_BYTES,
+            });
+        }
+        if request_id.chars().any(char::is_control) {
+            return Err(NetlistArtifactError::RequestIdControlCharacter);
         }
 
         let bytes = bytes.into();
@@ -226,6 +246,25 @@ mod tests {
         assert_eq!(
             NetlistArtifact::new("  ", b"R1 a b 1k\n".to_vec()).unwrap_err(),
             NetlistArtifactError::EmptyRequestId
+        );
+    }
+
+    #[test]
+    fn rejects_noncanonical_or_unbounded_request_identity() {
+        assert_eq!(
+            NetlistArtifact::new(" circuit-1", b"R1 a b 1k\n".to_vec()).unwrap_err(),
+            NetlistArtifactError::NonCanonicalRequestId
+        );
+        assert!(matches!(
+            NetlistArtifact::new(
+                "x".repeat(MAX_REQUEST_ID_BYTES + 1),
+                b"R1 a b 1k\n".to_vec()
+            ),
+            Err(NetlistArtifactError::RequestIdTooLarge { .. })
+        ));
+        assert_eq!(
+            NetlistArtifact::new("circuit\n1", b"R1 a b 1k\n".to_vec()).unwrap_err(),
+            NetlistArtifactError::RequestIdControlCharacter
         );
     }
 }
