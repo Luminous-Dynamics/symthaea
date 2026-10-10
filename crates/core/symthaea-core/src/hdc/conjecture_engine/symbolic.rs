@@ -55,6 +55,24 @@ impl SymExpr {
     /// division by zero, invalid logarithm arguments, and non-finite results.
     /// It is the required path for evidence-producing mathematical checks.
     pub fn eval_checked(&self, vars: &[(&str, f64)]) -> Result<f64, SymExprEvalError> {
+        // Validate the complete environment, including bindings unused by this
+        // expression. Strict evaluation must not accept malformed hidden inputs.
+        for (index, (name, value)) in vars.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(SymExprEvalError::NonFiniteVariableBinding(
+                    (*name).to_string(),
+                ));
+            }
+            if vars[index + 1..]
+                .iter()
+                .any(|(other, _)| *other == *name)
+            {
+                return Err(SymExprEvalError::DuplicateVariableBinding(
+                    (*name).to_string(),
+                ));
+            }
+        }
+
         let value = match self {
             SymExpr::Var(name) => {
                 let mut matches = vars
@@ -620,6 +638,19 @@ mod conservation_evidence_tests {
         assert_eq!(
             expr.eval_checked(&[("x", f64::NAN)]),
             Err(SymExprEvalError::NonFiniteVariableBinding("x".into()))
+        );
+    }
+
+    #[test]
+    fn checked_eval_rejects_unused_duplicate_or_non_finite_bindings() {
+        let constant = SymExpr::Const(2.0);
+        assert_eq!(
+            constant.eval_checked(&[("unused", 1.0), ("unused", 2.0)]),
+            Err(SymExprEvalError::DuplicateVariableBinding("unused".into()))
+        );
+        assert_eq!(
+            constant.eval_checked(&[("unused", f64::NAN)]),
+            Err(SymExprEvalError::NonFiniteVariableBinding("unused".into()))
         );
     }
 
