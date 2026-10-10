@@ -130,7 +130,7 @@ fn synthetic_rf_fixture_preserves_known_echo_time_and_sample_position() {
     )
     .unwrap();
     let trace = phantom
-        .simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 1_000)
+        .simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
         .unwrap();
     let echo = trace.expected_echoes().first().unwrap();
     let expected_time_s = 2.0 * 0.01 / SOUND_SPEED_M_S;
@@ -150,7 +150,7 @@ fn canonical_rf_bytes_commit_to_parameters_echo_truth_and_samples() {
     )
     .unwrap();
     let trace = phantom
-        .simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 1_000)
+        .simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 1_000, 10_000)
         .unwrap();
     let first = trace.canonical_bytes().unwrap();
     let second = trace.canonical_bytes().unwrap();
@@ -158,6 +158,30 @@ fn canonical_rf_bytes_commit_to_parameters_echo_truth_and_samples() {
     assert_eq!(&first[..8], b"SYMRF001");
     assert_eq!(first.len(), 64 + 32 + 500 * 8);
     assert_eq!(first, second);
+}
+
+#[test]
+fn synthetic_rf_fixture_enforces_sample_reflector_work_budget() {
+    let phantom = PointReflectorPhantom::new(
+        SOUND_SPEED_M_S,
+        vec![
+            PointReflector::new(0.01, 0.5).unwrap(),
+            PointReflector::new(0.02, 0.25).unwrap(),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(
+        phantom.simulate_rf_trace(
+            CENTER_FREQUENCY_HZ,
+            20_000_000.0,
+            2.0,
+            25e-6,
+            1_000,
+            999,
+        ),
+        Err(PhantomError::SampleReflectorProductsExceedBudget)
+    );
 }
 
 #[test]
@@ -169,15 +193,15 @@ fn synthetic_rf_fixture_rejects_unbounded_or_undersampled_requests() {
     .unwrap();
 
     assert_eq!(
-        phantom.simulate_rf_trace(CENTER_FREQUENCY_HZ, 9_000_000.0, 2.0, 25e-6, 1_000),
+        phantom.simulate_rf_trace(CENTER_FREQUENCY_HZ, 9_000_000.0, 2.0, 25e-6, 1_000, 10_000),
         Err(PhantomError::SampleRateBelowNyquist)
     );
     assert_eq!(
-        phantom.simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 0),
+        phantom.simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 0, 10_000),
         Err(PhantomError::SampleBudgetZero)
     );
     assert_eq!(
-        phantom.simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 100),
+        phantom.simulate_rf_trace(CENTER_FREQUENCY_HZ, 20_000_000.0, 2.0, 25e-6, 100, 10_000),
         Err(PhantomError::SampleCountExceedsBudget)
     );
 }
