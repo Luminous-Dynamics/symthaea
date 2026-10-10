@@ -52,7 +52,22 @@ These scenario names are a proposed workstream contract. They are not claims tha
 4. Track ring position and velocity, support/rider forces, coupling saturation, and total energy/vector-momentum residuals. A low final residual is not proof the transient stayed inside limits.
 5. Compare at least one simplified case to a separate derivation/implementation before upgrading beyond T0/T1. Do not borrow historical safety margins or failure probabilities as validation data.
 
-## 4. Explicit limits
+## 4. Executable scenario gate (contract only)
+
+A versioned template exists at [`docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json`](scenarios/F_SKYHOOK_LOAD_STEP.json). It declares **23 required inputs**, all currently null, so the scenario is explicitly `Blocked`, analysis state `NotRun`, and result artifacts empty. This is intentional: the source describes the failure mechanism, but does not provide a reviewed modern model of the chosen ring geometry and rider force law.
+
+The standard-library validator is [`scripts/engineering/validate_orbital_ring_failure_manifest.py`](../../scripts/engineering/validate_orbital_ring_failure_manifest.py). It checks missing/unknown fields, finite/unit-aware vector shape for the frame transform, quaternion and ring-plane normal, load-step/ramp consistency, nonnegative delays/damping, coupling parameters, and declared energy/momentum boundaries. A complete fixture may advance only to `ReadyForIndependentReview`; the validator cannot mark a physics model passed or run the transient.
+
+Recorded local checks:
+
+- `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
+- `python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test`: **33 passed, 0 failed**.
+- Running the validator on the checked-in template returned `passed_contract_checks` for the *manifest contract*, while correctly keeping the scenario `Blocked` with all 23 inputs unresolved and `analysis_state = NotRun`.
+- Repeated test and manifest-validation outputs were byte-identical. The exact outputs are preserved in [the validation report](evidence/f_skyhook_load_step_manifest_validation.json) and [the self-test report](evidence/orbital_ring_failure_manifest_validator_selftest.json).
+
+Validator Git blob: `5732c5eb656f576feda23102500541a1117fa011`; source SHA-256: `2eafdb020349a9760fda6bb9b8034f2254ca78c639fff30a49e20bee3d5c7d37`. The report’s purpose is to prevent incomplete scenario data from being mistaken for a ready-to-run physics case.
+
+## 5. Explicit limits
 
 The paper's claims are theoretical engineering analysis from 1983. They identify mechanisms and possible mitigations, but the scanned sections do not provide modern component qualification, a validated transient model, calibrated input distributions, correlated-fault probabilities, or experimental evidence that the complete system survives the described event. The use of shields, redundancy, or damped couplers must remain a hypothesis until the chosen implementation is modeled, independently checked, and eventually tested.
 
