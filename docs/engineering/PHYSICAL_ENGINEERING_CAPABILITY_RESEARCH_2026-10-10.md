@@ -107,7 +107,7 @@ The official [ngspice Version 47 manual, §2.1.1](https://ngspice.sourceforge.io
 
 ### Narrow physical-dimension guard added
 
-At exact PR head `c671a24d52d269896afe0675eb4aab6b146182f9`, the adapter now performs a deliberately constrained unit-dimension check for requested measurement forms. It recognizes `v(node)`, `i(source)`, `mag(v(node))`, and `mag(i(source))`; for `FIND` it requires an explicit `AT=` point, and summary operations are restricted to `MAX/MIN/AVG/RMS/PP`. It rejects a requested voltage measure declared in amperes (and the inverse) and fails closed on unsupported expressions.
+At exact PR head `d121e9c5d783f0182a1a91d31509fa286073c29d`, the adapter now performs a deliberately constrained unit-dimension check for requested measurement forms. It recognizes `v(node)`, `i(source)`, `mag(v(node))`, and `mag(i(source))`; for `FIND` it requires an explicit `AT=` point, and summary operations are restricted to `MAX/MIN/AVG/RMS/PP`. It rejects a requested voltage measure declared in amperes (and the inverse) and fails closed on unsupported expressions. A subsequent source review also tightened exact vector parsing so compound expressions cannot pass merely because they start and end like a simple vector.
 
 This is only a tranche-one whitelist, not a general SPICE expression type system or proof of physical validity. The longer-term owner must be the existing typed physical model work (#6870). The exact-head CI and PR Governance runs have been queued, but no result for that head has yet been verified. No new code or tests are claimed as passing until that gate completes.
 
