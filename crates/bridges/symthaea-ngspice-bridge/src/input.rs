@@ -211,6 +211,17 @@ mod tests {
     }
 
     #[test]
+    fn detects_digest_tampering() {
+        let mut artifact =
+            NetlistArtifact::new("circuit-a", b"R1 a b 1k\n".to_vec()).unwrap();
+        artifact.blake3_digest.push('0');
+        assert_eq!(
+            artifact.verify_for_request(&request("circuit-a")),
+            Err(NetlistArtifactError::DigestMismatch)
+        );
+    }
+
+    #[test]
     fn rejects_empty_request_identity() {
         assert_eq!(
             NetlistArtifact::new("  ", b"R1 a b 1k\n".to_vec()).unwrap_err(),
