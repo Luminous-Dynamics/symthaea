@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use symthaea_agribot::soil_process::{EvidenceKind, EvidenceRef};
 
 use crate::screening_design::{
-    verify_screening_design, FactorSetting, PlannedRunKind, ScreeningDesignPlan,
+    verify_screening_design, PlannedRunKind, ScreeningDesignPlan,
     ScreeningDesignVerificationReceipt,
 };
 
@@ -220,17 +220,20 @@ pub fn analyze_screening_responses(
         ));
     }
 
-    let ordered_observations: Vec<ScreeningResponseObservation> = plan
-        .runs
-        .iter()
-        .map(|run| {
-            observations_by_run
-                .get(run.run_id.as_str())
-                .expect("run coverage was checked above")
-                .to_owned()
-                .clone()
-        })
-        .collect();
+    let mut ordered_observations: Vec<ScreeningResponseObservation> =
+        Vec::with_capacity(plan.runs.len());
+    for run in &plan.runs {
+        let observation = observations_by_run
+            .get(run.run_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                ScreeningAnalysisError::new(
+                    "observations",
+                    "verified plan run has no primary-endpoint observation",
+                )
+            })?;
+        ordered_observations.push(observation.clone());
+    }
 
     let mut cell_sum: HashMap<(String, u32), f64> = HashMap::new();
     let mut cell_count: HashMap<(String, u32), u32> = HashMap::new();
@@ -313,7 +316,7 @@ pub fn analyze_screening_responses(
 
     for effect_mask in 1..combination_count {
         let mut contrast_sum = 0.0_f64;
-        for (row, _standard_row) in (0..combination_count).enumerate() {
+        for row in 0..combination_count {
             let standard_order = (row + 1) as u32;
             let mut row_sum = 0.0_f64;
             let mut row_count = 0_u32;
