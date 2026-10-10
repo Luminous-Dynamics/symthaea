@@ -53,7 +53,7 @@ def is_correct_and_secure(
         receipt_digest = check.get("receipt_digest")
         if not isinstance(check_id, str) or not check_id or check_id in seen_check_ids:
             return False
-        if status not in VALID_STATUSES or status != "pass":
+        if not isinstance(status, str) or status not in VALID_STATUSES or status != "pass":
             return False
         if not isinstance(refs, list) or not refs:
             return False
