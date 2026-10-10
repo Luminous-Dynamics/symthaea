@@ -1,0 +1,156 @@
+{
+  "schema": "symthaea.fin-sys.synthetic-public.v1",
+  "profile_id": "minsky-cashflow-v1",
+  "claim_ceiling": "Synthetic solver-visible observations only; no real-world classification.",
+  "fixtures": [
+    {
+      "fixture_id": "corp_cashflow_cover_001",
+      "subject_class": "NonFinancialFirm",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_currency_units",
+      "observations": {
+        "debt_stock": "1000",
+        "available_cash_flow": "260",
+        "interest_due": "60",
+        "principal_due": "140",
+        "new_borrowing_required_for_interest": "0",
+        "refinancing_required_for_principal": "0",
+        "productive_capital_formation": "180",
+        "liquid_asset_buffer": "120"
+      },
+      "source_families": ["synthetic_cashflow_generator_v1"],
+      "missing_coordinates": [],
+      "limitations": ["Single synthetic firm; no market-price, legal, or economy-wide claim."]
+    },
+    {
+      "fixture_id": "corp_refinance_gap_001",
+      "subject_class": "NonFinancialFirm",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_currency_units",
+      "observations": {
+        "debt_stock": "600",
+        "available_cash_flow": "90",
+        "interest_due": "50",
+        "principal_due": "180",
+        "new_borrowing_required_for_interest": "0",
+        "refinancing_required_for_principal": "140",
+        "productive_capital_formation": "75",
+        "weighted_average_maturity_months": "11"
+      },
+      "source_families": ["synthetic_cashflow_generator_v1"],
+      "missing_coordinates": [],
+      "limitations": ["Refinancing availability is an observed fixture condition, not a forecast."]
+    },
+    {
+      "fixture_id": "corp_interest_shortfall_001",
+      "subject_class": "NonFinancialFirm",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_currency_units",
+      "observations": {
+        "debt_stock": "420",
+        "available_cash_flow": "18",
+        "interest_due": "42",
+        "principal_due": "70",
+        "new_borrowing_required_for_interest": "24",
+        "refinancing_required_for_principal": "70",
+        "capitalized_interest": "24",
+        "productive_capital_formation": "10"
+      },
+      "source_families": ["synthetic_cashflow_generator_v1"],
+      "missing_coordinates": [],
+      "limitations": ["Synthetic firm financing observations only; intent and legality are outside this fixture."]
+    },
+    {
+      "fixture_id": "household_missing_income_001",
+      "subject_class": "Household",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_currency_units",
+      "observations": {
+        "debt_stock": "240",
+        "interest_due": "18",
+        "principal_due": "30",
+        "refinancing_required_for_principal": "0"
+      },
+      "source_families": ["synthetic_debt_statement_v1"],
+      "missing_coordinates": ["available_cash_flow"],
+      "limitations": ["Income/cash-flow evidence is absent from the solver-visible observation set."]
+    },
+    {
+      "fixture_id": "sovereign_long_maturity_001",
+      "subject_class": "Sovereign",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_percent_of_gdp_basis_points",
+      "observations": {
+        "gross_debt_to_gdp_bp": "12500",
+        "interest_to_revenue_bp": "850",
+        "gross_refinancing_need_to_gdp_bp": "450",
+        "weighted_average_maturity_months": "132",
+        "foreign_currency_share_bp": "500",
+        "floating_rate_share_bp": "800",
+        "primary_balance_to_gdp_bp": "50"
+      },
+      "source_families": ["synthetic_sovereign_accounts_v1"],
+      "missing_coordinates": ["household_style_available_cash_flow"],
+      "limitations": ["Sovereign observations require an explicitly applicable sovereign analysis profile."]
+    },
+    {
+      "fixture_id": "scheme_payout_dependency_001",
+      "subject_class": "SyntheticInvestmentScheme",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_currency_units",
+      "observations": {
+        "operating_external_revenue": "0",
+        "new_participant_inflows": "300",
+        "participant_payouts": "210",
+        "claimed_investment_return_payouts": "190",
+        "verified_productive_asset_cash_flow": "0",
+        "redemption_obligations": "260"
+      },
+      "source_families": ["synthetic_scheme_ledger_v1", "synthetic_marketing_record_v1"],
+      "missing_coordinates": [],
+      "limitations": ["Synthetic investment-scheme observations; external asset/counterparty verification is outside V1."]
+    },
+    {
+      "fixture_id": "economy_sector_heterogeneity_001",
+      "subject_class": "SyntheticEconomy",
+      "horizon": "12_months",
+      "unit_profile": "synthetic_currency_units",
+      "observations": {
+        "sector_a_available_cash_flow": "300",
+        "sector_a_interest_due": "40",
+        "sector_a_principal_due": "80",
+        "sector_b_available_cash_flow": "90",
+        "sector_b_interest_due": "45",
+        "sector_b_principal_due": "170",
+        "sector_b_refinancing_required_for_principal": "125",
+        "sector_c_available_cash_flow": "20",
+        "sector_c_interest_due": "35",
+        "sector_c_principal_due": "50",
+        "sector_c_new_borrowing_required_for_interest": "15"
+      },
+      "source_families": ["synthetic_sector_accounts_v1"],
+      "missing_coordinates": [],
+      "limitations": ["Sub-sector observations are intentionally preserved separately inside one aggregate fixture."]
+    },
+    {
+      "fixture_id": "bank_liquidity_buffer_001",
+      "subject_class": "Bank",
+      "horizon": "90_days",
+      "unit_profile": "synthetic_currency_units_and_basis_points",
+      "observations": {
+        "liquid_assets": "260",
+        "expected_90d_outflows": "180",
+        "available_stable_funding": "720",
+        "required_stable_funding": "650",
+        "equity_capital": "110",
+        "risk_weighted_assets": "700",
+        "loan_cash_inflows_90d": "95",
+        "wholesale_refinancing_due_90d": "70",
+        "baseline_credit_losses": "12"
+      },
+      "source_families": ["synthetic_bank_balance_sheet_v1"],
+      "missing_coordinates": [],
+      "limitations": ["Synthetic bank balance-sheet observations; no regulatory-capital or liquidity-compliance claim."]
+    }
+  ]
+}
