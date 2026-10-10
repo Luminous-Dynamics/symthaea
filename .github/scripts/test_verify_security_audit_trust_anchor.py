@@ -164,7 +164,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
 
     def test_verdict_accepts_only_exact_subject_and_required_lanes(self):
         payload, run = self.make_verdict()
-        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
         for change in (
             lambda x: x.update({"subject_sha": "c" * 40}),
             lambda x: x.update({"run_attempt": "1"}),
@@ -177,20 +177,57 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             change(broken)
             with self.subTest(broken=broken):
                 with self.assertRaises(module.VerificationError):
-                    module.validate_verdict(broken, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+                    module.validate_verdict(broken, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_verdict_workflow_path_must_match_authoritative_run_path(self):
         payload, run = self.make_verdict()
-        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
         run["path"] = ".github/workflows/other.yml"
         with self.assertRaises(module.VerificationError):
-            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
+
+    def test_authoritative_pr_merge_sha_rejects_mismatched_pr_state(self):
+        repo = "owner/repo"
+        subject = "a" * 40
+        pr = {"number": 12}
+        valid = {"number": 12, "state": "open", "mergeable": True, "merge_commit_sha": "c" * 40,
+                 "head": {"sha": subject, "ref": "security/fix", "repo": {"full_name": repo}},
+                 "base": {"ref": "main", "repo": {"full_name": repo}}}
+        with patch.object(module, "api", return_value=valid):
+            self.assertEqual(module.fetch_authoritative_pr_merge_sha(
+                repo, pr, subject, "security/fix", "main", "token"), "c" * 40)
+        bad = [
+            {**valid, "number": 13},
+            {**valid, "state": "closed"},
+            {**valid, "mergeable": False},
+            {**valid, "mergeable": None},
+            {**valid, "merge_commit_sha": None},
+            {**valid, "head": {**valid["head"], "sha": "b" * 40}},
+            {**valid, "head": {**valid["head"], "ref": "other"}},
+            {**valid, "head": {**valid["head"], "repo": {"full_name": "fork/repo"}}},
+            {**valid, "base": {**valid["base"], "ref": "release"}},
+            {**valid, "base": {**valid["base"], "repo": {"full_name": "other/repo"}}},
+        ]
+        for payload in bad:
+            with self.subTest(payload=payload), patch.object(module, "api", return_value=payload):
+                with self.assertRaises(module.VerificationError):
+                    module.fetch_authoritative_pr_merge_sha(
+                        repo, pr, subject, "security/fix", "main", "token")
+
+    def test_verdict_workflow_sha_must_match_authoritative_merge_sha(self):
+        repo = "Luminous-Dynamics/mycelix"
+        payload, run = self.make_verdict(repo)
+        module.validate_verdict(payload, repo, module.POLICY[repo], run,
+                                expected_pr_number=12, expected_workflow_sha="c" * 40)
+        with self.assertRaises(module.VerificationError):
+            module.validate_verdict(payload, repo, module.POLICY[repo], run,
+                                    expected_pr_number=12, expected_workflow_sha="d" * 40)
 
     def test_verdict_engine_commit_is_policy_bound(self):
         payload, run = self.make_verdict()
         payload["audit_engine_sha"] = "c" * 40
         with self.assertRaises(module.VerificationError):
-            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_verdict_freshness_rejects_stale_and_future_timestamps(self):
         repo = "Luminous-Dynamics/mycelix"
@@ -198,20 +235,20 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         payload, run = self.make_verdict(repo)
         payload["generated_at_utc"] = (datetime.now(timezone.utc) - timedelta(days=8)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         with self.assertRaises(module.VerificationError):
-            module.validate_verdict(payload, repo, policy, run, expected_pr_number=12)
+            module.validate_verdict(payload, repo, policy, run, expected_pr_number=12, expected_workflow_sha="c" * 40)
         payload, run = self.make_verdict(repo)
         payload["generated_at_utc"] = (datetime.now(timezone.utc) + timedelta(minutes=10)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         with self.assertRaises(module.VerificationError):
-            module.validate_verdict(payload, repo, policy, run, expected_pr_number=12)
+            module.validate_verdict(payload, repo, policy, run, expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_verdict_ref_must_match_exact_pull_request_number(self):
         repo = "Luminous-Dynamics/mycelix"
         policy = module.POLICY[repo]
         payload, run = self.make_verdict(repo)
-        module.validate_verdict(payload, repo, policy, run, expected_pr_number=12)
+        module.validate_verdict(payload, repo, policy, run, expected_pr_number=12, expected_workflow_sha="c" * 40)
         payload["workflow_ref"] = f"{repo}/{policy['workflow_path']}@refs/pull/13/merge"
         with self.assertRaises(module.VerificationError):
-            module.validate_verdict(payload, repo, policy, run, expected_pr_number=12)
+            module.validate_verdict(payload, repo, policy, run, expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_verdict_rejects_wrong_workflow_ref_url_and_unknown_fields(self):
         repo = "Luminous-Dynamics/mycelix"
@@ -226,16 +263,16 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             mutate(payload)
             with self.subTest(payload=payload):
                 with self.assertRaises(module.VerificationError):
-                    module.validate_verdict(payload, repo, policy, run, expected_pr_number=12)
+                    module.validate_verdict(payload, repo, policy, run, expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_pass_with_findings_is_distinct_and_consistent(self):
         payload, run = self.make_verdict()
         payload.update({"status": "PASS_WITH_FINDINGS", "non_blocking_findings_present": True,
                         "non_blocking_finding_sources": ["npm_below_threshold"]})
-        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+        module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
         payload["non_blocking_finding_sources"] = []
         with self.assertRaises(module.VerificationError):
-            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12)
+            module.validate_verdict(payload, "Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_artifact_digest_and_run_metadata_are_checked(self):
         payload, run = self.make_verdict()
@@ -251,7 +288,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes), \
              patch.object(module, "check_blob") as check_blob:
-            module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+            module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
         check_blob.assert_called_once_with(
             "Luminous-Dynamics/mycelix",
             module.POLICY["Luminous-Dynamics/mycelix"]["workflow_path"],
@@ -263,7 +300,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         with patch.object(module, "api", return_value={"artifacts": [altered]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_artifact_evidence_file_digest_mismatch_is_rejected(self):
         payload, run = self.make_verdict()
@@ -279,7 +316,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_artifact_missing_manifest_file_is_rejected(self):
         payload, run = self.make_verdict()
@@ -293,7 +330,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_artifact_without_digest_or_with_expiry_is_rejected(self):
         payload, run = self.make_verdict()
@@ -301,7 +338,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
                     "expired": True, "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
         with patch.object(module, "api", return_value={"artifacts": [artifact]}):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_duplicate_json_keys_are_rejected_even_when_artifact_digest_matches(self):
         payload, run = self.make_verdict()
@@ -317,7 +354,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_nested_verdict_path_is_rejected(self):
         payload, run = self.make_verdict()
@@ -331,7 +368,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
                     "workflow_run": {"id": run["id"], "head_sha": run["head_sha"]}}
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_artifact_zip_path_traversal_is_rejected(self):
         payload, run = self.make_verdict()
@@ -345,7 +382,7 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         with patch.object(module, "api", return_value={"artifacts": [artifact]}), \
              patch.object(module, "download_artifact_zip", return_value=archive_bytes):
             with self.assertRaises(module.VerificationError):
-                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12)
+                module.verify_verdict_artifact("Luminous-Dynamics/mycelix", module.POLICY["Luminous-Dynamics/mycelix"], run, "token", expected_pr_number=12, expected_workflow_sha="c" * 40)
 
     def test_pending_status_only_for_uncompleted_runs(self):
         self.assertTrue(module.should_publish_pending_status("workflow_run", "requested", {"status": "queued"}))
