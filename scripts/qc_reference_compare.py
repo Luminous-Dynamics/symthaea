@@ -65,6 +65,36 @@ EXPECTED_MOLECULE_METADATA: dict[str, tuple[tuple[str, ...], int, int]] = {
 }
 ATOMIC_NUMBER_BY_SYMBOL = {"H": 1, "He": 2, "Li": 3, "C": 6, "N": 7, "O": 8, "F": 9}
 
+# Canonical benchmark geometries, independently frozen in Bohr. The 1e-12
+# Bohr bound only accommodates last-bit differences in trig evaluation; it is
+# unrelated to and cannot relax any energy or overlap comparison threshold.
+MAX_GEOMETRY_COORDINATE_DEVIATION_BOHR = 1e-12
+EXPECTED_ATOM_POSITIONS_BOHR: dict[str, tuple[tuple[float, float, float], ...]] = {
+    "H2": ((0.0, 0.0, 0.0), (0.0, 0.0, 1.4)),
+    "HeH+": ((0.0, 0.0, 0.0), (0.0, 0.0, 1.4632)),
+    "H2O": (
+        (0.0, 0.0, 0.0),
+        (1.8088458464917874, 0.0, 0.0),
+        (-0.45351009730656106, 1.7510716398855828, 0.0),
+    ),
+    "NH3": (
+        (0.0, 0.0, 0.0),
+        (0.0, 1.7719961870615846, -0.72111948915719393),
+        (1.534646585808588, -0.88609257983702361, -0.72111948915719393),
+        (-1.534646585808588, -0.88609257983702361, -0.72111948915719393),
+    ),
+    "CH4": (
+        (0.0, 0.0, 0.0),
+        (1.185, 1.185, 1.185),
+        (-1.185, -1.185, 1.185),
+        (-1.185, 1.185, -1.185),
+        (1.185, -1.185, -1.185),
+    ),
+    "HF": ((0.0, 0.0, 0.0), (0.0, 0.0, 1.7328)),
+    "N2": ((0.0, 0.0, 0.0), (0.0, 0.0, 2.074)),
+    "LiH": ((0.0, 0.0, 0.0), (0.0, 0.0, 3.015)),
+}
+
 
 def finite_float(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -264,7 +294,12 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
                 f"cases[{index}] identity mismatch: {expected_name} ordered atom symbols "
                 f"must be {expected_symbols!r}, got {symbols!r}"
             )
-        for atom_index, (atom, symbol) in enumerate(zip(atoms, expected_symbols)):
+        if case.get("coordinate_unit") != "bohr":
+            raise ValueError(f"cases[{index}].coordinate_unit must be explicitly 'bohr'")
+        expected_positions = EXPECTED_ATOM_POSITIONS_BOHR[expected_name]
+        for atom_index, (atom, symbol, expected_position) in enumerate(
+            zip(atoms, expected_symbols, expected_positions)
+        ):
             atomic_number = atom.get("atomic_number")
             if (
                 isinstance(atomic_number, bool)
@@ -274,6 +309,37 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
                 raise ValueError(
                     f"cases[{index}].molecule.atoms[{atom_index}] atomic_number "
                     f"does not match symbol {symbol!r}"
+                )
+            position = atom.get("position_bohr")
+            if not isinstance(position, list) or len(position) != 3:
+                raise ValueError(
+                    f"cases[{index}].molecule.atoms[{atom_index}].position_bohr must have three coordinates"
+                )
+            actual_position: list[float] = []
+            for axis, value in enumerate(position):
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    raise ValueError(
+                        f"cases[{index}].molecule.atoms[{atom_index}] coordinate {axis} is not numeric"
+                    )
+                try:
+                    coordinate = float(value)
+                except (OverflowError, TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"cases[{index}].molecule.atoms[{atom_index}] coordinate {axis} "
+                        "cannot be represented as float"
+                    ) from exc
+                if not math.isfinite(coordinate):
+                    raise ValueError(
+                        f"cases[{index}].molecule.atoms[{atom_index}] coordinate {axis} is non-finite"
+                    )
+                actual_position.append(coordinate)
+            if any(
+                abs(actual - expected) > MAX_GEOMETRY_COORDINATE_DEVIATION_BOHR
+                for actual, expected in zip(actual_position, expected_position)
+            ):
+                raise ValueError(
+                    f"cases[{index}].molecule.atoms[{atom_index}] coordinate differs "
+                    f"from the frozen {expected_name} geometry in Bohr"
                 )
     return data, digest
 
