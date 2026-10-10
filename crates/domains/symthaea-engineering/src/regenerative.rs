@@ -162,6 +162,8 @@ pub enum CandidateEligibility {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeDesignAssessment {
+    /// Full immutable candidate snapshot, including all evidence references.
+    pub candidate: RegenerativeDesignCandidate,
     pub candidate_id: String,
     pub eligibility: CandidateEligibility,
     pub metrics: RegenerativeDesignMetrics,
@@ -421,6 +423,7 @@ pub fn assess_regenerative_candidate(
     };
 
     Ok(RegenerativeDesignAssessment {
+        candidate: candidate.clone(),
         candidate_id: candidate.candidate_id.clone(),
         eligibility,
         metrics,
@@ -609,6 +612,11 @@ mod tests {
             CandidateEligibility::EligibleForDesignComparison
         );
         assert!(assessment.field_validation_required);
+        assert_eq!(assessment.candidate, good);
+        assert_eq!(
+            assessment.candidate.process.evidence.process_parameters.kind,
+            EvidenceKind::Scenario
+        );
 
         let unknown =
             candidate("unknown", 0.30, 0.60, 3.0, 4.0, 2.0, QualityGateStatus::Unknown);
