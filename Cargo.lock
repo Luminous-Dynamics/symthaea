@@ -18714,6 +18714,7 @@ dependencies = [
 name = "symthaea-engineering"
 version = "0.1.0"
 dependencies = [
+ "symthaea-agribot",
  "serde",
  "serde_json",
  "symthaea-acoustics",
