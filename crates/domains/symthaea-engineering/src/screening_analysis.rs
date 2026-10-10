@@ -42,9 +42,21 @@ impl std::error::Error for ScreeningAnalysisError {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ObservedFactorSetting {
+    pub factor_id: String,
+    pub value: f64,
+    pub unit: String,
+    /// Evidence for the achieved physical setting, not the assigned setpoint.
+    pub evidence: EvidenceRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScreeningResponseObservation {
     pub observation_id: String,
     pub run_id: String,
+    /// Independently measured values actually achieved for each assigned process factor.
+    pub actual_factor_settings: Vec<ObservedFactorSetting>,
     pub endpoint_id: String,
     pub outcome_value: f64,
     pub outcome_unit: String,
@@ -173,6 +185,76 @@ pub fn analyze_screening_responses(
                 "observation/run identity mismatch",
             ));
         }
+        if observation.actual_factor_settings.len() != factor_count {
+            return Err(ScreeningAnalysisError::new(
+                "observations.actual_factor_settings",
+                "one measured achieved setting is required for each preregistered factor",
+            ));
+        }
+        let mut observed_factor_ids = HashSet::new();
+        for actual in &observation.actual_factor_settings {
+            if actual.factor_id.trim().is_empty()
+                || !observed_factor_ids.insert(actual.factor_id.as_str())
+            {
+                return Err(ScreeningAnalysisError::new(
+                    "observations.actual_factor_settings.factor_id",
+                    "factor IDs must be non-empty and unique for each run",
+                ));
+            }
+            let planned = run
+                .settings
+                .iter()
+                .find(|setting| setting.factor_id == actual.factor_id)
+                .ok_or_else(|| {
+                    ScreeningAnalysisError::new(
+                        "observations.actual_factor_settings.factor_id",
+                        "observed factor is not present in the planned run",
+                    )
+                })?;
+            let factor = factors
+                .iter()
+                .find(|factor| factor.factor_id == actual.factor_id)
+                .ok_or_else(|| {
+                    ScreeningAnalysisError::new(
+                        "observations.actual_factor_settings.factor_id",
+                        "observed factor is not present in the preregistered design",
+                    )
+                })?;
+            if !actual.value.is_finite() {
+                return Err(ScreeningAnalysisError::new(
+                    "observations.actual_factor_settings.value",
+                    "must be finite",
+                ));
+            }
+            if actual.unit != factor.unit {
+                return Err(ScreeningAnalysisError::new(
+                    "observations.actual_factor_settings.unit",
+                    "achieved setting unit must match the preregistered factor unit",
+                ));
+            }
+            if actual.evidence.evidence_id.trim().is_empty()
+                || actual.evidence.kind != EvidenceKind::Measured
+            {
+                return Err(ScreeningAnalysisError::new(
+                    "observations.actual_factor_settings.evidence",
+                    "achieved physical settings require evidence classified as measured",
+                ));
+            }
+            let deviation = (actual.value - planned.value).abs();
+            if !deviation.is_finite() || deviation > factor.max_absolute_deviation {
+                return Err(ScreeningAnalysisError::new(
+                    "observations.actual_factor_settings.value",
+                    "achieved setting falls outside the preregistered absolute-deviation tolerance; use a separately reviewed deviation/missing-data analysis",
+                ));
+            }
+        }
+        if observed_factor_ids.len() != factor_count {
+            return Err(ScreeningAnalysisError::new(
+                "observations.actual_factor_settings",
+                "the run does not contain every preregistered factor",
+            ));
+        }
+
         if observation.endpoint_id != endpoint.endpoint_id {
             return Err(ScreeningAnalysisError::new(
                 "observations.endpoint_id",
@@ -513,6 +595,8 @@ mod tests {
                     unit: "degree_C".into(),
                     low_value: 400.0,
                     high_value: 500.0,
+                    max_absolute_deviation: 2.0,
+                    deviation_tolerance_evidence: evidence("temp-tolerance", EvidenceKind::Literature),
                     randomization_class: FactorRandomizationClass::RandomizablePerRun,
                     low_level_evidence: evidence("temp-low", EvidenceKind::Literature),
                     high_level_evidence: evidence("temp-high", EvidenceKind::Literature),
@@ -523,6 +607,8 @@ mod tests {
                     unit: "minute".into(),
                     low_value: 10.0,
                     high_value: 30.0,
+                    max_absolute_deviation: 1.0,
+                    deviation_tolerance_evidence: evidence("res-tolerance", EvidenceKind::Literature),
                     randomization_class: FactorRandomizationClass::RandomizablePerRun,
                     low_level_evidence: evidence("res-low", EvidenceKind::Literature),
                     high_level_evidence: evidence("res-high", EvidenceKind::Literature),
@@ -581,6 +667,17 @@ mod tests {
                 ScreeningResponseObservation {
                     observation_id: format!("obs-{}", run.run_id),
                     run_id: run.run_id.clone(),
+                    actual_factor_settings: run.settings.iter().map(|setting| {
+                        ObservedFactorSetting {
+                            factor_id: setting.factor_id.clone(),
+                            value: setting.value,
+                            unit: setting.unit.clone(),
+                            evidence: evidence(
+                                &format!("achieved-setting-{}-{}", run.run_id, setting.factor_id),
+                                EvidenceKind::Measured,
+                            ),
+                        }
+                    }).collect(),
                     endpoint_id: "dry-char-yield".into(),
                     outcome_value,
                     outcome_unit: "kg_per_kg_dry_feedstock".into(),
@@ -643,6 +740,26 @@ mod tests {
 
         data = observations(&plan);
         data[0].evidence.kind = EvidenceKind::Scenario;
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+    }
+
+    #[test]
+    fn measured_achieved_settings_must_match_preregistered_tolerances() {
+        let plan = crate::screening_design::generate_screening_design(&request()).unwrap();
+        let mut data = observations(&plan);
+        data[0].actual_factor_settings[0].value += 1.0;
+        assert!(analyze_screening_responses(&plan, &data).is_ok());
+
+        data = observations(&plan);
+        data[0].actual_factor_settings[0].value += 3.0;
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].actual_factor_settings[0].evidence.kind = EvidenceKind::Scenario;
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].actual_factor_settings.pop();
         assert!(analyze_screening_responses(&plan, &data).is_err());
     }
 
