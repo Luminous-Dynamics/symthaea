@@ -96,7 +96,7 @@ impl AsciiRawfile {
 
         let plotname_count = lines
             .iter()
-            .filter(|line| line.starts_with("Plotname:"))
+            .filter(|line| line.trim_start().starts_with("Plotname:"))
             .count();
         if plotname_count != 1 {
             return Err(RawfileError(format!(
@@ -374,7 +374,7 @@ impl AsciiRawfile {
 fn required_header(lines: &[&str], prefix: &str) -> Result<String, RawfileError> {
     let matches: Vec<&str> = lines
         .iter()
-        .filter_map(|line| line.strip_prefix(prefix))
+        .filter_map(|line| line.trim_start().strip_prefix(prefix))
         .map(str::trim)
         .collect();
     if matches.len() != 1 || matches[0].is_empty() {
@@ -536,6 +536,24 @@ mod tests {
         let malformed = RC_FIXTURE.replace(
             "Flags: real",
             "Flags: real\nFlags: real",
+        );
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_indented_duplicate_plotname_header() {
+        let malformed = RC_FIXTURE.replace(
+            "Plotname: Transient Analysis",
+            "Plotname: Transient Analysis\n  Plotname: conflicting analysis",
+        );
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_indented_duplicate_required_header() {
+        let malformed = RC_FIXTURE.replace(
+            "Flags: real",
+            "Flags: real\n  Flags: complex",
         );
         assert!(AsciiRawfile::parse(&malformed).is_err());
     }
