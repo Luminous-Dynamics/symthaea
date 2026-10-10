@@ -215,8 +215,11 @@ impl CognitiveLoopService {
             (goal, "remembered_scene")
         } else {
             let rollout = manifold.dream_ahead(steps, 0.1);
-            // Rollout work has been consumed even if its output is unusable.
-            self.thermodynamic_load += estimate.rollout;
+            // A full-length response proves the rollout ran, even if its values are
+            // invalid. An empty response can be a fail-closed manifold guard.
+            if rollout.len() == steps {
+                self.thermodynamic_load += estimate.rollout;
+            }
             let Some(goal) = rollout.into_iter().last().filter(|goal| {
                 goal.dim() == manifold.hdc_dim()
                     && !goal.values.is_empty()
