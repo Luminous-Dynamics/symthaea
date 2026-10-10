@@ -437,8 +437,8 @@ impl ConjectureEngine {
     /// from trajectory-based discoveries.
     ///
     /// For each invariant, status is assigned based on whether it was
-    /// symbolically proven via the chain-rule path:
-    /// - `symbolically_proven == true` → `ConjectureStatus::SymbolicallyChecked`
+    /// symbolically checked through symbolic differentiation plus sampled residuals:
+    /// - `symbolic_check_passed == true` → `ConjectureStatus::SymbolicallyChecked`
     ///   (eligible for fast-track macro promotion)
     /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
     ///   and `MacroPromotionTier::Quarantined`, so unproven trajectory fits
@@ -456,12 +456,12 @@ impl ConjectureEngine {
     ) {
         for inv in invariants {
             let fitness = inv.variance + self.config.lambda * inv.complexity as f64;
-            let status = if inv.symbolically_proven {
-                ConjectureStatus::SymbolicallyChecked
-            } else {
-                ConjectureStatus::NumericallyTested {
-                    test_mse: inv.variance,
-                }
+            // This flag means the derivative passed a finite-point residual
+            // check after symbolic differentiation; it is not a universal proof.
+            // Keep autonomous discovery in the numerical evidence tier until a
+            // separate proof receipt is available.
+            let status = ConjectureStatus::NumericallyTested {
+                test_mse: inv.variance,
             };
             self.conjectures.push(Conjecture {
                 formula: inv.formula.clone(),
@@ -472,12 +472,8 @@ impl ConjectureEngine {
                 complexity: inv.complexity,
                 fitness,
                 status,
-                confidence: if inv.symbolically_proven { 0.99 } else { 0.6 },
-                macro_promotion_tier: if inv.symbolically_proven {
-                    MacroPromotionTier::FastTrackVerified
-                } else {
-                    MacroPromotionTier::Quarantined
-                },
+                confidence: 0.6,
+                macro_promotion_tier: MacroPromotionTier::Quarantined,
                 eml_compiled: None,
                 eml_metrics: None,
                 eml_verified_real: None,
@@ -3556,14 +3552,14 @@ mod tests {
         );
     }
 
-    /// THE KEY TEST: Prove E = x² + v² is conserved under harmonic oscillator dynamics.
+    /// Assess the harmonic-oscillator conservation candidate E = x² + v².
     ///
     /// dx/dt = v, dv/dt = -x
     /// dE/dt = ∂E/∂x · dx/dt + ∂E/∂v · dv/dt
     ///       = 2x · v + 2v · (-x)
     ///       = 2xv - 2xv = 0  ✓
     #[test]
-    fn test_harmonic_oscillator_conservation_proof() {
+    fn test_harmonic_oscillator_conservation_assessment() {
         let energy = SymExpr::Add(
             Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
             Box::new(SymExpr::Pow(Box::new(SymExpr::Var("v".into())), 2.0)),
@@ -3574,17 +3570,17 @@ mod tests {
             ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))), // dv/dt = -x
         ];
 
-        let proof = verify_conservation_symbolic(&energy, &dynamics);
-        eprintln!("\n{}", proof);
+        let assessment = assess_conservation_symbolic(&energy, &dynamics);
+        eprintln!("\n{}", assessment);
 
         assert!(
-            proof.is_conserved,
+            assessment.sampled_residual_passed,
             "E = x² + v² should be conserved under harmonic oscillator dynamics"
         );
         assert!(
-            proof.max_numerical_residual < 1e-10,
+            assessment.max_numerical_residual < 1e-10,
             "numerical residual should be ~0, got {:.2e}",
-            proof.max_numerical_residual
+            assessment.max_numerical_residual
         );
     }
 
@@ -3599,11 +3595,11 @@ mod tests {
             ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
         ];
 
-        let proof = verify_conservation_symbolic(&energy, &dynamics);
-        eprintln!("\n{}", proof);
+        let assessment = assess_conservation_symbolic(&energy, &dynamics);
+        eprintln!("\n{}", assessment);
 
         assert!(
-            !proof.is_conserved,
+            !assessment.sampled_residual_passed,
             "E = x² should NOT be conserved (dE/dt = 2xv ≠ 0)"
         );
     }
@@ -3614,7 +3610,7 @@ mod tests {
     /// Simplified: use α=β=γ=δ=1 → V = x - ln(x) + y - ln(y)
     /// But SymExpr doesn't support ln, so we test numerically at specific points instead.
     #[test]
-    fn test_conservation_proof_display() {
+    fn test_conservation_assessment_display() {
         // Just verify the proof infrastructure works and produces readable output
         let energy = SymExpr::Add(
             Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
@@ -3637,10 +3633,10 @@ mod tests {
             ),
         ];
 
-        let proof = verify_conservation_symbolic(&energy, &dynamics);
-        eprintln!("\n{}", proof);
+        let assessment = assess_conservation_symbolic(&energy, &dynamics);
+        eprintln!("\n{}", assessment);
         assert!(
-            proof.is_conserved,
+            assessment.sampled_residual_passed,
             "E = x² + 3v² with dv/dt = -x/3 should be conserved"
         );
     }
@@ -3829,7 +3825,7 @@ mod tests {
             variance: 1e-6,
             mean_value: 1.0,
             complexity: 3,
-            symbolically_proven: false,
+            symbolic_check_passed: false,
         }];
 
         engine.ingest_autonomous_invariants("autonomous_numeric", MathDomain::Physics, &invariants);
@@ -4535,8 +4531,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: HARMONIC OSCILLATOR ═══");
         eprintln!("  Input: dx/dt = v, dv/dt = -x\n");
         for r in &results {
-            let status = if r.symbolically_proven {
-                "PROVEN ✓"
+            let status = if r.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if r.variance < 1e-6 {
                 "numerically conserved"
             } else {
@@ -4548,7 +4544,7 @@ mod tests {
             );
         }
 
-        // x² + v² should be discovered as conserved AND symbolically proven
+        // x² + v² should be discovered as conserved AND symbolic/sample check passed
         let best = &results[0];
         assert!(
             best.name == "x² + y²" || best.name == "x² + v²",
@@ -4561,23 +4557,23 @@ mod tests {
             best.variance
         );
         assert!(
-            best.symbolically_proven,
-            "E = x²+v² should be symbolically proven"
+            best.symbolic_check_passed,
+            "E = x²+v² should be symbolic/sample check passed"
         );
 
         // x² alone should NOT be conserved
         let x2 = results.iter().find(|r| r.name == "x²").unwrap();
         assert!(x2.variance > 0.01, "x² should have high variance");
-        assert!(!x2.symbolically_proven, "x² should NOT be proven conserved");
+        assert!(!x2.symbolic_check_passed, "x² should not pass the symbolic/sample check");
 
         eprintln!("\n  >>> DISCOVERY: E = x² + v² is a conserved quantity");
-        eprintln!("  >>> PROOF: dE/dt = 2x·v + 2v·(-x) = 0 ✓");
+        eprintln!("  >>> SYMBOLIC-CHECK: derivative residuals sampled against the supplied dynamics");
     }
 
     /// LOTKA-VOLTERRA: discover the transcendental invariant V = x - ln(x) + y - ln(y).
     ///
-    /// This is the graduate-level test. The conserved quantity involves logarithms,
-    /// not just polynomials. The symbolic proof requires chain rule through ln:
+    /// This is the logarithmic-invariant assessment. The candidate involves logarithms,
+    /// not just polynomials. The symbolic assessment differentiates through ln; sampling is not a proof:
     ///   dV/dt = (1 - 1/x)(x - xy) + (1 - 1/y)(xy - y)
     ///         = (x - xy - 1 + y) + (xy - y - x + 1)
     ///         = 0
@@ -4620,8 +4616,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: LOTKA-VOLTERRA PREDATOR-PREY ═══");
         eprintln!("  Input: dx/dt = x(1-y), dy/dt = y(x-1)\n");
         for r in &results {
-            let status = if r.symbolically_proven {
-                "PROVEN ✓"
+            let status = if r.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if r.variance < 1e-4 {
                 "numerically conserved"
             } else {
@@ -4633,7 +4629,7 @@ mod tests {
             );
         }
 
-        // The LV invariant should be discovered AND symbolically proven
+        // The LV invariant should be discovered AND symbolic/sample check passed
         let lv = results.iter().find(|r| {
             r.name.contains("ln(x)") && r.name.contains("ln(y)") && r.name.contains("x -")
         });
@@ -4649,15 +4645,15 @@ mod tests {
         let x2y2 = results.iter().find(|r| r.name == "x² + y²");
         if let Some(c) = x2y2 {
             assert!(
-                !c.symbolically_proven,
+                !c.symbolic_check_passed,
                 "x²+y² should NOT be conserved in LV"
             );
         }
 
         eprintln!("\n  >>> DISCOVERY: V = x - ln(x) + y - ln(y) is a conserved quantity");
         eprintln!("  >>> This is the Lotka-Volterra first integral (transcendental invariant)");
-        if lv.symbolically_proven {
-            eprintln!("  >>> PROOF: dV/dt = (1-1/x)(x-xy) + (1-1/y)(xy-y) = 0 ✓");
+        if lv.symbolic_check_passed {
+            eprintln!("  >>> SYMBOLIC-CHECK: candidate derivative passed the finite-point residual check");
         }
     }
 
@@ -4745,8 +4741,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: KEPLER TWO-BODY ═══");
         eprintln!("  Input: d²r/dt² = -r/|r|³ (inverse-square gravity)\n");
         for r in &results {
-            let status = if r.symbolically_proven {
-                "PROVEN ✓"
+            let status = if r.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if r.variance < 1e-4 {
                 "numerically conserved"
             } else {
@@ -4832,8 +4828,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: DOUBLE PENDULUM (CHAOS) ═══");
         eprintln!("  Input: coupled pendulum, θ₁=1.5, θ₂=1.0 (chaotic regime)\n");
         for r in &results {
-            let status = if r.symbolically_proven {
-                "PROVEN ✓"
+            let status = if r.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if r.variance < 1e-3 {
                 "CONSERVED (numerical)"
             } else {
@@ -4916,8 +4912,8 @@ mod tests {
         eprintln!("║  Input: dx/dt = v, dv/dt = -x (that's ALL she gets)        ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().enumerate() {
-            let status = if inv.symbolically_proven {
-                "PROVEN ✓"
+            let status = if inv.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if inv.variance < 1e-6 {
                 "conserved"
             } else {
@@ -4949,8 +4945,8 @@ mod tests {
             "\n  >>> BEST DISCOVERY: {} (var={:.2e})",
             best.formula_str, best.variance
         );
-        if best.symbolically_proven {
-            eprintln!("  >>> SYMBOLICALLY PROVEN: dE/dt = 0 ✓");
+        if best.symbolic_check_passed {
+            eprintln!("  >>> SYMBOLICALLY SYMBOLIC-CHECK: dE/dt = 0 ✓");
         }
     }
 
@@ -5008,8 +5004,8 @@ mod tests {
         eprintln!("║  Input: d²r/dt² = -r/|r|³ (that's ALL she gets)            ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().enumerate() {
-            let status = if inv.symbolically_proven {
-                "PROVEN ✓"
+            let status = if inv.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if inv.variance < 1e-4 {
                 "conserved"
             } else {
@@ -5458,8 +5454,8 @@ mod tests {
         eprintln!("║  AUTONOMOUS DISCOVERY: SCHWARZSCHILD GEODESIC               ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().take(5).enumerate() {
-            let status = if inv.symbolically_proven {
-                "PROVEN ✓"
+            let status = if inv.symbolic_check_passed {
+                "SYMBOLIC-CHECK ✓"
             } else if inv.variance < 1e-4 {
                 "conserved"
             } else {
@@ -5999,8 +5995,8 @@ mod tests {
             "Kepler discovery should find invariants"
         );
         assert!(
-            invariants.iter().any(|inv| inv.symbolically_proven),
-            "Kepler discovery should produce at least one symbolically proven invariant for safe macro promotion"
+            invariants.iter().any(|inv| inv.symbolic_check_passed),
+            "Kepler discovery should produce at least one symbolic/sample check passed invariant for safe macro promotion"
         );
 
         // 2. Ingest into the ConjectureEngine's pool and reflect
