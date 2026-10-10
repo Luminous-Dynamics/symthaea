@@ -67,6 +67,11 @@ fn calibration_fixture_bytes() -> Vec<u8> {
     calibration_certificate().to_canonical_bytes()
 }
 
+fn verified_reference_standard() -> VerifiedArtifactBytes {
+    let reference = calibration_certificate().reference_standard().clone();
+    VerifiedArtifactBytes::verify(reference, reference_standard_fixture_bytes()).unwrap()
+}
+
 const REVIEW_NOW_UNIX_S: u64 = 1_750_000_000;
 
 fn review_signing_key() -> SigningKey {
@@ -1026,6 +1031,7 @@ fn verified_calibration_rejects_empty_certificate_or_review_bytes() {
         VerifiedCalibrationEvidence::new(
             record_with_empty_certificate,
             empty_certificate,
+            verified_reference_standard(),
             valid_review,
         )
         .unwrap_err(),
@@ -1067,10 +1073,40 @@ fn verified_calibration_requires_exact_certificate_and_review_artifact_reference
         VerifiedCalibrationEvidence::new(
             calibration.clone(),
             wrong_certificate,
+            verified_reference_standard(),
             verified_review,
         )
         .unwrap_err(),
         ContractError::VerifiedArtifactReferenceMismatch("calibration_certificate")
+    );
+
+    let verified_certificate =
+        VerifiedArtifactBytes::verify(calibration_artifact(), calibration_fixture_bytes())
+            .unwrap();
+    let verified_review = verify_review_bytes(
+        review_fixture_bytes(),
+        &calibration_artifact(),
+        "calibration-17",
+        "independent-review-receipt",
+    )
+    .unwrap();
+    let wrong_standard = VerifiedArtifactBytes::verify(
+        artifact(
+            "reference-standard-alias",
+            &sha256_hex(&reference_standard_fixture_bytes()),
+        ),
+        reference_standard_fixture_bytes(),
+    )
+    .unwrap();
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(
+            calibration.clone(),
+            verified_certificate,
+            wrong_standard,
+            verified_review,
+        )
+        .unwrap_err(),
+        ContractError::VerifiedArtifactReferenceMismatch("reference_standard")
     );
 
     let verified_certificate =
@@ -1084,7 +1120,12 @@ fn verified_calibration_requires_exact_certificate_and_review_artifact_reference
     )
     .unwrap();
     assert_eq!(
-        VerifiedCalibrationEvidence::new(calibration, verified_certificate, wrong_review)
+        VerifiedCalibrationEvidence::new(
+            calibration.clone(),
+            verified_certificate,
+            verified_reference_standard(),
+            wrong_review,
+        )
             .unwrap_err(),
         ContractError::VerifiedArtifactReferenceMismatch("calibration_review_receipt")
     );
@@ -1118,7 +1159,13 @@ fn verified_calibration_rejects_metadata_that_disagrees_with_certificate_claims(
     .unwrap();
 
     assert_eq!(
-        VerifiedCalibrationEvidence::new(calibration, certificate, review).unwrap_err(),
+        VerifiedCalibrationEvidence::new(
+            calibration,
+            certificate,
+            verified_reference_standard(),
+            review,
+        )
+        .unwrap_err(),
         ContractError::CalibrationCertificateClaimMismatch("range_max_value")
     );
 }
