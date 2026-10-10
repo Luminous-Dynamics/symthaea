@@ -708,7 +708,56 @@ pub struct ScreeningDesignVerificationReceipt {
     pub scope_note: String,
 }
 
-/// Recheck a generated schedule's structural invariants without calling the generator.
+
+/// Independently reconstruct treatment-row order from the declared seed for verification.
+///
+/// This intentionally does not call the generator's next_random, bounded_random, or shuffle
+/// helpers. Keep this verifier implementation isolated so it can catch accidental drift
+/// between scheduling and verification. It implements the published algorithm ID's SplitMix64
+/// stream and rejection-sampled Fisher–Yates shuffle.
+fn verifier_expected_treatment_orders(
+    request: &ScreeningDesignRequest,
+) -> Vec<Vec<(u32, u8)>> {
+    let combination_count = 1_usize << request.factors.len();
+    let treatment_count =
+        combination_count * request.replicates_per_setting_per_block as usize;
+    let mut state = request.randomization_seed;
+    let mut result = Vec::with_capacity(request.blocks.len());
+
+    for _block in &request.blocks {
+        let mut order = Vec::with_capacity(treatment_count);
+        for row in 0..combination_count {
+            for replicate in 1..=request.replicates_per_setting_per_block {
+                order.push(((row + 1) as u32, replicate));
+            }
+        }
+
+        // Independent spelling of SplitMix64 + unbiased bounded selection + Fisher–Yates.
+        for index in (1..order.len()).rev() {
+            let bound = (index + 1) as u64;
+            let rejection_threshold = bound.wrapping_neg() % bound;
+            let other = loop {
+                state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                let mut mixed = state;
+                mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+                mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+                let value = mixed ^ (mixed >> 31);
+                if value >= rejection_threshold {
+                    break (value % bound) as usize;
+                }
+            };
+            order.swap(index, other);
+        }
+        result.push(order);
+    }
+
+    result
+}
+
+/// Recheck a generated schedule's structural invariants and seed-to-order correspondence
+/// without calling the generator. This validates the serialized design artifact, but it does
+/// not authenticate cited evidence, independently reproduce the software in another trust
+/// domain, or authorize execution.
 /// This validates the serialized design artifact, but it does not authenticate its cited
 /// evidence, independently reproduce the software in another trust domain, or authorize execution.
 pub fn verify_screening_design(
@@ -759,6 +808,8 @@ pub fn verify_screening_design(
 
     let treatment_runs_per_block =
         combination_count * request.replicates_per_setting_per_block as usize;
+    let expected_treatment_orders = verifier_expected_treatment_orders(request);
+    let mut verified_treatment_positions_per_block = vec![0_usize; request.blocks.len()];
     let expected_center_positions =
         center_point_positions(treatment_runs_per_block, center_count);
     let mut run_ids = HashSet::new();
@@ -861,6 +912,22 @@ pub fn verify_screening_design(
                         "required center-point control is missing from its fixed stability-monitoring position",
                     ));
                 }
+                let treatment_position = verified_treatment_positions_per_block[block_index];
+                let expected_assignment = expected_treatment_orders[block_index]
+                    .get(treatment_position)
+                    .ok_or_else(|| {
+                        ScreeningDesignError::new(
+                            "runs.randomization",
+                            "block contains more treatment runs than the seeded assignment sequence",
+                        )
+                    })?;
+                if *expected_assignment != (standard_order, replicate) {
+                    return Err(ScreeningDesignError::new(
+                        "runs.randomization",
+                        "treatment run order does not match the declared seed and versioned randomization algorithm",
+                    ));
+                }
+                verified_treatment_positions_per_block[block_index] += 1;
                 let cell = (run.block_id.clone(), standard_order, replicate);
                 if !seen_cells.insert(cell) {
                     return Err(ScreeningDesignError::new(
@@ -1265,6 +1332,42 @@ mod tests {
         reordered.runs[second].replicate_index = Some(1);
         reordered.runs[second].settings = settings_for(&reordered.request_snapshot.factors, 0, false);
         assert!(verify_screening_design(&reordered).is_err());
+
+        // Reassign two valid treatment cells and recompute the unkeyed checksum. The
+        // artifact remains complete, unique, correctly typed, and internally checksummed,
+        // but it must fail because the assignments no longer follow the declared seed.
+        let mut seed_mismatch = generated.clone();
+        let treatment_positions = seed_mismatch
+            .runs
+            .iter()
+            .enumerate()
+            .filter(|(_, run)| {
+                run.block_id == seed_mismatch.request_snapshot.blocks[0].block_id
+                    && run.kind == PlannedRunKind::FactorialTreatment
+            })
+            .map(|(index, _)| index)
+            .take(2)
+            .collect::<Vec<_>>();
+        assert_eq!(treatment_positions.len(), 2);
+        let first = treatment_positions[0];
+        let second = treatment_positions[1];
+        let first_standard_order = seed_mismatch.runs[first].standard_order;
+        let first_replicate_index = seed_mismatch.runs[first].replicate_index;
+        let first_settings = seed_mismatch.runs[first].settings.clone();
+        seed_mismatch.runs[first].standard_order = seed_mismatch.runs[second].standard_order;
+        seed_mismatch.runs[first].replicate_index = seed_mismatch.runs[second].replicate_index;
+        seed_mismatch.runs[first].settings = seed_mismatch.runs[second].settings.clone();
+        seed_mismatch.runs[second].standard_order = first_standard_order;
+        seed_mismatch.runs[second].replicate_index = first_replicate_index;
+        seed_mismatch.runs[second].settings = first_settings;
+        seed_mismatch.schedule_sha256 = screening_schedule_sha256(
+            &seed_mismatch.algorithm_id,
+            &seed_mismatch.request_sha256,
+            &seed_mismatch.runs,
+        )
+        .unwrap();
+        let error = verify_screening_design(&seed_mismatch).unwrap_err();
+        assert_eq!(error.field, "runs.randomization");
 
         let mut incomplete = generated;
         incomplete.runs.pop();
