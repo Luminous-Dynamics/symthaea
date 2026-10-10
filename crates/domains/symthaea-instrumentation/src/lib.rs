@@ -807,8 +807,9 @@ pub enum StreamOrderFailure {
 }
 
 impl MeasurementStreamGuard {
-    /// Check sequence/time ordering when the caller does not need an explicit
-    /// wall/monotonic-now comparison. Quantitative use should call `observe_at`.
+    /// Check sequence/time ordering only. This method does not assess freshness,
+    /// resolve evidence, or qualify a measurement for quantitative use. Callers must
+    /// use `MeasurementEnvelope::assess_for_quantitative_use` for the complete gate.
     pub fn observe(&mut self, measurement: &MeasurementEnvelope) -> Result<(), StreamOrderFailure> {
         self.observe_inner(measurement, None)
     }
