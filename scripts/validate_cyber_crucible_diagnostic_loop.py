@@ -63,6 +63,18 @@ def content_digest(record: dict[str, Any], digest_field: str) -> str:
     payload.pop(digest_field, None)
     return hashlib.sha256(canonical_bytes(payload)).hexdigest()
 
+def action_content_digest(proposal: dict[str, Any]) -> str:
+    """Bind immutable action intent, excluding mutable lifecycle metadata.
+
+    Status and the receipt pointer change as the process advances. They must not
+    be part of the digest that an authorization decision signs; scope, action
+    class, rationale, side effects, recovery obligations, and evidence refs are.
+    """
+    payload = copy.deepcopy(proposal)
+    for field in ("proposal_digest", "status", "authority_receipt_ref"):
+        payload.pop(field, None)
+    return hashlib.sha256(canonical_bytes(payload)).hexdigest()
+
 
 def validate_report(report: Any) -> list[str]:
     errors: list[str] = []
@@ -152,7 +164,10 @@ def validate_report(report: Any) -> list[str]:
             errors.append(f"{label}.evaluator_id must be non-empty")
         if receipt.get("evaluator_id") == subject_id:
             errors.append(f"{label} evaluator must not be the assessed subject")
-        if receipt.get("scenario_id") != scenario_id or receipt.get("scenario_revision") != scenario_revision or receipt.get("scenario_digest") != scenario_digest:
+        receipt_revision = receipt.get("scenario_revision")
+        if not isinstance(receipt_revision, int) or isinstance(receipt_revision, bool) or receipt_revision < 1:
+            errors.append(f"{label}.scenario_revision must be a positive integer")
+        if receipt.get("scenario_id") != scenario_id or receipt_revision != scenario_revision or receipt.get("scenario_digest") != scenario_digest:
             errors.append(f"{label} scenario identity does not match the run's exact scenario id/revision/digest")
         if not is_member(receipt.get("status"), STATUSES):
             errors.append(f"{label}.status is unsupported")
@@ -240,6 +255,8 @@ def validate_report(report: Any) -> list[str]:
             if not is_member(step.get("authority_status"), {"not_requested", "denied", "authorized", "unknown"}):
                 errors.append("authority_check requires an explicit authority_status")
             if step.get("authority_status") == "authorized":
+                if not isinstance(step.get("proposal_refs"), list) or not step.get("proposal_refs"):
+                    errors.append("authority_status=authorized requires proposal_refs")
                 step_receipt_refs = step.get("receipt_refs", [])
                 if not isinstance(step_receipt_refs, list):
                     step_receipt_refs = []
@@ -335,6 +352,11 @@ def validate_report(report: Any) -> list[str]:
             errors.append(f"{label}.scope must be explicit")
         if not isinstance(proposal.get("rationale"), str) or not proposal["rationale"].strip():
             errors.append(f"{label}.rationale must be explicit")
+        supplied_proposal_digest = proposal.get("proposal_digest")
+        if not isinstance(supplied_proposal_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", supplied_proposal_digest):
+            errors.append(f"{label}.proposal_digest must be lowercase SHA-256 hex")
+        elif supplied_proposal_digest != action_content_digest(proposal):
+            errors.append(f"{label} proposal_digest does not bind the current action content")
         side_effects = proposal.get("predicted_side_effects")
         if not isinstance(side_effects, list) or not side_effects or any(not isinstance(x, str) or not x.strip() for x in side_effects):
             errors.append(f"{label}.predicted_side_effects must be a non-empty string list")
@@ -355,9 +377,47 @@ def validate_report(report: Any) -> list[str]:
                 and isinstance(auth_payload, dict)
                 and auth_payload.get("decision") == "authorized"
                 and auth_payload.get("proposal_id") == proposal_id
+                and auth_payload.get("proposal_digest") == proposal.get("proposal_digest")
                 and auth.get("scenario_digest") == scenario_digest
             ):
-                errors.append(f"{label} {proposal['status']} requires a matching authorization_decision receipt bound to this proposal and scenario")
+                errors.append(f"{label} {proposal['status']} requires an authorization_decision receipt bound to the exact proposal digest and scenario")
+            matching_authority_steps = [
+                step for step in steps if isinstance(step, dict)
+                and step.get("phase") == "authority_check"
+                and step.get("authority_status") == "authorized"
+                and proposal_id in (step.get("proposal_refs") if isinstance(step.get("proposal_refs"), list) else [])
+                and auth_ref in (step.get("receipt_refs") if isinstance(step.get("receipt_refs"), list) else [])
+            ]
+            if not matching_authority_steps:
+                errors.append(f"{label} {proposal['status']} requires an authority_check step bound to this proposal and receipt")
+    for index, step in enumerate(steps):
+        if not isinstance(step, dict) or step.get("phase") != "authority_check" or step.get("authority_status") != "authorized":
+            continue
+        proposal_refs = step.get("proposal_refs", [])
+        step_receipt_refs = step.get("receipt_refs", [])
+        bound = False
+        if isinstance(proposal_refs, list) and isinstance(step_receipt_refs, list):
+            for proposal_ref in proposal_refs:
+                proposal = proposal_by_id.get(proposal_ref) if isinstance(proposal_ref, str) else None
+                if not isinstance(proposal, dict):
+                    continue
+                for receipt_ref in step_receipt_refs:
+                    receipt = receipt_by_id.get(receipt_ref) if isinstance(receipt_ref, str) else None
+                    payload = receipt.get("payload") if isinstance(receipt, dict) else None
+                    if (
+                        receipt and receipt.get("receipt_type") == "authorization_decision"
+                        and receipt.get("status") == "pass" and isinstance(payload, dict)
+                        and payload.get("decision") == "authorized"
+                        and payload.get("proposal_id") == proposal.get("proposal_id")
+                        and payload.get("proposal_digest") == proposal.get("proposal_digest")
+                        and receipt.get("scenario_id") == scenario_id
+                        and receipt.get("scenario_revision") == scenario_revision
+                        and receipt.get("scenario_digest") == scenario_digest
+                    ):
+                        bound = True
+        if not bound:
+            errors.append(f"steps[{index}] authority approval does not bind the exact proposal digest and scenario")
+
     for index, step in enumerate(steps):
         if isinstance(step, dict):
             proposal_refs = step.get("proposal_refs", [])
