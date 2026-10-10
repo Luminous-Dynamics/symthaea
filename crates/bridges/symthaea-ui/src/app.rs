@@ -379,7 +379,7 @@ pub fn App() -> impl IntoView {
                     ></canvas>
                     {move || movie.with(|m| m.as_ref().map(|m| view! {
                         <p class="movie-note" style="font-size:0.8em;opacity:0.6;">
-                            {format!("{} frames · coherence {:.2}", m.frames_rgba.len(), m.semantic_coherence)}
+                            {format!("{} frames · trajectory continuity proxy {:.2}", m.frames_rgba.len(), m.semantic_coherence)}
                         </p>
                     }))}
                 </div>
