@@ -425,7 +425,13 @@ pub fn generate_plackett_burman_design(
         center_point_run_count,
         total_planned_run_count: runs.len() as u32,
         runs,
-        interpretation_note: "12-run Plackett–Burman main-effect screening proposal only. Main effects are generally confounded with two-factor interactions; use only when that limitation is defensible, then confirm selected factors in a follow-up design. No exact power analysis, interaction estimates, safety release, field authorization, or agronomic claim is provided.".into(),
+        interpretation_note: concat!(
+            "12-run Plackett–Burman main-effect screening proposal only. Main effects are generally ",
+            "confounded with two-factor interactions; use only when that limitation is defensible, ",
+            "then confirm selected factors in a follow-up design. No exact power analysis, ",
+            "interaction estimates, safety release, field authorization, or agronomic claim is provided."
+        )
+        .into(),
     })
 }
 
@@ -666,7 +672,11 @@ pub fn verify_plackett_burman_design(
         verified_factor_count: request.factors.len() as u32,
         verified_treatment_rows: verified_treatments,
         verified_center_points: verified_centers,
-        scope_note: "PB schedule structure and declared seed order verified; interactions remain aliased and external evidence/approval identities are not authenticated".into(),
+        scope_note: concat!(
+            "PB schedule structure and declared seed order verified; interactions remain aliased ",
+            "and external evidence/approval identities are not authenticated"
+        )
+        .into(),
     })
 }
 
@@ -955,7 +965,12 @@ pub fn analyze_plackett_burman_responses(
         main_effects,
         block_center_point_diagnostics: diagnostics,
         treatment_mean,
-        scope_note: "descriptive PB high-minus-low main effects only; these estimates can be biased by aliased two-factor interactions. No inferential claims, p-values, confidence intervals, safety approval, field authorization, or proof of agronomic efficacy.".into(),
+        scope_note: concat!(
+            "descriptive PB high-minus-low main effects only; these estimates can be biased by ",
+            "aliased two-factor interactions. No inferential claims, p-values, confidence intervals, ",
+            "safety approval, field authorization, or proof of agronomic efficacy."
+        )
+        .into(),
     })
 }
 
@@ -1132,13 +1147,13 @@ mod tests {
     }
 
     #[test]
-    fn missing_and_scenario_responses_fail_closed() {
+    fn missing_responses_and_unknown_review_fail_closed() {
         let plan=generate_plackett_burman_design(&request(3,0)).unwrap();
         assert!(analyze_plackett_burman_responses(&plan,&[]).is_err());
         let mut unapproved=request(3,0);
         unapproved.bench_scale_review.status=BenchScaleReviewStatus::Unknown;
-        unapproved.bench_scale_review.reviewed_design_sha256 =
-            plackett_burman_design_sha256(&unapproved).unwrap();
+        let unapproved_digest = plackett_burman_design_sha256(&unapproved).unwrap();
+        unapproved.bench_scale_review.reviewed_design_sha256 = unapproved_digest;
         assert!(generate_plackett_burman_design(&unapproved).is_err());
     }
 }
