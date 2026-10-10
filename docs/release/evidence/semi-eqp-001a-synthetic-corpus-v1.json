@@ -1,0 +1,155 @@
+{
+  "authority": "representation_only_no_execution_authority",
+  "cases": [
+    {
+      "as_built_ref": null,
+      "design_ref": "semi-eqp-design:synthetic-a",
+      "expected_disposition": "DesignOnly",
+      "id": "design_without_as_built"
+    },
+    {
+      "as_built_ref": "semi-eqp-article:synthetic-a1",
+      "commissioning_ref": null,
+      "design_ref": "semi-eqp-design:synthetic-a",
+      "expected_disposition": "AsBuiltUncommissioned",
+      "id": "as_built_without_commissioning"
+    },
+    {
+      "as_built_ref": "semi-eqp-article:synthetic-a1",
+      "commissioning_ref": "commissioning:synthetic-a1",
+      "expected_disposition": "CapabilityUnresolved",
+      "id": "commissioned_with_unresolved_required_subsystem",
+      "required_subsystem_refs": [
+        "subsystem:motion-a",
+        "subsystem:diagnostics-a"
+      ],
+      "resolved_subsystem_refs": [
+        "subsystem:motion-a"
+      ]
+    },
+    {
+      "commissioning_ref": "commissioning:synthetic-a1",
+      "expected_disposition": "CommissionedPartialCapability",
+      "id": "partial_workspace_observation_not_whole_tool",
+      "observed_refs": [
+        "observation:workspace-condition-a"
+      ],
+      "present_observation_roles": [
+        "workspace"
+      ],
+      "required_observation_roles": [
+        "workspace",
+        "thermal",
+        "positioning"
+      ]
+    },
+    {
+      "calibration_currentness": "stale",
+      "calibration_ref": "calibration:synthetic-stale-a",
+      "capability_evidence_ref": "evidence:capability-a",
+      "expected_disposition": "CapabilityUnresolved",
+      "id": "stale_calibration_blocks_stronger_capability"
+    },
+    {
+      "declared_compatible": true,
+      "expected_disposition": "ProcessCompatibilityUnresolved",
+      "id": "declared_process_compatibility_missing_diagnostics",
+      "present_diagnostic_refs": [],
+      "process_family_ref": "mfg-proc:synthetic-family-a",
+      "required_diagnostic_refs": [
+        "diagnostic:required-a"
+      ]
+    },
+    {
+      "expected_disposition": "ProcessCompatibilityUnresolved",
+      "id": "unresolved_subfab_blocks_compatibility",
+      "process_family_ref": "mfg-proc:synthetic-family-a",
+      "resolved_subfab_refs": [],
+      "subfab_requirement_refs": [
+        "subfab:vacuum-service-a"
+      ]
+    },
+    {
+      "base_configuration_ref": "semi-eqp-config:synthetic-a",
+      "changed_configuration_ref": "semi-eqp-config:synthetic-b",
+      "expected_identity_relation": "distinct",
+      "id": "tool_configuration_change_changes_identity"
+    },
+    {
+      "declared_order_semantics": "set",
+      "expected_identity_relation": "same",
+      "id": "unordered_subsystem_refs_are_canonical",
+      "subsystem_refs_a": [
+        "subsystem:alpha",
+        "subsystem:beta"
+      ],
+      "subsystem_refs_b": [
+        "subsystem:beta",
+        "subsystem:alpha"
+      ]
+    },
+    {
+      "expected_error": "DuplicateReference",
+      "id": "duplicate_required_subsystem_rejected",
+      "required_subsystem_refs": [
+        "subsystem:alpha",
+        "subsystem:alpha"
+      ]
+    },
+    {
+      "expected_disposition": "ObservedCapabilityUnderProfile",
+      "general_machine_qualification_ref": null,
+      "id": "one_process_trial_not_general_machine_qualification",
+      "process_trial_refs": [
+        "trial:synthetic-one"
+      ]
+    },
+    {
+      "capability_evidence_ref": "evidence:operational-a",
+      "closure_origin": "external_import",
+      "critical_subsystem_ref": "subsystem:imported-a",
+      "expected_closure": "external_import_dependent",
+      "expected_disposition": "ObservedCapabilityUnderProfile",
+      "id": "imported_critical_subsystem_preserves_operational_but_external_closure"
+    },
+    {
+      "execution_authority": false,
+      "expected_disposition": "ExecutionNotAuthorized",
+      "id": "stale_safety_evidence_blocks_execution_authority",
+      "machine_observation_ref": "observation:machine-a",
+      "safety_currentness": "stale",
+      "safety_interlock_evidence_ref": "safety:stale-a"
+    },
+    {
+      "expected_disposition": "CalibratedCapabilityUnderProfile",
+      "expected_history": "both_preserved",
+      "historical_calibration_states": [
+        {
+          "currentness": "stale",
+          "ref": "calibration:stale-a"
+        },
+        {
+          "currentness": "current",
+          "ref": "calibration:renewed-a"
+        }
+      ],
+      "id": "later_calibration_repair_does_not_rewrite_stale_history"
+    },
+    {
+      "as_built_ref": null,
+      "commissioning_ref": null,
+      "expected_error": "ProposalCannotMintPhysicalState",
+      "id": "design_proposal_cannot_mint_as_built_state",
+      "proposal_ref": "proposal:synthetic-a"
+    },
+    {
+      "execution_authority": false,
+      "expected_authority": "none",
+      "expected_disposition": "ExecutionNotAuthorized",
+      "id": "qualification_artifact_mints_no_execution_authority",
+      "qualification_ref": "qualification:synthetic-a"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for semiconductor-tool configuration/capability evidence semantics. Contains no machine construction or operating parameters.",
+  "schema": "semi-eqp-001a-synthetic-corpus-v1"
+}
