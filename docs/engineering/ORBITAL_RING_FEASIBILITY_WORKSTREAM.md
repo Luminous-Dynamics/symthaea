@@ -194,6 +194,7 @@ This increment must not claim that an orbital ring is stable, cheap, safe, build
 - Symthaea orbital model scope: https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-orbital/README.md
 - Monorepo space-automation plan and candid maturity assessment: https://github.com/Luminous-Dynamics/luminous-dynamics/blob/55757dfac7791d6d5d4733f7398f4ca17af215d0/symthaea/SPACE_AUTOMATION_PLAN_2026-07-06.md
 - [Orbital-ring research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md): source-audit priorities, failure-energy questions, debris exposure, and explicit evidence states.
+- [Failure-mode evidence note](ORBITAL_RING_FAILURE_MODE_NOTE.md): Part II source findings on skyhook load steps, lift-coil loss, cryogenic quench, inter-ring riders, and distinct ladder-collapse hazards.
 - [Birch power source audit script](../../scripts/engineering/orbital_ring_power_source_audit.py): repeatable arithmetic check distinguishing eddy-current drag from cryostat electrical power.
 - [Power-budget audit note](ORBITAL_RING_POWER_BUDGET_AUDIT.md): source page references, derivation, results, and open reconstruction tasks.
 - [Captured power audit JSON](evidence/orbital_ring_power_source_audit.json): deterministic output from the 12-check run.
@@ -248,7 +249,7 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 
 ### Checks actually performed
 
-- Read back the exact branch versions of all twelve changed files.
+- Read back the exact branch versions of all thirteen changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
@@ -261,4 +262,4 @@ The present execution environment does not have `cargo` installed. The Rust test
 
 ### Next engineering increment
 
-Continue analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. Next, resolve why the separate p. 483 superconducting-surface estimate is smaller than the Table 8 continuous-skyhook estimate, keeping their architecture/scope boundaries separate while advancing RG-01. For RG-01, complete the scenario fields in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md): inertial frame and support-frame transform, inertial and relative stream velocities, line density or discrete mass elements, path curvature, support motion/acceleration, external forces, and boundary fluxes of mass, energy, and momentum. Derive the vector balance independently, show assumptions and units, test the inertial circular-path limit covered by C1, and only then implement the bounded equation in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
+Continue analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. The next physical-model increment is now **F-SKYHOOK-LOAD-STEP**: define a bounded continuous-skyhook support-load step and rider/coupler topology using the requirements in [the failure-mode note](ORBITAL_RING_FAILURE_MODE_NOTE.md). Before simulating the transient, freeze the initial equilibrium, inertial and support frames, ring/support state, rider spacing and force law, stiffness/damping, load step/ramp, delays, saturation limits, and energy/vector-momentum boundary. If those are unknown, record the case as blocked rather than inventing a restoring force. In parallel, preserve the distinction between the p. 483 superconducting-surface estimate and Table 8's continuous-skyhook configuration. Once the scenario is fully specified, independently derive a small limiting case, define peak-offset/support-miss metrics, and only then implement the bounded test in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
