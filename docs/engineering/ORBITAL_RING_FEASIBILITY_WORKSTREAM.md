@@ -40,16 +40,16 @@ For each scenario, specify: Earth reference ellipsoid and gravity model; inertia
 
 Use SI internally: metres, kilograms, seconds, newtons, joules, pascals, radians. Use typed newtypes or an equivalent checked boundary; do not allow bare mixed-unit arrays into the authoritative model.
 
-For a freely orbiting object in a circular two-body Earth orbit, with geocentric radius (r = R_E + h), gravitational parameter μ:
+For a freely orbiting object in a circular two-body Earth orbit, with geocentric radius \(r = R_E + h\) and gravitational parameter \(\mu\):
 
-- Circular orbital speed: (v_c = \sqrt{\mu/r}\)
-- Circular orbital period: (T = 2\pi\sqrt{r^3/\mu}\)
-- Circumference of the chosen geometric circle: (C = 2\pi r\)
-- Specific mechanical energy for a circular Kepler orbit: ε = −μ/(2r)
+- Circular orbital speed: \(v_c = \sqrt{\mu/r}\)
+- Circular orbital period: \(T = 2\pi\sqrt{r^3/\mu}\)
+- Circumference of the chosen geometric circle: \(C = 2\pi r\)
+- Specific mechanical energy for a circular Kepler orbit: \(\epsilon = -\mu/(2r)\)
 
 Use these equations only for the stated circular-orbit model. A stationary supported ring is not a circular Kepler orbit, so the equations do not establish its equilibrium or its required rotor speed.
 
-Using \u03bc = 3.986004418\u00d710\u00b9\u2074 m\u00b3/s\u00b2 and an equatorial reference radius of 6,378.137 km gives this independently evaluated *two-body circular-orbit* sanity table:
+Using mu = 3.986004418e14 m^3/s^2 and an equatorial reference radius of 6,378.137 km gives this independently evaluated *two-body circular-orbit* sanity table:
 
 | Altitude h (km) | Radius r (km) | Circumference (km) | Circular speed (km/s) | Period (min) | Orbital kinetic energy per kg (MJ/kg) |
 |---:|---:|---:|---:|---:|---:|
@@ -60,13 +60,13 @@ Using \u03bc = 3.986004418\u00d710\u00b9\u2074 m\u00b3/s\u00b2 and an equatorial
 
 These numbers are reference fixtures for formula/unit tests only. They omit atmosphere, oblateness, lunar/solar perturbations, inclination, attitude, and all ring-support physics; they are **not** a claim that any listed altitude is suitable for a long-lived infrastructure ring. The table's kinetic-energy column is the ideal orbital specific kinetic energy, not the rotor's energy and not the energy required to build, deploy, or support a ring.
 
-For a curved moving mass stream, the local normal-force requirement is related to mass flow, curvature, and **inertial** velocity. A first-principles model must derive this from the actual control volume and velocity field. Do not substitute rotor speed relative to the sheath directly into (a_n=v^2/r) unless the reference frame and transformation justify it.
+For a curved moving mass stream, the local normal-force requirement is related to mass flow, curvature, and **inertial** velocity. A first-principles model must derive this from the actual control volume and velocity field. Do not substitute rotor speed relative to the sheath directly into \(a_n = v^2/r\) unless the reference frame and transformation justify it.
 
 If a local continuous-stream approximation is used, record line density λ, curvature κ, relative velocity, support-frame velocity and acceleration, and control-volume assumptions. Then derive the vector acceleration/force balance in the chosen frame. In a rotating body frame this must account for transport terms (including Coriolis, centrifugal and angular-acceleration terms as applicable). Validate the resulting expression against a small, independently hand-checkable limiting case.
 
 Energy and momentum are bookkeeping constraints, not optional secondary metrics:
 
-- Rotor kinetic energy: for absolute conservation accounting, calculate \(E_k = \\frac12 m |\\mathbf{v}_{\\text{inertial}}|^2\) using the rotor mass's velocity in one stated inertial bookkeeping frame (for example, GCRF). Relative-to-sheath kinetic energy is a useful subsystem diagnostic, but it is frame-dependent; do not add it to inertial-frame energy terms without transforming velocities and accounting for support-frame motion.
+- Rotor kinetic energy: for absolute conservation accounting, calculate \(E_k = \frac{1}{2}m\lVert\mathbf{v}_{\mathrm{inertial}}\rVert^2\) using the rotor mass's velocity in one stated inertial bookkeeping frame (for example, GCRF). Relative-to-sheath kinetic energy is a useful subsystem diagnostic, but it is frame-dependent; do not add it to inertial-frame energy terms without transforming velocities and accounting for support-frame motion.
 - Every payload launch/braking case must show where energy and momentum go: rotor, supporting structure, Earth, electrical store, propulsion, or another explicitly modelled body.
 - A replenishment term must be external energy input, not a free “momentum reset.”
 - Power loss, loss of magnetic support, loss of confinement, and rotor rupture are distinct fault classes. Loss of drive power does not instantaneously erase stored kinetic energy; nevertheless, failure of support/confinement can cause a severe mechanical transient.
