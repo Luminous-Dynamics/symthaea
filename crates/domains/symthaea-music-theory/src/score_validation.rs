@@ -319,6 +319,25 @@ fn validate_voice_crossing(score: &Score, issues: &mut Vec<ScoreValidationIssue>
     let mut times: Vec<f64> = score.notes.iter().map(|note| note.onset.beats()).collect();
     times.sort_by(f64::total_cmp);
     times.dedup_by(|left, right| (*left - *right).abs() < 1e-9);
+    let onset_samples = times.len() as u128;
+    let note_count = score.notes.len() as u128;
+    let over_budget = onset_samples
+        .checked_mul(note_count)
+        .is_none_or(|probes| probes > MAX_PER_BEAT_VALIDATION_NOTE_PROBES);
+    if over_budget {
+        issue(
+            issues,
+            ScoreValidationRule::ScoreMetadata,
+            ValidationSeverity::Fatal,
+            Vec::new(),
+            None,
+            None,
+            format!(
+                "score exceeds the voice-crossing validation budget of {MAX_PER_BEAT_VALIDATION_NOTE_PROBES} note-onset probes"
+            ),
+        );
+        return;
+    }
     for time in times {
         let Some((bass_index, bass)) = sounding(score, VoiceRole::Bass, time) else {
             continue;
@@ -680,6 +699,43 @@ mod tests {
             issue.rule == ScoreValidationRule::StrongBeatConsonance
                 || issue.rule == ScoreValidationRule::ParallelPerfectMotion
         }));
+    }
+
+    #[test]
+    fn excessive_note_by_onset_work_is_rejected_before_voice_crossing_scans() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        for onset_numerator in 0..2_237_i64 {
+            score
+                .try_push(ScoreNote {
+                    part: PartId::UNASSIGNED,
+                    pitch: Pitch::from_midi(60),
+                    onset: Duration::new(onset_numerator, 10_000),
+                    duration: Duration::new(1, 10_000),
+                    velocity: 0.7,
+                    role: VoiceRole::Harmony,
+                    emphasis: Emphasis::Normal,
+                    section_intensity: 1.0,
+                })
+                .unwrap();
+        }
+
+        assert!(score.total_beats.beats() < 1.0);
+        assert!(
+            (score.notes.len() as u128) * (score.notes.len() as u128)
+                > MAX_PER_BEAT_VALIDATION_NOTE_PROBES
+        );
+
+        let report = validate_score(&score, &ScoreValidationConfig::default());
+        assert!(
+            report.issues.iter().any(|issue| {
+                issue.rule == ScoreValidationRule::ScoreMetadata
+                    && issue.severity == ValidationSeverity::Fatal
+                    && issue.message.contains("voice-crossing validation budget")
+                    && issue.message.contains("note-onset probes")
+            }),
+            "scores over the onset-scan budget must fail explicitly: {:?}",
+            report.issues
+        );
     }
 
     #[test]
