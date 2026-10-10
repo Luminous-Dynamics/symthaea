@@ -1013,6 +1013,87 @@ fn calibration_resolver_rejects_certificate_bytes_with_a_wrong_digest() {
 }
 
 #[test]
+fn verified_calibration_rejects_reference_standard_with_wrong_quantity() {
+    let incompatible_standard = CalibrationCertificate::new(
+        "reference-standard-01",
+        InstrumentIdentity::new("acoustic-standard-lab-01", "pressure-output-a").unwrap(),
+        Quantity::AcousticPressure,
+        Unit::Pascal,
+        0.0,
+        10.0,
+        SAMPLE_TIME_NS - 10_000,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        0.1,
+        "primary-metrology-lab-01",
+        "pressure-reference-procedure-v1",
+        artifact(
+            "primary-reference-standard-01",
+            &sha256_hex(&primary_reference_standard_fixture_bytes()),
+        ),
+    )
+    .unwrap();
+    let standard_bytes = incompatible_standard.to_canonical_bytes();
+    let standard_reference = artifact(
+        "reference-standard-01",
+        &sha256_hex(&standard_bytes),
+    );
+
+    let certificate = CalibrationCertificate::new(
+        "calibration-17",
+        instrument_identity(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+        "calibration-lab-01",
+        "ultrasound-frequency-procedure-v1",
+        standard_reference.clone(),
+    )
+    .unwrap();
+    let certificate_bytes = certificate.to_canonical_bytes();
+    let certificate_reference = artifact(
+        "calibration-certificate",
+        &sha256_hex(&certificate_bytes),
+    );
+    let review_bytes = signed_review_fixture_bytes(&certificate_reference, "calibration-17");
+    let review = verify_review_bytes(
+        review_bytes,
+        &certificate_reference,
+        "calibration-17",
+        "independent-review-receipt",
+    )
+    .unwrap();
+    let resolved = ResolvedCalibration::new(
+        "calibration-17",
+        instrument_identity(),
+        certificate_reference.clone(),
+        review.artifact().reference().clone(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    )
+    .unwrap();
+
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(
+            resolved,
+            VerifiedArtifactBytes::verify(certificate_reference, certificate_bytes).unwrap(),
+            VerifiedArtifactBytes::verify(standard_reference, standard_bytes).unwrap(),
+            review,
+        )
+        .unwrap_err(),
+        ContractError::ReferenceStandardClaimMismatch("quantity")
+    );
+}
+
+#[test]
 fn calibration_resolver_rejects_reference_standard_bytes_with_a_wrong_digest() {
     let mut tampered = resolver();
     tampered.reference_standard_bytes_override =
