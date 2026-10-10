@@ -80,7 +80,6 @@ struct Movie {
     frames_rgba: Vec<Vec<u8>>,
     width: u32,
     height: u32,
-    semantic_coherence: f32,
     trajectory_continuity: Option<f32>,
 }
 
@@ -133,7 +132,6 @@ impl Movie {
             frames_rgba,
             width,
             height,
-            semantic_coherence: m["semantic_coherence"].as_f64().unwrap_or(0.0) as f32,
             trajectory_continuity: m["trajectory_continuity"]
                 .as_f64()
                 .filter(|score| score.is_finite() && (0.0..=1.0).contains(score))
