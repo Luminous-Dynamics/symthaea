@@ -70,6 +70,9 @@ pub struct CycleResult {
     pub language_source: Option<String>,
     #[cfg(feature = "canvas")]
     pub canvas_svg: Option<String>,
+    /// Renderer-neutral cognitive scene for GPU/native/browser consumers.
+    #[cfg(feature = "canvas")]
+    pub canvas_scene: Option<symthaea_canvas::RemoteScene>,
     #[cfg(feature = "identity")]
     pub signed_output: Option<crate::identity::SignedOutput>,
     #[cfg(feature = "identity")]
