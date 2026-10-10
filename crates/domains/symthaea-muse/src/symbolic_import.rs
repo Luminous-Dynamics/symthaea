@@ -61,6 +61,21 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         ));
     }
     let smf = Smf::parse(bytes).map_err(|error| format!("MIDI parse error: {error}"))?;
+    match smf.header.format {
+        midly::Format::Sequential => {
+            return Err(
+                "MIDI format 2 contains sequential independent patterns and cannot be represented as one simultaneous Score"
+                    .into(),
+            );
+        }
+        midly::Format::SingleTrack if smf.tracks.len() != 1 => {
+            return Err(
+                "MIDI format 0 requires exactly one track; refusing to merge malformed single-track input"
+                    .into(),
+            );
+        }
+        midly::Format::SingleTrack | midly::Format::Parallel => {}
+    }
     if smf.tracks.len() > MAX_IMPORTED_MIDI_TRACKS {
         return Err(format!(
             "MIDI import exceeds the {MAX_IMPORTED_MIDI_TRACKS}-track limit"
@@ -301,6 +316,19 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     let text = std::str::from_utf8(bytes).map_err(|_| "MusicXML must be UTF-8 XML")?;
     let document = roxmltree::Document::parse(text)
         .map_err(|error| format!("MusicXML parse error: {error}"))?;
+    let root = document.root_element();
+    if root.has_tag_name("score-timewise") {
+        return Err(
+            "MusicXML score-timewise organization is not supported; convert to score-partwise before import"
+                .into(),
+        );
+    }
+    if !root.has_tag_name("score-partwise") {
+        return Err(format!(
+            "MusicXML root element <{}> is not a supported score-partwise document",
+            root.tag_name().name()
+        ));
+    }
     let parts: Vec<_> = document
         .descendants()
         .filter(|node| node.has_tag_name("part"))
@@ -852,8 +880,12 @@ mod tests {
     }
 
     fn midi_file_with_tracks(tracks: &[&[u8]]) -> Vec<u8> {
-        let mut bytes = b"MThd".to_vec();
         let format = if tracks.len() > 1 { 1_u16 } else { 0_u16 };
+        midi_file_with_format(format, tracks)
+    }
+
+    fn midi_file_with_format(format: u16, tracks: &[&[u8]]) -> Vec<u8> {
+        let mut bytes = b"MThd".to_vec();
         bytes.extend_from_slice(&[0, 0, 0, 6]);
         bytes.extend_from_slice(&format.to_be_bytes());
         bytes.extend_from_slice(&(tracks.len() as u16).to_be_bytes());
@@ -864,6 +896,46 @@ mod tests {
             bytes.extend_from_slice(track);
         }
         bytes
+    }
+
+    #[test]
+    fn midi_format_two_sequential_patterns_are_not_flattened_into_one_score() {
+        let first = [0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0];
+        let second = [0, 0x90, 67, 100, 100, 0x80, 67, 0, 0, 0xFF, 0x2F, 0];
+        let tracks: [&[u8]; 2] = [&first, &second];
+        let error = parse_midi(&midi_file_with_format(2, &tracks)).unwrap_err();
+        assert!(error.contains("sequential independent patterns"), "{error}");
+    }
+
+    #[test]
+    fn malformed_midi_format_zero_with_multiple_tracks_is_rejected() {
+        let first = [0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0];
+        let second = [0, 0x90, 67, 100, 100, 0x80, 67, 0, 0, 0xFF, 0x2F, 0];
+        let tracks: [&[u8]; 2] = [&first, &second];
+        let error = parse_midi(&midi_file_with_format(0, &tracks)).unwrap_err();
+        assert!(error.contains("requires exactly one track"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_timewise_root_is_rejected_before_parts_are_flattened() {
+        let xml = br#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Solo</part-name></score-part></part-list>
+            <measure number="1"><part id="P1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </part></measure>
+            <measure number="2"><part id="P1">
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </part></measure>
+        </score-timewise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("score-timewise organization is not supported"), "{error}");
+    }
+
+    #[test]
+    fn non_score_musicxml_root_is_rejected_explicitly() {
+        let error = parse_musicxml(br#"<root><part id="P1"/></root>"#).unwrap_err();
+        assert!(error.contains("is not a supported score-partwise document"), "{error}");
     }
 
     fn json_score_with_one_note() -> Score {
