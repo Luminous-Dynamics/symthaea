@@ -1,0 +1,471 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Strict parser for ngspice ASCII rawfiles.
+//!
+//! This module parses numeric output only. It does not infer solver convergence,
+//! physical validity, or qualification; callers must obtain those from separate
+//! solver-specific evidence and independent checks.
+
+use std::error::Error;
+use std::fmt;
+
+/// Stable parser identity for evidence manifests and regression fixtures.
+pub const PARSER_VERSION: &str = "ngspice-ascii-raw-v1";
+
+/// A vector declared in an ngspice rawfile.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawVariable {
+    /// Zero-based variable index declared by the file.
+    pub index: usize,
+    /// Exact solver vector name, for example time or v(out).
+    pub name: String,
+    /// Exact solver variable kind, for example time or voltage.
+    pub kind: String,
+}
+
+impl RawVariable {
+    /// Map a small, explicit set of common ngspice kinds to SI display units.
+    ///
+    /// Unknown kinds deliberately return None; callers must not guess units.
+    pub fn si_unit(&self) -> Option<&'static str> {
+        match self.kind.as_str() {
+            "time" => Some("s"),
+            "voltage" => Some("V"),
+            "current" => Some("A"),
+            "frequency" => Some("Hz"),
+            _ => None,
+        }
+    }
+}
+
+/// One successfully parsed, single-plot ASCII ngspice rawfile.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AsciiRawfile {
+    /// Title declared by ngspice.
+    pub title: String,
+    /// Analysis name, such as Transient Analysis or Operating Point.
+    pub plotname: String,
+    /// Raw flags, retained rather than normalized away.
+    pub flags: Vec<String>,
+    /// Variables in solver-declared order.
+    pub variables: Vec<RawVariable>,
+    /// Each row contains one finite scalar per declared variable.
+    pub points: Vec<Vec<f64>>,
+}
+
+/// A parse or lookup failure. Errors are descriptive but never recover by
+/// fabricating missing values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawfileError(pub String);
+
+impl fmt::Display for RawfileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Error for RawfileError {}
+
+impl AsciiRawfile {
+    /// Parse a single-plot, real-valued ngspice ASCII rawfile.
+    ///
+    /// Multi-plot, complex, malformed, truncated, non-finite, or count-
+    /// inconsistent files are rejected. The parser intentionally supports a
+    /// strict subset rather than silently accepting formats it cannot verify.
+    pub fn parse(input: &str) -> Result<Self, RawfileError> {
+        let lines: Vec<&str> = input.lines().collect();
+
+        let plotname_count = lines
+            .iter()
+            .filter(|line| line.starts_with("Plotname:"))
+            .count();
+        if plotname_count != 1 {
+            return Err(RawfileError(format!(
+                "expected exactly one Plotname header, found {plotname_count}"
+            )));
+        }
+
+        let variables_headers: Vec<usize> = lines
+            .iter()
+            .enumerate()
+            .filter_map(|(index, line)| (line.trim() == "Variables:").then_some(index))
+            .collect();
+        let values_headers: Vec<usize> = lines
+            .iter()
+            .enumerate()
+            .filter_map(|(index, line)| (line.trim() == "Values:").then_some(index))
+            .collect();
+        if variables_headers.len() != 1 || values_headers.len() != 1 {
+            return Err(RawfileError(
+                "expected exactly one Variables: and one Values: section".into(),
+            ));
+        }
+
+        let variables_header = variables_headers[0];
+        let values_header = values_headers[0];
+        if values_header <= variables_header {
+            return Err(RawfileError(
+                "Values: section appears before Variables: section".into(),
+            ));
+        }
+
+        let title = required_header(&lines[..variables_header], "Title:")?;
+        let plotname = required_header(&lines[..variables_header], "Plotname:")?;
+        let flags_header = required_header(&lines[..variables_header], "Flags:")?;
+        let flags: Vec<String> = flags_header
+            .split_whitespace()
+            .map(str::to_ascii_lowercase)
+            .collect();
+        if !flags.iter().any(|flag| flag == "real") || flags.iter().any(|flag| flag == "complex") {
+            return Err(RawfileError(format!(
+                "only real-valued rawfiles are supported (flags: {})",
+                flags.join(" ")
+            )));
+        }
+
+        let variable_count = parse_positive_count(
+            &lines[..variables_header],
+            "No. Variables:",
+        )?;
+        let point_count = parse_positive_count(&lines[..variables_header], "No. Points:")?;
+
+        let variable_lines: Vec<&str> = lines[variables_header + 1..values_header]
+            .iter()
+            .copied()
+            .filter(|line| !line.trim().is_empty())
+            .collect();
+        if variable_lines.len() != variable_count {
+            return Err(RawfileError(format!(
+                "declared {variable_count} variables but found {} variable rows",
+                variable_lines.len()
+            )));
+        }
+
+        let mut variables = Vec::with_capacity(variable_count);
+        for (expected_index, line) in variable_lines.into_iter().enumerate() {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() != 3 {
+                return Err(RawfileError(format!(
+                    "variable row {expected_index} must contain index, name, and kind"
+                )));
+            }
+            let index = fields[0].parse::<usize>().map_err(|_| {
+                RawfileError(format!(
+                    "invalid variable index {:?} on row {expected_index}",
+                    fields[0]
+                ))
+            })?;
+            if index != expected_index {
+                return Err(RawfileError(format!(
+                    "variable index {index} is out of order; expected {expected_index}"
+                )));
+            }
+            let name = fields[1].to_string();
+            if variables.iter().any(|variable: &RawVariable| variable.name == name) {
+                return Err(RawfileError(format!("duplicate variable name {name:?}")));
+            }
+            variables.push(RawVariable {
+                index,
+                name,
+                kind: fields[2].to_string(),
+            });
+        }
+
+        let mut points: Vec<Vec<f64>> = Vec::with_capacity(point_count);
+        let mut current_point: Option<Vec<f64>> = None;
+        for (offset, raw_line) in lines[values_header + 1..].iter().enumerate() {
+            if raw_line.trim().is_empty() {
+                continue;
+            }
+
+            let line_number = values_header + 2 + offset;
+            let indented = raw_line
+                .chars()
+                .next()
+                .is_some_and(char::is_whitespace);
+            let fields: Vec<&str> = raw_line.split_whitespace().collect();
+            if fields.is_empty() {
+                continue;
+            }
+
+            if !indented {
+                finish_point(
+                    &mut points,
+                    &mut current_point,
+                    variable_count,
+                    point_count,
+                )?;
+                if points.len() >= point_count {
+                    return Err(RawfileError(format!(
+                        "unexpected extra data point at line {line_number}"
+                    )));
+                }
+
+                let point_index = fields[0].parse::<usize>().map_err(|_| {
+                    RawfileError(format!(
+                        "expected an unindented point index at line {line_number}"
+                    ))
+                })?;
+                if point_index != points.len() {
+                    return Err(RawfileError(format!(
+                        "point index {point_index} is out of order; expected {}",
+                        points.len()
+                    )));
+                }
+                current_point = Some(Vec::with_capacity(variable_count));
+                for field in fields.iter().skip(1) {
+                    push_finite_value(
+                        current_point.as_mut().expect("point was just initialized"),
+                        field,
+                        line_number,
+                    )?;
+                }
+            } else {
+                let point = current_point.as_mut().ok_or_else(|| {
+                    RawfileError(format!(
+                        "continuation values appear before the first point at line {line_number}"
+                    ))
+                })?;
+                for field in &fields {
+                    push_finite_value(point, field, line_number)?;
+                }
+            }
+
+            if current_point
+                .as_ref()
+                .is_some_and(|point| point.len() > variable_count)
+            {
+                return Err(RawfileError(format!(
+                    "point {} contains more than {variable_count} values",
+                    points.len()
+                )));
+            }
+        }
+
+        finish_point(
+            &mut points,
+            &mut current_point,
+            variable_count,
+            point_count,
+        )?;
+        if points.len() != point_count {
+            return Err(RawfileError(format!(
+                "declared {point_count} points but parsed {}",
+                points.len()
+            )));
+        }
+
+        Ok(Self {
+            title,
+            plotname,
+            flags,
+            variables,
+            points,
+        })
+    }
+
+    /// Read the last finite sample for a vector by its exact solver name.
+    pub fn final_value(&self, variable_name: &str) -> Result<f64, RawfileError> {
+        let index = self.variable_index(variable_name)?;
+        self.points
+            .last()
+            .and_then(|point| point.get(index))
+            .copied()
+            .ok_or_else(|| RawfileError("rawfile has no final sample".into()))
+    }
+
+    /// Return the sample of variable_name whose axis_name value is nearest to
+    /// target. This does not interpolate between samples.
+    pub fn value_nearest_to(
+        &self,
+        axis_name: &str,
+        target: f64,
+        variable_name: &str,
+    ) -> Result<f64, RawfileError> {
+        if !target.is_finite() {
+            return Err(RawfileError(
+                "nearest-sample target must be finite".into(),
+            ));
+        }
+        let axis_index = self.variable_index(axis_name)?;
+        let value_index = self.variable_index(variable_name)?;
+        let point = self
+            .points
+            .iter()
+            .min_by(|left, right| {
+                (left[axis_index] - target)
+                    .abs()
+                    .total_cmp(&(right[axis_index] - target).abs())
+            })
+            .ok_or_else(|| RawfileError("rawfile has no samples".into()))?;
+        Ok(point[value_index])
+    }
+
+    /// Return the largest absolute sample for a vector.
+    pub fn peak_abs_value(&self, variable_name: &str) -> Result<f64, RawfileError> {
+        let index = self.variable_index(variable_name)?;
+        self.points
+            .iter()
+            .map(|point| point[index].abs())
+            .max_by(f64::total_cmp)
+            .ok_or_else(|| RawfileError("rawfile has no samples".into()))
+    }
+
+    /// Return a known SI unit for a vector; unknown kinds fail closed.
+    pub fn si_unit(&self, variable_name: &str) -> Result<&'static str, RawfileError> {
+        let variable = self
+            .variables
+            .iter()
+            .find(|variable| variable.name == variable_name)
+            .ok_or_else(|| RawfileError(format!("requested vector {variable_name:?} is absent")))?;
+        variable.si_unit().ok_or_else(|| {
+            RawfileError(format!(
+                "no verified unit mapping for vector {:?} of kind {:?}",
+                variable.name, variable.kind
+            ))
+        })
+    }
+
+    fn variable_index(&self, variable_name: &str) -> Result<usize, RawfileError> {
+        self.variables
+            .iter()
+            .find(|variable| variable.name == variable_name)
+            .map(|variable| variable.index)
+            .ok_or_else(|| RawfileError(format!("requested vector {variable_name:?} is absent")))
+    }
+}
+
+fn required_header(lines: &[&str], prefix: &str) -> Result<String, RawfileError> {
+    let matches: Vec<&str> = lines
+        .iter()
+        .filter_map(|line| line.strip_prefix(prefix))
+        .map(str::trim)
+        .collect();
+    if matches.len() != 1 || matches[0].is_empty() {
+        return Err(RawfileError(format!(
+            "expected one non-empty {prefix} header"
+        )));
+    }
+    Ok(matches[0].to_string())
+}
+
+fn parse_positive_count(lines: &[&str], prefix: &str) -> Result<usize, RawfileError> {
+    let value = required_header(lines, prefix)?;
+    let count = value
+        .parse::<usize>()
+        .map_err(|_| RawfileError(format!("invalid numeric value for {prefix}")))?;
+    if count == 0 {
+        return Err(RawfileError(format!("{prefix} must be greater than zero")));
+    }
+    Ok(count)
+}
+
+fn push_finite_value(
+    point: &mut Vec<f64>,
+    text: &str,
+    line_number: usize,
+) -> Result<(), RawfileError> {
+    let value = text.parse::<f64>().map_err(|_| {
+        RawfileError(format!(
+            "invalid numeric value {text:?} on rawfile line {line_number}"
+        ))
+    })?;
+    if !value.is_finite() {
+        return Err(RawfileError(format!(
+            "non-finite numeric value on rawfile line {line_number}"
+        )));
+    }
+    point.push(value);
+    Ok(())
+}
+
+fn finish_point(
+    points: &mut Vec<Vec<f64>>,
+    current_point: &mut Option<Vec<f64>>,
+    variable_count: usize,
+    point_count: usize,
+) -> Result<(), RawfileError> {
+    if let Some(point) = current_point.take() {
+        if point.len() != variable_count {
+            return Err(RawfileError(format!(
+                "point {} has {} values; expected {variable_count}",
+                points.len(),
+                point.len()
+            )));
+        }
+        if points.len() >= point_count {
+            return Err(RawfileError(
+                "rawfile contains more points than declared".into(),
+            ));
+        }
+        points.push(point);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RC_FIXTURE: &str = include_str!("../tests/fixtures/rc_step_ascii.raw");
+
+    #[test]
+    fn parses_rc_transient_golden_fixture_and_units() {
+        let raw = AsciiRawfile::parse(RC_FIXTURE).expect("valid ASCII fixture");
+        assert_eq!(raw.title, "RC step reference");
+        assert_eq!(raw.plotname, "Transient Analysis");
+        assert_eq!(raw.variables.len(), 2);
+        assert_eq!(raw.points.len(), 3);
+        assert_eq!(raw.si_unit("time").unwrap(), "s");
+        assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
+        assert!((raw.value_nearest_to("time", 0.001, "v(out)").unwrap() - 0.6321205588).abs() < 1e-9);
+        assert!((raw.final_value("v(out)").unwrap() - 0.8646647168).abs() < 1e-9);
+        assert!((raw.peak_abs_value("v(out)").unwrap() - 0.8646647168).abs() < 1e-9);
+    }
+
+    #[test]
+    fn rejects_missing_requested_vector() {
+        let raw = AsciiRawfile::parse(RC_FIXTURE).unwrap();
+        assert!(raw.final_value("v(missing)").is_err());
+    }
+
+    #[test]
+    fn rejects_declared_point_count_mismatch() {
+        let malformed = RC_FIXTURE.replace("No. Points: 3", "No. Points: 4");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_non_finite_samples() {
+        let malformed = RC_FIXTURE.replace("6.321205588285577e-01", "NaN");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_complex_rawfiles() {
+        let malformed = RC_FIXTURE.replace("Flags: real", "Flags: complex");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_non_sequential_point_indices() {
+        let malformed = RC_FIXTURE.replace(
+            "1   1.000000000000000e-03",
+            "2   1.000000000000000e-03",
+        );
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn unknown_variable_kinds_do_not_get_guessed_units() {
+        let malformed = RC_FIXTURE.replace("v(out)  voltage", "v(out)  unknown");
+        let raw = AsciiRawfile::parse(&malformed).unwrap();
+        assert!(raw.si_unit("v(out)").is_err());
+    }
+
+    #[test]
+    fn rejects_multiple_plot_sections() {
+        let malformed = format!("{RC_FIXTURE}\nPlotname: AC Analysis\n");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+}
