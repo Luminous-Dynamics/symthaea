@@ -1,13 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use sha2::{Digest, Sha256};
 use symthaea_instrumentation::{
-    ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver, CalibrationReference,
+    sha256_hex, ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver,
+    CalibrationReference,
     ClockDomainId, ContractError, InstrumentIdentity, MeasurementEnvelope, MeasurementInput,
     MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
-    ResolvedCalibration, ResolvedRawData, StreamOrderFailure, Unit,
+    ResolvedCalibration, ResolvedRawData, StreamOrderFailure, Unit, VerifiedArtifactBytes,
 };
 
 const SAMPLE_TIME_NS: u64 = 1_000_000_000;
@@ -19,14 +19,6 @@ fn raw_fixture_bytes() -> Vec<u8> {
     (0..RAW_FIXTURE_LENGTH)
         .map(|index| (index as u8).wrapping_mul(31).wrapping_add(17))
         .collect()
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<Vec<_>>()
-        .join("")
 }
 
 fn raw_digest_hex() -> String {
@@ -158,18 +150,16 @@ impl CalibrationEvidenceResolver for MockResolver {
             .calibration_bytes_override
             .clone()
             .unwrap_or_else(calibration_fixture_bytes);
-        if sha256_hex(&certificate_bytes) != reference.evidence().sha256_hex() {
-            return Err("calibration certificate SHA-256 mismatch".into());
-        }
+        VerifiedArtifactBytes::verify(reference.evidence().clone(), certificate_bytes)
+            .map_err(|_| "calibration certificate SHA-256 mismatch".to_owned())?;
 
         let resolved = self.resolved.clone()?;
         let review_bytes = self
             .review_bytes_override
             .clone()
             .unwrap_or_else(review_fixture_bytes);
-        if sha256_hex(&review_bytes) != resolved.review_receipt().sha256_hex() {
-            return Err("calibration review receipt SHA-256 mismatch".into());
-        }
+        VerifiedArtifactBytes::verify(resolved.review_receipt().clone(), review_bytes)
+            .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
 
         Ok(resolved)
     }
@@ -181,16 +171,15 @@ impl RawDataEvidenceResolver for MockResolver {
         reference: &RawDataReference,
     ) -> Result<ResolvedRawData, String> {
         let bytes = self.raw_bytes.clone()?;
-        if sha256_hex(&bytes) != reference.artifact().sha256_hex() {
-            return Err("raw acquisition SHA-256 mismatch".into());
-        }
+        let verified = VerifiedArtifactBytes::verify(reference.artifact().clone(), bytes)
+            .map_err(|_| "raw acquisition SHA-256 mismatch".to_owned())?;
         let returned_artifact = self
             .raw_reference_override
             .clone()
             .unwrap_or_else(|| reference.artifact().clone());
         ResolvedRawData::new(
             returned_artifact,
-            u64::try_from(bytes.len())
+            u64::try_from(verified.byte_length())
                 .map_err(|_| "raw acquisition length overflowed".to_owned())?,
             "application/octet-stream",
         )
