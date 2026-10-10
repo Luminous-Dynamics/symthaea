@@ -859,6 +859,23 @@ mod tests {
     }
 
     #[test]
+    fn observed_window_too_short_is_not_qualified() {
+        let value = assessment(
+            vec![
+                event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(11, 100_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+                event(12, 200_000_000, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
+            ],
+            300_000_000,
+        );
+        assert!(matches!(
+            value.outcome().unwrap(),
+            Px4OffboardSubmissionOutcomeV1::OutsideProfile { failures }
+                if failures.contains(&Px4OffboardSubmissionFailureV1::ObservationWindowTooShort)
+        ));
+    }
+
+    #[test]
     fn sequence_gaps_are_not_hidden_by_canonical_timestamp_sorting() {
         let samples = vec![
             event(10, 0, Px4LocalSubmissionResultV1::AcceptedByLocalTransport),
@@ -1021,6 +1038,29 @@ mod tests {
         )
         .unwrap();
         assert_ne!(unsorted.profile_digest_hex, other_policy.profile_digest_hex);
+    }
+
+    #[test]
+    fn controller_profile_id_is_bound_into_profile_identity() {
+        let original = profile();
+        let revised_controller_profile = Px4OffboardSubmissionProfileV1::new(
+            "px4.offboard.publisher.fixture.v1",
+            "vehicle.slot-a",
+            "px4.firmware-vehicle-control.revision-2.fixture.v1",
+            "companion.publisher.fixture.v1",
+            Px4OffboardTransportV1::MavlinkSetpoint,
+            clock(),
+            3,
+            1_000_000_000,
+            500_000_000,
+            250_000_000,
+            vec![82, 84, 86],
+        )
+        .unwrap();
+        assert_ne!(
+            original.profile_digest_hex,
+            revised_controller_profile.profile_digest_hex
+        );
     }
 
     #[test]
