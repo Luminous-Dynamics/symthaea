@@ -47,7 +47,7 @@ Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts
 
 The \`SelfModel\` stub in \`magi_integration.rs\` initializes capability values from a shared prior, updates an estimate through an observed scalar and learning rate, and uses that estimate as the confidence reported by \`predict_behavior\`. It does not, by itself, bind a particular skill claim to a forecast committed before execution and a verified later outcome for the exact source/configuration/evaluation profile.
 
-The new capability-ledger primitive in [PR #7335](https://github.com/Luminous-Dynamics/symthaea/pull/7335) is the first proposed foundation for that missing link. It is intentionally not described as a complete learning loop yet: runtime forecast emission, trusted receipt verification, and end-to-end skill evaluation remain to be integrated.
+The new capability-ledger primitive in [PR #7348](https://github.com/Luminous-Dynamics/symthaea/pull/7348) is the first proposed foundation for that missing link. It is intentionally not described as a complete learning loop yet: runtime forecast emission, trusted receipt verification, and end-to-end skill evaluation remain to be integrated.
 
 ### Gap 4 — the full loop is not qualified by source presence
 
@@ -62,7 +62,7 @@ The following remain required before calling the loop operationally established:
 
 ## Proposed evidence-bound capability lifecycle
 
-The ledger in PR #7335 uses this lifecycle:
+The ledger in PR #7348 uses this lifecycle:
 
 \`Proposed → Discovered → Candidate → Qualified\`
 
@@ -78,7 +78,7 @@ The ledger computes Brier score and ECE for prospective success probabilities, r
 2. Preserve `tests_passed: None` as unresolved/not-qualified rather than success; bind compile/test claims to the relevant independent receipts.
 3. Add a resolver result/receipt type that binds outcome to prediction ID, exact subject, evaluator revision, chronology, and evidence root.
 4. Make verified receipt admission—not an arbitrary outcome argument—the only production route into qualification-grade calibration.
-5. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7335.
+5. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7348.
 6. Run focused tests on the exact integrated commit, then measure held-out transfer, calibration, and the actual downstream effect on decision selection.
 
 No formatting, compilation, or test pass is asserted by this document.
