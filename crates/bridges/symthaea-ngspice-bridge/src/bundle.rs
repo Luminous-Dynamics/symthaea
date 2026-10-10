@@ -450,6 +450,7 @@ fn validate_library_sections(
     source: &str,
 ) -> Result<(), ModelInputBundleError> {
     let mut stack: Vec<(String, usize)> = Vec::new();
+    let mut defined_sections = BTreeSet::new();
     for (index, line) in source.lines().enumerate() {
         let trimmed = line.trim_start();
         if trimmed.is_empty() || trimmed.starts_with('*') {
@@ -469,7 +470,17 @@ fn validate_library_sections(
                     }
                 })?;
                 match args.as_slice() {
-                    [section] => stack.push((section.clone(), index + 1)),
+                    [section] => {
+                        let canonical = section.to_ascii_lowercase();
+                        if !defined_sections.insert(canonical) {
+                            return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                                path: path.to_string(),
+                                line: index + 1,
+                                reason: format!("duplicate in-file library section {section:?}"),
+                            });
+                        }
+                        stack.push((section.clone(), index + 1));
+                    }
                     [_, _] => {} // External ".lib filename section" reference.
                     _ => {
                         return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
@@ -877,6 +888,22 @@ mod tests {
         assert!(matches!(
             bundle("main.cir", ".lib possible-external.lib\n", vec![]),
             Err(ModelInputBundleError::UnsupportedIncludeSyntax { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_library_section_names_case_insensitively() {
+        assert!(matches!(
+            bundle(
+                "main.cir",
+                ".lib models/device.lib tt\n",
+                vec![(
+                    "models/device.lib",
+                    ".lib tt\n.model D1 D\n.endl tt\n.LIB TT\n.model D2 D\n.ENDL TT\n"
+                )],
+            ),
+            Err(ModelInputBundleError::UnsupportedIncludeSyntax { reason, .. })
+                if reason.contains("duplicate in-file library section")
         ));
     }
 
