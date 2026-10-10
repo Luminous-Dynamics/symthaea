@@ -40,8 +40,33 @@ fn raw_reference() -> RawDataReference {
     RawDataReference::new(raw_artifact())
 }
 
+fn primary_reference_standard_fixture_bytes() -> Vec<u8> {
+    b"primary frequency reference standard fixture v1".to_vec()
+}
+
+fn reference_standard_certificate() -> CalibrationCertificate {
+    CalibrationCertificate::new(
+        "reference-standard-01",
+        InstrumentIdentity::new("frequency-standard-lab-01", "reference-output-a").unwrap(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 10_000,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        100.0,
+        "primary-metrology-lab-01",
+        "frequency-reference-procedure-v1",
+        artifact(
+            "primary-reference-standard-01",
+            &sha256_hex(&primary_reference_standard_fixture_bytes()),
+        ),
+    )
+    .unwrap()
+}
+
 fn reference_standard_fixture_bytes() -> Vec<u8> {
-    b"traceable frequency reference standard fixture v1".to_vec()
+    reference_standard_certificate().to_canonical_bytes()
 }
 
 fn calibration_certificate() -> CalibrationCertificate {
