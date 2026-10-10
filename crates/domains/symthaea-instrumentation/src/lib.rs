@@ -103,7 +103,7 @@ pub enum Unit {
     MeterPerSecond,
     MeterPerSecondSquared,
     RadianPerSecond,
-    Decibel,
+    DecibelRe20Micropascal,
     One,
 }
 
@@ -123,7 +123,7 @@ impl Unit {
             Self::MeterPerSecond => Quantity::Speed,
             Self::MeterPerSecondSquared => Quantity::Acceleration,
             Self::RadianPerSecond => Quantity::AngularVelocity,
-            Self::Decibel => Quantity::SoundPressureLevel,
+            Self::DecibelRe20Micropascal => Quantity::SoundPressureLevel,
             Self::One => Quantity::Dimensionless,
         }
     }
@@ -217,7 +217,6 @@ pub enum QualityFlag {
     SelfTestFailed,
     SensorOutOfRange,
     SignalQualityUnknown,
-    CalibrationUnverified,
 }
 
 /// Construction-time or record-integrity errors.
@@ -226,6 +225,7 @@ pub enum ContractError {
     EmptyIdentifier(&'static str),
     InvalidSha256,
     InvalidValidityInterval,
+    CalibrationReviewMustBeDistinct,
     NonFiniteValue(&'static str),
     NegativeUncertainty(&'static str),
     QuantityUnitMismatch { quantity: Quantity, unit: Unit },
@@ -237,7 +237,12 @@ impl fmt::Display for ContractError {
         match self {
             Self::EmptyIdentifier(field) => write!(f, "{field} must not be empty"),
             Self::InvalidSha256 => write!(f, "SHA-256 must contain exactly 64 hexadecimal characters"),
-            Self::InvalidValidityInterval => write!(f, "validity interval must satisfy start < end"),
+            Self::InvalidValidityInterval => {
+                write!(f, "validity interval must satisfy start < end")
+            }
+            Self::CalibrationReviewMustBeDistinct => {
+                write!(f, "calibration evidence and review receipt must be distinct artifacts")
+            }
             Self::NonFiniteValue(field) => write!(f, "{field} must be finite"),
             Self::NegativeUncertainty(field) => write!(f, "{field} must be non-negative"),
             Self::QuantityUnitMismatch { quantity, unit } => {
@@ -465,6 +470,9 @@ impl ResolvedCalibration {
     ) -> Result<Self, ContractError> {
         if valid_from_ns >= valid_until_ns {
             return Err(ContractError::InvalidValidityInterval);
+        }
+        if evidence == review_receipt {
+            return Err(ContractError::CalibrationReviewMustBeDistinct);
         }
         if quantity != unit.quantity() {
             return Err(ContractError::QuantityUnitMismatch { quantity, unit });
