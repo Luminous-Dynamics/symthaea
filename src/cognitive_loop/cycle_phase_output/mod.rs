@@ -484,6 +484,9 @@ impl CognitiveLoopService {
                                 }
                             }
                         } else {
+                            // No current goal means no new movie; avoid exposing the previous
+                            // cycle's retained geodesic as if it came from this request.
+                            self.carryover.quality.last_request_geodesic = false;
                             tracing::debug!(
                                 cycle = self.stats.total_cycles,
                                 goal_source,
@@ -501,13 +504,17 @@ impl CognitiveLoopService {
                         );
                     } else {
                         // Budget rejection must precede rollout/search and leave load and
-                        // manifold state untouched. Do not conflate this with source failure.
+                        // manifold state untouched. Clear the flag so a prior path is not
+                        // decoded and presented as the rejected request's result.
+                        self.carryover.quality.last_request_geodesic = false;
                         tracing::debug!(
                             cycle = self.stats.total_cycles,
                             load = self.thermodynamic_load,
                             "Subsystem REQUEST_GEODESIC: work budget rejected request"
                         );
                     }
+                } else {
+                    self.carryover.quality.last_request_geodesic = false;
                 }
             } else {
                 self.carryover.quality.last_request_geodesic = false;
