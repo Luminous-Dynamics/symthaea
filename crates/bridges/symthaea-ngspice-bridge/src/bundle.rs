@@ -282,6 +282,7 @@ impl ModelInputBundle {
         let source = std::str::from_utf8(bytes).map_err(|_| {
             ModelInputBundleError::Artifact(NetlistArtifactError::InvalidUtf8)
         })?;
+        validate_library_sections(path, source)?;
         for (line_index, line) in source.lines().enumerate() {
             let target = parse_include_target(path, line_index + 1, line)?;
             let Some(target) = target else {
@@ -376,6 +377,97 @@ fn resolve_include_path(from: &str, target: &str) -> Result<String, ModelInputBu
         None => target,
     };
     validate_relative_path(candidate)
+}
+
+/// Validate in-file .lib/.endl sections. A one-operand `.lib name` is
+/// a section opener in the normal syntax; ngspice's legacy compatibility mode
+/// can also interpret it as an external file include. Requiring balanced
+/// sections prevents that ambiguous legacy form from silently escaping the
+/// closed-world dependency list. A controlled executor must pin compatibility
+/// behavior explicitly as well.
+fn validate_library_sections(
+    path: &str,
+    source: &str,
+) -> Result<(), ModelInputBundleError> {
+    let mut stack: Vec<(String, usize)> = Vec::new();
+    for (index, line) in source.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('*') {
+            continue;
+        }
+        let (directive, tail) = match trimmed.split_once(char::is_whitespace) {
+            Some((directive, tail)) => (directive.to_ascii_lowercase(), tail.trim()),
+            None => (trimmed.to_ascii_lowercase(), ""),
+        };
+        match directive.as_str() {
+            ".lib" => {
+                let args = parse_tokens(tail).map_err(|reason| {
+                    ModelInputBundleError::UnsupportedIncludeSyntax {
+                        path: path.to_string(),
+                        line: index + 1,
+                        reason,
+                    }
+                })?;
+                match args.as_slice() {
+                    [section] => stack.push((section.clone(), index + 1)),
+                    [_, _] => {} // External ".lib filename section" reference.
+                    _ => {
+                        return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                            path: path.to_string(),
+                            line: index + 1,
+                            reason: "expected in-file .lib section or external file/section pair"
+                                .to_string(),
+                        });
+                    }
+                }
+            }
+            ".endl" => {
+                let args = parse_tokens(tail).map_err(|reason| {
+                    ModelInputBundleError::UnsupportedIncludeSyntax {
+                        path: path.to_string(),
+                        line: index + 1,
+                        reason,
+                    }
+                })?;
+                if args.len() > 1 {
+                    return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                        path: path.to_string(),
+                        line: index + 1,
+                        reason: ".endl accepts at most one section name".to_string(),
+                    });
+                }
+                let Some((expected, _opened_at)) = stack.pop() else {
+                    return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                        path: path.to_string(),
+                        line: index + 1,
+                        reason: ".endl has no matching in-file .lib section".to_string(),
+                    });
+                };
+                if args
+                    .first()
+                    .is_some_and(|actual| !actual.eq_ignore_ascii_case(&expected))
+                {
+                    return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                        path: path.to_string(),
+                        line: index + 1,
+                        reason: format!(
+                            ".endl section {:?} does not match open section {:?}",
+                            args[0], expected
+                        ),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+    if let Some((section, line)) = stack.last() {
+        return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+            path: path.to_string(),
+            line: *line,
+            reason: format!("in-file .lib section {section:?} has no matching .endl"),
+        });
+    }
+    Ok(())
 }
 
 fn parse_include_target(
@@ -561,6 +653,22 @@ mod tests {
         )
         .unwrap();
         assert!(bundle.dependency_bytes("models/device.lib").is_some());
+    }
+
+    #[test]
+    fn rejects_unbalanced_in_file_lib_section_that_could_be_legacy_external_lib() {
+        assert!(matches!(
+            bundle("main.cir", ".lib possible-external.lib\n", vec![]),
+            Err(ModelInputBundleError::UnsupportedIncludeSyntax { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_mismatched_endl_section_names() {
+        assert!(matches!(
+            bundle("main.cir", ".lib tt\n.endl ss\n", vec![]),
+            Err(ModelInputBundleError::UnsupportedIncludeSyntax { .. })
+        ));
     }
 
     #[test]
