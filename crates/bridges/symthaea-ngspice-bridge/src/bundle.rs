@@ -672,9 +672,9 @@ mod tests {
         let canonical = bundle.canonical_manifest_bytes();
         let expected = blake3::hash(&canonical).to_hex().to_string();
         assert_eq!(bundle.manifest_digest(), expected);
-        assert!(canonical.starts_with(
-            b"\x23\x00\x00\x00\x00\x00\x00\x00symthaea-ngspice-model-input-bundle-v1"
-        ));
+        let marker = b"symthaea-ngspice-model-input-bundle-v1";
+        assert_eq!(&canonical[..8], &(marker.len() as u64).to_le_bytes());
+        assert_eq!(&canonical[8..8 + marker.len()], marker);
     }
 
     #[test]
