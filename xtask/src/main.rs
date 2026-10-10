@@ -5,6 +5,9 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
+mod repository_snapshot;
+mod repository_snapshot_receipt;
+mod repository_snapshot_verify;
 
 #[derive(Parser)]
 struct Cli {
@@ -66,6 +69,18 @@ enum Commands {
         #[arg(long, default_value = ".")]
         root: PathBuf,
     },
+    RepositorySnapshot {
+        #[arg(long = "include-ignored")]
+        include_ignored: Vec<PathBuf>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    RepositorySnapshotVerify {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -105,6 +120,27 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::RepositorySnapshot {
+            include_ignored,
+            output,
+        } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            repository_snapshot::run(&root, include_ignored, output)?;
+        }
+        Commands::RepositorySnapshotVerify { snapshot, root } => {
+            let root = if root.is_absolute() {
+                root
+            } else {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .expect("xtask always lives one level below the workspace root")
+                    .join(root)
+            };
+            repository_snapshot_verify::run(&root, &snapshot)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
