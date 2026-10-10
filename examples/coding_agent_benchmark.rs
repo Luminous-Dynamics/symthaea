@@ -77,7 +77,8 @@ struct TaskResult {
 }
 
 impl TaskResult {
-    /// A task is correct only when every expected test function ran and passed.
+    /// A task is correct when every expected test passes and no test fails.
+    /// Additional tests emitted by generated code are allowed.
     ///
     /// Compile-only tasks have expected_tests == 0 and may pass on compilation
     /// alone. For tasks with tests, zero observed results must never be confused
@@ -86,7 +87,7 @@ impl TaskResult {
         !self.execution_simulated
             && self.compiled
             && self.tests_failed == 0
-            && self.tests_passed == self.expected_tests
+            && self.tests_passed >= self.expected_tests
     }
 }
 
@@ -990,7 +991,7 @@ fn run_task(
 
     // Status symbols: ✓ = all expected tests passed, ◐ = compiled but correctness
     // evidence is incomplete or failing, ✗ = didn't compile.
-    let correct = compiled && tests_failed == 0 && tests_passed == expected_tests;
+    let correct = compiled && tests_failed == 0 && tests_passed >= expected_tests;
     let status = if correct {
         "✓"
     } else if execution_simulated {
@@ -1376,6 +1377,8 @@ mod tests {
     #[test]
     fn all_expected_tests_must_pass() {
         assert!(result(true, 3, 0, 3, false).is_correct());
+        // Additional generated tests may pass alongside the supplied oracle.
+        assert!(result(true, 4, 0, 3, false).is_correct());
         assert!(!result(true, 2, 0, 3, false).is_correct());
         assert!(!result(true, 3, 1, 3, false).is_correct());
     }
