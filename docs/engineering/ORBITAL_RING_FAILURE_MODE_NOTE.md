@@ -65,7 +65,7 @@ Recorded local checks:
 - Running the validator on the checked-in template returned `passed_contract_checks` for the *manifest contract*, while correctly keeping the scenario `Blocked` with all 23 inputs unresolved and `analysis_state = NotRun`.
 - Repeated test and manifest-validation outputs were byte-identical. The exact outputs are preserved in [the validation report](evidence/f_skyhook_load_step_manifest_validation.json) and [the self-test report](evidence/orbital_ring_failure_manifest_validator_selftest.json).
 
-Validator Git blob: `5732c5eb656f576feda23102500541a1117fa011`; source SHA-256: `2eafdb020349a9760fda6bb9b8034f2254ca78c639fff30a49e20bee3d5c7d37`. The report’s purpose is to prevent incomplete scenario data from being mistaken for a ready-to-run physics case.
+Validator Git blob: `b81b0b8365acd3da201d5f42e46a1279edd16872`; source SHA-256: `2a6818ca9c860d40918313bbfda11184a0e0cc0c6f1f919543748a03225dee30`. Validation report Git blob: `1485c06416f5bd4fe47265a782bfc8722efca09f`; report SHA-256: `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`. The report’s purpose is to prevent incomplete scenario data from being mistaken for a ready-to-run physics case.
 
 ## 5. Explicit limits
 
