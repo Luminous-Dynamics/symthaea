@@ -93,7 +93,7 @@ fn main() {
             Ok(movie) => {
                 println!("✨ SUCCESS: Collaborative Mental Movie Generated!");
                 println!("   | Horizon:    {} steps", movie.path_length);
-                println!("   | Coherence:  {:.4}", movie.semantic_coherence);
+                println!("   | Trajectory Continuity (proxy): {:.4}", movie.semantic_coherence);
                 println!("   | Latency:    {:?} (CfC Analytical - O(1))", elapsed);
                 println!(
                     "   | Metabolism: {:.2} (Node B spent energy to help Node A)",
