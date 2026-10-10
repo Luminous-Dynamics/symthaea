@@ -238,16 +238,25 @@ impl CalibrationReviewPayload {
 
     /// Canonical domain-separated bytes to sign; independent of receipt encoding.
     pub fn signing_bytes(&self) -> Vec<u8> {
-        format!(
-            "{CALIBRATION_REVIEW_SCHEMA}\nkey_id={}\nrecord_id={}\ncertificate_artifact_id={}\ncertificate_sha256={}\nissued_at_unix_s={}\nexpires_at_unix_s={}\n",
-            self.key_id,
-            self.record_id,
-            self.certificate_artifact_id,
-            self.certificate_sha256_hex,
-            self.issued_at_unix_s,
-            self.expires_at_unix_s,
-        )
-        .into_bytes()
+        [
+            CALIBRATION_REVIEW_SCHEMA.to_owned(),
+            format!("key_id={}", self.key_id),
+            format!("record_id={}", self.record_id),
+            format!("certificate_artifact_id={}", self.certificate_artifact_id),
+            format!("certificate_sha256={}", self.certificate_sha256_hex),
+            format!("issued_at_unix_s={}", self.issued_at_unix_s),
+            format!("expires_at_unix_s={}", self.expires_at_unix_s),
+        ]
+        .join("\n")
+        format!("{}\n", [
+            CALIBRATION_REVIEW_SCHEMA.to_owned(),
+            format!("key_id={}", self.key_id),
+            format!("record_id={}", self.record_id),
+            format!("certificate_artifact_id={}", self.certificate_artifact_id),
+            format!("certificate_sha256={}", self.certificate_sha256_hex),
+            format!("issued_at_unix_s={}", self.issued_at_unix_s),
+            format!("expires_at_unix_s={}", self.expires_at_unix_s),
+        ].join("\n")).into_bytes()
     }
 }
 
@@ -278,17 +287,9 @@ impl SignedCalibrationReviewReceipt {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         let payload = &self.payload;
-        format!(
-            "{CALIBRATION_REVIEW_SCHEMA}\nkey_id={}\nrecord_id={}\ncertificate_artifact_id={}\ncertificate_sha256={}\nissued_at_unix_s={}\nexpires_at_unix_s={}\nsignature_hex={}\n",
-            payload.key_id,
-            payload.record_id,
-            payload.certificate_artifact_id,
-            payload.certificate_sha256_hex,
-            payload.issued_at_unix_s,
-            payload.expires_at_unix_s,
-            signature_hex,
-        )
-        .into_bytes()
+        let mut bytes = payload_signing_bytes(&payload);
+        bytes.extend_from_slice(format!("signature_hex={signature_hex}\n").as_bytes());
+        bytes
     }
 
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReviewVerificationError> {
@@ -616,18 +617,23 @@ mod tests {
             TRUST_SEQUENCE,
             NOW - 10,
             NOW + 100,
-            vec![ReviewTrustKey::new(
-                "reviewer-a",
-                signing_key().verifying_key().to_bytes(),
-                NOW - 100,
-                Some(NOW - 2),
-                None,
-            )
-            .unwrap()],
-        );
+            vec![
+                ReviewTrustKey::new(
+                    "reviewer-a",
+                    signing_key().verifying_key().to_bytes(),
+                    NOW - 100,
+                    Some(NOW - 2),
+                    None,
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
         assert_eq!(
-            expired.unwrap_err(),
-            ReviewVerificationError::InvalidKeyValidityWindow
+            expired.verify(&receipt, "calibration-record-1", &certificate(), NOW),
+            Err(ReviewVerificationError::SignerExpiredAtIssue(
+                "reviewer-a".into()
+            ))
         );
     }
 
@@ -670,6 +676,27 @@ mod tests {
                 NOW,
             ),
             Err(ReviewVerificationError::CertificateReferenceMismatch)
+        );
+    }
+
+    #[test]
+    fn empty_review_artifact_is_rejected_before_signature_verification() {
+        let digest = crate::sha256_hex(b"");
+        let artifact = VerifiedArtifactBytes::verify(
+            ArtifactReference::new("empty-review", digest).unwrap(),
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            VerifiedCalibrationReviewReceipt::verify(
+                artifact,
+                &trust_store(),
+                "calibration-record-1",
+                &certificate(),
+                NOW,
+            )
+            .unwrap_err(),
+            ReviewVerificationError::EmptyReceipt
         );
     }
 
