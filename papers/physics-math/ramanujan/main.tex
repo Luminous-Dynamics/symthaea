@@ -109,14 +109,14 @@ computes the total derivative
 via symbolic differentiation and the current local simplifier. The assessor
 records whether the derivative expression simplifies to constant zero and
 whether it has finite residual below tolerance at six fixed points. The
-showcase status \texttt{SYMBOLIC-CHECK} denotes this bounded evidence; neither
+showcase status \texttt{SYMBOLIC+SAMPLED} denotes this bounded evidence; neither
 a local rewrite nor six samples is a universal proof.
 
 \subsection{Two-tier verification}
 
 Symthaea reports two evidence tiers, kept distinct to avoid overclaiming:
 
-\textbf{Tier A (showcase \texttt{SYMBOLIC-CHECK}).} Symbolic chain-rule
+\textbf{Tier A (showcase \texttt{SYMBOLIC+SAMPLED}).} Symbolic chain-rule
 derivation via \texttt{SymExpr::diff} + \texttt{SymExpr::simplify}, followed
 by a numerical residual check at six fixed sample points in phase space. This
 is bounded supporting evidence, not a universal identity proof. A nonzero
@@ -183,7 +183,7 @@ $\mathrm{d}t = 0.01$.
 % ═════════════════════════════════════════════════════════════════════════
 \section{Results}
 
-The headline table below is produced verbatim by the showcase binary:
+The table below retains numerical metrics from a prior baseline run. Verification labels have been updated to distinguish finite-point evidence from formal proof; regenerate `results_table.tex` from the exact source head before publication:
 
 % === BEGIN AUTO-GENERATED TABLE ===
 % Historical numeric snapshot; verification labels were updated to avoid proof overclaims.
@@ -196,7 +196,7 @@ The headline table below is produced verbatim by the showcase binary:
 Of seven problems:
 
 \begin{itemize}
-  \item \textbf{Six} showcase candidates receive Tier-A \texttt{SYMBOLIC-CHECK}
+  \item \textbf{Six} showcase candidates receive Tier-A \texttt{SYMBOLIC+SAMPLED}
         status: symbolic chain-rule derivation plus six-point numerical residual
         agreement. This is not a universal proof. Four supported polynomial
         cases have separate Tier-B Z3 \texttt{unsat} witnesses; the Lotka--Volterra
