@@ -106,7 +106,6 @@ pub struct RhfResult {
     /// `eri_computed`.
     pub eri_screened: usize,
     /// Present when a required checked eigensolve or energy validation failed.
-    /// Present when a required checked eigensolve or energy validation failed.
     /// A failed calculation always has converged=false and non-finite energies.
     pub solver_error: Option<String>,
     /// Residual receipt for every required checked eigensolve and overlap transform.
