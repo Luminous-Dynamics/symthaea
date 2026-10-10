@@ -199,3 +199,8 @@ It composes existing owners rather than creating a parallel solver/evidence stac
 
 Current bounded follow-up: [CFD-QUAL-001 #7316](https://github.com/Luminous-Dynamics/symthaea/issues/7316) qualifies the native `NavierStokes2D` prototype before its results can be used as engineering evidence. The audit is documentation and source review only; it does not claim tests passed or that any solver is now qualified. The first code increment is the checked thermofluid API in [PR #7319](https://github.com/Luminous-Dynamics/symthaea/pull/7319), currently awaiting CI; it does not yet have a verified passing test result.
 
+
+
+## Quantum Chemistry Integration (2026-10-10)
+
+Symthaea already contains crates/domains/symthaea-quantum-chemistry; the key gap is qualified integration with graph-based process discovery, validated 3D geometry, and independent reference evidence. See [Quantum Chemistry Integration and Qualification Plan](QUANTUM_CHEMISTRY_INTEGRATION_2026-10-10.md) and [CHEM-QC-001 issue #7321](https://github.com/Luminous-Dynamics/symthaea/issues/7321). This is a bounded path, not a claim of general-purpose or experimentally validated chemistry. The native QC source documents unresolved small-molecule HF benchmark discrepancies, and the process-discovery oracle currently stops before QC.
