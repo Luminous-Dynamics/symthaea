@@ -448,6 +448,42 @@ mod tests {
     }
 
     #[test]
+    fn compilation_only_requirement_can_resolve_without_tests() {
+        let mut bridge = MagiCodeBridge::new();
+        let prediction_id = bridge.predict_generation_with_requirement(
+            "parse_expression",
+            "CodeGenerator",
+            0.9,
+            "parser compiles",
+            CodePredictionRequirement::CompilationOnly,
+        );
+
+        assert_eq!(
+            bridge.resolve_prediction_with_status(&prediction_id, true, None),
+            CodePredictionResolution::Resolved { was_correct: true }
+        );
+        assert_eq!(bridge.stats().total_predictions, 1);
+    }
+
+    #[test]
+    fn contradictory_compile_and_test_evidence_remains_unresolved() {
+        let mut bridge = MagiCodeBridge::new();
+        let prediction_id = bridge.predict_generation(
+            "invalid",
+            "CodeGenerator",
+            0.9,
+            "code compiles and tests pass",
+        );
+
+        assert_eq!(
+            bridge.resolve_prediction_with_status(&prediction_id, false, Some(true)),
+            CodePredictionResolution::InconsistentEvidence
+        );
+        assert_eq!(bridge.pending_count(), 1);
+        assert_eq!(bridge.stats().total_predictions, 0);
+    }
+
+    #[test]
     fn compile_failure_can_be_resolved_without_test_execution() {
         let mut bridge = MagiCodeBridge::new();
         let prediction_id =
@@ -506,15 +542,14 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_success_tracking() {
+    fn test_partial_progress_does_not_qualify_compile_and_test_claim() {
         let mut bridge = MagiCodeBridge::new();
 
         let id = bridge.predict_generation("sort", "LLM", 0.8, "will compile and pass tests");
-        // Compiles but tests fail
+        // Compilation is partial progress; the compile-and-test claim still failed.
         let was_correct = bridge.resolve_prediction(&id, true, Some(false));
-        // Predicted success (0.8 > 0.5), got partial (is_positive=true via Partial)
-        // Partial is_positive() = true, so prediction was correct
-        assert_eq!(was_correct, Some(true));
+        assert_eq!(was_correct, Some(false));
+        assert_eq!(bridge.pending_count(), 0);
     }
 
     #[test]
