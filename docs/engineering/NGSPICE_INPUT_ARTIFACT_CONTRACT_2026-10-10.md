@@ -42,12 +42,15 @@ Actual execution must still pin a specific ngspice package/version and matching
 sourcepath policy.
 
 Construction fails closed for missing dependencies, missing requested
-external library sections, duplicate paths, unused extra files, include cycles,
-malformed quoting, unsupported directive operand counts, unbalanced in-file
+external library sections, duplicate paths, duplicate in-file library section
+names (case-insensitively), unused extra files, include cycles, malformed
+quoting, unsupported directive operand counts, unbalanced in-file
 `.lib`/`.endl` sections, and mismatched section names. External
-`.lib file section` requests now verify that the dependency actually declares
-the selected section, case-insensitively; a file that exists but lacks that
-corner/library section is rejected. File count, aggregate byte count, and
+`.lib file section` requests verify that the dependency actually declares the
+selected section, case-insensitively; a file that exists but lacks that
+corner/library section is rejected. Duplicate section declarations within one
+library file are rejected because simulator first-match behavior would otherwise
+make the selected model ambiguous. File count, aggregate byte count, and
 include-directive count are bounded (256 files including primary, 32 MiB total,
 and 4,096 static include directives). The bundle exports canonical versioned
 manifest bytes with length-prefixed, domain-separated fields and sorted
