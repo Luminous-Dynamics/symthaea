@@ -896,8 +896,16 @@ mod tests {
         changed.randomization_seed += 1;
         let third = generate_screening_design(&changed).unwrap();
         assert_ne!(
-            first.runs.iter().map(|r| (r.block_id.clone(), r.standard_order, r.kind)).collect::<Vec<_>>(),
-            third.runs.iter().map(|r| (r.block_id.clone(), r.standard_order, r.kind)).collect::<Vec<_>>()
+            first
+                .runs
+                .iter()
+                .map(|r| (r.block_id.clone(), r.standard_order, r.kind))
+                .collect::<Vec<_>>(),
+            third
+                .runs
+                .iter()
+                .map(|r| (r.block_id.clone(), r.standard_order, r.kind))
+                .collect::<Vec<_>>()
         );
     }
 
