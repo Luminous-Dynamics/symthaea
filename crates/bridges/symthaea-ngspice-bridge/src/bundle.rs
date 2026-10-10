@@ -59,6 +59,11 @@ pub enum ModelInputBundleError {
     TooManyIncludeDirectives { actual: usize, maximum: usize },
     UnsupportedIncludeSyntax { path: String, line: usize, reason: String },
     MissingDependency { from: String, target: String },
+    MissingLibrarySection {
+        from: String,
+        target: String,
+        section: String,
+    },
     UnreferencedDependency(String),
     IncludeCycle(String),
     RequestIdMismatch { bundle: String, request: String },
@@ -89,6 +94,10 @@ impl fmt::Display for ModelInputBundleError {
             Self::MissingDependency { from, target } => {
                 write!(f, "{from:?} references missing dependency {target:?}")
             }
+            Self::MissingLibrarySection { from, target, section } => write!(
+                f,
+                "{from:?} requests library section {section:?}, but {target:?} does not define it"
+            ),
             Self::UnreferencedDependency(path) => {
                 write!(f, "dependency {path:?} is not reachable from the primary netlist")
             }
@@ -335,8 +344,8 @@ impl ModelInputBundle {
         })?;
         validate_library_sections(path, source)?;
         for (line_index, line) in source.lines().enumerate() {
-            let target = parse_include_target(path, line_index + 1, line)?;
-            let Some(target) = target else {
+            let include = parse_include_target(path, line_index + 1, line)?;
+            let Some(include) = include else {
                 continue;
             };
             *directive_count = directive_count.saturating_add(1);
@@ -346,13 +355,27 @@ impl ModelInputBundle {
                     maximum: MAX_INCLUDE_DIRECTIVES,
                 });
             }
-            let resolved = resolve_include_path(path, &target)?;
+            let resolved = resolve_include_path(path, &include.path)?;
             let dependency = self.dependencies.get(&resolved).ok_or_else(|| {
                 ModelInputBundleError::MissingDependency {
                     from: path.to_string(),
                     target: resolved.clone(),
                 }
             })?;
+
+            if let Some(expected_section) = include.library_section.as_deref() {
+                let dependency_source = std::str::from_utf8(dependency.bytes()).map_err(|_| {
+                    ModelInputBundleError::Artifact(NetlistArtifactError::InvalidUtf8)
+                })?;
+                if !has_library_section(dependency_source, expected_section)? {
+                    return Err(ModelInputBundleError::MissingLibrarySection {
+                        from: path.to_string(),
+                        target: resolved.clone(),
+                        section: expected_section.to_string(),
+                    });
+                }
+            }
+
             self.visit(
                 &resolved,
                 dependency.bytes(),
@@ -507,11 +530,17 @@ fn validate_library_sections(
     Ok(())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StaticInclude {
+    path: String,
+    library_section: Option<String>,
+}
+
 fn parse_include_target(
     path: &str,
     line_number: usize,
     line: &str,
-) -> Result<Option<String>, ModelInputBundleError> {
+) -> Result<Option<StaticInclude>, ModelInputBundleError> {
     let trimmed = line.trim_start();
     if trimmed.is_empty() || trimmed.starts_with('*') {
         return Ok(None);
@@ -522,7 +551,7 @@ fn parse_include_target(
         None => (trimmed.to_ascii_lowercase(), ""),
     };
 
-    let args = match directive.as_str() {
+    match directive.as_str() {
         ".include" | ".incpslt" => {
             let args = parse_tokens(tail).map_err(|reason| {
                 ModelInputBundleError::UnsupportedIncludeSyntax {
@@ -538,7 +567,10 @@ fn parse_include_target(
                     reason: "expected exactly one path token".to_string(),
                 });
             }
-            return Ok(Some(args[0].clone()));
+            Ok(Some(StaticInclude {
+                path: args[0].clone(),
+                library_section: None,
+            }))
         }
         ".lib" => {
             let args = parse_tokens(tail).map_err(|reason| {
@@ -548,31 +580,57 @@ fn parse_include_target(
                     reason,
                 }
             })?;
-            match args.len() {
-                0 => {
-                    return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
-                        path: path.to_string(),
-                        line: line_number,
-                        reason: "expected a library section or file/section pair".to_string(),
-                    });
-                }
-                1 => return Ok(None), // In-file library section opener.
-                2 => args,
-                _ => {
-                    return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
-                        path: path.to_string(),
-                        line: line_number,
-                        reason: "external .lib accepts exactly a file path and section name"
-                            .to_string(),
-                    });
-                }
+            match args.as_slice() {
+                [_section] => Ok(None), // In-file library section opener.
+                [library_path, section] => Ok(Some(StaticInclude {
+                    path: library_path.clone(),
+                    library_section: Some(section.clone()),
+                })),
+                [] => Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                    path: path.to_string(),
+                    line: line_number,
+                    reason: "expected a library section or file/section pair".to_string(),
+                }),
+                _ => Err(ModelInputBundleError::UnsupportedIncludeSyntax {
+                    path: path.to_string(),
+                    line: line_number,
+                    reason: "external .lib accepts exactly a file path and section name"
+                        .to_string(),
+                }),
             }
         }
-        _ => return Ok(None),
-    };
+        _ => Ok(None),
+    }
+}
 
-    // External .lib has two operands: path and section name.
-    Ok(Some(args[0].clone()))
+fn has_library_section(
+    source: &str,
+    expected_section: &str,
+) -> Result<bool, ModelInputBundleError> {
+    for (line_index, line) in source.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('*') {
+            continue;
+        }
+        let (directive, tail) = match trimmed.split_once(char::is_whitespace) {
+            Some((directive, tail)) => (directive.to_ascii_lowercase(), tail.trim()),
+            None => (trimmed.to_ascii_lowercase(), ""),
+        };
+        if directive != ".lib" {
+            continue;
+        }
+        let args = parse_tokens(tail).map_err(|reason| {
+            ModelInputBundleError::UnsupportedIncludeSyntax {
+                path: "<library-dependency>".to_string(),
+                line: line_index + 1,
+                reason,
+            }
+        })?;
+        if args.len() == 1 && args[0].eq_ignore_ascii_case(expected_section) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Tokenizer for the intentionally supported include syntax: whitespace
@@ -749,6 +807,36 @@ mod tests {
             "main.cir",
             ".lib models/device.lib tt\n",
             vec![("models/device.lib", ".lib tt\n.model D1 D(Is=1e-14)\n.endl tt\n")],
+        )
+        .unwrap();
+        assert!(bundle.dependency_bytes("models/device.lib").is_some());
+    }
+
+    #[test]
+    fn rejects_external_library_when_requested_section_is_missing() {
+        assert!(matches!(
+            bundle(
+                "main.cir",
+                ".lib models/device.lib ff\n",
+                vec![(
+                    "models/device.lib",
+                    ".lib tt\n.model D1 D(Is=1e-14)\n.endl tt\n"
+                )],
+            ),
+            Err(ModelInputBundleError::MissingLibrarySection { section, .. })
+                if section == "ff"
+        ));
+    }
+
+    #[test]
+    fn external_library_section_lookup_is_case_insensitive() {
+        let bundle = bundle(
+            "main.cir",
+            ".lib models/device.lib TT\n",
+            vec![(
+                "models/device.lib",
+                ".lib tt\n.model D1 D(Is=1e-14)\n.endl TT\n"
+            )],
         )
         .unwrap();
         assert!(bundle.dependency_bytes("models/device.lib").is_some());
