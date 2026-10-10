@@ -120,7 +120,7 @@ impl NetlistArtifact {
 }
 
 fn validate_bytes(bytes: &[u8]) -> Result<(), NetlistArtifactError> {
-    if bytes.is_empty() || bytes.iter().all(u8::is_ascii_whitespace) {
+    if bytes.is_empty() || bytes.iter().all(|byte| byte.is_ascii_whitespace()) {
         return Err(NetlistArtifactError::EmptyNetlist);
     }
     if bytes.len() > MAX_NETLIST_BYTES {
@@ -156,10 +156,8 @@ mod tests {
         let artifact = NetlistArtifact::new("circuit-1", bytes.clone()).unwrap();
 
         assert_eq!(artifact.bytes(), bytes);
-        assert_eq!(
-            artifact.blake3_digest(),
-            blake3::hash(&bytes).to_hex().as_str()
-        );
+        let expected_digest = blake3::hash(&bytes).to_hex().to_string();
+        assert_eq!(artifact.blake3_digest(), expected_digest);
         artifact.verify_for_request(&request("circuit-1")).unwrap();
     }
 
@@ -173,7 +171,7 @@ mod tests {
     #[test]
     fn rejects_empty_or_whitespace_only_netlists() {
         assert_eq!(
-            NetlistArtifact::new("circuit-1", Vec::new()).unwrap_err(),
+            NetlistArtifact::new("circuit-1", Vec::<u8>::new()).unwrap_err(),
             NetlistArtifactError::EmptyNetlist
         );
         assert_eq!(
