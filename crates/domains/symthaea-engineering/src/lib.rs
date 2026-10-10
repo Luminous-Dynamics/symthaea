@@ -27,6 +27,7 @@ use symthaea_swarm::{SwarmAggregator, SwarmMessage, SwarmProofMsg, SwarmStateMsg
 use symthaea_workspace::GlobalWorkspace;
 
 pub mod regenerative;
+pub mod measurement_planner;
 
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
