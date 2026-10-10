@@ -690,6 +690,18 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_rejects_internally_inconsistent_process_receipts() {
+        let mut option =
+            candidate("bad-carbon", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
+        option.process.char_carbon_kg = 150.0;
+        assert!(assess_regenerative_candidate(&option, &requirements()).is_err());
+
+        option = candidate("bad-heat", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
+        option.process.estimated_supplied_heat_mj = 1.0;
+        assert!(assess_regenerative_candidate(&option, &requirements()).is_err());
+    }
+
+    #[test]
     fn candidate_ids_must_be_unique_for_deterministic_frontier() {
         let options = vec![
             candidate("same", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass),
