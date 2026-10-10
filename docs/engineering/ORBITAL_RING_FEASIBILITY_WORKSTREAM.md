@@ -252,14 +252,14 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 
 ### Increment RG-03a — support-load scenario gate
 
-**A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, field-level provenance, typed vectors, support-frame from/to frames and epoch, support-frame quaternion, unit ring-plane normal, geometric/load consistency, step/ramp consistency, rider parameters, and explicit energy/momentum term inventories. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
+**A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, field-level provenance, rejection of test-fixture/rejected evidence, typed vectors, support-frame from/to frames and epoch, support-frame quaternion, unit ring-plane normal, geometric/load consistency, step/ramp consistency, rider parameters, and explicit energy/momentum term inventories. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
 
 - Local syntax check: `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
-- Validator self-tests: **65 passed, 0 failed**; every single required field was removed from an otherwise complete typed fixture and independently confirmed to block the gate.
+- Validator self-tests: **68 passed, 0 failed**; every single required field was removed from an otherwise complete typed fixture and independently confirmed to block the gate.
 - Template assessment: contract validation `passed_contract_checks`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
 - Both emitted JSON reports were byte-identical on repeat and are preserved under `docs/engineering/evidence/`.
-- Validator Git blob SHA: `8d3d009c865376714a4dc861ec33a992d5c7091e`; source SHA-256: `6d96e7a09bff8bbc71ae5f2d68dca18a7f557fe6f40ca415cba760adf5f1626e`.
-- Template Git blob SHA: `4f4e5403ea1b90d81877158aced84e48b19b5659`; validation report blob: `1485c06416f5bd4fe47265a782bfc8722efca09f` (SHA-256 `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`); self-test report blob: `3f44118bc53f88b0cc21f060fb3b8be912a6217d` (SHA-256 `7a5c4f0d48bb538a50bc9fc5a4cad0256c56081163b698c43fb66c05617f02d6`).
+- Validator Git blob SHA: `453053ad02f8cfde6a94598d73e930d98447b588`; source SHA-256: `676c3e30107f90e9c7853b260a3b5cc09b57265fe3ea95623086a309623ef219`.
+- Template Git blob SHA: `4f4e5403ea1b90d81877158aced84e48b19b5659`; validation report blob: `1485c06416f5bd4fe47265a782bfc8722efca09f` (SHA-256 `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`); self-test report blob: `4f0ecebeb0ae547d21e5757b3bf8ffdc8453dbbe` (SHA-256 `db24be6511b68722088c88d25561c002681212b4a66f096147aed29934f9c035`).
 
 A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
 
@@ -271,7 +271,7 @@ A green manifest-contract result does **not** mean model inputs are physically v
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
 - Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
 - Ran the column-aware power-source audit (20/20 checks) and repeated it with byte-identical JSON output; local copy's Git blob SHA matched the branch source.
-- Ran the failure-manifest validator self-test (65/65 checks); the provenance and consistency gate kept the 23-field scenario template Blocked and NotRun.
+- Ran the failure-manifest validator self-test (68/68 checks); the provenance and consistency gate kept the 23-field scenario template Blocked and NotRun.
 
 ### Checks not performed
 
