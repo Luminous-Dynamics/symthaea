@@ -472,8 +472,9 @@ impl CognitiveLoopService {
                             metadata.vision = Some(latest_telemetry);
 
                             if !path.is_empty() {
-                                let trajectory_coherence =
-                                    manifold.measure_path_coherence(&path).unwrap_or(0.0);
+                                let trajectory_continuity =
+                                    manifold.measure_path_coherence(&path);
+                                let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
                                 let frames = manifold.decode_geodesic_to_frames_improved(&path);
                                 if !frames.is_empty() {
                                     feedback.mental_movie =
@@ -485,6 +486,7 @@ impl CognitiveLoopService {
                                             path_length: path.len(),
                                             // Legacy field name: local continuity proxy, not semantics.
                                             semantic_coherence: trajectory_coherence,
+                                            trajectory_continuity,
                                             trajectory: path,
                                         });
                                 } else {
