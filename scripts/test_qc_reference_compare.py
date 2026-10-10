@@ -287,7 +287,7 @@ class QcReferenceCompareTests(unittest.TestCase):
             }
 
             for mutate, message in (
-                (lambda report: report["cases"][0].pop("method"), r"cases\[0\]\.method must be explicitly 'RHF'"),
+                (lambda report: report["cases"][0].pop("method"), r"cases\[0\]\.method must match frozen case ID method 'RHF'"),
                 (lambda report: report["cases"].pop(), "corpus census mismatch"),
                 (
                     lambda report: report["cases"][1].update(
