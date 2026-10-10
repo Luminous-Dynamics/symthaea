@@ -46,9 +46,10 @@ extra files, include cycles, malformed quoting, unsupported directive operand
 counts, unbalanced in-file `.lib`/`.endl` sections, and mismatched section
 names. File count, aggregate byte count, and include-directive count are
 bounded (256 files including primary, 32 MiB total, and 4,096 static include
-directives). The bundle manifest uses length-prefixed, domain-separated BLAKE3
-fields and canonical sorted dependency paths, and re-verifies the request
-identity, per-file digests, closure, and manifest digest before use.
+directives). The bundle exports canonical versioned manifest bytes with
+length-prefixed, domain-separated fields and sorted dependency paths; its
+manifest digest is BLAKE3 over those exact exported bytes. Verification checks
+the request identity, each file digest, closure, and manifest digest before use.
 
 This is **static include closure**, not a proof of full model closure or safe
 execution. The parser does not discover arbitrary data files, control-language
