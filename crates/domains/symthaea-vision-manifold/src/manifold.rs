@@ -299,7 +299,7 @@ pub struct VisionManifold {
     transition_model: Option<Box<dyn TransitionModel>>,
     /// Latest generated geodesic path on the manifold.
     last_geodesic: Vec<ContinuousHV>,
-    /// Accumulated thermodynamic cost of geodesic computation.
+    /// Cumulative manifold-local compute-cost diagnostic for rollouts, geodesics, and actions.
     pub geodesic_compute_cost: f32,
     /// Reference frame storage for mental movie decoding.
     last_observed_frame: Option<Vec<u8>>,
