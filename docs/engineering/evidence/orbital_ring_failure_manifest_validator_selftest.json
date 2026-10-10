@@ -259,10 +259,22 @@
     {
       "id": "transform_target_frame_mismatch_blocks",
       "status": "passed"
+    },
+    {
+      "id": "test_fixture_provenance_blocks_candidate",
+      "status": "passed"
+    },
+    {
+      "id": "rejected_evidence_provenance_blocks",
+      "status": "passed"
+    },
+    {
+      "id": "empty_provenance_references_block",
+      "status": "passed"
     }
   ],
   "checks_failed": 0,
-  "checks_passed": 65,
+  "checks_passed": 68,
   "interpretation": "Contract and provenance checks only; review-ready does not mean physically validated or safe.",
   "schema": "luminous-dynamics.orbital-ring-manifest-self-test/v1"
 }
