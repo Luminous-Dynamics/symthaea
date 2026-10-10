@@ -235,14 +235,16 @@ The kernel intentionally does not implement rotor/support equilibrium, electroma
 
 ### Increment RG-02a — Birch power source audit
 
-**Arithmetic source audit implemented and executed locally; complete physical/source reconstruction remains open.** The dependency-free script `scripts/engineering/orbital_ring_power_source_audit.py` re-evaluates the paper's p. 482 conducting-sheet example and larger precessing-force case using its stated aluminium conductivity and 5 cm sheet. It computes **0.17984 GW** for the rounded 2 × 10⁸ N example force and **449.59 GW** for the rounded 5 × 10¹¹ N force; the latter is within approximately 10% of the paper's “around 500 GW” statement. It separately reproduces the smaller ~0.17984 GW worked example with a rounded 2 × 10⁸ N force and the p. 482 total-force case of ~449.59 GW; it also records the p. 483 pair (about 100 MW cold-side load / 10 GW cryostat power) and the Table 8 pair on p. 485 (5 × 10⁸ W / 5 × 10¹⁰ W). The cryogenic pairs both imply 100:1, while their reported absolute scales differ by 5×. It also records the conditional 17.92 PJ mass/speed arithmetic.
+**Arithmetic source audit implemented and executed locally; complete physical/source reconstruction remains open.** The dependency-free script `scripts/engineering/orbital_ring_power_source_audit.py` re-evaluates the p. 482 conducting-sheet example and larger precessing-force case using Birch's stated aluminium conductivity and a 5 cm sheet. It computes **0.17984 GW** for the rounded 2 × 10⁸ N example force and **449.59 GW** for the rounded 5 × 10¹¹ N force; the latter is within approximately 10% of the paper's “around 500 GW” statement.
 
-- Result: **12 passed, 0 failed**.
-- Repeated-run determinism: output was byte-identical.
-- Source Git blob SHA: `63dd1221598644d745416476c149655906f7ab59`; source SHA-256: `d12fe55f532369cdb6da009b775d3849f1219c4e1aa0db22ea296eff3cb723e5`.
-- JSON report SHA-256: `02c3abbb45ad706c6d692a0a248bbf0d8d09cf26e7575b169af16176b77d0ee8`.
+The script separately records the p. 483 pair (about 100 MW cold-side load / 10 GW cryostat power) and the Table 8 pair on p. 485 (5 × 10⁸ W / 5 × 10¹⁰ W). Both imply 100:1, but the reported absolute scales differ by 5×. A separate Table 8 consistency check divides the per-ring superconducting masses by their listed mass-per-length values, obtaining implied lengths of **44.17 Mm** and **44.00 Mm**. Applying the listed 10 W/m heat loss to the mean length gives **440.83 MW**, within 12% of the rounded 500 MW total. This supports internal consistency of the table at its stated precision, but does not explain the earlier paragraph's 100 MW figure. The script also records the conditional 17.92 PJ mass/speed arithmetic.
 
-This is an arithmetic cross-check of transcribed source figures, not evidence that Birch's model is physically accurate, a complete reconstruction of its geometry/length basis, or a present-day feasibility result. In particular, 500 GW of modeled eddy-current drag and 10–50 GW cryostat power are different categories and must not be added or substituted without a consistent scenario definition.
+- Result: **16 passed, 0 failed**.
+- Repeated-run determinism: output was byte-identical; the report is preserved in `docs/engineering/evidence/orbital_ring_power_source_audit.json`.
+- Source Git blob SHA: `68d975e603aeb08049dd89670d754346d04a332b`; source SHA-256: `c1d5086eb55c9424d544ba229db76a6727d5f22e311b7e5006acd6c86f28da26`.
+- JSON report SHA-256: `a9a8357c6c56cbfd1d2b0681824b1529b5ece67be78bd08aaf8f1e801b49e7c4`.
+
+This is an arithmetic cross-check of transcribed source figures, not evidence that Birch's model is physically accurate, a complete reconstruction of the ring geometry, or a present-day feasibility result. Conducting-sheet eddy-current drag and superconducting cryostat power are different categories and must not be added or substituted without a consistent scenario definition.
 
 ### Checks actually performed
 
@@ -251,7 +253,7 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
 - Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
-- Ran the power-source arithmetic audit (12/12 checks) and repeated it with byte-identical JSON output.
+- Ran the power-source arithmetic audit (16/16 checks) and repeated it with byte-identical JSON output.
 
 ### Checks not performed
 
