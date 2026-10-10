@@ -880,7 +880,7 @@ mod tests {
     }
 
     fn request() -> ScreeningDesignRequest {
-        ScreeningDesignRequest {
+        let mut request = ScreeningDesignRequest {
             experiment_id: "soil-screen-001".into(),
             preregistration_id: "prereg-v1".into(),
             input_snapshot_id: "inputs-v1".into(),
@@ -923,11 +923,15 @@ mod tests {
                 status: BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol,
                 protocol_id: "bench-protocol-v1".into(),
                 reviewed_input_snapshot_id: "inputs-v1".into(),
+                reviewed_design_sha256: String::new(),
                 review_id: "review-001".into(),
                 reviewer_role: "qualified laboratory safety reviewer".into(),
                 evidence: evidence("review-record-001", EvidenceKind::Measured),
             },
-        }
+        };
+        request.bench_scale_review.reviewed_design_sha256 =
+            screening_design_sha256(&request).unwrap();
+        request
     }
 
     #[test]
@@ -940,6 +944,14 @@ mod tests {
         assert_eq!(plan.total_planned_run_count, 14);
         assert_eq!(plan.runs.len(), 14);
         assert_eq!(plan.request_snapshot, request);
+        assert_eq!(
+            plan.request_sha256,
+            screening_design_sha256(&request).unwrap()
+        );
+        assert_eq!(
+            verify_screening_design(&plan).unwrap().request_sha256,
+            plan.request_sha256
+        );
 
         for block in &request.blocks {
             let block_runs: Vec<_> = plan
@@ -1050,6 +1062,10 @@ mod tests {
 
         input = request();
         input.bench_scale_review.reviewed_input_snapshot_id = "different-inputs".into();
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.factors[0].high_value += 10.0;
         assert!(generate_screening_design(&input).is_err());
     }
 
