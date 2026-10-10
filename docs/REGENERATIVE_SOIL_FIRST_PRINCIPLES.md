@@ -224,6 +224,14 @@ Useful methodological sources:
 - Penn State STAT 503 derives the two-level factorial main-effect variance relationship and explains how replication and blocking alter the error term: [factorial effects and variance](https://online.stat.psu.edu/stat503/Lesson06) and [blocking in replicated factorial designs](https://online.stat.psu.edu/stat503/Lesson07).
 - USDA-ARS guidance describes power analysis as depending on effect magnitude, error variance, alpha and beta: [Power and replication](https://www.ars.usda.gov/ARSUserFiles/3122/PirkEtAl2013.pdf).
 
+## Closing the screening loop with measured outcomes
+
+The new \`symthaea-engineering::screening_analysis\` module connects the verified schedule to observed primary-endpoint outcomes. Each planned run must have exactly one observation with a unique observation ID, exact run ID, the preregistered endpoint ID, the exact endpoint unit, the preregistered measurement method, a finite outcome value, and a non-empty evidence ID marked **Measured**. Missing runs, duplicate IDs, unknown run IDs, method/unit mismatches, scenario-labelled outcomes, or a structurally corrupted schedule cause analysis to fail closed.
+
+The analysis reports descriptive factorial contrast estimates for every main effect and interaction in the declared full factorial, with the original design request and ordered observation records retained. For center-point designs it also reports, per block, the center-point mean minus the factorial-treatment mean. Randomization and complete blocks support a future inferential model, but these outputs are descriptive estimates only: no p-values, confidence intervals, causal claims, or crop-efficacy conclusions are generated. The center-point difference is not itself a formal curvature test.
+
+This stage deliberately does not impute missing outcomes. A missing observation should trigger the missing-data handling declared in the preregistered analysis plan, and that handling must be implemented and reviewed separately. The next scientific software milestone is a separately specified inferential analysis (including explicit residual degrees of freedom, model diagnostics, multiplicity and treatment-by-block checks), validated against an independent statistical implementation before anyone uses it to claim detection or efficacy.
+
 ## Evidence update and implications for the model
 
 A focused literature refresh adds an important constraint: the correct target is not “maximize biochar” but “choose a safe, economically viable intervention for a specific soil × crop × climate × management context.”
