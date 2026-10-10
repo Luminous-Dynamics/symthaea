@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Energy Efficiency Measurement Benchmark
 //!
-//! Measures the computational cost of the HDC+CfC pipeline and compares
-//! energy-per-inference against published transformer baselines.
+//! Measures HDC+CfC pipeline throughput and optionally observes Linux CPU
+//! package energy. Power × latency comparisons are illustrative scenarios.
 //!
 //! Run: `cargo run -p symthaea-physics --example energy_benchmark --release`
 
@@ -40,7 +40,7 @@ struct TransformerRef {
     time_per_inference_ms: f64,
 }
 
-const TRANSFORMER_REFS: &[TransformerRef] = &[
+const TRANSFORMER_ASSUMPTIONS: &[TransformerRef] = &[
     TransformerRef {
         name: "GPT-3 175B",
         power_watts: 355.0,
@@ -191,8 +191,8 @@ fn measure_with_stats(
     }
 }
 
-fn energy_per_inference(tdp_watts: f64, time_ms: f64) -> f64 {
-    tdp_watts * time_ms / 1000.0 // joules
+fn modeled_energy_per_call(power_assumption_watts: f64, time_ms: f64) -> f64 {
+    power_assumption_watts * time_ms / 1000.0 // modeled joules, not metered
 }
 
 // Linux powercap/RAPL can expose CPU package energy counters. These readings
@@ -329,15 +329,15 @@ fn build_energy_comparisons(
     tdp: f64,
     tdp_label: &str,
 ) -> Vec<EnergyComparison> {
-    let gpt3_energy = energy_per_inference(
-        TRANSFORMER_REFS[0].power_watts,
-        TRANSFORMER_REFS[0].time_per_inference_ms,
+    let gpt3_energy = modeled_energy_per_call(
+        TRANSFORMER_ASSUMPTIONS[0].power_watts,
+        TRANSFORMER_ASSUMPTIONS[0].time_per_inference_ms,
     );
 
     let mut comparisons = Vec::new();
 
     // Symthaea entry
-    let sym_energy = energy_per_inference(tdp, symthaea_pipeline_time_ms);
+    let sym_energy = modeled_energy_per_call(tdp, symthaea_pipeline_time_ms);
     comparisons.push(EnergyComparison {
         system: format!("Symthaea HDC+CfC ({tdp_label})"),
         power_watts: tdp,
@@ -348,8 +348,8 @@ fn build_energy_comparisons(
     });
 
     // Transformer references
-    for t in TRANSFORMER_REFS {
-        let e = energy_per_inference(t.power_watts, t.time_per_inference_ms);
+    for t in TRANSFORMER_ASSUMPTIONS {
+        let e = modeled_energy_per_call(t.power_watts, t.time_per_inference_ms);
         comparisons.push(EnergyComparison {
             system: t.name.to_string(),
             power_watts: t.power_watts,
@@ -603,11 +603,11 @@ fn main() {
     print_energy_table(&laptop_comparisons);
 
     // The power × latency values below are scenarios, not measured energy.
-    let symthaea_desktop_energy = energy_per_inference(
+    let symthaea_desktop_energy = modeled_energy_per_call(
         POWER_ASSUMPTION_DESKTOP_W,
         pipeline_time_ms,
     );
-    let symthaea_laptop_energy = energy_per_inference(
+    let symthaea_laptop_energy = modeled_energy_per_call(
         POWER_ASSUMPTION_LAPTOP_W,
         pipeline_time_ms,
     );
