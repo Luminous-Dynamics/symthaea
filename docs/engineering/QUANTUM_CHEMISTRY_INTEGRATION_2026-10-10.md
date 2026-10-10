@@ -224,6 +224,7 @@ A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous
 From the repository root in a Rust-enabled environment:
 
 ```sh
+SYMTHAEA_GIT_SHA="$(git rev-parse HEAD)" test -z "$(git status --porcelain)" || { echo "clean worktree required" >&2; exit 2; }
 SYMTHAEA_GIT_SHA="$(git rev-parse HEAD)" cargo run -p symthaea-quantum-chemistry --example qc_native_reference_fixtures > /tmp/qc-native.json
 ```
 
