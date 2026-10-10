@@ -89,15 +89,15 @@ This is not a failure-release, impact-damage, or structural-load prediction. Cou
 
 Run from the repository root:
 
-\`\`\`sh
+```sh
 python3 scripts/engineering/orbital_ring_power_source_audit.py
-\`\`\`
+```
 
 The standard-library script computes the stated ratios and drag coefficients and checks the smaller and larger drag-power estimates. The recorded run passed **12/12 checks** and emitted byte-identical JSON on repeat.
 
-- Source Git blob: \`63dd1221598644d745416476c149655906f7ab59\`
-- Source SHA-256: \`d12fe55f532369cdb6da009b775d3849f1219c4e1aa0db22ea296eff3cb723e5\`
-- Deterministic JSON SHA-256: \`02c3abbb45ad706c6d692a0a248bbf0d8d09cf26e7575b169af16176b77d0ee8\`
+- Source Git blob: `63dd1221598644d745416476c149655906f7ab59`
+- Source SHA-256: `d12fe55f532369cdb6da009b775d3849f1219c4e1aa0db22ea296eff3cb723e5`
+- Deterministic JSON SHA-256: `02c3abbb45ad706c6d692a0a248bbf0d8d09cf26e7575b169af16176b77d0ee8`
 
 This evidence verifies only the arithmetic of transcribed source values. It does not establish a valid current design, cryocooler performance, heat-rejection feasibility, structural stability, safe failure behavior, costs, or buildability.
 
