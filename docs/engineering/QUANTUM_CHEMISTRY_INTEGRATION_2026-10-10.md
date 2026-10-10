@@ -204,8 +204,8 @@ None of levels 1–8 implies level 9. A favorable reaction energy is not a barri
 
 ## Current implementation checkpoint (2026-10-10)
 
-The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `58aa3b9ff121a2173254d5af4dcf7f0ea8ec5005`.
+The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `3d883973247815559d9f4e1c895557d6e4ac7142`.
 
-The proposal adds a serializable request schema, explicit method/basis/environment/Bohr declarations, charge/electron/spin consistency checks, finite and non-coincident geometry checks, supported basis-data checks, SCF-setting validation, and request-level atom/basis/iteration budgets. It retains the built basis in an immutable preflight result, and its spin-population split uses signed arithmetic to avoid overflow on 32-bit/WASM targets. It does not run SCF or claim energy accuracy.
+The proposal adds a serializable request schema, explicit method/basis/environment/Bohr declarations, charge/electron/spin consistency checks, finite and non-coincident geometry checks, supported basis-data checks, SCF-setting validation, and request-level atom/basis/iteration budgets. It retains the built basis and overlap-derived independent-basis rank in an immutable preflight result, checks electron capacity against that rank after linear-dependence removal, and uses signed arithmetic for the spin split to avoid overflow on 32-bit/WASM targets. It does not run SCF or claim energy accuracy.
 
 **Verification state:** the PR's current GitHub Actions workflows were queued at the last status query; earlier attempts on prior commits were cancelled when the branch advanced. No build or test pass is claimed. Check the live PR checks for the current head before treating the code as verified.
