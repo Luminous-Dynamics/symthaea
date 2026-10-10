@@ -720,10 +720,10 @@ mod tests {
         assert_eq!(score.notes.len(), 2);
         assert_eq!(score.notes[0].onset, Duration::new(0, 480));
         assert_eq!(score.notes[0].duration, Duration::new(200, 480));
-        assert_eq!(score.notes[0].velocity, 100.0 / 127.0);
+        assert!((score.notes[0].velocity - 100.0 / 127.0).abs() < 1e-6);
         assert_eq!(score.notes[1].onset, Duration::new(100, 480));
         assert_eq!(score.notes[1].duration, Duration::new(200, 480));
-        assert_eq!(score.notes[1].velocity, 80.0 / 127.0);
+        assert!((score.notes[1].velocity - 80.0 / 127.0).abs() < 1e-6);
     }
 
     #[test]
