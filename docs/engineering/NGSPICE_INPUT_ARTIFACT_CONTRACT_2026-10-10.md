@@ -99,10 +99,16 @@ it outside a controlled runtime boundary.
    convergence evidence, requested metric completeness, and physical/model
    validation must be represented separately. Exit status zero and successful
    numeric parsing are not convergence proof or physical validation.
-6. **Independent checks:** validate the RC transient against the analytic
-   reference with explicit tolerance and sampling/interpolation policy, then
-   add RLC and DC-operating-point references. Negative cases must prove that
-   invalid inputs and missing/contradictory outputs fail closed.
+6. **Independent checks:** validate RC, critically damped RLC, and DC
+   operating-point fixtures against independently derived expectations. The
+   checked-in `*_analytic_ascii.raw` files and parser tests now cover those
+   three formats: RC response values, RLC response
+   `v_C(t)=1-(1+\\omega_n t)e^{-\\omega_n t}` for `\\zeta=1`, and the
+   12 V / 3 kΩ / 1 kΩ divider (`v(out)=3 V`). These are analytical parser
+   fixtures, not claimed solver outputs. The real-solver acceptance gate still
+   needs to run the matching netlists, compare observed values with declared
+   tolerances, and preserve residuals. Negative cases must prove that invalid
+   inputs, absent library sections, and missing/contradictory outputs fail closed.
 
 ## Solver-version note
 
