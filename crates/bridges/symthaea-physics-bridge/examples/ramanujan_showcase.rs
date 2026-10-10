@@ -442,10 +442,10 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
         "Each row reports the best invariant from the configured autonomous GP search. ",
     );
     out.push_str(
-        "The search provenance (primed versus cold) must be consulted before treating a result ",
+        "Each row reports the invariant candidate, a bounded symbolic/sample status, and the closest catalog match. ",
     );
     out.push_str(&format!(
-        "symbolic-check status (symbolic derivative + six-point residual; not a formal proof), and the closest match in the {}-equation physics catalog.}}\n",
+        "The status is not a formal proof; consult search provenance (primed versus cold) before interpreting discovery strength. Catalog size: {} equations.}}\n",
         catalog_size
     ));
     out.push_str("\\label{tab:ramanujan_showcase}\n");
