@@ -4,13 +4,14 @@ This document tells a reader who has **not** cloned the full `symthaea` repo, or
 
 ## What is claimed
 
-The paper claims that, starting from six canonical ODE systems, Symthaea's pipeline rediscovers conservation laws with three distinct rigor levels:
+The showcase distinguishes bounded candidate assessment from independently checked formal obligations:
 
-- **PROVEN** — a symbolic proof via chain-rule normalization, optionally formalized by Z3 returning `unsat` on the negation of `dC/dt = 0`.
-- **Numeric** — trajectory variance below threshold but no symbolic certificate.
-- **Approximate** — best-effort candidate, variance above threshold.
+- **Symbolic + sampled** — symbolic chain-rule differentiation followed by finite-point residual sampling. This is supporting evidence, not a universal proof.
+- **Numeric** — trajectory variance is below threshold, but the symbolic/sample assessment did not pass.
+- **Approximate** — the candidate remains a best-effort fit with variance above threshold.
+- **Formally verified (SMT)** — a separate supported polynomial obligation returns unsat from Z3. This applies only to the exact statement and witness checked.
 
-All claims are tied to a deterministic seed (`42`). The LaTeX table in `main.tex` is produced **verbatim** by `cargo run --release -p symthaea-physics-bridge --example ramanujan_showcase`.
+Candidate-search claims use deterministic seed 42. The checked-in stdout and LaTeX table are historical snapshots from before this evidence-label hardening; their old PROVEN labels are not execution evidence for the current source. Regenerate and qualify the outputs against the exact head before publication or reproducibility claims.
 
 ## Verification paths, in order of effort
 
@@ -56,27 +57,26 @@ Expected output: `unsat` on every line. CVC5 and MathSAT also close these; teste
 
 ## Scope of formal verification
 
-The pipeline reports one of three statuses per discovered invariant:
-
 | Status | Meaning |
 |--------|---------|
-| **PROVEN** | Chain-rule normalization closes $\mathrm{d}C/\mathrm{d}t$ to zero symbolically. When the normalizer cannot close, the engine emits the corresponding SMT-LIB2 query and accepts Z3's `unsat` verdict as a formal proof. |
-| **Numeric** | Trajectory variance below threshold ($<10^{-6}$) but no symbolic certificate. The discovered expression might be algebraically wrong but numerically conserved on the particular trajectory sampled. |
+| **Symbolic + sampled** | A symbolic derivative was constructed and its residual passed at six fixed points. This is finite evidence only; a nonzero derivative can vanish at those points. |
+| **Numeric** | Trajectory variance is below threshold, but the symbolic/sample assessment did not pass. |
 | **Approximate** | Best-effort candidate, variance above threshold. |
+| **Formally verified (SMT)** | A separately committed supported proof obligation returned unsat; see the exact witness files below. |
 
 Results from the committed baseline run (see `showcase_stdout.txt`):
 
 | Row | Discovery | Status |
 |-----|-----------|--------|
-| Harmonic oscillator | `x² + v²` | **PROVEN** |
-| Lotka–Volterra | `x − ln x + y − ln y` | **PROVEN** |
-| Kepler two-body (angular momentum) | `xv_y − yv_x` | **PROVEN** |
-| Hénon–Heiles | full 4D Hamiltonian | **PROVEN** |
+| Harmonic oscillator | `x² + v²` | **Symbolic + sampled** |
+| Lotka–Volterra | `x − ln x + y − ln y` | **Symbolic + sampled** |
+| Kepler two-body (angular momentum) | `xv_y − yv_x` | **Symbolic + sampled** |
+| Hénon–Heiles | full 4D Hamiltonian | **Symbolic + sampled** |
 | PCR3BP Jacobi | `cos(y/e)^(x³)` | **Numeric** (low variance, wrong formula — honest) |
-| Mystery ODE (anisotropic oscillator) | `½(pₓ²+pᵧ²) + x² + y² + xy` | **PROVEN** |
+| Mystery ODE (anisotropic oscillator) | `½(pₓ²+pᵧ²) + x² + y² + xy` | **Symbolic + sampled** |
 | Triangular numbers | `n(n+1)/2` | Identity |
 
-The PCR3BP row deserves attention: the discovered expression has variance $2.7 \times 10^{-10}$ but is transparently unrelated to the Jacobi integral. The pipeline reports \texttt{Numeric}, not \texttt{PROVEN}, which is the correct honest signal. A reader should read this as "the engine found something that happens to be low-variance on this trajectory, not a conservation law."
+The PCR3BP row deserves attention: the discovered expression has variance $2.7 \times 10^{-10}$ but is transparently unrelated to the Jacobi integral. The pipeline reports \texttt{Numeric}, not \texttt{Symbolic + sampled}, which is the correct honest signal. A reader should read this as "the engine found something that happens to be low-variance on this trajectory, not a conservation law."
 
 ## SMT proof witness availability
 
@@ -89,16 +89,16 @@ The PCR3BP row deserves attention: the discovered expression has variance $2.7 \
 
 All four return `unsat` under Z3 4.13+ (tested), independent re-verification confirmed.
 
-### Honest distinction between "PROVEN (showcase)" and "formally verified (SMT)"
+### Symbolic/sample assessment versus formal SMT verification
 
 Two stacked layers of evidence exist. The paper reports both:
 
 | Status tag in `showcase_stdout.txt` | Method | Reach |
 |-------------------------------------|--------|-------|
-| `PROVEN ✓` (shown in the showcase LaTeX table) | Symbolic chain-rule derivation via `SymExpr::diff` + `SymExpr::simplify`, then numerical residual check at 6 sample trajectory points | Handles polynomial and transcendental invariants; strong evidence but not a formal proof |
+| `Symbolic check + 6-point residual` (showcase status) | Symbolic chain-rule derivation via `SymExpr::diff` + `SymExpr::simplify`, then numerical residual check at 6 sample trajectory points | Handles polynomial and transcendental invariants; strong evidence but not a formal proof |
 | `unsat` (shown in `proofs/*.smt2` after `verify_invariants_formal`) | Z3 UNSAT on the obligation `∃x : dE/dt ≠ 0` encoded in `QF_NRA` | Polynomial invariants only; this IS a formal proof |
 
-The Lotka–Volterra invariant is `PROVEN` (symbolic + numerical) but **not** `unsat` (its log term is transcendental, outside `QF_NRA`). This is the correct honest pair of labels: we have strong evidence of conservation (showcase) and explicitly cannot formalize it within Z3's algebraic fragment (proofs/).
+The Lotka–Volterra invariant is **Symbolic + sampled** evidence but **not** `unsat` (its log term is transcendental, outside `QF_NRA`). This is the correct honest pair of labels: we have strong evidence of conservation (showcase) and explicitly cannot formalize it within Z3's algebraic fragment (proofs/).
 
 ### Why Hénon-Heiles uses 6H
 
@@ -116,7 +116,7 @@ The Docker image pins all three. The local `reproduce.sh` pipeline is determinis
 
 ## What fails verification
 
-- If any row changes its verification status (PROVEN → Numeric, or disappears), that is a reproducibility failure.
+- After exact-head regeneration, any unexplained status or numerical change is a reproducibility failure. The intentional removal of legacy PROVEN labels is expected.
 - If the Docker container returns a non-zero exit code, reproduction failed.
 - If `./reproduce.sh --verify-proofs` reports any `FAIL`, that specific claim is not independently verifiable on the verifying host's SMT solver; it may reflect a solver-version difference. Report the full `z3 -v` version along with the failure.
 
