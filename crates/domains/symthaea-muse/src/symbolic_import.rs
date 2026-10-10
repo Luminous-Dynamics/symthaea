@@ -7,7 +7,7 @@
 //! any shared Foundry or learning corpus.
 
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use symthaea_muse_protocol::{
     ImportedMotifSummary, ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
 };
@@ -93,7 +93,10 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0_u64;
-        let mut pending: HashMap<(u8, u8), (u64, u8)> = HashMap::new();
+        // Repeated note-ons for the same pitch/channel are valid in MIDI.
+        // Queue their starts rather than overwriting an earlier still-active
+        // note; each matching note-off closes the oldest outstanding onset.
+        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
         for event in track {
             tick = tick
                 .checked_add(u64::from(event.delta.as_int()))
@@ -116,12 +119,20 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     let channel = channel.as_int();
                     match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            pending.insert((channel, key.as_int()), (tick, vel.as_int()));
+                            pending
+                                .entry((channel, key.as_int()))
+                                .or_default()
+                                .push_back((tick, vel.as_int()));
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
-                            if let Some((onset, velocity)) =
-                                pending.remove(&(channel, key.as_int()))
-                            {
+                            let note_key = (channel, key.as_int());
+                            let matched = pending
+                                .get_mut(&note_key)
+                                .and_then(VecDeque::pop_front);
+                            if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
+                                pending.remove(&note_key);
+                            }
+                            if let Some((onset, velocity)) = matched {
                                 push_raw_note(
                                     &mut notes,
                                     RawNote {
@@ -140,17 +151,19 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 _ => {}
             }
         }
-        for ((_, pitch), (onset, velocity)) in pending {
-            push_raw_note(
-                &mut notes,
-                RawNote {
-                    track: track_index,
-                    pitch,
-                    onset,
-                    duration: tick.saturating_sub(onset).max(1),
-                    velocity,
-                },
-            )?;
+        for ((_, pitch), starts) in pending {
+            for (onset, velocity) in starts {
+                push_raw_note(
+                    &mut notes,
+                    RawNote {
+                        track: track_index,
+                        pitch,
+                        onset,
+                        duration: tick.saturating_sub(onset).max(1),
+                        velocity,
+                    },
+                )?;
+            }
         }
     }
     if notes.is_empty() {
@@ -688,6 +701,29 @@ mod tests {
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(error.contains("timing overflowed"), "{error}");
+    }
+
+    #[test]
+    fn repeated_same_pitch_midi_notes_keep_both_overlapping_onsets() {
+        // Two same-pitch note-ons before either note-off must not overwrite
+        // the earlier onset or collapse two notes into one.
+        let bytes = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 20,
+            0, 0x90, 60, 100,
+            100, 0x90, 60, 80,
+            100, 0x80, 60, 0,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&bytes).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[0].onset, Duration::new(0, 480));
+        assert_eq!(score.notes[0].duration, Duration::new(200, 480));
+        assert_eq!(score.notes[0].velocity, 100.0 / 127.0);
+        assert_eq!(score.notes[1].onset, Duration::new(100, 480));
+        assert_eq!(score.notes[1].duration, Duration::new(200, 480));
+        assert_eq!(score.notes[1].velocity, 80.0 / 127.0);
     }
 
     #[test]
