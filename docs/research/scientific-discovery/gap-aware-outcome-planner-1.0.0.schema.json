@@ -1,0 +1,13 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "$id":"https://symthaea.luminousdynamics.io/schemas/gap-aware-outcome-planner-1.0.0.json",
+ "title":"Gap-aware outcome discrimination planner","type":"object","additionalProperties":false,
+ "required":["schema","schema_version","authority","selection_policy","non_equivalences"],
+ "properties":{
+  "schema":{"const":"symthaea.evidence_plane.gap_aware_outcome_planner"},
+  "schema_version":{"const":"1.0.0"},
+  "authority":{"const":"decision_support_only"},
+  "selection_policy":{"type":"array","items":{"enum":["gap_coverage","likelihood_separation","trajectory_divergence","stable_ids"]},"minItems":4,"maxItems":4},
+  "non_equivalences":{"type":"array","minItems":6,"uniqueItems":true,"items":{"type":"string"},"contains":{"const":"computational_discrimination_is_not_experimental_evidence"}}
+ }
+}
