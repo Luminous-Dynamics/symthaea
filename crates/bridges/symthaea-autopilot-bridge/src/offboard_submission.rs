@@ -276,7 +276,7 @@ impl Px4OffboardSubmissionProfileV1 {
             return Err(Px4OffboardSubmissionError::ZeroLatestSubmissionAge);
         }
         let mut seen = HashSet::with_capacity(self.allowed_mavlink_setpoint_message_ids.len());
-        let mut previous = None;
+        let mut previous: Option<u32> = None;
         for id in &self.allowed_mavlink_setpoint_message_ids {
             if !seen.insert(*id) {
                 return Err(Px4OffboardSubmissionError::DuplicateMavlinkMessageId);
@@ -423,6 +423,15 @@ impl Px4OffboardSubmissionCadenceV1 {
         &self,
     ) -> Result<Px4OffboardSubmissionOutcomeV1, Px4OffboardSubmissionError> {
         self.validate()?;
+        // Preserve an observed local rejection even when the history is too short
+        // to assess cadence; absence of enough samples must not erase known failure.
+        if self.samples.iter().any(|sample| {
+            sample.local_result == Px4LocalSubmissionResultV1::RejectedByLocalTransport
+        }) {
+            return Ok(Px4OffboardSubmissionOutcomeV1::OutsideProfile {
+                failures: vec![Px4OffboardSubmissionFailureV1::LocalSubmissionRejected],
+            });
+        }
         if self.samples.len() < usize::from(self.profile.min_samples) {
             return Ok(Px4OffboardSubmissionOutcomeV1::Incomplete {
                 available_samples: self.samples.len(),
@@ -433,11 +442,6 @@ impl Px4OffboardSubmissionCadenceV1 {
         let first = self.samples.first().ok_or(Px4OffboardSubmissionError::EmptySampleWindow)?;
         let latest = self.samples.last().ok_or(Px4OffboardSubmissionError::EmptySampleWindow)?;
         let mut failures = Vec::new();
-        if self.samples.iter().any(|sample| {
-            sample.local_result == Px4LocalSubmissionResultV1::RejectedByLocalTransport
-        }) {
-            failures.push(Px4OffboardSubmissionFailureV1::LocalSubmissionRejected);
-        }
         let latest_age_ns = self
             .assessed_at
             .elapsed_since(&latest.submitted_at)
@@ -478,8 +482,8 @@ impl Px4OffboardSubmissionCadenceV1 {
 
         let mut seen_digest = HashSet::with_capacity(self.samples.len());
         let mut seen_sequence = HashSet::with_capacity(self.samples.len());
-        let mut previous_timestamp = None;
-        let mut previous_sequence = None;
+        let mut previous_timestamp: Option<u64> = None;
+        let mut previous_sequence: Option<u64> = None;
         for sample in &self.samples {
             sample.validate()?;
             if sample.producer_profile_id != self.profile.producer_profile_id {
@@ -841,6 +845,17 @@ mod tests {
                 required_samples: 3,
             }
         );
+
+        let known_rejection = assessment(
+            vec![event(10, 0, Px4LocalSubmissionResultV1::RejectedByLocalTransport)],
+            100,
+        );
+        assert_eq!(
+            known_rejection.outcome().unwrap(),
+            Px4OffboardSubmissionOutcomeV1::OutsideProfile {
+                failures: vec![Px4OffboardSubmissionFailureV1::LocalSubmissionRejected],
+            }
+        );
     }
 
     #[test]
@@ -895,6 +910,21 @@ mod tests {
         assert_eq!(
             Px4OffboardSubmissionCadenceV1::new(profile(), ts(1), vec![wrong_kind]).unwrap_err(),
             Px4OffboardSubmissionError::UnapprovedMavlinkMessageId(999)
+        );
+
+        let wrong_transport = Px4OffboardSubmissionEvidenceV1::new(
+            "companion.publisher.fixture.v1",
+            "vehicle.slot-a",
+            10,
+            Px4OffboardMessageKindV1::Ros2OffboardControlMode,
+            format!("{:064x}", 11),
+            Px4LocalSubmissionResultV1::AcceptedByLocalTransport,
+            ts(0),
+        )
+        .unwrap();
+        assert_eq!(
+            Px4OffboardSubmissionCadenceV1::new(profile(), ts(1), vec![wrong_transport]).unwrap_err(),
+            Px4OffboardSubmissionError::MessageKindTransportMismatch
         );
 
         let wrong_clock = Px4OffboardSubmissionEvidenceV1::new(
