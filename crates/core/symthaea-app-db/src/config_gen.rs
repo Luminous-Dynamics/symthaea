@@ -7,8 +7,8 @@
 //! structured inputs. Designed to run in the browser via WASM for the
 //! Sovereign Inoculation installer.
 
-use crate::{AppDatabase, AppEntry, InstallSource};
 use crate::aliases;
+use crate::{AppDatabase, AppEntry, InstallSource};
 use std::fmt::Write;
 
 const NIXOS_2605_NIXPKGS_REV: &str = "7fc6f2c20af09cdcaf48b92ec3121860139ec668";
@@ -1224,7 +1224,16 @@ mod tests {
         let line_feed = char::from_u32(10).unwrap().to_string();
         let carriage_return = char::from_u32(13).unwrap().to_string();
         let tab = char::from_u32(9).unwrap().to_string();
-        let value = ["prefix $", "{injection}", &quote, &slash, &line_feed, &carriage_return, &tab].concat();
+        let value = [
+            "prefix $",
+            "{injection}",
+            &quote,
+            &slash,
+            &line_feed,
+            &carriage_return,
+            &tab,
+        ]
+        .concat();
         let quoted = nix_string_literal(&value);
         let marker = ["$", "{injection}"].concat();
         assert!(quoted.contains(&format!("{slash}{marker}")));
@@ -1291,14 +1300,23 @@ mod tests {
             assert!(nix.contains(expected), "generated PhotoCraft config missing {expected:?}");
         }
         assert!(
-            selected.warnings.iter().any(|w| w.contains("PhotoCraft") && w.contains("not yet passed")),
+            selected
+                .warnings
+                .iter()
+                .any(|w| w.contains("PhotoCraft") && w.contains("not yet passed")),
             "the pinned source should not be described as runtime-qualified"
         );
-        assert!(validate_nix_syntax(nix).is_empty(), "Nix syntax: {:?}", validate_nix_syntax(nix));
+        assert!(
+            validate_nix_syntax(nix).is_empty(),
+            "Nix syntax: {:?}",
+            validate_nix_syntax(nix)
+        );
         assert_nix_parses_when_available(nix);
 
         if let Some(path) = std::env::var_os("SOVEREIGN_APPIMAGE_OVERLAY_OUT") {
-            let entry = AppDatabase::new().match_app("PhotoCraft").expect("catalog entry");
+            let entry = AppDatabase::new()
+                .match_app("PhotoCraft")
+                .expect("catalog entry");
             std::fs::write(path, render_appimage_overlay(&[entry]))
                 .expect("write generated PhotoCraft overlay");
         }
@@ -2386,7 +2404,6 @@ mod tests {
         );
     }
 }
-
 
 /// Quote catalog metadata for a Nix double-quoted string literal.
 ///
