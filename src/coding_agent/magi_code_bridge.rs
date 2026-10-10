@@ -241,28 +241,28 @@ impl MagiCodeBridge {
             return CodePredictionResolution::InconsistentEvidence;
         }
 
-        let mut pending = self.pending.remove(idx);
-
         // Preserve partial progress as an outcome category, while scoring the specific claim
         // against its declared evidence requirement. Test failure cannot qualify a compile-and-test
         // claim merely because compilation itself succeeded.
         let actual_outcome = if !compiled {
             OutcomeCategory::SafeFailure
         } else {
-            match (pending.requirement, tests_passed) {
+            match (requirement, tests_passed) {
                 (CodePredictionRequirement::CompilationOnly, _) => OutcomeCategory::Success,
                 (CodePredictionRequirement::CompilationAndTests, Some(true)) => OutcomeCategory::Success,
                 (CodePredictionRequirement::CompilationAndTests, Some(false)) => OutcomeCategory::Partial,
                 (CodePredictionRequirement::CompilationAndTests, None) => {
-                    // The awaiting-tests gate above makes this unreachable; remain fail-closed.
+                    // Keep the forecast active if the required result is not available.
                     return CodePredictionResolution::AwaitingTests;
                 }
             }
         };
 
+        let mut pending = self.pending.remove(idx);
+
         // Accuracy and Brier updates score the declared claim, not outcome severity alone.
         let predicted_success = pending.prediction.confidence > 0.5;
-        let actual_success = match pending.requirement {
+        let actual_success = match requirement {
             CodePredictionRequirement::CompilationOnly => compiled,
             CodePredictionRequirement::CompilationAndTests => {
                 compiled && tests_passed == Some(true)
