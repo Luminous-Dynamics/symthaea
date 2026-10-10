@@ -9,6 +9,9 @@
 //! A result from this module is not evidence that a device is safe or clinically
 //! effective.
 
+/// Deterministic point-reflector phantom and synthetic pulse-echo RF fixture.
+pub mod phantom;
+
 use std::fmt;
 
 /// Invalid inputs to the first-order ultrasound calculations.
