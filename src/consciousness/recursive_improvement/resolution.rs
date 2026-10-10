@@ -411,6 +411,7 @@ mod tests {
         assert!(matches!(result.outcome, Some(OutcomeCategory::Success)));
     }
 
+    #[cfg(unix)]
     #[test]
     fn timeout_is_unresolved_and_child_is_reaped_promptly() {
         let resolver = ExitCodeResolver::new("sleep", vec![0]).with_args(vec!["5".to_string()]);
@@ -420,6 +421,34 @@ mod tests {
         assert_eq!(result.disposition, ResolutionDisposition::TimedOut);
         assert!(started.elapsed() < Duration::from_secs(2));
         assert!(result.reason.as_deref().is_some_and(|reason| reason.contains("timed out")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_kills_child_process_group_and_closes_pipes() {
+        let resolver = ExitCodeResolver::new("sh", vec![0]).with_args(vec![
+            "-c".to_string(),
+            "sleep 5 & wait".to_string(),
+        ]);
+        let started = Instant::now();
+        let result = resolver.execute(Duration::from_millis(50));
+        assert_eq!(result.outcome, None);
+        assert_eq!(result.disposition, ResolutionDisposition::TimedOut);
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn successful_shell_exit_with_live_pipe_holders_is_not_scored_as_success() {
+        let resolver = ExitCodeResolver::new("sh", vec![0]).with_args(vec![
+            "-c".to_string(),
+            "sleep 5 & exit 0".to_string(),
+        ]);
+        let started = Instant::now();
+        let result = resolver.execute(Duration::from_secs(2));
+        assert_eq!(result.outcome, None);
+        assert_eq!(result.disposition, ResolutionDisposition::Unclear);
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 
     #[test]
@@ -433,6 +462,7 @@ mod tests {
         assert_eq!(result.disposition, ResolutionDisposition::Unclear);
     }
 
+    #[cfg(unix)]
     #[test]
     fn command_output_capture_is_bounded() {
         let resolver = ExitCodeResolver::new("yes", vec![0]);
