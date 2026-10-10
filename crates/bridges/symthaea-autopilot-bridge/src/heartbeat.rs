@@ -650,11 +650,19 @@ mod tests {
 
     #[test]
     fn timeout_and_gap_policy_are_profile_specific() {
+        let stale = assessment(good_samples(), 4_501);
         assert!(matches!(
-            assessment(good_samples(), 4_501).outcome().unwrap(),
+            stale.outcome().unwrap(),
             Px4HeartbeatFreshnessOutcomeV1::NotFresh { failures }
                 if failures.contains(&Px4HeartbeatFreshnessFailureV1::LatestHeartbeatStale)
         ));
+        let stale_fact = stale.readiness_fact().unwrap();
+        assert_eq!(stale_fact.requirement, Px4ReadinessRequirementV1::HeartbeatFresh);
+        assert_eq!(stale_fact.state, Px4ReadinessFactStateV1::Unsatisfied);
+        assert_eq!(
+            stale_fact.evidence_id,
+            Some(stale.freshness_id().unwrap())
+        );
 
         let gapped = vec![
             heartbeat(1_000, 1, 1, MAV_AUTOPILOT_PX4_RAW),
