@@ -377,7 +377,7 @@ pub fn analyze_screening_responses(
             ));
         }
         let effect_factor_indices: Vec<usize> = (0..factor_count)
-            .filter(|factor_index| effect_mask & (1_usize << factor_index) != 0)
+            .filter(|factor_index| effect_mask & (1_usize << *factor_index) != 0)
             .collect();
         let factor_ids = effect_factor_indices
             .iter()
