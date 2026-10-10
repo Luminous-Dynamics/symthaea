@@ -533,6 +533,135 @@ mod tests {
     }
 
     #[test]
+    fn metadata_binding_names_each_changed_critical_claim() {
+        let cert = certificate();
+        let (minimum, maximum) = cert.range();
+        let (valid_from, valid_until) = cert.validity_window_ns();
+        let base = |record_id: &str,
+                    instrument: &InstrumentIdentity,
+                    quantity: Quantity,
+                    unit: Unit,
+                    range_min: f64,
+                    range_max: f64,
+                    start: u64,
+                    end: u64,
+                    uncertainty: f64| {
+            cert.first_metadata_mismatch(
+                record_id,
+                instrument,
+                quantity,
+                unit,
+                range_min,
+                range_max,
+                start,
+                end,
+                uncertainty,
+            )
+        };
+
+        assert_eq!(
+            base(
+                "another-record",
+                cert.instrument(),
+                cert.quantity(),
+                cert.unit(),
+                minimum,
+                maximum,
+                valid_from,
+                valid_until,
+                cert.standard_uncertainty(),
+            ),
+            Some("record_id")
+        );
+        let other_instrument =
+            InstrumentIdentity::new("instrument-2", "channel-a").unwrap();
+        assert_eq!(
+            base(
+                cert.record_id(),
+                &other_instrument,
+                cert.quantity(),
+                cert.unit(),
+                minimum,
+                maximum,
+                valid_from,
+                valid_until,
+                cert.standard_uncertainty(),
+            ),
+            Some("instrument_or_channel")
+        );
+        assert_eq!(
+            base(
+                cert.record_id(),
+                cert.instrument(),
+                Quantity::AcousticPressure,
+                Unit::Pascal,
+                minimum,
+                maximum,
+                valid_from,
+                valid_until,
+                cert.standard_uncertainty(),
+            ),
+            Some("quantity")
+        );
+        assert_eq!(
+            base(
+                cert.record_id(),
+                cert.instrument(),
+                cert.quantity(),
+                Unit::Megahertz,
+                minimum,
+                maximum,
+                valid_from,
+                valid_until,
+                cert.standard_uncertainty(),
+            ),
+            Some("unit")
+        );
+        assert_eq!(
+            base(
+                cert.record_id(),
+                cert.instrument(),
+                cert.quantity(),
+                cert.unit(),
+                minimum + 1.0,
+                maximum,
+                valid_from,
+                valid_until,
+                cert.standard_uncertainty(),
+            ),
+            Some("range_min_value")
+        );
+        assert_eq!(
+            base(
+                cert.record_id(),
+                cert.instrument(),
+                cert.quantity(),
+                cert.unit(),
+                minimum,
+                maximum,
+                valid_from + 1,
+                valid_until,
+                cert.standard_uncertainty(),
+            ),
+            Some("valid_from_ns")
+        );
+        assert_eq!(
+            base(
+                cert.record_id(),
+                cert.instrument(),
+                cert.quantity(),
+                cert.unit(),
+                minimum,
+                maximum,
+                valid_from,
+                valid_until,
+                cert.standard_uncertainty() + 1.0,
+            ),
+            Some("standard_uncertainty")
+        );
+    }
+
+    #[test]
     fn control_characters_in_instrument_and_reference_ids_are_rejected() {
         assert_eq!(
             CalibrationCertificate::new(
