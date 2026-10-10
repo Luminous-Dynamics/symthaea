@@ -143,6 +143,29 @@ def is_latest(candidate: dict[str, Any], runs: list[dict[str, Any]], policy: dic
             and candidate.get("run_attempt", 0) == latest.get("run_attempt", 0))
 
 
+def check_run_pr_binding(run: dict[str, Any], repo: str, pr: dict[str, Any],
+                         subject: str, branch: str, default_branch: str) -> None:
+    """Bind GitHub's own run-to-PR association to the independently matched open PR."""
+    linked = run.get("pull_requests")
+    if not isinstance(linked, list) or len(linked) != 1 or not isinstance(linked[0], dict):
+        raise VerificationError("workflow run must identify exactly one associated pull request")
+    associated = linked[0]
+    if not isinstance(pr.get("number"), int) or associated.get("number") != pr.get("number"):
+        raise VerificationError("workflow run PR number differs from the independently matched open PR")
+    head = associated.get("head") or {}
+    base = associated.get("base") or {}
+    head_repo = head.get("repo") or {}
+    base_repo = base.get("repo") or {}
+    if head.get("sha") != subject or head.get("ref") != branch:
+        raise VerificationError("workflow run PR association has a mismatched head SHA or branch")
+    if base.get("ref") != default_branch:
+        raise VerificationError("workflow run PR association does not target the default branch")
+    if str(head_repo.get("full_name", "")).lower() != repo.lower():
+        raise VerificationError("workflow run PR association is fork-originated")
+    if str(base_repo.get("full_name", "")).lower() != repo.lower():
+        raise VerificationError("workflow run PR base repository differs from the trusted repository")
+
+
 def check_binding(run: dict[str, Any], repo: str, policy: dict[str, Any],
                   branch: str, expected_sha: str, expected_attempt: int | None) -> str:
     if run.get("workflow_id") != policy["workflow_id"] or run.get("name") != policy["workflow_name"]:
@@ -458,6 +481,7 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
     if pr is None:
         print("No open same-repository PR targets the default branch; no merge status applies.")
         return 0
+    check_run_pr_binding(run, repo, pr, subject, branch, default_branch)
     subject = check_binding(run, repo, policy, branch, subject, expected_attempt)
     runs_payload = api("GET", f"/repos/{owner}/{name}/actions/workflows/{policy['workflow_id']}/runs", token,
                        query={"head_sha": subject, "event": "pull_request", "per_page": 100, "page": 1})
