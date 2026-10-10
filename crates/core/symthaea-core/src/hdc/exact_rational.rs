@@ -45,14 +45,17 @@ impl RationalBudget {
     }
 
     fn validate_decimal_component(self, text: &str) -> Result<(), ExactRationalError> {
-        let digits = text.trim_start_matches(|ch| ch == '-' || ch == '+');
-        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(ExactRationalError::InvalidInteger);
-        }
+        // Strip at most one ASCII sign. Stripping every leading sign would let
+        // malformed inputs such as a very long "-----1" run evade the size
+        // preflight before BigInt parsing eventually rejects them.
+        let digits = match text.as_bytes().first() {
+            Some(b'+' | b'-') => &text[1..],
+            _ => text,
+        };
 
-        // Bound parsing work before allocating a BigInt. The deliberately
-        // conservative decimal digit ceiling allows a small guard band; the
-        // exact bit length is checked immediately after parsing/normalizing.
+        // Bound work before validating/scanning every byte and before allocating
+        // a BigInt. The conservative digit ceiling allows a small guard band;
+        // exact normalized component bits are checked after parsing.
         let max_decimal_digits = self
             .max_component_bits
             .saturating_mul(30_103)
@@ -61,6 +64,9 @@ impl RationalBudget {
             .saturating_add(2);
         if digits.len() as u64 > max_decimal_digits {
             return Err(ExactRationalError::ResourceLimitExceeded);
+        }
+        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(ExactRationalError::InvalidInteger);
         }
         Ok(())
     }
@@ -460,6 +466,20 @@ mod tests {
     fn bounds_decimal_parsing_before_big_integer_allocation() {
         let error = ExactRational::from_integer(&"9".repeat(100), budget(16)).unwrap_err();
         assert_eq!(error, ExactRationalError::ResourceLimitExceeded);
+    }
+
+    #[test]
+    fn repeated_signs_cannot_bypass_decimal_length_preflight() {
+        let malformed = format!("{}1", "-".repeat(1_000));
+        assert_eq!(
+            ExactRational::from_integer(&malformed, budget(16)).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+
+        assert_eq!(
+            ExactRational::from_integer("--1", budget(16)).unwrap_err(),
+            ExactRationalError::InvalidInteger
+        );
     }
 
     #[test]
