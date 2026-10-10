@@ -61,6 +61,8 @@ def sample_corpus_cases() -> list[dict]:
             basis=basis,
             method=method,
         )
+        positions = qc.EXPECTED_ATOM_POSITIONS_BOHR[molecule_name]
+        case["coordinate_unit"] = "bohr"
         case["molecule"] = {
             "charge": charge,
             "multiplicity": multiplicity,
@@ -68,9 +70,9 @@ def sample_corpus_cases() -> list[dict]:
                 {
                     "atomic_number": atomic_numbers[symbol],
                     "symbol": symbol,
-                    "position_bohr": [0.0, 0.0, float(index)],
+                    "position_bohr": list(position),
                 }
-                for index, symbol in enumerate(symbols)
+                for symbol, position in zip(symbols, positions)
             ],
         }
         cases.append(case)
@@ -316,6 +318,14 @@ class QcReferenceCompareTests(unittest.TestCase):
                 (
                     lambda report: report["cases"][1]["molecule"].update(charge=0),
                     "HeH+ charge must be 1",
+                ),
+                (
+                    lambda report: report["cases"][2]["molecule"]["atoms"][1]["position_bohr"].__setitem__(0, 1.9),
+                    "coordinate differs from the frozen H2O geometry",
+                ),
+                (
+                    lambda report: report["cases"][0].update(coordinate_unit="angstrom"),
+                    "coordinate_unit must be explicitly 'bohr'",
                 ),
                 (
                     lambda report: report["cases"].reverse(),
