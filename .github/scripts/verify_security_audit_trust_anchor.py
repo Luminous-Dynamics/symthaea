@@ -170,7 +170,7 @@ def check_binding(run: dict[str, Any], repo: str, policy: dict[str, Any],
                   branch: str, expected_sha: str, expected_attempt: int | None) -> str:
     if run.get("workflow_id") != policy["workflow_id"] or run.get("name") != policy["workflow_name"]:
         raise VerificationError("workflow ID/name does not match the base-owned policy")
-    if str(run.get("path", "")).split("@", 1)[0] != policy["workflow_path"]:
+    if run.get("path") != policy["workflow_path"]:
         raise VerificationError("workflow path does not match the base-owned policy")
     if run.get("event") != "pull_request":
         raise VerificationError("only pull_request runs can qualify a merge")
