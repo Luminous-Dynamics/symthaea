@@ -4,13 +4,14 @@
 use symthaea_instrumentation::{
     ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver, CalibrationReference,
     ContractError, InstrumentIdentity, MeasurementEnvelope, MeasurementInput, MeasurementPolicy,
-    MeasurementStreamGuard, Quantity, QualityFlag, RawDataReference, ResolvedCalibration,
-    StreamOrderFailure, Unit,
+    MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
+    ResolvedCalibration, ResolvedRawData, StreamOrderFailure, Unit,
 };
 
 const SAMPLE_TIME_NS: u64 = 1_000_000_000;
 const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SHA_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const SHA_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 fn artifact(id: &str, sha: &str) -> ArtifactReference {
     ArtifactReference::new(id, sha).unwrap()
@@ -57,10 +58,11 @@ fn policy() -> MeasurementPolicy {
 
 struct MockResolver {
     resolved: Result<ResolvedCalibration, String>,
+    resolved_raw: Result<ResolvedRawData, String>,
 }
 
 impl CalibrationEvidenceResolver for MockResolver {
-    fn resolve(
+    fn resolve_calibration(
         &self,
         _reference: &CalibrationReference,
     ) -> Result<ResolvedCalibration, String> {
@@ -68,9 +70,26 @@ impl CalibrationEvidenceResolver for MockResolver {
     }
 }
 
+impl RawDataEvidenceResolver for MockResolver {
+    fn resolve_raw_data(
+        &self,
+        _reference: &RawDataReference,
+    ) -> Result<ResolvedRawData, String> {
+        self.resolved_raw.clone()
+    }
+}
+
 fn resolver() -> MockResolver {
     MockResolver {
         resolved: Ok(resolved_calibration()),
+        resolved_raw: Ok(
+            ResolvedRawData::new(
+                artifact("raw-acquisition-1", SHA_C),
+                4_096,
+                "application/octet-stream",
+            )
+            .unwrap(),
+        ),
     }
 }
 
@@ -234,6 +253,8 @@ fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_prov
     assert_eq!(assessment.calibration_record_id, "calibration-17");
     assert_eq!(assessment.calibration_review_receipt.artifact_id(), "independent-review-receipt");
     assert_eq!(assessment.raw_data.artifact().artifact_id(), "raw-acquisition-1");
+    assert_eq!(assessment.raw_data.byte_length(), 4_096);
+    assert_eq!(assessment.raw_data.media_type(), "application/octet-stream");
 }
 
 #[test]
@@ -341,7 +362,15 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
 #[test]
 fn unresolved_calibration_evidence_fails_closed() {
     let missing = MockResolver {
-        resolved: Err("evidence artifact not found".into()),
+        resolved: Err("calibration artifact not found".into()),
+        resolved_raw: Ok(
+            ResolvedRawData::new(
+                artifact("raw-acquisition-1", SHA_C),
+                4_096,
+                "application/octet-stream",
+            )
+            .unwrap(),
+        ),
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
