@@ -271,6 +271,27 @@ impl EngineeringManager {
         regenerative::assess_regenerative_candidate(candidate, requirements)
     }
 
+    /// Rank evidence-linked measurement options which could resolve currently unresolved
+    /// regenerative-design constraints. This is a transparent triage heuristic, not an
+    /// optimal design-of-experiments plan or calibrated value-of-information estimate.
+    pub fn prioritize_regenerative_measurements(
+        &self,
+        intervals: &regenerative::RegenerativeMetricIntervals,
+        requirements: &regenerative::RegenerativeDesignRequirements,
+        measurement_cost_unit: &str,
+        options: &[measurement_planner::MeasurementOption],
+    ) -> Result<
+        measurement_planner::MeasurementPriorityPlan,
+        measurement_planner::MeasurementPlannerError,
+    > {
+        measurement_planner::prioritize_measurements(
+            intervals,
+            requirements,
+            measurement_cost_unit,
+            options,
+        )
+    }
+
     pub fn evaluate_material(
         &mut self,
         composition: &[(u16, f64)],
