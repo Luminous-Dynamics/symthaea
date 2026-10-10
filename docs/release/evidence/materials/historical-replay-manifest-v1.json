@@ -1,0 +1,246 @@
+{
+  "schema": "symthaea.materials-historical-replay-manifest.v1",
+  "repository": "Luminous-Dynamics/symthaea",
+  "manifest_role": "historical_preimage_only",
+  "authority": "none",
+  "claim_ceiling": "Binds historical materials semantic edges, path scopes, and known negative qualification references for later reproducible normalization/replay. Does not establish formatter derivation, semantic equivalence, compile/test qualification, scientific validity, or merge authority.",
+  "formatter_profile": {
+    "channel": "1.96.0",
+    "required_components": ["clippy", "rustfmt"],
+    "repository_rustfmt_config_observation": "NONE_AT_AUDITED_MAIN",
+    "normalization_evidence": "NOT_DERIVED"
+  },
+  "replay_policy": {
+    "operator": "normalize_parent_and_child_then_project_normalized_delta",
+    "patch_fuzz_allowed": false,
+    "silent_three_way_resolution_allowed": false,
+    "manual_conflict_resolution_is_mechanical_replay": false,
+    "overlap_states_allowed_for_automatic_projection": ["Disjoint", "ExactCompatible"],
+    "registered_failed_subjects_are_mutable_repair_targets": false
+  },
+  "lineages": {
+    "common_spine": ["MAT-006", "MAT-007", "MAT-008", "MAT-009", "MAT-010", "MAT-011"],
+    "provenance_provider_fork": ["MAT-012", "MAT-013", "MAT-014", "MAT-015"],
+    "authority_fork": ["MAT-011B", "MAT-016A", "MAT-016B"],
+    "generic_extractions": ["MAT-008B-0K"]
+  },
+  "edges": [
+    {
+      "edge_id": "MAT-006",
+      "historical_pr": 4290,
+      "parent_sha": "b92995c317bcb06a89f62a2c0ed8a07ab6f31299",
+      "child_sha": "c3faf4b9df140a62da199075e813b0ddb2b6cb97",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/technoeconomics.rs"
+      ],
+      "known_qualification": {
+        "run_id": 35457536343,
+        "disposition": "FormattingFailed",
+        "later_executable_gates": "NotRun"
+      },
+      "historical_blobs": {
+        "crates/domains/symthaea-materials/src/lib.rs": {
+          "pre": "b8f2335f9930b1a0b79dfb81ccfe4040e6adc585",
+          "post": "348ad281f710a1ce07afcac044fc644e86fbc0d1"
+        },
+        "crates/domains/symthaea-materials/src/technoeconomics.rs": {
+          "pre": null,
+          "post": "328536609790abf44b4dbf5545a51a91bbb83b2a"
+        }
+      }
+    },
+    {
+      "edge_id": "MAT-007",
+      "historical_pr": 4336,
+      "parent_sha": "c3faf4b9df140a62da199075e813b0ddb2b6cb97",
+      "child_sha": "14eaf3340f77e9a8ff6214c64eca4d0bb19cb350",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/material_subject.rs"
+      ],
+      "historical_blobs": {
+        "crates/domains/symthaea-materials/src/lib.rs": {
+          "pre": "348ad281f710a1ce07afcac044fc644e86fbc0d1",
+          "post": "fbcd16082e96a56ea242c24db21f897696715648"
+        },
+        "crates/domains/symthaea-materials/src/material_subject.rs": {
+          "pre": null,
+          "post": "777afc90c1e4883fa5411a05666e12d46ee3a76f"
+        }
+      }
+    },
+    {
+      "edge_id": "MAT-008",
+      "historical_pr": 4339,
+      "parent_sha": "14eaf3340f77e9a8ff6214c64eca4d0bb19cb350",
+      "child_sha": "84774a5cc8a30e24c32819f79330011bd3db5541",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/conditioned_property.rs",
+        "crates/domains/symthaea-materials/src/lib.rs"
+      ],
+      "historical_blobs": {
+        "crates/domains/symthaea-materials/src/conditioned_property.rs": {
+          "pre": null,
+          "post": "8029f9583a7dcfc6c1f144fe68f6215abb1caa0b"
+        },
+        "crates/domains/symthaea-materials/src/lib.rs": {
+          "pre": "fbcd16082e96a56ea242c24db21f897696715648",
+          "post": "4a02e523284539623a711f54c052514ffd3feacf"
+        }
+      }
+    },
+    {
+      "edge_id": "MAT-009",
+      "historical_pr": 4358,
+      "parent_sha": "84774a5cc8a30e24c32819f79330011bd3db5541",
+      "child_sha": "1c8e734b6414a0e3fce50aada49b534455745a45",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/discovery_campaign.rs",
+        "crates/domains/symthaea-materials/src/lib.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-010",
+      "historical_pr": 4361,
+      "parent_sha": "1c8e734b6414a0e3fce50aada49b534455745a45",
+      "child_sha": "2975f281338488067b4c197a21a06208a7e21780",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/search_memory.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-011",
+      "historical_pr": 4376,
+      "parent_sha": "2975f281338488067b4c197a21a06208a7e21780",
+      "child_sha": "3ed7777ec01e73d42cd8d183631480381d5c84b4",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/multi_fidelity.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-012",
+      "historical_pr": 4377,
+      "parent_sha": "3ed7777ec01e73d42cd8d183631480381d5c84b4",
+      "child_sha": "02af60dd37d5d75962504020af37b037ed974454",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/novelty_synthesis.rs",
+        "crates/domains/symthaea-materials/src/novelty_synthesis_hash.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-013",
+      "historical_pr": 4378,
+      "parent_sha": "02af60dd37d5d75962504020af37b037ed974454",
+      "child_sha": "934d43d5a41036dda9b66e312c65245aa5ef5f72",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/sample_lineage.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-014",
+      "historical_pr": 4380,
+      "parent_sha": "934d43d5a41036dda9b66e312c65245aa5ef5f72",
+      "child_sha": "1bbfe063ebd59bed6070059c65b4df9451a7c51b",
+      "kind": "PlanningLayer",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/lib.rs",
+        "crates/domains/symthaea-materials/src/orchestrator.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-015",
+      "historical_pr": 4433,
+      "parent_sha": "1bbfe063ebd59bed6070059c65b4df9451a7c51b",
+      "child_sha": "faebb84e6048384b1ba1c6e8db14ce89606c109b",
+      "kind": "ExecutionAdapter",
+      "changed_paths": [
+        "crates/domains/symthaea-materials-providers/Cargo.toml",
+        "crates/domains/symthaea-materials-providers/fixtures/oqmd_formationenergy_v1.json",
+        "crates/domains/symthaea-materials-providers/src/lib.rs",
+        "crates/domains/symthaea-materials-providers/src/oqmd.rs"
+      ]
+    },
+    {
+      "edge_id": "MAT-011B",
+      "historical_pr": 5000,
+      "parent_sha": "3ed7777ec01e73d42cd8d183631480381d5c84b4",
+      "child_sha": "6fa939a07aa0ea6e2f0dbeb44906363313146315",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/evaluation_seal.rs",
+        "crates/domains/symthaea-materials/src/lib.rs"
+      ],
+      "known_qualification": {
+        "run_id": 35510055394,
+        "disposition": "FormattingFailed",
+        "later_executable_gates": "NotRun"
+      }
+    },
+    {
+      "edge_id": "MAT-016A",
+      "historical_pr": 5004,
+      "parent_sha": "6fa939a07aa0ea6e2f0dbeb44906363313146315",
+      "child_sha": "12005f8eea32210e58e8ffc79c51fcc16f6036d6",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/authority_firewall.rs",
+        "crates/domains/symthaea-materials/src/lib.rs"
+      ],
+      "known_qualification": {
+        "run_id": 35510296583,
+        "disposition": "FormattingFailed",
+        "later_executable_gates": "NotRun"
+      }
+    },
+    {
+      "edge_id": "MAT-016B",
+      "historical_pr": 5010,
+      "parent_sha": "12005f8eea32210e58e8ffc79c51fcc16f6036d6",
+      "child_sha": "700b6f11c265e9e633b17109d73db983dc45a2f3",
+      "kind": "CommonScientificKernel",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/computational_admission.rs",
+        "crates/domains/symthaea-materials/src/lib.rs"
+      ],
+      "known_qualification": {
+        "run_id": 35510608950,
+        "disposition": "FormattingFailed",
+        "later_executable_gates": "NotRun"
+      }
+    },
+    {
+      "edge_id": "MAT-008B-0K",
+      "historical_pr": 4435,
+      "parent_sha": "54621a6eb5603a1ee8a9e7a07f409809c86a2f9f",
+      "child_sha": "7fdea9f589869e7862ea6c972fd91173ed6dbc72",
+      "kind": "ExtractedGenericRepair",
+      "changed_paths": [
+        "crates/domains/symthaea-materials/src/conditioned_property.rs"
+      ],
+      "historical_blobs": {
+        "crates/domains/symthaea-materials/src/conditioned_property.rs": {
+          "pre": "8029f9583a7dcfc6c1f144fe68f6215abb1caa0b",
+          "post": "8a3f6ff14ad1e1a689f593caa5ae5d25d5326953"
+        }
+      },
+      "projection": {
+        "after_edge": "MAT-008",
+        "forbidden_ancestry_import": "MAG-001",
+        "preserve_through_edges": ["MAT-009", "MAT-010", "MAT-011", "MAT-012", "MAT-013", "MAT-014", "MAT-015", "MAT-011B", "MAT-016A", "MAT-016B"]
+      }
+    }
+  ]
+}
