@@ -20,7 +20,7 @@ Each measurement binds:
 - optional raw-data and calibration references, each identified by an ID and SHA-256 digest;
 - explicit acquisition-quality flags.
 
-The initial unit set covers common engineering signals and research-healthcare prototypes: distance, time, frequency, acoustic pressure, temperature, electrical potential/current, heart rate, respiratory rate, oxygen saturation, speed, acceleration, angular velocity, sound-pressure level, and dimensionless values. Values are never silently converted. Extending the unit vocabulary requires an explicit quantity mapping and tests.
+The initial unit set covers common engineering signals and research-healthcare prototypes: distance, time, frequency, acoustic pressure, temperature, electrical potential/current, heart rate, respiratory rate, oxygen saturation, speed, acceleration, angular velocity, sound-pressure level referenced to 20 µPa, and dimensionless values. Values are never silently converted. Extending the unit vocabulary requires an explicit quantity mapping and tests.
 
 ## Fail-closed quantitative gate
 
