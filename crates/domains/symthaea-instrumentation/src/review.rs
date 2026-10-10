@@ -370,6 +370,31 @@ impl ReviewTrustStoreGuard {
         self.last_sequence
     }
 
+    pub fn last_digest(&self) -> Option<&str> {
+        self.last_digest.as_deref()
+    }
+
+    /// Export state for authenticated durable persistence.
+    pub fn checkpoint(&self) -> Option<(u64, String)> {
+        self.last_sequence
+            .zip(self.last_digest.clone())
+    }
+
+    /// Restore a checkpoint only after the caller authenticates its persisted source.
+    pub fn from_checkpoint(
+        highest_sequence: u64,
+        snapshot_digest: impl Into<String>,
+    ) -> Result<Self, ReviewVerificationError> {
+        let snapshot_digest = canonical_digest(&snapshot_digest.into())?;
+        if highest_sequence == 0 {
+            return Err(ReviewVerificationError::InvalidTrustCheckpoint);
+        }
+        Ok(Self {
+            last_sequence: Some(highest_sequence),
+            last_digest: Some(snapshot_digest),
+        })
+    }
+
     /// Admit a fresh snapshot if it advances state or exactly repeats the latest one.
     pub fn admit(
         &mut self,
@@ -479,6 +504,7 @@ pub enum ReviewVerificationError {
     TrustSnapshotSequenceReused {
         sequence: u64,
     },
+    InvalidTrustCheckpoint,
     TrustSnapshotStale,
     UnknownSigner(String),
     SignerNotYetValid(String),
@@ -835,6 +861,48 @@ mod tests {
                 highest_sequence: TRUST_SEQUENCE + 1,
                 received_sequence: TRUST_SEQUENCE,
             })
+        );
+    }
+
+    #[test]
+    fn authenticated_checkpoint_restores_rollback_high_water_mark() {
+        let newer = ReviewTrustStore::new(
+            TRUST_SEQUENCE + 1,
+            NOW - 10,
+            NOW + 200,
+            vec![
+                ReviewTrustKey::new(
+                    "reviewer-a",
+                    signing_key().verifying_key().to_bytes(),
+                    NOW - 100,
+                    Some(NOW + 500),
+                    None,
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
+        let mut guard = ReviewTrustStoreGuard::default();
+        guard.admit(&newer, NOW).unwrap();
+        let (sequence, digest) = guard.checkpoint().unwrap();
+        assert_eq!(sequence, TRUST_SEQUENCE + 1);
+        assert_eq!(guard.last_digest(), Some(digest.as_str()));
+
+        let mut restored = ReviewTrustStoreGuard::from_checkpoint(sequence, digest).unwrap();
+        assert_eq!(
+            restored.admit(&trust_store(), NOW),
+            Err(ReviewVerificationError::TrustSnapshotRollback {
+                highest_sequence: TRUST_SEQUENCE + 1,
+                received_sequence: TRUST_SEQUENCE,
+            })
+        );
+        assert_eq!(
+            ReviewTrustStoreGuard::from_checkpoint(0, "a".repeat(64)).unwrap_err(),
+            ReviewVerificationError::InvalidTrustCheckpoint
+        );
+        assert_eq!(
+            ReviewTrustStoreGuard::from_checkpoint(1, "A".repeat(64)).unwrap_err(),
+            ReviewVerificationError::InvalidDigest
         );
     }
 
