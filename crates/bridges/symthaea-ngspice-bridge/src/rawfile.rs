@@ -444,6 +444,45 @@ mod tests {
     use super::*;
 
     const RC_FIXTURE: &str = include_str!("../tests/fixtures/rc_step_ascii.raw");
+    const RLC_FIXTURE: &str =
+        include_str!("../tests/fixtures/rlc_step_analytic_ascii.raw");
+    const DC_FIXTURE: &str =
+        include_str!("../tests/fixtures/dc_operating_point_analytic_ascii.raw");
+
+    #[test]
+    fn parses_critically_damped_rlc_analytic_reference() {
+        let raw = AsciiRawfile::parse(RLC_FIXTURE).expect("valid RLC ASCII fixture");
+        assert_eq!(raw.title, "Critically damped RLC step analytical reference");
+        assert_eq!(raw.plotname, "Transient Analysis");
+        assert_eq!(raw.points.len(), 5);
+        assert_eq!(raw.si_unit("time").unwrap(), "s");
+        assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
+        assert!(
+            (raw.value_nearest_to("time", 0.0001, "v(out)").unwrap() - 0.2642411176571153)
+                .abs()
+                < 1e-9
+        );
+        assert!(
+            (raw.value_nearest_to("time", 0.0002, "v(out)").unwrap() - 0.5939941502901619)
+                .abs()
+                < 1e-9
+        );
+        assert!(
+            (raw.final_value("v(out)").unwrap() - 0.9995006007726127).abs() < 1e-9
+        );
+    }
+
+    #[test]
+    fn parses_resistive_divider_dc_operating_point_reference() {
+        let raw = AsciiRawfile::parse(DC_FIXTURE).expect("valid DC ASCII fixture");
+        assert_eq!(raw.title, "Resistive divider operating point analytical reference");
+        assert_eq!(raw.plotname, "Operating Point");
+        assert_eq!(raw.points.len(), 1);
+        assert_eq!(raw.si_unit("v(in)").unwrap(), "V");
+        assert_eq!(raw.si_unit("v(out)").unwrap(), "V");
+        assert!((raw.final_value("v(in)").unwrap() - 12.0).abs() < 1e-12);
+        assert!((raw.final_value("v(out)").unwrap() - 3.0).abs() < 1e-12);
+    }
 
     #[test]
     fn parses_rc_transient_golden_fixture_and_units() {
