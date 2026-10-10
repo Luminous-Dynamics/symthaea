@@ -52,6 +52,15 @@ fn evidence(evidence: &EvidenceRef, field: &'static str) -> Result<(), Screening
     nonempty(&evidence.evidence_id, field)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FactorRandomizationClass {
+    /// Each setting can be assigned to individual runs in the randomized complete block.
+    RandomizablePerRun,
+    /// A hard-to-change factor or equipment constraint requires a restricted/split-plot design.
+    RestrictedOrHardToChange,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScreeningFactor {
@@ -63,6 +72,8 @@ pub struct ScreeningFactor {
     pub low_value: f64,
     /// Higher tested factor setting. This is a numeric, quantitative factor.
     pub high_value: f64,
+    /// Randomization class must be established for the actual apparatus and protocol.
+    pub randomization_class: FactorRandomizationClass,
     /// Evidence for the lower level and its applicability to this process.
     pub low_level_evidence: EvidenceRef,
     /// Evidence for the higher level and its applicability to this process.
@@ -84,6 +95,12 @@ impl ScreeningFactor {
             return Err(ScreeningDesignError::new(
                 "factors.levels",
                 "low_value must be strictly less than high_value",
+            ));
+        }
+        if self.randomization_class != FactorRandomizationClass::RandomizablePerRun {
+            return Err(ScreeningDesignError::new(
+                "factors.randomization_class",
+                "this generator requires per-run randomization; restricted or hard-to-change factors need a separately specified split-plot/restricted-randomization design",
             ));
         }
         evidence(&self.low_level_evidence, "factors.low_level_evidence")?;
@@ -771,6 +788,7 @@ mod tests {
             unit: "degree_C".into(),
             low_value: low,
             high_value: high,
+            randomization_class: FactorRandomizationClass::RandomizablePerRun,
             low_level_evidence: evidence(&format!("{id}-low-range"), EvidenceKind::Scenario),
             high_level_evidence: evidence(&format!("{id}-high-range"), EvidenceKind::Scenario),
         }
@@ -1038,6 +1056,11 @@ mod tests {
         input = request();
         input.factors[0].low_value = 500.0;
         input.factors[0].high_value = 400.0;
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.factors[0].randomization_class =
+            FactorRandomizationClass::RestrictedOrHardToChange;
         assert!(generate_screening_design(&input).is_err());
     }
 }
