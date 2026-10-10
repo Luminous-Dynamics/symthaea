@@ -117,7 +117,7 @@ The software should provide:
 2. immutable input snapshots and evidence references for every parameter;
 3. conservation residuals and uncertainty propagation, with tolerance sourced from measurement uncertainty rather than a universal arbitrary constant;
 4. sensitivity analysis and scenario comparison before expensive experiments;
-5. a design-of-experiments planner that proposes informative tests without changing preregistered constraints;
+5. a measurement-triage stage that prioritizes evidence-backed tests only when they could address an unresolved decision; a full design-of-experiments planner must separately handle randomization, blocking, interactions, and power without changing preregistered constraints;
 6. separation of candidate generator, independent evaluator, and release authority;
 7. Pareto comparison only after mandatory safety and quality gates pass;
 8. reproducible exports for lab, field, cost, nutrient, energy and emissions ledgers;
@@ -134,6 +134,12 @@ The current Symthaea engineering implementation can accept evidence-linked inter
 - **Indeterminate:** the interval overlaps the threshold, or a required climate interval is missing.
 
 This is interval-bound screening only. Do not call an interval a 95% confidence interval unless the analysis that produced it supports that interpretation. Preserve the interval-generation method, sample size, calibration domain, date, units, dependence assumptions, and evidence ID in the referenced record. Scenario ranges can support exploration but cannot be silently relabelled as measurements or probabilistic coverage. The method currently does not propagate dependence/covariance across inputs and must not be interpreted as a Bayesian or Monte Carlo uncertainty model.
+
+## Initial measurement-triage utility
+
+Symthaea now provides a small utility that filters and ranks measurement options against unresolved interval-screen constraints. Its score is an explicit heuristic using three caller-provided inputs: decision relevance weight, expected interval-width reduction fraction, and cost in a shared unit and price basis. Each input carries an evidence ID. Options that do not currently target an unresolved constraint remain visible in the plan with no rank.
+
+This utility does **not** produce an optimized experiment design, statistical power calculation, confidence interval, probability of decision change, or calibrated expected value of information. Do not treat assumed reductions or relevance weights as empirical facts without validation. A proper experimental design must still predeclare hypotheses, endpoints, treatment levels, randomization, blocks/replicates, stopping rules, and analysis. NIST's handbook distinguishes screening studies used to identify important factors from response-surface or confirmatory designs: https://www.itl.nist.gov/div898/handbook/pri/section3/pri3346.htm. Sequential Bayesian design is a future option once a defensible likelihood/model and calibrated observations exist: https://www.nist.gov/programs-projects/sequential-bayesian-experiment-design.
 
 ## Decision gates
 
