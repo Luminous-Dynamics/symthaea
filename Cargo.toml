@@ -182,6 +182,7 @@ axum = { workspace = true }
 serde_json = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
+libc = { workspace = true }
 mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "crates/core/symthaea-core" }
