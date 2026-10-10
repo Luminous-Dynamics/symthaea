@@ -116,6 +116,29 @@ pub struct NixRecommendation {
     pub trade_offs: &'static [&'static str],
 }
 
+/// Installation recipe source, kept distinct from replacement quality.
+///
+/// This tells the generated Nix configuration whether the selected entry is a
+/// Nixpkgs attribute or a version-pinned upstream AppImage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallSource {
+    /// Package provided by the selected, locked Nixpkgs input.
+    Nixpkgs,
+    /// Upstream AppImage with immutable release URL and content digest.
+    AppImage {
+        version: &'static str,
+        url: &'static str,
+        hash_sri: &'static str,
+        homepage: &'static str,
+        description: &'static str,
+        license_attrs: &'static [&'static str],
+        platforms: &'static [&'static str],
+        runtime_packages: &'static [&'static str],
+        /// Freedesktop application ID for optional desktop/MIME integration.
+        desktop_id: Option<&'static str>,
+    },
+}
+
 /// An application entry in the database.
 #[derive(Debug, Clone)]
 pub struct AppEntry {
@@ -149,7 +172,12 @@ pub struct AppEntry {
     pub alternatives: &'static [NixRecommendation],
 
     /// nixpkgs channel this package name was last verified against (e.g., "25.05")
+    /// AppImage entries use "upstream"; channel staleness is determined from install_source.
     pub verified_channel: &'static str,
+    /// Installation recipe used by the installer.
+    pub install_source: InstallSource,
+    /// Explicit source provenance; separate from channel qualification.
+    pub source_provenance: &'static str,
 }
 
 // ═══════════════════════════════════════════════════════
@@ -524,17 +552,34 @@ macro_rules! app {
                 justification: $ajust, trade_offs: &[$($atradeoff),*],
             }),*],
             verified_channel: "25.05",
+            install_source: InstallSource::Nixpkgs,
+            source_provenance: "nixpkgs:25.05",
         }
     };
+}
+
+macro_rules! app_with_source {
+    ($source:expr_2021, $provenance:expr_2021, $($app:tt)*) => {{
+        AppEntry {
+            install_source: $source,
+            source_provenance: $provenance,
+            verified_channel: "upstream",
+            ..app!($($app)*)
+        }
+    }};
 }
 
 /// The nixpkgs channel that all entries in this database were verified against.
 pub const CURRENT_VERIFIED_CHANNEL: &str = "25.05";
 
 /// Check if a package entry might be stale (verified against a different channel
-/// than the target system is running). Returns true if the channels differ.
+/// than the target system is running). Upstream-pinned recipes have separate provenance
+/// and are not misclassified as stale Nixpkgs mappings.
 pub fn is_potentially_stale(entry: &AppEntry, current_channel: &str) -> bool {
-    entry.verified_channel != current_channel
+    match entry.install_source {
+        InstallSource::Nixpkgs => entry.verified_channel != current_channel,
+        InstallSource::AppImage { .. } => false,
+    }
 }
 
 /// Extract the major.minor channel version from a full NixOS version string.
@@ -923,6 +968,40 @@ static APPS: &[AppEntry] = &[
         flatpak: ["org.gimp.GIMP"], snap: ["gimp"],
         winget: ["GIMP.GIMP"], brew: ["gimp"],
         primary: ("gimp", "GIMP", MatchQuality::Native, "Same GIMP. Same plugins, same files.", []),
+        alts: []
+    ),
+    // Optional, explicitly selected, digest-pinned upstream release. v0.5.0 is early alpha.
+    app_with_source!(
+        InstallSource::AppImage {
+            version: "0.5.0",
+            url: "https://github.com/storytold/photocraft/releases/download/v0.5.0/photocraft-0.5.0-linux-x86_64.AppImage",
+            hash_sri: "sha256-9U2GOAcFO738/6DWJO9+SdP9QTEMe7Ht5IU29pkp0i8=",
+            homepage: "https://getartcraft.com/apps/photocraft",
+            description: "Native Rust image editor with layered PSD and PSB support (early alpha)",
+            license_attrs: &["mit", "asl20"],
+            platforms: &["x86_64-linux"],
+            runtime_packages: &[
+                "libxkbcommon",
+                "libx11",
+                "libxcb",
+                "libxcursor",
+                "libxi",
+                "wayland",
+                "vulkan-loader",
+                "libglvnd",
+                "mesa",
+            ],
+            desktop_id: Some("ai.storyteller.photocraft"),
+        },
+        "upstream:PhotoCraft@v0.5.0#sha256:f54d863807053bbdfcffa0d624ef7e49d3fd41310c7bb1ede48536f69929d22f",
+        "PhotoCraft", AppCategory::Creative2D, false,
+        win: ["PhotoCraft"], mac: ["PhotoCraft"], linux: ["photocraft"],
+        flatpak: ["ai.storyteller.photocraft"], snap: [],
+        winget: [], brew: [],
+        primary: ("photocraft", "PhotoCraft (early alpha)", MatchQuality::OfficialLinux,
+            "Official Rust-native image editor with layered PSD/PSB support. Installed using a version-pinned upstream Linux AppImage.",
+            ["Early alpha; feature parity and long-term compatibility are not guaranteed",
+             "Pinned installer package currently supports x86_64 Linux only"]),
         alts: []
     ),
     app!("Inkscape", AppCategory::Creative2D, false,
@@ -1704,6 +1783,68 @@ mod tests {
         assert!(db.match_app("Firefox").is_some());
         assert!(db.match_app("Google Chrome").is_some());
         assert!(db.match_app("Steam").is_some());
+    }
+
+    #[test]
+    fn test_photocraft_is_pinned_optional_upstream_appimage() {
+        let db = AppDatabase::new();
+        let photocraft = db
+            .match_app("PhotoCraft")
+            .expect("PhotoCraft should be catalogued");
+        assert_eq!(photocraft.name, "PhotoCraft");
+        assert_eq!(photocraft.primary.nix_pkg, "photocraft");
+        assert_eq!(photocraft.primary.display_name, "PhotoCraft (early alpha)");
+        assert_eq!(photocraft.primary.quality, MatchQuality::OfficialLinux);
+        assert!(!photocraft.proprietary);
+        assert_eq!(
+            photocraft.source_provenance,
+            "upstream:PhotoCraft@v0.5.0#sha256:f54d863807053bbdfcffa0d624ef7e49d3fd41310c7bb1ede48536f69929d22f"
+        );
+        match photocraft.install_source {
+            InstallSource::AppImage {
+                version,
+                url,
+                hash_sri,
+                homepage,
+                license_attrs,
+                platforms,
+                runtime_packages,
+                desktop_id,
+            } => {
+                assert_eq!(version, "0.5.0");
+                assert_eq!(
+                    url,
+                    "https://github.com/storytold/photocraft/releases/download/v0.5.0/photocraft-0.5.0-linux-x86_64.AppImage"
+                );
+                assert_eq!(hash_sri, "sha256-9U2GOAcFO738/6DWJO9+SdP9QTEMe7Ht5IU29pkp0i8=");
+                assert_eq!(homepage, "https://getartcraft.com/apps/photocraft");
+                assert_eq!(license_attrs, &["mit", "asl20"][..]);
+                assert_eq!(platforms, &["x86_64-linux"][..]);
+                assert_eq!(desktop_id, Some("ai.storyteller.photocraft"));
+                for package in [
+                    "libxkbcommon",
+                    "libx11",
+                    "libxcb",
+                    "libxcursor",
+                    "libxi",
+                    "wayland",
+                    "vulkan-loader",
+                    "libglvnd",
+                    "mesa",
+                ] {
+                    assert!(
+                        runtime_packages.contains(&package),
+                        "missing runtime package: {package}"
+                    );
+                }
+            }
+            InstallSource::Nixpkgs => {
+                panic!("PhotoCraft must retain its pinned AppImage source")
+            }
+        }
+        assert!(db.match_app("photocraft").is_some());
+        assert!(!is_potentially_stale(photocraft, "25.05"));
+        assert!(!is_potentially_stale(photocraft, "26.05"));
     }
 
     #[test]

@@ -1,0 +1,171 @@
+name: PhotoCraft AppImage qualification
+
+on:
+  push:
+    branches:
+      - "feat/photocraft-appimage-clean"
+  pull_request:
+    paths:
+      - "crates/core/symthaea-app-db/**"
+      - "crates/bridges/symthaea-web/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/photocraft-appimage-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photocraft-appimage-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Catalog, WASM, Nix build and GUI startup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      NIX_CONFIG: "experimental-features = nix-command flakes"
+      SOVEREIGN_REQUIRE_NIX_PARSER: "1"
+      NIXPKGS_2605_REV: "7fc6f2c20af09cdcaf48b92ec3121860139ec668"
+
+    steps:
+      - name: Check out exact commit without persisting credentials
+        # actions/checkout v7.0.1, immutable release commit.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        # dtolnay/rust-toolchain pinned to an immutable commit.
+        uses: dtolnay/rust-toolchain@3fc1e40d4c4ce3007de028907c886bc3996ce2ea
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Install Nix
+        # cachix/install-nix-action v31.11.1, immutable release commit.
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+
+      - name: Check changed Rust formatting
+        run: cargo fmt --check --package symthaea-app-db --package symthaea-web
+
+      - name: Run app database tests and export the generated overlay
+        env:
+          SOVEREIGN_APPIMAGE_OVERLAY_OUT: ${{ runner.temp }}/photocraft-overlay.nix
+        run: cargo test --package symthaea-app-db --all-features
+
+      - name: Check the deployed installer WebAssembly build
+        run: cargo check --package symthaea-web --features installer --target wasm32-unknown-unknown
+
+      - name: Evaluate, build, and smoke-test the generated AppImage package
+        shell: bash
+        env:
+          SOVEREIGN_APPIMAGE_OVERLAY_OUT: ${{ runner.temp }}/photocraft-overlay.nix
+        run: |
+          set -euo pipefail
+          overlay="$SOVEREIGN_APPIMAGE_OVERLAY_OUT"
+          test -s "$overlay"
+          nix-instantiate --parse "$overlay" >/dev/null
+
+          # Use the exact Nixpkgs revision already pinned by the public config generator.
+          nixpkgs_expr="builtins.getFlake \"github:NixOS/nixpkgs/$NIXPKGS_2605_REV\""
+          package_expr="let
+            source = $nixpkgs_expr;
+            pkgs = import source.outPath {
+              system = \"x86_64-linux\";
+              overlays = [ (import $overlay) ];
+            };
+          in pkgs.photocraft"
+
+          actual_rev="$(nix eval --impure --raw --expr "($nixpkgs_expr).rev")"
+          test "$actual_rev" = "$NIXPKGS_2605_REV"
+          drv_path="$(nix eval --impure --raw --expr "($package_expr).drvPath")"
+          test -n "$drv_path"
+          out="$(nix build --no-link --print-out-paths --impure --expr "$package_expr")"
+          test -x "$out/bin/photocraft"
+          desktop_file="$out/share/applications/ai.storyteller.photocraft.desktop"
+          mime_file="$out/share/mime/packages/ai.storyteller.photocraft.xml"
+          metainfo_file="$out/share/metainfo/ai.storyteller.photocraft.metainfo.xml"
+          icon_file="$out/share/icons/hicolor/256x256/apps/ai.storyteller.photocraft.png"
+          test -f "$desktop_file"
+          test -f "$mime_file"
+          test -f "$metainfo_file"
+          test -f "$icon_file"
+          grep -F 'Exec=photocraft %F' "$desktop_file"
+          grep -F 'Icon=ai.storyteller.photocraft' "$desktop_file"
+
+          version_output="$("$out/bin/photocraft" --version)"
+          printf '%s\n' "$version_output"
+          grep -F "photocraft 0.5.0" <<<"$version_output"
+
+          # --version does not initialize windowing or the GPU; exercise the GUI launch under Xvfb.
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb xauth
+          fi
+          command -v xvfb-run >/dev/null
+
+          launch_log="$RUNNER_TEMP/photocraft-x11-startup.log"
+          gui_config="$RUNNER_TEMP/photocraft-gui-config"
+          marker="$gui_config/gpu-starting.json"
+          mkdir -p "$gui_config"
+          marker_seen=0
+          marker_cleared=0
+
+          set +e
+          env -u WAYLAND_DISPLAY -u WAYLAND_SOCKET -u WGPU_BACKEND \
+            PHOTOCRAFT_NO_DESKTOP_INTEGRATION=1 \
+            PHOTOCRAFT_CONFIG_DIR="$gui_config" \
+            timeout --signal=TERM --kill-after=5s 20s \
+            xvfb-run -a "$out/bin/photocraft" --safe-gpu >"$launch_log" 2>&1 &
+          launch_pid="$!"
+          set -e
+
+          # Observe marker creation and removal; absence only at the end is not enough evidence.
+          while kill -0 "$launch_pid" 2>/dev/null; do
+            if [ -e "$marker" ]; then
+              marker_seen=1
+            elif [ "$marker_seen" -eq 1 ]; then
+              marker_cleared=1
+            fi
+            sleep 0.05
+          done
+          set +e
+          wait "$launch_pid"
+          launch_status="$?"
+          set -e
+          cat "$launch_log"
+
+          if [ "$launch_status" -ne 124 ]; then
+            printf 'Expected the GUI process to reach the 20s timeout; exit=%s\n' "$launch_status" >&2
+            exit 1
+          fi
+          if [ "$marker_seen" -ne 1 ]; then
+            printf 'PhotoCraft never created its GPU-startup marker.\n' >&2
+            exit 1
+          fi
+          if [ "$marker_cleared" -ne 1 ] || [ -e "$marker" ]; then
+            printf 'PhotoCraft did not complete first-frame startup before the deadline.\n' >&2
+            if [ -e "$marker" ]; then cat "$marker" >&2; fi
+            exit 1
+          fi
+
+          {
+            printf '### PhotoCraft generated-package evidence\n\n'
+            printf -- '- Subject commit: %s\n' "$GITHUB_SHA"
+            printf -- '- Nixpkgs revision: %s\n' "$actual_rev"
+            printf -- '- AppImage SRI: %s\n' 'sha256-9U2GOAcFO738/6DWJO9+SdP9QTEMe7Ht5IU29pkp0i8='
+            printf -- '- AppImage SHA-256: %s\n' 'f54d863807053bbdfcffa0d624ef7e49d3fd41310c7bb1ede48536f69929d22f'
+            printf -- '- Derivation: %s\n' "$drv_path"
+            printf -- '- Output: %s\n' "$out"
+            printf -- '- Version output: %s\n' "$version_output"
+            printf -- '- Desktop entry: %s\n' "$desktop_file"
+            printf -- '- MIME definition: %s\n' "$mime_file"
+            printf -- '- AppStream metadata: %s\n' "$metainfo_file"
+            printf -- '- Icon: %s\n' "$icon_file"
+            printf -- '- X11 smoke test: 20-second Xvfb run, marker creation/removal observed; timeout exit %s\n' "$launch_status"
+          } >> "$GITHUB_STEP_SUMMARY"
