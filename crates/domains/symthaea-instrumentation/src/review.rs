@@ -908,7 +908,7 @@ mod tests {
 
         let mut tampered = bytes.clone();
         let sequence_offset =
-            b"SYMRTRSS1\\0".len() + b"SYMRTRS1\\0".len() + 2
+            b"SYMRTRSS1\0".len() + b"SYMRTRS1\0".len() + 2
                 + REVIEW_TRUST_STORE_SCHEMA.len();
         tampered[sequence_offset] ^= 1;
         let parsed_tampered = SignedReviewTrustStoreSnapshot::from_canonical_bytes(&tampered)
