@@ -331,7 +331,8 @@ impl CognitiveLoopService {
         }
 
         // Report measured local transition continuity, not a fixed semantic score.
-        let trajectory_coherence = manifold.measure_path_coherence(&path).unwrap_or(0.0);
+        let trajectory_continuity = manifold.measure_path_coherence(&path);
+        let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
 
         // Decode the path into a viewable mental movie
         let frames = manifold.decode_geodesic_to_frames_improved(&path);
