@@ -74,7 +74,7 @@ fn measurement_in_clock_domain(
 }
 
 fn policy() -> MeasurementPolicy {
-    MeasurementPolicy::new(500_000_000, 2_000.0, 1_000.0).unwrap()
+    MeasurementPolicy::new(500_000_000, Unit::Hertz, 2_000.0, 1_000.0).unwrap()
 }
 
 struct MockResolver {
@@ -709,8 +709,56 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
 }
 
 #[test]
+fn uncertainty_policy_must_use_the_exact_measurement_unit() {
+    let megahertz_policy =
+        MeasurementPolicy::new(500_000_000, Unit::Megahertz, 0.002, 0.001).unwrap();
+    let mut guard = MeasurementStreamGuard::default();
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &megahertz_policy,
+                &resolver(),
+                &mut guard,
+            )
+            .unwrap_err(),
+        AssessmentFailure::PolicyUnitMismatch {
+            policy_unit: Unit::Megahertz,
+            measurement_unit: Unit::Hertz,
+        }
+    );
+
+    // Rejecting a policy/measurement unit mismatch does not consume a sensor
+    // sequence; with the correctly typed policy, the same sample is eligible.
+    measurement(1, SAMPLE_TIME_NS)
+        .assess_for_quantitative_use(
+            SAMPLE_TIME_NS,
+            &clock_domain(),
+            &policy(),
+            &resolver(),
+            &mut guard,
+        )
+        .unwrap();
+}
+
+#[test]
+fn measurement_policy_rejects_invalid_uncertainty_limits() {
+    assert_eq!(
+        MeasurementPolicy::new(1_000, Unit::Hertz, f64::NAN, 1.0).unwrap_err(),
+        ContractError::NonFiniteValue("max_measurement_standard_uncertainty")
+    );
+    assert_eq!(
+        MeasurementPolicy::new(1_000, Unit::Hertz, 1.0, -0.1).unwrap_err(),
+        ContractError::NegativeUncertainty("max_calibration_standard_uncertainty")
+    );
+}
+
+#[test]
 fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
-    let tight_measurement_policy = MeasurementPolicy::new(1_000, 999.0, 1_000.0).unwrap();
+    let tight_measurement_policy =
+        MeasurementPolicy::new(1_000, Unit::Hertz, 999.0, 1_000.0).unwrap();
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
@@ -724,7 +772,8 @@ fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
         AssessmentFailure::MeasurementUncertaintyExceeded
     );
 
-    let tight_calibration_policy = MeasurementPolicy::new(1_000, 2_000.0, 899.0).unwrap();
+    let tight_calibration_policy =
+        MeasurementPolicy::new(1_000, Unit::Hertz, 2_000.0, 899.0).unwrap();
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
             .assess_for_quantitative_use(
