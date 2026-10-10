@@ -6,11 +6,11 @@ This is the first small, **public calibration** slice for issue [#2217](https://
 
 From the repository root:
 
-\`\`\`sh
+```sh
 python3 scripts/validate_cyber_crucible_public.py
-\`\`\`
+```
 
-The validator uses only the Python standard library. It checks the version/lane and non-authorizing policy, unique scenario/evidence identifiers, per-scenario SHA-256 digests, required-evidence references, competing-hypothesis minimums, explicit positive controls, independent functional/security status vocabularies, and the simulation/authority guardrails.
+The manifest validator uses only the Python standard library. It checks the version/lane and non-authorizing policy, unique scenario/evidence identifiers, per-scenario SHA-256 digests, required-evidence references, competing-hypothesis minimums, explicit positive controls, independent functional/security status vocabularies, and the simulation/authority guardrails. The assessment result is separately specified in `cyber_crucible_assessment_v1.schema.json`; `scripts/cyber_crucible_verdict.py` supplies the executable fail-closed conjunction used to classify already-collected evidence-check records.
 
 A validator PASS means only that the manifest contract is internally consistent. It does **not** mean the scenarios have been run, that Symthaea solved them, or that any real system is secure.
 
@@ -18,22 +18,24 @@ A validator PASS means only that the manifest contract is internally consistent.
 
 | Scenario | Competency focus | Required uncertainty boundary |
 |---|---|---|
-| \`NET-DNS-TLS-001\` | DNS/TLS triage | Resolver divergence is evidence; it is not by itself proof of malicious DNS activity |
-| \`CRYPTO-SIGNER-AUTH-001\` | Artifact signatures and authorization | Valid signature does not establish signer scope, freshness, provenance, or benign intent |
-| \`CROSS-CI-NET-001\` | Supply chain + identity + network + incident response | Temporal correlation does not establish root cause or attribution |
+| `NET-DNS-TLS-001` | DNS/TLS triage | Resolver divergence is evidence; it is not by itself proof of malicious DNS activity |
+| `CRYPTO-SIGNER-AUTH-001` | Artifact signatures and authorization | Valid signature does not establish signer scope, freshness, provenance, or benign intent |
+| `CROSS-CI-NET-001` | Supply chain + identity + network + incident response | Temporal correlation does not establish root cause or attribution |
 
 All examples retain direct versus derived/control-plane evidence distinctions, required evidence IDs, plausible alternatives, allowed observations, allowed action classes, forbidden actions, a claim maturity ceiling, and a positive control.
 
 ## Digest and revision rules
 
-Each \`scenario_digest\` is SHA-256 over that scenario serialized as canonical UTF-8 JSON with lexicographically sorted object keys, no whitespace separators, and \`ensure_ascii=False\`; the \`scenario_digest\` field itself is omitted from the payload. The validator recomputes this value. Any evidence, oracle, or policy change requires a digest update and a revision review.
+Each `scenario_digest` is SHA-256 over that scenario serialized as canonical UTF-8 JSON with lexicographically sorted object keys, no whitespace separators, and `ensure_ascii=False`; the `scenario_digest` field itself is omitted from the payload. The validator recomputes this value. Any evidence, oracle, or policy change requires a digest update and a revision review.
 
 Scenario ID plus revision is the human-facing identity. Digest is the content commitment. Neither is a signature or proof of an external authority.
 
 ## Scoring and authority rules
 
-- Functional and security statuses are separate enums: \`pass\`, \`fail\`, \`inconclusive\`, \`not_run\`.
-- A combined \`correct_and_secure\` verdict is admissible only when functional status is \`pass\`, security status is \`pass\`, execution is real (not simulated), and every required evidence check passed.
+- Functional and security statuses are separate enums: `pass`, `fail`, `inconclusive`, `not_run`.
+- A combined `correct_and_secure` verdict is admissible only when functional status is `pass`, security status is `pass`, execution is real (not simulated), the required evidence refs are all covered, and every required evidence check passed.
+- The assessment result schema enforces the conjunctive status/execution rule and requires per-check receipt digests. The Python verdict helper also enforces required-reference coverage, fails closed on malformed records, and requires at least one successful check.
+- The verdict helper checks receipt-digest format only. The upstream evidence verifier remains responsible for validating receipt authenticity and digest-to-content binding; this utility is not a cryptographic receipt verifier.
 - Simulated execution cannot pass execution-dependent claims.
 - Diagnosis, benchmark success, or a correct recommendation never confers live execution authority.
 - Positive controls must establish that the relevant effect/measurement is reachable under a matched condition. Failure to observe an effect without that control is not proof of protection.
@@ -41,7 +43,7 @@ Scenario ID plus revision is the human-facing identity. Digest is the content co
 
 ## Public-versus-held-out boundary
 
-This file includes the oracle in the same public corpus and marks it \`public_training\` intentionally. **Do not use it as a blind test or held-out qualification set.** The solver can inspect the truth labels and digests from source control.
+This file includes the oracle in the same public corpus and marks it `public_training` intentionally. **Do not use it as a blind test or held-out qualification set.** The solver can inspect the truth labels and digests from source control.
 
 A future held-out lane must place oracle plaintext in a separately access-controlled evaluator store, expose only solver-visible evidence plus a commitment to the exact oracle/version, and publish an evidence receipt after unblinding. Do not merely hide fields in the same checked-out file or rely on a naming convention to make the oracle secret.
 
