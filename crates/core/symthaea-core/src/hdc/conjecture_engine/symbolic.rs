@@ -210,9 +210,13 @@ pub struct ConservationCheck {
     /// constant numerical zero. This is structural evidence about the current
     /// simplifier, not a universal proof.
     pub symbolic_derivative_simplified_to_zero: bool,
-    /// True when the derived symbolic derivative has absolute residual below
+    /// True only when the derived expression evaluates to a finite value at
+    /// every fixed sample point. Non-finite evaluations invalidate the sample.
+    pub sampled_values_finite: bool,
+    /// True when every sample is finite and its absolute residual is below
     /// 1e-10 at all six fixed numeric test points.
     pub sampled_residual_passed: bool,
+    /// Infinity denotes that at least one sample was non-finite.
     pub max_numerical_residual: f64,
 }
 
@@ -224,6 +228,11 @@ impl fmt::Display for ConservationCheck {
             f,
             "  Simplified to zero: {}",
             if self.symbolic_derivative_simplified_to_zero { "YES" } else { "NO" }
+        )?;
+        writeln!(
+            f,
+            "  Sample values finite: {}",
+            if self.sampled_values_finite { "YES" } else { "NO" }
         )?;
         writeln!(
             f,
@@ -263,16 +272,29 @@ pub fn assess_conservation_symbolic(
         vec![("x", 0.3), ("v", -0.9)],
         vec![("x", 2.0), ("v", -1.5)],
     ];
-    let max_residual = test_points
+    let sampled_residuals: Vec<f64> = test_points
         .iter()
-        .map(|pt| total_deriv.eval(pt).abs())
-        .fold(0.0f64, f64::max);
+        .map(|pt| total_deriv.eval(pt))
+        .collect();
+    let sampled_values_finite = sampled_residuals.iter().all(|value| value.is_finite());
+    // f64::max ignores a NaN operand, which could otherwise turn an
+    // undefined residual into an apparent zero. Fail closed if any sample is
+    // non-finite and make that failure visible in the reported residual.
+    let max_residual = if sampled_values_finite {
+        sampled_residuals
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0f64, f64::max)
+    } else {
+        f64::INFINITY
+    };
 
     ConservationCheck {
         quantity: format!("{}", energy),
         total_derivative: format!("{}", total_deriv),
         symbolic_derivative_simplified_to_zero,
-        sampled_residual_passed: max_residual < 1e-10,
+        sampled_values_finite,
+        sampled_residual_passed: sampled_values_finite && max_residual < 1e-10,
         max_numerical_residual: max_residual,
     }
 }
@@ -448,6 +470,28 @@ mod conservation_evidence_tests {
         // zero must not be inferred from an epsilon comparison.
         assert!(check.sampled_residual_passed);
         assert!(!check.symbolic_derivative_simplified_to_zero);
+    }
+
+    #[test]
+    fn non_finite_sample_evaluation_fails_closed() {
+        // x - x is zero at every input, so this derivative is undefined at
+        // every sample. NaN must not be ignored by a floating-point max fold.
+        let denominator = SymExpr::Add(
+            Box::new(SymExpr::Var("x".into())),
+            Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+        );
+        let rhs = SymExpr::Div(
+            Box::new(SymExpr::Var("x".into())),
+            Box::new(denominator),
+        );
+        let check = assess_conservation_symbolic(
+            &SymExpr::Var("x".into()),
+            &[("x", rhs)],
+        );
+
+        assert!(!check.sampled_values_finite);
+        assert!(!check.sampled_residual_passed);
+        assert!(check.max_numerical_residual.is_infinite());
     }
 
     #[test]
