@@ -7,6 +7,9 @@
 /// Immutable, request-bound primary netlist identity.
 pub mod input;
 
+/// Closed-world static include/library dependency bundles.
+pub mod bundle;
+
 /// Strict numeric parsing primitives for single-plot ASCII rawfiles.
 pub mod rawfile;
 
