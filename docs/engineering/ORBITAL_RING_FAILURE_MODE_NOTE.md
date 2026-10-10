@@ -61,12 +61,12 @@ The standard-library validator is [`scripts/engineering/validate_orbital_ring_fa
 Recorded local checks:
 
 - `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
-- `python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test`: **72 passed, 0 failed**.
+- `python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test`: **73 passed, 0 failed**.
 - Additional regressions reject `test_fixture` and rejected provenance, empty evidence references, missing from/to-frame metadata, a transform target that differs from the declared inertial frame, and energy/momentum boundaries without term-inventory references.
 - Running the validator on the checked-in template returned `passed_contract_checks` for the *manifest contract*, while correctly keeping the scenario `Blocked` with all 23 inputs unresolved and `analysis_state = NotRun`.
 - Repeated test and manifest-validation outputs were byte-identical. The exact outputs are preserved in [the validation report](evidence/f_skyhook_load_step_manifest_validation.json) and [the self-test report](evidence/orbital_ring_failure_manifest_validator_selftest.json).
 
-Validator Git blob: `1974f34d4f920e63fbe55055775fcc2b1b329d8c`; source SHA-256: `b446b3d8b9bcde9ea26802c33203c1c0c4d1c7eec796067d4e1ef156f876bbc1`. Template Git blob: `4f4e5403ea1b90d81877158aced84e48b19b5659`. Validation report Git blob: `1485c06416f5bd4fe47265a782bfc8722efca09f`; report SHA-256: `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`. Self-test report Git blob: `41ff8edb6d14274efba570f78fc7527bec0fd64a`; report SHA-256: `76c97b9b2d20b592186b8bcff3d09be77e627e4ebc14625ad22df4843d44bf9b`. The report’s purpose is to prevent incomplete scenario data from being mistaken for a ready-to-run physics case.
+Validator Git blob: `2d07b86480dea71f3272fbee2a9fde4152727abb`; source SHA-256: `86dece2753b53f44a5f3dffc109a33121ec2b4ff5cef28bca01a41029af74217`. Template Git blob: `4f4e5403ea1b90d81877158aced84e48b19b5659`. Validation report Git blob: `8d0f200eb2db33c4c4ef6b8dc07ef98d21e184d6`; report SHA-256: `0aa07355674fb104d0e9bb38ad3bafad3cd768b3557e4bfe012126b25f8c253c`. Self-test report Git blob: `87612c32dfe45c3c0fb8b8588716b35c0457aa67`; report SHA-256: `dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5`. The report records scenario schema/version v2; its purpose is to prevent incomplete or schema-mismatched scenario data from being mistaken for a ready-to-run physics case.
 
 ## 5. Explicit limits
 
@@ -74,4 +74,4 @@ The paper's claims are theoretical engineering analysis from 1983. They identify
 
 **Next gate:** specify a continuous-skyhook support-loss test geometry and the inter-ring rider force/kinematic contract. If those fields are not available, keep F-SKYHOOK-LOAD-STEP blocked rather than letting a nominal orbit propagator imply safety.
 
-The scenario contract is now schema/version v2 and requires the scenario-level `initial_path_constraint=circular_reference_path` and checks `abs(r·v)/||r||` against the provenance-backed `acceptance_limits.max_initial_radial_velocity_m_s`. Four regression cases cover valid tangency, excessive radial speed, a missing radial-speed tolerance, and a missing path constraint. The limit is a scenario-specific kinematic consistency bound—not an orbit-stability or safety criterion.
+The scenario contract is now schema/version v2 and requires the scenario-level `initial_path_constraint=circular_reference_path` and checks `abs(r·v)/||r||` against the provenance-backed `acceptance_limits.max_initial_radial_velocity_m_s`. Four regression cases cover valid tangency, excessive radial speed, a missing radial-speed tolerance, and a missing path constraint, and scenario-version mismatch. The limit is a scenario-specific kinematic consistency bound—not an orbit-stability or safety criterion.
