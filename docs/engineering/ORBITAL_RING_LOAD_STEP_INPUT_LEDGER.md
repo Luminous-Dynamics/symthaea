@@ -13,7 +13,7 @@ Primary failure-mechanism source: Birch, *Orbital Ring Systems and Jacob's Ladde
 - **Independent model:** produced by a separately implemented or independently reviewed calculation, with code/version and input digest.
 - **Test fixture:** only for validator development. It must never be presented as an engineering value.
 
-Every populated input requires an input_provenance record with classification, at least one evidence_refs item, rationale, and review_state. A reference proves traceability/origin, not correctness. independently_reviewed records a review disposition; it does not constitute a physics pass. A rejected record blocks the field. If a value is unknown, leave the value null and state Blocked.
+Every populated input requires an input_provenance record with classification, at least one evidence_refs item, rationale, and review_state. A reference proves traceability/origin, not correctness. independently_reviewed records a review disposition; it does not constitute a physics pass. A rejected record blocks the field, and the validator rejects test_fixture provenance for scenario-candidate values. If a value is unknown, leave the value null and state Blocked.
 
 ## Field-by-field closure contract
 
@@ -38,14 +38,14 @@ Every populated input requires an input_provenance record with classification, a
 | 17 | rider_max_coupling_force_n | N, finite and positive | Hardware/model force limit, duration/thermal constraints, load-sharing assumption and saturation transition. Do not infer this from nominal stiffness alone. |
 | 18 | actuation_measurement_delay_s | s, finite and nonnegative | Sensor, computation, communications and actuator latency boundary. Provide nominal value, worst-case/uncertainty interval and whether clocks are synchronized. |
 | 19 | force_model_reference | Immutable equation/model reference | Gravity and all other force laws, versions, assumptions, domains of validity and independently checked limiting cases. State explicitly which forces are omitted. |
-| 20 | energy_boundary | Frame, included bodies, work/flux terms | Enumerate all included subsystems, external work, heat/electrical transfer, material/energy flux, storage terms and signs. Frame must match inertial_frame; scope_complete requires a reviewed term inventory, not an empty list by default. |
-| 21 | momentum_boundary | Frame, included bodies, force/flux terms | Enumerate included bodies, external forces/torques, exchanged momentum and mass flux. Frame must match inertial_frame; do not substitute angular momentum or scalar speed for vector momentum. |
+| 20 | energy_boundary | Frame, included bodies, work/flux terms | Enumerate all included subsystems, external work, heat/electrical transfer, material/energy flux, storage terms and signs. Frame must match inertial_frame; scope_complete must not be inferred from empty lists. term_inventory_ref must point to an explicit term inventory for independent review. |
+| 21 | momentum_boundary | Frame, included bodies, force/flux terms | Enumerate included bodies, external forces/torques, exchanged momentum and mass flux. Frame must match inertial_frame; term_inventory_ref must point to an explicit term inventory for independent review. Do not substitute angular momentum or scalar speed for vector momentum. |
 | 22 | acceptance_limits | m, N, J, kg·m/s | Before running, justify each limit from clearance/geometry, hardware or independently reviewed numerical error. Energy and momentum residual limits must use the declared control-volume normalization and uncertainty. |
 | 23 | independent_reference_case | Immutable case/artifact reference | A separate calculation that shares no unexamined implementation path with the target solver; specify what it checks, expected result, tolerances, and reviewer. A copied golden output is not independence. |
 
 ## Cross-field invariants
 
-The validator enforces basic shape and selected consistency rules: ring-point norm versus radius, position/velocity with ring plane, a strict decrease in support-load magnitude, unique support angles, matching energy/momentum/inertial frames, coupling acceptance limit not exceeding the coupler's declared force capacity, and provenance for every populated value. These are **necessary contract checks, not sufficient physics checks**.
+The validator enforces basic shape and selected consistency rules: ring-point norm versus radius, position/velocity with ring plane, a strict decrease in support-load magnitude, unique support angles, matching energy/momentum/inertial frames, explicit from/to transform frames and epoch, term-inventory references for both conservation boundaries, coupling acceptance limit not exceeding the coupler's declared force capacity, and provenance for every populated value. It rejects test_fixture and rejected evidence provenance. These are **necessary contract checks, not sufficient physics checks**.
 
 A valid physical model will need additional checked invariants: tangent velocity for a declared circular reference path; support-load locations consistent with the selected topology; force law and stiffness/damping using compatible coordinates; baseline equilibrium residuals; conservation residuals during the transient; and convergence with time/space discretization. Do not add a generic numerical tolerance without dimensional reasoning and a reference comparison.
 
