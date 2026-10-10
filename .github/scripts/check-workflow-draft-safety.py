@@ -168,9 +168,29 @@ def has_draft_guard(expression: str | None) -> bool:
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
-    if not any("ready_for_review" in line for line in pr_block):
+    # Inspect the actual event type list, not arbitrary occurrences in paths,
+    # comments, or unrelated values. Current repository workflows use an inline
+    # flow list; unsupported representations fail closed until explicitly handled.
+    type_lines = [line for line in pr_block if re.match(r"^    types:", line)]
+    if len(type_lines) != 1:
         raise SafetyError(
-            f"{path}: runner-capable pull_request workflow must include ready_for_review"
+            f"{path}: runner-capable pull_request workflow must declare exactly one "
+            "inline pull_request.types list including ready_for_review"
+        )
+    match = re.fullmatch(r"    types:\\s*\\[([^\\]]*)\\]\\s*(?:#.*)?", type_lines[0])
+    if match is None:
+        raise SafetyError(
+            f"{path}: pull_request.types must use the supported inline list form"
+        )
+    event_types = {
+        item.strip().strip("\\\"'").strip()
+        for item in match.group(1).split(",")
+        if item.strip()
+    }
+    if "ready_for_review" not in event_types:
+        raise SafetyError(
+            f"{path}: runner-capable pull_request workflow must include "
+            "ready_for_review in pull_request.types"
         )
 
 
@@ -298,6 +318,22 @@ jobs:
         pass
     else:
         raise AssertionError("runner workflow without ready_for_review was accepted")
+
+    # A path or comment containing the event token is not an event trigger.
+    disguised = safe.replace(
+        "types: [opened, synchronize, reopened, ready_for_review]",
+        "types: [opened, synchronize, reopened]\\n    paths:\\n      - ready_for_review.yml",
+    )
+    try:
+        validate_generic(
+            Path("disguised-ready.yml"),
+            disguised,
+            pull_request_block(disguised) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError("ready_for_review path text was mistaken for an event type")
 
     manual = """on:
   pull_request:
