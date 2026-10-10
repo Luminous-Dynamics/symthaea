@@ -195,7 +195,7 @@ The new `symthaea_engineering::screening_design` module creates an executable **
 
 Before schedule generation, the request must identify the preregistration and input snapshot, objective, primary hypothesis, analysis-plan ID, each factor's low/high values and evidence references, blocks, independent replicate counts, and one primary endpoint with a minimum practically meaningful difference. It also requires a declared bench-scale review approval tied to both the exact protocol ID and exact input-snapshot ID; this prevents accidentally reusing a review reference for a different declared design snapshot. Scenario-only review evidence is rejected. This gate only allows generation of a *bench-scale schedule*—it does not authorize equipment operation, a field trial, product release, or soil application. The current API checks the declared review status, non-scenario evidence class, evidence-ID presence, exact protocol ID, and exact input-snapshot ID, but does not authenticate or resolve the review record against an independent evidence service. Until that trust-plane integration exists, the caller's approval assertion remains an external input rather than a verified authorization.
 
-Each block contains every factorial treatment setting. Treatment runs are Fisher–Yates shuffled with a versioned SplitMix64 pseudo-random stream; the seed and algorithm ID are retained so the schedule is reproducible. Optional center-point controls can be disabled or set to 3–5 per block; when used, every factor is at its numerical midpoint and controls are placed deterministically, evenly across the block with controls at the beginning and end. That follows NIST's guidance that center points help monitor stability and curvature, but the control pattern does not replace a response-surface study.
+Each block contains every factorial treatment setting. Treatment runs and optional center-point controls are jointly Fisher–Yates shuffled with a versioned SplitMix64 pseudo-random stream; the seed and algorithm ID are retained so the schedule is reproducible. Center-point controls can be disabled or set to 3–5 per block; when used, every factor is at its numerical midpoint. Randomizing them together with treatment runs avoids always placing controls at the beginning and end, which could confound control status with time/order drift. Center points can help monitor stability and curvature, but do not replace a response-surface study.
 
 The generated schedule can be passed to a separate structural verifier that rechecks contiguous run order, unique IDs, complete treatment/replicate coverage per block, factor levels/units, and center-point placement without calling the generator. This guards against malformed or corrupted plan artifacts, but it runs in the same crate and does not independently authenticate the review record or prove that its source is trustworthy.
 
@@ -206,6 +206,23 @@ Methodological sources:
 - NIST/SEMATECH, [two-level full factorial designs](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3331.htm): a (2^k) design covers every combination of k factors at low/high levels.
 - NIST/SEMATECH, [blocking full factorial designs](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3333.htm): nuisance variation can be managed by blocks, with explicit attention to effects potentially confounded with blocking.
 - NIST/SEMATECH, [adding center points](https://itl.nist.gov/div898/handbook/pri/section3/pri337.htm): center points can assess process stability and curvature and should be distributed across the experiment.
+
+## Preliminary power planning
+
+The optional `symthaea-engineering::screening_power` module adds a first-pass power check for **main effects only**. It requires a residual standard-deviation estimate with the same unit as the predeclared primary endpoint, a named source context and method, evidence provenance, familywise alpha, and target power. Scenario-only variance inputs are rejected. The formula adjusts familywise alpha with Bonferroni over the (k) main effects and uses the factorial-contrast variance relationship
+
+[
+\operatorname{Var}(\widehat{\text{main effect}})=\frac{\sigma^2}{n\,2^{k-2}},
+]
+
+where (n) is the number of complete-factorial replicates (blocks multiplied by within-setting replicates). It estimates current power and required complete-factorial replications using a two-sided normal approximation.
+
+This is a **preliminary screen, not a claim of adequate power**. The computation treats the supplied residual SD as known; it does not calculate exact finite-sample noncentral-(t) power or uncertainty in the variance estimate, account for block-by-treatment interaction, evaluate interaction effects, include center points in the factorial contrast, or correct for secondary endpoints and post-hoc exploration. It assumes independent, balanced, common-variance errors and additive block effects. Use context-relevant pilot data and an appropriate statistical review before selecting replication or declaring a confirmatory trial adequately powered.
+
+Useful methodological sources:
+- NIST's [sample size guide](https://itl.nist.gov/div898/handbook/prc/section2/prc222.htm) explains that sample size depends on alpha, beta/power, effect size and standard deviation; it warns that a standard-deviation assumption is required.
+- Penn State STAT 503 derives the two-level factorial main-effect variance relationship and explains how replication and blocking alter the error term: [factorial effects and variance](https://online.stat.psu.edu/stat503/Lesson06) and [blocking in replicated factorial designs](https://online.stat.psu.edu/stat503/Lesson07).
+- USDA-ARS guidance describes power analysis as depending on effect magnitude, error variance, alpha and beta: [Power and replication](https://www.ars.usda.gov/ARSUserFiles/3122/PirkEtAl2013.pdf).
 
 ## Evidence update and implications for the model
 
