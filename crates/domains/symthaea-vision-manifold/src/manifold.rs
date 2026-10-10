@@ -1982,6 +1982,16 @@ impl VisionManifold {
         path
     }
 
+    /// Check whether this manifold can account for the requested path cost before
+    /// any search work begins. The cumulative counter is diagnostic and may have
+    /// reached a non-finite value independently of the caller's service-level load.
+    pub fn can_compute_geodesic(&self, steps: usize, num_candidates: usize) -> bool {
+        if steps == 0 || num_candidates == 0 {
+            return true;
+        }
+        checked_geodesic_cost_increment(steps, num_candidates, self.geodesic_compute_cost).is_some()
+    }
+
     /// Select the best geodesic path using Expected Free Energy (G).
     ///
     /// Generates multiple candidate paths via different interpolation strategies
