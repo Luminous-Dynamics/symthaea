@@ -4,7 +4,7 @@
 //! Bounded 12-run Plackett–Burman main-effect screening.
 //!
 //! This design family reduces the treatment matrix from 2^k full-factorial combinations to
-//! 12 rows for 2–11 factors. It is a screening proposal only: main effects can be confounded
+//! 12 rows for 5–11 factors, where screening savings are meaningful and factor selection is the goal. It is a screening proposal only: main effects can be confounded
 //! with two-factor interactions, so do not use it when those interactions may be material.
 //! It deliberately has its own verifier and descriptive main-effect analysis; the full-factorial
 //! analysis and power formula must not be applied to these rows.
@@ -22,7 +22,7 @@ use crate::screening_design::{
 };
 
 const ALGORITHM_ID: &str = "plackett-burman-12-run-main-effects-splitmix64-fy-centerpoints-v1";
-const MIN_FACTORS: usize = 2;
+const MIN_FACTORS: usize = 5;
 const MAX_FACTORS: usize = 11;
 const MIN_BLOCKS: usize = 1;
 const MAX_BLOCKS: usize = 8;
@@ -73,7 +73,7 @@ impl PlackettBurmanDesignRequest {
         if !(MIN_FACTORS..=MAX_FACTORS).contains(&self.factors.len()) {
             return Err(ScreeningDesignError::new(
                 "factors",
-                "12-run Plackett–Burman screening supports 2 to 11 quantitative factors",
+                "12-run Plackett–Burman screening is reserved for 5 to 11 quantitative factors; use a full factorial for smaller factor sets",
             ));
         }
         let mut factor_ids = HashSet::new();
@@ -1152,11 +1152,12 @@ mod tests {
 
     #[test]
     fn full_factorial_run_growth_is_reduced_by_bounded_pb_matrix() {
-        let small = generate_plackett_burman_design(&request(2, 0)).unwrap();
+        let small = generate_plackett_burman_design(&request(5, 0)).unwrap();
         let large = generate_plackett_burman_design(&request(11, 0)).unwrap();
         assert_eq!(small.treatment_run_count, 24);
         assert_eq!(large.treatment_run_count, 24);
         assert_eq!(large.total_planned_run_count, 24);
+        assert_eq!(1_usize << 5, 32);
         assert_eq!(1_usize << 11, 2_048);
         assert!(verify_plackett_burman_design(&large).is_ok());
 
@@ -1222,11 +1223,11 @@ mod tests {
 
     #[test]
     fn descriptive_analysis_recovers_additive_main_effects() {
-        let plan = generate_plackett_burman_design(&request(4, 0)).unwrap();
+        let plan = generate_plackett_burman_design(&request(5, 0)).unwrap();
         let observations = observations_for(&plan, false);
         let result = analyze_plackett_burman_responses(&plan, &observations).unwrap();
 
-        assert_eq!(result.main_effects.len(), 4);
+        assert_eq!(result.main_effects.len(), 5);
         for effect in result.main_effects {
             assert!(
                 (effect.effect_estimate - 5.0).abs() < 1e-9,
@@ -1237,8 +1238,13 @@ mod tests {
     }
 
     #[test]
+    fn smaller_factor_sets_should_use_full_factorial() {
+        assert!(generate_plackett_burman_design(&request(4, 0)).is_err());
+    }
+
+    #[test]
     fn missing_and_scenario_responses_fail_closed() {
-        let plan = generate_plackett_burman_design(&request(3, 0)).unwrap();
+        let plan = generate_plackett_burman_design(&request(5, 0)).unwrap();
         assert!(analyze_plackett_burman_responses(&plan, &[]).is_err());
 
         let scenario_observations = observations_for(&plan, true);
@@ -1246,7 +1252,7 @@ mod tests {
             analyze_plackett_burman_responses(&plan, &scenario_observations).is_err()
         );
 
-        let mut unapproved = request(3, 0);
+        let mut unapproved = request(5, 0);
         unapproved.bench_scale_review.status = BenchScaleReviewStatus::Unknown;
         let unapproved_digest = plackett_burman_design_sha256(&unapproved).unwrap();
         unapproved.bench_scale_review.reviewed_design_sha256 = unapproved_digest;
