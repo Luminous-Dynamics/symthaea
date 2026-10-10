@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Validated first-order ultrasound design calculations for research use.
+//! Input-checked first-order ultrasound design calculations for research use.
 //!
 //! These functions estimate physical quantities and check a necessary sampling
 //! condition. They do not model a complete transducer, tissue propagation,
@@ -128,26 +128,29 @@ pub struct SamplingPlanAssessment {
     pub proposed_sample_rate_hz: f64,
     /// True iff the proposed rate is at least the mathematical Nyquist minimum.
     pub nyquist_condition_satisfied: bool,
-    /// True iff a non-empty reference to separately reviewed anti-alias evidence was supplied.
-    /// This module does not inspect or verify the referenced evidence.
+    /// True iff a non-empty reference string was supplied.
+    /// This does NOT establish that the artifact exists, was reviewed, or applies to this chain.
     pub anti_alias_evidence_reference_supplied: bool,
 }
 
 impl SamplingPlanAssessment {
-    /// Returns true only when both minimum checks pass.
+    /// Returns true when the mathematical Nyquist condition holds and a non-empty
+    /// evidence-reference string was supplied.
     ///
-    /// Passing is not a hardware-safety or medical-device validation claim.
+    /// This method does not resolve or verify the referenced artifact and says nothing
+    /// about filter quality, the real acquisition chain, sampling margin, or device safety.
     pub fn passes_minimum_checks(&self) -> bool {
         self.nyquist_condition_satisfied && self.anti_alias_evidence_reference_supplied
     }
 }
 
 /// Check a proposed sampling rate against a simple Nyquist condition and the
-/// presence of a separately reviewed anti-alias evidence reference.
+/// presence of a caller-supplied anti-alias evidence reference identifier.
 ///
-/// Evidence is represented by a reference identifier, not trusted as true by
-/// this function. A production workflow must resolve and independently review
-/// that evidence and establish adequate margin for the actual acquisition chain.
+/// The reference is not trusted as true by this function: it does not resolve
+/// the identifier or verify the artifact. A production workflow must resolve
+/// and independently review the evidence and establish adequate margin for the
+/// actual acquisition chain.
 pub fn assess_sampling_plan(
     proposed_sample_rate_hz: f64,
     highest_signal_frequency_hz: f64,
