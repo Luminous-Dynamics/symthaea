@@ -125,24 +125,52 @@ impl CognitiveLoopService {
 
         #[cfg(feature = "swarm")]
         {
-            // Admission must happen before dilation or path search. Lifetime manifold
-            // telemetry is not a per-request budget and must never gate this request.
-            let estimate = estimate_imagination_work(0, steps, 4)
+            // Inspect peer/local shape and reserve the one-time dilation budget before
+            // any manifold mutation. HDC bundling requires identical dimensions.
+            let peer_dim = peer_msg.consciousness_hv.dim();
+            let peer_intent_dim = peer_msg.intent_hv.dim();
+            let local_dim = bridge.manifold().hdc_dim();
+            if peer_dim == 0 || peer_intent_dim != peer_dim {
+                return Err(ImagineFutureError::NoGeodesic);
+            }
+
+            let dilation_target_dim =
+                symthaea_core::hdc::HdcDimensionality::Ultra.dimension();
+            let needs_dilation = peer_dim > local_dim;
+            let compatible_target_dim = if needs_dilation {
+                dilation_target_dim
+            } else {
+                local_dim
+            };
+            if peer_dim != compatible_target_dim {
+                // Do not bundle mismatched vectors or request a resolution the
+                // manifold cannot represent exactly.
+                return Err(ImagineFutureError::NoGeodesic);
+            }
+
+            let mut estimate = estimate_imagination_work(0, steps, 4)
                 .ok_or(ImagineFutureError::ThermodynamicOverload(f32::INFINITY))?;
+            if needs_dilation {
+                estimate.dilation = 0.08;
+            }
             preflight_imagination_work(self.thermodynamic_load, estimate)
                 .map_err(ImagineFutureError::ThermodynamicOverload)?;
 
             let manifold = bridge.manifold_mut();
 
-            // 2. Auto-dilate if peer is at higher resolution (Phase 3 optimization)
-            let peer_dim = peer_msg.consciousness_hv.values.len();
-            if peer_dim > manifold.hdc_dim() {
+            // Dilation is performed only after budget admission. Charge its one-time
+            // estimated cost after the operation, including an unsuccessful attempt.
+            if needs_dilation {
                 tracing::info!(
                     peer_dim,
-                    local_dim = manifold.hdc_dim(),
+                    local_dim,
                     "Collaborative Dreaming: Dilating to match peer resolution"
                 );
                 manifold.dilate(symthaea_core::hdc::HdcDimensionality::Ultra);
+                self.thermodynamic_load += estimate.dilation;
+                if manifold.hdc_dim() != peer_dim {
+                    return Err(ImagineFutureError::NoGeodesic);
+                }
             }
             // 3. Co-opt the manifold: Bundle peer consciousness into local state            // This effectively projects the "Self" into the "Other's" perspective.
             let mut collaborative_start = manifold.state().clone();
