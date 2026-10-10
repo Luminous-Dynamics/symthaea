@@ -179,16 +179,19 @@ impl AsciiRawfile {
             }
 
             let line_number = values_header + 2 + offset;
-            let indented = raw_line
-                .chars()
-                .next()
-                .is_some_and(char::is_whitespace);
             let fields: Vec<&str> = raw_line.split_whitespace().collect();
             if fields.is_empty() {
                 continue;
             }
 
-            if !indented {
+            // ngspice's native writer prefixes point indices with whitespace
+            // too, then emits one scientific-notation value per line. Detect
+            // a new point by the declared value count, not indentation.
+            let starts_new_point = current_point
+                .as_ref()
+                .is_none_or(|point| point.len() == variable_count);
+
+            if starts_new_point {
                 finish_point(
                     &mut points,
                     &mut current_point,
@@ -203,7 +206,7 @@ impl AsciiRawfile {
 
                 let point_index = fields[0].parse::<usize>().map_err(|_| {
                     RawfileError(format!(
-                        "expected an unindented point index at line {line_number}"
+                        "expected a point index at line {line_number}"
                     ))
                 })?;
                 if point_index != points.len() {
@@ -221,11 +224,7 @@ impl AsciiRawfile {
                     )?;
                 }
             } else {
-                let point = current_point.as_mut().ok_or_else(|| {
-                    RawfileError(format!(
-                        "continuation values appear before the first point at line {line_number}"
-                    ))
-                })?;
+                let point = current_point.as_mut().expect("incomplete point exists");
                 for field in &fields {
                     push_finite_value(point, field, line_number)?;
                 }
