@@ -127,7 +127,7 @@ impl ReviewTrustStore {
     /// validity/revocation windows, public keys, and sequence are signed together.
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"SYMRTRS1\\0");
+        bytes.extend_from_slice(b"SYMRTRS1\0");
         append_len_prefixed(&mut bytes, REVIEW_TRUST_STORE_SCHEMA.as_bytes());
         bytes.extend_from_slice(&self.sequence.to_le_bytes());
         bytes.extend_from_slice(&self.issued_at_unix_s.to_le_bytes());
@@ -350,7 +350,7 @@ impl SignedCalibrationReviewReceipt {
 }
 
 /// Signed canonical trust-store snapshot.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct SignedReviewTrustStoreSnapshot {
     trust_store: ReviewTrustStore,
     signature: [u8; 64],
@@ -366,7 +366,7 @@ impl SignedReviewTrustStoreSnapshot {
 
     /// Canonical domain-separated bytes an authority signs out of process.
     pub fn signing_message(trust_store: &ReviewTrustStore) -> Vec<u8> {
-        let mut message = b"symthaea.calibration-review-trust-signature.v1\\0".to_vec();
+        let mut message = b"symthaea.calibration-review-trust-signature.v1\0".to_vec();
         message.extend_from_slice(&trust_store.canonical_bytes());
         message
     }
@@ -412,7 +412,7 @@ impl VerifiedReviewTrustStore {
     /// Bind both the snapshot contents and the authority that authenticated them.
     pub fn canonical_digest(&self) -> String {
         let mut bytes =
-            b"symthaea.calibration-review-verified-trust.v1\\0".to_vec();
+            b"symthaea.calibration-review-verified-trust.v1\0".to_vec();
         bytes.extend_from_slice(&self.trust_store.canonical_bytes());
         bytes.extend_from_slice(self.authority_key_sha256.as_bytes());
         crate::sha256_hex(&bytes)
@@ -706,6 +706,23 @@ mod tests {
         .unwrap()
     }
 
+    fn authority_signing_key() -> SigningKey {
+        SigningKey::from_bytes(&[0x24; 32])
+    }
+
+    fn verified_trust_store_from(store: ReviewTrustStore) -> VerifiedReviewTrustStore {
+        let authority = authority_signing_key();
+        let message = SignedReviewTrustStoreSnapshot::signing_message(&store);
+        let signature = authority.sign(&message).to_bytes();
+        SignedReviewTrustStoreSnapshot::new(store, signature)
+            .verify(&authority.verifying_key())
+            .unwrap()
+    }
+
+    fn verified_trust_store() -> VerifiedReviewTrustStore {
+        verified_trust_store_from(trust_store())
+    }
+
     fn signed_receipt() -> SignedCalibrationReviewReceipt {
         let payload = CalibrationReviewPayload::new(
             "reviewer-a",
@@ -729,6 +746,69 @@ mod tests {
             bytes,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn signed_trust_snapshot_authenticates_canonical_key_lifecycle_state() {
+        let store = trust_store();
+        let authority = authority_signing_key();
+        let signature = authority
+            .sign(&SignedReviewTrustStoreSnapshot::signing_message(&store))
+            .to_bytes();
+        let verified = SignedReviewTrustStoreSnapshot::new(store.clone(), signature)
+            .verify(&authority.verifying_key())
+            .unwrap();
+
+        assert_eq!(verified.sequence(), TRUST_SEQUENCE);
+        assert_eq!(
+            verified.authority_key_sha256(),
+            crate::sha256_hex(authority.verifying_key().as_bytes())
+        );
+        assert_eq!(
+            verified.trust_store().canonical_digest(),
+            store.canonical_digest()
+        );
+    }
+
+    #[test]
+    fn signed_trust_snapshot_rejects_tampering_or_wrong_authority() {
+        let store = trust_store();
+        let authority = authority_signing_key();
+        let signature = authority
+            .sign(&SignedReviewTrustStoreSnapshot::signing_message(&store))
+            .to_bytes();
+        let other_authority = SigningKey::from_bytes(&[0x25; 32]);
+        assert_eq!(
+            SignedReviewTrustStoreSnapshot::new(store.clone(), signature)
+                .verify(&other_authority.verifying_key())
+                .unwrap_err(),
+            ReviewVerificationError::InvalidTrustSnapshotSignature
+        );
+
+        let replacement = ReviewTrustStore::new(
+            TRUST_SEQUENCE,
+            NOW - 10,
+            NOW + 100,
+            vec![
+                ReviewTrustKey::new(
+                    "reviewer-b",
+                    SigningKey::from_bytes(&[0x43; 32])
+                        .verifying_key()
+                        .to_bytes(),
+                    NOW - 100,
+                    Some(NOW + 500),
+                    None,
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            SignedReviewTrustStoreSnapshot::new(replacement, signature)
+                .verify(&authority.verifying_key())
+                .unwrap_err(),
+            ReviewVerificationError::InvalidTrustSnapshotSignature
+        );
     }
 
     #[test]
@@ -920,23 +1000,25 @@ mod tests {
 
     #[test]
     fn trust_store_guard_allows_idempotent_rechecks_and_monotonic_advance() {
-        let initial = trust_store();
-        let advanced = ReviewTrustStore::new(
-            TRUST_SEQUENCE + 1,
-            NOW - 10,
-            NOW + 200,
-            vec![
-                ReviewTrustKey::new(
-                    "reviewer-a",
-                    signing_key().verifying_key().to_bytes(),
-                    NOW - 100,
-                    Some(NOW + 500),
-                    None,
-                )
-                .unwrap(),
-            ],
-        )
-        .unwrap();
+        let initial = verified_trust_store();
+        let advanced = verified_trust_store_from(
+            ReviewTrustStore::new(
+                TRUST_SEQUENCE + 1,
+                NOW - 10,
+                NOW + 200,
+                vec![
+                    ReviewTrustKey::new(
+                        "reviewer-a",
+                        signing_key().verifying_key().to_bytes(),
+                        NOW - 100,
+                        Some(NOW + 500),
+                        None,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap(),
+        );
         let mut guard = ReviewTrustStoreGuard::default();
 
         guard.check_candidate(&initial, NOW).unwrap();
@@ -950,28 +1032,30 @@ mod tests {
 
     #[test]
     fn trust_store_guard_rejects_sequence_rollback() {
-        let newer = ReviewTrustStore::new(
-            TRUST_SEQUENCE + 1,
-            NOW - 10,
-            NOW + 200,
-            vec![
-                ReviewTrustKey::new(
-                    "reviewer-a",
-                    signing_key().verifying_key().to_bytes(),
-                    NOW - 100,
-                    Some(NOW + 500),
-                    None,
-                )
-                .unwrap(),
-            ],
-        )
-        .unwrap();
+        let newer = verified_trust_store_from(
+            ReviewTrustStore::new(
+                TRUST_SEQUENCE + 1,
+                NOW - 10,
+                NOW + 200,
+                vec![
+                    ReviewTrustKey::new(
+                        "reviewer-a",
+                        signing_key().verifying_key().to_bytes(),
+                        NOW - 100,
+                        Some(NOW + 500),
+                        None,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap(),
+        );
         let mut guard = ReviewTrustStoreGuard::default();
         guard.check_candidate(&newer, NOW).unwrap();
         guard.record_verified(&newer);
 
         assert_eq!(
-            guard.check_candidate(&trust_store(), NOW),
+            guard.check_candidate(&verified_trust_store(), NOW),
             Err(ReviewVerificationError::TrustSnapshotRollback {
                 highest_sequence: TRUST_SEQUENCE + 1,
                 received_sequence: TRUST_SEQUENCE,
@@ -981,22 +1065,24 @@ mod tests {
 
     #[test]
     fn authenticated_checkpoint_restores_rollback_high_water_mark() {
-        let newer = ReviewTrustStore::new(
-            TRUST_SEQUENCE + 1,
-            NOW - 10,
-            NOW + 200,
-            vec![
-                ReviewTrustKey::new(
-                    "reviewer-a",
-                    signing_key().verifying_key().to_bytes(),
-                    NOW - 100,
-                    Some(NOW + 500),
-                    None,
-                )
-                .unwrap(),
-            ],
-        )
-        .unwrap();
+        let newer = verified_trust_store_from(
+            ReviewTrustStore::new(
+                TRUST_SEQUENCE + 1,
+                NOW - 10,
+                NOW + 200,
+                vec![
+                    ReviewTrustKey::new(
+                        "reviewer-a",
+                        signing_key().verifying_key().to_bytes(),
+                        NOW - 100,
+                        Some(NOW + 500),
+                        None,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap(),
+        );
         let mut guard = ReviewTrustStoreGuard::default();
         guard.check_candidate(&newer, NOW).unwrap();
         guard.record_verified(&newer);
@@ -1006,7 +1092,7 @@ mod tests {
 
         let mut restored = ReviewTrustStoreGuard::from_checkpoint(sequence, digest).unwrap();
         assert_eq!(
-            restored.check_candidate(&trust_store(), NOW),
+            restored.check_candidate(&verified_trust_store(), NOW),
             Err(ReviewVerificationError::TrustSnapshotRollback {
                 highest_sequence: TRUST_SEQUENCE + 1,
                 received_sequence: TRUST_SEQUENCE,
@@ -1024,27 +1110,30 @@ mod tests {
 
     #[test]
     fn trust_store_guard_rejects_different_contents_at_the_same_sequence() {
-        let replacement = ReviewTrustStore::new(
-            TRUST_SEQUENCE,
-            NOW - 10,
-            NOW + 100,
-            vec![
-                ReviewTrustKey::new(
-                    "reviewer-b",
-                    SigningKey::from_bytes(&[0x43; 32])
-                        .verifying_key()
-                        .to_bytes(),
-                    NOW - 100,
-                    Some(NOW + 500),
-                    None,
-                )
-                .unwrap(),
-            ],
-        )
-        .unwrap();
+        let replacement = verified_trust_store_from(
+            ReviewTrustStore::new(
+                TRUST_SEQUENCE,
+                NOW - 10,
+                NOW + 100,
+                vec![
+                    ReviewTrustKey::new(
+                        "reviewer-b",
+                        SigningKey::from_bytes(&[0x43; 32])
+                            .verifying_key()
+                            .to_bytes(),
+                        NOW - 100,
+                        Some(NOW + 500),
+                        None,
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap(),
+        );
+        let initial = verified_trust_store();
         let mut guard = ReviewTrustStoreGuard::default();
-        guard.check_candidate(&trust_store(), NOW).unwrap();
-        guard.record_verified(&trust_store());
+        guard.check_candidate(&initial, NOW).unwrap();
+        guard.record_verified(&initial);
 
         assert_eq!(
             guard.check_candidate(&replacement, NOW),
@@ -1058,7 +1147,9 @@ mod tests {
     fn trust_snapshot_and_receipt_expiration_are_enforced() {
         let receipt = signed_receipt();
         assert_eq!(
-            trust_store().verify(&receipt, "calibration-record-1", &certificate(), NOW + 100),
+            verified_trust_store()
+                .trust_store()
+                .verify(&receipt, "calibration-record-1", &certificate(), NOW + 100),
             Err(ReviewVerificationError::TrustSnapshotStale)
         );
         assert_eq!(
@@ -1107,7 +1198,7 @@ mod tests {
         assert_eq!(
             VerifiedCalibrationReviewReceipt::verify(
                 artifact,
-                &trust_store(),
+                &verified_trust_store(),
                 &mut ReviewTrustStoreGuard::default(),
                 "calibration-record-1",
                 &certificate(),
