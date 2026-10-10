@@ -35,7 +35,7 @@ From the repository root:
 python3 scripts/engineering/orbital_ring_reference_check.py
 ```
 
-This standard-library Python implementation checks the documented orbit fixtures and Rust numeric anchors, algebraic consistency relations, and a hand-checkable inertial circular-stream limit. It emits deterministic JSON and exits nonzero on failure. The current recorded local run passed 47/47 checks with byte-identical output on repeat. This is arithmetic/limiting-case evidence only; it does not compile or test this Rust crate, compare against an external astrodynamics solver, validate moving-support physics, or prove ring equilibrium.
+This standard-library Python implementation checks the documented orbit fixtures and Rust numeric anchors, algebraic consistency relations, and a hand-checkable inertial circular-stream limit. It emits deterministic JSON and exits nonzero on failure. The current recorded local run passed 47/47 checks with byte-identical output on repeat. This is arithmetic/limiting-case evidence only; it does not compile or test this Rust crate, compare against an external astrodynamics solver, validate moving-support physics, or prove ring equilibrium. See the [control-volume derivation note](../../../docs/engineering/ORBITAL_RING_CONTROL_VOLUME_NOTE.md) for the equation boundary and the inputs that must be frozen before a coupled model is implemented.
 
 ## Next steps
 
