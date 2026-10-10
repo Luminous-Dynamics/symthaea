@@ -244,3 +244,159 @@ body {
     opacity: 0.5;
     cursor: default;
 }
+
+
+/* Keep semantic announcements available to assistive technology without
+ * turning the visual habitat into a stream of implementation details. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Keyboard users should always be able to see where interaction is. */
+.gateway-row input:focus-visible,
+.composer input:focus-visible,
+.composer button:focus-visible,
+.timeline-pause:focus-visible {
+    outline: 2px solid #9a90ff;
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .orb {
+        animation: none;
+    }
+
+    .orb,
+    .turn,
+    .projection-pane {
+        transition: none !important;
+    }
+}
+
+
+/* Semantic history is a quiet event stream, not a telemetry dashboard. */
+.cognitive-timeline {
+    margin: 1.5rem 0;
+    padding: 0.9rem 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.timeline-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.timeline-header > div:first-child {
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+}
+
+.timeline-state {
+    font-size: 0.68rem;
+    opacity: 0.4;
+}
+
+.timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.timeline-pause {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.timeline-pause:hover {
+    border-color: rgba(255,255,255,0.28);
+}
+
+.timeline-header h2 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    opacity: 0.7;
+}
+
+.timeline-count {
+    font-size: 0.72rem;
+    opacity: 0.45;
+}
+
+.timeline-list {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.65rem;
+}
+
+.timeline-event {
+    display: grid;
+    grid-template-columns: minmax(8rem, auto) auto auto 1fr;
+    align-items: baseline;
+    gap: 0.7rem;
+    padding: 0.35rem 0;
+    font-size: 0.78rem;
+}
+
+.timeline-kind {
+    opacity: 0.85;
+}
+
+.timeline-cycle,
+.timeline-basis,
+.timeline-evidence {
+    opacity: 0.45;
+}
+
+.timeline-basis {
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+}
+
+.timeline-evidence {
+    justify-self: end;
+}
+
+.timeline-empty {
+    margin: 0.4rem 0 0;
+    font-size: 0.78rem;
+    opacity: 0.45;
+}
+
+@media (max-width: 600px) {
+    .timeline-event {
+        grid-template-columns: 1fr auto;
+    }
+
+    .timeline-basis,
+    .timeline-evidence {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-event {
+        transition: none !important;
+    }
+}
