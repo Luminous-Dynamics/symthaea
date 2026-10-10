@@ -411,6 +411,9 @@ impl CognitiveLoopService {
 
             #[cfg(feature = "vision-manifold")]
             if integrated.has_flag(output_flags::REQUEST_GEODESIC) {
+                // A request owns its output: clear any stale movie so a rejected
+                // search cannot appear as the result of the current request.
+                feedback.mental_movie = None;
                 self.carryover.quality.last_request_geodesic = true;
                 if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
                     use super::imagination::{
@@ -481,23 +484,39 @@ impl CognitiveLoopService {
                                     let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
                                     let frames = manifold.decode_geodesic_to_frames_improved(&path);
                                     if !frames.is_empty() {
+                                        let path_length = path.len();
                                         feedback.mental_movie =
                                             Some(crate::cognitive_loop::types::MentalMovie {
                                                 frames,
                                                 width: self.config.vision_frame_width,
                                                 height: self.config.vision_frame_height,
                                                 channels: manifold.last_frame_channels(),
-                                                path_length: path.len(),
+                                                path_length,
                                                 // Legacy field name: local continuity proxy, not semantics.
                                                 semantic_coherence: trajectory_coherence,
                                                 trajectory_continuity,
                                                 trajectory: path,
                                             });
+                                        tracing::info!(
+                                            cycle = self.stats.total_cycles,
+                                            goal_source,
+                                            path_length,
+                                            "Subsystem REQUEST_GEODESIC: model-grounded mental simulation completed"
+                                        );
                                     } else {
                                         self.carryover.quality.last_request_geodesic = false;
+                                        tracing::debug!(
+                                            cycle = self.stats.total_cycles,
+                                            path_length = path.len(),
+                                            "Subsystem REQUEST_GEODESIC: decoder returned no frames"
+                                        );
                                     }
                                 } else {
                                     self.carryover.quality.last_request_geodesic = false;
+                                    tracing::debug!(
+                                        cycle = self.stats.total_cycles,
+                                        "Subsystem REQUEST_GEODESIC: search returned no path"
+                                    );
                                 }
                             } else {
                                 self.carryover.quality.last_request_geodesic = false;
@@ -516,15 +535,7 @@ impl CognitiveLoopService {
                                 "Subsystem REQUEST_GEODESIC: no valid remembered or rollout target"
                             );
                         }
-                        tracing::info!(
-                            cycle = self.stats.total_cycles,
-                            goal_source,
-                            path_length = feedback
-                                .mental_movie
-                                .as_ref()
-                                .map_or(0, |movie| movie.path_length),
-                            "Subsystem REQUEST_GEODESIC: model-grounded mental simulation completed"
-                        );
+
                     } else {
                         // Budget rejection must precede rollout/search and leave load and
                         // manifold state untouched. Clear the flag so a prior path is not
