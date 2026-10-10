@@ -289,14 +289,16 @@ def monthly_mean_daylight_hours_noaa(
 ) -> tuple[float, ...]:
     """Average the pinned daylight estimate by calendar month over an inclusive period.
 
-    Returns January through December. Every month must occur at least once in the
-    requested period; this prevents a partial-window mean from masquerading as
-    a complete twelve-month seasonal profile.
+    Returns January through December. The inclusive period must start on January 1
+    and end on December 31 (possibly spanning multiple complete years); partial
+    boundary months are rejected rather than mislabeled as calendar-month means.
     """
     start = _iso_date("period_start", period_start)
     end = _iso_date("period_end", period_end)
     if end < start:
         raise ValueError("period_end must not precede period_start")
+    if (start.month, start.day) != (1, 1) or (end.month, end.day) != (12, 31):
+        raise ValueError("period must cover complete calendar years for monthly averages")
 
     totals = [0.0] * 12
     counts = [0] * 12
