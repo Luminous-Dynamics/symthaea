@@ -104,6 +104,13 @@ class PublicCyberCrucibleContractTests(unittest.TestCase):
         self.assertFalse(
             VERDICT.is_correct_and_secure("pass", "pass", "real", ["E1", "E2"], checks)
         )
+
+    def test_unhashable_malformed_evidence_status_fails_closed(self):
+        checks = self.valid_checks()
+        checks[0]["status"] = []
+        self.assertFalse(
+            VERDICT.is_correct_and_secure("pass", "pass", "real", ["E1", "E2"], checks)
+        )
     @classmethod
     def setUpClass(cls) -> None:
         cls.manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
