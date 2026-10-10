@@ -390,7 +390,12 @@ mod tests {
         }
     }
 
-    fn variation(lower: f64, upper: f64, kind: EvidenceKind, unit: &str) -> ResidualVariationEstimate {
+    fn variation(
+        lower: f64,
+        upper: f64,
+        kind: EvidenceKind,
+        unit: &str,
+    ) -> ResidualVariationEstimate {
         ResidualVariationEstimate {
             residual_standard_deviation_lower_bound: lower,
             residual_standard_deviation_upper_bound: upper,
@@ -416,6 +421,8 @@ mod tests {
         assert!(result.projected_power_normal_approx >= 0.80);
         assert_eq!(result.status, ScreeningPowerStatus::ProjectedTargetMet);
         assert_eq!(result.bonferroni_alpha_per_main_effect, 0.025);
+        assert_eq!(result.residual_standard_deviation_lower_bound, 0.008);
+        assert_eq!(result.residual_standard_deviation_upper_bound_used, 0.01);
         assert!(result
             .scope_note
             .contains("not exact finite-sample power"));
@@ -426,7 +433,7 @@ mod tests {
         let input = request();
         let low = assess_screening_power(
             &input,
-            &variation(0.01, EvidenceKind::Measured, &input.primary_endpoint.unit),
+            &variation(0.008, 0.01, EvidenceKind::Measured, &input.primary_endpoint.unit),
             0.05,
             0.80,
         )
@@ -471,7 +478,7 @@ mod tests {
     #[test]
     fn alpha_power_and_variance_inputs_fail_closed() {
         let input = request();
-        let sd = variation(0.01, EvidenceKind::Measured, &input.primary_endpoint.unit);
+        let sd = variation(0.008, 0.01, EvidenceKind::Measured, &input.primary_endpoint.unit);
         assert!(assess_screening_power(&input, &sd, 0.0, 0.80).is_err());
         assert!(assess_screening_power(&input, &sd, 0.05, 1.0).is_err());
         assert!(assess_screening_power(
