@@ -147,9 +147,10 @@ The target process is not 'maximum biochar yield'. It is a constrained multi-obj
 - an explicitly limited sensible-heat + water vaporization duty estimate with all property inputs visible;
 - separate nutrient-stream elemental mass, recovered mass, and seasonally available mass calculations;
 - rejection of NaN/infinite, negative, out-of-range, overflow and physically inconsistent carbon inputs;
-- tests for mass/carbon balances, thermal duty, sub-zero ambient temperature, invalid inputs, nutrient recovery bounds, and serialization.
+- typed evidence references for feedstock data, empirical process parameters, thermophysical properties, reactor design, stream composition, recovery parameters and plant-availability parameters; result objects retain these references;
+- tests for mass/carbon balances, thermal duty, sub-zero ambient temperature, invalid/missing evidence, nutrient recovery bounds, and serialization.
 
-The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The module has not been claimed as compile-verified until CI passes. Input provenance, units, evidence class and uncertainty must be associated with the persisted input record; the next increment should formalize those receipts and connect to the shared evidence plane.
+The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The module has not been claimed as compile-verified until CI passes. Evidence IDs currently link to caller-managed immutable records; next integration should store/check these references in Symthaea's shared evidence plane and require schema/version identifiers for each parameter group.
 
 ## Acceptance criteria for the next milestone
 
