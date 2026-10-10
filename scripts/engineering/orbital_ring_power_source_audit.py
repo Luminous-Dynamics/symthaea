@@ -24,6 +24,8 @@ TABLE8_ORBITAL_SC_LINE_MASS_KG_M = 1.2
 TABLE8_GEO_SC_MASS_PER_RING_KG = 8.8e7
 TABLE8_GEO_SC_LINE_MASS_KG_M = 2.0
 TABLE8_CRYO_HEAT_LOSS_PER_LENGTH_W_M = 10.0
+EARTH_EQUATORIAL_RADIUS_M = 6_378_137.0
+TABLE8_REFERENCE_ALTITUDE_M = 600_000.0
 
 
 def main():
@@ -35,6 +37,10 @@ def main():
     table8_geo_length_m = TABLE8_GEO_SC_MASS_PER_RING_KG / TABLE8_GEO_SC_LINE_MASS_KG_M
     table8_mean_length_m = 0.5 * (table8_orbital_length_m + table8_geo_length_m)
     table8_length_based_heat_load_w = TABLE8_CRYO_HEAT_LOSS_PER_LENGTH_W_M * table8_mean_length_m
+    table8_implied_radius_m = table8_mean_length_m / (2.0 * math.pi)
+    table8_implied_altitude_m = table8_implied_radius_m - EARTH_EQUATORIAL_RADIUS_M
+    reference_600km_circumference_m = 2.0 * math.pi * (EARTH_EQUATORIAL_RADIUS_M + TABLE8_REFERENCE_ALTITUDE_M)
+    length_difference_from_600km_fraction = abs(table8_mean_length_m - reference_600km_circumference_m) / reference_600km_circumference_m
     checks = []
 
     def record(check_id, passed, observed=None, expected=None, tolerance=None, note=None):
@@ -78,6 +84,11 @@ def main():
     record("table8.10w_per_m_reconstructs_500mw_total", abs(table8_length_based_heat_load_w - CRYO_PAIRS[1]["cold_side_heat_load_w"]) <= 0.15 * CRYO_PAIRS[1]["cold_side_heat_load_w"],
            table8_length_based_heat_load_w, CRYO_PAIRS[1]["cold_side_heat_load_w"], 0.15 * CRYO_PAIRS[1]["cold_side_heat_load_w"],
            "Uses the mean length implied by the table's total per-ring superconductor mass divided by its mass-per-length row.")
+    record("table8.implied_radius_positive_finite", math.isfinite(table8_implied_radius_m) and table8_implied_radius_m > 0, table8_implied_radius_m)
+    record("table8.implied_altitude_positive_finite", math.isfinite(table8_implied_altitude_m) and table8_implied_altitude_m > 0, table8_implied_altitude_m)
+    record("table8.mean_length_within_1pct_of_600km_circular_path", length_difference_from_600km_fraction <= 0.01,
+           length_difference_from_600km_fraction, 0.0, 0.01,
+           "Comparison benchmark only: 600 km is discussed as a representative ORS height in the paper; this does not prove the Table 8 design uses that exact altitude.")
     record("stored_energy_finite_positive", math.isfinite(stored_energy_j) and stored_energy_j > 0, stored_energy_j)
     record("stored_energy_reference_17_92_PJ", abs(stored_energy_j - 17.92e15) < 1.0,
            stored_energy_j, 17.92e15, 1.0,
@@ -114,6 +125,11 @@ def main():
             "cryogenic_heat_loss_per_length_w_m": TABLE8_CRYO_HEAT_LOSS_PER_LENGTH_W_M,
             "length_based_heat_load_w": table8_length_based_heat_load_w,
             "table_reported_total_heat_load_w": CRYO_PAIRS[1]["cold_side_heat_load_w"],
+            "equivalent_circular_radius_m": table8_implied_radius_m,
+            "equivalent_circular_altitude_m": table8_implied_altitude_m,
+            "earth_equatorial_radius_m_assumed_for_altitude": EARTH_EQUATORIAL_RADIUS_M,
+            "600km_reference_circular_path_length_m": reference_600km_circumference_m,
+            "relative_length_difference_from_600km_reference": length_difference_from_600km_fraction,
             "caveat": "Algebraic consistency with the table rows only; does not independently establish the actual geometry or explain the p. 483 100 MW estimate."
         },
         "conditional_stored_energy": {"mass_kg": ORS_MASS_KG, "speed_m_s": INERTIAL_SPEED_M_S,
