@@ -226,6 +226,14 @@ A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous
 
 
 The end-to-end numerical run is also wired as `.github/workflows/qc-numerical-diagnostic.yml`. It intentionally allows expected scientific discrepancies to make the diagnostic workflow fail, while uploading `/tmp/qc-native.json` and `/tmp/qc-comparison.json` as artifacts. This gives us the actual discrepancies to debug without turning report generation into a scientific pass.
+## 6-31G basis-function equivalence investigation (2026-10-10)
+
+Follow-up: [BASIS-CONFORM-001 issue #7332](https://github.com/Luminous-Dynamics/symthaea/issues/7332).
+
+The native provider explicitly uses custom segmented coefficients for its C/N/O inner-valence s contractions. A source-level comparison with the version-pinned [BSE 6-31G v1 data](https://www.basissetexchange.org/basis/6-31g/format/nwchem/?elements=1%2C6-8&version=1) shows materially different coefficient vectors. The native primitive path multiplies each primitive by its analytic normalization and the contracted function is then normalized by one common factor. Using this convention and the standard same-center primitive overlap formula, the native and BSE carbon inner 3-primitive s contractions have a normalized cross-overlap of approximately **0.97927**; the analogous oxygen s contraction is approximately **0.98142**. That indicates the vectors are not simply the same AO with a different overall normalization.
+
+This is a formula-level calculation from the checked-in coefficient tables, **not a live PySCF runtime result**. It does not by itself prove whether the custom contraction was intended as a different basis variant or is erroneous. The independent matrix gate in [PR #7323](https://github.com/Luminous-Dynamics/symthaea/pull/7323) should quantify the full AO overlap discrepancy on exact source heads. Do not blindly swap the coefficients; establish the precise BSE version and conversion convention first. The authoritative 6-31G family originates in Hehre, Ditchfield & Pople (1972), [J. Chem. Phys. 56, 2257–2261, DOI 10.1063/1.1677527](https://doi.org/10.1063/1.1677527).
+
 ## Checked Jacobi eigensolver and NumPy reference (2026-10-10)
 
 The next slice is proposed in [PR #7331](https://github.com/Luminous-Dynamics/symthaea/pull/7331), composing with [QC-EIGEN-001 issue #7325](https://github.com/Luminous-Dynamics/symthaea/issues/7325).
