@@ -37,7 +37,10 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::complex::{Complex, ComplexArithmeticEngine, HdcComplex};
-use crate::hdc::numeric_tower::{Number, NumberResult, NumericTower};
+use crate::hdc::numeric_tower::{
+    ArithmeticPrecision, Number, NumberResult, NumericArithmeticError, NumericArithmeticResult,
+    NumericTower,
+};
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 // ============================================================================
@@ -103,6 +106,17 @@ impl MathValue {
             MathValue::Rational { .. } => 2,
             MathValue::Real(_) => 3,
             MathValue::Complex { .. } => 4,
+        }
+    }
+
+    /// Check exact zero without applying the legacy floating-point tolerance.
+    pub fn is_zero_exact(&self) -> bool {
+        match self {
+            MathValue::Natural(n) => *n == 0,
+            MathValue::Integer(n) => *n == 0,
+            MathValue::Rational { numerator, denominator } => *denominator != 0 && *numerator == 0,
+            MathValue::Real(x) => *x == 0.0,
+            MathValue::Complex { re, im } => *re == 0.0 && *im == 0.0,
         }
     }
 
@@ -236,6 +250,15 @@ pub struct MathResult {
     pub phi: f64,
     /// Ordered list of domain promotions that occurred (e.g. "ℕ → ℤ").
     pub domain_promotions: Vec<String>,
+}
+
+/// Unified math result that preserves whether the computation was exact.
+#[derive(Debug, Clone)]
+pub struct CheckedMathResult {
+    /// The ordinary unified math result, including HDC encoding and promotions.
+    pub result: MathResult,
+    /// Exactness classification from the numeric tower, or Approximate for complex math.
+    pub precision: ArithmeticPrecision,
 }
 
 // ============================================================================
@@ -532,6 +555,106 @@ impl UnifiedMathEngine {
         Some(self.from_tower_result(&nr, a, b, "divide"))
     }
 
+    /// Shared checked binary operation, retaining exactness and rejecting invalid values.
+    fn checked_arithmetic(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+        op: &str,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(a)?;
+        Self::validate_checked_math_value(b)?;
+        if op == "divide" && b.is_zero_exact() {
+            return Err(NumericArithmeticError::DivisionByZero);
+        }
+
+        if Self::needs_complex(a, b) {
+            let ca = a.to_complex();
+            let cb = b.to_complex();
+            let complex_result = match op {
+                "add" => ca + cb,
+                "subtract" => ca - cb,
+                "multiply" => ca * cb,
+                "divide" => ca / cb,
+                _ => return Err(NumericArithmeticError::NonFiniteResult),
+            };
+            if !complex_result.re.is_finite() || !complex_result.im.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result(complex_result, a, b, op),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let na = a.to_tower_number();
+        let nb = b.to_tower_number();
+        let numeric_result: NumericArithmeticResult = match op {
+            "add" => self.tower.checked_add(&na, &nb),
+            "subtract" => self.tower.checked_subtract(&na, &nb),
+            "multiply" => self.tower.checked_multiply(&na, &nb),
+            "divide" => self.tower.checked_divide(&na, &nb),
+            _ => return Err(NumericArithmeticError::NonFiniteResult),
+        }?;
+
+        Ok(CheckedMathResult {
+            result: self.from_tower_result(&numeric_result.result, a, b, op),
+            precision: numeric_result.precision,
+        })
+    }
+
+    fn validate_checked_math_value(value: &MathValue) -> Result<(), NumericArithmeticError> {
+        match value {
+            MathValue::Rational { denominator: 0, .. } => {
+                Err(NumericArithmeticError::InvalidRationalOperand)
+            }
+            MathValue::Real(number) if !number.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteOperand)
+            }
+            MathValue::Complex { re, im } if !re.is_finite() || !im.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteOperand)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Checked addition. Unlike the compatibility API, this reports exactness and
+    /// rejects malformed rational and non-finite inputs with a typed error.
+    pub fn checked_add(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "add")
+    }
+
+    /// Checked subtraction. Exactness is preserved separately from MathResult.
+    pub fn checked_subtract(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "subtract")
+    }
+
+    /// Checked multiplication. Exactness is preserved separately from MathResult.
+    pub fn checked_multiply(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "multiply")
+    }
+
+    /// Checked division, rejecting exact zero and malformed/non-finite operands.
+    pub fn checked_divide(
+        &self,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        self.checked_arithmetic(a, b, "divide")
+    }
+
     /// Square root: sqrt(a).
     ///
     /// Negative reals and negative integers auto-promote to Complex:
@@ -630,6 +753,51 @@ mod tests {
     // ====================================================================
     // Domain labeling
     // ====================================================================
+
+    #[test]
+    fn test_checked_math_reports_exact_and_approximate_precision() {
+        let engine = UnifiedMathEngine::new();
+        let exact = engine
+            .checked_add(&MathValue::Natural(2), &MathValue::Natural(3))
+            .expect("valid exact sum");
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(5)));
+
+        let approximate = engine
+            .checked_add(&MathValue::Real(0.1), &MathValue::Real(0.2))
+            .expect("finite approximate sum");
+        assert_eq!(approximate.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(approximate.result.value, MathValue::Real(value) if value.is_finite()));
+    }
+
+    #[test]
+    fn test_checked_math_rejects_malformed_rational_and_non_finite_values() {
+        let engine = UnifiedMathEngine::new();
+        let malformed = MathValue::Rational { numerator: 1, denominator: 0 };
+        assert_eq!(
+            engine.checked_add(&malformed, &MathValue::Natural(1)).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            engine.checked_multiply(&MathValue::Real(f64::INFINITY), &MathValue::Natural(1)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_math_division_uses_exact_zero() {
+        let engine = UnifiedMathEngine::new();
+        assert_eq!(
+            engine.checked_divide(&MathValue::Natural(1), &MathValue::Real(0.0)).unwrap_err(),
+            NumericArithmeticError::DivisionByZero
+        );
+
+        let quotient = engine
+            .checked_divide(&MathValue::Natural(1), &MathValue::Real(1e-16))
+            .expect("small but nonzero divisor");
+        assert_eq!(quotient.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(quotient.result.value, MathValue::Real(value) if value.is_finite()));
+    }
 
     #[test]
     fn test_domain_labels() {
