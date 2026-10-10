@@ -1204,6 +1204,7 @@ impl VisionManifold {
         // Preserve training_triggered/training_loss set by observe_encoded
         let training_triggered = self.telemetry.training_triggered;
         let training_loss = self.telemetry.training_loss;
+        let last_geodesic_cost = self.telemetry.last_geodesic_cost;
         self.telemetry = VisionTelemetry {
             encode_time_us: encode_us,
             evolve_time_us: evolve_us,
@@ -1235,7 +1236,7 @@ impl VisionManifold {
                 .iter()
                 .map(|hv| hv.values.clone())
                 .collect(),
-            last_geodesic_cost: self.geodesic_compute_cost,
+            last_geodesic_cost,
             last_geodesic_length: self.last_geodesic.len(),
             last_fep_action: self.telemetry.last_fep_action.clone(),
         };
@@ -1395,6 +1396,7 @@ impl VisionManifold {
 
         let training_triggered = self.telemetry.training_triggered;
         let training_loss = self.telemetry.training_loss;
+        let last_geodesic_cost = self.telemetry.last_geodesic_cost;
         self.telemetry = VisionTelemetry {
             encode_time_us: 0,
             evolve_time_us: evolve_us,
@@ -1426,7 +1428,7 @@ impl VisionManifold {
                 .iter()
                 .map(|hv| hv.values.clone())
                 .collect(),
-            last_geodesic_cost: self.geodesic_compute_cost,
+            last_geodesic_cost,
             last_geodesic_length: self.last_geodesic.len(),
             last_fep_action: self.telemetry.last_fep_action.clone(),
         };
@@ -1599,7 +1601,6 @@ impl VisionManifold {
             .iter()
             .map(|hv| hv.values.clone())
             .collect();
-        self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
         self.telemetry.last_geodesic_length = self.last_geodesic.len();
 
         // Reset compute cost for next cycle
@@ -11202,5 +11203,27 @@ mod checked_geodesic_cost_tests {
         assert!(manifold.can_compute_geodesic(8, 3));
         manifold.geodesic_compute_cost = f32::MAX;
         assert!(!manifold.can_compute_geodesic(8, 3));
+    }
+
+    #[test]
+    fn observation_refresh_preserves_incremental_geodesic_cost() {
+        use super::ContinuousHV;
+
+        let mut manifold = VisionManifold::new(VisionConfig::default(), 16, 16);
+        let from = ContinuousHV::random(manifold.hdc_dim(), 0xC057_0001);
+        let goal = ContinuousHV::random(manifold.hdc_dim(), 0xC057_0002);
+        let path = manifold.find_geodesic(&from, &goal, 8);
+        assert_eq!(path.len(), 8);
+
+        let expected = 8.0 * 0.012;
+        assert!((manifold.telemetry.last_geodesic_cost - expected).abs() < 1e-6);
+
+        // Non-geodesic work belongs to the cycle counter, not the last-call field.
+        manifold.geodesic_compute_cost += 0.05;
+        manifold
+            .observe_frame_checked(&vec![23; 16 * 16], 16, 16, 1, 0.033)
+            .expect("valid observation");
+        assert!((manifold.telemetry.last_geodesic_cost - expected).abs() < 1e-6);
+        assert_eq!(manifold.geodesic_compute_cost, 0.0);
     }
 }
