@@ -1,0 +1,63 @@
+name: Math Retrieval Materializer Implementation Receipt
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/math-retrieval-materializer-implementation-receipt.yml"
+      - "docs/research/MATH_RET_RUNTIME_002D.md"
+      - "tools/math-retrieval-materializer-receipt/**"
+      - "tools/math-retrieval-materializer-identity/**"
+      - "tools/math-retrieval-production-runtime/**"
+      - "tools/math-retrieval-runtime-seam/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-materializer-implementation-receipt:
+    name: Qualify content-addressed materializer implementation receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Install frozen Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify frozen predecessor objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:${path}")"
+            printf '%s  %s\n' "$actual" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_blob tools/math-retrieval-runtime-seam/src/lib.rs \
+            29c949a9331fbe8e912cd0d03a048595bc354d7b
+          check_blob tools/math-retrieval-materializer-identity/src/lib.rs \
+            ccd7c5faa4d3ee4a3fceb7f65a0fa5a8dd68fb5f
+          check_blob tools/math-retrieval-production-runtime/src/lib.rs \
+            ee8085dbdb701567e408e592c1e35b92fff3fff5
+
+      - name: Check standalone lock
+        shell: bash
+        run: cargo metadata --manifest-path tools/math-retrieval-materializer-receipt/Cargo.toml --locked --format-version 1 >/dev/null
+
+      - name: Format implementation receipt loader
+        shell: bash
+        run: cargo fmt --manifest-path tools/math-retrieval-materializer-receipt/Cargo.toml -- --check
+
+      - name: Check implementation receipt loader
+        shell: bash
+        run: cargo check --manifest-path tools/math-retrieval-materializer-receipt/Cargo.toml --locked
+
+      - name: Test implementation receipt loader
+        shell: bash
+        run: cargo test --manifest-path tools/math-retrieval-materializer-receipt/Cargo.toml --locked

@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-math-retrieval-materializer-receipt"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Content-addressed implementation receipt loader for Symthaea canonical retrieval materializers"
+
+[dependencies]
+serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+symthaea-math-retrieval-materializer-identity = { path = "../math-retrieval-materializer-identity" }
+symthaea-math-retrieval-runtime-seam = { path = "../math-retrieval-runtime-seam" }
+
+# Standalone while the materializer implementation provenance boundary is qualified.
+[workspace]
