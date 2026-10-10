@@ -316,8 +316,8 @@ fn inverse_normal_cdf(probability: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::screening_design::{
-        BenchScaleReview, BenchScaleReviewStatus, ExperimentBlock, PrimaryEndpoint,
-        ScreeningFactor,
+        BenchScaleReview, BenchScaleReviewStatus, ExperimentBlock, FactorRandomizationClass,
+        PrimaryEndpoint, ScreeningFactor,
     };
 
     fn evidence(id: &str, kind: EvidenceKind) -> EvidenceRef {
@@ -344,6 +344,7 @@ mod tests {
                     unit: "degree_C".into(),
                     low_value: 400.0,
                     high_value: 500.0,
+                    randomization_class: FactorRandomizationClass::RandomizablePerRun,
                     low_level_evidence: evidence("temp-low", EvidenceKind::Literature),
                     high_level_evidence: evidence("temp-high", EvidenceKind::Literature),
                 },
@@ -353,6 +354,7 @@ mod tests {
                     unit: "minute".into(),
                     low_value: 10.0,
                     high_value: 30.0,
+                    randomization_class: FactorRandomizationClass::RandomizablePerRun,
                     low_level_evidence: evidence("time-low", EvidenceKind::Literature),
                     high_level_evidence: evidence("time-high", EvidenceKind::Literature),
                 },
