@@ -721,6 +721,99 @@ mod tests {
     }
 
     #[test]
+    fn freshness_thresholds_are_inclusive_at_the_declared_boundary() {
+        // Latest age is exactly the profile's 1.5 s ceiling.
+        assert_eq!(
+            assessment(good_samples(), 4_500).outcome().unwrap(),
+            Px4HeartbeatFreshnessOutcomeV1::Fresh
+        );
+
+        // A gap exactly equal to the configured 1.5 s ceiling is accepted.
+        let boundary_gap = vec![
+            heartbeat(1_000, 1, 1, MAV_AUTOPILOT_PX4_RAW),
+            heartbeat(2_500, 1, 1, MAV_AUTOPILOT_PX4_RAW),
+            heartbeat(3_000, 1, 1, MAV_AUTOPILOT_PX4_RAW),
+        ];
+        assert_eq!(
+            assessment(boundary_gap, 3_100).outcome().unwrap(),
+            Px4HeartbeatFreshnessOutcomeV1::Fresh
+        );
+
+        // One nanosecond over the age limit is not fresh.
+        let mut value = assessment(good_samples(), 4_500);
+        value.assessed_at.nanoseconds += 1;
+        value.freshness_digest_hex = value.compute_digest_hex();
+        assert!(matches!(
+            value.outcome().unwrap(),
+            Px4HeartbeatFreshnessOutcomeV1::NotFresh { failures }
+                if failures.contains(&Px4HeartbeatFreshnessFailureV1::LatestHeartbeatStale)
+        ));
+    }
+
+    #[test]
+    fn duplicate_receipts_and_mixed_producers_fail_closed() {
+        let mut duplicates = good_samples();
+        duplicates[2] = duplicates[1].clone();
+        assert_eq!(
+            Px4HeartbeatFreshnessV1::new(
+                "mavlink.decoder.fixture.v1",
+                profile(),
+                ts(3_500),
+                duplicates,
+            )
+            .unwrap_err(),
+            Px4HeartbeatEvidenceError::DuplicateSample
+        );
+
+        let mut mixed = good_samples();
+        mixed[2] = MavlinkHeartbeatEvidenceV1::new(
+            "other.decoder.fixture.v1",
+            1,
+            1,
+            2,
+            MAV_AUTOPILOT_PX4_RAW,
+            0,
+            0,
+            3,
+            3,
+            ts(3_000),
+        )
+        .unwrap();
+        assert_eq!(
+            Px4HeartbeatFreshnessV1::new(
+                "mavlink.decoder.fixture.v1",
+                profile(),
+                ts(3_500),
+                mixed,
+            )
+            .unwrap_err(),
+            Px4HeartbeatEvidenceError::MixedProducer
+        );
+    }
+
+    #[test]
+    fn freshness_identity_binds_policy_and_observation_order() {
+        let samples = good_samples();
+        let forward = assessment(samples.clone(), 3_500);
+        let reverse = assessment(samples.into_iter().rev().collect(), 3_500);
+        assert_eq!(forward.freshness_id().unwrap(), reverse.freshness_id().unwrap());
+
+        let original_id = forward.freshness_id().unwrap();
+        let mut changed_profile = forward.clone();
+        changed_profile.profile.max_latest_age_ns += 1;
+        assert!(changed_profile.validate().is_err());
+
+        let mut changed_clock = forward.clone();
+        changed_clock.assessed_at.clock_domain = clock("other.monotonic");
+        assert!(changed_clock.validate().is_err());
+
+        assert_eq!(
+            original_id,
+            assessment(good_samples(), 3_500).freshness_id().unwrap()
+        );
+    }
+
+    #[test]
     fn mutation_and_serde_boundaries_are_explicit() {
         let value = assessment(good_samples(), 3_500);
         let bytes = serde_json::to_vec(&value).unwrap();
