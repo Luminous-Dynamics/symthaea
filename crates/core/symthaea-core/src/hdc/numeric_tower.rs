@@ -281,6 +281,51 @@ pub struct NumberResult {
     pub encoding: BinaryHV,
 }
 
+/// Exactness classification for a numeric-tower operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArithmeticPrecision {
+    /// The value is the exact result of the operation over the represented inputs.
+    Exact,
+    /// The value was computed using floating-point arithmetic or an explicit
+    /// fallback because the fixed-width exact representation was insufficient.
+    Approximate,
+}
+
+/// Typed failures returned by the checked numeric-tower API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumericArithmeticError {
+    /// A public Rational variant had a zero denominator.
+    InvalidRationalOperand,
+    /// Division by an exactly zero denominator was requested.
+    DivisionByZero,
+    /// An input Real was NaN or infinite.
+    NonFiniteOperand,
+    /// A finite input operation produced a non-finite floating-point result.
+    NonFiniteResult,
+}
+
+impl std::fmt::Display for NumericArithmeticError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRationalOperand => write!(f, "rational operand has a zero denominator"),
+            Self::DivisionByZero => write!(f, "division by zero"),
+            Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
+            Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
+        }
+    }
+}
+
+impl std::error::Error for NumericArithmeticError {}
+
+/// Result of a checked operation, including whether its value is exact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NumericArithmeticResult {
+    /// Full numeric-tower result, including encoding and operation trace.
+    pub result: NumberResult,
+    /// Exactness classification of the computed value.
+    pub precision: ArithmeticPrecision,
+}
+
 impl NumberResult {
     /// Add a proof step to the trace
     fn add_proof_step(&mut self, step: String) {
@@ -688,6 +733,104 @@ impl NumericTower {
     // ========================================================================
     // ARITHMETIC OPERATIONS
     // ========================================================================
+
+    /// Validate the domain-level invariants required by checked arithmetic.
+    fn validate_checked_operand(number: &Number) -> Result<(), NumericArithmeticError> {
+        match number {
+            Number::Rational { denominator: 0, .. } => {
+                Err(NumericArithmeticError::InvalidRationalOperand)
+            }
+            Number::Real(value) if !value.is_finite() => {
+                Err(NumericArithmeticError::NonFiniteOperand)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Shared checked arithmetic implementation used by the checked public API.
+    fn checked_binary_arithmetic(
+        &self,
+        a: &Number,
+        b: &Number,
+        operation: &str,
+        symbol: &str,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        Self::validate_checked_operand(a)?;
+        Self::validate_checked_operand(b)?;
+        if operation == "divide" && b.is_zero_exact() {
+            return Err(NumericArithmeticError::DivisionByZero);
+        }
+
+        let mut proof_trace = vec![format!("{}: {} {} {}", operation, a, symbol, b)];
+        let has_real_operand = matches!(a, Number::Real(_)) || matches!(b, Number::Real(_));
+
+        let (number, precision) = if !has_real_operand {
+            if let Some(exact) = Self::exact_binary_result(a, b, operation) {
+                proof_trace.push(format!("Exact {} result = {}", operation, exact));
+                (exact, ArithmeticPrecision::Exact)
+            } else {
+                let value = Self::apply_f64(a.to_f64(), b.to_f64(), operation);
+                if !value.is_finite() {
+                    return Err(NumericArithmeticError::NonFiniteResult);
+                }
+                proof_trace.push(format!(
+                    "Exact {} exceeds the current fixed-width representation or intermediate capacity; approximate Real({value}) returned.",
+                    operation
+                ));
+                (Number::Real(value), ArithmeticPrecision::Approximate)
+            }
+        } else {
+            let value = Self::apply_f64(a.to_f64(), b.to_f64(), operation);
+            if !value.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            proof_trace.push(format!(
+                "Floating-point {} evaluated to Real({value}); exactness is not claimed.",
+                operation
+            ));
+            (Number::Real(value), ArithmeticPrecision::Approximate)
+        };
+
+        let input_domains = [a.domain(), b.domain()];
+        let result = self.build_result(number, operation.to_string(), proof_trace, &input_domains);
+        Ok(NumericArithmeticResult { result, precision })
+    }
+
+    /// Checked addition: rejects malformed/non-finite operands and reports exactness.
+    pub fn checked_add(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "add", "+")
+    }
+
+    /// Checked subtraction: rejects malformed/non-finite operands and reports exactness.
+    pub fn checked_subtract(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "subtract", "-")
+    }
+
+    /// Checked multiplication: rejects malformed/non-finite operands and reports exactness.
+    pub fn checked_multiply(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "multiply", "*")
+    }
+
+    /// Checked division: rejects invalid operands and division by exact zero.
+    pub fn checked_divide(
+        &self,
+        a: &Number,
+        b: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        self.checked_binary_arithmetic(a, b, "divide", "/")
+    }
 
     /// Add two numbers using checked exact arithmetic with an explicit Real fallback.
     pub fn add(&self, a: &Number, b: &Number) -> NumberResult {
@@ -1792,6 +1935,59 @@ mod tests {
             ),
             "sqrt(4/9) = 2/3, got {:?}",
             r.number
+        );
+    }
+
+    #[test]
+    fn test_checked_arithmetic_reports_exactness() {
+        let tower = NumericTower::new();
+        let exact = tower
+            .checked_add(&Number::Natural(2), &Number::Natural(3))
+            .expect("valid exact addition");
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.number, Number::Natural(5)));
+
+        let approximate = tower
+            .checked_add(&Number::Natural(u64::MAX), &Number::Natural(1))
+            .expect("finite approximate fallback");
+        assert_eq!(approximate.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(approximate.result.number, Number::Real(value) if value.is_finite()));
+        assert!(approximate.result.proof_trace.iter().any(|line| line.contains("approximate Real")));
+    }
+
+    #[test]
+    fn test_checked_arithmetic_rejects_malformed_rational_operand() {
+        let tower = NumericTower::new();
+        let malformed = Number::Rational { numerator: 7, denominator: 0 };
+        assert_eq!(
+            tower.checked_add(&malformed, &Number::Natural(1)).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            tower.checked_multiply(&Number::Natural(1), &malformed).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_arithmetic_rejects_non_finite_operands_and_results() {
+        let tower = NumericTower::new();
+        assert_eq!(
+            tower.checked_add(&Number::Real(f64::NAN), &Number::Natural(1)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            tower.checked_multiply(&Number::Real(f64::MAX), &Number::Real(2.0)).unwrap_err(),
+            NumericArithmeticError::NonFiniteResult
+        );
+    }
+
+    #[test]
+    fn test_checked_division_rejects_exact_zero() {
+        let tower = NumericTower::new();
+        assert_eq!(
+            tower.checked_divide(&Number::Natural(1), &Number::Real(-0.0)).unwrap_err(),
+            NumericArithmeticError::DivisionByZero
         );
     }
 
