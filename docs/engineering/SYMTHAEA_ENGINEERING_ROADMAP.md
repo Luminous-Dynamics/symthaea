@@ -190,3 +190,17 @@ Symthaea's engineering layer should become open public infrastructure for solver
 - Multi-physics request objects that describe coupling before execution.
 - CAD/geometry interchange based first on existing STEP/NURBS/mesh work, then FreeCAD integration.
 - Strict separation between reasoning crates and native solver dependencies.
+
+## October 2026: first-principles chemical engineering
+
+The current cross-cutting research audit is tracked in [`FIRST_PRINCIPLES_CHEMICAL_ENGINEERING_PHYSICS_AUDIT_2026-10-10.md`](FIRST_PRINCIPLES_CHEMICAL_ENGINEERING_PHYSICS_AUDIT_2026-10-10.md), reviewed in [PR #7317](https://github.com/Luminous-Dynamics/symthaea/pull/7317).
+
+It composes existing owners rather than creating a parallel solver/evidence stack: physics types (#6868), maturity envelopes (#6871), engineering V&V (#3697), coupling contracts (#6173), solver input closure (#5659), SEC-002B assurance work (#5124), process semantics (#5686), and the water systems owner (#5966).
+
+Current bounded follow-up: [CFD-QUAL-001 #7316](https://github.com/Luminous-Dynamics/symthaea/issues/7316) qualifies the native `NavierStokes2D` prototype before its results can be used as engineering evidence. The audit is documentation and source review only; it does not claim tests passed or that any solver is now qualified. The first code increment is the checked thermofluid API in [PR #7319](https://github.com/Luminous-Dynamics/symthaea/pull/7319), currently awaiting CI; it does not yet have a verified passing test result.
+
+
+
+## Quantum Chemistry Integration (2026-10-10)
+
+Symthaea already contains crates/domains/symthaea-quantum-chemistry; the key gap is qualified integration with graph-based process discovery, validated 3D geometry, independent reference evidence, and fail-closed numerical-solver status. See [Quantum Chemistry Integration and Qualification Plan](QUANTUM_CHEMISTRY_INTEGRATION_2026-10-10.md), [CHEM-QC-001 issue #7321](https://github.com/Luminous-Dynamics/symthaea/issues/7321), and [QC-EIGEN-001 issue #7325](https://github.com/Luminous-Dynamics/symthaea/issues/7325). The bounded implementation increments are proposed in PRs #7322 (request preflight), #7323 (source-bound PySCF comparator), #7331 (checked Jacobi/NumPy matrix diagnostic), and #7333 (6-31G coefficients aligned to pinned BSE v1). [BASIS-CONFORM-001 issue #7332](https://github.com/Luminous-Dynamics/symthaea/issues/7332) tracks the independent overlap/energy confirmation. The latter is not fully integrated into RHF/UHF yet, so it does not complete the solver-qualification acceptance criteria. The native QC source documents unresolved small-molecule HF benchmark discrepancies, and the process-discovery oracle currently stops before QC.
