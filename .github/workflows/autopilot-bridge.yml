@@ -33,7 +33,7 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
 
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.96.0 --profile minimal --component clippy
+        run: rustup toolchain install 1.96.0 --profile minimal --component clippy --component rustfmt
 
       - name: Record qualification identity
         run: |
@@ -49,6 +49,9 @@ jobs:
             echo "cargo_lock=ABSENT"
           fi
           echo "workflow_blob_sha=$(git hash-object .github/workflows/autopilot-bridge.yml)"
+
+      - name: Formatting qualification
+        run: cargo +1.96.0 fmt -p symthaea-autopilot-bridge -- --check
 
       - name: Unit qualification
         run: cargo +1.96.0 test -p symthaea-autopilot-bridge -- --test-threads=1
