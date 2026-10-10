@@ -185,7 +185,11 @@ impl CognitiveLoopService {
                 );
                 manifold.dilate(symthaea_core::hdc::HdcDimensionality::Ultra);
                 self.thermodynamic_load += estimate.dilation;
-                if manifold.hdc_dim() != dilation_target_dim || peer_dim > manifold.hdc_dim() {
+                if manifold.hdc_dim() != dilation_target_dim
+                    || peer_dim > manifold.hdc_dim()
+                    || manifold.state().dim() != manifold.hdc_dim()
+                    || !manifold.state().values.iter().all(|value| value.is_finite())
+                {
                     return Err(ImagineFutureError::NoGeodesic);
                 }
             }
