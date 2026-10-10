@@ -12,6 +12,13 @@ use std::fmt;
 /// Stable parser identity for evidence manifests and regression fixtures.
 pub const PARSER_VERSION: &str = "ngspice-ascii-raw-v1";
 
+// Bounds are intentional: rawfiles may be solver-generated or externally supplied.
+const MAX_RAWFILE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RAWFILE_LINES: usize = 3_000_000;
+const MAX_VARIABLES: usize = 10_000;
+const MAX_POINTS: usize = 1_000_000;
+const MAX_SCALARS: usize = 5_000_000;
+
 /// A vector declared in an ngspice rawfile.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawVariable {
@@ -73,6 +80,18 @@ impl AsciiRawfile {
     /// inconsistent files are rejected. The parser intentionally supports a
     /// strict subset rather than silently accepting formats it cannot verify.
     pub fn parse(input: &str) -> Result<Self, RawfileError> {
+        if input.len() > MAX_RAWFILE_BYTES {
+            return Err(RawfileError(format!(
+                "rawfile is {} bytes; maximum supported size is {MAX_RAWFILE_BYTES}",
+                input.len()
+            )));
+        }
+        let line_count = input.lines().count();
+        if line_count > MAX_RAWFILE_LINES {
+            return Err(RawfileError(format!(
+                "rawfile has {line_count} lines; maximum supported count is {MAX_RAWFILE_LINES}"
+            )));
+        }
         let lines: Vec<&str> = input.lines().collect();
 
         let plotname_count = lines
@@ -128,6 +147,24 @@ impl AsciiRawfile {
             "No. Variables:",
         )?;
         let point_count = parse_positive_count(&lines[..variables_header], "No. Points:")?;
+        if variable_count > MAX_VARIABLES {
+            return Err(RawfileError(format!(
+                "declared variable count {variable_count} exceeds limit {MAX_VARIABLES}"
+            )));
+        }
+        if point_count > MAX_POINTS {
+            return Err(RawfileError(format!(
+                "declared point count {point_count} exceeds limit {MAX_POINTS}"
+            )));
+        }
+        let scalar_count = variable_count.checked_mul(point_count).ok_or_else(|| {
+            RawfileError("declared variable/point product overflows".into())
+        })?;
+        if scalar_count > MAX_SCALARS {
+            return Err(RawfileError(format!(
+                "declared scalar count {scalar_count} exceeds limit {MAX_SCALARS}"
+            )));
+        }
 
         let variable_lines: Vec<&str> = lines[variables_header + 1..values_header]
             .iter()
@@ -431,6 +468,12 @@ mod tests {
     #[test]
     fn rejects_declared_point_count_mismatch() {
         let malformed = RC_FIXTURE.replace("No. Points: 3", "No. Points: 4");
+        assert!(AsciiRawfile::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn rejects_hostile_oversized_counts_before_allocating_point_storage() {
+        let malformed = RC_FIXTURE.replace("No. Points: 3", "No. Points: 18446744073709551615");
         assert!(AsciiRawfile::parse(&malformed).is_err());
     }
 
