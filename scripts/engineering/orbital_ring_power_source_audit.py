@@ -80,7 +80,7 @@ def main():
     record("cryo_reported_wall_plug_scale_factor_5", abs(power_scale - 5.0) < 1e-12, power_scale, 5.0, 1e-12)
     record("table8.orbital_length_positive", math.isfinite(table8_orbital_length_m) and table8_orbital_length_m > 0, table8_orbital_length_m)
     record("table8.geosynchronous_length_positive", math.isfinite(table8_geo_length_m) and table8_geo_length_m > 0, table8_geo_length_m)
-    length_relative_difference = abs(table8_orbital_length_m - table8_geo_length_m) / table8_mean_length_m
+    length_relative_difference = abs(table8_orbital_length_m - table8_geo_length_m) / (0.5 * (table8_orbital_length_m + table8_geo_length_m))
     record("table8.inferred_ring_lengths_agree_within_1pct", length_relative_difference <= 0.01,
            length_relative_difference, 0.0, 0.01)
     record("table8.cryo_row_assigned_to_support_column",
