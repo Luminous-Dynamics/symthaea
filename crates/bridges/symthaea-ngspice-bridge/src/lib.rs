@@ -17,7 +17,9 @@ use symthaea_sim_bridge::{
 pub struct NgspiceBridge {
     /// When true, return deterministic placeholder metrics for orchestration tests.
     pub dry_run: bool,
-    /// Command used to invoke the solver (e.g. "ngspice").
+    /// Executable reserved for the future artifact-bound solver path (e.g. "ngspice").
+    /// The current real path deliberately refuses to spawn any executable until the
+    /// SimulationRequest contract carries an immutable netlist artifact.
     pub solver_cmd: String,
 }
 
