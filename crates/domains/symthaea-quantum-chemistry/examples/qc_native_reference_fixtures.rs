@@ -48,6 +48,7 @@ struct CaseRecord {
     case_id: String,
     molecule_name: String,
     basis: &'static str,
+    method: &'static str,
     coordinate_unit: &'static str,
     molecule: MoleculeRecord,
     historical_reference: HistoricalReference,
@@ -213,6 +214,7 @@ fn run_case(
         case_id: format!("{name}/{basis_name}/RHF"),
         molecule_name: name.to_owned(),
         basis: basis_name,
+        method: "RHF",
         coordinate_unit: "bohr",
         molecule: molecule_record,
         historical_reference: HistoricalReference {
