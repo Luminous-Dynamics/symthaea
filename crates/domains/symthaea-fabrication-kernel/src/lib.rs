@@ -135,6 +135,8 @@ pub mod operational_replay;
 pub mod operator_command;
 pub mod operator_command_tracker;
 pub mod package;
+pub mod passive_design;
+pub mod passive_evidence;
 pub mod step_import;
 
 pub use automatic_rollback::{
@@ -389,6 +391,15 @@ pub use operator_command_tracker::{
 pub use package::{
     Inspected3mfPackage, PackageError, PackageInspectionLimits, inspect_3mf_package,
     verify_attested_3mf_package, verify_governed_3mf_package,
+};
+pub use passive_design::{
+    NoMovingPartsPolicy, PassiveDesignEvidence, PassiveFunctionContract, PassiveInput,
+    PassiveMechanism, PassiveObjectiveObservation, PassiveObjectiveWeights, PassiveOutput,
+    PassiveValidationReport, PassiveViolation,
+};
+pub use passive_evidence::{
+    PassiveEvidenceConflict, PassiveEvidenceExtraction, PassiveEvidenceFact, PassiveEvidenceField,
+    PassiveEvidenceExtractor, PassiveEvidenceSource,
 };
 pub use policy_migration::{
     AuthorizedPolicyMigration, PolicyBinding, PolicyInvariantBinding, PolicyInvariantDisposition,

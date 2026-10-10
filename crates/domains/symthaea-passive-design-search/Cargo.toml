@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-passive-design-search"
+version = "0.1.0"
+edition = "2024"
+description = "Pareto search and deterministic topology fingerprints for passive engineering design"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }

@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-passive-design-gate"
+version = "0.1.0"
+edition = "2024"
+description = "Explicit-evidence feasibility gate for no-moving-parts engineering candidates"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }

@@ -12,5 +12,7 @@ keywords = ["openfoam", "cfd", "fluid-dynamics", "simulation"]
 categories = ["simulation", "science"]
 
 [dependencies]
+blake3 = { workspace = true }
+symthaea-passive-solver-binding = { path = "../../domains/symthaea-passive-solver-binding" }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 

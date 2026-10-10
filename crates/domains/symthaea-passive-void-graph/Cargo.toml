@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-passive-void-graph"
+version = "0.1.0"
+edition = "2024"
+description = "Typed functional void graphs for passive physical design search"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
