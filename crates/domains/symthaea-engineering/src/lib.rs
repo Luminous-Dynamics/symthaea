@@ -26,6 +26,8 @@ use symthaea_sim_bridge::{
 use symthaea_swarm::{SwarmAggregator, SwarmMessage, SwarmProofMsg, SwarmStateMsg};
 use symthaea_workspace::GlobalWorkspace;
 
+pub mod regenerative;
+
 pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
 pub use symthaea_memory as memory;
