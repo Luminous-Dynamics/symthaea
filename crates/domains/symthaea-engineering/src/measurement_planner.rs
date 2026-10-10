@@ -161,6 +161,8 @@ pub enum MeasurementPlanStatus {
     NoUnresolvedNumericConstraints,
     /// Constraints remain unresolved, but none of the supplied options targets them.
     NoApplicableMeasurementOptions,
+    /// At least one option targets an unresolved constraint, but every such option has zero weight.
+    ApplicableOptionsHaveZeroPriorityWeight,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -224,7 +226,7 @@ pub fn prioritize_measurements(
     }
 
     let assessment = assess_regenerative_uncertainty(intervals, requirements)
-        .map_err(|_| MeasurementPlannerError::new("interval_assessment", "requirements or intervals are invalid"))?;
+        .map_err(|error| MeasurementPlannerError::new(error.field, error.reason))?;
 
     let unresolved_constraint_ids: Vec<String> = assessment
         .constraints
@@ -250,8 +252,12 @@ pub fn prioritize_measurements(
             .iter()
             .find(|constraint| constraint.constraint_id == target_constraint_id);
         let relevant_status = target_constraint.map(|constraint| constraint.status);
+        let metric_interval_available = option.metric.interval(intervals).is_some();
+        let is_missing_required_climate = option.metric == MeasurementMetric::NetClimate
+            && relevant_status == Some(IntervalConstraintStatus::Unresolved)
+            && target_constraint_id == "climate_objective_interval_available";
         let relevant = relevant_status == Some(IntervalConstraintStatus::Unresolved)
-            && option.metric.interval(intervals).is_some();
+            && (metric_interval_available || is_missing_required_climate);
 
         let score = if relevant {
             let value = option.decision_relevance_weight
@@ -322,10 +328,15 @@ pub fn prioritize_measurements(
     }
 
     let ranked_count = priorities.iter().filter(|item| item.rank.is_some()).count();
-    let status = if !unresolved_constraint_ids.is_empty() && ranked_count > 0 {
+    let has_decision_relevant_option = priorities
+        .iter()
+        .any(|item| item.currently_decision_relevant);
+    let status = if ranked_count > 0 {
         MeasurementPlanStatus::PrioritiesAvailable
     } else if unresolved_constraint_ids.is_empty() {
         MeasurementPlanStatus::NoUnresolvedNumericConstraints
+    } else if has_decision_relevant_option {
+        MeasurementPlanStatus::ApplicableOptionsHaveZeroPriorityWeight
     } else {
         MeasurementPlanStatus::NoApplicableMeasurementOptions
     };
@@ -459,6 +470,7 @@ mod tests {
         assert_eq!(plan.status, MeasurementPlanStatus::PrioritiesAvailable);
         assert_eq!(plan.options[0].target_constraint_id, "climate_objective_interval_available");
         assert_eq!(plan.options[0].rank, Some(1));
+        assert!(plan.options[0].currently_decision_relevant);
     }
 
     #[test]
@@ -491,5 +503,16 @@ mod tests {
         assert!(prioritize_measurements(
             &intervals(), &requirements(), "USD_2026_per_measurement", &options,
         ).is_err());
+    }
+
+    #[test]
+    fn zero_weight_is_not_reported_as_missing_measurement_coverage() {
+        let options = vec![option("yield-lab", MeasurementMetric::CharYield, 2.0, 0.5, 0.0)];
+        let plan = prioritize_measurements(
+            &intervals(), &requirements(), "USD_2026_per_measurement", &options,
+        ).unwrap();
+        assert_eq!(plan.status, MeasurementPlanStatus::ApplicableOptionsHaveZeroPriorityWeight);
+        assert!(plan.options[0].currently_decision_relevant);
+        assert_eq!(plan.options[0].rank, None);
     }
 }
