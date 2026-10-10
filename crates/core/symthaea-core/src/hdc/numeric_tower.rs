@@ -81,16 +81,17 @@ fn normalize_fraction_i128(numerator: i128, denominator: i128) -> Option<(i128, 
     if denominator == 0 {
         return None;
     }
+    // Zero normalizes to 0/1 regardless of denominator sign or magnitude;
+    // do this before sign normalization because i128::MIN cannot be negated.
+    if numerator == 0 {
+        return Some((0, 1));
+    }
 
     let (numerator, denominator) = if denominator < 0 {
         (numerator.checked_neg()?, denominator.checked_neg()?)
     } else {
         (numerator, denominator)
     };
-
-    if numerator == 0 {
-        return Some((0, 1));
-    }
 
     let divisor = i128::try_from(gcd_u128(numerator.unsigned_abs(), denominator as u128)).ok()?;
     Some((numerator / divisor, denominator / divisor))
@@ -2019,6 +2020,12 @@ mod tests {
             "sqrt(4/9) = 2/3, got {:?}",
             r.number
         );
+    }
+
+    #[test]
+    fn test_fraction_normalization_handles_zero_before_sign_negation() {
+        assert_eq!(normalize_fraction_i128(0, i128::MIN), Some((0, 1)));
+        assert_eq!(normalize_fraction_i128(0, i128::MAX), Some((0, 1)));
     }
 
     #[test]
