@@ -71,6 +71,8 @@ pub struct VerifiedPolicyReceipt {
     pub recomputed_unserved_energy_kwh: f64,
     pub recomputed_curtailed_energy_kwh: f64,
     pub recomputed_battery_cycles: f64,
+    pub recomputed_battery_conversion_loss_kwh: f64,
+    pub recomputed_battery_degradation_energy_loss_kwh: f64,
 }
 
 /// Per-metric deltas computed as candidate minus baseline. Negative values
@@ -81,6 +83,8 @@ pub struct PolicyMetricDeltas {
     pub unserved_energy_kwh: f64,
     pub curtailed_energy_kwh: f64,
     pub battery_cycles: f64,
+    pub battery_conversion_loss_kwh: f64,
+    pub battery_degradation_energy_loss_kwh: f64,
 }
 
 /// Paired-policy comparison for one frozen scenario.
@@ -336,6 +340,8 @@ impl FrozenEnergyScenario {
         let mut unserved_kwh = 0.0;
         let mut curtailed_kwh = 0.0;
         let mut battery_cycles = 0.0;
+        let mut battery_conversion_loss_kwh = 0.0;
+        let mut battery_degradation_energy_loss_kwh = 0.0;
         let mut previous_soc_after: Option<f64> = None;
         let mut previous_cycles_after: Option<f64> = None;
 
@@ -367,12 +373,17 @@ impl FrozenEnergyScenario {
                 step.generation_kw,
                 step.battery_soc_before,
                 step.battery_soc_after,
+                step.battery_stored_energy_before_kwh,
+                step.battery_stored_energy_after_kwh,
                 step.battery_cycles_before,
                 step.battery_cycles_after,
                 step.charge_setpoint_kw,
                 step.discharge_setpoint_kw,
                 step.battery_charge_input_kw,
                 step.battery_discharge_output_kw,
+                step.battery_charge_loss_kwh,
+                step.battery_discharge_loss_kwh,
+                step.battery_degradation_energy_loss_kwh,
                 step.net_kw,
                 step.import_price_per_kwh,
                 step.export_price_per_kwh,
@@ -386,6 +397,11 @@ impl FrozenEnergyScenario {
                 || step.generation_kw < 0.0
                 || !(0.0..=1.0).contains(&step.battery_soc_before)
                 || !(0.0..=1.0).contains(&step.battery_soc_after)
+                || step.battery_stored_energy_before_kwh < 0.0
+                || step.battery_stored_energy_after_kwh < 0.0
+                || step.battery_charge_loss_kwh < 0.0
+                || step.battery_discharge_loss_kwh < 0.0
+                || step.battery_degradation_energy_loss_kwh < 0.0
                 || step.battery_cycles_before < 0.0
                 || step.battery_cycles_after < step.battery_cycles_before
                 || step.charge_setpoint_kw < 0.0
@@ -427,6 +443,8 @@ impl FrozenEnergyScenario {
             let mut expected_cycles_after = step.battery_cycles_before;
             let mut expected_charge_input_kw = 0.0;
             let mut expected_discharge_output_kw = 0.0;
+            let mut expected_accepted_dc_kwh = 0.0;
+            let mut expected_removed_dc_kwh = 0.0;
 
             if step.charge_setpoint_kw > 0.0 {
                 let requested_dc_kwh = step.charge_setpoint_kw
@@ -435,6 +453,7 @@ impl FrozenEnergyScenario {
                 let headroom_kwh =
                     (1.0 - step.battery_soc_before) * effective_capacity_kwh;
                 let accepted_dc_kwh = requested_dc_kwh.min(headroom_kwh);
+                expected_accepted_dc_kwh = accepted_dc_kwh;
                 if effective_capacity_kwh > 0.0 {
                     expected_soc_after = (step.battery_soc_before
                         + accepted_dc_kwh / effective_capacity_kwh)
@@ -464,6 +483,7 @@ impl FrozenEnergyScenario {
                     step.battery_soc_before * effective_capacity_kwh;
                 let delivered_dc_kwh = requested_dc_kwh.min(available_dc_kwh);
                 let delivered_ac_kwh = delivered_dc_kwh * efficiency;
+                expected_removed_dc_kwh = delivered_dc_kwh;
                 if effective_capacity_kwh > 0.0 {
                     expected_soc_after = (step.battery_soc_before
                         - delivered_dc_kwh / effective_capacity_kwh)
@@ -476,6 +496,26 @@ impl FrozenEnergyScenario {
                     delivered_ac_kwh / step.step_duration_hours;
             }
 
+            let expected_stored_before_kwh =
+                step.battery_soc_before * effective_capacity_kwh;
+            let health_after = (1.0
+                - expected_cycles_after * self.battery.degradation_per_cycle)
+                .clamp(0.0, 1.0);
+            let expected_stored_after_kwh =
+                expected_soc_after * capacity_kwh * health_after;
+            let expected_charge_loss_kwh = (expected_charge_input_kw
+                * step.step_duration_hours
+                - expected_accepted_dc_kwh)
+                .max(0.0);
+            let expected_discharge_loss_kwh = (expected_removed_dc_kwh
+                - expected_discharge_output_kw * step.step_duration_hours)
+                .max(0.0);
+            let expected_degradation_loss_kwh = (expected_stored_before_kwh
+                + expected_accepted_dc_kwh
+                - expected_removed_dc_kwh
+                - expected_stored_after_kwh)
+                .max(0.0);
+
             if !close(step.battery_soc_after, expected_soc_after)
                 || !close(step.battery_cycles_after, expected_cycles_after)
                 || !close(step.battery_charge_input_kw, expected_charge_input_kw)
@@ -483,7 +523,32 @@ impl FrozenEnergyScenario {
                     step.battery_discharge_output_kw,
                     expected_discharge_output_kw,
                 )
+                || !close(
+                    step.battery_stored_energy_before_kwh,
+                    expected_stored_before_kwh,
+                )
+                || !close(
+                    step.battery_stored_energy_after_kwh,
+                    expected_stored_after_kwh,
+                )
+                || !close(step.battery_charge_loss_kwh, expected_charge_loss_kwh)
+                || !close(step.battery_discharge_loss_kwh, expected_discharge_loss_kwh)
+                || !close(
+                    step.battery_degradation_energy_loss_kwh,
+                    expected_degradation_loss_kwh,
+                )
             {
+                return Err(QualificationError::BatteryTransitionMismatch);
+            }
+
+            let storage_balance_residual = step.battery_stored_energy_before_kwh
+                + step.battery_charge_input_kw * step.step_duration_hours
+                - step.battery_stored_energy_after_kwh
+                - step.battery_discharge_output_kw * step.step_duration_hours
+                - step.battery_charge_loss_kwh
+                - step.battery_discharge_loss_kwh
+                - step.battery_degradation_energy_loss_kwh;
+            if !close(storage_balance_residual, 0.0) {
                 return Err(QualificationError::BatteryTransitionMismatch);
             }
 
@@ -539,6 +604,10 @@ impl FrozenEnergyScenario {
             unserved_kwh += expected_unserved_delta;
             curtailed_kwh += expected_curtailed_delta;
             battery_cycles += step.battery_cycles_after - step.battery_cycles_before;
+            battery_conversion_loss_kwh +=
+                step.battery_charge_loss_kwh + step.battery_discharge_loss_kwh;
+            battery_degradation_energy_loss_kwh +=
+                step.battery_degradation_energy_loss_kwh;
             expected_elapsed += expected_duration;
         }
 
@@ -547,6 +616,10 @@ impl FrozenEnergyScenario {
             || !receipt.trace.result.unserved_energy_kwh.is_finite()
             || !receipt.trace.result.battery_cycles.is_finite()
             || !receipt.trace.curtailed_energy_kwh.is_finite()
+            || !receipt.trace.battery_conversion_loss_kwh.is_finite()
+            || !receipt.trace.battery_degradation_energy_loss_kwh.is_finite()
+            || receipt.trace.battery_conversion_loss_kwh < 0.0
+            || receipt.trace.battery_degradation_energy_loss_kwh < 0.0
             || receipt.trace.result.unserved_energy_kwh < 0.0
             || receipt.trace.result.battery_cycles < 0.0
             || receipt.trace.curtailed_energy_kwh < 0.0
@@ -554,6 +627,14 @@ impl FrozenEnergyScenario {
             || !close(receipt.trace.result.unserved_energy_kwh, unserved_kwh)
             || !close(receipt.trace.curtailed_energy_kwh, curtailed_kwh)
             || !close(receipt.trace.result.battery_cycles, battery_cycles)
+            || !close(
+                receipt.trace.battery_conversion_loss_kwh,
+                battery_conversion_loss_kwh,
+            )
+            || !close(
+                receipt.trace.battery_degradation_energy_loss_kwh,
+                battery_degradation_energy_loss_kwh,
+            )
         {
             return Err(QualificationError::AggregateMetricMismatch);
         }
@@ -568,6 +649,8 @@ impl FrozenEnergyScenario {
             recomputed_unserved_energy_kwh: unserved_kwh,
             recomputed_curtailed_energy_kwh: curtailed_kwh,
             recomputed_battery_cycles: battery_cycles,
+            recomputed_battery_conversion_loss_kwh: battery_conversion_loss_kwh,
+            recomputed_battery_degradation_energy_loss_kwh: battery_degradation_energy_loss_kwh,
         })
     }
 }
@@ -623,12 +706,19 @@ pub fn compare_policy_receipts(
             - baseline_verified.recomputed_curtailed_energy_kwh,
         battery_cycles: candidate_verified.recomputed_battery_cycles
             - baseline_verified.recomputed_battery_cycles,
+        battery_conversion_loss_kwh: candidate_verified.recomputed_battery_conversion_loss_kwh
+            - baseline_verified.recomputed_battery_conversion_loss_kwh,
+        battery_degradation_energy_loss_kwh: candidate_verified
+            .recomputed_battery_degradation_energy_loss_kwh
+            - baseline_verified.recomputed_battery_degradation_energy_loss_kwh,
     };
     if [
         deltas.total_cost,
         deltas.unserved_energy_kwh,
         deltas.curtailed_energy_kwh,
         deltas.battery_cycles,
+        deltas.battery_conversion_loss_kwh,
+        deltas.battery_degradation_energy_loss_kwh,
     ]
     .iter()
     .any(|value| !value.is_finite())
@@ -926,6 +1016,16 @@ mod tests {
                 candidate_verified.recomputed_battery_cycles
                     - baseline_verified.recomputed_battery_cycles
             );
+            assert_eq!(
+                comparison.deltas.battery_conversion_loss_kwh,
+                candidate_verified.recomputed_battery_conversion_loss_kwh
+                    - baseline_verified.recomputed_battery_conversion_loss_kwh
+            );
+            assert_eq!(
+                comparison.deltas.battery_degradation_energy_loss_kwh,
+                candidate_verified.recomputed_battery_degradation_energy_loss_kwh
+                    - baseline_verified.recomputed_battery_degradation_energy_loss_kwh
+            );
             assert_eq!(baseline_verified.step_count, scenario.step_count().unwrap());
             assert_eq!(candidate_verified.step_count, scenario.step_count().unwrap());
             // These remain independent metrics; no weighted composite can mask
@@ -934,6 +1034,10 @@ mod tests {
             assert!(candidate_verified.recomputed_unserved_energy_kwh >= 0.0);
             assert!(baseline_verified.recomputed_battery_cycles >= 0.0);
             assert!(candidate_verified.recomputed_battery_cycles >= 0.0);
+            assert!(baseline_verified.recomputed_battery_conversion_loss_kwh >= 0.0);
+            assert!(candidate_verified.recomputed_battery_conversion_loss_kwh >= 0.0);
+            assert!(baseline_verified.recomputed_battery_degradation_energy_loss_kwh >= 0.0);
+            assert!(candidate_verified.recomputed_battery_degradation_energy_loss_kwh >= 0.0);
         }
     }
 
@@ -1047,6 +1151,67 @@ mod tests {
             (verified.recomputed_curtailed_energy_kwh - baseline.trace.curtailed_energy_kwh).abs()
                 < 1e-8
         );
+    }
+
+    #[test]
+    fn battery_energy_ledger_accounts_for_conversion_and_capacity_fade() {
+        let scenario = FrozenEnergyScenario {
+            id: "battery-energy-loss-accounting-v1".into(),
+            dt_hours: 1.0,
+            total_hours: 1.0,
+            start_hour: 10.0,
+            battery: BatterySpec {
+                capacity_kwh: 10.0,
+                power_rating_kw: 10.0,
+                round_trip_efficiency: 0.81,
+                initial_soc: 0.20,
+                degradation_per_cycle: 0.01,
+            },
+            tariff: TariffSchedule {
+                off_peak_price_per_kwh: 0.10,
+                peak_price_per_kwh: 0.35,
+                peak_start_hour: 17.0,
+                peak_end_hour: 21.0,
+                export_price_per_kwh: 0.05,
+            },
+            load_profile_kw: vec![0.0],
+            generation_profile_kw: vec![5.0],
+            grid_available_by_step: vec![true],
+        };
+        let receipt = scenario
+            .run_policy("naive-greedy", TEST_POLICY_REVISION, naive_greedy_policy)
+            .unwrap();
+        let verified = scenario.verify_receipt(&receipt).unwrap();
+
+        assert!(
+            (verified.recomputed_battery_conversion_loss_kwh - 0.5).abs() < 1e-8
+        );
+        assert!(
+            (verified.recomputed_battery_degradation_energy_loss_kwh - 0.014625).abs()
+                < 1e-8
+        );
+        assert!(
+            (verified.recomputed_battery_conversion_loss_kwh
+                - receipt.trace.battery_conversion_loss_kwh)
+                .abs()
+                < 1e-8
+        );
+        assert!(
+            (verified.recomputed_battery_degradation_energy_loss_kwh
+                - receipt.trace.battery_degradation_energy_loss_kwh)
+                .abs()
+                < 1e-8
+        );
+
+        let step = &receipt.trace.steps[0];
+        let residual = step.battery_stored_energy_before_kwh
+            + step.battery_charge_input_kw * step.step_duration_hours
+            - step.battery_stored_energy_after_kwh
+            - step.battery_discharge_output_kw * step.step_duration_hours
+            - step.battery_charge_loss_kwh
+            - step.battery_discharge_loss_kwh
+            - step.battery_degradation_energy_loss_kwh;
+        assert!(residual.abs() < 1e-9, "battery energy residual={residual}");
     }
 
     #[test]

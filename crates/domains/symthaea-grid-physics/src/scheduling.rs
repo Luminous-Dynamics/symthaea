@@ -77,12 +77,19 @@ pub struct ScenarioStepReceipt {
     pub generation_kw: f64,
     pub battery_soc_before: f64,
     pub battery_soc_after: f64,
+    pub battery_stored_energy_before_kwh: f64,
+    pub battery_stored_energy_after_kwh: f64,
     pub battery_cycles_before: f64,
     pub battery_cycles_after: f64,
     pub charge_setpoint_kw: f64,
     pub discharge_setpoint_kw: f64,
     pub battery_charge_input_kw: f64,
     pub battery_discharge_output_kw: f64,
+    /// AC-to-DC / DC-to-AC conversion losses over this step, in kWh.
+    pub battery_charge_loss_kwh: f64,
+    pub battery_discharge_loss_kwh: f64,
+    /// Stored-energy reduction from the model's capacity-fade update, in kWh.
+    pub battery_degradation_energy_loss_kwh: f64,
     pub net_kw: f64,
     pub import_price_per_kwh: f64,
     pub export_price_per_kwh: f64,
@@ -99,6 +106,10 @@ pub struct ScenarioTraceResult {
     pub steps: Vec<ScenarioStepReceipt>,
     /// Renewable/other surplus energy unavailable for export in islanded mode.
     pub curtailed_energy_kwh: f64,
+    /// Charge/discharge conversion losses, recomputed from per-step receipts.
+    pub battery_conversion_loss_kwh: f64,
+    /// Inventory reduction attributed to the simplified capacity-fade model.
+    pub battery_degradation_energy_loss_kwh: f64,
 }
 
 /// Failures returned by the validated energy-scheduling scenario runner.
@@ -324,6 +335,7 @@ pub fn try_run_scenario_with_receipt_profiles(
         }
         let step_grid_available = grid_available_profile(t);
         let battery_soc_before = working_battery.soc();
+        let battery_stored_energy_before_kwh = working_battery.stored_energy_kwh();
         let battery_cycles_before = working_battery.equivalent_full_cycles();
         let load_kw = load_profile(t);
         let generation_kw = generation_profile(t);
@@ -379,6 +391,21 @@ pub fn try_run_scenario_with_receipt_profiles(
             return Err(ScenarioError::InvalidBatteryState);
         }
         let served_kw_from_battery = discharge_delivered_ac_kwh / step_hours;
+        let discharge_removed_dc_kwh = if one_way_efficiency > 0.0 {
+            discharge_delivered_ac_kwh / one_way_efficiency
+        } else {
+            0.0
+        };
+        let battery_stored_energy_after_kwh = working_battery.stored_energy_kwh();
+        let battery_charge_loss_kwh =
+            (actual_charge_kw * step_hours - charge_accepted_dc_kwh).max(0.0);
+        let battery_discharge_loss_kwh =
+            (discharge_removed_dc_kwh - discharge_delivered_ac_kwh).max(0.0);
+        let battery_degradation_energy_loss_kwh = (battery_stored_energy_before_kwh
+            + charge_accepted_dc_kwh
+            - discharge_removed_dc_kwh
+            - battery_stored_energy_after_kwh)
+            .max(0.0);
 
         // Use accepted charge energy, not the requested setpoint, in the
         // balance. A full battery must not appear to consume its requested
@@ -425,12 +452,17 @@ pub fn try_run_scenario_with_receipt_profiles(
             generation_kw,
             battery_soc_before,
             battery_soc_after: working_battery.soc(),
+            battery_stored_energy_before_kwh,
+            battery_stored_energy_after_kwh,
             battery_cycles_before,
             battery_cycles_after: working_battery.equivalent_full_cycles(),
             charge_setpoint_kw: charge_kw,
             discharge_setpoint_kw: discharge_kw,
             battery_charge_input_kw: actual_charge_kw,
             battery_discharge_output_kw: served_kw_from_battery,
+            battery_charge_loss_kwh,
+            battery_discharge_loss_kwh,
+            battery_degradation_energy_loss_kwh,
             net_kw,
             import_price_per_kwh,
             export_price_per_kwh,
@@ -462,10 +494,25 @@ pub fn try_run_scenario_with_receipt_profiles(
         return Err(ScenarioError::NonFiniteResult);
     }
     *battery = working_battery;
+    let battery_conversion_loss_kwh = step_receipts
+        .iter()
+        .map(|step| step.battery_charge_loss_kwh + step.battery_discharge_loss_kwh)
+        .sum::<f64>();
+    let battery_degradation_energy_loss_kwh = step_receipts
+        .iter()
+        .map(|step| step.battery_degradation_energy_loss_kwh)
+        .sum::<f64>();
+    if !battery_conversion_loss_kwh.is_finite()
+        || !battery_degradation_energy_loss_kwh.is_finite()
+    {
+        return Err(ScenarioError::NonFiniteResult);
+    }
     Ok(ScenarioTraceResult {
         result,
         steps: step_receipts,
         curtailed_energy_kwh,
+        battery_conversion_loss_kwh,
+        battery_degradation_energy_loss_kwh,
     })
 }
 
