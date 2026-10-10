@@ -62,6 +62,8 @@ struct TaskResult {
     // Level 3: correctness
     tests_passed: usize,
     tests_failed: usize,
+    /// Number of test functions supplied by this benchmark task.
+    expected_tests: usize,
     // Agent metrics
     iterations: usize,
     tiers_used: Vec<String>,
@@ -73,15 +75,15 @@ struct TaskResult {
 }
 
 impl TaskResult {
-    /// Success = compiled AND all tests passed (or no tests but compiled)
+    /// A task is correct only when every expected test function ran and passed.
+    ///
+    /// Compile-only tasks have expected_tests == 0 and may pass on compilation
+    /// alone. For tasks with tests, zero observed results must never be confused
+    /// with an intentionally empty test suite.
     fn is_correct(&self) -> bool {
         self.compiled
             && self.tests_failed == 0
-            && (self.tests_passed > 0 || self.test_source_empty())
-    }
-    fn test_source_empty(&self) -> bool {
-        // Tasks with no test assertions count as "correct" if they compile
-        self.tests_passed == 0 && self.tests_failed == 0
+            && self.tests_passed == self.expected_tests
     }
 }
 
@@ -790,6 +792,15 @@ fn strip_markdown_fences(source: &str) -> String {
     source.to_string()
 }
 
+/// Count the Rust test functions supplied as the benchmark's correctness oracle.
+///
+/// The current task corpus uses standard #[test] functions. Keep this expected
+/// count independent of execution results so missing/skipped test execution
+/// cannot silently become a passing benchmark result.
+fn count_expected_tests(test_source: &str) -> usize {
+    test_source.matches("#[test]").count()
+}
+
 /// Validate generated code by compiling and running test assertions.
 fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, usize, bool, bool) {
     let mut executor = CodeExecutor::with_real_execution();
@@ -941,8 +952,12 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         .map(|t| t.to_string())
         .collect();
 
-    // Status symbols: ✓ = correct (compiles + tests pass), ◐ = compiles but tests fail, ✗ = doesn't compile
-    let status = if compiled && tests_failed == 0 {
+    let expected_tests = count_expected_tests(task.test_source);
+
+    // Status symbols: ✓ = all expected tests passed, ◐ = compiled but correctness
+    // evidence is incomplete or failing, ✗ = didn't compile.
+    let correct = compiled && tests_failed == 0 && tests_passed == expected_tests;
+    let status = if correct {
         "✓"
     } else if compiled {
         "◐"
@@ -959,9 +974,8 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     );
     if compiled {
         eprint!(
-            "[compiled, {}/{} tests]",
-            tests_passed,
-            tests_passed + tests_failed
+            "[compiled, {}/{} expected tests passed; {} failed]",
+            tests_passed, expected_tests, tests_failed
         );
     } else if !compile_errors.is_empty() {
         let first_err: String = compile_errors[0].chars().take(50).collect();
@@ -982,6 +996,7 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         auto_fix_succeeded: fix_succeeded,
         tests_passed,
         tests_failed,
+        expected_tests,
         iterations: result.iterations_used,
         tiers_used: tier_strings,
         energy: result.total_energy,
@@ -1233,6 +1248,7 @@ fn main() {
                 "compiled": r.compiled,
                 "tests_passed": r.tests_passed,
                 "tests_failed": r.tests_failed,
+                "expected_tests": r.expected_tests,
                 "correct": r.is_correct(),
                 "auto_fix_attempted": r.auto_fix_attempted,
                 "auto_fix_succeeded": r.auto_fix_succeeded,
@@ -1273,5 +1289,76 @@ fn main() {
         serde_json::to_string_pretty(&json_report).unwrap(),
     ) {
         eprintln!("\nJSON report: {}", report_path.display());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn result(
+        compiled: bool,
+        tests_passed: usize,
+        tests_failed: usize,
+        expected_tests: usize,
+    ) -> TaskResult {
+        TaskResult {
+            description: "fixture".to_string(),
+            difficulty: Difficulty::Native,
+            code_written: true,
+            contains_expected_fn: true,
+            contains_todo: false,
+            compiled,
+            compile_errors: Vec::new(),
+            auto_fix_attempted: false,
+            auto_fix_succeeded: false,
+            tests_passed,
+            tests_failed,
+            expected_tests,
+            iterations: 1,
+            tiers_used: Vec::new(),
+            energy: 0.0,
+            phi_mean: 0.0,
+            quality_gate_rejections: 0,
+            elapsed_ms: 0,
+            final_phase: "Done".to_string(),
+        }
+    }
+
+    #[test]
+    fn expected_tests_that_never_execute_are_not_a_pass() {
+        assert!(!result(true, 0, 0, 3).is_correct());
+    }
+
+    #[test]
+    fn all_expected_tests_must_pass() {
+        assert!(result(true, 3, 0, 3).is_correct());
+        assert!(!result(true, 2, 0, 3).is_correct());
+        assert!(!result(true, 3, 1, 3).is_correct());
+    }
+
+    #[test]
+    fn compile_only_task_can_pass_without_tests() {
+        assert!(result(true, 0, 0, 0).is_correct());
+    }
+
+    #[test]
+    fn uncompiled_task_is_never_correct() {
+        assert!(!result(false, 3, 0, 3).is_correct());
+    }
+
+    #[test]
+    fn expected_test_count_counts_standard_test_functions() {
+        assert_eq!(
+            count_expected_tests(
+                r#"
+                #[test] fn first() {}
+                #[test]
+                fn second() {}
+                "#
+            ),
+            2
+        );
+        assert_eq!(count_expected_tests(""), 0);
     }
 }
