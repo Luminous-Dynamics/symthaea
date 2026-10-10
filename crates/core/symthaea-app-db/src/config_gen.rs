@@ -2454,7 +2454,7 @@ fn nix_string_literal(value: &str) -> String {
 }
 
 fn render_appimage_overlay(entries: &[&AppEntry]) -> String {
-    let mut out = String::with_capacity(2048);
+    let mut out = String::with_capacity(3072);
     writeln!(out, "(final: prev: {{").unwrap();
 
     for entry in entries {
@@ -2467,41 +2467,91 @@ fn render_appimage_overlay(entries: &[&AppEntry]) -> String {
             license_attrs,
             platforms,
             runtime_packages,
+            desktop_id,
         } = entry.install_source else {
             continue;
         };
 
         let package = entry.primary.nix_pkg;
-        writeln!(out, "  {package} = prev.appimageTools.wrapType2 {{").unwrap();
-        writeln!(out, "    pname = {};", nix_string_literal(package)).unwrap();
-        writeln!(out, "    version = {};", nix_string_literal(version)).unwrap();
-        writeln!(out, "    src = prev.fetchurl {{").unwrap();
-        writeln!(out, "      url = {};", nix_string_literal(url)).unwrap();
-        writeln!(out, "      hash = {};", nix_string_literal(hash_sri)).unwrap();
-        writeln!(out, "    }};").unwrap();
-        writeln!(out, "    extraPkgs = appPkgs: with appPkgs; [").unwrap();
-        for runtime_package in runtime_packages {
-            writeln!(out, "      {runtime_package}").unwrap();
+        writeln!(out, "  {package} =").unwrap();
+        writeln!(out, "    let").unwrap();
+        writeln!(out, "      pname = {};", nix_string_literal(package)).unwrap();
+        writeln!(out, "      version = {};", nix_string_literal(version)).unwrap();
+        writeln!(out, "      src = prev.fetchurl {{").unwrap();
+        writeln!(out, "        url = {};", nix_string_literal(url)).unwrap();
+        writeln!(out, "        hash = {};", nix_string_literal(hash_sri)).unwrap();
+        writeln!(out, "      }};").unwrap();
+
+        if desktop_id.is_some() {
+            writeln!(
+                out,
+                "      appimageContents = prev.appimageTools.extractType2 {{"
+            )
+            .unwrap();
+            writeln!(out, "        inherit pname version src;").unwrap();
+            writeln!(out, "      }};").unwrap();
         }
-        writeln!(out, "    ];").unwrap();
-        writeln!(out, "    meta = {{").unwrap();
-        writeln!(out, "      description = {};", nix_string_literal(description)).unwrap();
-        writeln!(out, "      homepage = {};", nix_string_literal(homepage)).unwrap();
+
+        writeln!(out, "    in").unwrap();
+        writeln!(out, "    prev.appimageTools.wrapType2 {{").unwrap();
+        writeln!(out, "      inherit pname version src;").unwrap();
+        writeln!(out, "      extraPkgs = appPkgs: with appPkgs; [").unwrap();
+        for runtime_package in runtime_packages {
+            writeln!(out, "        {runtime_package}").unwrap();
+        }
+        writeln!(out, "      ];").unwrap();
+
+        if let Some(desktop_id) = desktop_id {
+            writeln!(out, "      extraInstallCommands = ''").unwrap();
+            writeln!(
+                out,
+                "        mkdir -p $out/share/applications $out/share/mime/packages $out/share/metainfo $out/share/icons"
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "        install -Dm444 ${{appimageContents}}/usr/share/applications/{}.desktop -t $out/share/applications/",
+                desktop_id
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "        install -Dm444 ${{appimageContents}}/usr/share/mime/packages/{}.xml -t $out/share/mime/packages/",
+                desktop_id
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "        install -Dm444 ${{appimageContents}}/usr/share/metainfo/{}.metainfo.xml -t $out/share/metainfo/",
+                desktop_id
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "        cp -r ${{appimageContents}}/usr/share/icons/hicolor $out/share/icons/"
+            )
+            .unwrap();
+            writeln!(out, "      '';").unwrap();
+        }
+
+        writeln!(out, "      meta = {{").unwrap();
+        writeln!(out, "        description = {};", nix_string_literal(description)).unwrap();
+        writeln!(out, "        homepage = {};", nix_string_literal(homepage)).unwrap();
         let license_list = license_attrs
             .iter()
             .map(|license| format!("prev.lib.licenses.{license}"))
             .collect::<Vec<_>>()
             .join(" ");
-        writeln!(out, "      license = [ {license_list} ];").unwrap();
+        writeln!(out, "        license = [ {license_list} ];").unwrap();
         let platform_list = platforms
             .iter()
             .map(|platform| nix_string_literal(platform))
             .collect::<Vec<_>>()
             .join(" ");
-        writeln!(out, "      platforms = [ {platform_list} ];").unwrap();
-        writeln!(out, "      mainProgram = {};", nix_string_literal(package)).unwrap();
+        writeln!(out, "        platforms = [ {platform_list} ];").unwrap();
+        writeln!(out, "        mainProgram = {};", nix_string_literal(package)).unwrap();
+        writeln!(out, "      }};").unwrap();
         writeln!(out, "    }};").unwrap();
-        writeln!(out, "  }};").unwrap();
     }
 
     writeln!(out, "}})").unwrap();
