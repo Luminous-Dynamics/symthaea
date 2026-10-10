@@ -719,14 +719,18 @@ pub fn assess_biochar_climate(
     }
 
     let durable_char_storage_kg_co2e = match input.char_storage.eligibility {
-        CharStorageEligibility::VerifiedEligible => Some(
-            process.char_carbon_kg
-                * input
-                    .char_storage
-                    .durable_fraction_at_horizon
-                    .expect("validated eligible storage has a durability fraction")
-                * (44.0 / 12.0),
-        ),
+        CharStorageEligibility::VerifiedEligible => {
+            let fraction = input
+                .char_storage
+                .durable_fraction_at_horizon
+                .ok_or_else(|| {
+                    SoilProcessError::new(
+                        "char_storage.durable_fraction_at_horizon",
+                        "verified storage requires an explicit durability fraction",
+                    )
+                })?;
+            Some(process.char_carbon_kg * fraction * (44.0 / 12.0))
+        }
         CharStorageEligibility::VerifiedIneligible => Some(0.0),
         CharStorageEligibility::Unknown => None,
     };
