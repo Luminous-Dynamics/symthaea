@@ -9,6 +9,7 @@
 //! a design under budget, estimate causal effects, approve a field trial, or certify safety.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 use symthaea_agribot::soil_process::{EvidenceKind, EvidenceRef};
@@ -169,6 +170,64 @@ impl ExperimentBlock {
     }
 }
 
+#[derive(Serialize)]
+struct ScreeningDesignReviewPayload<'a> {
+    schema_id: &'static str,
+    experiment_id: &'a str,
+    preregistration_id: &'a str,
+    input_snapshot_id: &'a str,
+    protocol_id: &'a str,
+    objective: &'a str,
+    primary_hypothesis: &'a str,
+    analysis_plan_id: &'a str,
+    randomization_seed: u64,
+    factors: &'a [ScreeningFactor],
+    blocks: &'a [ExperimentBlock],
+    replicates_per_setting_per_block: u8,
+    center_point_runs_per_block: u8,
+    primary_endpoint: &'a PrimaryEndpoint,
+}
+
+/// Compute the canonical SHA-256 fingerprint of the design inputs which a reviewer
+/// approves. The approval object itself is excluded to avoid a circular digest; the
+/// payload includes protocol/snapshot identity, factor levels and randomization classes,
+/// blocks, replication, center points, seed, hypothesis, analysis plan, and endpoint.
+/// Struct field order and schema_id are versioned parts of this fingerprint contract.
+pub fn screening_design_sha256(
+    request: &ScreeningDesignRequest,
+) -> Result<String, ScreeningDesignError> {
+    let payload = ScreeningDesignReviewPayload {
+        schema_id: "screening-design-review-payload-v1",
+        experiment_id: &request.experiment_id,
+        preregistration_id: &request.preregistration_id,
+        input_snapshot_id: &request.input_snapshot_id,
+        protocol_id: &request.protocol_id,
+        objective: &request.objective,
+        primary_hypothesis: &request.primary_hypothesis,
+        analysis_plan_id: &request.analysis_plan_id,
+        randomization_seed: request.randomization_seed,
+        factors: &request.factors,
+        blocks: &request.blocks,
+        replicates_per_setting_per_block: request.replicates_per_setting_per_block,
+        center_point_runs_per_block: request.center_point_runs_per_block,
+        primary_endpoint: &request.primary_endpoint,
+    };
+    let bytes = serde_json::to_vec(&payload).map_err(|_| {
+        ScreeningDesignError::new(
+            "request_sha256",
+            "failed to serialize the versioned design-review payload",
+        )
+    })?;
+    let digest = Sha256::digest(bytes);
+    let alphabet = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        encoded.push(alphabet[(byte >> 4) as usize] as char);
+        encoded.push(alphabet[(byte & 0x0f) as usize] as char);
+    }
+    Ok(encoded)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BenchScaleReviewStatus {
@@ -187,6 +246,8 @@ pub struct BenchScaleReview {
     pub protocol_id: String,
     /// Must match the exact request input snapshot containing levels and endpoint.
     pub reviewed_input_snapshot_id: String,
+    /// SHA-256 of the versioned review payload returned by screening_design_sha256().
+    pub reviewed_design_sha256: String,
     pub review_id: String,
     pub reviewer_role: String,
     pub evidence: EvidenceRef,
@@ -292,6 +353,17 @@ impl ScreeningDesignRequest {
                 "review must reference the exact input snapshot containing the factor ranges and endpoint",
             ));
         }
+        nonempty(
+            &self.bench_scale_review.reviewed_design_sha256,
+            "bench_scale_review.reviewed_design_sha256",
+        )?;
+        let actual_design_sha256 = screening_design_sha256(self)?;
+        if self.bench_scale_review.reviewed_design_sha256 != actual_design_sha256 {
+            return Err(ScreeningDesignError::new(
+                "bench_scale_review.reviewed_design_sha256",
+                "review digest does not match the exact versioned design inputs",
+            ));
+        }
         nonempty(&self.bench_scale_review.review_id, "bench_scale_review.review_id")?;
         nonempty(&self.bench_scale_review.reviewer_role, "bench_scale_review.reviewer_role")?;
         evidence(&self.bench_scale_review.evidence, "bench_scale_review.evidence")?;
@@ -375,6 +447,8 @@ pub struct PlannedRun {
 #[serde(deny_unknown_fields)]
 pub struct ScreeningDesignPlan {
     pub algorithm_id: String,
+    /// SHA-256 of the immutable design-input payload approved by the review reference.
+    pub request_sha256: String,
     /// Full copy of the preregistered inputs used to generate this schedule.
     pub request_snapshot: ScreeningDesignRequest,
     pub treatment_combination_count: u32,
@@ -448,6 +522,7 @@ pub fn generate_screening_design(
     request: &ScreeningDesignRequest,
 ) -> Result<ScreeningDesignPlan, ScreeningDesignError> {
     let total_runs = request.validate()?;
+    let request_sha256 = screening_design_sha256(request)?;
     let factor_count = request.factors.len();
     let combination_count = 1_usize << factor_count;
     let treatment_runs_per_block =
@@ -520,6 +595,7 @@ pub fn generate_screening_design(
 
     Ok(ScreeningDesignPlan {
         algorithm_id: DESIGN_ALGORITHM_ID.to_string(),
+        request_sha256,
         request_snapshot: request.clone(),
         treatment_combination_count: combination_count as u32,
         treatment_run_count,
@@ -538,6 +614,7 @@ pub fn generate_screening_design(
 pub struct ScreeningDesignVerificationReceipt {
     pub experiment_id: String,
     pub input_snapshot_id: String,
+    pub request_sha256: String,
     pub algorithm_id: String,
     pub verified_run_count: u32,
     pub verified_block_count: u32,
@@ -556,6 +633,13 @@ pub fn verify_screening_design(
 ) -> Result<ScreeningDesignVerificationReceipt, ScreeningDesignError> {
     let request = &plan.request_snapshot;
     let expected_total = request.validate()?;
+    let request_sha256 = screening_design_sha256(request)?;
+    if plan.request_sha256 != request_sha256 {
+        return Err(ScreeningDesignError::new(
+            "plan.request_sha256",
+            "stored request fingerprint does not match the versioned design input payload",
+        ));
+    }
     if plan.algorithm_id != DESIGN_ALGORITHM_ID {
         return Err(ScreeningDesignError::new(
             "algorithm_id",
@@ -759,6 +843,7 @@ pub fn verify_screening_design(
     Ok(ScreeningDesignVerificationReceipt {
         experiment_id: request.experiment_id.clone(),
         input_snapshot_id: request.input_snapshot_id.clone(),
+        request_sha256,
         algorithm_id: plan.algorithm_id.clone(),
         verified_run_count: plan.runs.len() as u32,
         verified_block_count: request.blocks.len() as u32,
