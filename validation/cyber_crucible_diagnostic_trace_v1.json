@@ -1,0 +1,77 @@
+{
+  "trace_schema_version": "cyber-crucible-diagnostic-trace.v1",
+  "trace_id": "TRACE-DNS-CALIBRATION-001",
+  "classification": "public_calibration_non_qualifying",
+  "scenario_binding": {
+    "scenario_id": "NET-DNS-TLS-001",
+    "revision": 1,
+    "scenario_digest": "ad90b3c34112ae08b497d2a99e5c4d2d4e969b0d8f5c17ad05695c9bff62557e"
+  },
+  "execution_context": {
+    "mode": "synthetic",
+    "scope": "Public fixture illustration only; no external query, live service, or operational action was performed.",
+    "authorization_ref": null
+  },
+  "assets": [
+    { "asset_id": "CLIENT-1", "role": "affected client", "trust_boundary": "Endpoint configuration and local clock are not authoritative for remote DNS state.", "criticality": "moderate" },
+    { "asset_id": "RESOLVER-A", "role": "configured resolver A", "trust_boundary": "Resolver response must be compared against authenticated baseline and change history.", "criticality": "high" },
+    { "asset_id": "RESOLVER-B", "role": "configured resolver B", "trust_boundary": "Resolver response may differ because of legitimate cache or policy state.", "criticality": "high" }
+  ],
+  "evidence": [
+    { "evidence_id": "E1", "observed_at": "fixture-relative T+00", "kind": "client_observation", "basis": "direct", "source_class": "public_fixture", "integrity_status": "unverified", "observation": "The client reports intermittent application connection and TLS failures." },
+    { "evidence_id": "E2", "observed_at": "fixture-relative T+02", "kind": "controlled_baseline", "basis": "direct", "source_class": "public_fixture", "integrity_status": "unverified", "observation": "A matched direct-IP request succeeds, establishing limited endpoint reachability." },
+    { "evidence_id": "E3", "observed_at": "fixture-relative T+03", "kind": "resolver_observation", "basis": "direct", "source_class": "public_fixture", "integrity_status": "unverified", "observation": "Two configured resolvers return different answers for the same name." },
+    { "evidence_id": "E4", "observed_at": "fixture-relative T+04", "kind": "clock_observation", "basis": "direct", "source_class": "public_fixture", "integrity_status": "unverified", "observation": "The client clock differs from the trusted time reference." }
+  ],
+  "hypotheses": [
+    { "hypothesis_id": "H1", "statement": "A legitimate endpoint change left stale DNS or cache state on one resolver.", "status": "active", "confidence_bps": 5600, "confidence_calibration": "uncalibrated", "supporting_evidence_refs": ["E3"], "contradicting_evidence_refs": [] },
+    { "hypothesis_id": "H2", "statement": "A resolver configuration or network-path defect contributes to the intermittent failure.", "status": "active", "confidence_bps": 6400, "confidence_calibration": "uncalibrated", "supporting_evidence_refs": ["E1", "E3"], "contradicting_evidence_refs": [] },
+    { "hypothesis_id": "H3", "statement": "Client clock skew contributes to TLS validation failure after name resolution.", "status": "retained", "confidence_bps": 4400, "confidence_calibration": "uncalibrated", "supporting_evidence_refs": ["E1", "E4"], "contradicting_evidence_refs": [] },
+    { "hypothesis_id": "H4", "statement": "Malicious DNS manipulation remains possible but is not established by resolver divergence alone.", "status": "retained", "confidence_bps": 2200, "confidence_calibration": "uncalibrated", "supporting_evidence_refs": ["E3"], "contradicting_evidence_refs": [] }
+  ],
+  "observations": [
+    { "observation_id": "O1", "target": "Resolver A/B answer and TTL comparison", "question": "Do authenticated resolver logs and change chronology explain the answer divergence?", "observation_class": "compare_authenticated_logs", "impact": "read_only", "authority_status": "not_required", "outcome": "illustrative_only", "evidence_refs": ["E1", "E2", "E3"], "rationale": "This is the next bounded observation because it can discriminate cache/configuration explanations without changing production state.", "result_summary": "The public fixture provides divergence but not enough chronology to identify the root cause.", "authorization_ref": null }
+  ],
+  "containment_proposals": [
+    { "proposal_id": "C1", "action_class": "defer_live_mutation", "description": "Preserve the current DNS and TLS configuration while read-only evidence and authorized change history are gathered.", "affected_asset_ids": ["CLIENT-1", "RESOLVER-A", "RESOLVER-B"], "scope_evidence_refs": ["E1", "E2", "E3"], "authority_status": "unknown", "disposition": "deferred", "preconditions": ["Obtain resolver logs and compare the exact affected name and time window", "Confirm the change owner and authorized maintenance window before any mutation"], "predicted_side_effects": ["Intermittent failures may continue while diagnosis proceeds", "Avoids converting uncertain evidence into a potentially broad DNS or TLS outage"], "reversible": true, "rollback_plan": "No live mutation is proposed or made in this synthetic trace; no rollback operation is applicable.", "rollback_verification": "Verify no configuration change was issued by this trace before closing the diagnostic episode.", "authorization_ref": null, "execution_evidence_refs": [] }
+  ],
+  "recovery": {
+    "status": "not_started",
+    "entry_criteria": ["Root cause and authorized remediation scope are established", "A matched baseline and rollback owner are recorded before a change"],
+    "obligations": [
+      { "obligation_id": "R1", "description": "Confirm resolver answers and TTL behavior match the approved configuration.", "verification_method": "Compare authenticated resolver logs and a repeated bounded read-only query.", "status": "pending", "evidence_refs": [], "rationale": "The public fixture does not contain the required authenticated chronology." },
+      { "obligation_id": "R2", "description": "Confirm TLS validation uses a trusted clock and the expected certificate chain.", "verification_method": "Check time synchronization evidence and certificate validation output without disabling validation.", "status": "pending", "evidence_refs": [], "rationale": "The fixture does not establish that the clock is the sole cause." },
+      { "obligation_id": "R3", "description": "Confirm service health across affected names and resolver paths after an authorized fix.", "verification_method": "Repeat a predefined read-only health matrix and compare with the pre-change baseline.", "status": "pending", "evidence_refs": [], "rationale": "No fix was applied, so recovery and eradication are not established." }
+    ]
+  },
+  "phases": [
+    { "phase": "orient", "state": "completed", "summary": "Record the bounded failure window and separate observations from causal claims.", "evidence_refs": ["E1"] },
+    { "phase": "model_assets_and_trust_boundaries", "state": "completed", "summary": "Map the client and both resolvers without assuming their control-plane records are authoritative.", "evidence_refs": ["E1", "E3"] },
+    { "phase": "enumerate_competing_hypotheses", "state": "completed", "summary": "Retain stale cache, resolver/path defect, clock skew, and malicious manipulation as alternatives.", "evidence_refs": ["E1", "E3", "E4"] },
+    { "phase": "identify_evidence_gaps", "state": "completed", "summary": "Authenticated logs, change chronology, TTL detail, and stronger time evidence are missing.", "evidence_refs": ["E3", "E4"] },
+    { "phase": "select_next_observation", "state": "completed", "summary": "Choose a read-only comparison of authenticated resolver logs before remediation.", "evidence_refs": ["E1", "E2", "E3"] },
+    { "phase": "update_beliefs", "state": "completed", "summary": "Keep resolver divergence as an observation and leave cause confidence uncalibrated.", "evidence_refs": ["E1", "E3", "E4"] },
+    { "phase": "scope_impact", "state": "completed", "summary": "Limit scope to the observed client and configured resolver pair pending broader evidence.", "evidence_refs": ["E1", "E2", "E3"] },
+    { "phase": "assess_claim_maturity", "state": "completed", "summary": "The evidence ceiling is a bounded diagnostic hypothesis, not compromise or attribution.", "evidence_refs": ["E1", "E2", "E3", "E4"] },
+    { "phase": "propose_containment", "state": "completed", "summary": "Defer live DNS/TLS changes because cause, scope, and authority remain unresolved.", "evidence_refs": ["E1", "E2", "E3"] },
+    { "phase": "predict_side_effects", "state": "completed", "summary": "Document that failure may persist while avoiding an uncertain change that could widen an outage.", "evidence_refs": ["E1", "E2"] },
+    { "phase": "check_authority", "state": "completed", "summary": "No authorization reference is present and no live mutation is claimed or permitted by this trace.", "evidence_refs": [] },
+    { "phase": "verify_outcome", "state": "completed", "summary": "No operational effect was executed, so this trace makes no containment-success claim.", "evidence_refs": [] },
+    { "phase": "define_recovery_obligations", "state": "completed", "summary": "Keep resolver, TLS/time, and end-to-end health verification pending until an authorized fix exists.", "evidence_refs": [] },
+    { "phase": "assess_residual_uncertainty", "state": "completed", "summary": "The true cause, full impact, and whether any malicious activity occurred remain unresolved.", "evidence_refs": ["E1", "E3", "E4"] },
+    { "phase": "produce_evidence_bearing_report", "state": "completed", "summary": "Escalate for bounded read-only investigation; state uncertainty and avoid attribution or production claims.", "evidence_refs": ["E1", "E2", "E3", "E4"] }
+  ],
+  "residual_uncertainty": {
+    "known_unknowns": ["Which resolver response matches the approved endpoint state", "Whether clock skew independently explains any TLS failures", "Whether the divergence is benign or malicious", "Whether any additional clients or names are affected"],
+    "confidence_limit": "All confidence values are uncalibrated scenario-analysis annotations; fixture assertions are not authenticated operational evidence.",
+    "attribution_status": "not_supported"
+  },
+  "report": {
+    "disposition": "escalate",
+    "root_cause_status": "not_supported",
+    "attribution_status": "not_supported",
+    "evidence_refs": ["E1", "E2", "E3", "E4"],
+    "summary": "Resolver divergence and intermittent TLS failures justify further bounded investigation, but the public fixture does not establish root cause, malicious intent, actor identity, complete recovery, or permission to change production state.",
+    "production_authority_granted": false
+  }
+}
