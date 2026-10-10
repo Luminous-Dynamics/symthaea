@@ -1269,7 +1269,7 @@ mod tests {
     }
 
     #[test]
-    fn midi_late_nondefault_key_is_rejected_against_default_c_major() {
+    fn midi_late_nondefault_key_is_rejected_without_opening_context() {
         let track = [
             100, 0xFF, 0x59, 2, 1, 0, // G major at tick 100
             0, 0x90, 60, 100,
@@ -1452,7 +1452,7 @@ mod tests {
         </part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
-            error.contains("changes from the default at a non-zero beat"),
+            error.contains("first appears at a non-zero beat"),
             "{error}"
         );
     }
@@ -1471,7 +1471,7 @@ mod tests {
         </part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
-            error.contains("changes from the default at a non-zero beat"),
+            error.contains("first appears at a non-zero beat"),
             "{error}"
         );
     }
@@ -1490,7 +1490,7 @@ mod tests {
         </part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
-            error.contains("changes from the default at a non-zero beat"),
+            error.contains("first appears at a non-zero beat"),
             "{error}"
         );
     }
