@@ -923,7 +923,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardSubmissionCadenceV1::new(profile(), ts(1), vec![wrong_transport]).unwrap_err(),
+            Px4OffboardSubmissionCadenceV1::new(profile(), ts(1), vec![wrong_transport])
+                .unwrap_err(),
             Px4OffboardSubmissionError::MessageKindTransportMismatch
         );
 
