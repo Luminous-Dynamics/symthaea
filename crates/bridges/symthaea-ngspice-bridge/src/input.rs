@@ -47,9 +47,16 @@ impl fmt::Display for NetlistArtifactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyRequestId => f.write_str("netlist artifact request ID cannot be empty"),
-            Self::NonCanonicalRequestId => f.write_str("request ID must not have leading or trailing whitespace"),
-            Self::RequestIdTooLarge { actual, maximum } => write!(f, "request ID is {actual} bytes; maximum accepted size is {maximum}"),
-            Self::RequestIdControlCharacter => f.write_str("request ID must not contain control characters"),
+            Self::NonCanonicalRequestId => {
+                f.write_str("request ID must not have leading or trailing whitespace")
+            }
+            Self::RequestIdTooLarge { actual, maximum } => write!(
+                f,
+                "request ID is {actual} bytes; maximum accepted size is {maximum}"
+            ),
+            Self::RequestIdControlCharacter => {
+                f.write_str("request ID must not contain control characters")
+            }
             Self::RequestIdMismatch { artifact, request } => write!(
                 f,
                 "netlist artifact belongs to request {artifact:?}, not {request:?}"
