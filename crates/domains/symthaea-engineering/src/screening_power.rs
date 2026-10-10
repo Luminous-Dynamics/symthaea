@@ -130,6 +130,8 @@ pub struct ScreeningPowerAssessment {
     pub input_snapshot_id: String,
     /// SHA-256 of the versioned design-input payload used by the reviewed schedule.
     pub request_sha256: String,
+    /// SHA-256 of the exact generated run-order artifact used for this assessment.
+    pub schedule_sha256: String,
     pub primary_endpoint_id: String,
     pub endpoint_unit: String,
     pub effect_family: String,
@@ -240,6 +242,7 @@ pub fn assess_screening_power(
         experiment_id: request.experiment_id.clone(),
         input_snapshot_id: request.input_snapshot_id.clone(),
         request_sha256: validated_schedule.request_sha256.clone(),
+        schedule_sha256: validated_schedule.schedule_sha256.clone(),
         primary_endpoint_id: endpoint.endpoint_id.clone(),
         endpoint_unit: endpoint.unit.clone(),
         effect_family: "two-sided main effects only; Bonferroni familywise adjustment across all declared factors".into(),
@@ -431,6 +434,8 @@ mod tests {
             result.request_sha256,
             crate::screening_design::screening_design_sha256(&input).unwrap()
         );
+        let planned = generate_screening_design(&input).unwrap();
+        assert_eq!(result.schedule_sha256, planned.schedule_sha256);
         assert!(result.projected_power_normal_approx >= 0.80);
         assert_eq!(result.status, ScreeningPowerStatus::ProjectedTargetMet);
         assert_eq!(result.bonferroni_alpha_per_main_effect, 0.025);
