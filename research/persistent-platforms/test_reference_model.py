@@ -388,7 +388,7 @@ class SolarDaylightDerivationTests(unittest.TestCase):
         monthly = monthly_mean_daylight_hours_noaa(-26.2, "2020-01-01", "2020-12-31")
         self.assertEqual(len(monthly), 12)
         self.assertGreater(monthly[0], monthly[6])
-        with self.assertRaisesRegex(ValueError, "each calendar month"):
+        with self.assertRaisesRegex(ValueError, "complete calendar years"):
             monthly_mean_daylight_hours_noaa(-26.2, "2020-01-01", "2020-02-01")
         with self.assertRaisesRegex(ValueError, "latitude_deg"):
             solar_daylight_hours_noaa(91.0, "2020-06-21")
