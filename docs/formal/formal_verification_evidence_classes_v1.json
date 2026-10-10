@@ -1,0 +1,106 @@
+{
+  "schema": "symthaea.formal-verification.evidence-classes.v1",
+  "tracking_issue": 5712,
+  "authority": "ArchitectureOnly",
+  "classes": [
+    {
+      "id": "AbstractFormalTheorem",
+      "establishes": "A theorem follows from the exact formal definitions and stated assumptions under the admitted proof-kernel and axiom policy.",
+      "does_not_establish": [
+        "production Rust refinement",
+        "native binary correctness",
+        "runtime authority"
+      ]
+    },
+    {
+      "id": "ExtractedSourceRefinement",
+      "establishes": "The selected supported Rust source semantics, under the exact recorded translation pipeline, satisfy the stated formal relationship.",
+      "does_not_establish": [
+        "rustc correctness",
+        "LLVM correctness",
+        "native binary correctness",
+        "coverage of excluded or unsupported source behavior",
+        "runtime authority"
+      ]
+    },
+    {
+      "id": "DeductiveImplementationProof",
+      "establishes": "The selected executable Rust subject satisfies the exact verifier contracts under the recorded verifier trust boundary.",
+      "does_not_establish": [
+        "whole-program correctness",
+        "compiler correctness",
+        "distributed-protocol correctness",
+        "runtime authority"
+      ]
+    },
+    {
+      "id": "BoundedModelSafety",
+      "establishes": "No specified safety violation was found inside the exact retained finite model/configuration/state-space profile.",
+      "does_not_establish": [
+        "unbounded proof",
+        "liveness",
+        "production refinement",
+        "runtime authority"
+      ]
+    },
+    {
+      "id": "TemporalModelEvidence",
+      "establishes": "The named temporal or reachability property holds under the exact retained model/checker/configuration/fairness/bound profile.",
+      "does_not_establish": [
+        "production liveness",
+        "unbounded behavior outside the profile",
+        "runtime authority"
+      ]
+    },
+    {
+      "id": "BoundedTraceConformance",
+      "establishes": "The implementation and formal model agree under the exact stated projection/refinement relation for the retained bounded traces.",
+      "does_not_establish": [
+        "full semantic refinement",
+        "whole-program correctness",
+        "runtime authority"
+      ]
+    },
+    {
+      "id": "RuntimeQualification",
+      "establishes": "The exact runtime subject exhibited the claimed bounded behavior under the exact retained qualification environment/profile.",
+      "does_not_establish": [
+        "a stronger formal theorem",
+        "general behavior outside the qualification profile",
+        "automatic authority for external effects"
+      ]
+    }
+  ],
+  "mandatory_non_equivalences": [
+    "AbstractFormalTheorem != implementation theorem",
+    "Aeneas extraction != proof",
+    "Aeneas extraction != compiler verification",
+    "Aeneas extraction != native binary verification",
+    "generated Lean != Lean proof",
+    "Lean proof != intended-theorem conformance",
+    "Lean proof != axiom-policy acceptance",
+    "Verus PASS != rustc correctness",
+    "Verus PASS != LLVM correctness",
+    "Verus PASS != distributed-protocol correctness",
+    "TLC bounded PASS != unbounded proof",
+    "Alloy UNSAT != theorem outside the declared scope",
+    "crosswalk != behavioral refinement",
+    "bounded trace conformance != full refinement",
+    "formal-model refinement != Holochain/runtime refinement",
+    "cryptographic authentication != authorization",
+    "formal verification != permission for external effects",
+    "proof receipt != runtime authority"
+  ],
+  "standard_tools": {
+    "abstract_math": ["Lean4", "Mathlib4"],
+    "rust_to_lean": ["Charon", "Aeneas"],
+    "rust_deductive": ["Verus"],
+    "distributed_temporal": ["TLA+", "TLC"],
+    "structural": ["Alloy"]
+  },
+  "experimental_tools": {
+    "Quint": "Admit only as a bounded model-based-testing/developer bridge unless a later reviewed architecture explicitly promotes it.",
+    "Creusot": "Evaluate only for a concrete important Rust proof materially blocked in Verus; not part of the v1 standard toolchain.",
+    "Hax": "May be evaluated as a developer/extraction frontend but not counted as an independent Lean proof lineage when it shares the Charon/Aeneas path."
+  }
+}
