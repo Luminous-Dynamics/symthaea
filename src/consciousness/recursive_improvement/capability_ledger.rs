@@ -251,6 +251,8 @@ pub struct CapabilityLedger {
     subject: SubjectIdentity,
     claims: BTreeMap<String, CapabilityClaim>,
     forecasts: BTreeMap<String, ForecastRecord>,
+    /// Most recent accepted forecast/outcome event sequence for the whole ledger.
+    last_sequence: u64,
 }
 
 impl CapabilityLedger {
@@ -260,6 +262,7 @@ impl CapabilityLedger {
             subject,
             claims: BTreeMap::new(),
             forecasts: BTreeMap::new(),
+            last_sequence: 0,
         })
     }
 
@@ -363,6 +366,9 @@ impl CapabilityLedger {
         if forecast.subject != self.subject {
             return Err(CapabilityLedgerError::SubjectMismatch);
         }
+        if forecast.sequence <= self.last_sequence {
+            return Err(CapabilityLedgerError::SequenceNotMonotonic);
+        }
         let claim = self
             .claims
             .get(&forecast.claim_id)
@@ -381,6 +387,7 @@ impl CapabilityLedger {
         if self.forecasts.contains_key(&forecast.forecast_id) {
             return Err(CapabilityLedgerError::DuplicateForecast);
         }
+        let sequence = forecast.sequence;
         self.forecasts.insert(
             forecast.forecast_id.clone(),
             ForecastRecord {
@@ -388,6 +395,7 @@ impl CapabilityLedger {
                 receipt: None,
             },
         );
+        self.last_sequence = sequence;
         Ok(())
     }
 
@@ -411,6 +419,9 @@ impl CapabilityLedger {
                 .is_some_and(|cost| !cost.is_finite() || cost < 0.0)
         {
             return Err(CapabilityLedgerError::InvalidOutcomeReceipt);
+        }
+        if receipt.sequence <= self.last_sequence {
+            return Err(CapabilityLedgerError::SequenceNotMonotonic);
         }
         {
             let record = self
@@ -437,10 +448,12 @@ impl CapabilityLedger {
         }) {
             return Err(CapabilityLedgerError::ReceiptReplay);
         }
+        let sequence = receipt.sequence;
         self.forecasts
             .get_mut(&receipt.forecast_id)
             .ok_or(CapabilityLedgerError::UnknownForecast)?
             .receipt = Some(receipt);
+        self.last_sequence = sequence;
         Ok(())
     }
 
@@ -1009,24 +1022,77 @@ mod tests {
     }
 
     #[test]
+    fn forecast_and_outcome_events_share_one_monotonic_sequence() {
+        let mut ledger = setup_claim();
+        ledger
+            .record_forecast(CapabilityForecast {
+                forecast_id: "first".to_string(),
+                claim_id: "rust-debugging".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: 5,
+                context_id: "context-first".to_string(),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: 0.8,
+                expected_compute_units: 1.0,
+                predicted_failure_mode: None,
+            })
+            .unwrap();
+
+        let receipt = CapabilityOutcomeReceipt {
+            forecast_id: "first".to_string(),
+            subject: subject(),
+            sequence: 5,
+            observed_success: true,
+            split: CapabilitySplit::HeldOut,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            receipt_sha256: "3".repeat(64),
+            actual_compute_units: None,
+        };
+        assert_eq!(
+            ledger.resolve_forecast(receipt.clone()),
+            Err(CapabilityLedgerError::SequenceNotMonotonic)
+        );
+
+        let mut later_receipt = receipt;
+        later_receipt.sequence = 6;
+        ledger.resolve_forecast(later_receipt).unwrap();
+
+        assert_eq!(
+            ledger.record_forecast(CapabilityForecast {
+                forecast_id: "out-of-order".to_string(),
+                claim_id: "rust-debugging".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: 5,
+                context_id: "context-out-of-order".to_string(),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: 0.8,
+                expected_compute_units: 1.0,
+                predicted_failure_mode: None,
+            }),
+            Err(CapabilityLedgerError::SequenceNotMonotonic)
+        );
+    }
+
+    #[test]
     fn receipt_root_cannot_be_replayed_for_a_second_forecast() {
         let mut ledger = setup_claim();
-        for (id, seq) in [("first", 1u64), ("second", 3u64)] {
-            ledger
-                .record_forecast(CapabilityForecast {
-                    forecast_id: id.to_string(),
-                    claim_id: "rust-debugging".to_string(),
-                    claim_sha256: "f".repeat(64),
-                    subject: subject(),
-                    sequence: seq,
-                    context_id: format!("context-{id}"),
-                    split: CapabilitySplit::HeldOut,
-                    predicted_success_probability: 0.5,
-                    expected_compute_units: 1.0,
-                    predicted_failure_mode: None,
-                })
-                .unwrap();
-        }
+        ledger
+            .record_forecast(CapabilityForecast {
+                forecast_id: "first".to_string(),
+                claim_id: "rust-debugging".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: 1,
+                context_id: "context-first".to_string(),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: 0.5,
+                expected_compute_units: 1.0,
+                predicted_failure_mode: None,
+            })
+            .unwrap();
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "first".to_string(),
             subject: subject(),
@@ -1039,6 +1105,21 @@ mod tests {
             actual_compute_units: None,
         };
         ledger.resolve_forecast(receipt.clone()).unwrap();
+
+        ledger
+            .record_forecast(CapabilityForecast {
+                forecast_id: "second".to_string(),
+                claim_id: "rust-debugging".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: 3,
+                context_id: "context-second".to_string(),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: 0.5,
+                expected_compute_units: 1.0,
+                predicted_failure_mode: None,
+            })
+            .unwrap();
         let replay = CapabilityOutcomeReceipt {
             forecast_id: "second".to_string(),
             sequence: 4,
