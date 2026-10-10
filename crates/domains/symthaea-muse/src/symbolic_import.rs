@@ -407,7 +407,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     let mut key_events = Vec::<(Duration, (i32, bool))>::new();
     let mut meter_events = Vec::<(Duration, u8)>::new();
     let mut tempo_events = Vec::<(Duration, f32)>::new();
-    let mut raw = Vec::<(usize, u8, Duration, Duration)>::new();
+    let mut raw = Vec::<(usize, u8, Duration, Duration, f32)>::new();
 
     for (part_index, part) in parts.iter().enumerate() {
         // Divisions are part-local and can change during a score. Keep the
@@ -415,6 +415,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         let mut divisions = 1_i64;
         let mut cursor = Duration::zero();
         let mut previous_onset = Duration::zero();
+        let mut current_velocity = 90.0_f32 / 127.0;
         for child in part.descendants().filter(|node| node.is_element()) {
             if child.has_tag_name("divisions") {
                 let value = node_i64(child)
@@ -485,7 +486,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 meter_events.push((cursor, numerator));
             } else if child.has_tag_name("metronome") {
                 let bpm = musicxml_metronome_tempo(child)?;
-                let position = musicxml_tempo_position(child, cursor)?;
+                let position = musicxml_sound_position(child, cursor)?;
                 tempo_events.push((position, bpm));
             } else if child.has_tag_name("sound") {
                 if let Some(value) = child.attribute("tempo") {
@@ -497,8 +498,17 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                             "MusicXML tempo must be finite and between 20 and 320 BPM".into(),
                         );
                     }
-                    let position = musicxml_tempo_position(child, cursor)?;
+                    let position = musicxml_sound_position(child, cursor)?;
                     tempo_events.push((position, bpm));
+                }
+                if let Some(value) = child.attribute("dynamics") {
+                    let position = musicxml_sound_position(child, cursor)?;
+                    let velocity = musicxml_dynamics_velocity(value, "sound dynamics")?;
+                    // Score stores velocity on each note, so a supported
+                    // unoffset sound dynamic can update this part's following
+                    // note events without inventing a global dynamics curve.
+                    let _ = position;
+                    current_velocity = velocity;
                 }
             } else if child.has_tag_name("backup") {
                 let amount = musicxml_duration(child, "backup")?;
@@ -532,6 +542,19 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                             .into(),
                     );
                 }
+                if ["end-dynamics", "attack", "release", "pizzicato"]
+                    .iter()
+                    .any(|attribute| child.attribute(*attribute).is_some())
+                {
+                    return Err(
+                        "MusicXML note uses end-dynamics, attack, release, or pizzicato, which the current Score model cannot represent"
+                            .into(),
+                    );
+                }
+                let note_velocity = match child.attribute("dynamics") {
+                    Some(value) => musicxml_dynamics_velocity(value, "note dynamics")?,
+                    None => current_velocity,
+                };
                 let duration = musicxml_duration(child, "note")?;
                 let duration = Duration::new(duration, divisions);
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
@@ -571,7 +594,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                             "MusicXML import exceeds the {MAX_IMPORTED_NOTES}-note limit"
                         ));
                     }
-                    raw.push((part_index, midi, onset, duration));
+                    raw.push((part_index, midi, onset, duration, note_velocity));
                 }
                 previous_onset = onset;
                 if !chord {
@@ -598,7 +621,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     };
     let mut score = Score::new(key, tempo, meter);
     let part_count = parts.len();
-    for (part, midi, onset, duration) in raw {
+    for (part, midi, onset, duration, velocity) in raw {
         let role = if part_count == 1 || part == 0 {
             VoiceRole::Melody
         } else if part + 1 == part_count {
@@ -616,10 +639,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 pitch: Pitch::from_midi(midi),
                 onset,
                 duration,
-                // MusicXML's default playback dynamics are MIDI velocity 90
-                // (forte). Store the normalized value instead of an arbitrary
-                // nearby float.
-                velocity: 90.0 / 127.0,
+                velocity,
                 role,
                 emphasis: Emphasis::Normal,
                 section_intensity: 1.0,
@@ -830,10 +850,10 @@ fn stable_musicxml_metadata<T: Copy + PartialEq>(
     Ok(first_value)
 }
 
-/// Return the current beat position for a tempo indicator only when its
-/// effective sound/direction offset is zero. MusicXML's sound-level offset
+/// Return the current beat position for a sound/dynamics indicator only when
+/// its effective sound/direction offset is zero. A sound-level offset
 /// overrides a containing direction offset, so inspect it first.
-fn musicxml_tempo_position(
+fn musicxml_sound_position(
     node: roxmltree::Node<'_, '_>,
     position: Duration,
 ) -> Result<Duration, String> {
@@ -873,6 +893,28 @@ fn musicxml_tempo_position(
         ancestor = parent.parent();
     }
     Ok(position)
+}
+
+/// Map MusicXML playback dynamics (percent of forte MIDI velocity 90) onto
+/// the representable MIDI velocity domain. Reject values that cannot be
+/// encoded rather than clipping or silently changing the source value.
+fn musicxml_dynamics_velocity(value: &str, field: &str) -> Result<f32, String> {
+    let percent = value
+        .trim()
+        .parse::<f32>()
+        .map_err(|_| format!("MusicXML {field} must be a non-negative decimal"))?;
+    if !percent.is_finite() || percent < 0.0 {
+        return Err(format!(
+            "MusicXML {field} must be a finite non-negative decimal"
+        ));
+    }
+    let midi_velocity = (percent * 0.9).round();
+    if midi_velocity > 127.0 {
+        return Err(format!(
+            "MusicXML {field} exceeds the representable MIDI velocity range"
+        ));
+    }
+    Ok(midi_velocity / 127.0)
 }
 
 /// MusicXML durations use positive integer division units. Required values
@@ -1166,6 +1208,68 @@ mod tests {
         let tracks: [&[u8]; 2] = [&first, &second];
         let error = parse_midi(&midi_file_with_format(0, &tracks)).unwrap_err();
         assert!(error.contains("requires exactly one track"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_sound_dynamics_apply_to_subsequent_notes() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound dynamics="71"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert!(score.notes.iter().all(|note| {
+            (note.velocity - 64.0_f32 / 127.0).abs() < 1e-7
+        }));
+    }
+
+    #[test]
+    fn musicxml_note_dynamics_override_part_playback_dynamics() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound dynamics="50"/></direction>
+            <note dynamics="71"><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert!((score.notes[0].velocity - 64.0_f32 / 127.0).abs() < 1e-7);
+        assert!((score.notes[1].velocity - 45.0_f32 / 127.0).abs() < 1e-7);
+    }
+
+    #[test]
+    fn musicxml_sound_dynamics_outside_velocity_range_are_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound dynamics="150"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("exceeds the representable MIDI velocity range"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_unsupported_note_playback_attributes_are_rejected() {
+        for attribute in [
+            r#"end-dynamics="71""#,
+            r#"attack="1""#,
+            r#"release="1""#,
+            r#"pizzicato="yes""#,
+        ] {
+            let xml = format!(
+                r#"<score-partwise><part id="P1"><measure number="1">
+                    <attributes><divisions>1</divisions></attributes>
+                    <note {attribute}><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+                </measure></part></score-partwise>"#
+            );
+            let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+            assert!(
+                error.contains("end-dynamics, attack, release, or pizzicato"),
+                "{attribute}: {error}"
+            );
+        }
     }
 
     #[test]
