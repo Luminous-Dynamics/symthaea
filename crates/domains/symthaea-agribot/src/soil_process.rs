@@ -33,6 +33,92 @@ impl fmt::Display for SoilProcessError {
 
 impl Error for SoilProcessError {}
 
+/// Provenance class for one input group. A literature value or estimate remains
+/// distinct from a direct measurement; a scenario is never an observation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceKind {
+    Measured,
+    Literature,
+    Estimated,
+    Scenario,
+}
+
+/// Reference to an immutable evidence record or versioned parameter source.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceRef {
+    pub evidence_id: String,
+    pub kind: EvidenceKind,
+}
+
+impl EvidenceRef {
+    fn validate(&self, field: &'static str) -> Result<(), SoilProcessError> {
+        if self.evidence_id.trim().is_empty() {
+            return Err(SoilProcessError::new(field, "evidence ID cannot be empty"));
+        }
+        Ok(())
+    }
+}
+
+/// Separate provenance for feedstock observations, empirical process parameters,
+/// thermophysical values, reactor design data, and the exact input snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PyrolysisEvidence {
+    pub feedstock: EvidenceRef,
+    pub process_parameters: EvidenceRef,
+    pub thermophysical_properties: EvidenceRef,
+    pub reactor_design: EvidenceRef,
+    pub input_snapshot_id: String,
+}
+
+impl PyrolysisEvidence {
+    fn validate(&self) -> Result<(), SoilProcessError> {
+        self.feedstock.validate("evidence.feedstock")?;
+        self.process_parameters.validate("evidence.process_parameters")?;
+        self.thermophysical_properties
+            .validate("evidence.thermophysical_properties")?;
+        self.reactor_design.validate("evidence.reactor_design")?;
+        if self.input_snapshot_id.trim().is_empty() {
+            return Err(SoilProcessError::new(
+                "evidence.input_snapshot_id",
+                "input snapshot ID cannot be empty",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Provenance for stream composition, recovery calibration, and period-specific
+/// plant-availability fractions. These are separate evidence sources by design.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NutrientRecoveryEvidence {
+    pub influent_composition: EvidenceRef,
+    pub recovery_parameters: EvidenceRef,
+    pub plant_availability_parameters: EvidenceRef,
+    pub input_snapshot_id: String,
+}
+
+impl NutrientRecoveryEvidence {
+    fn validate(&self) -> Result<(), SoilProcessError> {
+        self.influent_composition
+            .validate("evidence.influent_composition")?;
+        self.recovery_parameters
+            .validate("evidence.recovery_parameters")?;
+        self.plant_availability_parameters
+            .validate("evidence.plant_availability_parameters")?;
+        if self.input_snapshot_id.trim().is_empty() {
+            return Err(SoilProcessError::new(
+                "evidence.input_snapshot_id",
+                "input snapshot ID cannot be empty",
+            ));
+        }
+        Ok(())
+    }
+}
+
 fn finite(value: f64, field: &'static str) -> Result<(), SoilProcessError> {
     if !value.is_finite() {
         return Err(SoilProcessError::new(field, "must be finite"));
@@ -84,6 +170,8 @@ fn fraction(value: f64, field: &'static str, allow_zero: bool) -> Result<(), Soi
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PyrolysisBatchInput {
+    /// Provenance for every empirical/property input group and a stable input snapshot.
+    pub evidence: PyrolysisEvidence,
     /// Wet feedstock mass entering the process, kg.
     pub wet_feedstock_kg: f64,
     /// Feed water divided by total wet feedstock mass, between 0 and 1.
@@ -114,6 +202,7 @@ pub struct PyrolysisBatchInput {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PyrolysisBatchResult {
+    pub evidence: PyrolysisEvidence,
     pub dry_feedstock_kg: f64,
     pub feed_water_kg: f64,
     pub char_product_kg: f64,
@@ -147,6 +236,7 @@ pub struct PyrolysisBatchResult {
 pub fn calculate_pyrolysis_batch(
     input: &PyrolysisBatchInput,
 ) -> Result<PyrolysisBatchResult, SoilProcessError> {
+    input.evidence.validate()?;
     finite_nonnegative(input.wet_feedstock_kg, "wet_feedstock_kg")?;
     fraction(input.moisture_fraction_wet_basis, "moisture_fraction_wet_basis", true)?;
     fraction(input.feedstock_carbon_fraction_dry, "feedstock_carbon_fraction_dry", true)?;
@@ -252,6 +342,7 @@ pub fn calculate_pyrolysis_batch(
     }
 
     Ok(PyrolysisBatchResult {
+        evidence: input.evidence.clone(),
         dry_feedstock_kg,
         feed_water_kg,
         char_product_kg,
@@ -297,6 +388,7 @@ pub struct NutrientRecoveryFractions {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecoveredNutrientMassKg {
+    pub evidence: NutrientRecoveryEvidence,
     pub nitrogen_in: f64,
     pub phosphorus_in: f64,
     pub potassium_in: f64,
@@ -317,7 +409,9 @@ pub fn calculate_recovered_nutrients(
     volume_m3: f64,
     concentrations_kg_per_m3: NutrientConcentrationsKgPerM3,
     fractions: NutrientRecoveryFractions,
+    evidence: &NutrientRecoveryEvidence,
 ) -> Result<RecoveredNutrientMassKg, SoilProcessError> {
+    evidence.validate()?;
     finite_nonnegative(volume_m3, "volume_m3")?;
     for (name, value) in [
         ("nitrogen_concentration", concentrations_kg_per_m3.nitrogen),
@@ -351,6 +445,7 @@ pub fn calculate_recovered_nutrients(
         potassium_recovered * fractions.potassium_plant_available_in_period;
 
     let result = RecoveredNutrientMassKg {
+        evidence: evidence.clone(),
         nitrogen_in,
         phosphorus_in,
         potassium_in,
@@ -384,6 +479,13 @@ mod tests {
 
     fn pyrolysis_input() -> PyrolysisBatchInput {
         PyrolysisBatchInput {
+            evidence: PyrolysisEvidence {
+                feedstock: EvidenceRef { evidence_id: "scenario-feedstock-001".into(), kind: EvidenceKind::Scenario },
+                process_parameters: EvidenceRef { evidence_id: "scenario-pyrolysis-yield-001".into(), kind: EvidenceKind::Scenario },
+                thermophysical_properties: EvidenceRef { evidence_id: "reference-properties-001".into(), kind: EvidenceKind::Literature },
+                reactor_design: EvidenceRef { evidence_id: "scenario-reactor-001".into(), kind: EvidenceKind::Scenario },
+                input_snapshot_id: "scenario-run-001".into(),
+            },
             wet_feedstock_kg: 1_000.0,
             moisture_fraction_wet_basis: 0.20,
             feedstock_carbon_fraction_dry: 0.48,
@@ -428,6 +530,18 @@ mod tests {
     }
 
     #[test]
+    fn missing_provenance_is_rejected_and_scenario_status_is_retained() {
+        let mut input = pyrolysis_input();
+        input.evidence.process_parameters.evidence_id.clear();
+        assert!(calculate_pyrolysis_batch(&input).is_err());
+
+        input = pyrolysis_input();
+        let result = calculate_pyrolysis_batch(&input).unwrap();
+        assert_eq!(result.evidence, input.evidence);
+        assert_eq!(result.evidence.process_parameters.kind, EvidenceKind::Scenario);
+    }
+
+    #[test]
     fn dry_feedstock_has_zero_water_duty() {
         let mut input = pyrolysis_input();
         input.moisture_fraction_wet_basis = 0.0;
@@ -465,6 +579,12 @@ mod tests {
 
     #[test]
     fn recovered_nutrients_are_element_specific_and_bounded() {
+        let evidence = NutrientRecoveryEvidence {
+            influent_composition: EvidenceRef { evidence_id: "scenario-influent-001".into(), kind: EvidenceKind::Scenario },
+            recovery_parameters: EvidenceRef { evidence_id: "scenario-recovery-001".into(), kind: EvidenceKind::Scenario },
+            plant_availability_parameters: EvidenceRef { evidence_id: "scenario-availability-001".into(), kind: EvidenceKind::Scenario },
+            input_snapshot_id: "scenario-nutrient-run-001".into(),
+        };
         let result = calculate_recovered_nutrients(
             100.0,
             NutrientConcentrationsKgPerM3 {
@@ -480,6 +600,7 @@ mod tests {
                 phosphorus_plant_available_in_period: 0.50,
                 potassium_plant_available_in_period: 0.90,
             },
+            &evidence,
         )
         .unwrap();
 
@@ -502,6 +623,12 @@ mod tests {
             phosphorus: 0.02,
             potassium: 0.03,
         };
+        let evidence = NutrientRecoveryEvidence {
+            influent_composition: EvidenceRef { evidence_id: "scenario-influent-001".into(), kind: EvidenceKind::Scenario },
+            recovery_parameters: EvidenceRef { evidence_id: "scenario-recovery-001".into(), kind: EvidenceKind::Scenario },
+            plant_availability_parameters: EvidenceRef { evidence_id: "scenario-availability-001".into(), kind: EvidenceKind::Scenario },
+            input_snapshot_id: "scenario-nutrient-run-001".into(),
+        };
         let mut fractions = NutrientRecoveryFractions {
             nitrogen_recovered: 0.8,
             phosphorus_recovered: 0.8,
@@ -510,11 +637,11 @@ mod tests {
             phosphorus_plant_available_in_period: 0.5,
             potassium_plant_available_in_period: 0.5,
         };
-        assert!(calculate_recovered_nutrients(-1.0, concentrations, fractions).is_err());
+        assert!(calculate_recovered_nutrients(-1.0, concentrations, fractions, &evidence).is_err());
         fractions.nitrogen_recovered = 1.1;
-        assert!(calculate_recovered_nutrients(10.0, concentrations, fractions).is_err());
+        assert!(calculate_recovered_nutrients(10.0, concentrations, fractions, &evidence).is_err());
         fractions.nitrogen_recovered = 0.8;
-        assert!(calculate_recovered_nutrients(f64::MAX, concentrations, fractions).is_err());
+        assert!(calculate_recovered_nutrients(f64::MAX, concentrations, fractions, &evidence).is_err());
     }
 
     #[test]
