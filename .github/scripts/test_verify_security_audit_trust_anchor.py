@@ -190,7 +190,8 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         repo = "owner/repo"
         subject = "a" * 40
         pr = {"number": 12}
-        valid = {"number": 12, "state": "open", "mergeable": True, "merge_commit_sha": "c" * 40,
+        valid = {"number": 12, "state": "open", "mergeable": True, "mergeable_state": "clean",
+                 "merge_commit_sha": "c" * 40,
                  "head": {"sha": subject, "ref": "security/fix", "repo": {"full_name": repo}},
                  "base": {"ref": "main", "repo": {"full_name": repo}}}
         with patch.object(module, "api", return_value=valid):
@@ -201,6 +202,10 @@ class TrustAnchorPolicyTests(unittest.TestCase):
             {**valid, "state": "closed"},
             {**valid, "mergeable": False},
             {**valid, "mergeable": None},
+            {**valid, "mergeable_state": "behind"},
+            {**valid, "mergeable_state": "unknown"},
+            {**valid, "mergeable_state": None},
+            {**valid, "mergeable_state": "future-state"},
             {**valid, "merge_commit_sha": None},
             {**valid, "head": {**valid["head"], "sha": "b" * 40}},
             {**valid, "head": {**valid["head"], "ref": "other"}},
@@ -210,6 +215,21 @@ class TrustAnchorPolicyTests(unittest.TestCase):
         ]
         for payload in bad:
             with self.subTest(payload=payload), patch.object(module, "api", return_value=payload):
+                with self.assertRaises(module.VerificationError):
+                    module.fetch_authoritative_pr_merge_sha(
+                        repo, pr, subject, "security/fix", "main", "token")
+
+    def test_pr_merge_state_must_be_known_and_not_behind(self):
+        repo = "owner/repo"
+        subject = "a" * 40
+        pr = {"number": 12}
+        valid = {"number": 12, "state": "open", "mergeable": True, "mergeable_state": "clean",
+                 "merge_commit_sha": "c" * 40,
+                 "head": {"sha": subject, "ref": "security/fix", "repo": {"full_name": repo}},
+                 "base": {"ref": "main", "repo": {"full_name": repo}}}
+        for state in ("behind", "unknown", None, "future-state"):
+            payload = {**valid, "mergeable_state": state}
+            with self.subTest(mergeable_state=state), patch.object(module, "api", return_value=payload):
                 with self.assertRaises(module.VerificationError):
                     module.fetch_authoritative_pr_merge_sha(
                         repo, pr, subject, "security/fix", "main", "token")
