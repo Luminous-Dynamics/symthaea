@@ -717,12 +717,14 @@ impl ResolvedCalibration {
     }
 }
 
-/// Calibration metadata paired with digest-verified certificate and review bytes.
+/// Calibration metadata paired with byte-verified, claim-bound evidence.
 ///
-/// The constructor binds each verified byte wrapper to the exact artifact
-/// reference carried by the resolved record. It does not parse the artifacts,
-/// authenticate signatures, or prove that metadata was derived from the content;
-/// adapters must perform those checks before constructing this value.
+/// Construction parses the canonical certificate and checks its record,
+/// instrument/channel, quantity/unit, range, validity window, and uncertainty
+/// against the resolved record. It requires verified bytes for the certificate's
+/// referenced standard and a signed review receipt bound to the record and exact
+/// certificate artifact. It does not authenticate the trust-store distribution,
+/// authorize the provider, or validate a complete traceability chain.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedCalibrationEvidence {
     calibration: ResolvedCalibration,
@@ -824,11 +826,13 @@ impl VerifiedCalibrationEvidence {
     }
 }
 
-/// Resolve a calibration reference from an independently governed evidence
-/// store. Implementations must hash the exact certificate and review-receipt
-/// bytes and return them through `VerifiedCalibrationEvidence`. They must also
-/// parse/bind the claims and verify signatures/trust policy; the wrapper cannot
-/// prove that the resolver is independent or that metadata came from the bytes.
+/// Resolve a calibration record and its evidence from an independently governed
+/// source. Implementations must hash the exact certificate, reference-standard,
+/// and signed review-receipt bytes and return them through
+/// `VerifiedCalibrationEvidence`. The wrapper parses and binds the certificate's
+/// declared claims, but the resolver/deployment must authenticate trust-store
+/// distribution, provider authority, reference-standard provenance, and the full
+/// traceability chain. The type cannot prove resolver independence by itself.
 pub trait CalibrationEvidenceResolver {
     fn resolve_calibration(
         &self,
