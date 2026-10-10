@@ -413,61 +413,101 @@ impl CognitiveLoopService {
             if integrated.has_flag(output_flags::REQUEST_GEODESIC) {
                 self.carryover.quality.last_request_geodesic = true;
                 if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
-                    let manifold = bridge.manifold_mut();
-                    let current_state = manifold.state().clone();
-                    let remembered_goal = manifold
-                        .last_scene_match()
-                        .and_then(|match_res| manifold.get_scene_encoding(match_res.scene_id))
-                        .filter(|goal| {
-                            !goal.values.is_empty()
-                                && goal.values.iter().all(|value| value.is_finite())
-                        });
-                    let (goal, goal_source) = if let Some(goal) = remembered_goal {
-                        (Some(goal), "remembered_scene")
-                    } else {
-                        let rollout = manifold.dream_ahead(8, 0.1);
-                        (
-                            rollout.into_iter().last().filter(|goal| {
-                                goal.dim() == manifold.hdc_dim()
-                                    && goal.values.iter().all(|value| value.is_finite())
-                            }),
-                            "model_rollout_endpoint",
-                        )
+                    use super::imagination::{
+                        estimate_imagination_work, preflight_imagination_work,
                     };
 
-                    // Invalid or unavailable model output fails closed; never substitute
-                    // an arbitrary random latent vector and present it as a future.
-                    let path = goal
-                        .map(|goal| manifold.select_best_geodesic(&current_state, &goal, 8, 3))
-                        .unwrap_or_default();
-                    let latest_telemetry = manifold.telemetry().clone();
-                    perception.vision_telemetry = Some(latest_telemetry.clone());
-                    metadata.vision = Some(latest_telemetry);
-
-                    if !path.is_empty() {
-                        let frames = manifold.decode_geodesic_to_frames_improved(&path);
-                        if !frames.is_empty() {
-                            feedback.mental_movie =
-                                Some(crate::cognitive_loop::types::MentalMovie {
-                                    frames,
-                                    width: self.config.vision_frame_width,
-                                    height: self.config.vision_frame_height,
-                                    channels: manifold.last_frame_channels(),
-                                    path_length: path.len(),
-                                    semantic_coherence: 0.0,
-                                    trajectory: path,
-                                });
-                        }
-                    }
-                    tracing::info!(
-                        cycle = self.stats.total_cycles,
-                        goal_source,
-                        path_length = feedback
-                            .mental_movie
-                            .as_ref()
-                            .map_or(0, |movie| movie.path_length),
-                        "Subsystem REQUEST_GEODESIC: model-grounded mental simulation completed"
+                    // A remembered goal must match the current manifold. Otherwise use a
+                    // local rollout hypothesis only after budget admission has succeeded.
+                    let remembered_goal = {
+                        let manifold = bridge.manifold();
+                        manifold
+                            .last_scene_match()
+                            .and_then(|match_res| manifold.get_scene_encoding(match_res.scene_id))
+                            .filter(|goal| {
+                                goal.dim() == manifold.hdc_dim()
+                                    && !goal.values.is_empty()
+                                    && goal.values.iter().all(|value| value.is_finite())
+                            })
+                    };
+                    let rollout_steps = if remembered_goal.is_some() { 0 } else { 8 };
+                    let estimate = estimate_imagination_work(rollout_steps, 8, 3).and_then(
+                        |estimate| {
+                            preflight_imagination_work(self.thermodynamic_load, estimate)
+                                .ok()
+                                .map(|()| estimate)
+                        },
                     );
+
+                    if let Some(estimate) = estimate {
+                        let manifold = bridge.manifold_mut();
+                        let current_state = manifold.state().clone();
+                        let (goal, goal_source) = if let Some(goal) = remembered_goal {
+                            (Some(goal), "remembered_scene")
+                        } else {
+                            let rollout = manifold.dream_ahead(8, 0.1);
+                            // Charge the completed rollout even when it yields no valid
+                            // endpoint. The predicted endpoint is a hypothesis, not truth.
+                            self.thermodynamic_load += estimate.rollout;
+                            (
+                                rollout.into_iter().last().filter(|goal| {
+                                    goal.dim() == manifold.hdc_dim()
+                                        && !goal.values.is_empty()
+                                        && goal.values.iter().all(|value| value.is_finite())
+                                }),
+                                "model_rollout_endpoint",
+                            )
+                        };
+
+                        if let Some(goal) = goal {
+                            let path = manifold.select_best_geodesic(&current_state, &goal, 8, 3);
+                            // Account for the search even when it returns an empty path.
+                            self.thermodynamic_load += estimate.geodesic;
+
+                            let latest_telemetry = manifold.telemetry().clone();
+                            perception.vision_telemetry = Some(latest_telemetry.clone());
+                            metadata.vision = Some(latest_telemetry);
+
+                            if !path.is_empty() {
+                                let frames = manifold.decode_geodesic_to_frames_improved(&path);
+                                if !frames.is_empty() {
+                                    feedback.mental_movie =
+                                        Some(crate::cognitive_loop::types::MentalMovie {
+                                            frames,
+                                            width: self.config.vision_frame_width,
+                                            height: self.config.vision_frame_height,
+                                            channels: manifold.last_frame_channels(),
+                                            path_length: path.len(),
+                                            semantic_coherence: 0.0,
+                                            trajectory: path,
+                                        });
+                                }
+                            }
+                        } else {
+                            tracing::debug!(
+                                cycle = self.stats.total_cycles,
+                                goal_source,
+                                "Subsystem REQUEST_GEODESIC: no valid remembered or rollout target"
+                            );
+                        }
+                        tracing::info!(
+                            cycle = self.stats.total_cycles,
+                            goal_source,
+                            path_length = feedback
+                                .mental_movie
+                                .as_ref()
+                                .map_or(0, |movie| movie.path_length),
+                            "Subsystem REQUEST_GEODESIC: model-grounded mental simulation completed"
+                        );
+                    } else {
+                        // Budget rejection must precede rollout/search and leave load and
+                        // manifold state untouched. Do not conflate this with source failure.
+                        tracing::debug!(
+                            cycle = self.stats.total_cycles,
+                            load = self.thermodynamic_load,
+                            "Subsystem REQUEST_GEODESIC: work budget rejected request"
+                        );
+                    }
                 }
             } else {
                 self.carryover.quality.last_request_geodesic = false;
