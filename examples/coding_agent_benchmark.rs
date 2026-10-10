@@ -62,6 +62,10 @@ struct TaskResult {
     // Level 3: correctness
     tests_passed: usize,
     tests_failed: usize,
+    /// Number of test functions supplied by this benchmark task.
+    expected_tests: usize,
+    /// True if execution was simulated and compilation/tests were not actually run.
+    execution_simulated: bool,
     // Agent metrics
     iterations: usize,
     tiers_used: Vec<String>,
@@ -72,16 +76,51 @@ struct TaskResult {
     final_phase: String,
 }
 
-impl TaskResult {
-    /// Success = compiled AND all tests passed (or no tests but compiled)
-    fn is_correct(&self) -> bool {
-        self.compiled
-            && self.tests_failed == 0
-            && (self.tests_passed > 0 || self.test_source_empty())
+/// Classify benchmark evidence without collapsing distinct failure modes into a
+/// single false result. The order is deliberate: simulated/no-code/compile
+/// failures take precedence over any counters; a missing oracle and missing
+/// test results are not equivalent to a verified pass.
+fn verification_status_for(
+    code_written: bool,
+    compiled: bool,
+    expected_tests: usize,
+    tests_passed: usize,
+    tests_failed: usize,
+    execution_simulated: bool,
+) -> &'static str {
+    if execution_simulated {
+        "simulated_execution"
+    } else if !code_written {
+        "no_code_generated"
+    } else if !compiled {
+        "compilation_failed"
+    } else if expected_tests == 0 {
+        "no_test_oracle"
+    } else if tests_failed > 0 {
+        "test_failures"
+    } else if tests_passed < expected_tests {
+        "incomplete_test_evidence"
+    } else {
+        "verified"
     }
-    fn test_source_empty(&self) -> bool {
-        // Tasks with no test assertions count as "correct" if they compile
-        self.tests_passed == 0 && self.tests_failed == 0
+}
+
+impl TaskResult {
+    fn verification_status(&self) -> &'static str {
+        verification_status_for(
+            self.code_written,
+            self.compiled,
+            self.expected_tests,
+            self.tests_passed,
+            self.tests_failed,
+            self.execution_simulated,
+        )
+    }
+
+    /// L3 correctness requires real execution, an explicit test oracle, and
+    /// observed passing results for every expected test with zero failures.
+    fn is_correct(&self) -> bool {
+        self.verification_status() == "verified"
     }
 }
 
@@ -790,8 +829,20 @@ fn strip_markdown_fences(source: &str) -> String {
     source.to_string()
 }
 
+/// Count the Rust test functions supplied as the benchmark's correctness oracle.
+///
+/// The current task corpus uses standard #[test] functions. Keep this expected
+/// count independent of execution results so missing/skipped test execution
+/// cannot silently become a passing benchmark result.
+fn count_expected_tests(test_source: &str) -> usize {
+    test_source.matches("#[test]").count()
+}
+
 /// Validate generated code by compiling and running test assertions.
-fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, usize, bool, bool) {
+fn validate_code(
+    source: &str,
+    test_source: &str,
+) -> (bool, Vec<String>, usize, usize, bool, bool, bool) {
     let mut executor = CodeExecutor::with_real_execution();
 
     // Clean LLM output: strip fences, prose, balance braces
@@ -805,12 +856,19 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     };
     let result = executor.execute_rust(&clean_source, test_src);
 
+    // The simulation sentinel sets compiled=true for compatibility, but no
+    // compiler or test process actually ran. Never promote that into evidence.
+    if result.simulated {
+        return (false, vec![], 0, 0, false, false, true);
+    }
+
     if result.compiled {
         return (
             true,
             vec![],
             result.tests_passed,
             result.tests_failed,
+            false,
             false,
             false,
         );
@@ -850,6 +908,9 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
             .collect();
         let fixed_code = fixed_lines.join("\n");
         let retry = executor.execute_rust(&fixed_code, test_src);
+        if retry.simulated {
+            return (false, vec![], 0, 0, true, false, true);
+        }
         if retry.compiled {
             return (
                 true,
@@ -858,6 +919,7 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
                 retry.tests_failed,
                 true,
                 true,
+                false,
             );
         }
         source_to_fix = fixed_code;
@@ -870,6 +932,9 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     let fixed = try_auto_fix(&source_to_fix, &result.compile_errors);
     if let Some(ref fixed_source) = fixed {
         let retry = executor.execute_rust(fixed_source, test_src);
+        if retry.simulated {
+            return (false, vec![], 0, 0, true, false, true);
+        }
         if retry.compiled {
             return (
                 true,
@@ -878,15 +943,22 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
                 retry.tests_failed,
                 true,
                 true,
+                false,
             );
         }
-        return (false, retry.compile_errors, 0, 0, true, false);
+        return (false, retry.compile_errors, 0, 0, true, false, false);
     }
 
-    (false, result.compile_errors, 0, 0, false, false)
+    (false, result.compile_errors, 0, 0, false, false, false)
 }
 
-fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -> TaskResult {
+fn run_task(
+    task: &BenchTask,
+    task_idx: usize,
+    task_total: usize,
+    use_llm: bool,
+    use_cloud: bool,
+) -> TaskResult {
     let temp_dir = tempfile::tempdir().expect("tempdir");
     let config = CodingAgentConfig {
         max_iterations: task.max_iterations,
@@ -916,12 +988,19 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         content.contains("TODO") || content.contains("todo!") || content.contains("unimplemented!");
 
     // Level 2+3: Real compilation and test execution
-    let (compiled, compile_errors, tests_passed, tests_failed, fix_attempted, fix_succeeded) =
-        if code_written && !content.trim().is_empty() {
-            validate_code(&content, task.test_source)
-        } else {
-            (false, vec!["No code generated".into()], 0, 0, false, false)
-        };
+    let (
+        compiled,
+        compile_errors,
+        tests_passed,
+        tests_failed,
+        fix_attempted,
+        fix_succeeded,
+        execution_simulated,
+    ) = if code_written && !content.trim().is_empty() {
+        validate_code(&content, task.test_source)
+    } else {
+        (false, vec!["No code generated".into()], 0, 0, false, false, false)
+    };
 
     let quality_rejections = result
         .observations
@@ -941,9 +1020,23 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         .map(|t| t.to_string())
         .collect();
 
-    // Status symbols: ✓ = correct (compiles + tests pass), ◐ = compiles but tests fail, ✗ = doesn't compile
-    let status = if compiled && tests_failed == 0 {
+    let expected_tests = count_expected_tests(task.test_source);
+
+    // L3 correctness requires an actual supplied test oracle. Empty test_source
+    // means compile-only evidence: useful for L2, never sufficient for correctness.
+    let verification_status = verification_status_for(
+        code_written,
+        compiled,
+        expected_tests,
+        tests_passed,
+        tests_failed,
+        execution_simulated,
+    );
+    let correct = verification_status == "verified";
+    let status = if correct {
         "✓"
+    } else if execution_simulated {
+        "?"
     } else if compiled {
         "◐"
     } else {
@@ -951,17 +1044,19 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
     };
 
     eprint!(
-        "\r  [{:>2}/50] {} {} {} ",
+        "\r  [{:>2}/{}] {} {} {} ",
         task_idx + 1,
+        task_total,
         task.difficulty,
         status,
         task.description
     );
-    if compiled {
+    if execution_simulated {
+        eprint!("[NOT EXECUTED: sandbox simulation; result is unverified]");
+    } else if compiled {
         eprint!(
-            "[compiled, {}/{} tests]",
-            tests_passed,
-            tests_passed + tests_failed
+            "[compiled, {}/{} expected tests passed; {} failed]",
+            tests_passed, expected_tests, tests_failed
         );
     } else if !compile_errors.is_empty() {
         let first_err: String = compile_errors[0].chars().take(50).collect();
@@ -982,6 +1077,8 @@ fn run_task(task: &BenchTask, task_idx: usize, use_llm: bool, use_cloud: bool) -
         auto_fix_succeeded: fix_succeeded,
         tests_passed,
         tests_failed,
+        expected_tests,
+        execution_simulated,
         iterations: result.iterations_used,
         tiers_used: tier_strings,
         energy: result.total_energy,
@@ -1061,6 +1158,17 @@ fn print_report(results: &[TaskResult], stats: &BenchStats) {
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║     Symthaea Coding Agent — Hardened Benchmark Results          ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
+
+    println!("── Verification Evidence Gates ───────────────────────────");
+    let mut evidence_counts: std::collections::BTreeMap<&str, usize> =
+        std::collections::BTreeMap::new();
+    for result in results {
+        *evidence_counts.entry(result.verification_status()).or_insert(0) += 1;
+    }
+    for (gate, count) in evidence_counts {
+        println!("  {}: {}", gate, count);
+    }
+    println!();
 
     println!("── Validation Levels ──────────────────────────────────────");
     println!(
@@ -1215,7 +1323,7 @@ fn main() {
     let results: Vec<TaskResult> = tasks
         .iter()
         .enumerate()
-        .map(|(i, task)| run_task(task, i, use_llm, use_cloud))
+        .map(|(i, task)| run_task(task, i, tasks.len(), use_llm, use_cloud))
         .collect();
 
     let stats = compute_stats(&results);
@@ -1233,6 +1341,9 @@ fn main() {
                 "compiled": r.compiled,
                 "tests_passed": r.tests_passed,
                 "tests_failed": r.tests_failed,
+                "expected_tests": r.expected_tests,
+                "execution_simulated": r.execution_simulated,
+                "verification_status": r.verification_status(),
                 "correct": r.is_correct(),
                 "auto_fix_attempted": r.auto_fix_attempted,
                 "auto_fix_succeeded": r.auto_fix_succeeded,
@@ -1245,9 +1356,18 @@ fn main() {
         })
         .collect();
 
+    let mut verification_status_counts: std::collections::BTreeMap<&'static str, usize> =
+        std::collections::BTreeMap::new();
+    for result in &results {
+        *verification_status_counts
+            .entry(result.verification_status())
+            .or_insert(0) += 1;
+    }
+
     let json_report = serde_json::json!({
         "benchmark": "symthaea_coding_agent_hardened",
         "summary": {
+            "verification_status_counts": verification_status_counts,
             "total": stats.total,
             "name_match": stats.name_match,
             "compiled": stats.compiled,
@@ -1273,5 +1393,130 @@ fn main() {
         serde_json::to_string_pretty(&json_report).unwrap(),
     ) {
         eprintln!("\nJSON report: {}", report_path.display());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn result(
+        compiled: bool,
+        tests_passed: usize,
+        tests_failed: usize,
+        expected_tests: usize,
+        execution_simulated: bool,
+    ) -> TaskResult {
+        TaskResult {
+            description: "fixture".to_string(),
+            difficulty: Difficulty::Native,
+            code_written: true,
+            contains_expected_fn: true,
+            contains_todo: false,
+            compiled,
+            compile_errors: Vec::new(),
+            auto_fix_attempted: false,
+            auto_fix_succeeded: false,
+            tests_passed,
+            tests_failed,
+            expected_tests,
+            execution_simulated,
+            iterations: 1,
+            tiers_used: Vec::new(),
+            energy: 0.0,
+            phi_mean: 0.0,
+            quality_gate_rejections: 0,
+            elapsed_ms: 0,
+            final_phase: "Done".to_string(),
+        }
+    }
+
+    #[test]
+    fn expected_tests_that_never_execute_are_not_a_pass() {
+        assert!(!result(true, 0, 0, 3, false).is_correct());
+    }
+
+    #[test]
+    fn all_expected_tests_must_pass() {
+        assert!(result(true, 3, 0, 3, false).is_correct());
+        // Additional generated tests may pass alongside the supplied oracle.
+        assert!(result(true, 4, 0, 3, false).is_correct());
+        assert!(!result(true, 2, 0, 3, false).is_correct());
+        assert!(!result(true, 3, 1, 3, false).is_correct());
+    }
+
+    #[test]
+    fn compile_only_task_is_not_reported_as_correct() {
+        // Compilation is a useful L2 signal, but without a supplied oracle it
+        // cannot establish L3 functional correctness.
+        assert!(!result(true, 0, 0, 0, false).is_correct());
+    }
+
+    #[test]
+    fn uncompiled_task_is_never_correct() {
+        assert!(!result(false, 3, 0, 3, false).is_correct());
+    }
+
+    #[test]
+    fn simulated_compile_only_result_is_not_verified() {
+        // The executor's simulation sentinel can set compiled=true while
+        // explicitly stating that no compiler or test process ran.
+        assert!(!result(true, 0, 0, 0, true).is_correct());
+        // Even counters that look complete cannot establish anything when
+        // the compiler/test process was simulated rather than executed.
+        assert!(!result(true, 3, 0, 3, true).is_correct());
+    }
+
+    #[test]
+    fn verification_status_distinguishes_missing_evidence() {
+        assert_eq!(
+            verification_status_for(false, false, 0, 0, 0, false),
+            "no_code_generated"
+        );
+        assert_eq!(
+            result(false, 0, 0, 3, false).verification_status(),
+            "compilation_failed"
+        );
+        assert_eq!(
+            result(true, 0, 0, 3, false).verification_status(),
+            "incomplete_test_evidence"
+        );
+        assert_eq!(
+            result(true, 0, 0, 0, false).verification_status(),
+            "no_test_oracle"
+        );
+        assert_eq!(
+            result(true, 3, 1, 3, false).verification_status(),
+            "test_failures"
+        );
+        assert_eq!(
+            result(true, 3, 0, 3, true).verification_status(),
+            "simulated_execution"
+        );
+        assert_eq!(
+            result(true, 3, 0, 3, false).verification_status(),
+            "verified"
+        );
+    }
+
+    #[test]
+    fn testless_task_cannot_claim_functional_correctness() {
+        // Even real compilation cannot substitute for behavioral evidence.
+        assert!(!result(true, 0, 0, 0, false).is_correct());
+    }
+
+    #[test]
+    fn expected_test_count_counts_standard_test_functions() {
+        assert_eq!(
+            count_expected_tests(
+                r#"
+                #[test] fn first() {}
+                #[test]
+                fn second() {}
+                "#
+            ),
+            2
+        );
+        assert_eq!(count_expected_tests(""), 0);
     }
 }
