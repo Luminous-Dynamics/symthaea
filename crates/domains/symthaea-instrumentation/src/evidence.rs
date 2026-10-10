@@ -10,6 +10,7 @@
 
 use sha2::{Digest, Sha256};
 use std::fmt;
+use std::io::Read;
 
 use crate::ArtifactReference;
 
@@ -66,6 +67,82 @@ impl VerifiedArtifactBytes {
     }
 }
 
+/// Verify a reader incrementally without retaining a second copy of its bytes.
+///
+/// The returned digest binds the bytes consumed through EOF. Callers must ensure
+/// the underlying object remains immutable (or persist the same stream) before
+/// using data addressed by this digest; this result does not lock a mutable file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedArtifactDigest {
+    reference: ArtifactReference,
+    byte_length: u64,
+}
+
+impl VerifiedArtifactDigest {
+    /// Hash a complete reader using a bounded buffer and compare it to the reference.
+    pub fn verify_reader<R: Read>(
+        reference: ArtifactReference,
+        mut reader: R,
+    ) -> Result<Self, ArtifactVerificationError> {
+        let artifact_id = reference.artifact_id().to_owned();
+        let mut hasher = Sha256::new();
+        let mut byte_length = 0_u64;
+        let mut buffer = [0_u8; 64 * 1024];
+
+        loop {
+            let count = reader.read(&mut buffer).map_err(|_| {
+                ArtifactVerificationError::ReadFailure {
+                    artifact_id: artifact_id.clone(),
+                }
+            })?;
+            if count == 0 {
+                break;
+            }
+
+            let count = u64::try_from(count).map_err(|_| {
+                ArtifactVerificationError::LengthOverflow {
+                    artifact_id: artifact_id.clone(),
+                }
+            })?;
+            byte_length = byte_length.checked_add(count).ok_or_else(|| {
+                ArtifactVerificationError::LengthOverflow {
+                    artifact_id: artifact_id.clone(),
+                }
+            })?;
+            hasher.update(&buffer[..count as usize]);
+        }
+
+        let actual_sha256 = hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let expected_sha256 = reference.sha256_hex().to_owned();
+        if actual_sha256 != expected_sha256 {
+            return Err(ArtifactVerificationError::DigestMismatch {
+                artifact_id,
+                expected_sha256,
+                actual_sha256,
+            });
+        }
+
+        Ok(Self {
+            reference,
+            byte_length,
+        })
+    }
+
+    /// Exact artifact identity and digest that were checked.
+    pub fn reference(&self) -> &ArtifactReference {
+        &self.reference
+    }
+
+    /// Number of bytes consumed through EOF.
+    pub fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+}
+
 /// Content-integrity failures. Digest matching is not an authenticity proof.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArtifactVerificationError {
@@ -73,6 +150,12 @@ pub enum ArtifactVerificationError {
         artifact_id: String,
         expected_sha256: String,
         actual_sha256: String,
+    },
+    ReadFailure {
+        artifact_id: String,
+    },
+    LengthOverflow {
+        artifact_id: String,
     },
 }
 
@@ -88,6 +171,12 @@ impl fmt::Display for ArtifactVerificationError {
                 "SHA-256 mismatch for artifact {artifact_id}: expected {expected_sha256}, got \
                  {actual_sha256}"
             ),
+            Self::ReadFailure { artifact_id } => {
+                write!(f, "failed to read bytes for artifact {artifact_id}")
+            }
+            Self::LengthOverflow { artifact_id } => {
+                write!(f, "byte length overflow while verifying artifact {artifact_id}")
+            }
         }
     }
 }
@@ -157,5 +246,60 @@ mod tests {
             VerifiedArtifactBytes::verify(incorrect, Vec::new()),
             Err(ArtifactVerificationError::DigestMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn streaming_verifier_hashes_large_content_without_buffering_the_whole_artifact() {
+        let bytes = (0..200_000_usize)
+            .map(|index| (index as u8).wrapping_mul(13))
+            .collect::<Vec<_>>();
+        let digest = sha256_hex(&bytes);
+        let reference = reference("large-raw-acquisition", &digest);
+
+        let verified = VerifiedArtifactDigest::verify_reader(
+            reference.clone(),
+            std::io::Cursor::new(bytes.clone()),
+        )
+        .unwrap();
+
+        assert_eq!(verified.reference(), &reference);
+        assert_eq!(verified.byte_length(), bytes.len() as u64);
+    }
+
+    #[test]
+    fn streaming_verifier_rejects_a_mutated_reader() {
+        let expected = b"original acquisition".to_vec();
+        let reference = reference("raw-stream", &sha256_hex(&expected));
+        let mutated = b"mutated acquisition".to_vec();
+
+        assert!(matches!(
+            VerifiedArtifactDigest::verify_reader(
+                reference,
+                std::io::Cursor::new(mutated),
+            ),
+            Err(ArtifactVerificationError::DigestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn streaming_verifier_fails_closed_when_the_reader_errors() {
+        struct FailingReader;
+
+        impl Read for FailingReader {
+            fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("fixture read failure"))
+            }
+        }
+
+        assert_eq!(
+            VerifiedArtifactDigest::verify_reader(
+                reference("unavailable", &sha256_hex(b"expected")),
+                FailingReader,
+            )
+            .unwrap_err(),
+            ArtifactVerificationError::ReadFailure {
+                artifact_id: "unavailable".to_owned(),
+            }
+        );
     }
 }
