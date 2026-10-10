@@ -413,6 +413,44 @@ impl ScreeningDesignRequest {
     }
 }
 
+#[derive(Serialize)]
+struct ScreeningScheduleHashPayload<'a> {
+    schema_id: &'static str,
+    algorithm_id: &'a str,
+    request_sha256: &'a str,
+    runs: &'a [PlannedRun],
+}
+
+/// Fingerprint the exact run-order artifact. This is an integrity checksum, not an
+/// authenticated signature. The verifier recomputes it so accidental edits to run order,
+/// assignments, IDs, units, or outcomes' planned settings are detected.
+pub fn screening_schedule_sha256(
+    algorithm_id: &str,
+    request_sha256: &str,
+    runs: &[PlannedRun],
+) -> Result<String, ScreeningDesignError> {
+    let payload = ScreeningScheduleHashPayload {
+        schema_id: "screening-schedule-payload-v1",
+        algorithm_id,
+        request_sha256,
+        runs,
+    };
+    let bytes = serde_json::to_vec(&payload).map_err(|_| {
+        ScreeningDesignError::new(
+            "schedule_sha256",
+            "failed to serialize the versioned schedule payload",
+        )
+    })?;
+    let digest = Sha256::digest(bytes);
+    let alphabet = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        encoded.push(alphabet[(byte >> 4) as usize] as char);
+        encoded.push(alphabet[(byte & 0x0f) as usize] as char);
+    }
+    Ok(encoded)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlannedRunKind {
@@ -451,6 +489,8 @@ pub struct ScreeningDesignPlan {
     pub algorithm_id: String,
     /// SHA-256 of the immutable design-input payload approved by the review reference.
     pub request_sha256: String,
+    /// SHA-256 of the exact scheduled runs and their order.
+    pub schedule_sha256: String,
     /// Full copy of the preregistered inputs used to generate this schedule.
     pub request_snapshot: ScreeningDesignRequest,
     pub treatment_combination_count: u32,
@@ -594,10 +634,13 @@ pub fn generate_screening_design(
             * request.replicates_per_setting_per_block as usize
     );
     debug_assert_eq!(center_run_count as usize, center_count * request.blocks.len());
+    let schedule_sha256 =
+        screening_schedule_sha256(DESIGN_ALGORITHM_ID, &request_sha256, &runs)?;
 
     Ok(ScreeningDesignPlan {
         algorithm_id: DESIGN_ALGORITHM_ID.to_string(),
         request_sha256,
+        schedule_sha256,
         request_snapshot: request.clone(),
         treatment_combination_count: combination_count as u32,
         treatment_run_count,
@@ -617,6 +660,7 @@ pub struct ScreeningDesignVerificationReceipt {
     pub experiment_id: String,
     pub input_snapshot_id: String,
     pub request_sha256: String,
+    pub schedule_sha256: String,
     pub algorithm_id: String,
     pub verified_run_count: u32,
     pub verified_block_count: u32,
@@ -640,6 +684,14 @@ pub fn verify_screening_design(
         return Err(ScreeningDesignError::new(
             "plan.request_sha256",
             "stored request fingerprint does not match the versioned design input payload",
+        ));
+    }
+    let schedule_sha256 =
+        screening_schedule_sha256(&plan.algorithm_id, &request_sha256, &plan.runs)?;
+    if plan.schedule_sha256 != schedule_sha256 {
+        return Err(ScreeningDesignError::new(
+            "plan.schedule_sha256",
+            "stored schedule checksum does not match the exact run-order artifact",
         ));
     }
     if plan.algorithm_id != DESIGN_ALGORITHM_ID {
@@ -846,6 +898,7 @@ pub fn verify_screening_design(
         experiment_id: request.experiment_id.clone(),
         input_snapshot_id: request.input_snapshot_id.clone(),
         request_sha256,
+        schedule_sha256,
         algorithm_id: plan.algorithm_id.clone(),
         verified_run_count: plan.runs.len() as u32,
         verified_block_count: request.blocks.len() as u32,
@@ -950,10 +1003,9 @@ mod tests {
             plan.request_sha256,
             screening_design_sha256(&request).unwrap()
         );
-        assert_eq!(
-            verify_screening_design(&plan).unwrap().request_sha256,
-            plan.request_sha256
-        );
+        let receipt = verify_screening_design(&plan).unwrap();
+        assert_eq!(receipt.request_sha256, plan.request_sha256);
+        assert_eq!(receipt.schedule_sha256, plan.schedule_sha256);
 
         for block in &request.blocks {
             let block_runs: Vec<_> = plan
@@ -1121,6 +1173,21 @@ mod tests {
             .unwrap();
         treatment.settings[0].value += 1.0;
         assert!(verify_screening_design(&tampered).is_err());
+
+        let mut reordered = generated.clone();
+        let first = reordered.runs.iter().position(|run| run.kind == PlannedRunKind::FactorialTreatment).unwrap();
+        let second = reordered.runs.iter().position(|run| run.kind == PlannedRunKind::CenterPointControl).unwrap();
+        // Change run payload fields while preserving the run ID/order envelope: structural
+        // checks alone would be insufficient, but the stored schedule checksum must fail.
+        reordered.runs[first].kind = PlannedRunKind::CenterPointControl;
+        reordered.runs[first].standard_order = None;
+        reordered.runs[first].replicate_index = None;
+        reordered.runs[first].settings = settings_for(&reordered.request_snapshot.factors, 0, true);
+        reordered.runs[second].kind = PlannedRunKind::FactorialTreatment;
+        reordered.runs[second].standard_order = Some(1);
+        reordered.runs[second].replicate_index = Some(1);
+        reordered.runs[second].settings = settings_for(&reordered.request_snapshot.factors, 0, false);
+        assert!(verify_screening_design(&reordered).is_err());
 
         let mut incomplete = generated;
         incomplete.runs.pop();
