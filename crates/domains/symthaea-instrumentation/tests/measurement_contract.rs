@@ -120,15 +120,14 @@ fn review_trust_store() -> ReviewTrustStore {
     .unwrap()
 }
 
-fn verify_review_bytes(
+fn verify_review_artifact(
+    reference: ArtifactReference,
     bytes: Vec<u8>,
     certificate: &ArtifactReference,
     record_id: &str,
-    artifact_id: &str,
 ) -> Result<VerifiedCalibrationReviewReceipt, String> {
-    let reference = artifact(artifact_id, &sha256_hex(&bytes));
     let verified = VerifiedArtifactBytes::verify(reference, bytes)
-        .map_err(|error| error.to_string())?;
+        .map_err(|_| "calibration review receipt SHA-256 mismatch".to_owned())?;
     VerifiedCalibrationReviewReceipt::verify(
         verified,
         &review_trust_store(),
@@ -140,8 +139,21 @@ fn verify_review_bytes(
         ReviewVerificationError::CertificateReferenceMismatch => {
             "calibration review receipt does not bind the certificate SHA-256".to_owned()
         }
+        ReviewVerificationError::InvalidSignature => {
+            "calibration review receipt signature is invalid".to_owned()
+        }
         other => format!("calibration review verification failed: {other}"),
     })
+}
+
+fn verify_review_bytes(
+    bytes: Vec<u8>,
+    certificate: &ArtifactReference,
+    record_id: &str,
+    artifact_id: &str,
+) -> Result<VerifiedCalibrationReviewReceipt, String> {
+    let reference = artifact(artifact_id, &sha256_hex(&bytes));
+    verify_review_artifact(reference, bytes, certificate, record_id)
 }
 
 fn clock_domain() -> ClockDomainId {
@@ -233,11 +245,11 @@ impl CalibrationEvidenceResolver for MockResolver {
             .review_bytes_override
             .clone()
             .unwrap_or_else(|| signed_review_fixture_bytes(resolved.evidence(), "calibration-17"));
-        let verified_review = verify_review_bytes(
+        let verified_review = verify_review_artifact(
+            resolved.review_receipt().clone(),
             review_bytes,
             resolved.evidence(),
             "calibration-17",
-            resolved.review_receipt().artifact_id(),
         )?;
 
         VerifiedCalibrationEvidence::new(resolved, verified_certificate, verified_review)
@@ -860,13 +872,20 @@ fn verified_calibration_rejects_empty_certificate_or_review_bytes() {
         Vec::new(),
     )
     .unwrap();
-    let valid_review =
-        VerifiedArtifactBytes::verify(review_artifact(), review_fixture_bytes()).unwrap();
+    let empty_cert_review_bytes =
+        signed_review_fixture_bytes(&empty_certificate_reference, "calibration-17");
+    let valid_review = verify_review_bytes(
+        empty_cert_review_bytes,
+        &empty_certificate_reference,
+        "calibration-17",
+        "independent-review-receipt",
+    )
+    .unwrap();
     let record_with_empty_certificate = ResolvedCalibration::new(
         "calibration-17",
         instrument_identity(),
         empty_certificate_reference,
-        review_artifact(),
+        valid_review.artifact().reference().clone(),
         Quantity::Frequency,
         Unit::Hertz,
         4_000_000.0,
@@ -886,35 +905,19 @@ fn verified_calibration_rejects_empty_certificate_or_review_bytes() {
         ContractError::EmptyEvidenceArtifact("calibration_certificate")
     );
 
-    let verified_certificate =
-        VerifiedArtifactBytes::verify(calibration_artifact(), calibration_fixture_bytes())
-            .unwrap();
-    let empty_review_reference =
-        artifact("independent-review-receipt", &empty_digest);
+    let empty_review_reference = artifact("independent-review-receipt", &empty_digest);
     let empty_review =
-        VerifiedArtifactBytes::verify(empty_review_reference.clone(), Vec::new()).unwrap();
-    let record_with_empty_review = ResolvedCalibration::new(
-        "calibration-17",
-        instrument_identity(),
-        calibration_artifact(),
-        empty_review_reference,
-        Quantity::Frequency,
-        Unit::Hertz,
-        4_000_000.0,
-        6_000_000.0,
-        SAMPLE_TIME_NS - 1,
-        SAMPLE_TIME_NS + 2_000_000_000,
-        900.0,
-    )
-    .unwrap();
+        VerifiedArtifactBytes::verify(empty_review_reference, Vec::new()).unwrap();
     assert_eq!(
-        VerifiedCalibrationEvidence::new(
-            record_with_empty_review,
-            verified_certificate,
+        VerifiedCalibrationReviewReceipt::verify(
             empty_review,
+            &review_trust_store(),
+            "calibration-17",
+            &calibration_artifact(),
+            REVIEW_NOW_UNIX_S,
         )
         .unwrap_err(),
-        ContractError::EmptyEvidenceArtifact("calibration_review_receipt")
+        ReviewVerificationError::EmptyReceipt
     );
 }
 
@@ -926,8 +929,13 @@ fn verified_calibration_requires_exact_certificate_and_review_artifact_reference
         calibration_fixture_bytes(),
     )
     .unwrap();
-    let verified_review =
-        VerifiedArtifactBytes::verify(review_artifact(), review_fixture_bytes()).unwrap();
+    let verified_review = verify_review_bytes(
+        review_fixture_bytes(),
+        &calibration_artifact(),
+        "calibration-17",
+        "independent-review-receipt",
+    )
+    .unwrap();
     assert_eq!(
         VerifiedCalibrationEvidence::new(
             calibration.clone(),
@@ -941,9 +949,11 @@ fn verified_calibration_requires_exact_certificate_and_review_artifact_reference
     let verified_certificate =
         VerifiedArtifactBytes::verify(calibration_artifact(), calibration_fixture_bytes())
             .unwrap();
-    let wrong_review = VerifiedArtifactBytes::verify(
-        artifact("another-review-id", &review_digest_hex()),
+    let wrong_review = verify_review_bytes(
         review_fixture_bytes(),
+        &calibration_artifact(),
+        "calibration-17",
+        "another-review-id",
     )
     .unwrap();
     assert_eq!(
@@ -997,12 +1007,16 @@ fn calibration_resolver_rejects_a_review_bound_to_another_certificate_digest() {
 
 #[test]
 fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
+    let other_certificate = artifact("different-certificate", &calibration_digest_hex());
+    let other_review_bytes =
+        signed_review_fixture_bytes(&other_certificate, "calibration-17");
+    let other_review = review_artifact_for_bytes(&other_review_bytes);
     let wrong_artifact = MockResolver {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
             instrument_identity(),
-            artifact("different-certificate", &calibration_digest_hex()),
-            review_artifact(),
+            other_certificate,
+            other_review,
             Quantity::Frequency,
             Unit::Hertz,
             4_000_000.0,
@@ -1015,7 +1029,7 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
         raw_bytes: Ok(raw_fixture_bytes()),
         raw_reference_override: None,
         calibration_bytes_override: None,
-        review_bytes_override: None,
+        review_bytes_override: Some(other_review_bytes),
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
