@@ -370,6 +370,17 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             root.tag_name().name()
         ));
     }
+    // The importer has no separate written-pitch/sounding-pitch layer. A
+    // transposing-instrument directive must not be silently ignored.
+    if document
+        .descendants()
+        .any(|node| node.has_tag_name("transpose"))
+    {
+        return Err(
+            "MusicXML part transposition is not supported; convert to concert pitch before import"
+                .into(),
+        );
+    }
     let parts: Vec<_> = document
         .descendants()
         .filter(|node| node.has_tag_name("part"))
@@ -508,6 +519,16 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 if child.children().any(|node| node.has_tag_name("grace")) {
                     return Err(
                         "MusicXML grace notes are not yet supported; refusing to invent a duration"
+                            .into(),
+                    );
+                }
+                // A tied note segment would be imported as a fresh attack
+                // because Score currently has no tie/sustain-link metadata.
+                if child.descendants().any(|node| {
+                    node.has_tag_name("tie") || node.has_tag_name("tied")
+                }) {
+                    return Err(
+                        "MusicXML ties are not supported by the single-note-event importer; refusing to turn tied segments into reattacks"
                             .into(),
                     );
                 }
@@ -1122,6 +1143,44 @@ mod tests {
         let error = parse_musicxml(xml).unwrap_err();
         assert!(
             error.contains("must contain a supported <pitch> or an explicit <rest>"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_part_transposition_is_rejected_instead_of_ignored() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes>
+                <divisions>1</divisions>
+                <transpose><diatonic>-1</diatonic><chromatic>-2</chromatic></transpose>
+            </attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("part transposition is not supported"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn musicxml_tied_note_segments_are_rejected_instead_of_reattacked() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note>
+                <pitch><step>C</step><octave>4</octave></pitch><duration>1</duration>
+                <tie type="start"/>
+                <notations><tied type="start"/></notations>
+            </note>
+            <note>
+                <pitch><step>C</step><octave>4</octave></pitch><duration>1</duration>
+                <tie type="stop"/>
+                <notations><tied type="stop"/></notations>
+            </note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(
+            error.contains("ties are not supported by the single-note-event importer"),
             "{error}"
         );
     }
