@@ -276,10 +276,39 @@ fn validate_qualified_netlist(
     netlist: &str,
     requested: &BTreeMap<String, String>,
 ) -> Result<(), SimulationError> {
+    // ngspice always consumes the first physical line as the deck title, not
+    // as a device/directive. Require the deliberately narrow comment-style
+    // title used by our admitted fixtures so the validator cannot approve an
+    // element on line 1 that the solver silently ignores.
+    let Some((title_line, _)) = netlist.split_once('\n') else {
+        return Err(SimulationError::InvalidRequest(
+            "qualified ngspice netlist requires a title line and newline delimiter".into(),
+        ));
+    };
+    if title_line.trim().is_empty() || !title_line.starts_with('*') {
+        return Err(SimulationError::InvalidRequest(
+            "qualified ngspice netlist must start with an explicit '*' title line; ngspice ignores its first line during circuit parsing".into(),
+        ));
+    }
+    if !netlist.ends_with('\n') {
+        return Err(SimulationError::InvalidRequest(
+            "qualified ngspice netlist must end with a newline delimiter".into(),
+        ));
+    }
+    let terminal_line = netlist.lines().last().map(str::trim);
+    if !terminal_line.is_some_and(|line| line.eq_ignore_ascii_case(".end")) {
+        return Err(SimulationError::InvalidRequest(
+            "qualified ngspice netlist must end with .end followed by a newline delimiter".into(),
+        ));
+    }
+
     let mut measures = BTreeSet::new();
     let mut has_tabulated_output = false;
 
-    for raw_line in netlist.lines() {
+    // Skip the title line because ngspice does not parse it as a device or
+    // directive. Validate all subsequent statements against the admitted
+    // subset.
+    for raw_line in netlist.lines().skip(1) {
         let line = raw_line.trim();
         if line.is_empty() || line.starts_with('*') {
             continue;
@@ -444,6 +473,30 @@ mod tests {
     fn qualified_linear_netlist_is_admitted() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
         assert!(validate_qualified_netlist(safe_netlist(), &requested).is_ok());
+    }
+
+    #[test]
+    fn netlist_title_and_terminal_end_match_ngspice_input_contract() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        let valid = safe_netlist();
+        assert!(validate_qualified_netlist(valid, &requested).is_ok());
+
+        // ngspice treats line 1 as a title even if it looks like a device.
+        // Reject it instead of validating a circuit different from the solver's.
+        let no_title = valid.lines().skip(1).collect::<Vec<_>>().join("\n") + "\n";
+        assert!(validate_qualified_netlist(&no_title, &requested).is_err());
+
+        let blank_title = format!("\n{}", valid.lines().skip(1).collect::<Vec<_>>().join("\n")) + "\n";
+        assert!(validate_qualified_netlist(&blank_title, &requested).is_err());
+
+        let missing_end = valid.replace(".end\n", "");
+        assert!(validate_qualified_netlist(&missing_end, &requested).is_err());
+
+        let missing_newline = valid.trim_end_matches('\n');
+        assert!(validate_qualified_netlist(missing_newline, &requested).is_err());
+
+        let statement_after_end = valid.replace(".end\n", ".end\nR3 out 0 1k\n");
+        assert!(validate_qualified_netlist(&statement_after_end, &requested).is_err());
     }
 
     #[test]
