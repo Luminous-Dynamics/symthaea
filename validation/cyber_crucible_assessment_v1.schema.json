@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/cyber_crucible_assessment_v1.schema.json",
+  "title": "Symthaea Cyber Crucible Assessment Result v1",
+  "description": "Assessment receipt schema. A correct-and-secure result requires both independent verdicts, real execution, and passing evidence checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "scenario_revision",
+    "scenario_digest",
+    "functional_status",
+    "security_status",
+    "execution_mode",
+    "required_evidence_refs",
+    "required_evidence_checks",
+    "correct_and_secure"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9]+(?:-[A-Z0-9]+)*$"
+    },
+    "scenario_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scenario_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "functional_status": {
+      "enum": [
+        "pass",
+        "fail",
+        "inconclusive",
+        "not_run"
+      ]
+    },
+    "security_status": {
+      "enum": [
+        "pass",
+        "fail",
+        "inconclusive",
+        "not_run"
+      ]
+    },
+    "execution_mode": {
+      "enum": [
+        "real",
+        "simulated",
+        "not_run"
+      ]
+    },
+    "required_evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required_evidence_checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check_id",
+          "status",
+          "evidence_refs",
+          "receipt_digest"
+        ],
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "inconclusive",
+              "not_run"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "receipt_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "correct_and_secure": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "functional_status": {
+            "const": "pass"
+          },
+          "security_status": {
+            "const": "pass"
+          },
+          "execution_mode": {
+            "const": "real"
+          },
+          "required_evidence_checks": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "status": {
+                  "const": "pass"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "functional_status",
+          "security_status",
+          "execution_mode",
+          "required_evidence_checks"
+        ]
+      },
+      "then": {
+        "properties": {
+          "correct_and_secure": {
+            "const": true
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "correct_and_secure": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
+}
