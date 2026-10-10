@@ -575,6 +575,9 @@ pub struct ResolvedCalibration {
     standard_uncertainty: f64,
 }
 
+/// A calibration result bound to an exact instrument/channel, supported quantity/unit,
+/// inclusive value range, validity interval, and standard uncertainty. Range bounds are
+/// expressed in `unit`; the end of the validity interval is exclusive.
 impl ResolvedCalibration {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
