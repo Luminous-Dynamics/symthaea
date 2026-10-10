@@ -436,9 +436,9 @@ impl ConjectureEngine {
     /// distance kernels, cross-products, and Hamiltonian skeletons extracted
     /// from trajectory-based discoveries.
     ///
-    /// The `symbolic_check_passed` flag records symbolic differentiation plus
-    /// finite-point residual sampling. It is useful diagnostic evidence, but is
-    /// not a universal proof and cannot grant formal status or macro authority.
+    /// The `sampled_residual_passed` flag records only that finite-point residual
+    /// sampling passed after symbolic differentiation. It is diagnostic evidence,
+    /// not a universal proof, and cannot grant formal status or macro authority.
     /// Autonomous candidates remain `NumericallyTested` and quarantined until
     /// an independent proof receipt is available.
     ///
@@ -3822,7 +3822,7 @@ mod tests {
             variance: 1e-6,
             mean_value: 1.0,
             complexity: 3,
-            symbolic_check_passed: false,
+            sampled_residual_passed: false,
         }];
 
         engine.ingest_autonomous_invariants("autonomous_numeric", MathDomain::Physics, &invariants);
@@ -4528,8 +4528,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: HARMONIC OSCILLATOR ═══");
         eprintln!("  Input: dx/dt = v, dv/dt = -x\n");
         for r in &results {
-            let status = if r.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if r.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if r.variance < 1e-6 {
                 "numerically conserved"
             } else {
@@ -4541,7 +4541,7 @@ mod tests {
             );
         }
 
-        // x² + v² should be discovered as conserved AND symbolic/sample check passed
+        // x² + v² should be discovered as conserved AND sampled-residual check passed
         let best = &results[0];
         assert!(
             best.name == "x² + y²" || best.name == "x² + v²",
@@ -4554,17 +4554,17 @@ mod tests {
             best.variance
         );
         assert!(
-            best.symbolic_check_passed,
-            "E = x²+v² should be symbolic/sample check passed"
+            best.sampled_residual_passed,
+            "E = x²+v² should be sampled-residual check passed"
         );
 
         // x² alone should NOT be conserved
         let x2 = results.iter().find(|r| r.name == "x²").unwrap();
         assert!(x2.variance > 0.01, "x² should have high variance");
-        assert!(!x2.symbolic_check_passed, "x² should not pass the symbolic/sample check");
+        assert!(!x2.sampled_residual_passed, "x² should not pass the sampled-residual check");
 
         eprintln!("\n  >>> DISCOVERY: E = x² + v² is a conserved quantity");
-        eprintln!("  >>> SYMBOLIC-CHECK: derivative residuals sampled against the supplied dynamics");
+        eprintln!("  >>> SYMBOLIC+SAMPLED: finite-point residuals passed; no formal proof receipt");
     }
 
     /// LOTKA-VOLTERRA: discover the transcendental invariant V = x - ln(x) + y - ln(y).
@@ -4613,8 +4613,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: LOTKA-VOLTERRA PREDATOR-PREY ═══");
         eprintln!("  Input: dx/dt = x(1-y), dy/dt = y(x-1)\n");
         for r in &results {
-            let status = if r.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if r.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if r.variance < 1e-4 {
                 "numerically conserved"
             } else {
@@ -4626,7 +4626,7 @@ mod tests {
             );
         }
 
-        // The LV invariant should be discovered AND symbolic/sample check passed
+        // The LV invariant should be discovered AND sampled-residual check passed
         let lv = results.iter().find(|r| {
             r.name.contains("ln(x)") && r.name.contains("ln(y)") && r.name.contains("x -")
         });
@@ -4642,15 +4642,15 @@ mod tests {
         let x2y2 = results.iter().find(|r| r.name == "x² + y²");
         if let Some(c) = x2y2 {
             assert!(
-                !c.symbolic_check_passed,
+                !c.sampled_residual_passed,
                 "x²+y² should NOT be conserved in LV"
             );
         }
 
         eprintln!("\n  >>> DISCOVERY: V = x - ln(x) + y - ln(y) is a conserved quantity");
         eprintln!("  >>> This is the Lotka-Volterra first integral (transcendental invariant)");
-        if lv.symbolic_check_passed {
-            eprintln!("  >>> SYMBOLIC-CHECK: candidate derivative passed the finite-point residual check");
+        if lv.sampled_residual_passed {
+            eprintln!("  >>> SYMBOLIC+SAMPLED: candidate derivative passed the finite-point residual check");
         }
     }
 
@@ -4738,8 +4738,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: KEPLER TWO-BODY ═══");
         eprintln!("  Input: d²r/dt² = -r/|r|³ (inverse-square gravity)\n");
         for r in &results {
-            let status = if r.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if r.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if r.variance < 1e-4 {
                 "numerically conserved"
             } else {
@@ -4825,8 +4825,8 @@ mod tests {
         eprintln!("\n═══ AUTOMATED PHYSICIST: DOUBLE PENDULUM (CHAOS) ═══");
         eprintln!("  Input: coupled pendulum, θ₁=1.5, θ₂=1.0 (chaotic regime)\n");
         for r in &results {
-            let status = if r.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if r.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if r.variance < 1e-3 {
                 "CONSERVED (numerical)"
             } else {
@@ -4909,8 +4909,8 @@ mod tests {
         eprintln!("║  Input: dx/dt = v, dv/dt = -x (that's ALL she gets)        ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().enumerate() {
-            let status = if inv.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if inv.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if inv.variance < 1e-6 {
                 "conserved"
             } else {
@@ -4942,8 +4942,8 @@ mod tests {
             "\n  >>> BEST DISCOVERY: {} (var={:.2e})",
             best.formula_str, best.variance
         );
-        if best.symbolic_check_passed {
-            eprintln!("  >>> SYMBOLIC-CHECK: finite-point residuals passed; no formal proof receipt");
+        if best.sampled_residual_passed {
+            eprintln!("  >>> SYMBOLIC+SAMPLED: finite-point residuals passed; no formal proof receipt");
         }
     }
 
@@ -5001,8 +5001,8 @@ mod tests {
         eprintln!("║  Input: d²r/dt² = -r/|r|³ (that's ALL she gets)            ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().enumerate() {
-            let status = if inv.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if inv.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if inv.variance < 1e-4 {
                 "conserved"
             } else {
@@ -5451,8 +5451,8 @@ mod tests {
         eprintln!("║  AUTONOMOUS DISCOVERY: SCHWARZSCHILD GEODESIC               ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().take(5).enumerate() {
-            let status = if inv.symbolic_check_passed {
-                "SYMBOLIC-CHECK ✓"
+            let status = if inv.sampled_residual_passed {
+                "SYMBOLIC+SAMPLED ✓"
             } else if inv.variance < 1e-4 {
                 "conserved"
             } else {
@@ -5976,8 +5976,8 @@ mod tests {
         );
         assert!(!invariants.is_empty(), "Kepler discovery should find invariant candidates");
         assert!(
-            invariants.iter().any(|inv| inv.symbolic_check_passed),
-            "Kepler discovery should retain at least one symbolic/sample check result"
+            invariants.iter().any(|inv| inv.sampled_residual_passed),
+            "Kepler discovery should retain at least one sampled-residual check result"
         );
 
         let mut engine = ConjectureEngine::new();
