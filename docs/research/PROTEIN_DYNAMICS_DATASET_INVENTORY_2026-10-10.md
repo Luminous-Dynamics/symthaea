@@ -1,4 +1,4 @@
-# Protein Dynamics Dataset Inventory — 2026-10-10
+# Protein Dynamics Dataset Inventory — initial draft 2026-10-10; source audit refreshed 2026-10-11
 
 **Status:** initial literature/source inventory; not a frozen test manifest. No datasets have been downloaded, checksummed, or benchmarked by this inventory. The exact revision of this document and any future asset manifest must be recorded before experiments.
 
