@@ -150,6 +150,14 @@ jobs:
           }
           for field in effect_provenance_fields:
               assert field in source, f"Missing effect provenance field: {field}"
+
+          provider_result_binding_fields = {
+              "result_payload_digest",
+              "raw_bytes_digest",
+              "authenticated-api-channel",
+          }
+          for field in provider_result_binding_fields:
+              assert field in source, f"Missing provider-result binding field: {field}"
           for field in webhook_context_fields:
               assert field in source, f"Missing webhook context field: {field}"
           assert "received_context" in source, "Missing independent received-context input"
