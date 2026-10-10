@@ -727,6 +727,8 @@ impl ResolvedCalibration {
 pub struct VerifiedCalibrationEvidence {
     calibration: ResolvedCalibration,
     certificate: VerifiedArtifactBytes,
+    certificate_claims: CalibrationCertificate,
+    reference_standard: VerifiedArtifactBytes,
     review_receipt: VerifiedCalibrationReviewReceipt,
 }
 
@@ -734,6 +736,7 @@ impl VerifiedCalibrationEvidence {
     pub fn new(
         calibration: ResolvedCalibration,
         certificate: VerifiedArtifactBytes,
+        reference_standard: VerifiedArtifactBytes,
         review_receipt: VerifiedCalibrationReviewReceipt,
     ) -> Result<Self, ContractError> {
         if certificate.byte_length() == 0 {
@@ -770,6 +773,14 @@ impl VerifiedCalibrationEvidence {
         ) {
             return Err(ContractError::CalibrationCertificateClaimMismatch(field));
         }
+        if reference_standard.byte_length() == 0 {
+            return Err(ContractError::EmptyEvidenceArtifact("reference_standard"));
+        }
+        if reference_standard.reference() != parsed_certificate.reference_standard() {
+            return Err(ContractError::VerifiedArtifactReferenceMismatch(
+                "reference_standard",
+            ));
+        }
         if review_receipt.artifact().reference() != &calibration.review_receipt {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
                 "calibration_review_receipt",
@@ -786,6 +797,8 @@ impl VerifiedCalibrationEvidence {
         Ok(Self {
             calibration,
             certificate,
+            certificate_claims: parsed_certificate,
+            reference_standard,
             review_receipt,
         })
     }
@@ -796,6 +809,14 @@ impl VerifiedCalibrationEvidence {
 
     pub fn certificate(&self) -> &VerifiedArtifactBytes {
         &self.certificate
+    }
+
+    pub fn certificate_claims(&self) -> &CalibrationCertificate {
+        &self.certificate_claims
+    }
+
+    pub fn reference_standard(&self) -> &VerifiedArtifactBytes {
+        &self.reference_standard
     }
 
     pub fn review_receipt(&self) -> &VerifiedCalibrationReviewReceipt {
