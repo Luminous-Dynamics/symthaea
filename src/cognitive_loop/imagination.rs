@@ -154,7 +154,8 @@ impl CognitiveLoopService {
             }
 
             // Report the same measured local-transition proxy used by the manifold.
-            let trajectory_coherence = manifold.measure_path_coherence(&path).unwrap_or(0.0);
+            let trajectory_continuity = manifold.measure_path_coherence(&path);
+            let trajectory_coherence = trajectory_continuity.unwrap_or(0.0);
 
             // 5. Decode and return the "Dream"
             let frames = manifold.decode_geodesic_to_frames_improved(&path);
@@ -172,6 +173,7 @@ impl CognitiveLoopService {
                 path_length: path.len(),
                 // Legacy field name retained; 0.0 means no proxy score was available.
                 semantic_coherence: trajectory_coherence,
+                trajectory_continuity,
                 trajectory: path,
             })
         }
