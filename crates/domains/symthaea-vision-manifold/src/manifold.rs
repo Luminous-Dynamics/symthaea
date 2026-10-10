@@ -11116,17 +11116,25 @@ fn checked_compute_cost_increment(
     unit_cost: f64,
     cumulative_cost: f32,
 ) -> Option<(f32, f32)> {
-    let call_cost = (work_units as f64 * unit_cost) as f32;
+    let exact_call_cost = work_units as f64 * unit_cost;
+    let call_cost = exact_call_cost as f32;
     if !unit_cost.is_finite()
         || unit_cost < 0.0
+        || !exact_call_cost.is_finite()
         || !call_cost.is_finite()
         || !cumulative_cost.is_finite()
         || cumulative_cost < 0.0
+        || (work_units > 0 && unit_cost > 0.0 && call_cost == 0.0)
     {
         return None;
     }
     let projected = cumulative_cost + call_cost;
-    projected.is_finite().then_some((call_cost, projected))
+    // Reject increments that disappear entirely at the accumulator's current
+    // precision. A finite unchanged total is not successful cost accounting.
+    if !projected.is_finite() || (call_cost > 0.0 && projected <= cumulative_cost) {
+        return None;
+    }
+    Some((call_cost, projected))
 }
 
 /// Compute per-call and projected cumulative geodesic cost with checked
