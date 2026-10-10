@@ -296,7 +296,8 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         let mut previous_onset = Duration::zero();
         for child in part.descendants().filter(|node| node.is_element()) {
             if child.has_tag_name("divisions") {
-                let value = node_i64(child).unwrap_or(divisions);
+                let value = node_i64(child)
+                    .ok_or_else(|| "MusicXML divisions must be a positive integer".to_string())?;
                 if value <= 0 {
                     return Err("MusicXML divisions must be positive".into());
                 }
@@ -314,14 +315,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     tempo = value;
                 }
             } else if child.has_tag_name("backup") {
-                let amount = child
-                    .children()
-                    .find(|node| node.has_tag_name("duration"))
-                    .and_then(node_i64)
-                    .unwrap_or(0);
-                if amount < 0 {
-                    return Err("MusicXML backup duration cannot be negative".into());
-                }
+                let amount = musicxml_duration(child, "backup")?;
                 let amount = Duration::new(amount, divisions);
                 cursor = cursor
                     .checked_sub(amount)
@@ -330,28 +324,20 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     return Err("MusicXML backup moves before the start of a part".into());
                 }
             } else if child.has_tag_name("forward") {
-                let amount = child
-                    .children()
-                    .find(|node| node.has_tag_name("duration"))
-                    .and_then(node_i64)
-                    .unwrap_or(0);
-                if amount < 0 {
-                    return Err("MusicXML forward duration cannot be negative".into());
-                }
+                let amount = musicxml_duration(child, "forward")?;
                 let amount = Duration::new(amount, divisions);
                 cursor = cursor
                     .checked_add(amount)
                     .ok_or_else(|| "MusicXML forward timing overflowed".to_string())?;
             } else if child.has_tag_name("note") {
-                let duration = child
-                    .children()
-                    .find(|node| node.has_tag_name("duration"))
-                    .and_then(node_i64)
-                    .unwrap_or(divisions);
-                if duration < 0 {
-                    return Err("MusicXML note duration cannot be negative".into());
+                if child.children().any(|node| node.has_tag_name("grace")) {
+                    return Err(
+                        "MusicXML grace notes are not yet supported; refusing to invent a duration"
+                            .into(),
+                    );
                 }
-                let duration = Duration::new(duration.max(1), divisions);
+                let duration = musicxml_duration(child, "note")?;
+                let duration = Duration::new(duration, divisions);
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
                 let rest = child.children().any(|node| node.has_tag_name("rest"));
                 let onset = if chord { previous_onset } else { cursor };
@@ -483,6 +469,22 @@ fn validate_imported_score(score: &Score) -> Result<(), String> {
 
 fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
+}
+
+/// MusicXML durations use positive integer division units. Required values
+/// must not be converted into defaults: doing so changes imported timing.
+fn musicxml_duration(parent: roxmltree::Node<'_, '_>, element: &str) -> Result<i64, String> {
+    let node = parent
+        .children()
+        .find(|node| node.has_tag_name("duration"))
+        .ok_or_else(|| format!("MusicXML {element} is missing its <duration> element"))?;
+    let value = node_i64(node).ok_or_else(|| {
+        format!("MusicXML {element} duration must be an integer number of divisions")
+    })?;
+    if value <= 0 {
+        return Err(format!("MusicXML {element} duration must be positive"));
+    }
+    Ok(value)
 }
 
 fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<Option<u8>, String> {
@@ -755,6 +757,56 @@ mod tests {
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
         assert!(error.contains("integer semitone value"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_missing_note_duration_is_rejected_instead_of_invented() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("missing its <duration> element"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_malformed_note_duration_is_rejected_instead_of_defaulted() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>abc</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("integer number of divisions"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_zero_note_duration_is_rejected_instead_of_promoted() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>0</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("duration must be positive"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_grace_note_is_rejected_instead_of_given_a_default_duration() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><grace slash="yes"/><pitch><step>B</step><octave>4</octave></pitch>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("grace notes are not yet supported"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_malformed_divisions_are_rejected_instead_of_reusing_previous_value() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>abc</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("divisions must be a positive integer"), "{error}");
     }
 
     #[test]
