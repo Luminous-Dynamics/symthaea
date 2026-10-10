@@ -166,6 +166,14 @@ A separate module estimates normal-approximation power for the (k) two-sided mai
 
 This screen does not declare the trial scientifically powered. It treats the supplied SD as known; it does not handle the exact finite-sample noncentral-(t) distribution, uncertainty in the SD estimate, factor interactions, block-by-treatment interactions, or multiplicity beyond the (k) main effects. It assumes independent, balanced, common-variance errors and additive block effects. Missing or scenario-only variance evidence blocks the calculation. Use context-relevant pilot data and a statistician/agronomist-approved analysis before fixing replication. NIST notes that sample size depends on alpha, target power, effect size, and standard deviation: https://itl.nist.gov/div898/handbook/prc/section2/prc222.htm. The factorial contrast variance formula is given in Penn State STAT 503: https://online.stat.psu.edu/stat503/Lesson06.
 
+## Measured-response capture and descriptive factorial analysis
+
+After an experiment, the engineering crate accepts one primary-endpoint observation for every planned run. Each record must identify the exact run, endpoint, method, unit, finite observed value and measured-evidence ID. The plan is structurally re-verified before analysis. The request fails closed if a run is missing, an observation/run ID is duplicated or unknown, the response uses a different endpoint/method/unit, the observation is scenario-labelled, or the schedule was changed after generation.
+
+The first analysis output includes conventional descriptive factorial contrasts for all main effects and interactions in the two-level full factorial, plus block-wise center-point mean minus factorial-treatment mean when center points exist. It retains the design request, observation provenance and run order. These are **descriptive effects only**: there are no p-values, confidence intervals, causal conclusions or field-efficacy claims. A center-point difference is diagnostic, not a formal curvature test.
+
+Do not silently discard or impute a missing response. Apply the predeclared missing-data plan, preserve the deviation and null/adverse result, and require review before inference. A future inferential stage should explicitly model the blocked structure and residual degrees of freedom, validate model diagnostics, handle multiplicity and block-by-treatment interactions, and be cross-checked against an independent statistical implementation. The preliminary normal-approximation power screen is not that inferential analysis.
+
 ## Decision gates
 
 - **G0 — provenance:** feedstock and site metadata are complete enough to plan sampling.
