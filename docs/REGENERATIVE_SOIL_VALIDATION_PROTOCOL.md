@@ -150,7 +150,7 @@ Required before generation:
 - one primary endpoint, measurement method and a minimum practically meaningful difference with supporting rationale;
 - 2–8 distinct blocks that describe a nuisance stratum (for example, day or feedstock lot);
 - a fixed randomization seed; run order is randomized within each block and the algorithm ID is retained;
-- an evidence-backed reviewer approval for the exact bench-scale protocol. Unknown/rejected review status, a protocol-ID mismatch, or scenario-only approval evidence causes the planner to reject the request. The current implementation checks these declarations structurally but does not authenticate the referenced review record against an independent evidence service; therefore this gate is not a security authorization mechanism.
+- an evidence-backed reviewer approval for the exact bench-scale protocol. Unknown/rejected review status, a protocol-ID mismatch, an input-snapshot-ID mismatch, or scenario-only approval evidence causes the planner to reject the request. The current implementation checks these declarations structurally but does not authenticate the referenced review record against an independent evidence service; therefore this gate is not a security authorization mechanism.
 
 Optional center-point controls are disabled or 3–5 per block. When enabled, every quantitative factor is set to its numeric midpoint; controls are evenly placed with controls at the beginning and end of each block, while treatment runs remain randomized among themselves. NIST describes center points as a check on stability and curvature, not as a substitute for a response-surface experiment: https://itl.nist.gov/div898/handbook/pri/section3/pri337.htm.
 
