@@ -98,6 +98,7 @@ Recommended division:
 - **Thermofluids and digital twin:** staged heat duty, heat-exchanger/heat-recovery scenarios, moisture control, sensors, process telemetry and calibration against a physical unit.
 - **Materials models:** source-specific composition and measured characterization (ultimate/proximate analysis, ash/minerals, pH, electrical conductivity, surface area, pore-size distributions, CEC, H/C and O/C ratios, relevant contaminants).
 - **Operations research:** choose feedstock blend, throughput, energy source/heat recovery, process conditions and product blends under explicit constraints; compute Pareto fronts rather than a single opaque 'best' recipe.
+- **Engineering facade:** the new regenerative screening module independently checks process mass/carbon/heat closure, applies user-specified hard constraints, and refuses to put candidates with a failed or unknown product-quality gate on the Pareto frontier. Scenario candidates remain visibly scenario-tagged.
 - **Causal reasoning and Symthaea planning:** recommend the next informative experiment and compare counterfactuals. Keep causal hypotheses distinct from demonstrated effects.
 - **Independent evaluator:** recompute balances and check feasibility without trusting the agent that proposed a design.
 - **Sol Atlas:** map verified suppliers, crop seasons, nutrient flows, facility capacity, demand, transportation, and uncertainty.
@@ -150,7 +151,13 @@ The target process is not 'maximum biochar yield'. It is a constrained multi-obj
 - typed evidence references for feedstock data, empirical process parameters, thermophysical properties, reactor design, stream composition, recovery parameters and plant-availability parameters; result objects retain these references;
 - tests for mass/carbon balances, thermal duty, sub-zero ambient temperature, invalid/missing evidence, nutrient recovery bounds, and serialization.
 
-The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The module has not been claimed as compile-verified until CI passes. Evidence IDs currently link to caller-managed immutable records; next integration should store/check these references in Symthaea's shared evidence plane and require schema/version identifiers for each parameter group.
+`crates/domains/symthaea-engineering/src/regenerative.rs` adds:
+- candidate assessments against versioned yield, carbon-retention, supplied-heat, cost and water requirements;
+- independent re-checks of mass, carbon and declared heat-duty identities;
+- strict same-unit cost comparisons, provenance retention, and a quality gate that fails closed on unknown status;
+- a sorted, deterministic Pareto frontier that retains trade-offs instead of hiding them inside a weighted composite score.
+
+The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The modules are not claimed as compile-verified until CI passes. Evidence IDs currently link to caller-managed immutable records; next integration should verify those receipts against Symthaea's shared evidence plane and require schema/version identifiers for each parameter group.
 
 ## Acceptance criteria for the next milestone
 
