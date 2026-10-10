@@ -25,6 +25,7 @@ The public module **symthaea_acoustics::ultrasound** provides:
 - idealized pulse-echo axial-resolution estimates from pulse cycle count, sound speed, and center frequency;
 - a transparent Nyquist minimum calculation and sampling-plan assessment that records whether an anti-alias evidence reference was supplied;
 - a deterministic point-reflector phantom that emits a bounded synthetic RF trace while retaining analytic pulse-echo travel times and fractional sample indices;
+- a versioned canonical little-endian synthetic-fixture encoding that commits to generation parameters, analytic echo truth, and sample values, making exact-byte hashing possible for evidence storage;
 - negative and known-answer tests for malformed physical inputs, under-sampling, resource-budget overruns, too-short acquisition windows, and echo-time/sample-position agreement.
 
 The axial-resolution equation follows the spatial-pulse-length formulation: spatial pulse length is approximately Nλ, and idealized axial resolution is half that length. Bandwidth-to-resolution conversions are intentionally not hard-coded in this first increment because pulse shape and bandwidth conventions alter the conversion. The estimate is not a real-probe performance result.
@@ -66,7 +67,7 @@ These are architectural boundaries, not a commitment to create five new crates. 
 
 ### Gate B — simulator cross-check
 
-Use an established acoustics simulator such as [k-Wave](https://www.k-wave.org/) / [k-Wave Python](https://k-wave-python.readthedocs.io/en/latest/) as an external comparator. First compare the synthetic phantom's (2d/c) echo times against analytically solvable homogeneous-medium cases; then compare simulator-derived arrival times with fixed solver configuration and recorded error metrics before adding attenuation, speckle, finite apertures or tissue complexity. The current point-reflector generator is a deterministic fixture, not a full wave solver, and has not yet been cross-validated against k-Wave. A simulator cross-check is not clinical validation.
+Use an established acoustics simulator such as [k-Wave](https://www.k-wave.org/) / [k-Wave Python](https://k-wave-python.readthedocs.io/en/latest/) as an external comparator. First compare the synthetic phantom's (2d/c) echo times against analytically solvable homogeneous-medium cases; then compare simulator-derived arrival times with fixed solver configuration and recorded error metrics before adding attenuation, speckle, finite apertures or tissue complexity. The current point-reflector generator is a deterministic fixture, not a full wave solver, and has not yet been cross-validated against k-Wave. Its `SYMRF001` canonical encoding is for synthetic research artifacts only—not DICOM or a real-device acquisition format. A downstream evidence adapter should hash the exact canonical bytes, record the format version and generator commit, and resolve that digest from stored bytes rather than trust an identifier or digest string alone. A simulator cross-check is not clinical validation.
 
 ### Gate C — hardware-independent phantom evaluation
 
