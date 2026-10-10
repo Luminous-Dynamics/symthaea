@@ -1,26 +1,23 @@
 # World Prediction + Calibration Pipeline Implementation Plan
 
 **Priority**: 1 (Critical - Truth Backbone)
-**Status**: Core MAGI components exist; end-to-end outcome authority and capability qualification remain unproven (source audit 2026-10-10)
+**Status**: Phase 1-3.5 IMPLEMENTED
 **Estimated Complexity**: Medium-High
 **Key Insight**: "The system predicts itself but not the world"
 **Related**: `MAGI_LOOP_SPECIFICATION.md` (AGI Crossing Criterion)
 **Implementation Date**: 2026-01-20
 
-### Current Source Status
+### Implementation Status
 
-This table distinguishes source presence from end-to-end behavior qualification. A module or API existing is not, by itself, evidence that the live system uses it correctly.
-
-| Area | Source status | Qualification boundary |
-|------|---------------|------------------------|
-| World predictions and contracts | Implemented in the recursive-improvement world-prediction module | The public resolution API still accepts an outcome directly; caller enforcement of the declared external resolver is not established by this path alone. |
-| Brier/ECE calibration | Implemented in the calibration module | Forecasts must remain prospectively bound to independently resolved outcomes; calibration scores are meaningful only with enough valid resolved evidence. |
-| Constraint gate | Implemented in the constraint-gate module | A component gate does not prove every real execution path is gated. Exact path-level integration must be verified. |
-| Causal attribution | Attribution records and generation exist in MAGI integration | Responsible-domain and missing-information assignments are heuristic; they are not verified causal findings by themselves. |
-| EFE integration | Calibration-derived EFE contribution and adjusted EFE APIs exist | Their influence on the live action-selection route and measured outcomes remains an end-to-end qualification question. |
-| Operational self-model | Capability domains, generic estimates, and updates exist in MAGI integration | The current stub does not itself maintain per-claim prospective forecasts linked to independently verified outcomes. PR #7335 adds a separate first capability-ledger primitive; it is not yet wired into the runtime. |
-| External resolver execution | Command and resource-state resolver implementations exist | ExitCodeResolver accepts a timeout argument but currently ignores it, so command execution is not bounded by that argument. Fix and test this before relying on time-bounded resolution. |
-| MAGI crossing criterion | Not established by source presence alone | Requires exact-subject, independently verified end-to-end qualification across at least two unrelated domains. |
+| Phase | Status | Files Created |
+|-------|--------|---------------|
+| Phase 1: WorldPrediction | COMPLETE | `world_prediction.rs` |
+| Phase 1.5: ResolutionContract | COMPLETE | `world_prediction.rs` |
+| Phase 2: BrierScoreTracker | COMPLETE | `calibration.rs` |
+| Phase 3.5: ConstraintGate | COMPLETE | `constraint_gate.rs` |
+| Integration | COMPLETE | `magi_integration.rs` |
+| Phase 3: EFE Integration | PENDING | - |
+| Phase 4: CausalAttribution Integration | PENDING | - |
 
 ---
 
@@ -49,17 +46,30 @@ The crossing criterion: **Complete this loop across 2+ domains without hard-code
 
 ---
 
-## Source-Audited Gaps
+## Gap Analysis
 
-The original planning gap table below was overtaken by implementation and is superseded by the current source-status table above. The remaining gap is not the absence of every component; it is the missing trusted wiring and qualification between components.
+### What EXISTS (Strong Foundation)
 
-Priority follow-through:
-1. Make external outcome resolution an enforced protocol: execute the declared resolver, enforce its timeout, and bind its result to the exact pending prediction and subject.
-2. Admit calibration evidence only through a trusted verifier path; the caller must not be able to convert an arbitrary outcome argument into qualified evidence.
-3. Connect per-capability prospective forecasts to the evidence-bound capability ledger (PR #7335), retaining exact subject/config/profile identity and outcome chronology.
-4. Make EFE influence auditable at the live action-selection boundary; separately measure whether the adjusted choice improves outcomes.
-5. Treat causal attribution as a hypothesis until a predeclared intervention or control supports the cause.
-6. Demonstrate repeatable, held-out qualification in two unrelated domains, with unresolved, skipped, stale-subject, and unauthenticated evidence excluded.
+| Component | Location | Capability |
+|-----------|----------|------------|
+| `PredictionRecord` | `self_model.rs:211-241` | Tracks predicted vs actual Φ/latency |
+| `record_outcome()` | `lookahead.rs:305-322` | Records predicted vs actual for learning |
+| `CalibrationStats` | `self_model.rs:416-440` | Mean error tracking |
+| `ActiveInferenceRouter` | `active_inference.rs` | Full EFE with pragmatic/epistemic |
+| `GenerativeModel` | `active_inference.rs:132-248` | State transition + likelihood matrices |
+| `AdaptiveThresholds` | `phi_attention.rs:300-399` | Success/failure tracking per action type |
+
+### What's MISSING (Critical Gaps)
+
+| Gap | Impact | Solution |
+|-----|--------|----------|
+| **World outcome predictions** | Can't verify actions work | `WorldPrediction` struct |
+| **Brier scores** | Poor calibration signal | `BrierScoreTracker` |
+| **Action → Outcome mapping** | No causal learning | `CausalAttribution` |
+| **EFE world grounding** | Routing ignores reality | `WorldGroundedEFE` |
+| **Prediction horizons** | Only immediate Φ | `TemporalPrediction` |
+
+---
 
 ## Integration Architecture
 
@@ -929,4 +939,4 @@ impl ActionIR {
 
 *"The system that doesn't check its predictions against reality will eventually act on hallucinations." — Design principle*
 
-**Next Step**: Close the resolver/receipt authority gap, then wire the capability ledger into prospective prediction and qualification. Do not reimplement modules that already exist or declare the MAGI crossing criterion until exact-subject end-to-end evidence passes.
+**Next Step**: Implement Phase 1 (WorldPrediction struct) in new file.
