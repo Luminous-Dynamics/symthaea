@@ -637,7 +637,7 @@ pub fn classify_remote_command_capability(
 
     match program.as_str() {
         "pwd" | "echo" | "true" | "false" | "date" | "whoami" | "id" | "uname" | "hostname"
-        | "printenv" | "env" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
+        | "printenv" | "ls" | "cat" | "head" | "tail" | "stat" | "which" | "rg"
         | "grep" | "find" | "journalctl" | "ps" | "df" | "du" | "free" | "sleep" => {
             Ok(RemoteCommandCapability::ReadOnly)
         }
@@ -1699,6 +1699,26 @@ mod remote_command_capability_tests {
     fn test_remote_command_capability_marks_mutating_touch() {
         let capability = classify_remote_command_capability("touch", &["/tmp/file".into()])
             .expect("touch should be recognized");
+        assert_eq!(capability, RemoteCommandCapability::Mutating);
+    }
+
+    #[test]
+    fn test_remote_command_capability_rejects_env_wrapper() {
+        let err = classify_remote_command_capability(
+            "env",
+            &["systemctl".into(), "restart".into(), "nginx.service".into()],
+        )
+        .expect_err("env must not be treated as a read-only command wrapper");
+        assert!(err.contains("allowlist"));
+    }
+
+    #[test]
+    fn test_remote_command_capability_keeps_direct_systemctl_mutating() {
+        let capability = classify_remote_command_capability(
+            "systemctl",
+            &["restart".into(), "nginx.service".into()],
+        )
+        .expect("direct systemctl restart should be recognized");
         assert_eq!(capability, RemoteCommandCapability::Mutating);
     }
 
