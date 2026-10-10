@@ -15,6 +15,7 @@ pub mod finance;
 pub mod game;
 pub mod inequality;
 pub mod market;
+pub mod institutional_expectations;
 
 pub use creditism::{CreditismError, ExchangeSettlement, PersonalCreditLedger};
 pub use error::{EconomicsError, Result};
@@ -53,3 +54,8 @@ mod integration_tests {
         assert!(payment * 60.0 > 10_000.0);
     }
 }
+pub use institutional_expectations::{
+    ActualInstitutionObservation, ExpectationBook, ExpectationError, ExpectationRecord,
+    ExpectationRepresentation, ExpectationUpdate, InformationSetIdentity,
+    ReferencedInstitutionStatus,
+};

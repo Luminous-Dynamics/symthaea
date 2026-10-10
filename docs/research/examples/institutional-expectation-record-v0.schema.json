@@ -9,11 +9,12 @@
     "subject_id",
     "observation_time",
     "referenced_institution_hash",
+    "referenced_institution_status",
     "expectation_rule_hash",
-    "information_set_hash",
+    "information_set",
     "representation",
     "belief_value",
-    "currentness"
+    "belief_current"
   ],
   "properties": {
     "schema_version": {
@@ -28,8 +29,8 @@
       "minLength": 1
     },
     "observation_time": {
-      "type": "string",
-      "minLength": 1
+      "type": "integer",
+      "minimum": 0
     },
     "referenced_institution_hash": {
       "type": "string",
@@ -39,9 +40,23 @@
       "type": "string",
       "minLength": 1
     },
-    "information_set_hash": {
-      "type": "string",
-      "minLength": 1
+    "information_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash",
+        "as_of"
+      ],
+      "properties": {
+        "hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "as_of": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     },
     "representation": {
       "type": "string",
@@ -58,11 +73,11 @@
     "belief_value": {},
     "confidence": {
       "type": [
-        "number",
+        "integer",
         "null"
       ],
       "minimum": 0,
-      "maximum": 1
+      "maximum": 100
     },
     "signal_identity": {
       "type": [
@@ -70,25 +85,22 @@
         "null"
       ]
     },
-    "actual_subsequent_state_hash": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "update_event_identity": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "currentness": {
+    "belief_current": {
       "type": "boolean"
     },
     "superseded_by": {
       "type": [
         "string",
         "null"
+      ]
+    },
+    "referenced_institution_status": {
+      "type": "string",
+      "enum": [
+        "current",
+        "historical",
+        "future",
+        "unknown"
       ]
     }
   }
