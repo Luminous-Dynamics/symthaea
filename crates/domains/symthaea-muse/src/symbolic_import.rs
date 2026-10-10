@@ -170,24 +170,31 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
                             let note_key = (channel, key.as_int());
-                            let matched = pending
+                            let (onset, velocity) = pending
                                 .get_mut(&note_key)
-                                .and_then(VecDeque::pop_front);
+                                .and_then(VecDeque::pop_front)
+                                .ok_or_else(|| {
+                                    "MIDI note-off has no matching active note-on".to_string()
+                                })?;
                             if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
                                 pending.remove(&note_key);
                             }
-                            if let Some((onset, velocity)) = matched {
-                                push_raw_note(
-                                    &mut notes,
-                                    RawNote {
-                                        track: track_index,
-                                        pitch: key.as_int(),
-                                        onset,
-                                        duration: tick.saturating_sub(onset).max(1),
-                                        velocity,
-                                    },
-                                )?;
-                            }
+                            let duration = tick
+                                .checked_sub(onset)
+                                .filter(|duration| *duration > 0)
+                                .ok_or_else(|| {
+                                    "MIDI note-on/off pair must span at least one tick".to_string()
+                                })?;
+                            push_raw_note(
+                                &mut notes,
+                                RawNote {
+                                    track: track_index,
+                                    pitch: key.as_int(),
+                                    onset,
+                                    duration,
+                                    velocity,
+                                },
+                            )?;
                         }
                         _ => {}
                     }
@@ -195,19 +202,10 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 _ => {}
             }
         }
-        for ((_, pitch), starts) in pending {
-            for (onset, velocity) in starts {
-                push_raw_note(
-                    &mut notes,
-                    RawNote {
-                        track: track_index,
-                        pitch,
-                        onset,
-                        duration: tick.saturating_sub(onset).max(1),
-                        velocity,
-                    },
-                )?;
-            }
+        if pending.values().any(|starts| !starts.is_empty()) {
+            return Err(format!(
+                "MIDI track {track_index} ends with unmatched note-on events; refusing to infer note durations"
+            ));
         }
     }
     let tempo_microseconds_per_quarter =
@@ -225,8 +223,8 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         return Err("the MIDI file contains no pitched note events".into());
     }
 
-    // Unclosed notes were flushed from HashMaps above; canonical ordering
-    // makes serialized import identity reproducible between process runs.
+    // Canonical ordering makes serialized import identity reproducible
+    // between process runs.
     notes.sort_by_key(|note| (note.onset, note.track, note.pitch, note.duration, note.velocity));
     let roles = roles_by_track(&notes);
     let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
@@ -896,6 +894,37 @@ mod tests {
             bytes.extend_from_slice(track);
         }
         bytes
+    }
+
+    #[test]
+    fn midi_same_tick_note_on_and_note_off_are_rejected_not_lengthened() {
+        let track = [
+            0, 0x90, 60, 100,
+            0, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("must span at least one tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_unmatched_note_on_at_end_of_track_is_rejected() {
+        let track = [
+            0, 0x90, 60, 100,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("ends with unmatched note-on events"), "{error}");
+    }
+
+    #[test]
+    fn midi_note_off_without_active_matching_note_is_rejected() {
+        let track = [
+            0, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("no matching active note-on"), "{error}");
     }
 
     #[test]
