@@ -470,6 +470,12 @@ impl MeasurementEnvelope {
         if &self.clock_domain != now_clock_domain {
             return Err(AssessmentFailure::ClockDomainMismatch);
         }
+        if policy.uncertainty_unit != self.unit {
+            return Err(AssessmentFailure::PolicyUnitMismatch {
+                policy_unit: policy.uncertainty_unit,
+                measurement_unit: self.unit,
+            });
+        }
         stream_guard
             .observe_at(self, now_ns)
             .map_err(|failure| match failure {
@@ -670,6 +676,7 @@ impl<T> InstrumentEvidenceResolver for T where
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MeasurementPolicy {
     max_age_ns: u64,
+    uncertainty_unit: Unit,
     max_measurement_standard_uncertainty: f64,
     max_calibration_standard_uncertainty: f64,
 }
@@ -677,6 +684,7 @@ pub struct MeasurementPolicy {
 impl MeasurementPolicy {
     pub fn new(
         max_age_ns: u64,
+        uncertainty_unit: Unit,
         max_measurement_standard_uncertainty: f64,
         max_calibration_standard_uncertainty: f64,
     ) -> Result<Self, ContractError> {
@@ -693,9 +701,14 @@ impl MeasurementPolicy {
         }
         Ok(Self {
             max_age_ns,
+            uncertainty_unit,
             max_measurement_standard_uncertainty,
             max_calibration_standard_uncertainty,
         })
+    }
+
+    pub fn uncertainty_unit(&self) -> Unit {
+        self.uncertainty_unit
     }
 }
 
@@ -767,6 +780,7 @@ pub enum AssessmentFailure {
     CalibrationUnitMismatch,
     CalibrationNotValidAtCapture,
     CalibrationRangeExceeded { value: f64, minimum: f64, maximum: f64 },
+    PolicyUnitMismatch { policy_unit: Unit, measurement_unit: Unit },
     MeasurementUncertaintyExceeded,
     CalibrationUncertaintyExceeded,
 }
