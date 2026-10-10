@@ -11142,7 +11142,10 @@ fn checked_geodesic_cost_increment(
 
 #[cfg(test)]
 mod checked_geodesic_cost_tests {
-    use super::{checked_compute_cost_increment, checked_geodesic_cost_increment};
+    use super::{
+        checked_compute_cost_increment, checked_geodesic_cost_increment, VisionConfig,
+        VisionManifold,
+    };
 
     #[test]
     fn checked_cost_returns_increment_and_new_cumulative_total() {
@@ -11171,5 +11174,13 @@ mod checked_geodesic_cost_tests {
         assert!((total - 1.064).abs() < 1e-6);
         assert_eq!(checked_compute_cost_increment(1, f64::NAN, 0.0), None);
         assert_eq!(checked_compute_cost_increment(usize::MAX, f64::MAX, 0.0), None);
+    }
+
+    #[test]
+    fn manifold_admission_refuses_non_finite_cumulative_counter() {
+        let mut manifold = VisionManifold::new(VisionConfig::default(), 64, 64);
+        assert!(manifold.can_compute_geodesic(8, 3));
+        manifold.geodesic_compute_cost = f32::MAX;
+        assert!(!manifold.can_compute_geodesic(8, 3));
     }
 }
