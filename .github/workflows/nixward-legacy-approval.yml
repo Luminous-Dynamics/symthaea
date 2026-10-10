@@ -1,0 +1,43 @@
+name: Nixward Legacy Approval Replay
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/core/nixward/src/action/legacy_approval_gate.rs"
+      - "crates/core/nixward/src/action/mod.rs"
+      - "scripts/qualify_nixward_legacy_approval.sh"
+      - ".github/workflows/nixward-legacy-approval.yml"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  legacy-approval-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Run checked-in focused qualification
+        run: bash scripts/qualify_nixward_legacy_approval.sh
