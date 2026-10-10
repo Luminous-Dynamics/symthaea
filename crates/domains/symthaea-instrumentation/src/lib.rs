@@ -701,15 +701,20 @@ pub struct MeasurementStreamGuard {
     last: HashMap<InstrumentIdentity, StreamPosition>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct StreamPosition {
     sequence: u64,
+    clock_domain: ClockDomainId,
     last_timestamp_ns: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StreamOrderFailure {
     SequenceNotIncreasing { previous: u64, received: u64 },
+    ClockDomainChanged {
+        previous: ClockDomainId,
+        received: ClockDomainId,
+    },
     TimestampMovedBackward { previous_ns: u64, received_ns: u64 },
     FutureTimestamp { captured_at_ns: u64, now_ns: u64 },
 }
@@ -724,7 +729,7 @@ impl MeasurementStreamGuard {
     /// Validate ordering and reject future timestamps using the same clock basis
     /// represented by `now_ns`. A future timestamp consumes the sequence but
     /// retains the last known non-future timestamp, so it cannot freeze the channel.
-    pub fn observe_at(
+    fn observe_at(
         &mut self,
         measurement: &MeasurementEnvelope,
         now_ns: u64,
@@ -738,9 +743,15 @@ impl MeasurementStreamGuard {
         now_ns: Option<u64>,
     ) -> Result<(), StreamOrderFailure> {
         let identity = measurement.identity.clone();
-        let previous = self.last.get(&identity).copied();
+        let previous = self.last.get(&identity).cloned();
 
-        if let Some(position) = previous {
+        if let Some(position) = previous.as_ref() {
+            if position.clock_domain != measurement.clock_domain {
+                return Err(StreamOrderFailure::ClockDomainChanged {
+                    previous: position.clock_domain.clone(),
+                    received: measurement.clock_domain.clone(),
+                });
+            }
             if measurement.sequence <= position.sequence {
                 return Err(StreamOrderFailure::SequenceNotIncreasing {
                     previous: position.sequence,
@@ -754,6 +765,7 @@ impl MeasurementStreamGuard {
                         identity,
                         StreamPosition {
                             sequence: measurement.sequence,
+                            clock_domain: measurement.clock_domain.clone(),
                             last_timestamp_ns: Some(previous_timestamp_ns),
                         },
                     );
@@ -771,7 +783,10 @@ impl MeasurementStreamGuard {
                     identity,
                     StreamPosition {
                         sequence: measurement.sequence,
-                        last_timestamp_ns: previous.and_then(|p| p.last_timestamp_ns),
+                        clock_domain: measurement.clock_domain.clone(),
+                        last_timestamp_ns: previous
+                            .as_ref()
+                            .and_then(|p| p.last_timestamp_ns),
                     },
                 );
                 return Err(StreamOrderFailure::FutureTimestamp {
@@ -785,6 +800,7 @@ impl MeasurementStreamGuard {
             identity,
             StreamPosition {
                 sequence: measurement.sequence,
+                clock_domain: measurement.clock_domain.clone(),
                 last_timestamp_ns: Some(measurement.captured_at_ns),
             },
         );
