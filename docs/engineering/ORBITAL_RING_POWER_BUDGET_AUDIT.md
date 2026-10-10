@@ -95,9 +95,9 @@ python3 scripts/engineering/orbital_ring_power_source_audit.py
 
 The standard-library script computes the drag coefficients, checks the smaller and larger drag-power estimates and paired cryogenic ratios, and reconstructs the Table 8 length/heat-load scale. The recorded run passed **16/16 checks** and emitted byte-identical JSON on repeat. The captured report is checked into [the evidence directory](evidence/orbital_ring_power_source_audit.json) for review.
 
-- Source Git blob: `68d975e603aeb08049dd89670d754346d04a332b`
-- Source SHA-256: `c1d5086eb55c9424d544ba229db76a6727d5f22e311b7e5006acd6c86f28da26`
-- Deterministic JSON SHA-256: `a9a8357c6c56cbfd1d2b0681824b1529b5ece67be78bd08aaf8f1e801b49e7c4`
+- Source Git blob: `5b6e23922027c64b604158b2557fc68673a4ecc9`
+- Source SHA-256: `adab9dcdd4bd8fc6f8ffa99d5fb42035849054d68852ddaca631da63c9ad7514`
+- Deterministic JSON SHA-256: `b353bdf568f2f1358cfff49cb5d2bf334e37b137d41876bbd79a193e7aa8df5d`
 
 This evidence verifies only the arithmetic of transcribed source values. It does not establish a valid current design, cryocooler performance, heat-rejection feasibility, structural stability, safe failure behavior, costs, or buildability.
 
