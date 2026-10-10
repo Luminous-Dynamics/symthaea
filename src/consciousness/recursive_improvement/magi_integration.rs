@@ -763,10 +763,14 @@ impl WorldGroundedSelfModel {
 
         // This is a count of terminal operational observations, not trusted calibration samples.
         self.loop_state.predictions_resolved += 1;
-        if admission == CalibrationAdmission::SimulationOnly {
-            // A completed calibration loop requires admitted calibration evidence. An
-            // unverified runtime observation alone must not signal loop completion.
-            self.check_loop_completion();
+        match admission {
+            CalibrationAdmission::UnverifiedObservation => {}
+            #[cfg(any(test, feature = "magi-simulation"))]
+            CalibrationAdmission::SimulationOnly => {
+                // A completed calibration loop requires admitted calibration evidence. An
+                // unverified runtime observation alone must not signal loop completion.
+                self.check_loop_completion();
+            }
         }
 
         Some(was_correct)
