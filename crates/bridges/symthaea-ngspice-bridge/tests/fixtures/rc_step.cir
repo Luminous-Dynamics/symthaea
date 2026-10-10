@@ -1,0 +1,8 @@
+* ENG-SPICE-001 deterministic RC step fixture
+V1 in 0 PULSE(0 1 0 1n 1n 100m 200m)
+R1 in out 1k
+C1 out 0 1u
+.tran 10u 5m
+.measure tran vout_1ms FIND v(out) AT=1m
+.print tran v(out)
+.end
