@@ -62,6 +62,7 @@ Recorded local checks:
 
 - `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
 - `python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test`: **68 passed, 0 failed**.
+- Additional regressions reject `test_fixture` and rejected provenance, empty evidence references, missing from/to-frame metadata, a transform target that differs from the declared inertial frame, and energy/momentum boundaries without term-inventory references.
 - Running the validator on the checked-in template returned `passed_contract_checks` for the *manifest contract*, while correctly keeping the scenario `Blocked` with all 23 inputs unresolved and `analysis_state = NotRun`.
 - Repeated test and manifest-validation outputs were byte-identical. The exact outputs are preserved in [the validation report](evidence/f_skyhook_load_step_manifest_validation.json) and [the self-test report](evidence/orbital_ring_failure_manifest_validator_selftest.json).
 
