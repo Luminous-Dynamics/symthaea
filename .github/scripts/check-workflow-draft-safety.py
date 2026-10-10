@@ -164,7 +164,34 @@ def explicitly_excludes_pull_request(expression: str | None) -> bool:
 
 
 def has_draft_guard(expression: str | None) -> bool:
-    return expression is not None and DRAFT_FALSE.search(expression) is not None
+    if expression is None:
+        return False
+    normalized = " ".join(expression.split())
+
+    # Refuse unary negation of any subexpression; a textual occurrence of a
+    # positive draft predicate under "!" is not a guard.
+    if re.search(r"(?<![=<>!])!(?!=)", normalized):
+        return False
+    if DRAFT_FALSE.search(normalized) is None:
+        return False
+
+    # Without disjunction, a positive draft==false term can only restrict
+    # admission further. With disjunction, accept only the two explicit safe
+    # forms that make the alternate branch exclude pull_request altogether.
+    if "||" not in normalized:
+        return True
+    if normalized.count("||") != 1:
+        return False
+    safe_event_exclusion = re.compile(
+        r"(?:"
+        r"github\.event_name\s*!=\s*['\"]pull_request['\"]\s*\|\|\s*"
+        r"github\.event\.pull_request\.draft\s*==\s*false"
+        r"|"
+        r"github\.event\.pull_request\.draft\s*==\s*false\s*\|\|\s*"
+        r"github\.event_name\s*!=\s*['\"]pull_request['\"]"
+        r")"
+    )
+    return safe_event_exclusion.search(normalized) is not None
 
 
 def require_ready_event(path: Path, pr_block: list[str]) -> None:
@@ -299,6 +326,22 @@ jobs:
     pr = pull_request_block(safe)
     assert pr is not None
     assert validate_generic(Path("safe.yml"), safe, pr) == (1, 1)
+    assert has_draft_guard("github.event.pull_request.draft == false")
+    assert has_draft_guard(
+        "github.repository == 'Luminous-Dynamics/symthaea' && "
+        "(github.event_name != 'pull_request' || "
+        "github.event.pull_request.draft == false)"
+    )
+    assert not has_draft_guard(
+        "always() || github.event.pull_request.draft == false"
+    )
+    assert not has_draft_guard(
+        "!github.event.pull_request.draft == false"
+    )
+    assert not has_draft_guard(
+        "github.event_name != 'pull_request' || "
+        "github.event.pull_request.draft == false || always()"
+    )
 
     unsafe = safe.replace(
         "    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false\n",
