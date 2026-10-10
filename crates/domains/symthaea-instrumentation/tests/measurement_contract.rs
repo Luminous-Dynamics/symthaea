@@ -384,14 +384,29 @@ fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_prov
             &mut MeasurementStreamGuard::default(),
         )
         .unwrap();
-    assert_eq!(assessment.age_ns, 10);
-    assert_eq!(assessment.measurement_standard_uncertainty, 1_000.0);
-    assert_eq!(assessment.calibration_standard_uncertainty, 900.0);
-    assert_eq!(assessment.calibration_record_id, "calibration-17");
-    assert_eq!(assessment.calibration_review_receipt.artifact_id(), "independent-review-receipt");
-    assert_eq!(assessment.raw_data.artifact().artifact_id(), "raw-acquisition-1");
-    assert_eq!(assessment.raw_data.byte_length(), 4_096);
-    assert_eq!(assessment.raw_data.media_type(), "application/octet-stream");
+    assert_eq!(assessment.instrument().instrument_id(), "ultrasound-research-rig-01");
+    assert_eq!(assessment.sequence(), 1);
+    assert_eq!(assessment.captured_at_ns(), SAMPLE_TIME_NS);
+    assert_eq!(assessment.clock_domain().as_str(), "ultrasound-rig-boot-epoch-01");
+    assert_eq!(assessment.quantity(), Quantity::Frequency);
+    assert_eq!(assessment.unit(), Unit::Hertz);
+    assert_eq!(assessment.value(), 5_000_000.0);
+    assert_eq!(assessment.age_ns(), 10);
+    assert_eq!(assessment.measurement_standard_uncertainty(), 1_000.0);
+    assert_eq!(assessment.calibration_standard_uncertainty(), 900.0);
+    assert_eq!(assessment.calibration_record_id(), "calibration-17");
+    assert_eq!(
+        assessment.calibration_evidence().artifact_id(),
+        "calibration-certificate"
+    );
+    assert_eq!(
+        assessment.calibration_range(),
+        (4_000_000.0, 6_000_000.0)
+    );
+    assert_eq!(assessment.calibration_review_receipt().artifact_id(), "independent-review-receipt");
+    assert_eq!(assessment.raw_data().artifact().artifact_id(), "raw-acquisition-1");
+    assert_eq!(assessment.raw_data().byte_length(), 4_096);
+    assert_eq!(assessment.raw_data().media_type(), "application/octet-stream");
 }
 
 #[test]
