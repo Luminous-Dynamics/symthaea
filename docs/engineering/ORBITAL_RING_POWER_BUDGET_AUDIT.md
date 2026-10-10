@@ -93,7 +93,7 @@ Run from the repository root:
 python3 scripts/engineering/orbital_ring_power_source_audit.py
 ```
 
-The standard-library script computes the stated ratios and drag coefficients and checks the smaller and larger drag-power estimates. The recorded run passed **12/12 checks** and emitted byte-identical JSON on repeat.
+The standard-library script computes the stated ratios and drag coefficients and checks the smaller and larger drag-power estimates. The recorded run passed **12/12 checks** and emitted byte-identical JSON on repeat. The captured report is checked into [the evidence directory](evidence/orbital_ring_power_source_audit.json) for review.
 
 - Source Git blob: `63dd1221598644d745416476c149655906f7ab59`
 - Source SHA-256: `d12fe55f532369cdb6da009b775d3849f1219c4e1aa0db22ea296eff3cb723e5`
