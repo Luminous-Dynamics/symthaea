@@ -118,6 +118,7 @@ jobs:
 
           set +e
           env -u WAYLAND_DISPLAY -u WAYLAND_SOCKET -u WGPU_BACKEND \
+            PHOTOCRAFT_NO_DESKTOP_INTEGRATION=1 \
             PHOTOCRAFT_CONFIG_DIR="$gui_config" \
             timeout --signal=TERM --kill-after=5s 20s \
             xvfb-run -a "$out/bin/photocraft" --safe-gpu >"$launch_log" 2>&1 &
