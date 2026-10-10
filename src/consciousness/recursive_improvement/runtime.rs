@@ -51,9 +51,13 @@
 //! ```
 
 use std::collections::VecDeque;
+use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
@@ -241,6 +245,84 @@ pub struct PendingPrediction {
     pub deadline: Option<Instant>,
     /// Auto-resolve type (if any)
     pub auto_resolve: Option<AutoResolveType>,
+}
+
+/// Result of attempting to observe an auto-resolve condition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AutoResolveAttempt {
+    /// An outcome was actually observed.
+    Observed(bool),
+    /// This resolver type is event/deadline driven and has no outcome on this tick.
+    NotReady,
+    /// The resolver command exceeded its own execution deadline.
+    TimedOut(String),
+    /// An execution error prevented observing the requested state.
+    Unclear(String),
+}
+
+const AUTO_RESOLVE_COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Execute an auto-resolve command under a wall-clock bound.
+///
+/// The resolver only needs the exit status, so output streams are sent to null rather than
+/// captured. The child starts in its own Unix process group; timeout cleanup kills the group
+/// as well as reaping the direct child. This prevents shell descendants from outliving the
+/// resolver in the ordinary case. A process that deliberately escapes its group is not covered.
+async fn run_auto_resolve_command(
+    mut command: tokio::process::Command,
+    timeout: Duration,
+) -> AutoResolveAttempt {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+
+    #[cfg(unix)]
+    command.as_std_mut().process_group(0);
+
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return AutoResolveAttempt::Unclear(format!("failed to spawn resolver command: {error}"));
+        }
+    };
+    let process_group_id = child.id();
+
+    match tokio::time::timeout(timeout, child.wait()).await {
+        Ok(Ok(status)) => {
+            // A resolver is an observation command, not a daemon launcher. Clean up any
+            // descendants left in its process group before accepting the exit status.
+            #[cfg(unix)]
+            unsafe {
+                let _ = libc::kill(-(process_group_id as libc::pid_t), libc::SIGKILL);
+            }
+            AutoResolveAttempt::Observed(status.success())
+        }
+        Ok(Err(error)) => {
+            terminate_runtime_process_group(&mut child, process_group_id).await;
+            AutoResolveAttempt::Unclear(format!("failed while waiting for resolver command: {error}"))
+        }
+        Err(_) => {
+            terminate_runtime_process_group(&mut child, process_group_id).await;
+            AutoResolveAttempt::TimedOut(format!(
+                "resolver command exceeded its {:?} deadline",
+                timeout
+            ))
+        }
+    }
+}
+
+async fn terminate_runtime_process_group(
+    child: &mut tokio::process::Child,
+    process_group_id: u32,
+) {
+    #[cfg(unix)]
+    unsafe {
+        let _ = libc::kill(-(process_group_id as libc::pid_t), libc::SIGKILL);
+    }
+    let _ = child.kill().await;
+    let _ = child.wait().await;
 }
 
 /// Types of automatic resolution
@@ -612,75 +694,146 @@ impl MagiLoopRuntime {
         Ok(())
     }
 
-    /// Resolve pending predictions
+    /// Resolve pending predictions.
+    ///
+    /// The pending-queue lock is never held across an await. Resolver timeouts and execution
+    /// errors remove the affected prediction from active polling but do not update calibration;
+    /// only an observed resolver result enters the ordinary resolution path.
     async fn resolve_pending(&self) -> anyhow::Result<()> {
-        let mut pending = self.pending.lock();
-        let mut resolved = Vec::new();
+        enum ResolutionAction {
+            Observed { prediction_id: String, success: bool },
+            Unresolved {
+                prediction_id: String,
+                disposition: &'static str,
+                reason: String,
+            },
+        }
 
-        for (idx, pred) in pending.iter().enumerate() {
-            // Check if past deadline
-            if let Some(deadline) = pred.deadline {
-                if Instant::now() > deadline {
-                    resolved.push((idx, false)); // Timeout = failure
-                    continue;
-                }
+        let now = Instant::now();
+        let snapshot: Vec<(String, Option<Instant>, Option<AutoResolveType>)> = {
+            let pending = self.pending.lock();
+            pending
+                .iter()
+                .map(|pred| {
+                    (
+                        pred.prediction.id.clone(),
+                        pred.deadline,
+                        pred.auto_resolve.clone(),
+                    )
+                })
+                .collect()
+        };
+
+        let mut actions = Vec::new();
+        for (prediction_id, deadline, auto) in snapshot {
+            // Explicit prediction deadlines keep their documented contract: once the stated
+            // observation window expires, Timeout is resolved as a task-level failure. This is
+            // distinct from a resolver process timing out while trying to observe the task.
+            if deadline.is_some_and(|deadline| now > deadline) {
+                actions.push(ResolutionAction::Observed {
+                    prediction_id,
+                    success: false,
+                });
+                continue;
             }
 
-            // Check auto-resolve
-            if let Some(ref auto) = pred.auto_resolve {
-                if let Some(success) = self.check_auto_resolve(auto).await {
-                    resolved.push((idx, success));
+            let Some(auto) = auto else {
+                continue;
+            };
+            match self.check_auto_resolve(&auto).await {
+                AutoResolveAttempt::Observed(success) => {
+                    actions.push(ResolutionAction::Observed {
+                        prediction_id,
+                        success,
+                    });
+                }
+                AutoResolveAttempt::NotReady => {}
+                AutoResolveAttempt::TimedOut(reason) => {
+                    actions.push(ResolutionAction::Unresolved {
+                        prediction_id,
+                        disposition: "timed out",
+                        reason,
+                    });
+                }
+                AutoResolveAttempt::Unclear(reason) => {
+                    actions.push(ResolutionAction::Unresolved {
+                        prediction_id,
+                        disposition: "unclear",
+                        reason,
+                    });
                 }
             }
         }
 
-        // Process resolutions (in reverse to maintain indices)
-        for (idx, success) in resolved.into_iter().rev() {
-            if let Some(pred) = pending.remove(idx) {
-                // Record resolution via the model
-                let mut model = self.model.lock();
+        for action in actions {
+            let prediction_id = match &action {
+                ResolutionAction::Observed { prediction_id, .. }
+                | ResolutionAction::Unresolved { prediction_id, .. } => prediction_id,
+            };
+            let pred = {
+                let mut pending = self.pending.lock();
+                pending
+                    .iter()
+                    .position(|item| item.prediction.id == *prediction_id)
+                    .and_then(|idx| pending.remove(idx))
+            };
+            let Some(pred) = pred else {
+                // The prediction may have been removed by another runtime task.
+                continue;
+            };
 
-                // Resolve the prediction in the underlying WorldGroundedSelfModel
-                let outcome = if success {
-                    OutcomeCategory::Success
-                } else {
-                    OutcomeCategory::SafeFailure
-                };
-                let _ = model.model_mut().resolve_prediction(
-                    &pred.prediction.id,
-                    outcome,
-                    1.0, // Full confidence in resolution
-                );
-
-                // Trigger persistence sync
-                model.on_resolution();
-
-                // Inform the bridge for PAC tracking
-                {
-                    let mut bridge = self.bridge.lock();
-                    bridge.observe_resolution(pred.prediction.confidence, success);
+            match action {
+                ResolutionAction::Unresolved {
+                    disposition,
+                    reason,
+                    ..
+                } => {
+                    // Do not update the model, bridge, Brier score, or resolved-event stream.
+                    self.log(
+                        LogLevel::Warning,
+                        format!(
+                            "Unresolved: {} (resolver {disposition}): {reason}",
+                            pred.prediction.claim
+                        ),
+                    );
                 }
-
-                // Calculate Brier score from the prediction
-                let brier = pred.prediction.brier_score().unwrap_or(0.5);
-
-                // Log
-                let status = if success { "Success" } else { "Failure" };
-                self.log(
-                    if success {
-                        LogLevel::Success
+                ResolutionAction::Observed { success, .. } => {
+                    let mut model = self.model.lock();
+                    let outcome = if success {
+                        OutcomeCategory::Success
                     } else {
-                        LogLevel::Warning
-                    },
-                    format!(
-                        "Resolved: {} ({}). Brier: {:.4}",
-                        pred.prediction.claim, status, brier
-                    ),
-                );
+                        OutcomeCategory::SafeFailure
+                    };
+                    let _ = model.model_mut().resolve_prediction(
+                        &pred.prediction.id,
+                        outcome,
+                        1.0,
+                    );
+                    model.on_resolution();
+                    drop(model);
 
-                // Emit event
-                if let Some(ref tx) = self.event_tx {
-                    let _ = tx.try_send(RuntimeEvent::PredictionResolved { success, brier });
+                    {
+                        let mut bridge = self.bridge.lock();
+                        bridge.observe_resolution(pred.prediction.confidence, success);
+                    }
+
+                    let brier = pred.prediction.brier_score().unwrap_or(0.5);
+                    let status = if success { "Success" } else { "Failure" };
+                    self.log(
+                        if success {
+                            LogLevel::Success
+                        } else {
+                            LogLevel::Warning
+                        },
+                        format!(
+                            "Resolved: {} ({}). Brier: {:.4}",
+                            pred.prediction.claim, status, brier
+                        ),
+                    );
+
+                    if let Some(ref tx) = self.event_tx {
+                        let _ = tx.try_send(RuntimeEvent::PredictionResolved { success, brier });
+                    }
                 }
             }
         }
@@ -688,36 +841,39 @@ impl MagiLoopRuntime {
         Ok(())
     }
 
-    /// Check if an auto-resolve condition is met
-    async fn check_auto_resolve(&self, auto: &AutoResolveType) -> Option<bool> {
+    /// Check if an auto-resolve condition is met.
+    async fn check_auto_resolve(&self, auto: &AutoResolveType) -> AutoResolveAttempt {
         match auto {
-            AutoResolveType::FileExists(path) => Some(std::path::Path::new(path).exists()),
+            AutoResolveType::FileExists(path) => {
+                AutoResolveAttempt::Observed(std::path::Path::new(path).exists())
+            }
             AutoResolveType::CommandSucceeds(cmd) => {
-                let output = tokio::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(cmd)
-                    .output()
-                    .await
-                    .ok()?;
-                Some(output.status.success())
+                let mut command = tokio::process::Command::new("sh");
+                command.arg("-c").arg(cmd);
+                run_auto_resolve_command(command, AUTO_RESOLVE_COMMAND_TIMEOUT).await
             }
             AutoResolveType::PortOpen(host, port) => {
                 let addr = format!("{}:{}", host, port);
-                let result = tokio::net::TcpStream::connect(&addr).await;
-                Some(result.is_ok())
+                match tokio::time::timeout(
+                    AUTO_RESOLVE_COMMAND_TIMEOUT,
+                    tokio::net::TcpStream::connect(&addr),
+                )
+                .await
+                {
+                    Ok(Ok(_)) => AutoResolveAttempt::Observed(true),
+                    Ok(Err(_)) => AutoResolveAttempt::Observed(false),
+                    Err(_) => AutoResolveAttempt::TimedOut(format!(
+                        "port observation exceeded its {:?} deadline",
+                        AUTO_RESOLVE_COMMAND_TIMEOUT
+                    )),
+                }
             }
             AutoResolveType::ServiceRunning(name) => {
-                let output = tokio::process::Command::new("systemctl")
-                    .args(["is-active", name])
-                    .output()
-                    .await
-                    .ok()?;
-                Some(output.status.success())
+                let mut command = tokio::process::Command::new("systemctl");
+                command.args(["is-active", name]);
+                run_auto_resolve_command(command, AUTO_RESOLVE_COMMAND_TIMEOUT).await
             }
-            AutoResolveType::Timeout(_) => {
-                // Timeouts are handled by deadline check
-                None
-            }
+            AutoResolveType::Timeout(_) => AutoResolveAttempt::NotReady,
         }
     }
 }
@@ -740,6 +896,33 @@ mod tests {
     #[test]
     fn test_runtime_state_default() {
         assert_eq!(RuntimeState::default(), RuntimeState::Initializing);
+    }
+
+    #[tokio::test]
+    async fn resolver_command_timeout_stays_unresolved() {
+        let mut command = tokio::process::Command::new("sh");
+        command.arg("-c").arg("sleep 5 & wait");
+        let started = Instant::now();
+        let result = run_auto_resolve_command(command, Duration::from_millis(50)).await;
+        assert!(matches!(result, AutoResolveAttempt::TimedOut(_)));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn resolver_spawn_failure_stays_unresolved() {
+        let command = tokio::process::Command::new(
+            "/definitely/not/a/real/symthaea-command",
+        );
+        let result = run_auto_resolve_command(command, Duration::from_millis(50)).await;
+        assert!(matches!(result, AutoResolveAttempt::Unclear(_)));
+    }
+
+    #[tokio::test]
+    async fn resolver_nonzero_exit_is_an_observed_failure() {
+        let mut command = tokio::process::Command::new("sh");
+        command.arg("-c").arg("exit 17");
+        let result = run_auto_resolve_command(command, Duration::from_secs(1)).await;
+        assert_eq!(result, AutoResolveAttempt::Observed(false));
     }
 
     #[tokio::test]
