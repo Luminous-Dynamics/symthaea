@@ -596,7 +596,12 @@ pub fn regenerative_pareto_frontier(
     let mut frontier = Vec::new();
     for (i, (candidate_id, candidate_metrics)) in eligible.iter().enumerate() {
         let is_dominated = eligible.iter().enumerate().any(|(j, (_, other_metrics))| {
-            i != j && dominates(*other_metrics, *candidate_metrics, requirements.include_climate_objective)
+            i != j
+                && dominates(
+                    *other_metrics,
+                    *candidate_metrics,
+                    requirements.include_climate_objective,
+                )
         });
         if !is_dominated {
             frontier.push(candidate_id.clone());
@@ -863,7 +868,8 @@ pub fn assess_regenerative_uncertainty(
         status,
         constraints,
         field_validation_required: true,
-        scope_note: "numeric-constraint interval screen only; this function does not assess product-quality gates, prove field efficacy, or authorize application; interval meaning depends on cited evidence".into(),
+        scope_note: "numeric-constraint interval screen only; this function does not assess product-quality gates, prove field efficacy, or authorize application; interval meaning depends on cited evidence"
+            .into(),
     })
 }
 
@@ -928,7 +934,12 @@ mod uncertainty_tests {
         let result = assess_regenerative_uncertainty(&input, &req).unwrap();
         assert_eq!(result.status, RobustFeasibilityStatus::Indeterminate);
         assert_eq!(
-            result.constraints.iter().find(|c| c.constraint_id == "char_yield_minimum").unwrap().status,
+            result
+                .constraints
+                .iter()
+                .find(|c| c.constraint_id == "char_yield_minimum")
+                .unwrap()
+                .status,
             IntervalConstraintStatus::Unresolved
         );
     }
@@ -941,7 +952,12 @@ mod uncertainty_tests {
         let result = assess_regenerative_uncertainty(&input, &req).unwrap();
         assert_eq!(result.status, RobustFeasibilityStatus::NumericConstraintsRobustlyViolated);
         assert_eq!(
-            result.constraints.iter().find(|c| c.constraint_id == "supplied_heat_maximum").unwrap().status,
+            result
+                .constraints
+                .iter()
+                .find(|c| c.constraint_id == "supplied_heat_maximum")
+                .unwrap()
+                .status,
             IntervalConstraintStatus::RobustFail
         );
     }
