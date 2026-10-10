@@ -363,6 +363,15 @@ mod work_budget_tests {
     }
 
     #[test]
+    fn dilation_cost_is_included_in_admission() {
+        let mut estimate = estimate_imagination_work(0, 2, 4).unwrap();
+        assert!(preflight_imagination_work(0.80, estimate).is_ok());
+        estimate.dilation = 0.08;
+        assert!((estimate.total().unwrap() - 0.176).abs() < 1e-6);
+        assert!(preflight_imagination_work(0.80, estimate).is_err());
+    }
+
+    #[test]
     fn estimator_fails_closed_on_candidate_multiplication_overflow() {
         assert!(estimate_imagination_work(0, usize::MAX, 4).is_none());
     }
