@@ -7,14 +7,40 @@
 
 ## Decision summary
 
-Use two deliberately separate source lanes:
+Use **one existing experimental-ensemble benchmark framework plus two evidence-separated data lanes**:
 
-1. **Algorithm/controller pilot:** a small, deterministic, family-aware subset from mdCATH, because one published data-generation pipeline supplies repeated trajectories and condition labels suitable for replayable state/trajectory tasks. This only tests performance against simulation-generated reference trajectories.
-2. **Experimental-evidence lane:** a small, curated set of experimental entries from the Protein Ensemble Database (PED), selected only after primary-observable and provenance audit. This is required before discussing agreement with experimental conformational evidence.
+1. **Benchmark reuse:** audit PeptoneBench before implementing custom experimental-observable scoring. It already evaluates predicted ensembles against chemical-shift and SAXS observables, and reports pre-/post-refinement results. This is a starting point, not automatic qualification: pin its revision and dependencies, record its preprint/provenance, reproduce a reference case, and keep refinement results separate from primary held-out scoring.
+2. **Algorithm/controller pilot:** a small, deterministic, family-aware subset from mdCATH for replayable state/trajectory tasks. This only tests performance against simulation-generated reference trajectories; it is not experimental validation.
+3. **Experimental-evidence lane:** a curated set of experimentally measured observables from PED/BMRB/SASBDB, selected only after source, condition, provenance, and observable-leakage audit.
 
-Do not begin by downloading all mdCATH or treating every PED ensemble as independent physical ground truth. Neither is justified at this stage.
+Do not download all mdCATH or treat every deposited PED ensemble as independent physical ground truth. Neither is justified at this stage.
 
-## 1. mdCATH — candidate for the first controller pilot
+## 1. PeptoneBench — reuse before rebuilding experimental scoring
+
+**Primary code reference:** https://github.com/PeptoneLtd/peptonebench  
+**Associated manuscript:** Invernizzi et al., “Advancing Protein Ensemble Predictions Across the Order–Disorder Continuum,” bioRxiv preprint posted 2025-10-18, DOI https://doi.org/10.1101/2025.10.18.680935.
+
+The public repository documents a working evaluation pipeline for protein ensemble predictions against experimental data spanning structured and disordered proteins. It includes dataset definitions for three PeptoneDB collections, scripts to construct chemical-shift and SAXS datasets from BMRB and SASBDB, forward-model processing, and reports with refinement and without refinement. The repository states that its code is Apache-2.0 licensed; individual input datasets and derived assets retain their own source-specific licenses and terms.
+
+### Process decision
+
+Do **not** write a parallel experimental-observable scoring stack before an ownership/compatibility audit of PeptoneBench. First:
+
+1. Pin a precise source commit/tag, Python/runtime dependencies, container/build inputs, dataset manifest versions, and source checksums. The current `main` branch is mutable and is not an adequate version identifier.
+2. Read the published protocol and implementation for how targets, experimental observables, forward models, refinement weights, exclusions, and aggregation are handled.
+3. Reproduce one small published/reference target from raw inputs to output CSV and verify all assets and outputs by hash.
+4. Treat **unrefined/pre-reweighting score** as the primary prediction-quality result only when the prediction and evaluation inputs are frozen before target observables are exposed.
+5. Report **post-reweighting/refinement** results separately as an allowed-observable-conditioned diagnostic. When the same experimental observable is used to reweight an ensemble and then scored, it is not a held-out validation result.
+6. Audit target overlaps between the benchmark and any model training/fine-tuning data; an openly available benchmark is not automatically a blind or prospective test set.
+7. Record the benchmark's preprint status and the authors' stated commercial affiliations in the research record. This is context for independent reproduction, not by itself a reason to reject the benchmark.
+
+### Important limitation
+
+PeptoneBench provides an experimental-observable evaluation path; it does not automatically test whether Symthaea saves compute. To measure that claim, all compared systems must receive equivalent sequence/context and resource budgets, with predictor calls, candidate counts, refinement calls, CPU/GPU time, and wall time recorded. Symthaea's contribution must be isolated through no-HDC and no-adaptive-selection ablations.
+
+**Current disposition:** strong candidate to reuse after reproduction and split/exposure audit; not yet integrated, run, or qualified by this repository.
+
+## 2. mdCATH — candidate for the first controller pilot
 
 **Primary source:** Mirarchi, Giorgino & De Fabritiis, “mdCATH: A Large-Scale MD Dataset for Data-Driven Computational Biophysics,” Scientific Data 11, 1299 (2024), https://doi.org/10.1038/s41597-024-04140-z.
 
@@ -51,7 +77,7 @@ It can test deterministic replay, trajectory-state coverage, adaptive-selection 
 
 It cannot alone prove native-state accuracy, experimental ensemble fidelity, physical folding kinetics, binding efficacy, or that the existing in-repository quantum-chemistry MD module can simulate proteins.
 
-## 2. Protein Ensemble Database (PED) — candidate for experimental compatibility
+## 3. Protein Ensemble Database (PED) — candidate for experimental compatibility
 
 **Source:** https://proteinensemble.org/ and API documentation at https://proteinensemble.org/api. The PED site describes an open-access, curated repository with experimental and predicted ensembles, experimental/method metadata, primary-publication links, downloadable ensemble assets, and validation information. Its entries include NMR, SAXS, and smFRET-associated work among other methods.
 
@@ -76,7 +102,23 @@ Counts and descriptions above reflect public PED browse listings inspected on 20
 
 PED is the best candidate lane found so far for experimental-observable compatibility, but individual records remain **unqualified** until this audit is complete.
 
-## 3. Suggested data-custody manifest
+
+
+## Current source snapshot (retrieved 2026-10-11)
+
+The current PED public site reports **9,528 proteins, 28,954 entries, 29,120 ensembles, and 3,226,106 conformers**, with statistics updated 2026-10-09. These are live catalog statistics, not a frozen target manifest. The public browse page confirms the following exact candidate records:
+
+- **PED00001 — pSic1 residues 1–90 with six specified phosphorylation sites:** currently listed as 3 ensembles and 32 conformers, with NMR observables including RDCs, chemical shifts, relaxation/T2, PRE, and SAXS tags.
+- **PED00003 — beta-synuclein residues 1–134:** 1 ensemble and 575 conformers shown in the public browse listing.
+- **PED00004 — p27 Kip1 residues 25–93:** 1 ensemble and 130 conformers shown in the public browse listing.
+- **PED00017 — tau-f isoform:** 5 ensembles and 995 conformers shown; tags include NMR/NOESY/RDC/chemical-shift methods.
+- **PED00197 — full-length human SMAD2 wildtype, monomer:** NMR and SAXS are listed, with primary experimental data cross-references BMRB 50738 and SASBDB SASDK29. Its methods description reports fitting/selecting an ensemble against SAXS; therefore, the same SAXS observable must not be treated as held-out validation for an ensemble built or selected against it.
+
+References: [PED current catalog](https://proteinensemble.org/), [browse records](https://proteinensemble.org/browse), [PED help and identifier mapping](https://proteinensemble.org/help), [PED00197 details](https://proteinensemble.org/entries/PED00197/).
+
+This fixes the status of these identifiers as live-listed **candidate records**, not qualified held-out targets. Their actual assets, current metadata payloads, license terms, source data, split group, and observable independence still require per-record verification. No record has been downloaded or admitted to a benchmark.
+
+## 4. Suggested data-custody manifest
 
 Before model evaluation, create a machine-readable manifest with one record per source experiment or simulated trajectory group. Preserve, where available:
 
@@ -92,7 +134,7 @@ Before model evaluation, create a machine-readable manifest with one record per 
 
 Do not place held-out observable values in the model-facing manifest. Keep an evaluator-only answer manifest under separate access and exact identity control. Cryptographic hashes bind file identity but do not prove data truth, independent measurement, or correct interpretation.
 
-## 4. Immediate execution queue (independent of CI)
+## 5. Immediate execution queue (independent of CI)
 
 1. Implement a **read-only metadata inventory** first; do not download the full multi-terabyte dataset.
 2. Confirm per-record permissions and retrievable assets. Record unavailable assets and exclusions rather than skipping them silently.
