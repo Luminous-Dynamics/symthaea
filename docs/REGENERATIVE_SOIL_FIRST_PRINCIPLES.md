@@ -170,6 +170,25 @@ Relevant research:
 
 The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The modules are not claimed as compile-verified until CI passes. Evidence IDs currently link to caller-managed immutable records; next integration should verify those receipts against Symthaea's shared evidence plane and require schema/version identifiers for each parameter group.
 
+## Evidence update and implications for the model
+
+A focused literature refresh adds an important constraint: the correct target is not “maximize biochar” but “choose a safe, economically viable intervention for a specific soil × crop × climate × management context.”
+
+- Bekchanova et al. (2024) systematically reviewed 92 articles / 1,609 observations focused on sandy-textured soils. Their synthesis reported positive average responses for several nutrient-cycle indicators, but no average effect on soil mineral nitrogen or nutrient-use efficiency; heterogeneity and publication-bias sensitivity were material, including a sign change for effective CEC after correction. This is a strong reason to model outcome-specific effects and uncertainty, not one universal “soil improvement” score: https://doi.org/10.1186/s13750-024-00326-5
+- A 2025 review comparing six biochar standards reports shared attention to feedstock restrictions, total carbon / H:C characterization, heavy metals and PAHs. The product-quality gate should therefore be a versioned set of analyte-specific checks, not a single boolean asserted by the process simulator: https://doi.org/10.1016/j.biteb.2025.102059
+- A 2025 field-trial-focused review of biochar combined with other amendments highlights the need to distinguish biochar alone, amendment alone, and the combination with proper controls: https://doi.org/10.1007/s42773-025-00531-6
+
+### Model changes this evidence motivates
+
+1. **No universal effect coefficients.** Store soil/crop/context-stratified evidence, study design, duration, sample size, effect estimate, confidence interval, and risk-of-bias assessment. Do not transport a mean effect to a new site without an explicit applicability check.
+2. **Quality gates become typed and analyte-specific.** Track test method, units, lab/sample identity, detection limit, threshold source/version, and result. Unknown, missing, or stale mandatory tests must remain indeterminate, not pass.
+3. **Evaluate interventions factorially.** Where feasible, compare untreated control, standard practice, biochar alone, nutrient amendment alone, and biochar + amendment. Track interaction effects instead of attributing every combined-treatment benefit to char.
+4. **Report uncertainty and downside risk.** Alongside point estimates, retain uncertainty intervals and a worst-case / sensitivity view. A candidate that looks best only under optimistic assumptions should not dominate the recommendation.
+5. **Keep the objective vector explicit.** Crop yield and stability, plant-available nutrients, nutrient losses, water productivity, lifecycle greenhouse-gas balance, contaminant risk, cost per hectare, and labor/logistics are distinct objectives. A Pareto frontier is more honest than one weighted score unless weights are explicitly chosen and justified.
+6. **Model nutrient balance at field and regional scales.** Imported fertilizer is only one input. Track manure/compost, biological N fixation, deposition, irrigation inputs, crop removals, losses, and soil-stock changes to distinguish a genuine nutrient deficit from a distribution or affordability problem.
+
+These are research-driven design requirements, not claims that the current code already implements the full statistical, laboratory, or agronomic stack.
+
 ## Acceptance criteria for the next milestone
 
 - [ ] Rust formatting and focused crate tests pass.
