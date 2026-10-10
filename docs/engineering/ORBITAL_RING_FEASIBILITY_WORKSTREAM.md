@@ -195,6 +195,8 @@ This increment must not claim that an orbital ring is stable, cheap, safe, build
 - Monorepo space-automation plan and candid maturity assessment: https://github.com/Luminous-Dynamics/luminous-dynamics/blob/55757dfac7791d6d5d4733f7398f4ca17af215d0/symthaea/SPACE_AUTOMATION_PLAN_2026-07-06.md
 - [Orbital-ring research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md): source-audit priorities, failure-energy questions, debris exposure, and explicit evidence states.
 - [Failure-mode evidence note](ORBITAL_RING_FAILURE_MODE_NOTE.md): Part II source findings on skyhook load steps, lift-coil loss, cryogenic quench, inter-ring riders, and distinct ladder-collapse hazards.
+- [F-SKYHOOK-LOAD-STEP manifest](scenarios/F_SKYHOOK_LOAD_STEP.json): 23 explicit required fields; correctly blocked until geometry, initial equilibrium, rider force law and boundary ledgers are specified.
+- [Fail-closed manifest validator](../../scripts/engineering/validate_orbital_ring_failure_manifest.py) and [its 33-check report](evidence/orbital_ring_failure_manifest_validator_selftest.json): completeness/type gates only, no physics execution.
 - [Birch power source audit script](../../scripts/engineering/orbital_ring_power_source_audit.py): repeatable arithmetic check distinguishing eddy-current drag from cryostat electrical power.
 - [Power-budget audit note](ORBITAL_RING_POWER_BUDGET_AUDIT.md): source page references, derivation, results, and open reconstruction tasks.
 - [Captured power audit JSON](evidence/orbital_ring_power_source_audit.json): deterministic output from the 12-check run.
@@ -247,14 +249,28 @@ The script separately records the p. 483 pair (about 100 MW cold-side load / 10 
 
 This is an arithmetic cross-check of transcribed source figures, not evidence that Birch's model is physically accurate, a complete reconstruction of the ring geometry, or a present-day feasibility result. Conducting-sheet eddy-current drag and superconducting cryostat power are different categories and must not be added or substituted without a consistent scenario definition.
 
+### Increment RG-03a — support-load scenario gate
+
+**A fault-scenario contract now exists; the physics case remains blocked.** The template \`docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json\` records the Part II source basis and names 23 required inputs. The validator \`scripts/engineering/validate_orbital_ring_failure_manifest.py\` checks missing/unknown inputs, typed vectors, support-frame quaternion, unit ring-plane normal, step/ramp consistency, rider parameters, and explicit energy/momentum boundaries. The template intentionally has 23 unresolved inputs, \`declared_state = Blocked\`, \`analysis_state = NotRun\`, and no result artifacts.
+
+- Local syntax check: \`python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py\` succeeded.
+- Validator self-tests: **33 passed, 0 failed**; every single required field was removed from an otherwise complete typed fixture and independently confirmed to block the gate.
+- Template assessment: contract validation \`passed_contract_checks\`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
+- Both emitted JSON reports were byte-identical on repeat and are preserved under \`docs/engineering/evidence/\`.
+- Validator Git blob SHA: \`5732c5eb656f576feda23102500541a1117fa011\`; source SHA-256: \`2eafdb020349a9760fda6bb9b8034f2254ca78c639fff30a49e20bee3d5c7d37\`.
+- Template Git blob SHA: \`9302886b4c076155100bc6539726822f11fd3ef3\`; manifest-validation report blob: \`2e29acbba4c89973683764e55ce6df1ac3733191\`; self-test report blob: \`b584a648f9c47d8c8fffa059e852fe31ce008a81\`.
+
+A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
+
 ### Checks actually performed
 
-- Read back the exact branch versions of all thirteen changed files.
+- Read back the exact branch versions of all seventeen changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
 - Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
 - Ran the column-aware power-source audit (20/20 checks) and repeated it with byte-identical JSON output; local copy's Git blob SHA matched the branch source.
+- Ran the failure-manifest validator self-test (33/33 checks); the typed completeness gate kept the 23-field scenario template Blocked and NotRun.
 
 ### Checks not performed
 
@@ -262,4 +278,4 @@ The present execution environment does not have `cargo` installed. The Rust test
 
 ### Next engineering increment
 
-Continue analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. The next physical-model increment is now **F-SKYHOOK-LOAD-STEP**: define a bounded continuous-skyhook support-load step and rider/coupler topology using the requirements in [the failure-mode note](ORBITAL_RING_FAILURE_MODE_NOTE.md). Before simulating the transient, freeze the initial equilibrium, inertial and support frames, ring/support state, rider spacing and force law, stiffness/damping, load step/ramp, delays, saturation limits, and energy/vector-momentum boundary. If those are unknown, record the case as blocked rather than inventing a restoring force. In parallel, preserve the distinction between the p. 483 superconducting-surface estimate and Table 8's continuous-skyhook configuration. Once the scenario is fully specified, independently derive a small limiting case, define peak-offset/support-miss metrics, and only then implement the bounded test in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
+Continue analytical work in parallel with the outstanding Rust toolchain gate. The scenario contract now defines **what must be known**, but the load-step simulation is still blocked by design: do not fill the 23 inputs with placeholders or convert the validator's contract pass into a physics pass. The next process increment is independent specification/review of the initial equilibrium, support and rider topology, force law, frame transforms, disturbance profile, and energy/momentum boundaries. Once those are fully specified, derive a limiting case independently and review the acceptance metrics before implementing any transient solver. Keep the p. 483 superconducting-surface estimate distinct from Table 8's continuous-skyhook case. No stronger fidelity claim is allowed without a suitable independent solver or reviewer.
