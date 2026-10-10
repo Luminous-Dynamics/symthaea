@@ -15,11 +15,12 @@ real execution until the full run boundary exists.
 - the request ID to which the artifact was bound at construction;
 - a lowercase hexadecimal BLAKE3 digest of those exact bytes.
 
-Construction rejects an empty request ID, empty/whitespace-only netlist, invalid
-UTF-8, embedded NUL bytes, and inputs over 4 MiB. The fields are private and
-read-only accessors expose bytes and digest. `verify_for_request` recomputes
-the digest and rejects request-ID mismatch. Tests cover exact hashing, LF vs
-CRLF identity, invalid input, size limits, request mismatch, and digest
+Construction rejects an empty, non-canonical, over-256-byte, or control-character
+request ID; an empty/whitespace-only netlist; invalid UTF-8; embedded NUL bytes;
+and inputs over 4 MiB. The fields are private and read-only accessors expose
+bytes and digest. `verify_for_request` recomputes the digest and rejects
+request-ID mismatch. Tests cover exact hashing, LF vs CRLF identity, invalid
+input, size limits, canonical request identity, request mismatch, and digest
 tampering.
 
 The shared `SimulationRequest` was intentionally not changed. This avoids
