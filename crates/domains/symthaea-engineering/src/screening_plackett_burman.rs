@@ -334,16 +334,17 @@ fn shuffle<T>(values: &mut [T], state: &mut u64) {
     }
 }
 
-fn settings_for_row(factors: &[ScreeningFactor], row: usize, center: bool) -> Vec<FactorSetting> {
+fn settings_for_row(
+    factors: &[ScreeningFactor],
+    matrix: &[Vec<i8>],
+    row: usize,
+    center: bool,
+) -> Vec<FactorSetting> {
     factors
         .iter()
         .enumerate()
         .map(|(index, factor)| {
-            let coded_level = if center {
-                0
-            } else {
-                canonical_pb12_matrix()[row][index]
-            };
+            let coded_level = if center { 0 } else { matrix[row][index] };
             let value = match coded_level {
                 -1 => factor.low_value,
                 1 => factor.high_value,
@@ -387,7 +388,7 @@ pub fn generate_plackett_burman_design(
                 (
                     PlackettBurmanRunKind::CenterPointControl,
                     None,
-                    settings_for_row(&request.factors, 0, true),
+                    settings_for_row(&request.factors, &matrix, 0, true),
                 )
             } else {
                 let row = rows[treatment_cursor];
@@ -396,7 +397,7 @@ pub fn generate_plackett_burman_design(
                 (
                     PlackettBurmanRunKind::MainEffectScreening,
                     Some((row + 1) as u8),
-                    settings_for_row(&request.factors, row, false),
+                    settings_for_row(&request.factors, &matrix, row, false),
                 )
             };
             let run_id = format!(
@@ -795,7 +796,10 @@ pub fn analyze_plackett_burman_responses(
                 ScreeningDesignError::new("observations.actual_factor_settings.factor_id", "unknown factor")
             })?;
             let assigned = run.settings.iter().find(|s| s.factor_id == actual.factor_id).ok_or_else(|| {
-                ScreeningDesignError::new("observations.actual_factor_settings.factor_id", "factor missing from planned run")
+                ScreeningDesignError::new(
+                    "observations.actual_factor_settings.factor_id",
+                    "factor missing from planned run",
+                )
             })?;
             if !actual.value.is_finite() || actual.unit != factor.unit {
                 return Err(ScreeningDesignError::new(
@@ -928,7 +932,9 @@ pub fn analyze_plackett_burman_responses(
         for block in &request.blocks {
             let block_treatment_count = *treatment_count_by_block.get(block.block_id.as_str()).unwrap_or(&0);
             let block_center_count = *center_count_by_block.get(block.block_id.as_str()).unwrap_or(&0);
-            if block_treatment_count != PB_RUNS as u32 || block_center_count != request.center_point_runs_per_block as u32 {
+            if block_treatment_count != PB_RUNS as u32
+                || block_center_count != request.center_point_runs_per_block as u32
+            {
                 return Err(ScreeningDesignError::new(
                     "observations.center_points",
                     "block must contain all 12 PB treatments and the declared center-point count",
