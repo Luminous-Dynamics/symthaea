@@ -9,11 +9,11 @@
 //! The wire representation uses decimal strings so JSON consumers do not lose
 //! integer precision through IEEE-754 number parsing.
 
+use super::numeric_tower::Number;
+use crate::hdc::binary_hv::BinaryHV;
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{ToPrimitive, Zero};
-use crate::hdc::binary_hv::BinaryHV;
-use super::numeric_tower::Number;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -110,8 +110,12 @@ impl fmt::Display for ExactRationalError {
             Self::ZeroDenominator => write!(f, "rational denominator cannot be zero"),
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::ResourceLimitExceeded => write!(f, "rational resource budget exceeded"),
-            Self::ExactResultOutOfRange => write!(f, "exact rational is outside the numeric-tower range"),
-            Self::ApproximateInput => write!(f, "approximate numeric input cannot be imported as an exact rational"),
+            Self::ExactResultOutOfRange => {
+                write!(f, "exact rational is outside the numeric-tower range")
+            },
+            Self::ApproximateInput => {
+                write!(f, "approximate numeric input cannot be imported as an exact rational")
+            },
         }
     }
 }
@@ -189,10 +193,12 @@ impl ExactRational {
     /// unambiguous representation: normalized decimal numerator and denominator
     /// components are length-prefixed and preceded by a format/version tag.
     pub fn canonical_encoding_bytes(&self) -> Vec<u8> {
-        const PREFIX: &[u8] = b"SYMTHEA\0EXACT-RATIONAL\0V1\0";
+        const PREFIX: &[u8] = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0";
         let numerator = self.value.numer().to_str_radix(10);
         let denominator = self.value.denom().to_str_radix(10);
-        let mut encoded = Vec::with_capacity(PREFIX.len() + 16 + numerator.len() + denominator.len());
+        let mut encoded = Vec::with_capacity(
+            PREFIX.len() + 16 + numerator.len() + denominator.len(),
+        );
         encoded.extend_from_slice(PREFIX);
         encoded.extend_from_slice(&(numerator.len() as u64).to_be_bytes());
         encoded.extend_from_slice(numerator.as_bytes());
@@ -209,7 +215,7 @@ impl ExactRational {
     pub fn to_hdc(&self) -> BinaryHV {
         let canonical = self.canonical_encoding_bytes();
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"SYMTHEA.EXACT_RATIONAL.HDC.V1\\0");
+        hasher.update(b"SYMTHAEA.EXACT_RATIONAL.HDC.V1\0");
         hasher.update(&canonical);
         let mut output = [0u8; BinaryHV::BYTES];
         hasher.finalize_xof().fill(&mut output);
@@ -436,7 +442,7 @@ mod tests {
 
         assert_eq!(half_a.canonical_encoding_bytes(), half_b.canonical_encoding_bytes());
         assert_ne!(half_a.canonical_encoding_bytes(), two_thirds.canonical_encoding_bytes());
-        assert!(half_a.canonical_encoding_bytes().starts_with(b"SYMTHEA\0EXACT-RATIONAL\0V1\0"));
+        assert!(half_a.canonical_encoding_bytes().starts_with(b"SYMTHAEA\0EXACT-RATIONAL\0V1\0"));
     }
 
     #[test]
