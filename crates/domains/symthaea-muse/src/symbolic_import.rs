@@ -290,7 +290,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 pitch: Pitch::from_midi(note.pitch),
                 onset: Duration::new(onset, ticks_per_beat as i64),
                 duration: Duration::new(duration, ticks_per_beat as i64),
-                velocity: (note.velocity as f32 / 127.0).clamp(0.05, 1.0),
+                velocity: note.velocity as f32 / 127.0,
                 role: roles
                     .get(&note.track)
                     .copied()
@@ -1044,6 +1044,22 @@ mod tests {
             bytes.extend_from_slice(track);
         }
         bytes
+    }
+
+    #[test]
+    fn midi_low_note_velocity_is_preserved_without_amplifying_floor() {
+        let track = [
+            0, 0x90, 60, 1, // lowest positive MIDI note-on velocity
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        assert_eq!(score.notes.len(), 1);
+        assert!(
+            (score.notes[0].velocity - 1.0_f32 / 127.0).abs() < 1e-7,
+            "expected the source velocity ratio, got {}",
+            score.notes[0].velocity
+        );
     }
 
     #[test]
