@@ -525,7 +525,8 @@ fn parse_include_target(
                     return Err(ModelInputBundleError::UnsupportedIncludeSyntax {
                         path: path.to_string(),
                         line: line_number,
-                        reason: "external .lib accepts exactly a file path and section name".to_string(),
+                        reason: "external .lib accepts exactly a file path and section name"
+                            .to_string(),
                     });
                 }
             }
