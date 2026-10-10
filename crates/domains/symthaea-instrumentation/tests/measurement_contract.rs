@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use sha2::{Digest, Sha256};
 use symthaea_instrumentation::{
     ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver, CalibrationReference,
     ClockDomainId, ContractError, InstrumentIdentity, MeasurementEnvelope, MeasurementInput,
@@ -12,7 +13,33 @@ use symthaea_instrumentation::{
 const SAMPLE_TIME_NS: u64 = 1_000_000_000;
 const SHA_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SHA_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const SHA_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const RAW_FIXTURE_LENGTH: usize = 4_096;
+
+fn raw_fixture_bytes() -> Vec<u8> {
+    (0..RAW_FIXTURE_LENGTH)
+        .map(|index| (index as u8).wrapping_mul(31).wrapping_add(17))
+        .collect()
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+fn raw_digest_hex() -> String {
+    sha256_hex(&raw_fixture_bytes())
+}
+
+fn raw_artifact() -> ArtifactReference {
+    artifact("raw-acquisition-1", &raw_digest_hex())
+}
+
+fn raw_reference() -> RawDataReference {
+    RawDataReference::new(raw_artifact())
+}
 
 fn clock_domain() -> ClockDomainId {
     ClockDomainId::new("ultrasound-rig-boot-epoch-01").unwrap()
@@ -66,7 +93,7 @@ fn measurement_in_clock_domain(
         value: 5_000_000.0,
         standard_uncertainty: 1_000.0,
         calibration: Some(calibration_reference()),
-        raw_data: Some(RawDataReference::new(artifact("raw-acquisition-1", SHA_C))),
+        raw_data: Some(raw_reference()),
         processing_chain_version: "sha256:reconstruction-pipeline-v1".to_owned(),
         quality_flags: vec![],
     })
@@ -79,7 +106,8 @@ fn policy() -> MeasurementPolicy {
 
 struct MockResolver {
     resolved: Result<ResolvedCalibration, String>,
-    resolved_raw: Result<ResolvedRawData, String>,
+    raw_bytes: Result<Vec<u8>, String>,
+    raw_reference_override: Option<ArtifactReference>,
 }
 
 impl CalibrationEvidenceResolver for MockResolver {
@@ -94,27 +122,30 @@ impl CalibrationEvidenceResolver for MockResolver {
 impl RawDataEvidenceResolver for MockResolver {
     fn resolve_raw_data(
         &self,
-        _reference: &RawDataReference,
+        reference: &RawDataReference,
     ) -> Result<ResolvedRawData, String> {
-        self.resolved_raw.clone()
-    }
-}
-
-fn resolved_raw_data() -> Result<ResolvedRawData, String> {
-    Ok(
+        let bytes = self.raw_bytes.clone()?;
+        if sha256_hex(&bytes) != reference.artifact().sha256_hex() {
+            return Err("raw acquisition SHA-256 mismatch".into());
+        }
+        let returned_artifact = self
+            .raw_reference_override
+            .clone()
+            .unwrap_or_else(|| reference.artifact().clone());
         ResolvedRawData::new(
-            artifact("raw-acquisition-1", SHA_C),
-            4_096,
+            returned_artifact,
+            u64::try_from(bytes.len()).map_err(|_| "raw acquisition length overflowed")?,
             "application/octet-stream",
         )
-        .unwrap(),
-    )
+        .map_err(|error| error.to_string())
+    }
 }
 
 fn resolver() -> MockResolver {
     MockResolver {
         resolved: Ok(resolved_calibration()),
-        resolved_raw: resolved_raw_data(),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     }
 }
 
@@ -316,7 +347,8 @@ fn quantitative_gate_rejects_calibration_for_another_instrument_channel() {
             )
             .unwrap(),
         ),
-        resolved_raw: resolved_raw_data(),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     };
 
     assert_eq!(
@@ -352,7 +384,8 @@ fn quantitative_gate_rejects_values_outside_the_calibrated_range() {
             )
             .unwrap(),
         ),
-        resolved_raw: resolved_raw_data(),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     };
 
     assert_eq!(
@@ -522,7 +555,7 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
 fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
     assert_eq!(
         ResolvedRawData::new(
-            artifact("empty-raw", SHA_C),
+            artifact("empty-raw", &raw_digest_hex()),
             0,
             "application/octet-stream",
         )
@@ -530,7 +563,7 @@ fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
         ContractError::EmptyRawDataArtifact
     );
     assert_eq!(
-        ResolvedRawData::new(artifact("raw", SHA_C), 10, " ")
+        ResolvedRawData::new(artifact("raw", &raw_digest_hex()), 10, " ")
             .unwrap_err(),
         ContractError::EmptyIdentifier("raw_data_media_type")
     );
@@ -540,7 +573,8 @@ fn rejects_empty_or_malformed_resolved_raw_data_metadata() {
 fn unresolved_raw_acquisition_evidence_fails_closed() {
     let missing_raw = MockResolver {
         resolved: Ok(resolved_calibration()),
-        resolved_raw: Err("raw artifact bytes not found".into()),
+        raw_bytes: Err("raw artifact bytes not found".into()),
+        raw_reference_override: None,
     };
 
     assert_eq!(
@@ -558,17 +592,33 @@ fn unresolved_raw_acquisition_evidence_fails_closed() {
 }
 
 #[test]
+fn raw_resolver_rejects_bytes_whose_sha256_does_not_match_the_reference() {
+    let tampered = MockResolver {
+        resolved: Ok(resolved_calibration()),
+        raw_bytes: Ok(b"tampered acquisition bytes".to_vec()),
+        raw_reference_override: None,
+    };
+
+    assert_eq!(
+        measurement(1, SAMPLE_TIME_NS)
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &clock_domain(),
+                &policy(),
+                &tampered,
+                &mut MeasurementStreamGuard::default(),
+            )
+            .unwrap_err(),
+        AssessmentFailure::RawDataEvidenceUnresolved("raw acquisition SHA-256 mismatch".into())
+    );
+}
+
+#[test]
 fn resolved_raw_data_must_match_the_envelope_digest_and_artifact_id() {
     let mismatched_raw = MockResolver {
         resolved: Ok(resolved_calibration()),
-        resolved_raw: Ok(
-            ResolvedRawData::new(
-                artifact("other-acquisition", SHA_C),
-                4_096,
-                "application/octet-stream",
-            )
-            .unwrap(),
-        ),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: Some(artifact("other-acquisition", &raw_digest_hex())),
     };
 
     assert_eq!(
@@ -589,14 +639,8 @@ fn resolved_raw_data_must_match_the_envelope_digest_and_artifact_id() {
 fn unresolved_calibration_evidence_fails_closed() {
     let missing = MockResolver {
         resolved: Err("calibration artifact not found".into()),
-        resolved_raw: Ok(
-            ResolvedRawData::new(
-                artifact("raw-acquisition-1", SHA_C),
-                4_096,
-                "application/octet-stream",
-            )
-            .unwrap(),
-        ),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -629,7 +673,8 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
             900.0,
         )
         .unwrap()),
-        resolved_raw: resolved_raw_data(),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -662,7 +707,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
             900.0,
         )
         .unwrap()),
-        resolved_raw: resolved_raw_data(),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
@@ -692,7 +738,8 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
             900.0,
         )
         .unwrap()),
-        resolved_raw: resolved_raw_data(),
+        raw_bytes: Ok(raw_fixture_bytes()),
+        raw_reference_override: None,
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
