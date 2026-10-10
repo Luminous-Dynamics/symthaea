@@ -445,7 +445,7 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
         "The search provenance (primed versus cold) must be consulted before treating a result ",
     );
     out.push_str(&format!(
-        "verification status (chain rule + Z3), and the closest match in the {}-equation physics catalog.}}\n",
+        "symbolic-check status (symbolic derivative + six-point residual; not a formal proof), and the closest match in the {}-equation physics catalog.}}\n",
         catalog_size
     ));
     out.push_str("\\label{tab:ramanujan_showcase}\n");
