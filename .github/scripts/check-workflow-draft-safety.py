@@ -315,6 +315,43 @@ jobs:
     # ready_for_review event because no PR runner can ever be allocated.
     assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
 
+    # Mixed workflows must still require ready_for_review when any one
+    # runner job can execute on PR events; a separate manual-only runner
+    # cannot suppress that requirement.
+    mixed = """on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+jobs:
+  manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+  pull-request:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+"""
+    pr = pull_request_block(mixed)
+    assert pr is not None
+    assert validate_generic(Path("mixed.yml"), mixed, pr) == (2, 1)
+
+    mixed_no_ready = mixed.replace(", ready_for_review", "")
+    try:
+        validate_generic(
+            Path("mixed-no-ready.yml"),
+            mixed_no_ready,
+            pull_request_block(mixed_no_ready) or [],
+        )
+    except SafetyError:
+        pass
+    else:
+        raise AssertionError(
+            "manual-only runner incorrectly masked missing ready_for_review for a PR runner"
+        )
+
 
 def main() -> int:
     self_test()
