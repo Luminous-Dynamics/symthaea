@@ -427,6 +427,11 @@ def verify_verdict_artifact(repo: str, policy: dict[str, Any], run: dict[str, An
     validate_verdict(verdict, repo, policy, run, expected_pr_number)
 
 
+def verifier_tests_passed(outcome: Any) -> bool:
+    """Require an explicit successful result from the trusted self-test step."""
+    return isinstance(outcome, str) and outcome == "success"
+
+
 def should_publish_pending_status(mode: str, activity: str, run: dict[str, Any]) -> bool:
     """Prevent a delayed start event from overwriting the final status."""
     return (mode == "workflow_run"
@@ -461,8 +466,8 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
 
     target = run.get("html_url")
     # A failed invariant suite must actively replace an old green status.
-    self_test_outcome = os.environ.get("VERIFIER_TEST_OUTCOME", "success")
-    if self_test_outcome != "success":
+    self_test_outcome = os.environ.get("VERIFIER_TEST_OUTCOME", "").strip()
+    if not verifier_tests_passed(self_test_outcome):
         post_status(repo, subject, token, "failure",
                     f"Independent verifier self-tests did not pass: {self_test_outcome}", target)
         print("FAIL: independent verifier self-tests did not pass", file=sys.stderr)
