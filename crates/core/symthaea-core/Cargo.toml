@@ -49,6 +49,12 @@ parking_lot = { workspace = true }
 once_cell = { workspace = true }
 nalgebra = { workspace = true }
 num-complex = "0.4"
+# Bounded arbitrary-precision rational math, kept opt-in to preserve the default
+# dependency and public-API surface. Exact decimal-string wire format lives in
+# hdc::exact_rational.
+num-bigint = { version = "0.4.6", optional = true }
+num-rational = { version = "0.4.2", optional = true }
+num-traits = { version = "0.2.19", optional = true }
 bumpalo = "3.16"
 chrono = { workspace = true }
 
@@ -206,5 +212,6 @@ neural_validation = []                       # TRIBE v2 fMRI comparison: cortica
 synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
 cantor-hdc = []                              # Hierarchical Cantor Hypervectors (RHN)
 gpu = ["dep:wgpu"]                            # WGPU-accelerated HDC compute primitives
+exact-rational = ["dep:num-bigint", "dep:num-rational", "dep:num-traits"] # Bounded arbitrary-precision rationals
 
 # full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)
