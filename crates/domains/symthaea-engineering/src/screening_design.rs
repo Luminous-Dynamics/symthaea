@@ -284,7 +284,9 @@ impl ScreeningDesignRequest {
                 "review must apply to the exact protocol ID in this request",
             ));
         }
-        if self.bench_scale_review.status != BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol {
+        if self.bench_scale_review.status
+            != BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol
+        {
             return Err(ScreeningDesignError::new(
                 "bench_scale_review.status",
                 "run plan withheld unless a reviewer approves this exact bench-scale protocol",
@@ -304,7 +306,9 @@ impl ScreeningDesignRequest {
             .ok_or_else(|| ScreeningDesignError::new("run_count", "treatment run count overflow"))?;
         let center_runs = (self.center_point_runs_per_block as usize)
             .checked_mul(self.blocks.len())
-            .ok_or_else(|| ScreeningDesignError::new("run_count", "center point run count overflow"))?;
+            .ok_or_else(|| {
+                ScreeningDesignError::new("run_count", "center point run count overflow")
+            })?;
         let total_runs = treatment_runs
             .checked_add(center_runs)
             .ok_or_else(|| ScreeningDesignError::new("run_count", "total run count overflow"))?;
@@ -502,7 +506,12 @@ pub fn generate_screening_design(
     }
 
     debug_assert_eq!(runs.len(), total_runs);
-    debug_assert_eq!(treatment_run_count as usize, combination_count * request.blocks.len() * request.replicates_per_setting_per_block as usize);
+    debug_assert_eq!(
+        treatment_run_count as usize,
+        combination_count
+            * request.blocks.len()
+            * request.replicates_per_setting_per_block as usize
+    );
     debug_assert_eq!(center_run_count as usize, center_count * request.blocks.len());
 
     Ok(ScreeningDesignPlan {
@@ -513,7 +522,8 @@ pub fn generate_screening_design(
         center_point_run_count: center_run_count,
         total_planned_run_count: runs.len() as u32,
         runs,
-        interpretation_note: "deterministic bench-scale screening schedule only; not a power analysis, response-surface model, product-quality release, field-trial authorization, application-rate recommendation, or proof of agronomic efficacy. Block effects and center-point behavior must be included in the preregistered analysis.".into(),
+        interpretation_note: "deterministic bench-scale screening schedule only; not a power analysis, response-surface model, product-quality release, field-trial authorization, application-rate recommendation, or proof of agronomic efficacy. Block effects and center-point behavior must be included in the preregistered analysis."
+            .into(),
     })
 }
 
@@ -603,7 +613,9 @@ pub fn verify_screening_design(
             .blocks
             .iter()
             .position(|block| block.block_id == run.block_id)
-            .ok_or_else(|| ScreeningDesignError::new("runs.block_id", "run references an unknown block"))?;
+            .ok_or_else(|| {
+                ScreeningDesignError::new("runs.block_id", "run references an unknown block")
+            })?;
         if previous_block_id != Some(run.block_id.as_str()) {
             if previous_block_id.is_some() {
                 if local_position != treatment_runs_per_block + center_count {
@@ -640,10 +652,16 @@ pub fn verify_screening_design(
         match run.kind {
             PlannedRunKind::FactorialTreatment => {
                 let standard_order = run.standard_order.ok_or_else(|| {
-                    ScreeningDesignError::new("runs.standard_order", "treatment requires a standard-order row")
+                    ScreeningDesignError::new(
+                        "runs.standard_order",
+                        "treatment requires a standard-order row",
+                    )
                 })?;
                 let replicate = run.replicate_index.ok_or_else(|| {
-                    ScreeningDesignError::new("runs.replicate_index", "treatment requires a replicate index")
+                    ScreeningDesignError::new(
+                        "runs.replicate_index",
+                        "treatment requires a replicate index",
+                    )
                 })?;
                 if standard_order == 0 || standard_order as usize > combination_count {
                     return Err(ScreeningDesignError::new(
@@ -756,7 +774,8 @@ pub fn verify_screening_design(
         verified_factorial_combination_count: combination_count as u32,
         verified_treatment_replicate_cell_count: verified_treatments,
         verified_center_point_count: verified_centers,
-        scope_note: "schedule structure verified; referenced evidence is not authenticated, and this is not power analysis, product release, field authorization, or proof of agronomic efficacy".into(),
+        scope_note: "schedule structure verified; referenced evidence is not authenticated, and this is not power analysis, product release, field authorization, or proof of agronomic efficacy"
+            .into(),
     })
 }
 
@@ -790,10 +809,14 @@ mod tests {
             input_snapshot_id: "inputs-v1".into(),
             protocol_id: "bench-protocol-v1".into(),
             objective: "Screen process conditions for measured char yield and energy demand".into(),
-            primary_hypothesis: "At least one declared process factor changes the primary endpoint".into(),
+            primary_hypothesis: "At least one declared process factor changes the primary endpoint"
+                .into(),
             analysis_plan_id: "analysis-plan-v1".into(),
             randomization_seed: 0x5eed,
-            factors: vec![factor("peak_temperature", 400.0, 500.0), factor("residence_time", 10.0, 30.0)],
+            factors: vec![
+                factor("peak_temperature", 400.0, 500.0),
+                factor("residence_time", 10.0, 30.0),
+            ],
             blocks: vec![
                 ExperimentBlock {
                     block_id: "day-1".into(),
@@ -814,7 +837,10 @@ mod tests {
                 unit: "kg_per_kg_dry_feedstock".into(),
                 measurement_method_id: "weighing-and-moisture-method-v1".into(),
                 minimum_practically_meaningful_difference: 0.03,
-                difference_rationale_evidence: evidence("yield-difference-rationale", EvidenceKind::Literature),
+                difference_rationale_evidence: evidence(
+                    "yield-difference-rationale",
+                    EvidenceKind::Literature,
+                ),
             },
             bench_scale_review: BenchScaleReview {
                 status: BenchScaleReviewStatus::ApprovedForThisBenchScaleProtocol,
@@ -839,9 +865,19 @@ mod tests {
         assert_eq!(plan.request_snapshot, request);
 
         for block in &request.blocks {
-            let block_runs: Vec<_> = plan.runs.iter().filter(|run| run.block_id == block.block_id).collect();
+            let block_runs: Vec<_> = plan
+                .runs
+                .iter()
+                .filter(|run| run.block_id == block.block_id)
+                .collect();
             assert_eq!(block_runs.len(), 7);
-            assert_eq!(block_runs.iter().filter(|run| run.kind == PlannedRunKind::CenterPointControl).count(), 3);
+            assert_eq!(
+                block_runs
+                    .iter()
+                    .filter(|run| run.kind == PlannedRunKind::CenterPointControl)
+                    .count(),
+                3
+            );
             let treatment_rows: HashSet<_> = block_runs.iter()
                 .filter_map(|run| run.standard_order)
                 .collect();
@@ -868,13 +904,23 @@ mod tests {
     #[test]
     fn factorial_settings_encode_low_high_and_center_correctly() {
         let plan = generate_screening_design(&request()).unwrap();
-        let low = plan.runs.iter().find(|run| run.kind == PlannedRunKind::FactorialTreatment && run.standard_order == Some(1)).unwrap();
+        let low = plan
+            .runs
+            .iter()
+            .find(|run| {
+                run.kind == PlannedRunKind::FactorialTreatment && run.standard_order == Some(1)
+            })
+            .unwrap();
         assert_eq!(low.settings[0].coded_level, -1);
         assert_eq!(low.settings[0].value, 400.0);
         assert_eq!(low.settings[1].coded_level, -1);
         assert_eq!(low.settings[1].value, 10.0);
 
-        let center = plan.runs.iter().find(|run| run.kind == PlannedRunKind::CenterPointControl).unwrap();
+        let center = plan
+            .runs
+            .iter()
+            .find(|run| run.kind == PlannedRunKind::CenterPointControl)
+            .unwrap();
         assert_eq!(center.settings[0].coded_level, 0);
         assert_eq!(center.settings[0].value, 450.0);
         assert_eq!(center.settings[1].value, 20.0);
