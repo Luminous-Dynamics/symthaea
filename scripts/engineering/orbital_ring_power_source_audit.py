@@ -11,6 +11,7 @@ SCHEMA = "luminous-dynamics.orbital-ring-power-source-audit/v1"
 MU_0_H_M = 4.0 * math.pi * 1e-7
 ALUMINUM_CONDUCTIVITY_S_M = 3.54e7
 SHEET_THICKNESS_M = 0.05
+EXAMPLE_SKYHOOK_LIFT_FORCE_N = 2.0e8
 PRECESSING_FORCE_N = 5.0e11
 CRYO_PAIRS = [
     {"source_location": "Birch 1982, p. 483, §3.4", "cold_side_heat_load_w": 100e6, "cryostat_electrical_power_w": 10e9},
@@ -22,6 +23,7 @@ INERTIAL_SPEED_M_S = 8.0e3
 
 def main():
     equivalent_drag_speed_m_s = 2.0 / (MU_0_H_M * ALUMINUM_CONDUCTIVITY_S_M * SHEET_THICKNESS_M)
+    example_eddy_power_w = EXAMPLE_SKYHOOK_LIFT_FORCE_N * equivalent_drag_speed_m_s
     eddy_power_w = PRECESSING_FORCE_N * equivalent_drag_speed_m_s
     stored_energy_j = 0.5 * ORS_MASS_KG * INERTIAL_SPEED_M_S**2
     checks = []
@@ -42,6 +44,10 @@ def main():
            equivalent_drag_speed_m_s, note="Computed using the paper's Eq. (73) coefficient with its stated aluminium conductivity and illustrative 5 cm sheet.")
     record("eddy_drag.equivalent_speed_reference", abs(equivalent_drag_speed_m_s - 0.90) <= 0.02,
            equivalent_drag_speed_m_s, 0.90, 0.02)
+    record("eddy_drag.example_power_finite_positive", math.isfinite(example_eddy_power_w) and example_eddy_power_w > 0, example_eddy_power_w)
+    record("eddy_drag.example_power_reproduced", abs(example_eddy_power_w - 0.2e9) <= 0.03e9,
+           example_eddy_power_w, 0.2e9, 0.03e9,
+           "Uses the paper's rounded example lift force of 2e8 N; compares to the stated ~0.2 GW example.")
     record("eddy_drag.power_finite_positive", math.isfinite(eddy_power_w) and eddy_power_w > 0, eddy_power_w)
     record("eddy_drag.power_scale_reproduced", abs(eddy_power_w - 5e11) <= 0.12 * 5e11,
            eddy_power_w, 5e11, 0.12 * 5e11,
@@ -71,8 +77,10 @@ def main():
         "eddy_drag_example": {
             "formula_from_paper": "P_E = F_L * 2/(mu_0 * sigma * delta)",
             "mu_0_h_m": MU_0_H_M, "aluminum_conductivity_s_m": ALUMINUM_CONDUCTIVITY_S_M,
-            "sheet_thickness_m": SHEET_THICKNESS_M, "precessing_force_n": PRECESSING_FORCE_N,
-            "equivalent_drag_speed_m_s": equivalent_drag_speed_m_s, "calculated_power_w": eddy_power_w,
+            "sheet_thickness_m": SHEET_THICKNESS_M, "equivalent_drag_speed_m_s": equivalent_drag_speed_m_s,
+            "example_skyhook_lift_force_n": EXAMPLE_SKYHOOK_LIFT_FORCE_N,
+            "example_calculated_power_gw": example_eddy_power_w / 1e9, "example_source_approximation_gw": 0.2,
+            "precessing_force_n": PRECESSING_FORCE_N, "calculated_power_w": eddy_power_w,
             "calculated_power_gw": eddy_power_w / 1e9, "source_approximation_gw": 500.0,
             "interpretation": "Electromagnetic eddy-current drag estimate for the stated conducting-sheet model; distinct from superconducting cryostat wall-plug power."
         },
