@@ -14,6 +14,7 @@
 use super::graph::FactSearchResult;
 use super::manager::{KnowledgeManager, KnowledgeSignals};
 use crate::cognitive_loop::thresholds;
+use symthaea_epistemic_types::MemoryProvenance;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,8 @@ pub struct ReasoningContext {
 /// A fact from the knowledge graph with provenance
 #[derive(Debug, Clone)]
 pub struct GroundedFact {
+    /// Stable provenance envelope; retrieval metadata remains separate from evidence assessment.
+    pub provenance: Option<MemoryProvenance>,
     /// Human-readable fact text
     pub text: String,
     /// Confidence score (decayed over time)
@@ -151,12 +154,18 @@ impl ReasoningContext {
         // 1. Convert search results to grounded facts
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
-            .map(|r| GroundedFact {
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|r| {
+                let fact = manager.graph().get_fact(r.fact_id)?;
+                Some(GroundedFact {
+                    provenance: manager.graph().provenance(r.fact_id),
+                    // Grounded context must expose the persisted claim itself rather than
+                    // a process-local FactId label; the FactId remains retrieval metadata.
+                    text: fact.encoding.source_text.clone(),
+                    confidence: r.confidence,
+                    similarity: r.similarity,
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
+                })
             })
             .collect();
 
@@ -409,6 +418,7 @@ mod tests {
     #[test]
     fn test_summary_generation() {
         let facts = vec![GroundedFact {
+            provenance: None,
             text: "Iran sanctioned.".into(),
             confidence: 0.9,
             similarity: 0.7,
@@ -453,6 +463,7 @@ mod tests {
     fn test_grounded_fact_accessors() {
         let mut ctx = ReasoningContext::default();
         ctx.relevant_facts.push(GroundedFact {
+            provenance: None,
             text: "test".into(),
             confidence: 0.85,
             similarity: 0.6,

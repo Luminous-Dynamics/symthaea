@@ -57,6 +57,7 @@ DIRECT_GENERIC = {
     "test-hardened-daemon",
     "test-hardened-api",
     "test-hardened-nix",
+    "epf-verification",
     "test-all-features",
     "test-feature-matrix",
     "wasm-compat",
