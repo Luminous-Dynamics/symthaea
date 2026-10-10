@@ -1881,7 +1881,7 @@ impl VisionManifold {
     /// autonomous dynamics. The live perceptual state and FEP belief remain unchanged.
     pub fn dream_ahead(&mut self, steps: usize, dt: f32) -> Vec<ContinuousHV> {
         // Reject impossible accounting before allocating or computing the rollout.
-        let Some((rollout_cost, projected_compute_cost)) =
+        let Some((_, projected_compute_cost)) =
             checked_compute_cost_increment(steps, 0.008, self.geodesic_compute_cost)
         else {
             return Vec::new();
@@ -1904,7 +1904,6 @@ impl VisionManifold {
 
         // Account for simulated work without changing sensory or belief state.
         self.geodesic_compute_cost = projected_compute_cost;
-        let _ = rollout_cost;
         predictions
     }
 
