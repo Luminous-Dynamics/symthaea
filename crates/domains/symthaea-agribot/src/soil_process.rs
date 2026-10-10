@@ -849,6 +849,12 @@ pub fn assess_observed_mass_balance(
         "closure_tolerance_fraction",
         true,
     )?;
+    if input.closure_tolerance_fraction >= 1.0 {
+        return Err(SoilProcessError::new(
+            "closure_tolerance_fraction",
+            "must be strictly less than 1.0",
+        ));
+    }
     input.input_evidence.validate("input_evidence")?;
     if input.input_evidence.kind != EvidenceKind::Measured {
         return Err(SoilProcessError::new(
@@ -857,6 +863,12 @@ pub fn assess_observed_mass_balance(
         ));
     }
     input.tolerance_evidence.validate("tolerance_evidence")?;
+    if input.tolerance_evidence.kind == EvidenceKind::Scenario {
+        return Err(SoilProcessError::new(
+            "tolerance_evidence.kind",
+            "closure tolerance cannot be justified only by a scenario",
+        ));
+    }
     if input.output_streams.is_empty() {
         return Err(SoilProcessError::new(
             "output_streams",
@@ -1008,6 +1020,14 @@ mod observed_mass_balance_tests {
     fn invalid_tolerance_missing_streams_and_overflow_fail_closed() {
         let mut measurement = input();
         measurement.closure_tolerance_fraction = f64::NAN;
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+
+        measurement = input();
+        measurement.closure_tolerance_fraction = 1.0;
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+
+        measurement = input();
+        measurement.tolerance_evidence.kind = EvidenceKind::Scenario;
         assert!(assess_observed_mass_balance(&measurement).is_err());
 
         measurement = input();
