@@ -18714,10 +18714,10 @@ dependencies = [
 name = "symthaea-engineering"
 version = "0.1.0"
 dependencies = [
- "symthaea-agribot",
  "serde",
  "serde_json",
  "symthaea-acoustics",
+ "symthaea-agribot",
  "symthaea-broca",
  "symthaea-causal-reasoning",
  "symthaea-circuits",
