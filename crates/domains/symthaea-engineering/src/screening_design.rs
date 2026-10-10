@@ -1044,8 +1044,8 @@ mod tests {
                 evidence: evidence("review-record-001", EvidenceKind::Measured),
             },
         };
-        request.bench_scale_review.reviewed_design_sha256 =
-            screening_design_sha256(&request).unwrap();
+        let design_digest = screening_design_sha256(&request).unwrap();
+        request.bench_scale_review.reviewed_design_sha256 = design_digest;
         request
     }
 
