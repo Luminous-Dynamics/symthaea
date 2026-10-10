@@ -25,8 +25,8 @@
 //! - One combined LaTeX table ready to paste into papers/latex/ramanujan-protocol/
 
 use symthaea_core::hdc::conjecture_engine::{
-    AutonomousInvariant, ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence,
-    RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_latex,
+    AutonomousDiscoveryMode, AutonomousInvariant, ConjectureEngine, ConjectureStatus, MathDomain,
+    ObservedSequence, RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_latex,
 };
 use symthaea_physics_bridge::{
     DimensionalSignature, PhysicsSearchEngine, UnitMap, recognize_expr, recognize_expr_with_units,
@@ -363,6 +363,11 @@ fn run_problem(
     if let Some(ref inv) = best {
         println!("  ⏵ Best:    {}", inv.formula_str);
         println!("  ⏵ Variance: {:.2e}", inv.variance);
+        let provenance = match inv.discovery_mode {
+            AutonomousDiscoveryMode::Primed => "primed (built-in invariant templates enabled)",
+            AutonomousDiscoveryMode::Cold => "cold (built-in invariant templates disabled)",
+        };
+        println!("  ⏵ Search:   {}", provenance);
 
         // Z3 status (already determined inside discover_invariants_autonomous when
         // dynamics were provided — symbolically_proven means the chain rule proof
@@ -434,10 +439,10 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
         "\\caption{Autonomous conservation-law discovery across canonical dynamical systems. ",
     );
     out.push_str(
-        "Each row reports an invariant discovered with zero human guidance from the differential ",
+        "Each row reports the best invariant from the configured autonomous GP search. ",
     );
     out.push_str(
-        "equations alone, the trajectory variance of the discovered quantity, the symbolic ",
+        "The search provenance (primed versus cold) must be consulted before treating a result ",
     );
     out.push_str(&format!(
         "verification status (chain rule + Z3), and the closest match in the {}-equation physics catalog.}}\n",
