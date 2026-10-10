@@ -45,6 +45,15 @@ def sample_case() -> dict:
     }
 
 
+def sample_corpus_cases() -> list[dict]:
+    # Input-loader tests exercise corpus identity/census, not chemistry values.
+    # The individual compare_case tests above exercise a realistic H2 record.
+    return [
+        {**sample_case(), "case_id": case_id}
+        for case_id in qc.EXPECTED_CASE_IDS
+    ]
+
+
 def fake_pyscf(energy: float = -1.1175, converged: bool = True, error: Exception | None = None):
     module = types.ModuleType("pyscf")
     module.__version__ = "test-double-0"
@@ -240,6 +249,44 @@ class QcReferenceCompareTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, 2)
             self.assertEqual(path.read_text(encoding="utf-8"), "preserve native evidence")
 
+    def test_input_rejects_missing_duplicate_unexpected_or_reordered_cases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "native.json"
+            valid = {
+                "schema_version": 2,
+                "producer": "symthaea-quantum-chemistry",
+                "coordinate_unit": "bohr",
+                "method": "RHF",
+                "source_revision": "0123456789abcdef0123456789abcdef01234567",
+                "source_tree_sha": "89abcdef0123456789abcdef0123456789abcdef",
+                "worktree_clean": True,
+                "cases": sample_corpus_cases(),
+            }
+
+            for mutate, message in (
+                (lambda report: report["cases"].pop(), "corpus census mismatch"),
+                (
+                    lambda report: report["cases"][1].update(
+                        case_id=report["cases"][0]["case_id"]
+                    ),
+                    "duplicate fixture case IDs",
+                ),
+                (
+                    lambda report: report["cases"][0].update(case_id="unexpected"),
+                    "corpus census mismatch",
+                ),
+                (
+                    lambda report: report["cases"].reverse(),
+                    "case order differs",
+                ),
+            ):
+                report = json.loads(json.dumps(valid))
+                mutate(report)
+                path.write_text(json.dumps(report), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, message):
+                    qc.load_input(path)
+
+    def test_source_binding_requires_current_head_and_clean_worktree(self):
     def test_source_binding_requires_current_head_and_clean_worktree(self):
         source_revision = "0123456789abcdef0123456789abcdef01234567"
         source_tree = "89abcdef0123456789abcdef0123456789abcdef"
@@ -316,7 +363,7 @@ class QcReferenceCompareTests(unittest.TestCase):
             "source_revision": "0123456789abcdef0123456789abcdef01234567",
             "source_tree_sha": "89abcdef0123456789abcdef0123456789abcdef",
             "worktree_clean": True,
-            "cases": [sample_case()],
+            "cases": sample_corpus_cases(),
         }
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "native.json"
