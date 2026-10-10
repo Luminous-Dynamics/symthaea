@@ -200,3 +200,12 @@ None of levels 1–8 implies level 9. A favorable reaction energy is not a barri
 - NIST CCCBDB: https://cccbdb.nist.gov/summaryx.asp
 - MolSSI QCArchive: https://qcarchive.molssi.org/
 - Cantera: https://cantera.org/stable/reference/index.html
+
+
+## Current implementation checkpoint (2026-10-10)
+
+The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `d3257187f74d084ba1802c42417c32e1d66d60a9`.
+
+The proposal adds a serializable request schema, explicit method/basis/environment/Bohr declarations, charge/electron/spin consistency checks, finite and non-coincident geometry checks, supported basis-data checks, SCF-setting validation, and request-level atom/basis/iteration budgets. It retains the built basis in an immutable preflight result and does not run SCF or claim energy accuracy.
+
+**Verification state:** the PR's current GitHub Actions workflows were queued at the last status query; earlier attempts on prior commits were cancelled when the branch advanced. No build or test pass is claimed. Check the live PR checks for the current head before treating the code as verified.
