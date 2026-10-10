@@ -153,7 +153,13 @@ impl Score {
         let Some(end) = note.onset.checked_add(note.duration) else {
             return Err(note);
         };
-        if end.beats() > self.total_beats.beats() {
+        // Keep the canonical score boundary exact. Two distinct rational beat
+        // positions can round to the same f64 above 2^53; using beats() here
+        // would then leave total_beats shorter than a successfully inserted note.
+        let Some(ordering) = end.checked_cmp(self.total_beats) else {
+            return Err(note);
+        };
+        if ordering == std::cmp::Ordering::Greater {
             self.total_beats = end;
         }
         self.notes.push(note);
@@ -277,6 +283,28 @@ mod tests {
         assert_eq!(s.voice(VoiceRole::Bass).len(), 1);
         assert_eq!(s.events().len(), 2);
         assert_eq!(s.events()[0].onset, Duration::zero()); // sorted by onset
+    }
+
+    #[test]
+    fn try_push_tracks_exactly_ordered_ends_beyond_f64_integer_precision() {
+        let mut s = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        let make_note = |onset: i64| ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: c4(),
+            onset: Duration::new(onset, 1),
+            duration: Duration::new(1, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        };
+
+        // IEEE-754 f64 cannot distinguish every integer above 2^53:
+        // both end values previously compared equal after beats() conversion.
+        s.try_push(make_note(9_007_199_254_740_991)).unwrap();
+        s.try_push(make_note(9_007_199_254_740_992)).unwrap();
+
+        assert_eq!(s.total_beats, Duration::new(9_007_199_254_740_993, 1));
     }
 
     #[test]
