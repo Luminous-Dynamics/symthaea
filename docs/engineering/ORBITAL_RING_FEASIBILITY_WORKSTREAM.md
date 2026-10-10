@@ -196,6 +196,7 @@ This increment must not claim that an orbital ring is stable, cheap, safe, build
 - [Orbital-ring research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md): source-audit priorities, failure-energy questions, debris exposure, and explicit evidence states.
 - [Birch power source audit script](../../scripts/engineering/orbital_ring_power_source_audit.py): repeatable arithmetic check distinguishing eddy-current drag from cryostat electrical power.
 - [Power-budget audit note](ORBITAL_RING_POWER_BUDGET_AUDIT.md): source page references, derivation, results, and open reconstruction tasks.
+- [Captured power audit JSON](evidence/orbital_ring_power_source_audit.json): deterministic output from the 12-check run.
 
 ## 10. Decision requested from reviewers
 
@@ -234,7 +235,7 @@ The kernel intentionally does not implement rotor/support equilibrium, electroma
 
 ### Increment RG-02a — Birch power source audit
 
-**Arithmetic source audit implemented and executed locally; complete physical/source reconstruction remains open.** The dependency-free script `scripts/engineering/orbital_ring_power_source_audit.py` re-evaluates the paper's p. 482 conducting-sheet example and larger precessing-force case using its stated aluminium conductivity and 5 cm sheet. It computes **0.17984 GW** for the rounded 2 × 10⁸ N example force and **449.59 GW** for the rounded 5 × 10¹¹ N force; the latter is within approximately 10% of the paper's “around 500 GW” statement. It separately records the p. 483 pair (about 100 MW cold-side load / 10 GW cryostat power) and the Table 8 pair on p. 485 (5 × 10⁸ W / 5 × 10¹⁰ W); both imply 100:1, while the reported absolute scales differ by 5×. It also records the conditional 17.92 PJ mass/speed arithmetic.
+**Arithmetic source audit implemented and executed locally; complete physical/source reconstruction remains open.** The dependency-free script `scripts/engineering/orbital_ring_power_source_audit.py` re-evaluates the paper's p. 482 conducting-sheet example and larger precessing-force case using its stated aluminium conductivity and 5 cm sheet. It computes **0.17984 GW** for the rounded 2 × 10⁸ N example force and **449.59 GW** for the rounded 5 × 10¹¹ N force; the latter is within approximately 10% of the paper's “around 500 GW” statement. It separately reproduces the smaller ~0.17984 GW worked example with a rounded 2 × 10⁸ N force and the p. 482 total-force case of ~449.59 GW; it also records the p. 483 pair (about 100 MW cold-side load / 10 GW cryostat power) and the Table 8 pair on p. 485 (5 × 10⁸ W / 5 × 10¹⁰ W). The cryogenic pairs both imply 100:1, while their reported absolute scales differ by 5×. It also records the conditional 17.92 PJ mass/speed arithmetic.
 
 - Result: **12 passed, 0 failed**.
 - Repeated-run determinism: output was byte-identical.
@@ -245,7 +246,7 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 
 ### Checks actually performed
 
-- Read back the exact branch versions of all ten changed files.
+- Read back the exact branch versions of all twelve changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
