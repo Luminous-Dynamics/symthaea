@@ -241,8 +241,8 @@ The script separately records the p. 483 pair (about 100 MW cold-side load / 10 
 
 - Result: **16 passed, 0 failed**.
 - Repeated-run determinism: output was byte-identical; the report is preserved in `docs/engineering/evidence/orbital_ring_power_source_audit.json`.
-- Source Git blob SHA: `68d975e603aeb08049dd89670d754346d04a332b`; source SHA-256: `c1d5086eb55c9424d544ba229db76a6727d5f22e311b7e5006acd6c86f28da26`.
-- JSON report SHA-256: `a9a8357c6c56cbfd1d2b0681824b1529b5ece67be78bd08aaf8f1e801b49e7c4`.
+- Source Git blob SHA: `5b6e23922027c64b604158b2557fc68673a4ecc9`; source SHA-256: `adab9dcdd4bd8fc6f8ffa99d5fb42035849054d68852ddaca631da63c9ad7514`.
+- JSON report SHA-256: `b353bdf568f2f1358cfff49cb5d2bf334e37b137d41876bbd79a193e7aa8df5d`.
 
 This is an arithmetic cross-check of transcribed source figures, not evidence that Birch's model is physically accurate, a complete reconstruction of the ring geometry, or a present-day feasibility result. Conducting-sheet eddy-current drag and superconducting cryostat power are different categories and must not be added or substituted without a consistent scenario definition.
 
