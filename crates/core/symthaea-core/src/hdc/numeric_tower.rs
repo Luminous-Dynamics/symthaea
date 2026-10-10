@@ -131,7 +131,41 @@ impl Number {
         }
     }
 
+    /// Check whether this number is exactly zero in its represented domain.
+    ///
+    /// Unlike Number::is_zero, this does not treat small nonzero floating-point
+    /// values as zero. NaN and infinities are never classified as exact zero.
+    /// Use this predicate for algebraic guards such as division-by-zero checks.
+    pub fn is_zero_exact(&self) -> bool {
+        match self {
+            Number::Natural(n) => *n == 0,
+            Number::Integer(n) => *n == 0,
+            Number::Rational {
+                numerator,
+                denominator,
+            } => *denominator != 0 && *numerator == 0,
+            Number::Real(x) => *x == 0.0,
+        }
+    }
+
+    /// Check whether this number is within an absolute tolerance of zero.
+    ///
+    /// Returns false for negative or non-finite tolerances and for non-finite
+    /// values. This is an approximate numerical predicate, not an algebraic one.
+    pub fn is_approximately_zero(&self, tolerance: f64) -> bool {
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return false;
+        }
+
+        let value = self.to_f64();
+        value.is_finite() && value.abs() <= tolerance
+    }
+
     /// Check if this number is zero in any domain.
+    ///
+    /// Compatibility note: floating-point values with magnitude below 1e-15
+    /// are treated as zero. Prefer is_zero_exact for algebraic guards and
+    /// is_approximately_zero when the tolerance matters.
     pub fn is_zero(&self) -> bool {
         match self {
             Number::Natural(n) => *n == 0,
@@ -784,7 +818,7 @@ impl NumericTower {
     /// Auto-promotes ℤ → ℚ when division is not exact.
     /// Returns `None` if b is zero.
     pub fn divide(&self, a: &Number, b: &Number) -> Option<NumberResult> {
-        if b.is_zero() {
+        if b.is_zero_exact() {
             return None;
         }
 
@@ -2001,4 +2035,49 @@ mod tests {
             r.number
         );
     }
+    #[test]
+    fn test_exact_zero_is_distinct_from_legacy_approximate_zero() {
+        assert!(Number::Natural(0).is_zero_exact());
+        assert!(Number::Integer(0).is_zero_exact());
+        assert!(Number::Rational { numerator: 0, denominator: 5 }.is_zero_exact());
+        assert!(Number::Real(0.0).is_zero_exact());
+        assert!(Number::Real(-0.0).is_zero_exact());
+
+        let smallest_subnormal = f64::from_bits(1);
+        assert!(!Number::Real(smallest_subnormal).is_zero_exact());
+        // Keep the historical tolerance behavior for existing callers.
+        assert!(Number::Real(smallest_subnormal).is_zero());
+        assert!(!Number::Real(f64::NAN).is_zero_exact());
+        assert!(!Number::Real(f64::INFINITY).is_zero_exact());
+        assert!(!Number::Rational { numerator: 0, denominator: 0 }.is_zero_exact());
+    }
+
+    #[test]
+    fn test_approximate_zero_requires_explicit_valid_tolerance() {
+        assert!(Number::Real(1e-16).is_approximately_zero(1e-15));
+        assert!(!Number::Real(1e-16).is_approximately_zero(1e-17));
+        assert!(Number::Natural(0).is_approximately_zero(0.0));
+        assert!(!Number::Real(f64::NAN).is_approximately_zero(1.0));
+        assert!(!Number::Real(0.0).is_approximately_zero(-1.0));
+        assert!(!Number::Real(0.0).is_approximately_zero(f64::NAN));
+        assert!(!Number::Real(0.0).is_approximately_zero(f64::INFINITY));
+    }
+
+    #[test]
+    fn test_division_accepts_small_nonzero_real_divisor() {
+        let tower = NumericTower::new();
+        let numerator = Number::Natural(1);
+        let divisor = Number::Real(1e-16);
+
+        let result = tower
+            .divide(&numerator, &divisor)
+            .expect("a finite, nonzero real divisor must not be rejected as zero");
+
+        assert!(
+            (result.number.to_f64() - 1e16).abs() < 2.0,
+            "1 / 1e-16 should be approximately 1e16, got {:?}",
+            result.number
+        );
+    }
+
 }
