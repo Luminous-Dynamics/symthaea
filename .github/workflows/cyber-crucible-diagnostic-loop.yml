@@ -1,0 +1,60 @@
+name: Cyber Crucible Diagnostic Loop Contract
+
+on:
+  pull_request:
+    paths:
+      - "validation/cyber_crucible_diagnostic_loop_v1.schema.json"
+      - "validation/cyber_crucible_diagnostic_loop_public_v1.json"
+      - "scripts/validate_cyber_crucible_diagnostic_loop.py"
+      - "tests/test_cyber_crucible_diagnostic_loop.py"
+      - "validation/CYBER_CRUCIBLE_DIAGNOSTIC_LOOP_V1.md"
+      - ".github/workflows/cyber-crucible-diagnostic-loop.yml"
+  push:
+    branches: [main]
+    paths:
+      - "validation/cyber_crucible_diagnostic_loop_v1.schema.json"
+      - "validation/cyber_crucible_diagnostic_loop_public_v1.json"
+      - "scripts/validate_cyber_crucible_diagnostic_loop.py"
+      - "tests/test_cyber_crucible_diagnostic_loop.py"
+      - "validation/CYBER_CRUCIBLE_DIAGNOSTIC_LOOP_V1.md"
+      - ".github/workflows/cyber-crucible-diagnostic-loop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic-loop-contract:
+    name: Diagnostic loop, digest binding, and fail-closed regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.26.0"
+
+      - name: Validate schema and public example
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("validation/cyber_crucible_diagnostic_loop_v1.schema.json").read_text(encoding="utf-8"))
+          report = json.loads(Path("validation/cyber_crucible_diagnostic_loop_public_v1.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(report))
+          if errors:
+              for error in errors:
+                  print(f"{'/'.join(map(str, error.absolute_path))}: {error.message}")
+              raise SystemExit(f"Diagnostic-loop schema validation failed with {len(errors)} error(s)")
+          print("JSON Schema PASS: diagnostic-loop public example")
+          PY
+
+      - name: Verify canonical evidence and receipt bindings
+        run: python3 scripts/validate_cyber_crucible_diagnostic_loop.py
+
+      - name: Exercise fail-closed regressions
+        run: python3 -m unittest discover -s tests -p "test_cyber_crucible_diagnostic_loop.py" -v
