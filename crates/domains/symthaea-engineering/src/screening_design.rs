@@ -73,6 +73,11 @@ pub struct ScreeningFactor {
     pub low_value: f64,
     /// Higher tested factor setting. This is a numeric, quantitative factor.
     pub high_value: f64,
+    /// Maximum permitted absolute difference between the assigned setting and the
+    /// measured value achieved during the run, in the factor's declared unit.
+    pub max_absolute_deviation: f64,
+    /// Provenance/rationale for the allowed factor deviation; included in the design hash.
+    pub deviation_tolerance_evidence: EvidenceRef,
     /// Randomization class must be established for the actual apparatus and protocol.
     pub randomization_class: FactorRandomizationClass,
     /// Evidence for the lower level and its applicability to this process.
@@ -98,6 +103,16 @@ impl ScreeningFactor {
                 "low_value must be strictly less than high_value",
             ));
         }
+        if !self.max_absolute_deviation.is_finite() || self.max_absolute_deviation < 0.0 {
+            return Err(ScreeningDesignError::new(
+                "factors.max_absolute_deviation",
+                "must be finite and non-negative",
+            ));
+        }
+        evidence(
+            &self.deviation_tolerance_evidence,
+            "factors.deviation_tolerance_evidence",
+        )?;
         if self.randomization_class != FactorRandomizationClass::RandomizablePerRun {
             return Err(ScreeningDesignError::new(
                 "factors.randomization_class",
@@ -952,9 +967,18 @@ mod tests {
         ScreeningFactor {
             factor_id: id.into(),
             label: format!("Process factor {id}"),
-            unit: "degree_C".into(),
+            unit: if id.contains("residence") {
+                "minute".into()
+            } else {
+                "degree_C".into()
+            },
             low_value: low,
             high_value: high,
+            max_absolute_deviation: if id.contains("residence") { 1.0 } else { 2.0 },
+            deviation_tolerance_evidence: evidence(
+                &format!("{id}-deviation-tolerance"),
+                EvidenceKind::Scenario,
+            ),
             randomization_class: FactorRandomizationClass::RandomizablePerRun,
             low_level_evidence: evidence(&format!("{id}-low-range"), EvidenceKind::Scenario),
             high_level_evidence: evidence(&format!("{id}-high-range"), EvidenceKind::Scenario),
@@ -1270,6 +1294,14 @@ mod tests {
         input = request();
         input.factors[0].low_value = 500.0;
         input.factors[0].high_value = 400.0;
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.factors[0].max_absolute_deviation = f64::NAN;
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.factors[0].deviation_tolerance_evidence.evidence_id.clear();
         assert!(generate_screening_design(&input).is_err());
 
         input = request();
