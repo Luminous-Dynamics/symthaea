@@ -572,7 +572,6 @@ pub fn verify_screening_design(
     let expected_center_positions = center_slots(treatment_runs_per_block, center_count);
     let mut run_ids = HashSet::new();
     let mut seen_cells: HashSet<(String, u32, u8)> = HashSet::new();
-    let mut seen_centers: HashSet<String> = HashSet::new();
     let mut current_block_index = 0_usize;
     let mut local_position = 0_usize;
     let mut current_block_run_count = 0_usize;
@@ -714,10 +713,6 @@ pub fn verify_screening_design(
                             "center-point factors must use their declared numeric midpoints and units",
                         ));
                     }
-                }
-                if !seen_centers.insert(run.block_id.clone()) {
-                    // One center-point is permitted at each scheduled center position, so
-                    // the set is only used for unique block tracking elsewhere. Do not reject repeats.
                 }
                 verified_centers += 1;
             }
@@ -923,6 +918,27 @@ mod tests {
         input = request();
         input.bench_scale_review.reviewed_input_snapshot_id = "different-inputs".into();
         assert!(generate_screening_design(&input).is_err());
+    }
+
+    #[test]
+    fn structural_verifier_accepts_valid_plan_and_rejects_corruption() {
+        let generated = generate_screening_design(&request()).unwrap();
+        let receipt = verify_screening_design(&generated).unwrap();
+        assert_eq!(receipt.verified_run_count, 14);
+        assert_eq!(receipt.verified_block_count, 2);
+        assert_eq!(receipt.verified_treatment_cell_count, 8);
+        assert_eq!(receipt.verified_center_point_count, 6);
+
+        let mut tampered = generated.clone();
+        let treatment = tampered.runs.iter_mut()
+            .find(|run| run.kind == PlannedRunKind::FactorialTreatment)
+            .unwrap();
+        treatment.settings[0].value += 1.0;
+        assert!(verify_screening_design(&tampered).is_err());
+
+        let mut incomplete = generated;
+        incomplete.runs.pop();
+        assert!(verify_screening_design(&incomplete).is_err());
     }
 
     #[test]
