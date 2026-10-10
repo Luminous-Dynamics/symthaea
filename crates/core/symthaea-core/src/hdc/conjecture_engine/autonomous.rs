@@ -180,8 +180,8 @@ pub fn discover_conservation_laws(
         }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-        let proven = if var < 1e-6 * mean.abs().max(1.0) {
-            assess_conservation_symbolic(sym_expr, dynamics).is_conserved
+        let symbolic_check_passed = if var < 1e-6 * mean.abs().max(1.0) {
+            assess_conservation_symbolic(sym_expr, dynamics).sampled_residual_passed
         } else {
             false
         };
@@ -190,7 +190,7 @@ pub fn discover_conservation_laws(
             expression: format!("{}", sym_expr),
             variance: var,
             mean_value: mean,
-            symbolic_check_passed: proven,
+            symbolic_check_passed,
             discovery_mode,
         });
     }
@@ -233,8 +233,8 @@ pub fn discover_conservation_laws_with_custom(
         }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-        let proven = if var < 1e-6 * mean.abs().max(1.0) {
-            assess_conservation_symbolic(sym_expr, dynamics).is_conserved
+        let symbolic_check_passed = if var < 1e-6 * mean.abs().max(1.0) {
+            assess_conservation_symbolic(sym_expr, dynamics).sampled_residual_passed
         } else {
             false
         };
@@ -243,7 +243,7 @@ pub fn discover_conservation_laws_with_custom(
             expression: format!("{}", sym_expr),
             variance: var,
             mean_value: mean,
-            symbolic_check_passed: proven,
+            symbolic_check_passed,
         });
     }
     for (name, eval_fn) in &custom_candidates {
@@ -1045,10 +1045,10 @@ fn discover_invariants_autonomous_with_mode(
         seen_means.push(mean);
 
         let expr = simplify(&population[idx]);
-        let proven = if let Some(dyn_rules) = dynamics {
+        let symbolic_check_passed = if let Some(dyn_rules) = dynamics {
             if var < 1e-4 * mean.abs().max(1.0) {
                 if let Some(sym) = expr_to_sym(&expr) {
-                    assess_conservation_symbolic(&sym, dyn_rules).is_conserved
+                    assess_conservation_symbolic(&sym, dyn_rules).sampled_residual_passed
                 } else {
                     false
                 }
@@ -1065,7 +1065,7 @@ fn discover_invariants_autonomous_with_mode(
             variance: var,
             mean_value: mean,
             complexity: expr.complexity(),
-            symbolic_check_passed: proven,
+            symbolic_check_passed,
             discovery_mode,
         });
 
