@@ -16,6 +16,8 @@
 pub mod heartbeat;
 /// Companion-side PX4 Offboard proof-of-life submission cadence evidence.
 pub mod offboard_submission;
+/// PX4-reported navigation-mode and failsafe-state observations.
+pub mod offboard_observation;
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.
