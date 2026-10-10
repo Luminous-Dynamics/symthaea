@@ -588,7 +588,8 @@ fn digest_hex(bytes: &[u8; 32]) -> String {
 pub enum Px4ModeFailsafeObservationError {
     /// Schema version is not supported by this v1 record.
     #[error("unsupported PX4 mode/failsafe schema version {found}")]
-    UnsupportedSchemaVersion { /// Unsupported version encountered.
+    UnsupportedSchemaVersion {
+        /// Unsupported version encountered.
         found: u16,
     },
     /// Identifier is empty, padded, too long, or contains control characters.
@@ -711,7 +712,7 @@ mod tests {
             nav_state_raw,
             accepts_offboard_setpoints,
             failsafe_active,
-            failsafe_active && sequence == 12,
+            failsafe_active && sequence == 11,
             0,
             ts(received_ns),
         )
