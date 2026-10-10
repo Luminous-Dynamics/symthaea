@@ -11116,12 +11116,18 @@ fn checked_compute_cost_increment(
     unit_cost: f64,
     cumulative_cost: f32,
 ) -> Option<(f32, f32)> {
+    // Every public simulation path is bounded by the same maximum per-request
+    // work budget as the cognitive-loop admission layer. This also rejects
+    // enormous step counts before Vec::with_capacity or path generation.
+    const MAX_CALL_COST: f32 = 0.95;
+
     let exact_call_cost = work_units as f64 * unit_cost;
     let call_cost = exact_call_cost as f32;
     if !unit_cost.is_finite()
         || unit_cost < 0.0
         || !exact_call_cost.is_finite()
         || !call_cost.is_finite()
+        || call_cost > MAX_CALL_COST
         || !cumulative_cost.is_finite()
         || cumulative_cost < 0.0
         || (work_units > 0 && unit_cost > 0.0 && call_cost == 0.0)
@@ -11173,6 +11179,12 @@ mod checked_geodesic_cost_tests {
         assert_eq!(checked_geodesic_cost_increment(1, 1, f32::INFINITY), None);
         assert_eq!(checked_geodesic_cost_increment(1, 1, f32::MAX), None);
         assert_eq!(checked_geodesic_cost_increment(1, 1, -1.0), None);
+    }
+
+    #[test]
+    fn checked_cost_rejects_per_call_budget_excess_before_allocation() {
+        assert_eq!(checked_compute_cost_increment(100, 0.012, 0.0), None);
+        assert_eq!(checked_compute_cost_increment(200, 0.008, 0.0), None);
     }
 
     #[test]
