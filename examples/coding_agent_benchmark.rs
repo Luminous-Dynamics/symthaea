@@ -1470,6 +1470,10 @@ mod tests {
     #[test]
     fn verification_status_distinguishes_missing_evidence() {
         assert_eq!(
+            verification_status_for(false, false, 0, 0, 0, false),
+            "no_code_generated"
+        );
+        assert_eq!(
             result(false, 0, 0, 3, false).verification_status(),
             "compilation_failed"
         );
