@@ -200,6 +200,23 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
         if not isinstance(case_id, str) or not case_id:
             raise ValueError(f"cases[{index}].case_id must be a non-empty string")
         case_ids.append(case_id)
+    if len(set(case_ids)) != len(case_ids):
+        raise ValueError("input report contains duplicate fixture case IDs")
+    expected_ids = set(EXPECTED_CASE_IDS)
+    actual_ids = set(case_ids)
+    if actual_ids != expected_ids:
+        missing = sorted(expected_ids - actual_ids)
+        unexpected = sorted(actual_ids - expected_ids)
+        raise ValueError(
+            f"fixture corpus census mismatch: missing={missing!r}; unexpected={unexpected!r}"
+        )
+    if tuple(case_ids) != EXPECTED_CASE_IDS:
+        raise ValueError("fixture corpus case order differs from the frozen reference order")
+
+    # Only inspect case semantics after the IDs have passed the frozen census;
+    # malformed or unexpected IDs must fail with the corpus-contract error.
+    for index, case in enumerate(cases):
+        case_id = case["case_id"]
         expected_name, expected_basis, expected_method = case_id.rsplit("/", 2)
         if case.get("molecule_name") != expected_name:
             raise ValueError(
@@ -258,18 +275,6 @@ def load_input(path: Path) -> tuple[dict[str, Any], str]:
                     f"cases[{index}].molecule.atoms[{atom_index}] atomic_number "
                     f"does not match symbol {symbol!r}"
                 )
-    if len(set(case_ids)) != len(case_ids):
-        raise ValueError("input report contains duplicate fixture case IDs")
-    expected_ids = set(EXPECTED_CASE_IDS)
-    actual_ids = set(case_ids)
-    if actual_ids != expected_ids:
-        missing = sorted(expected_ids - actual_ids)
-        unexpected = sorted(actual_ids - expected_ids)
-        raise ValueError(
-            f"fixture corpus census mismatch: missing={missing!r}; unexpected={unexpected!r}"
-        )
-    if tuple(case_ids) != EXPECTED_CASE_IDS:
-        raise ValueError("fixture corpus case order differs from the frozen reference order")
     return data, digest
 
 
