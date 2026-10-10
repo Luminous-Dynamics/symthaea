@@ -392,10 +392,14 @@ impl MeasurementEnvelope {
         if !self.quality_flags.is_empty() {
             return Err(AssessmentFailure::QualityFlagsPresent(self.quality_flags.clone()));
         }
-        if self.raw_data.is_none() {
-            return Err(AssessmentFailure::MissingRawDataReference);
-        }
-        let reference = self.calibration.as_ref().ok_or(AssessmentFailure::MissingCalibrationReference)?;
+        let raw_data = self
+            .raw_data
+            .clone()
+            .ok_or(AssessmentFailure::MissingRawDataReference)?;
+        let reference = self
+            .calibration
+            .as_ref()
+            .ok_or(AssessmentFailure::MissingCalibrationReference)?;
         let resolved = resolver.resolve(reference).map_err(AssessmentFailure::CalibrationEvidenceUnresolved)?;
 
         if resolved.record_id != reference.record_id
@@ -424,7 +428,7 @@ impl MeasurementEnvelope {
             calibration_standard_uncertainty: resolved.standard_uncertainty,
             calibration_record_id: resolved.record_id,
             calibration_review_receipt: resolved.review_receipt,
-            raw_data: self.raw_data.as_ref().expect("checked above").clone(),
+            raw_data,
             processing_chain_version: self.processing_chain_version.clone(),
         })
     }
@@ -498,9 +502,9 @@ pub trait CalibrationEvidenceResolver {
 /// Conservative thresholds for a particular consumer and intended use.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MeasurementPolicy {
-    pub max_age_ns: u64,
-    pub max_measurement_standard_uncertainty: f64,
-    pub max_calibration_standard_uncertainty: f64,
+    max_age_ns: u64,
+    max_measurement_standard_uncertainty: f64,
+    max_calibration_standard_uncertainty: f64,
 }
 
 impl MeasurementPolicy {
