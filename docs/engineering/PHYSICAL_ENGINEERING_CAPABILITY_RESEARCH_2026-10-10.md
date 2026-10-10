@@ -95,7 +95,7 @@ The ngspice parser should not be considered ready from a single happy-path fixtu
 | Dry-run produces numerically plausible fixture values | Test orchestration works, but result remains `DryRun` and cannot satisfy external-solver evidence |
 | Tampered input/output bytes under an existing digest | Digest verification fails; no engineering evidence accepted |
 
-The minimum numerical benchmark should be intentionally small. For example, an ideal first-order RC step response has time constant \\(\\tau = RC\\) and capacitor voltage \\(V_C(t)=V_{step}(1-e^{-t/\\tau})\\) for zero initial voltage. Compare a declared sample/measurement at \\(t=\\tau\\) to \\(1-e^{-1}\\approx0.6321\\) of the step, while accounting for the exact source, initial conditions, transient time-step settings, tolerances, and any model simplifications. This proves only that specific circuit model and parser path; it says nothing about hardware qualification.
+The minimum numerical benchmark should be intentionally small. For example, an ideal first-order RC step response has time constant \(\tau = RC\) and capacitor voltage \(V_C(t)=V_{step}(1-e^{-t/\tau})\) for zero initial voltage. Compare a declared sample/measurement at \(t=\tau\) to \(1-e^{-1}\approx0.6321\) of the step, while accounting for the exact source, initial conditions, transient time-step settings, tolerances, and any model simplifications. This proves only that specific circuit model and parser path; it says nothing about hardware qualification.
 
 ## Proposed external toolchain
 
