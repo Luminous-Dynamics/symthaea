@@ -2423,7 +2423,7 @@ mod tests {
             assert!(!EngineeringManager::is_covered(d));
         }
         // Covered domains must NOT appear in the gap list.
-        for d in [Civil, Mechanical, Electrical, Materials, Systems] {
+        for d in [Civil, Mechanical, Electrical, Materials, Environmental, Systems] {
             assert!(!gaps.contains(&d));
         }
     }
