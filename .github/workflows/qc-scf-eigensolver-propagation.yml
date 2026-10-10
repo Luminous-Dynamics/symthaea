@@ -2,6 +2,7 @@ name: QC SCF Eigensolver Propagation
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
       - "crates/domains/symthaea-quantum-chemistry/src/scf/mod.rs"
@@ -20,6 +21,7 @@ concurrency:
 jobs:
   checked-scf-contract:
     name: Checked RHF/UHF numerical contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
