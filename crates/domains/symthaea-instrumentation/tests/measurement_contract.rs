@@ -4,8 +4,9 @@
 use ed25519_dalek::{Signer, SigningKey};
 use std::io::Cursor;
 use symthaea_instrumentation::{
-    sha256_hex, ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver,
-    CalibrationReference, CalibrationReviewPayload, ClockDomainId, ContractError,
+    sha256_hex, ArtifactReference, AssessmentFailure, CalibrationCertificate,
+    CalibrationEvidenceResolver, CalibrationReference, CalibrationReviewPayload,
+    ClockDomainId, ContractError,
     InstrumentIdentity, MeasurementEnvelope, MeasurementInput, MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
     ResolvedCalibration, ResolvedRawData, ReviewTrustKey, ReviewTrustStore,
@@ -37,15 +38,29 @@ fn raw_reference() -> RawDataReference {
     RawDataReference::new(raw_artifact())
 }
 
+fn calibration_certificate() -> CalibrationCertificate {
+    CalibrationCertificate::new(
+        "calibration-17",
+        instrument_identity(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+        "calibration-lab-01",
+        "ultrasound-frequency-procedure-v1",
+        artifact(
+            "reference-standard-01",
+            &sha256_hex(b"traceable frequency reference standard fixture v1"),
+        ),
+    )
+    .unwrap()
+}
+
 fn calibration_fixture_bytes() -> Vec<u8> {
-    [
-        "symthaea-calibration-certificate-fixture-v1",
-        "instrument=ultrasound-research-rig-01",
-        "channel=rf-channel-0",
-        "range_hz=4000000..6000000",
-    ]
-    .join("\n")
-    .into_bytes()
+    calibration_certificate().to_canonical_bytes()
 }
 
 const REVIEW_NOW_UNIX_S: u64 = 1_750_000_000;
@@ -960,6 +975,39 @@ fn verified_calibration_requires_exact_certificate_and_review_artifact_reference
         VerifiedCalibrationEvidence::new(calibration, verified_certificate, wrong_review)
             .unwrap_err(),
         ContractError::VerifiedArtifactReferenceMismatch("calibration_review_receipt")
+    );
+}
+
+#[test]
+fn verified_calibration_rejects_metadata_that_disagrees_with_certificate_claims() {
+    let calibration = ResolvedCalibration::new(
+        "calibration-17",
+        instrument_identity(),
+        calibration_artifact(),
+        review_artifact(),
+        Quantity::Frequency,
+        Unit::Hertz,
+        4_000_000.0,
+        7_000_000.0,
+        SAMPLE_TIME_NS - 1,
+        SAMPLE_TIME_NS + 2_000_000_000,
+        900.0,
+    )
+    .unwrap();
+    let certificate =
+        VerifiedArtifactBytes::verify(calibration_artifact(), calibration_fixture_bytes())
+            .unwrap();
+    let review = verify_review_bytes(
+        review_fixture_bytes(),
+        &calibration_artifact(),
+        "calibration-17",
+        "independent-review-receipt",
+    )
+    .unwrap();
+
+    assert_eq!(
+        VerifiedCalibrationEvidence::new(calibration, certificate, review).unwrap_err(),
+        ContractError::CalibrationCertificateClaimMismatch("range_max_value")
     );
 }
 
