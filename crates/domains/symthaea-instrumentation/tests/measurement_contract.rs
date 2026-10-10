@@ -18,6 +18,10 @@ fn clock_domain() -> ClockDomainId {
     ClockDomainId::new("ultrasound-rig-boot-epoch-01").unwrap()
 }
 
+fn instrument_identity() -> InstrumentIdentity {
+    InstrumentIdentity::new("ultrasound-research-rig-01", "rf-channel-0").unwrap()
+}
+
 fn artifact(id: &str, sha: &str) -> ArtifactReference {
     ArtifactReference::new(id, sha).unwrap()
 }
@@ -29,10 +33,13 @@ fn calibration_reference() -> CalibrationReference {
 fn resolved_calibration() -> ResolvedCalibration {
     ResolvedCalibration::new(
         "calibration-17",
+        instrument_identity(),
         artifact("calibration-certificate", SHA_A),
         artifact("independent-review-receipt", SHA_B),
         Quantity::Frequency,
         Unit::Hertz,
+        4_000_000.0,
+        6_000_000.0,
         SAMPLE_TIME_NS - 1,
         SAMPLE_TIME_NS + 2_000_000_000,
         900.0,
@@ -50,7 +57,7 @@ fn measurement_in_clock_domain(
     clock_domain: ClockDomainId,
 ) -> MeasurementEnvelope {
     MeasurementEnvelope::new(MeasurementInput {
-        identity: InstrumentIdentity::new("ultrasound-research-rig-01", "rf-channel-0").unwrap(),
+        identity: instrument_identity(),
         sequence,
         captured_at_ns,
         clock_domain,
@@ -221,10 +228,13 @@ fn calibration_intervals_must_be_non_empty() {
     assert_eq!(
         ResolvedCalibration::new(
             "calibration",
+            instrument_identity(),
             artifact("certificate", SHA_A),
             artifact("review", SHA_B),
             Quantity::Frequency,
             Unit::Hertz,
+            4_000_000.0,
+            6_000_000.0,
             42,
             42,
             0.0,
@@ -249,10 +259,13 @@ fn calibration_evidence_and_review_receipt_must_be_distinct_artifacts() {
         assert_eq!(
             ResolvedCalibration::new(
                 "calibration-17",
+                instrument_identity(),
                 evidence,
                 receipt,
                 Quantity::Frequency,
                 Unit::Hertz,
+                4_000_000.0,
+                6_000_000.0,
                 SAMPLE_TIME_NS - 1,
                 SAMPLE_TIME_NS + 2_000_000_000,
                 900.0,
@@ -492,10 +505,13 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
     let wrong_artifact = MockResolver {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
+            instrument_identity(),
             artifact("different-certificate", SHA_A),
             artifact("review", SHA_B),
             Quantity::Frequency,
             Unit::Hertz,
+            4_000_000.0,
+            6_000_000.0,
             SAMPLE_TIME_NS - 1,
             SAMPLE_TIME_NS + 2_000_000_000,
             900.0,
@@ -522,10 +538,13 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
     let wrong_unit = MockResolver {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
+            instrument_identity(),
             artifact("calibration-certificate", SHA_A),
             artifact("review", SHA_B),
             Quantity::AcousticPressure,
             Unit::Pascal,
+            0.0,
+            10_000_000.0,
             SAMPLE_TIME_NS - 1,
             SAMPLE_TIME_NS + 2_000_000_000,
             900.0,
@@ -549,10 +568,13 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
     let out_of_date = MockResolver {
         resolved: Ok(ResolvedCalibration::new(
             "calibration-17",
+            instrument_identity(),
             artifact("calibration-certificate", SHA_A),
             artifact("review", SHA_B),
             Quantity::Frequency,
             Unit::Hertz,
+            4_000_000.0,
+            6_000_000.0,
             SAMPLE_TIME_NS + 1,
             SAMPLE_TIME_NS + 2_000_000_000,
             900.0,
