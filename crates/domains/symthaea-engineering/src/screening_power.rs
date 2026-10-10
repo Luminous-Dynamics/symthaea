@@ -427,6 +427,10 @@ mod tests {
         .unwrap();
         assert_eq!(result.current_full_factorial_replicates, 2);
         assert_eq!(result.factorial_combinations, 4);
+        assert_eq!(
+            result.request_sha256,
+            crate::screening_design::screening_design_sha256(&input).unwrap()
+        );
         assert!(result.projected_power_normal_approx >= 0.80);
         assert_eq!(result.status, ScreeningPowerStatus::ProjectedTargetMet);
         assert_eq!(result.bonferroni_alpha_per_main_effect, 0.025);
