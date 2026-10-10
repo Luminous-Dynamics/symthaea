@@ -758,7 +758,11 @@ impl WorldGroundedSelfModel {
 
         // This is a count of terminal operational observations, not trusted calibration samples.
         self.loop_state.predictions_resolved += 1;
-        self.check_loop_completion();
+        if admission == CalibrationAdmission::SimulationOnly {
+            // A completed calibration loop requires admitted calibration evidence. An
+            // unverified runtime observation alone must not signal loop completion.
+            self.check_loop_completion();
+        }
 
         Some(was_correct)
     }
@@ -1864,6 +1868,8 @@ mod tests {
         assert_eq!(model.calibration().total_predictions(), calibration_before);
         assert_eq!(model.loop_state().calibration_quality, quality_before);
         assert_eq!(model.loop_state().predictions_resolved, 1);
+        assert_eq!(model.loop_state().loop_iterations, 0);
+        assert!(!model.loop_state().is_active);
         assert!(model.recent_attributions().is_empty());
     }
 
