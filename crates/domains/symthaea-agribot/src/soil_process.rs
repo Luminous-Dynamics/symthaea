@@ -473,6 +473,300 @@ pub fn calculate_recovered_nutrients(
     Ok(result)
 }
 
+/// A climate-flow category must be explicit: emissions, removals, and avoided
+/// emissions are reported separately and never silently collapsed into a single score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClimateFlowKind {
+    Emission,
+    Removal,
+    AvoidedEmission,
+}
+
+/// Positive quantity in kg CO2-equivalent. The flow kind controls whether it contributes
+/// to emissions or credits. A flow is only as reliable as its explicit evidence record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClimateFlow {
+    pub flow_id: String,
+    pub kind: ClimateFlowKind,
+    pub kg_co2e: f64,
+    pub evidence: EvidenceRef,
+}
+
+/// Whether the system has a documented basis for crediting biogenic carbon stored in char.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CharStorageEligibility {
+    /// Sustainable biogenic sourcing eligibility has been verified by the caller.
+    VerifiedEligible,
+    /// Evidence establishes that durable biogenic storage must not be credited.
+    VerifiedIneligible,
+    /// Eligibility is not established. A complete net result must remain unknown.
+    Unknown,
+}
+
+/// Completeness is relative to one declared life-cycle boundary, not a claim that all
+/// possible impacts in the universe have been measured.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClimateInventoryStatus {
+    CompleteForDeclaredBoundary,
+    Partial,
+}
+
+/// Explicit char-storage credit assumptions for one time horizon.
+///
+/// A durable-storage fraction is empirical/modelled, never derived from the carbon mass
+/// balance alone. For VerifiedEligible, eligibility evidence must be a measured/verified
+/// record. Persistence can be measured, literature-derived or scenario input, and should
+/// remain labelled accordingly by the caller.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CharStorageAccounting {
+    pub horizon_years: u32,
+    pub eligibility: CharStorageEligibility,
+    pub eligibility_evidence: Option<EvidenceRef>,
+    pub durable_fraction_at_horizon: Option<f64>,
+    pub persistence_evidence: Option<EvidenceRef>,
+}
+
+impl CharStorageAccounting {
+    fn validate(&self) -> Result<(), SoilProcessError> {
+        if self.horizon_years == 0 {
+            return Err(SoilProcessError::new(
+                "char_storage.horizon_years",
+                "must be greater than zero",
+            ));
+        }
+
+        match self.eligibility {
+            CharStorageEligibility::VerifiedEligible => {
+                let eligibility = self.eligibility_evidence.as_ref().ok_or_else(|| {
+                    SoilProcessError::new(
+                        "char_storage.eligibility_evidence",
+                        "verified eligibility requires an evidence record",
+                    )
+                })?;
+                eligibility.validate("char_storage.eligibility_evidence")?;
+                if eligibility.kind != EvidenceKind::Measured {
+                    return Err(SoilProcessError::new(
+                        "char_storage.eligibility_evidence",
+                        "verified eligibility requires measured/verified evidence, not a scenario",
+                    ));
+                }
+                let fraction = self.durable_fraction_at_horizon.ok_or_else(|| {
+                    SoilProcessError::new(
+                        "char_storage.durable_fraction_at_horizon",
+                        "verified storage requires an explicit durability fraction",
+                    )
+                })?;
+                fraction_value(fraction, "char_storage.durable_fraction_at_horizon")?;
+                let persistence = self.persistence_evidence.as_ref().ok_or_else(|| {
+                    SoilProcessError::new(
+                        "char_storage.persistence_evidence",
+                        "durability fraction requires a source record",
+                    )
+                })?;
+                persistence.validate("char_storage.persistence_evidence")?;
+            }
+            CharStorageEligibility::VerifiedIneligible => {
+                let eligibility = self.eligibility_evidence.as_ref().ok_or_else(|| {
+                    SoilProcessError::new(
+                        "char_storage.eligibility_evidence",
+                        "verified ineligibility requires an evidence record",
+                    )
+                })?;
+                eligibility.validate("char_storage.eligibility_evidence")?;
+                if self.durable_fraction_at_horizon.is_some()
+                    || self.persistence_evidence.is_some()
+                {
+                    return Err(SoilProcessError::new(
+                        "char_storage",
+                        "ineligible storage cannot also supply a credited durability fraction",
+                    ));
+                }
+            }
+            CharStorageEligibility::Unknown => {
+                if self.eligibility_evidence.is_some()
+                    || self.durable_fraction_at_horizon.is_some()
+                    || self.persistence_evidence.is_some()
+                {
+                    return Err(SoilProcessError::new(
+                        "char_storage",
+                        "unknown eligibility must not smuggle in an asserted storage credit",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn fraction_value(value: f64, field: &'static str) -> Result<(), SoilProcessError> {
+    finite_nonnegative(value, field)?;
+    if value > 1.0 {
+        return Err(SoilProcessError::new(field, "must be within [0, 1]"));
+    }
+    Ok(())
+}
+
+/// Climate inventory for one explicitly identified biochar batch and declared boundary.
+///
+/// Examples of separate flows include reactor energy, methane/N2O and other measured
+/// process emissions, transport, application, measured removals, and substantiated
+/// avoided emissions such as a documented displaced product or waste-fate baseline.
+/// The function does not invent counterfactual credits or infer gas emissions from the
+/// difference between feedstock carbon and char carbon.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BiocharClimateInput {
+    pub boundary_id: String,
+    pub inventory_status: ClimateInventoryStatus,
+    pub inventory_evidence: EvidenceRef,
+    pub flows: Vec<ClimateFlow>,
+    pub char_storage: CharStorageAccounting,
+}
+
+/// Auditable climate subtotal for a batch. Positive net means net emissions; negative
+/// net means net removals/credits within the declared inventory boundary only.
+/// net_kg_co2e is absent unless both the inventory and storage eligibility are complete.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BiocharClimateAssessment {
+    pub boundary_id: String,
+    pub horizon_years: u32,
+    pub inventory_status: ClimateInventoryStatus,
+    pub gross_emissions_kg_co2e: f64,
+    pub other_removals_kg_co2e: f64,
+    pub avoided_emissions_kg_co2e: f64,
+    /// None means the model is not justified in applying a durable-char-storage credit.
+    pub durable_char_storage_kg_co2e: Option<f64>,
+    pub net_kg_co2e: Option<f64>,
+    pub flows: Vec<ClimateFlow>,
+    pub char_storage: CharStorageAccounting,
+    pub inventory_evidence: EvidenceRef,
+    pub process_evidence: PyrolysisEvidence,
+    pub scope_note: String,
+}
+
+/// Assess a biochar batch's climate terms without inventing missing lifecycle credits.
+///
+/// Carbon in char is converted to CO2-equivalent with the molecular-mass ratio 44/12.
+/// Only the explicitly supplied durability fraction at the specified horizon is credited.
+/// The result is not an ISO-conformant LCA, carbon-credit issuance, or proof of net removal.
+pub fn assess_biochar_climate(
+    process: &PyrolysisBatchResult,
+    input: &BiocharClimateInput,
+) -> Result<BiocharClimateAssessment, SoilProcessError> {
+    if input.boundary_id.trim().is_empty() {
+        return Err(SoilProcessError::new("boundary_id", "cannot be empty"));
+    }
+    input.inventory_evidence.validate("inventory_evidence")?;
+    input.char_storage.validate()?;
+
+    finite_nonnegative(process.char_product_kg, "process.char_product_kg")?;
+    finite_nonnegative(process.char_carbon_kg, "process.char_carbon_kg")?;
+    if process.char_carbon_kg > process.char_product_kg {
+        return Err(SoilProcessError::new(
+            "process.char_carbon_kg",
+            "must be no greater than total char mass",
+        ));
+    }
+    process.evidence.feedstock.validate("process.evidence.feedstock")?;
+    process
+        .evidence
+        .process_parameters
+        .validate("process.evidence.process_parameters")?;
+    process
+        .evidence
+        .thermophysical_properties
+        .validate("process.evidence.thermophysical_properties")?;
+    process
+        .evidence
+        .reactor_design
+        .validate("process.evidence.reactor_design")?;
+    if process.evidence.input_snapshot_id.trim().is_empty() {
+        return Err(SoilProcessError::new(
+            "process.evidence.input_snapshot_id",
+            "cannot be empty",
+        ));
+    }
+
+    let mut ids = std::collections::HashSet::new();
+    let mut emissions = 0.0_f64;
+    let mut removals = 0.0_f64;
+    let mut avoided = 0.0_f64;
+
+    for flow in &input.flows {
+        if flow.flow_id.trim().is_empty() || !ids.insert(flow.flow_id.as_str()) {
+            return Err(SoilProcessError::new(
+                "flows.flow_id",
+                "flow IDs must be non-empty and unique",
+            ));
+        }
+        finite_nonnegative(flow.kg_co2e, "flows.kg_co2e")?;
+        flow.evidence.validate("flows.evidence")?;
+        let subtotal = match flow.kind {
+            ClimateFlowKind::Emission => &mut emissions,
+            ClimateFlowKind::Removal => &mut removals,
+            ClimateFlowKind::AvoidedEmission => &mut avoided,
+        };
+        *subtotal += flow.kg_co2e;
+        if !subtotal.is_finite() {
+            return Err(SoilProcessError::new("flows", "subtotal overflow"));
+        }
+    }
+
+    let durable_char_storage_kg_co2e = match input.char_storage.eligibility {
+        CharStorageEligibility::VerifiedEligible => Some(
+            process.char_carbon_kg
+                * input
+                    .char_storage
+                    .durable_fraction_at_horizon
+                    .expect("validated eligible storage has a durability fraction")
+                * (44.0 / 12.0),
+        ),
+        CharStorageEligibility::VerifiedIneligible => Some(0.0),
+        CharStorageEligibility::Unknown => None,
+    };
+
+    let net_kg_co2e = if input.inventory_status == ClimateInventoryStatus::CompleteForDeclaredBoundary {
+        durable_char_storage_kg_co2e.map(|storage| emissions - removals - avoided - storage)
+    } else {
+        None
+    };
+
+    let totals = [
+        emissions,
+        removals,
+        avoided,
+        durable_char_storage_kg_co2e.unwrap_or(0.0),
+    ];
+    if totals.iter().any(|value| !value.is_finite() || *value < 0.0) {
+        return Err(SoilProcessError::new("assessment", "invalid or non-finite subtotal"));
+    }
+    if net_kg_co2e.is_some_and(|value| !value.is_finite()) {
+        return Err(SoilProcessError::new("net_kg_co2e", "net balance overflow"));
+    }
+
+    Ok(BiocharClimateAssessment {
+        boundary_id: input.boundary_id.clone(),
+        horizon_years: input.char_storage.horizon_years,
+        inventory_status: input.inventory_status,
+        gross_emissions_kg_co2e: emissions,
+        other_removals_kg_co2e: removals,
+        avoided_emissions_kg_co2e: avoided,
+        durable_char_storage_kg_co2e,
+        net_kg_co2e,
+        flows: input.flows.clone(),
+        char_storage: input.char_storage.clone(),
+        inventory_evidence: input.inventory_evidence.clone(),
+        process_evidence: process.evidence.clone(),
+        scope_note: "scenario/batch accounting within declared boundary; not an ISO-conformant LCA, carbon-credit issuance, or proof of net removal".into(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
