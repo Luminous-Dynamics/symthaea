@@ -55,6 +55,10 @@ pub struct ObservedFactorSetting {
 pub struct ScreeningResponseObservation {
     pub observation_id: String,
     pub run_id: String,
+    /// The exact preregistered design request to which this observation belongs.
+    pub request_sha256: String,
+    /// The exact randomized schedule/run order to which this observation belongs.
+    pub schedule_sha256: String,
     /// Independently measured values actually achieved for each assigned process factor.
     pub actual_factor_settings: Vec<ObservedFactorSetting>,
     pub endpoint_id: String,
@@ -171,6 +175,18 @@ pub fn analyze_screening_responses(
             return Err(ScreeningAnalysisError::new(
                 "observations.observation_id",
                 "observation IDs must be unique",
+            ));
+        }
+        if observation.request_sha256 != plan.request_sha256 {
+            return Err(ScreeningAnalysisError::new(
+                "observations.request_sha256",
+                "observation is bound to a different preregistered design payload",
+            ));
+        }
+        if observation.schedule_sha256 != plan.schedule_sha256 {
+            return Err(ScreeningAnalysisError::new(
+                "observations.schedule_sha256",
+                "observation is bound to a different randomized run schedule",
             ));
         }
         let run = planned_by_id.get(observation.run_id.as_str()).ok_or_else(|| {
@@ -667,6 +683,8 @@ mod tests {
                 ScreeningResponseObservation {
                     observation_id: format!("obs-{}", run.run_id),
                     run_id: run.run_id.clone(),
+                    request_sha256: plan.request_sha256.clone(),
+                    schedule_sha256: plan.schedule_sha256.clone(),
                     actual_factor_settings: run.settings.iter().map(|setting| {
                         ObservedFactorSetting {
                             factor_id: setting.factor_id.clone(),
@@ -773,6 +791,14 @@ mod tests {
 
         data = observations(&plan);
         data[0].actual_factor_settings[0].value = f64::NAN;
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].request_sha256 = "different-design".into();
+        assert!(analyze_screening_responses(&plan, &data).is_err());
+
+        data = observations(&plan);
+        data[0].schedule_sha256 = "different-schedule".into();
         assert!(analyze_screening_responses(&plan, &data).is_err());
 
         data = observations(&plan);
