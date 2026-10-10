@@ -152,8 +152,12 @@ fn review_artifact_for_bytes(bytes: &[u8]) -> ArtifactReference {
     artifact("independent-review-receipt", &sha256_hex(bytes))
 }
 
-fn review_trust_store() -> ReviewTrustStore {
-    ReviewTrustStore::new(
+fn review_trust_authority_key() -> SigningKey {
+    SigningKey::from_bytes(&[0x24; 32])
+}
+
+fn review_trust_store() -> VerifiedReviewTrustStore {
+    let store = ReviewTrustStore::new(
         4,
         REVIEW_NOW_UNIX_S - 10,
         REVIEW_NOW_UNIX_S + 100,
@@ -168,7 +172,14 @@ fn review_trust_store() -> ReviewTrustStore {
             .unwrap(),
         ],
     )
-    .unwrap()
+    .unwrap();
+    let authority = review_trust_authority_key();
+    let signature = authority
+        .sign(&SignedReviewTrustStoreSnapshot::signing_message(&store))
+        .to_bytes();
+    SignedReviewTrustStoreSnapshot::new(store, signature)
+        .verify(&authority.verifying_key())
+        .unwrap()
 }
 
 fn verify_review_artifact(
