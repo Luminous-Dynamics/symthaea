@@ -287,7 +287,11 @@ async fn run_auto_resolve_command(
             return AutoResolveAttempt::Unclear(format!("failed to spawn resolver command: {error}"));
         }
     };
-    let process_group_id = child.id();
+    let Some(process_group_id) = child.id() else {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        return AutoResolveAttempt::Unclear("spawned resolver did not expose a process id".to_string());
+    };
 
     match tokio::time::timeout(timeout, child.wait()).await {
         Ok(Ok(status)) => {
@@ -709,7 +713,6 @@ impl MagiLoopRuntime {
             },
         }
 
-        let now = Instant::now();
         let snapshot: Vec<(String, Option<Instant>, Option<AutoResolveType>)> = {
             let pending = self.pending.lock();
             pending
@@ -729,7 +732,7 @@ impl MagiLoopRuntime {
             // Explicit prediction deadlines keep their documented contract: once the stated
             // observation window expires, Timeout is resolved as a task-level failure. This is
             // distinct from a resolver process timing out while trying to observe the task.
-            if deadline.is_some_and(|deadline| now > deadline) {
+            if deadline.is_some_and(|deadline| Instant::now() > deadline) {
                 actions.push(ResolutionAction::Observed {
                     prediction_id,
                     success: false,
@@ -898,6 +901,7 @@ mod tests {
         assert_eq!(RuntimeState::default(), RuntimeState::Initializing);
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn resolver_command_timeout_stays_unresolved() {
         let mut command = tokio::process::Command::new("sh");
@@ -908,6 +912,7 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn resolver_spawn_failure_stays_unresolved() {
         let command = tokio::process::Command::new(
@@ -917,6 +922,7 @@ mod tests {
         assert!(matches!(result, AutoResolveAttempt::Unclear(_)));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn resolver_nonzero_exit_is_an_observed_failure() {
         let mut command = tokio::process::Command::new("sh");
