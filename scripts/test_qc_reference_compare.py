@@ -46,12 +46,35 @@ def sample_case() -> dict:
 
 
 def sample_corpus_cases() -> list[dict]:
-    # Input-loader tests exercise corpus identity/census, not chemistry values.
-    # The individual compare_case tests above exercise a realistic H2 record.
-    return [
-        {**sample_case(), "case_id": case_id}
-        for case_id in qc.EXPECTED_CASE_IDS
-    ]
+    # Loader-only records carry the correct frozen identity metadata. Their
+    # placeholder coordinates are not chemistry fixtures and are never used
+    # as numerical comparison inputs.
+    atomic_numbers = {"H": 1, "He": 2, "Li": 3, "C": 6, "N": 7, "O": 8, "F": 9}
+    cases = []
+    for case_id in qc.EXPECTED_CASE_IDS:
+        molecule_name, basis, method = case_id.rsplit("/", 2)
+        symbols, charge, multiplicity = qc.EXPECTED_MOLECULE_METADATA[molecule_name]
+        case = sample_case()
+        case.update(
+            case_id=case_id,
+            molecule_name=molecule_name,
+            basis=basis,
+            method=method,
+        )
+        case["molecule"] = {
+            "charge": charge,
+            "multiplicity": multiplicity,
+            "atoms": [
+                {
+                    "atomic_number": atomic_numbers[symbol],
+                    "symbol": symbol,
+                    "position_bohr": [0.0, 0.0, float(index)],
+                }
+                for index, symbol in enumerate(symbols)
+            ],
+        }
+        cases.append(case)
+    return cases
 
 
 def fake_pyscf(energy: float = -1.1175, converged: bool = True, error: Exception | None = None):
@@ -275,6 +298,24 @@ class QcReferenceCompareTests(unittest.TestCase):
                 (
                     lambda report: report["cases"][0].update(case_id="unexpected"),
                     "corpus census mismatch",
+                ),
+                (
+                    lambda report: report["cases"][0].update(molecule_name="CH4"),
+                    "identity mismatch: expected molecule_name 'H2'",
+                ),
+                (
+                    lambda report: report["cases"][0].update(basis="6-31G"),
+                    "identity mismatch: expected basis 'STO-3G'",
+                ),
+                (
+                    lambda report: report["cases"][2]["molecule"].update(
+                        atoms=sample_corpus_cases()[0]["molecule"]["atoms"]
+                    ),
+                    "ordered atom symbols must be",
+                ),
+                (
+                    lambda report: report["cases"][1]["molecule"].update(charge=0),
+                    "HeH+ charge must be 1",
                 ),
                 (
                     lambda report: report["cases"].reverse(),
