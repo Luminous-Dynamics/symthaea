@@ -72,6 +72,8 @@ The ledger computes Brier score and ECE for prospective success probabilities, r
 
 **Trust boundary:** the ledger checks metadata and bindings; it is not a cryptographic artifact verifier. Its input receipt must already have been authenticated by the external evidence pipeline. A caller-supplied digest string alone is not proof that a run occurred.
 
+The existing `symthaea-evidence-plane` crate is a measured-counter/integrity contract (`EvidenceCounters`, `Expectation`, `check_integrity`), not an outcome-signature verifier. Its `config_hash` documentation explicitly states that it uses `DefaultHasher` over a debug representation and is not cryptographic or security-sensitive. It may be useful for recording instrumentation counters, but it must not be repurposed as the trust anchor for resolver receipts. Outcome qualification needs authenticated provenance and exact prediction/subject binding.
+
 ## Next implementation order
 
 1. Enforce timeouts and unresolved results in both the synchronous resolver and the async runtime subprocess path.
