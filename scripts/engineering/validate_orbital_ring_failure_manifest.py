@@ -108,6 +108,8 @@ def provenance_errors(k, p):
     e = []
     if p.get("classification") not in PROVENANCE_CLASSES:
         e.append(f"{k}: invalid provenance classification")
+    elif p.get("classification") == "test_fixture":
+        e.append(f"{k}: test_fixture provenance cannot be used for a scenario candidate")
     refs = p.get("evidence_refs")
     if not isinstance(refs, list) or not refs or not all(isinstance(r, str) and r.strip() and not missing(r) for r in refs):
         e.append(f"{k}: evidence_refs must contain at least one explicit reference")
@@ -204,8 +206,8 @@ def complete_fixture():
 
 
 def fixture_provenance():
-    return {k: {"classification":"test_fixture","evidence_refs":[f"fixture://{k}"],
-                "rationale":"Deterministic validator-only fixture; not an engineering value.",
+    return {k: {"classification":"engineering_assumption","evidence_refs":[f"fixture://{k}"],
+                "rationale":"Synthetic validator state-machine test only; not an engineering value or accepted physical assumption.",
                 "review_state":"not_reviewed"} for k in FIELDS}
 
 
@@ -272,6 +274,15 @@ def self_test():
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
     c["required_inputs"]["support_frame_transform"]["to_frame"]="ITRF"; c["declared_state"]="Blocked"; r=assess(c)
     check("transform_target_frame_mismatch_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    c["input_provenance"]["ring_radius_m"]["classification"]="test_fixture"; c["declared_state"]="Blocked"; r=assess(c)
+    check("test_fixture_provenance_blocks_candidate", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    c["input_provenance"]["initial_equilibrium_evidence_ref"]["review_state"]="rejected"; c["declared_state"]="Blocked"; r=assess(c)
+    check("rejected_evidence_provenance_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
+    c["input_provenance"]["force_model_reference"]["evidence_refs"]=[]; c["declared_state"]="Blocked"; r=assess(c)
+    check("empty_provenance_references_block", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1",
             "checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),
             "checks":tests,"interpretation":"Contract and provenance checks only; review-ready does not mean physically validated or safe."}
