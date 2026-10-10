@@ -41,6 +41,13 @@ def sample_case() -> dict:
 
 
 def sample_report() -> dict:
+    cases = []
+    for case_id, (dimension, matrix) in qc.EXPECTED_CASE_MATRICES.items():
+        case = sample_case()
+        case["case_id"] = case_id
+        case["dimension"] = dimension
+        case["matrix_row_major"] = list(matrix)
+        cases.append(case)
     return {
         "schema_version": 1,
         "producer": "symthaea-quantum-chemistry",
@@ -48,10 +55,7 @@ def sample_report() -> dict:
         "source_revision": "0123456789abcdef0123456789abcdef01234567",
         "source_tree_sha": "89abcdef0123456789abcdef0123456789abcdef",
         "worktree_clean": True,
-        "cases": [
-            {**sample_case(), "case_id": case_id}
-            for case_id in qc.EXPECTED_CASE_IDS
-        ],
+        "cases": cases,
     }
 
 
@@ -144,6 +148,24 @@ class QcEigenReferenceCompareTests(unittest.TestCase):
                 qc.load_input(path)
 
             report = sample_report()
+            report["cases"][3]["matrix_row_major"][0] = 4.25
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "differs from the frozen matrix manifest"):
+                qc.load_input(path)
+
+            report = sample_report()
+            report["cases"][4]["matrix_row_major"][0] = True
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "is not numeric"):
+                qc.load_input(path)
+
+            report = sample_report()
+            report["cases"][0]["dimension"] = True
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "dimension must be 1"):
+                qc.load_input(path)
+
+            report = sample_report()
             report["cases"].reverse()
             path.write_text(json.dumps(report), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "case order differs"):
@@ -157,10 +179,10 @@ class QcEigenReferenceCompareTests(unittest.TestCase):
             qc.subprocess,
             "run",
             side_effect=[
-                completed(commit + "\\n"),
-                completed(tree + "\\n"),
-                completed(commit + "\\n"),
-                completed(tree + "\\n"),
+                completed(commit + "\n"),
+                completed(tree + "\n"),
+                completed(commit + "\n"),
+                completed(tree + "\n"),
                 completed(""),
             ],
         ) as run:
@@ -176,10 +198,10 @@ class QcEigenReferenceCompareTests(unittest.TestCase):
             qc.subprocess,
             "run",
             side_effect=[
-                completed(commit + "\\n"),
-                completed(tree + "\\n"),
-                completed(other_commit + "\\n"),
-                completed(tree + "\\n"),
+                completed(commit + "\n"),
+                completed(tree + "\n"),
+                completed(other_commit + "\n"),
+                completed(tree + "\n"),
             ],
         ):
             with self.assertRaisesRegex(ValueError, "does not equal current Git HEAD"):
@@ -189,11 +211,11 @@ class QcEigenReferenceCompareTests(unittest.TestCase):
             qc.subprocess,
             "run",
             side_effect=[
-                completed(commit + "\\n"),
-                completed(tree + "\\n"),
-                completed(commit + "\\n"),
-                completed(tree + "\\n"),
-                completed(" M src/lib.rs\\n"),
+                completed(commit + "\n"),
+                completed(tree + "\n"),
+                completed(commit + "\n"),
+                completed(tree + "\n"),
+                completed(" M src/lib.rs\n"),
             ],
         ):
             with self.assertRaisesRegex(ValueError, "worktree is dirty"):
