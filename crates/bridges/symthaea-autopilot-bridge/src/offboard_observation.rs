@@ -503,7 +503,9 @@ impl Px4ModeFailsafeObservationAssessmentV1 {
                 if sample.nav_state_raw != previous_state
                     && sample.nav_state_timestamp_us <= previous_state_timestamp
                 {
-                    return Err(Px4ModeFailsafeObservationError::ModeTransitionTimestampDidNotAdvance);
+                    return Err(
+                        Px4ModeFailsafeObservationError::ModeTransitionTimestampDidNotAdvance,
+                    );
                 }
                 if sample.nav_state_raw == previous_state
                     && sample.nav_state_timestamp_us != previous_state_timestamp
@@ -787,6 +789,54 @@ mod tests {
                 if !state.reports_offboard_mode
                     && !state.accepts_offboard_setpoints
                     && state.nav_state_transition_observed
+        ));
+    }
+
+    #[test]
+    fn latest_age_threshold_is_inclusive_at_the_declared_boundary() {
+        let boundary = assessment(
+            vec![
+                observation(10, 1_000, 900, 14, false, true, 1_000_000_000),
+                observation(11, 2_000, 900, 14, false, true, 1_100_000_000),
+            ],
+            2_600_000_000,
+        );
+        assert!(matches!(
+            boundary.outcome().unwrap(),
+            Px4ModeFailsafeObservationOutcomeV1::FreshObservation { state }
+                if state.latest_observation_age_ns == 1_500_000_000
+        ));
+
+        let stale_by_one = assessment(
+            vec![
+                observation(10, 1_000, 900, 14, false, true, 1_000_000_000),
+                observation(11, 2_000, 900, 14, false, true, 1_100_000_000),
+            ],
+            2_600_000_001,
+        );
+        assert!(matches!(
+            stale_by_one.outcome().unwrap(),
+            Px4ModeFailsafeObservationOutcomeV1::Stale { age_ns, .. }
+                if age_ns == 1_500_000_001
+        ));
+    }
+
+    #[test]
+    fn failsafe_transition_does_not_require_a_navigation_mode_transition() {
+        let value = assessment(
+            vec![
+                observation(10, 1_000, 900, 14, false, true, 1_000_000_000),
+                observation(11, 2_000, 900, 14, true, true, 1_100_000_000),
+            ],
+            1_200_000_000,
+        );
+        assert!(matches!(
+            value.outcome().unwrap(),
+            Px4ModeFailsafeObservationOutcomeV1::FreshObservation { state }
+                if !state.nav_state_transition_observed
+                    && state.failsafe_transition_observed
+                    && state.previous_failsafe_active == Some(false)
+                    && state.failsafe_active
         ));
     }
 
