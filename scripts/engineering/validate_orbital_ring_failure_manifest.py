@@ -175,6 +175,7 @@ def assess(m):
     if m.get("schema") != SCHEMA: structural.append("schema mismatch")
     if m.get("scenario_id") != SCENARIO_ID: structural.append("scenario_id mismatch")
     if m.get("architecture_mode") != "continuous_skyhook_ors": structural.append("architecture mismatch")
+    if m.get("scenario_version") != 2: structural.append("scenario_version must be 2 for scenario schema v2")
     if m.get("initial_path_constraint") != "circular_reference_path": structural.append("initial_path_constraint must be circular_reference_path")
     if tuple(m.get("required_fields", ())) != FIELDS: structural.append("required_fields contract mismatch")
     if m.get("analysis_state") != "NotRun": structural.append("analysis_state must remain NotRun")
@@ -191,7 +192,8 @@ def assess(m):
     return {
         "schema": "luminous-dynamics.orbital-ring-manifest-validation/v1",
         "validation_state": "passed_contract_checks" if not structural else "failed_contract_checks",
-        "scenario_id": m.get("scenario_id"), "expected_gate_state": expected,
+        "scenario_id": m.get("scenario_id"), "scenario_schema": m.get("schema"),
+        "scenario_version": m.get("scenario_version"), "expected_gate_state": expected,
         "declared_gate_state": m.get("declared_state"), "analysis_state": m.get("analysis_state"),
         "required_input_count": len(FIELDS), "missing_or_unknown_fields": blocked,
         "type_errors": errors, "blocking_fields": sorted(blocking), "blocking_field_count": len(blocking),
@@ -225,7 +227,7 @@ def fixture_provenance():
 def self_test():
     tests = []
     def check(name, condition): tests.append({"id": name, "status": "passed" if condition else "failed"})
-    m = {"schema":SCHEMA,"scenario_id":SCENARIO_ID,"architecture_mode":"continuous_skyhook_ors",
+    m = {"schema":SCHEMA,"scenario_id":SCENARIO_ID,"scenario_version":2,"architecture_mode":"continuous_skyhook_ors",
          "initial_path_constraint":"circular_reference_path",
          "declared_state":"Blocked","analysis_state":"NotRun","result_artifacts":[],
          "required_fields":list(FIELDS),"required_inputs":{k:None for k in FIELDS},
@@ -305,6 +307,8 @@ def self_test():
     check("circular_reference_missing_radial_tolerance_blocks", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1)
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["initial_path_constraint"]="unspecified"; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("missing_path_constraint_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and bool(r["structural_errors"]))
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["scenario_version"]=1; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
+    check("scenario_version_mismatch_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and "scenario_version must be 2 for scenario schema v2" in r["structural_errors"])
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1",
             "checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),
             "checks":tests,"interpretation":"Contract and provenance checks only; review-ready does not mean physically validated or safe."}
