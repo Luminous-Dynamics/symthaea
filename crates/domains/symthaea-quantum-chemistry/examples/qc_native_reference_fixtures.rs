@@ -121,6 +121,34 @@ fn record_molecule(molecule: &Molecule) -> MoleculeRecord {
     }
 }
 
+fn git_output(args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+    let output = Command::new("git").args(args).output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+    Ok(String::from_utf8(output.stdout)?.trim().to_owned())
+}
+
+fn source_provenance() -> Result<(String, String), Box<dyn std::error::Error>> {
+    let status = git_output(&["status", "--porcelain", "--untracked-files=all"])?;
+    if !status.is_empty() {
+        return Err("refusing to emit QC fixtures from a dirty Git worktree".into());
+    }
+    let revision = git_output(&["rev-parse", "--verify", "HEAD^{commit}"])?;
+    let tree = git_output(&["rev-parse", "--verify", "HEAD^{tree}"])?;
+    for (kind, sha) in [("commit", &revision), ("tree", &tree)] {
+        if sha.len() != 40 || !sha.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            return Err(format!("Git returned an invalid {kind} SHA").into());
+        }
+    }
+    Ok((revision, tree))
+}
+
 fn run_case(
     name: &str,
     molecule: Molecule,
@@ -197,9 +225,51 @@ fn run_case(
     }
 }
 
-fn source_provenance() -> Result<(String, String), Box<dyn std::error::Error>> {
-    // Ensure the report still refers to the same clean source tree after all
-    // native calculations; fail rather than bind a run across a concurrent edit.
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (source_revision, source_tree_sha) = source_provenance()?;
+    let molecules = benchmark_molecules();
+    let sto3g_references = hf_sto3g_references();
+    let six_31g_references = hf_631g_references();
+    let mut cases = Vec::with_capacity(sto3g_references.len() + six_31g_references.len());
+
+    for (ref_name, reference_energy, tolerance) in &sto3g_references {
+        if let Some((_, molecule)) = molecules.iter().find(|(name, _)| name == ref_name) {
+            let note = if *ref_name == "N2" {
+                "Known native N2/STO-3G discrepancy remains unresolved; the historical target is context only."
+            } else {
+                "Historical reference is contextual only; cross-backend pass/fail uses numerical agreement for the same serialized geometry and basis."
+            };
+            cases.push(run_case(
+                ref_name,
+                molecule.clone(),
+                "STO-3G",
+                *reference_energy,
+                *tolerance,
+                Sto3g::build,
+                note,
+            ));
+        }
+    }
+
+    for (ref_name, reference_energy, tolerance) in &six_31g_references {
+        if let Some((_, molecule)) = molecules.iter().find(|(name, _)| name == ref_name) {
+            let note = match *ref_name {
+                "H2O" => "Known native H2O/6-31G discrepancy remains unresolved; the historical target is context only.",
+                "CH4" => "Known native CH4/6-31G discrepancy remains unresolved; the historical target is context only.",
+                _ => "Historical reference is contextual only; cross-backend pass/fail uses numerical agreement for the same serialized geometry and basis.",
+            };
+            cases.push(run_case(
+                ref_name,
+                molecule.clone(),
+                "6-31G",
+                *reference_energy,
+                *tolerance,
+                Basis631G::build,
+                note,
+            ));
+        }
+    }
+
     let (ending_revision, ending_tree_sha) = source_provenance()?;
     if ending_revision != source_revision || ending_tree_sha != source_tree_sha {
         return Err("repository HEAD/tree changed while QC fixtures were running".into());
