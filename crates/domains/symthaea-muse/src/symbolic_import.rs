@@ -86,9 +86,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         return Err("MIDI metrical timing must have a non-zero ticks-per-beat value".into());
     }
     let mut tempo_bpm = 120.0_f32;
+    let mut tempo_microseconds_per_quarter = None::<u32>;
     let mut meter = 4_u8;
+    let mut seen_meter = None::<u8>;
     let mut fifths = 0_i8;
     let mut minor = false;
+    let mut seen_key = None::<(i8, bool)>;
     let mut notes = Vec::new();
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
@@ -103,15 +106,66 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 .ok_or_else(|| "MIDI absolute tick position overflowed".to_string())?;
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
-                    if value.as_int() == 0 {
+                    let micros_per_quarter = value.as_int();
+                    if micros_per_quarter == 0 {
                         return Err("MIDI tempo events must be non-zero".into());
                     }
-                    tempo_bpm = 60_000_000.0 / value.as_int() as f32;
+                    if tempo_microseconds_per_quarter
+                        .is_some_and(|previous| previous != micros_per_quarter)
+                    {
+                        return Err(
+                            "MIDI tempo changes cannot be represented by a single-tempo Score"
+                                .into(),
+                        );
+                    }
+                    let bpm = 60_000_000.0 / micros_per_quarter as f32;
+                    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+                        return Err(
+                            "MIDI tempo must be finite and between 20 and 320 BPM".into(),
+                        );
+                    }
+                    tempo_microseconds_per_quarter = Some(micros_per_quarter);
+                    tempo_bpm = bpm;
                 }
-                TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, _, _, _)) => {
-                    meter = numerator.max(1);
+                TrackEventKind::Meta(MetaMessage::TimeSignature(
+                    numerator,
+                    denominator_power,
+                    _,
+                    _,
+                )) => {
+                    // Score stores quarter-note beats per bar, so only x/4
+                    // can currently be represented without changing duration.
+                    if denominator_power != 2 {
+                        return Err(
+                            "MIDI time-signature denominators other than quarter notes are not representable"
+                                .into(),
+                        );
+                    }
+                    if !(1..=16).contains(&numerator) {
+                        return Err(
+                            "MIDI time-signature numerator must be in 1..=16".into(),
+                        );
+                    }
+                    if seen_meter.is_some_and(|previous| previous != numerator) {
+                        return Err(
+                            "MIDI meter changes cannot be represented by a single-meter Score"
+                                .into(),
+                        );
+                    }
+                    seen_meter = Some(numerator);
+                    meter = numerator;
                 }
                 TrackEventKind::Meta(MetaMessage::KeySignature(sf, is_minor)) => {
+                    if !(-7..=7).contains(&sf) {
+                        return Err("MIDI key signature must be in -7..=7 fifths".into());
+                    }
+                    let signature = (sf, is_minor);
+                    if seen_key.is_some_and(|previous| previous != signature) {
+                        return Err(
+                            "MIDI key changes cannot be represented by a single-key Score".into(),
+                        );
+                    }
+                    seen_key = Some(signature);
                     fifths = sf;
                     minor = is_minor;
                 }
@@ -180,7 +234,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     } else {
         Key::major(tonic)
     };
-    let mut score = Score::new(key, tempo_bpm.clamp(20.0, 320.0), meter.clamp(1, 16));
+    let mut score = Score::new(key, tempo_bpm, meter);
     for note in notes {
         let onset = i64::try_from(note.onset)
             .map_err(|_| "MIDI note onset is not representable".to_string())?;
@@ -284,8 +338,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     }
     let mut fifths = 0_i32;
     let mut minor = false;
+    let mut seen_key = None::<(i32, bool)>;
     let mut meter = 4_u8;
+    let mut seen_meter = None::<u8>;
     let mut tempo = 120.0_f32;
+    let mut seen_tempo = None::<f32>;
     let mut raw = Vec::<(usize, u8, Duration, Duration)>::new();
 
     for (part_index, part) in parts.iter().enumerate() {
@@ -302,17 +359,102 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     return Err("MusicXML divisions must be positive".into());
                 }
                 divisions = value;
-            } else if child.has_tag_name("fifths") {
-                fifths = node_i64(child)
-                    .unwrap_or(i64::from(fifths))
-                    .clamp(-7, 7) as i32;
-            } else if child.has_tag_name("mode") {
-                minor = child.text().is_some_and(|value| value.trim() == "minor");
-            } else if child.has_tag_name("beats") {
-                meter = node_i64(child).unwrap_or(i64::from(meter)).clamp(1, 16) as u8;
+            } else if child.has_tag_name("key") {
+                // The Score contract carries one key signature. Reject later
+                // changes rather than analyzing/rendering the work in the
+                // final key from the file.
+                let key_fifths = child
+                    .children()
+                    .find(|node| node.has_tag_name("fifths"))
+                    .and_then(node_i64)
+                    .ok_or_else(|| {
+                        "MusicXML non-traditional keys are not supported by a single-key Score"
+                            .to_string()
+                    })?;
+                if !(-7..=7).contains(&key_fifths) {
+                    return Err("MusicXML key signature fifths must be in -7..=7".into());
+                }
+                let key_minor = match child.children().find(|node| node.has_tag_name("mode")) {
+                    None => false,
+                    Some(mode) => match mode.text().unwrap_or("").trim() {
+                        "major" => false,
+                        "minor" => true,
+                        value => {
+                            return Err(format!(
+                                "MusicXML key mode {value:?} is not supported by a single-key Score"
+                            ));
+                        }
+                    },
+                };
+                let signature = (key_fifths as i32, key_minor);
+                if seen_key.is_some_and(|previous| previous != signature) {
+                    return Err(
+                        "MusicXML key changes cannot be represented by a single-key Score".into(),
+                    );
+                }
+                seen_key = Some(signature);
+                fifths = signature.0;
+                minor = signature.1;
+            } else if child.has_tag_name("time") {
+                // Score::time_signature() interprets meter as quarter-note
+                // beats per bar. Compound, non-quarter and time-varying
+                // signatures cannot be flattened into this field faithfully.
+                let beats: Vec<_> = child
+                    .children()
+                    .filter(|node| node.has_tag_name("beats"))
+                    .collect();
+                let beat_types: Vec<_> = child
+                    .children()
+                    .filter(|node| node.has_tag_name("beat-type"))
+                    .collect();
+                if beats.len() != 1 || beat_types.len() != 1 {
+                    return Err(
+                        "MusicXML composite or senza-misura signatures are not supported by Score"
+                            .into(),
+                    );
+                }
+                let numerator = node_i64(beats[0]).ok_or_else(|| {
+                    "MusicXML time-signature numerator must be a single integer".to_string()
+                })?;
+                let denominator = node_i64(beat_types[0]).ok_or_else(|| {
+                    "MusicXML time-signature denominator must be an integer".to_string()
+                })?;
+                if denominator != 4 {
+                    return Err(
+                        "MusicXML time-signature denominators other than quarter notes are not representable"
+                            .into(),
+                    );
+                }
+                if !(1..=16).contains(&numerator) {
+                    return Err("MusicXML time-signature numerator must be in 1..=16".into());
+                }
+                let numerator = numerator as u8;
+                if seen_meter.is_some_and(|previous| previous != numerator) {
+                    return Err(
+                        "MusicXML meter changes cannot be represented by a single-meter Score"
+                            .into(),
+                    );
+                }
+                seen_meter = Some(numerator);
+                meter = numerator;
             } else if child.has_tag_name("sound") {
-                if let Some(value) = child.attribute("tempo").and_then(|v| v.parse().ok()) {
-                    tempo = value;
+                if let Some(value) = child.attribute("tempo") {
+                    let bpm = value.parse::<f32>().map_err(|_| {
+                        "MusicXML tempo must be a number between 20 and 320 BPM".to_string()
+                    })?;
+                    if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
+                        return Err(
+                            "MusicXML tempo must be finite and between 20 and 320 BPM".into(),
+                        );
+                    }
+                    if seen_tempo.is_some_and(|previous| previous != bpm) {
+                        return Err(
+                            "MusicXML tempo changes cannot be represented by a single-tempo Score"
+                                .into(),
+                        );
+                    }
+                    seen_tempo = Some(bpm);
+                    tempo = bpm;
                 }
             } else if child.has_tag_name("backup") {
                 let amount = musicxml_duration(child, "backup")?;
@@ -369,7 +511,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     } else {
         Key::major(tonic)
     };
-    let mut score = Score::new(key, tempo.clamp(20.0, 320.0), meter);
+    let mut score = Score::new(key, tempo, meter);
     let part_count = parts.len();
     for (part, midi, onset, duration) in raw {
         let role = if part_count == 1 || part == 0 {
@@ -630,10 +772,19 @@ mod tests {
 
     fn minimal_musicxml() -> &'static [u8] {
         br#"<score-partwise><part id="P1"><measure number="1">
-            <attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats></time></attributes>
+            <attributes><divisions>1</divisions><key><fifths>0</fifths><mode>major</mode></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
             <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#
+    }
+
+    fn midi_file(track: &[u8]) -> Vec<u8> {
+        let mut bytes = b"MThd".to_vec();
+        bytes.extend_from_slice(&[0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0]);
+        bytes.extend_from_slice(b"MTrk");
+        bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(track);
+        bytes
     }
 
     fn json_score_with_one_note() -> Score {
@@ -841,6 +992,95 @@ mod tests {
         assert_eq!(score.notes[1].onset, Duration::new(100, 480));
         assert_eq!(score.notes[1].duration, Duration::new(200, 480));
         assert!((score.notes[1].velocity - 80.0 / 127.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn midi_tempo_changes_are_rejected_instead_of_flattened() {
+        let track = [
+            0, 0xFF, 0x51, 3, 0x07, 0xA1, 0x20, // 120 BPM
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("tempo changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn midi_non_quarter_meter_is_rejected_instead_of_flattened() {
+        let track = [
+            0, 0xFF, 0x58, 4, 4, 3, 24, 8, // 4/8, denominator power 3
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("denominators other than quarter notes"), "{error}");
+    }
+
+    #[test]
+    fn midi_key_changes_are_rejected_instead_of_flattened() {
+        let track = [
+            0, 0xFF, 0x59, 2, 0, 0, // C major
+            100, 0xFF, 0x59, 2, 1, 0, // G major
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("key changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_tempo_changes_are_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound tempo="120"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            <direction><sound tempo="90"/></direction>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("tempo changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_meter_changes_are_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2"><attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("meter changes cannot be represented"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_non_quarter_meter_is_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>6</beats><beat-type>8</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("denominators other than quarter notes"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_key_changes_are_rejected_instead_of_flattened() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1"><attributes><divisions>1</divisions><key><fifths>0</fifths><mode>major</mode></key></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2"><attributes><key><fifths>1</fifths><mode>major</mode></key></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let error = parse_musicxml(xml).unwrap_err();
+        assert!(error.contains("key changes cannot be represented"), "{error}");
     }
 
     #[test]
