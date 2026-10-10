@@ -162,7 +162,7 @@
     "url": "https://nss.org/wp-content/uploads/Orbital-Rings.pdf",
     "year": 1982
   },
-  "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1 but the absolute scale differs by 5x. This script does not resolve whether scenario, length basis, or normalization differs.",
+  "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1. Table 8 mass-per-ring divided by mass-per-length implies a mean length of about 44.08 Mm, and 10 W/m implies about 440.83 MW, close to the table total. This internal consistency check does not explain why the earlier paragraph is five times lower or establish the underlying physical geometry/configuration.",
   "table8_length_reconstruction": {
     "caveat": "Algebraic consistency with the table rows only; does not independently establish the actual geometry or explain the p. 483 100 MW estimate.",
     "cryogenic_heat_loss_per_length_w_m": 10.0,
