@@ -288,6 +288,7 @@ pub enum ContractError {
     EmptyRawDataArtifact,
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
+    InvalidCalibrationRange,
     NonFiniteValue(&'static str),
     NegativeUncertainty(&'static str),
     QuantityUnitMismatch { quantity: Quantity, unit: Unit },
@@ -309,6 +310,9 @@ impl fmt::Display for ContractError {
             }
             Self::CalibrationReviewMustBeDistinct => {
                 write!(f, "calibration evidence and review receipt must be distinct artifacts")
+            }
+            Self::InvalidCalibrationRange => {
+                write!(f, "calibration minimum must not exceed its maximum")
             }
             Self::NonFiniteValue(field) => write!(f, "{field} must be finite"),
             Self::NegativeUncertainty(field) => write!(f, "{field} must be non-negative"),
@@ -504,6 +508,9 @@ impl MeasurementEnvelope {
         {
             return Err(AssessmentFailure::CalibrationReferenceMismatch);
         }
+        if resolved.instrument != self.identity {
+            return Err(AssessmentFailure::CalibrationInstrumentMismatch);
+        }
         if resolved.quantity != self.quantity || resolved.unit != self.unit {
             return Err(AssessmentFailure::CalibrationUnitMismatch);
         }
@@ -511,6 +518,13 @@ impl MeasurementEnvelope {
             && self.captured_at_ns < resolved.valid_until_ns)
         {
             return Err(AssessmentFailure::CalibrationNotValidAtCapture);
+        }
+        if self.value < resolved.range_min_value || self.value > resolved.range_max_value {
+            return Err(AssessmentFailure::CalibrationRangeExceeded {
+                value: self.value,
+                minimum: resolved.range_min_value,
+                maximum: resolved.range_max_value,
+            });
         }
         if self.standard_uncertainty > policy.max_measurement_standard_uncertainty {
             return Err(AssessmentFailure::MeasurementUncertaintyExceeded);
@@ -539,10 +553,13 @@ impl MeasurementEnvelope {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedCalibration {
     record_id: String,
+    instrument: InstrumentIdentity,
     evidence: ArtifactReference,
     review_receipt: ArtifactReference,
     quantity: Quantity,
     unit: Unit,
+    range_min_value: f64,
+    range_max_value: f64,
     valid_from_ns: u64,
     valid_until_ns: u64,
     standard_uncertainty: f64,
@@ -552,10 +569,13 @@ impl ResolvedCalibration {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         record_id: impl Into<String>,
+        instrument: InstrumentIdentity,
         evidence: ArtifactReference,
         review_receipt: ArtifactReference,
         quantity: Quantity,
         unit: Unit,
+        range_min_value: f64,
+        range_max_value: f64,
         valid_from_ns: u64,
         valid_until_ns: u64,
         standard_uncertainty: f64,
@@ -571,6 +591,15 @@ impl ResolvedCalibration {
         if quantity != unit.quantity() {
             return Err(ContractError::QuantityUnitMismatch { quantity, unit });
         }
+        if !range_min_value.is_finite() {
+            return Err(ContractError::NonFiniteValue("calibration_range_min_value"));
+        }
+        if !range_max_value.is_finite() {
+            return Err(ContractError::NonFiniteValue("calibration_range_max_value"));
+        }
+        if range_min_value > range_max_value {
+            return Err(ContractError::InvalidCalibrationRange);
+        }
         if !standard_uncertainty.is_finite() {
             return Err(ContractError::NonFiniteValue("calibration_standard_uncertainty"));
         }
@@ -579,10 +608,13 @@ impl ResolvedCalibration {
         }
         Ok(Self {
             record_id: non_empty(record_id.into(), "calibration_record_id")?,
+            instrument,
             evidence,
             review_receipt,
             quantity,
             unit,
+            range_min_value,
+            range_max_value,
             valid_from_ns,
             valid_until_ns,
             standard_uncertainty,
@@ -678,8 +710,10 @@ pub enum AssessmentFailure {
     RawDataReferenceMismatch,
     CalibrationEvidenceUnresolved(String),
     CalibrationReferenceMismatch,
+    CalibrationInstrumentMismatch,
     CalibrationUnitMismatch,
     CalibrationNotValidAtCapture,
+    CalibrationRangeExceeded { value: f64, minimum: f64, maximum: f64 },
     MeasurementUncertaintyExceeded,
     CalibrationUncertaintyExceeded,
 }
