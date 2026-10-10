@@ -1,6 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use std::io::Cursor;
 use symthaea_instrumentation::{
     sha256_hex, ArtifactReference, AssessmentFailure, CalibrationEvidenceResolver,
     CalibrationReference,
@@ -8,6 +9,7 @@ use symthaea_instrumentation::{
     MeasurementPolicy,
     MeasurementStreamGuard, Quantity, QualityFlag, RawDataEvidenceResolver, RawDataReference,
     ResolvedCalibration, ResolvedRawData, StreamOrderFailure, Unit, VerifiedArtifactBytes,
+    VerifiedArtifactDigest,
 };
 
 const SAMPLE_TIME_NS: u64 = 1_000_000_000;
@@ -171,16 +173,18 @@ impl RawDataEvidenceResolver for MockResolver {
         reference: &RawDataReference,
     ) -> Result<ResolvedRawData, String> {
         let bytes = self.raw_bytes.clone()?;
-        let verified = VerifiedArtifactBytes::verify(reference.artifact().clone(), bytes)
-            .map_err(|_| "raw acquisition SHA-256 mismatch".to_owned())?;
+        let verified = VerifiedArtifactDigest::verify_reader(
+            reference.artifact().clone(),
+            Cursor::new(bytes),
+        )
+        .map_err(|_| "raw acquisition SHA-256 mismatch".to_owned())?;
         let returned_artifact = self
             .raw_reference_override
             .clone()
             .unwrap_or_else(|| reference.artifact().clone());
         ResolvedRawData::new(
             returned_artifact,
-            u64::try_from(verified.byte_length())
-                .map_err(|_| "raw acquisition length overflowed".to_owned())?,
+            verified.byte_length(),
             "application/octet-stream",
         )
         .map_err(|error| error.to_string())
