@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.luminousdynamics.io/schemas/scientific-decision-frontier-1.0.0.json",
+  "title": "Scientific multi-objective decision frontier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "authority", "objectives", "non_equivalences"],
+  "properties": {
+    "schema": {"const": "symthaea.evidence_plane.scientific_decision_frontier"},
+    "schema_version": {"const": "1.0.0"},
+    "authority": {"const": "decision_support_only"},
+    "objectives": {
+      "type": "array",
+      "const": ["gap_coverage", "likelihood_separation", "trajectory_divergence", "eig_per_cost", "pragmatic_risk"]
+    },
+    "non_equivalences": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": {"type": "string"},
+      "contains": {"const": "pareto_frontier_is_not_a_truth_ranking"}
+    }
+  }
+}

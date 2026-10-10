@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"symthaea.research.scientific_discovery.outcome_likelihood.1.0.0",
+  "title":"Scientific Outcome Likelihood Model",
+  "type":"object","additionalProperties":false,
+  "properties":{
+    "schema":{"const":"symthaea.research.scientific_discovery.outcome_likelihood"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"computational_forecast_only"},
+    "inputs":{"type":"array","items":{"enum":["predicted_continuous_hdc_state","outcome_prototype","softmax_temperature"]}},
+    "outputs":{"type":"array","items":{"enum":["outcome_similarity","model_implied_likelihood"]}},
+    "non_equivalences":{"type":"array","items":{"type":"string"}}
+  },
+  "required":["schema","schema_version","authority","inputs","outputs","non_equivalences"]
+}

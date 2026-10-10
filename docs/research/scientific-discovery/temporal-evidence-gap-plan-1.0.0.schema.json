@@ -1,0 +1,42 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/temporal-evidence-gap-plan-1.0.0.schema.json",
+  "title":"Temporal Evidence Gap Plan",
+  "description":"Temporal aggregation of computational outcome discrimination against explicit unmet evidence predicates. It preserves all qualifying horizons and does not select a best experiment or emit evidence.",
+  "type":"object",
+  "required":["assessments"],
+  "properties":{
+    "assessments":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["left_model_id","right_model_id","left_lineage","right_lineage","outcome_id","advances_unmet_predicates","horizons_seconds","first_horizon_seconds","strongest_horizon_seconds","strongest_likelihood_separation","strongest_trajectory_divergence","candidates"],
+        "properties":{
+          "left_model_id":{"type":"string","minLength":1},
+          "right_model_id":{"type":"string","minLength":1},
+          "left_lineage":{"type":"string","minLength":1},
+          "right_lineage":{"type":"string","minLength":1},
+          "outcome_id":{"type":"string","minLength":1},
+          "advances_unmet_predicates":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+          "horizons_seconds":{"type":"array","items":{"type":"number","exclusiveMinimum":0}},
+          "first_horizon_seconds":{"type":"number","exclusiveMinimum":0},
+          "strongest_horizon_seconds":{"type":"number","exclusiveMinimum":0},
+          "strongest_likelihood_separation":{"type":"number","minimum":0},
+          "strongest_trajectory_divergence":{"type":"number"},
+          "candidates":{"type":"array","items":{"type":"object"}}
+        },
+        "additionalProperties":false
+      }
+    }
+  },
+  "additionalProperties":false,
+  "x-authority":"decision_support_only",
+  "x-non-equivalences":[
+    "computational_discrimination_is_not_evidence",
+    "strongest_horizon_is_not_a_recommendation",
+    "model_implied_likelihood_is_not_experimental_probability",
+    "shared_lineage_is_not_independence",
+    "gap_coverage_is_not_truth_or_confidence",
+    "temporal_plan_is_not_millennium_criterion_evidence"
+  ]
+}
