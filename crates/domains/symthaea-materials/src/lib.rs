@@ -17,6 +17,7 @@ pub mod database;
 pub mod encoder;
 pub mod haptic_prober;
 pub mod mining;
+pub mod opportunity;
 pub mod properties;
 pub mod strategic;
 
@@ -26,6 +27,11 @@ pub use encoder::MaterialHdcEncoder;
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
     MiningPredictor, MiningReading,
+};
+pub use opportunity::{
+    AssessmentValue, BottleneckEvidenceState, InterventionClass, MaterialBottleneckHypothesisV1,
+    OpportunityAxis, OpportunityDimensionV1, OpportunityError, OpportunityId, PlanningOrdinal,
+    ResearchInterventionV1, ResearchOpportunityV1, TechnologyFunctionSubjectV1,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
 pub use strategic::{
