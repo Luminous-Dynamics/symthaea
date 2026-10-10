@@ -85,13 +85,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     if ticks_per_beat == 0 {
         return Err("MIDI metrical timing must have a non-zero ticks-per-beat value".into());
     }
-    let mut tempo_bpm = 120.0_f32;
-    let mut tempo_microseconds_per_quarter = None::<u32>;
-    let mut meter = 4_u8;
-    let mut seen_meter = None::<u8>;
-    let mut fifths = 0_i8;
-    let mut minor = false;
-    let mut seen_key = None::<(i8, bool)>;
+    // Collect absolute tick positions before judging whether these global
+    // metadata streams fit Score's single-value fields. Track traversal order
+    // is not a global timeline: another track may contain an earlier event.
+    let mut tempo_events = Vec::<(u64, u32)>::new();
+    let mut meter_events = Vec::<(u64, (u8, u8))>::new();
+    let mut key_events = Vec::<(u64, (i8, bool))>::new();
     let mut notes = Vec::new();
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
@@ -110,22 +109,13 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     if micros_per_quarter == 0 {
                         return Err("MIDI tempo events must be non-zero".into());
                     }
-                    if tempo_microseconds_per_quarter
-                        .is_some_and(|previous| previous != micros_per_quarter)
-                    {
-                        return Err(
-                            "MIDI tempo changes cannot be represented by a single-tempo Score"
-                                .into(),
-                        );
-                    }
                     let bpm = 60_000_000.0 / micros_per_quarter as f32;
                     if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
                         return Err(
                             "MIDI tempo must be finite and between 20 and 320 BPM".into(),
                         );
                     }
-                    tempo_microseconds_per_quarter = Some(micros_per_quarter);
-                    tempo_bpm = bpm;
+                    tempo_events.push((tick, micros_per_quarter));
                 }
                 TrackEventKind::Meta(MetaMessage::TimeSignature(
                     numerator,
@@ -146,28 +136,13 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                             "MIDI time-signature numerator must be in 1..=16".into(),
                         );
                     }
-                    if seen_meter.is_some_and(|previous| previous != numerator) {
-                        return Err(
-                            "MIDI meter changes cannot be represented by a single-meter Score"
-                                .into(),
-                        );
-                    }
-                    seen_meter = Some(numerator);
-                    meter = numerator;
+                    meter_events.push((tick, (numerator, denominator_power)));
                 }
                 TrackEventKind::Meta(MetaMessage::KeySignature(sf, is_minor)) => {
                     if !(-7..=7).contains(&sf) {
                         return Err("MIDI key signature must be in -7..=7 fifths".into());
                     }
-                    let signature = (sf, is_minor);
-                    if seen_key.is_some_and(|previous| previous != signature) {
-                        return Err(
-                            "MIDI key changes cannot be represented by a single-key Score".into(),
-                        );
-                    }
-                    seen_key = Some(signature);
-                    fifths = sf;
-                    minor = is_minor;
+                    key_events.push((tick, (sf, is_minor)));
                 }
                 TrackEventKind::Midi { channel, message } if channel.as_int() != 9 => {
                     let channel = channel.as_int();
@@ -220,6 +195,17 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
             }
         }
     }
+    let tempo_microseconds_per_quarter =
+        stable_midi_metadata(&tempo_events, 500_000_u32, "tempo", "single-tempo")?;
+    let tempo_bpm = 60_000_000.0 / tempo_microseconds_per_quarter as f32;
+    if !tempo_bpm.is_finite() || !(20.0..=320.0).contains(&tempo_bpm) {
+        return Err("MIDI tempo must be finite and between 20 and 320 BPM".into());
+    }
+    let (meter, _denominator_power) =
+        stable_midi_metadata(&meter_events, (4_u8, 2_u8), "meter", "single-meter")?;
+    let (fifths, minor) =
+        stable_midi_metadata(&key_events, (0_i8, false), "key", "single-key")?;
+
     if notes.is_empty() {
         return Err("the MIDI file contains no pitched note events".into());
     }
@@ -604,7 +590,33 @@ fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
 }
 
-/// Extract only a regular, undotted quarter-note metronome mark. Metric
+/// Validate a global MIDI metadata stream against the single-value Score
+/// schema. MIDI applies defaults before the first event; if the first explicit
+/// event occurs later at a non-default value, the opening region already has
+/// different metadata and cannot be represented by one Score field.
+fn stable_midi_metadata<T: Copy + Eq>(
+    events: &[(u64, T)],
+    default: T,
+    name: &str,
+    schema_field: &str,
+) -> Result<T, String> {
+    let Some((first_tick, first_value)) = events.iter().min_by_key(|event| event.0) else {
+        return Ok(default);
+    };
+    if *first_tick > 0 && *first_value != default {
+        return Err(format!(
+            "MIDI {name} changes from the default at a non-zero tick and cannot be represented by a {schema_field} Score"
+        ));
+    }
+    if events.iter().any(|(_, value)| value != first_value) {
+        return Err(format!(
+            "MIDI {name} changes cannot be represented by a {schema_field} Score"
+        ));
+    }
+    Ok(*first_value)
+}
+
+/// Extract only a regular, undotted quarter-note metronome mark. Metric/// Extract only a regular, undotted quarter-note metronome mark. Metric
 /// modulations, beat-unit conversions and text/range markings require a richer
 /// tempo representation than Score's single quarter-note BPM value.
 fn musicxml_metronome_tempo(node: roxmltree::Node<'_, '_>) -> Result<f32, String> {
@@ -1049,6 +1061,55 @@ mod tests {
         assert_eq!(score.notes[1].onset, Duration::new(100, 480));
         assert_eq!(score.notes[1].duration, Duration::new(200, 480));
         assert!((score.notes[1].velocity - 80.0 / 127.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn midi_late_nondefault_tempo_is_rejected_against_default_120_bpm() {
+        let track = [
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_late_nondefault_key_is_rejected_against_default_c_major() {
+        let track = [
+            100, 0xFF, 0x59, 2, 1, 0, // G major at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_late_nondefault_meter_is_rejected_against_default_four_four() {
+        let track = [
+            100, 0xFF, 0x58, 4, 3, 2, 24, 8, // 3/4 at tick 100
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+    }
+
+    #[test]
+    fn midi_equal_tempo_events_at_zero_and_later_are_accepted() {
+        let track = [
+            0, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 0
+            100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // same value later
+            0, 0x90, 60, 100,
+            100, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        assert_eq!(score.tempo_bpm, 150.0);
     }
 
     #[test]
