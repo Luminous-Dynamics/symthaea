@@ -1,0 +1,46 @@
+{
+  "encoding_version": 1,
+  "hash": "SHA-256",
+  "domains": {
+    "canonical": "memory-canonical:v1\\0",
+    "projection": "memory-projection:v1\\0"
+  },
+  "vectors": [
+    {
+      "name": "semantic_claim",
+      "canonical_identity": "claim:abc",
+      "canonical_digest": "223b32c636f5eff3dff7b27cc4087657e15a4b48a5cfb5787f9d01310a09bb8c",
+      "projection": {
+        "schema_version": 1,
+        "memory_kind": 2,
+        "projection_profile": "semantic-v1",
+        "source_frontier": null
+      },
+      "projection_digest": "f42c445e8f9c7a1781986b9b4df9a0ef9d45deaf49c63d11f4bf7e8a486c1791"
+    },
+    {
+      "name": "vector_same_canonical_identity",
+      "canonical_identity": "claim:abc",
+      "canonical_digest": "223b32c636f5eff3dff7b27cc4087657e15a4b48a5cfb5787f9d01310a09bb8c",
+      "projection": {
+        "schema_version": 1,
+        "memory_kind": 5,
+        "projection_profile": "embedding-v1",
+        "source_frontier": null
+      },
+      "projection_digest": "9cc7756915846d3b92026e9b9cffbe27e901e9b856019a63fb4d9ca6dd2a498e"
+    },
+    {
+      "name": "unicode_hdc_frontier",
+      "canonical_identity": "π/材料",
+      "canonical_digest": "b93856edcb98cdeb82505efba801b4231ce1541cda75d021658be5534be6ad02",
+      "projection": {
+        "schema_version": 1,
+        "memory_kind": 6,
+        "projection_profile": "hdc-v1",
+        "source_frontier": "frontier:7"
+      },
+      "projection_digest": "9a4206df0a45ff92e48ecb6499946b8d79052e6e7324e718cf91eba9c03f9fb0"
+    }
+  ]
+}
