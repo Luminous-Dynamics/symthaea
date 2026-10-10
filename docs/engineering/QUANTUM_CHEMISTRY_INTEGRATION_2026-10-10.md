@@ -216,7 +216,7 @@ The proposal adds a serializable request schema, explicit method/basis/environme
 A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous-Dynamics/symthaea/pull/7323):
 
 - `crates/domains/symthaea-quantum-chemistry/examples/qc_native_reference_fixtures.rs` emits the exact geometry, charge, multiplicity, basis/method labels, native status/result, and legacy reference target as JSON. It preserves solver panics/non-convergence as explicit records rather than silently dropping a fixture.
-- `scripts/qc_reference_compare.py` evaluates the *same serialized coordinates* in PySCF, requires an exact 40-character native source revision, records PySCF version, solver settings and the exact input-report SHA-256, includes every input case in the result, and compares total, electronic, and nuclear-repulsion energies using a separate explicit cross-backend tolerance (default 1e-6 Hartree). It writes the diagnostic report before returning failure if anything is failed/not-comparable.
+- `scripts/qc_reference_compare.py` evaluates the *same serialized coordinates* in PySCF, verifies that the declared Git commit owns the declared tree, checks atom symbols against atomic numbers and validates RHF spin preconditions, records PySCF version/settings and the exact input-report SHA-256, includes every input case in the result, and compares total, electronic, and nuclear-repulsion energies plus each backend's energy-decomposition residual using a separate explicit cross-backend tolerance (default 1e-6 Hartree). It writes the diagnostic report before returning failure if anything is failed/not-comparable.
 - The legacy reference tolerances stay as contextual metadata and are **not** reused as the cross-backend comparison threshold. The current known N2/STO-3G, H2O/6-31G and CH4/6-31G issues are expected to stay visible until root-caused.
 
 ### Usage
@@ -224,8 +224,7 @@ A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous
 From the repository root in a Rust-enabled environment:
 
 ```sh
-SYMTHAEA_GIT_SHA="$(git rev-parse HEAD)" test -z "$(git status --porcelain)" || { echo "clean worktree required" >&2; exit 2; }
-SYMTHAEA_GIT_SHA="$(git rev-parse HEAD)" cargo run -p symthaea-quantum-chemistry --example qc_native_reference_fixtures > /tmp/qc-native.json
+cargo run -p symthaea-quantum-chemistry --example qc_native_reference_fixtures > /tmp/qc-native.json
 ```
 
 Then in the PySCF verification environment:
@@ -237,4 +236,4 @@ nix develop .#qc-verify --command python scripts/qc_reference_compare.py \
 
 The command returns nonzero when any case fails or cannot be compared. A nonzero result with a complete JSON report is a useful failure artifact, not an excuse to loosen thresholds. Cross-backend agreement is a software-validation signal, not a claim of chemical accuracy or experimental validation.
 
-**Verification status for the new scripts:** proposed in PR #7323, including a focused workflow that compiles the Rust example, runs the quantum-chemistry crate tests, and exercises comparator policy with a mocked backend. No local execution or actual PySCF numerical result is claimed here; the real comparison must still run in `.#qc-verify`.
+**Verification status for the new scripts:** proposed in PR #7323, including a focused workflow that compiles the Rust example, runs the quantum-chemistry crate tests, and exercises comparator policy with a mocked backend. The fixture producer refuses to start on a dirty source tree and checks that HEAD/tree remain unchanged after calculation; the comparator verifies commit/tree consistency against local Git objects. This is consistency checking, not a signature or build attestation. No local execution or actual PySCF numerical result is claimed here; the real comparison must still run in `.#qc-verify`.
