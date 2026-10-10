@@ -204,9 +204,9 @@ None of levels 1–8 implies level 9. A favorable reaction energy is not a barri
 
 ## Current implementation checkpoint (2026-10-10)
 
-The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `739687a23333a2a00849c30ff755f49bb8d4e1b5`.
+The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `6ef6cb3264b6ccdcbc62ec7d977a013865ff22b1`.
 
-The proposal adds a serializable request schema, explicit method/basis/environment/Bohr declarations, charge/electron/spin consistency checks, finite and non-coincident geometry checks, supported basis-data checks, SCF-setting validation, and request-level atom/basis/iteration budgets. It retains the built basis and overlap-derived independent-basis rank in an immutable preflight result, checks electron capacity against that rank after linear-dependence removal, and uses signed arithmetic for the spin split to avoid overflow on 32-bit/WASM targets. It does not run SCF or claim energy accuracy.
+The proposal adds a serializable request schema, explicit method/basis/environment/Bohr declarations, charge/electron/spin consistency checks, finite and non-coincident geometry checks, supported basis-data checks, SCF-setting validation, and request-level atom/basis/iteration budgets. It retains the built basis and overlap-derived independent-basis rank in an immutable preflight result, checks electron capacity after linear-dependence removal, validates the maximum residual in Xᵀ S X − I against 1e-6, and uses signed arithmetic for the spin split. It does not run SCF or claim energy accuracy. A separate focused workflow targets the request tests. The residual gate is not a solver convergence proof; #7325 tracks convergence reporting for the Jacobi eigensolver.
 
 **Verification state:** the PR's current GitHub Actions workflows were queued at the last status query; earlier attempts on prior commits were cancelled when the branch advanced. No build or test pass is claimed. Check the live PR checks for the current head before treating the code as verified.
 
@@ -219,6 +219,9 @@ A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous
 - `scripts/qc_reference_compare.py` evaluates the *same serialized coordinates* in PySCF, verifies that the declared Git commit owns the declared tree, checks atom symbols against atomic numbers and validates RHF spin preconditions, records PySCF version/settings and the exact input-report SHA-256, includes every input case in the result, and compares total, electronic, and nuclear-repulsion energies plus each backend's energy-decomposition residual using a separate explicit cross-backend tolerance (default 1e-6 Hartree). It writes the diagnostic report before returning failure if anything is failed/not-comparable.
 - The legacy reference tolerances stay as contextual metadata and are **not** reused as the cross-backend comparison threshold. The current known N2/STO-3G, H2O/6-31G and CH4/6-31G issues are expected to stay visible until root-caused.
 
+
+
+The end-to-end numerical run is also wired as `.github/workflows/qc-numerical-diagnostic.yml`. It intentionally allows expected scientific discrepancies to make the diagnostic workflow fail, while uploading `/tmp/qc-native.json` and `/tmp/qc-comparison.json` as artifacts. This gives us the actual discrepancies to debug without turning report generation into a scientific pass.
 ### Usage
 
 From the repository root in a Rust-enabled environment:
