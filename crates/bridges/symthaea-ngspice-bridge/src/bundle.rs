@@ -804,6 +804,41 @@ mod tests {
     }
 
     #[test]
+    fn rejects_more_than_the_file_count_limit() {
+        let dependencies = (0..MAX_BUNDLE_FILES)
+            .map(|index| {
+                (
+                    format!("models/model-{index}.inc"),
+                    b".param value=1\n".to_vec(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert!(matches!(
+            ModelInputBundle::new(
+                "bundle-test-1",
+                "main.cir",
+                b"R1 a b 1k\n".to_vec(),
+                dependencies,
+            ),
+            Err(ModelInputBundleError::TooManyFiles { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_more_than_the_include_directive_limit() {
+        let source = ".include shared.inc\n".repeat(MAX_INCLUDE_DIRECTIVES + 1);
+        assert!(matches!(
+            ModelInputBundle::new(
+                "bundle-test-1",
+                "main.cir",
+                source.into_bytes(),
+                vec![("shared.inc".to_string(), b".param value=1\n".to_vec())],
+            ),
+            Err(ModelInputBundleError::TooManyIncludeDirectives { .. })
+        ));
+    }
+
+    #[test]
     fn detects_manifest_tampering_and_request_mismatch() {
         let mut artifact = bundle("main.cir", "R1 a b 1k\n", vec![]).unwrap();
         artifact.manifest_digest.push('0');
