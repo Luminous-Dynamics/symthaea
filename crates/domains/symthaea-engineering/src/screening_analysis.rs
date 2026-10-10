@@ -232,7 +232,7 @@ pub fn analyze_screening_responses(
                     "verified plan run has no primary-endpoint observation",
                 )
             })?;
-        ordered_observations.push(observation.clone());
+        ordered_observations.push((*observation).clone());
     }
 
     let mut cell_sum: HashMap<(String, u32), f64> = HashMap::new();
@@ -595,13 +595,16 @@ mod tests {
         assert_eq!(result.all_observation_count, 14);
         assert_eq!(result.factorial_effects.len(), 3);
         let a = result.factorial_effects.iter()
-            .find(|effect| effect.factor_ids == vec!["temperature"])
+            .find(|effect| effect.factor_ids == vec!["temperature".to_string()])
             .unwrap();
         let b = result.factorial_effects.iter()
-            .find(|effect| effect.factor_ids == vec!["residence"])
+            .find(|effect| effect.factor_ids == vec!["residence".to_string()])
             .unwrap();
         let ab = result.factorial_effects.iter()
-            .find(|effect| effect.factor_ids == vec!["temperature", "residence"])
+            .find(|effect| {
+                effect.factor_ids
+                    == vec!["temperature".to_string(), "residence".to_string()]
+            })
             .unwrap();
         assert!((a.effect_estimate - 4.0).abs() < 1e-12);
         assert!((b.effect_estimate - 6.0).abs() < 1e-12);
