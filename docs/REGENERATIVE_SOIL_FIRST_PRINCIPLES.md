@@ -160,6 +160,12 @@ The target process is not 'maximum biochar yield'. It is a constrained multi-obj
 - optional lifecycle-climate objective and net-climate hard limit, with incomplete climate inputs marked indeterminate;
 - a sorted, deterministic Pareto frontier that retains trade-offs instead of hiding them inside a weighted composite score, and includes climate only when explicitly required.
 
+### Conservative interval screening
+
+The engineering module now also exposes `MetricInterval`, `RegenerativeMetricIntervals`, and `assess_regenerative_uncertainty()`. This path evaluates constraints against caller-supplied lower/upper bounds. A constraint passes only when its entire interval is on the feasible side of the threshold; it fails robustly only when its entire interval violates the threshold; an interval crossing the threshold is indeterminate. Missing climate bounds remain indeterminate when climate comparison is required.
+
+These bounds are **not automatically generated confidence intervals**. Each interval must cite evidence describing whether it represents measurement uncertainty, a calibrated prediction interval, or a conservative scenario envelope. The current method does not infer distributions, estimate covariance, run Monte Carlo propagation, discover causal effects, or generate an optimal experiment plan. It is a deliberately conservative screening primitive, not a substitute for those future capabilities or for field validation.
+
 The lifecycle function is **not** an ISO-conformant life-cycle assessment or a carbon-credit verifier. It credits char storage only when the caller provides verified biogenic-sourcing eligibility and an explicit, evidence-linked durability fraction for a declared horizon. It does not infer emissions from feedstock carbon absent from char and does not invent counterfactual credits.
 
 Relevant research:
