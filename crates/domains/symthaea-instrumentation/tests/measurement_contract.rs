@@ -521,10 +521,67 @@ fn quantitative_gate_itself_rejects_a_replayed_measurement() {
 }
 
 #[test]
+fn future_timestamp_consumes_sequence_without_poisoning_timestamp_high_water_mark() {
+    let first = measurement(7, SAMPLE_TIME_NS);
+    let future = measurement(8, SAMPLE_TIME_NS + 2_000_000_000);
+    let next_valid = measurement(9, SAMPLE_TIME_NS + 10);
+    let retry_future_sequence = measurement(8, SAMPLE_TIME_NS + 20);
+
+    let mut guard = MeasurementStreamGuard::default();
+    first
+        .assess_for_quantitative_use(
+            SAMPLE_TIME_NS,
+            &policy(),
+            &resolver(),
+            &mut guard,
+        )
+        .unwrap();
+
+    assert_eq!(
+        future
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS + 1_000_000_000,
+                &policy(),
+                &resolver(),
+                &mut guard,
+            )
+            .unwrap_err(),
+        AssessmentFailure::ClockInFuture
+    );
+
+    // A later sequence with a timestamp beyond the last accepted sample remains
+    // usable: the future-dated timestamp did not poison the timestamp high-water mark.
+    next_valid
+        .assess_for_quantitative_use(
+            SAMPLE_TIME_NS + 20,
+            &policy(),
+            &resolver(),
+            &mut guard,
+        )
+        .unwrap();
+
+    // The rejected future sample's sequence was still consumed and cannot be replayed.
+    assert_eq!(
+        retry_future_sequence
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS + 30,
+                &policy(),
+                &resolver(),
+                &mut guard,
+            )
+            .unwrap_err(),
+        AssessmentFailure::StreamOrder(StreamOrderFailure::SequenceNotIncreasing {
+            previous: 9,
+            received: 8,
+        })
+    );
+}
+
+#[test]
 fn units_map_to_the_declared_quantity_without_implicit_conversion() {
     assert_eq!(Unit::Megahertz.quantity(), Quantity::Frequency);
     assert_eq!(Unit::Microvolt.quantity(), Quantity::ElectricalPotential);
-    assert_eq!(Unit::Percent.quantity(), Quantity::OxygenSaturation);
+    assert_eq!(Unit::Percent.quantity(), Quantity::Dimensionless);
     assert_eq!(Unit::DecibelRe20Micropascal.quantity(), Quantity::SoundPressureLevel);
     // Same physical quantity, different units remain explicit; this crate does not convert.
     assert_ne!(Unit::Hertz, Unit::Megahertz);
