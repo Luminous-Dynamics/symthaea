@@ -50,13 +50,10 @@ impl SymExpr {
     /// This checked API rejects missing/duplicate/non-finite bindings,
     /// division by zero, invalid logarithm arguments, and non-finite results.
     /// It is the required path for evidence-producing mathematical checks.
-    pub fn eval_checked(
-        &self,
-        vars: &[(&str, f64)],
-    ) -> Result<f64, SymExprEvalError> {
+    pub fn eval_checked(&self, vars: &[(&str, f64)]) -> Result<f64, SymExprEvalError> {
         let value = match self {
             SymExpr::Var(name) => {
-                let mut matches = vars.iter().filter(|(candidate, _)| *candidate == name);
+                let mut matches = vars.iter().filter(|(candidate, _)| *candidate == name.as_str());
                 let (_, value) = matches
                     .next()
                     .ok_or_else(|| SymExprEvalError::MissingVariable(name.clone()))?;
@@ -369,8 +366,7 @@ pub fn assess_conservation_symbolic(
                 .map(|(variable_index, (name, _))| {
                     (
                         *name,
-                        BASE_SAMPLE_VALUES
-                            [(sample_index + variable_index) % BASE_SAMPLE_VALUES.len()],
+                        BASE_SAMPLE_VALUES[(sample_index + variable_index) % BASE_SAMPLE_VALUES.len()],
                     )
                 })
                 .collect()
