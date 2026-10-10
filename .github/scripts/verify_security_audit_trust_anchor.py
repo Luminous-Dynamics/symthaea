@@ -157,6 +157,16 @@ def fetch_authoritative_pr_merge_sha(repo: str, pr: dict[str, Any], subject: str
     return sha(current.get("merge_commit_sha"), "pr.merge_commit_sha")
 
 
+def recheck_authoritative_pr_merge_sha(repo: str, pr: dict[str, Any], subject: str,
+                                       branch: str, default_branch: str,
+                                       expected_merge_sha: str, token: str) -> None:
+    """Reject a verdict if the PR's authoritative test-merge commit changed during validation."""
+    expected = sha(expected_merge_sha, "expected PR test-merge SHA")
+    observed = fetch_authoritative_pr_merge_sha(repo, pr, subject, branch, default_branch, token)
+    if observed != expected:
+        raise VerificationError("PR test-merge commit changed while the verdict artifact was being verified")
+
+
 def is_latest(candidate: dict[str, Any], runs: list[dict[str, Any]], policy: dict[str, Any], subject: str) -> bool:
     eligible = [r for r in runs if r.get("workflow_id") == policy["workflow_id"]
                 and r.get("event") == "pull_request" and r.get("head_sha") == subject
@@ -565,6 +575,10 @@ def process(repo: str, policy: dict[str, Any], run_id: int, token: str, mode: st
         expected_workflow_sha = fetch_authoritative_pr_merge_sha(repo, pr, subject, branch, default_branch, token)
         verify_verdict_artifact(repo, policy, run, token, expected_pr_number=pr_number,
                                 expected_workflow_sha=expected_workflow_sha)
+        # The artifact can take time to download and inspect. Re-read authoritative
+        # PR state immediately before success publication to close the TOCTOU gap.
+        recheck_authoritative_pr_merge_sha(repo, pr, subject, branch, default_branch,
+                                           expected_workflow_sha, token)
     except VerificationError as exc:
         failure = str(exc)
 
