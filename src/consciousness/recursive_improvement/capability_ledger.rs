@@ -892,6 +892,123 @@ mod tests {
     }
 
     #[test]
+    fn trusted_evaluator_revision_is_pinned() {
+        let mut ledger = setup_claim();
+        for i in 0..3 {
+            let id = format!("wrong-revision-{i}");
+            let seq = 2 * i + 1;
+            ledger
+                .record_forecast(CapabilityForecast {
+                    forecast_id: id.clone(),
+                    claim_id: "rust-debugging".to_string(),
+                    claim_sha256: "f".repeat(64),
+                    subject: subject(),
+                    sequence: seq,
+                    context_id: format!("held-out-{i}"),
+                    split: CapabilitySplit::HeldOut,
+                    predicted_success_probability: 0.9,
+                    expected_compute_units: 10.0,
+                    predicted_failure_mode: None,
+                })
+                .unwrap();
+            ledger
+                .resolve_forecast(CapabilityOutcomeReceipt {
+                    forecast_id: id,
+                    subject: subject(),
+                    sequence: seq + 1,
+                    observed_success: true,
+                    split: CapabilitySplit::HeldOut,
+                    evaluator_identity: "independent-qualification-runner".to_string(),
+                    evaluator_revision: "unreviewed-revision".to_string(),
+                    receipt_sha256: format!("{:064x}", seq + 1),
+                    actual_compute_units: Some(10.0),
+                })
+                .unwrap();
+        }
+        assert_eq!(
+            ledger.qualify_claim("rust-debugging", &policy()),
+            Err(CapabilityLedgerError::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn invalid_probabilities_and_costs_fail_closed() {
+        let mut ledger = setup_claim();
+        for (id, probability, cost) in [
+            ("nan-probability", f64::NAN, 1.0),
+            ("negative-probability", -0.01, 1.0),
+            ("over-one-probability", 1.01, 1.0),
+            ("negative-cost", 0.5, -1.0),
+            ("infinite-cost", 0.5, f64::INFINITY),
+        ] {
+            let forecast = CapabilityForecast {
+                forecast_id: id.to_string(),
+                claim_id: "rust-debugging".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: 1,
+                context_id: format!("context-{id}"),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: probability,
+                expected_compute_units: cost,
+                predicted_failure_mode: None,
+            };
+            assert_eq!(
+                ledger.record_forecast(forecast),
+                Err(CapabilityLedgerError::InvalidForecast),
+                "invalid input should be rejected: {id}"
+            );
+        }
+    }
+
+    #[test]
+    fn unqualified_claim_cannot_record_forecasts() {
+        let mut ledger = CapabilityLedger::new(subject()).unwrap();
+        ledger
+            .add_claim(
+                CapabilityClaim::new(
+                    "not-ready",
+                    "f".repeat(64),
+                    "Not ready for evaluation",
+                    "Test scope",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            ledger.record_forecast(CapabilityForecast {
+                forecast_id: "premature".to_string(),
+                claim_id: "not-ready".to_string(),
+                claim_sha256: "f".repeat(64),
+                subject: subject(),
+                sequence: 1,
+                context_id: "context".to_string(),
+                split: CapabilitySplit::HeldOut,
+                predicted_success_probability: 0.5,
+                expected_compute_units: 1.0,
+                predicted_failure_mode: None,
+            }),
+            Err(CapabilityLedgerError::InvalidLifecycleTransition)
+        );
+    }
+
+    #[test]
+    fn duplicate_claim_ids_are_rejected() {
+        let mut ledger = setup_claim();
+        let duplicate = CapabilityClaim::new(
+            "rust-debugging",
+            "1".repeat(64),
+            "A conflicting claim version",
+            "A different scope",
+        )
+        .unwrap();
+        assert_eq!(
+            ledger.add_claim(duplicate),
+            Err(CapabilityLedgerError::DuplicateClaim)
+        );
+    }
+
+    #[test]
     fn receipt_root_cannot_be_replayed_for_a_second_forecast() {
         let mut ledger = setup_claim();
         for (id, seq) in [("first", 1u64), ("second", 3u64)] {
