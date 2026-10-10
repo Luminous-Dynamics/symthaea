@@ -27,11 +27,21 @@ cargo clippy -p symthaea-orbital-ring --all-targets -- -D warnings
 
 These commands are a verification target; this README does not claim they have run in the current environment.
 
+## Independent T0 reference check
+
+From the repository root:
+
+```sh
+python3 scripts/engineering/orbital_ring_reference_check.py
+```
+
+This standard-library Python implementation checks the documented orbit fixtures and Rust numeric anchors, algebraic consistency relations, and a hand-checkable inertial circular-stream limit. It emits deterministic JSON and exits nonzero on failure. The current recorded local run passed 47/47 checks with byte-identical output on repeat. This is arithmetic/limiting-case evidence only; it does not compile or test this Rust crate, compare against an external astrodynamics solver, validate moving-support physics, or prove ring equilibrium.
+
 ## Next steps
 
-1. Review the architecture and reference-frame contract.
-2. Independently check this two-body reference case against a separate implementation.
-3. Define a small, reviewable rotor/support control-volume model before implementing its equations.
+1. Keep the Python arithmetic check as a reproducible T0 gate; obtain actual Rust-toolchain results as a separate code-quality gate.
+2. Specify and independently derive one rotor/support control volume, including all reference-frame transforms and mass/energy/momentum boundary flows.
+3. Compare the bounded orbital subsystem to an appropriately scoped external solver or independent review before making stronger fidelity claims.
 4. Add solver-backed structural, electromagnetic, thermal, and dynamics interfaces only after the T0 assumptions are fixed.
 
 See [the workstream contract](../../../docs/engineering/ORBITAL_RING_FEASIBILITY_WORKSTREAM.md) for the fidelity ladder, evidence requirements, and staged plan.
