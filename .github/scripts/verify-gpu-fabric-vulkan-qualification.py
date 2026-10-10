@@ -69,15 +69,40 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 def parse_kv(lines: list[str]) -> dict[str, str]:
+    """Parse unique scalar witness fields, not repeatable runtime stage telemetry."""
     values: dict[str, str] = {}
     for line in lines:
-        if "=" not in line or line.startswith(("resource_", "memory_type_record=", "memory_heap_record=")):
+        if "=" not in line or line.startswith((
+            "resource_",
+            "memory_type_record=",
+            "memory_heap_record=",
+            # Emitted by the test-only qualification_stage hook. These records
+            # can appear between a fixture's receipt block and the next fixture
+            # marker; they are diagnostic events, not scalar witness claims.
+            "qualification_stage=",
+        )):
             continue
         key, value = line.split("=", 1)
         if key in values:
             fail(f"duplicate key: {key}")
         values[key] = value
     return values
+
+
+def self_test_parse_kv() -> None:
+    parsed = parse_kv([
+        "qualification_stage=execute_begin",
+        "qualification_stage=queue_submitted_expected=2",
+        "receipt_version=12",
+    ])
+    if parsed != {"receipt_version": "12"}:
+        fail("repeatable qualification stage diagnostics leaked into scalar witness fields")
+    try:
+        parse_kv(["receipt_version=12", "receipt_version=13"])
+    except VerificationError:
+        pass
+    else:
+        fail("duplicate scalar witness key was accepted")
 
 def parse_runtime(path: Path) -> list[tuple[str, list[str]]]:
     blocks: list[tuple[str, list[str]]] = []
@@ -1009,6 +1034,11 @@ def verify_packages(path: Path) -> None:
         fail(f"missing runner packages: {sorted(missing)}")
 
 def main() -> int:
+    if sys.argv[1:] == ["--self-test"]:
+        self_test_parse_kv()
+        print("verifier_self_test=pass")
+        return 0
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--environment", type=Path, required=True)
