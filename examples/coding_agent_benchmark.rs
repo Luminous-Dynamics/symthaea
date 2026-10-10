@@ -64,6 +64,8 @@ struct TaskResult {
     tests_failed: usize,
     /// Number of test functions supplied by this benchmark task.
     expected_tests: usize,
+    /// True if execution was simulated and compilation/tests were not actually run.
+    execution_simulated: bool,
     // Agent metrics
     iterations: usize,
     tiers_used: Vec<String>,
@@ -81,7 +83,8 @@ impl TaskResult {
     /// alone. For tasks with tests, zero observed results must never be confused
     /// with an intentionally empty test suite.
     fn is_correct(&self) -> bool {
-        self.compiled
+        !self.execution_simulated
+            && self.compiled
             && self.tests_failed == 0
             && self.tests_passed == self.expected_tests
     }
@@ -802,7 +805,10 @@ fn count_expected_tests(test_source: &str) -> usize {
 }
 
 /// Validate generated code by compiling and running test assertions.
-fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, usize, bool, bool) {
+fn validate_code(
+    source: &str,
+    test_source: &str,
+) -> (bool, Vec<String>, usize, usize, bool, bool, bool) {
     let mut executor = CodeExecutor::with_real_execution();
 
     // Clean LLM output: strip fences, prose, balance braces
@@ -816,12 +822,19 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     };
     let result = executor.execute_rust(&clean_source, test_src);
 
+    // The simulation sentinel sets compiled=true for compatibility, but no
+    // compiler or test process actually ran. Never promote that into evidence.
+    if result.simulated {
+        return (false, vec![], 0, 0, false, false, true);
+    }
+
     if result.compiled {
         return (
             true,
             vec![],
             result.tests_passed,
             result.tests_failed,
+            false,
             false,
             false,
         );
@@ -861,6 +874,9 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
             .collect();
         let fixed_code = fixed_lines.join("\n");
         let retry = executor.execute_rust(&fixed_code, test_src);
+        if retry.simulated {
+            return (false, vec![], 0, 0, true, false, true);
+        }
         if retry.compiled {
             return (
                 true,
@@ -869,6 +885,7 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
                 retry.tests_failed,
                 true,
                 true,
+                false,
             );
         }
         source_to_fix = fixed_code;
@@ -881,6 +898,9 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
     let fixed = try_auto_fix(&source_to_fix, &result.compile_errors);
     if let Some(ref fixed_source) = fixed {
         let retry = executor.execute_rust(fixed_source, test_src);
+        if retry.simulated {
+            return (false, vec![], 0, 0, true, false, true);
+        }
         if retry.compiled {
             return (
                 true,
@@ -889,12 +909,13 @@ fn validate_code(source: &str, test_source: &str) -> (bool, Vec<String>, usize, 
                 retry.tests_failed,
                 true,
                 true,
+                false,
             );
         }
-        return (false, retry.compile_errors, 0, 0, true, false);
+        return (false, retry.compile_errors, 0, 0, true, false, false);
     }
 
-    (false, result.compile_errors, 0, 0, false, false)
+    (false, result.compile_errors, 0, 0, false, false, false)
 }
 
 fn run_task(
@@ -933,12 +954,19 @@ fn run_task(
         content.contains("TODO") || content.contains("todo!") || content.contains("unimplemented!");
 
     // Level 2+3: Real compilation and test execution
-    let (compiled, compile_errors, tests_passed, tests_failed, fix_attempted, fix_succeeded) =
-        if code_written && !content.trim().is_empty() {
-            validate_code(&content, task.test_source)
-        } else {
-            (false, vec!["No code generated".into()], 0, 0, false, false)
-        };
+    let (
+        compiled,
+        compile_errors,
+        tests_passed,
+        tests_failed,
+        fix_attempted,
+        fix_succeeded,
+        execution_simulated,
+    ) = if code_written && !content.trim().is_empty() {
+        validate_code(&content, task.test_source)
+    } else {
+        (false, vec!["No code generated".into()], 0, 0, false, false, false)
+    };
 
     let quality_rejections = result
         .observations
@@ -965,6 +993,8 @@ fn run_task(
     let correct = compiled && tests_failed == 0 && tests_passed == expected_tests;
     let status = if correct {
         "✓"
+    } else if execution_simulated {
+        "?"
     } else if compiled {
         "◐"
     } else {
@@ -979,7 +1009,9 @@ fn run_task(
         status,
         task.description
     );
-    if compiled {
+    if execution_simulated {
+        eprint!("[NOT EXECUTED: sandbox simulation; result is unverified]");
+    } else if compiled {
         eprint!(
             "[compiled, {}/{} expected tests passed; {} failed]",
             tests_passed, expected_tests, tests_failed
@@ -1004,6 +1036,7 @@ fn run_task(
         tests_passed,
         tests_failed,
         expected_tests,
+        execution_simulated,
         iterations: result.iterations_used,
         tiers_used: tier_strings,
         energy: result.total_energy,
@@ -1256,6 +1289,7 @@ fn main() {
                 "tests_passed": r.tests_passed,
                 "tests_failed": r.tests_failed,
                 "expected_tests": r.expected_tests,
+                "execution_simulated": r.execution_simulated,
                 "correct": r.is_correct(),
                 "auto_fix_attempted": r.auto_fix_attempted,
                 "auto_fix_succeeded": r.auto_fix_succeeded,
@@ -1308,6 +1342,7 @@ mod tests {
         tests_passed: usize,
         tests_failed: usize,
         expected_tests: usize,
+        execution_simulated: bool,
     ) -> TaskResult {
         TaskResult {
             description: "fixture".to_string(),
@@ -1322,6 +1357,7 @@ mod tests {
             tests_passed,
             tests_failed,
             expected_tests,
+            execution_simulated,
             iterations: 1,
             tiers_used: Vec::new(),
             energy: 0.0,
@@ -1334,24 +1370,31 @@ mod tests {
 
     #[test]
     fn expected_tests_that_never_execute_are_not_a_pass() {
-        assert!(!result(true, 0, 0, 3).is_correct());
+        assert!(!result(true, 0, 0, 3, false).is_correct());
     }
 
     #[test]
     fn all_expected_tests_must_pass() {
-        assert!(result(true, 3, 0, 3).is_correct());
-        assert!(!result(true, 2, 0, 3).is_correct());
-        assert!(!result(true, 3, 1, 3).is_correct());
+        assert!(result(true, 3, 0, 3, false).is_correct());
+        assert!(!result(true, 2, 0, 3, false).is_correct());
+        assert!(!result(true, 3, 1, 3, false).is_correct());
     }
 
     #[test]
     fn compile_only_task_can_pass_without_tests() {
-        assert!(result(true, 0, 0, 0).is_correct());
+        assert!(result(true, 0, 0, 0, false).is_correct());
     }
 
     #[test]
     fn uncompiled_task_is_never_correct() {
-        assert!(!result(false, 3, 0, 3).is_correct());
+        assert!(!result(false, 3, 0, 3, false).is_correct());
+    }
+
+    #[test]
+    fn simulated_compile_only_result_is_not_verified() {
+        // The executor's simulation sentinel can set compiled=true while
+        // explicitly stating that no compiler or test process ran.
+        assert!(!result(true, 0, 0, 0, true).is_correct());
     }
 
     #[test]
