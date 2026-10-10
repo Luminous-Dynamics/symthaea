@@ -1000,18 +1000,13 @@ impl WorldGroundedSelfModel {
             CalibrationQuality::from_ece(ece, min_required, total);
     }
 
-    /// Check if a complete MAGI loop iteration occurred
+    /// Check if a complete MAGI calibration loop iteration occurred.
     fn check_loop_completion(&mut self) {
-        // A loop is complete when:
-        // 1. A prediction was made
-        // 2. It was resolved
-        // 3. Calibration was updated
-        // 4. (Optionally) Attribution was generated
-
-        // Simple heuristic: every 10 resolved predictions counts as a loop
-        if self.loop_state.predictions_resolved > 0
-            && self.loop_state.predictions_resolved % 10 == 0
-        {
+        // Operationally observed outcomes are not necessarily trusted calibration samples.
+        // Complete a calibration loop only after ten admitted samples, not ten terminal
+        // runtime observations.
+        let admitted_predictions = self.calibration.total_predictions();
+        if admitted_predictions > 0 && admitted_predictions % 10 == 0 {
             self.loop_state.loop_iterations += 1;
             self.loop_state.is_active = true;
         }
