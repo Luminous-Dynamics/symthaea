@@ -297,6 +297,7 @@ pub enum ContractError {
     EmptyRawDataArtifact,
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
+    VerifiedArtifactReferenceMismatch(&'static str),
     InvalidCalibrationRange,
     NonFiniteValue(&'static str),
     NegativeUncertainty(&'static str),
@@ -319,6 +320,9 @@ impl fmt::Display for ContractError {
             }
             Self::CalibrationReviewMustBeDistinct => {
                 write!(f, "calibration evidence and review receipt must be distinct artifacts")
+            }
+            Self::VerifiedArtifactReferenceMismatch(artifact) => {
+                write!(f, "verified bytes must match the resolved {artifact} reference")
             }
             Self::InvalidCalibrationRange => {
                 write!(f, "calibration minimum must not exceed its maximum")
@@ -514,9 +518,10 @@ impl MeasurementEnvelope {
             return Err(AssessmentFailure::RawDataReferenceMismatch);
         }
 
-        let resolved = resolver
+        let verified_calibration = resolver
             .resolve_calibration(reference)
             .map_err(AssessmentFailure::CalibrationEvidenceUnresolved)?;
+        let resolved = verified_calibration.calibration();
 
         if resolved.record_id != reference.record_id
             || resolved.evidence != reference.evidence
@@ -559,9 +564,9 @@ impl MeasurementEnvelope {
             age_ns,
             measurement_standard_uncertainty: self.standard_uncertainty,
             calibration_standard_uncertainty: resolved.standard_uncertainty,
-            calibration_record_id: resolved.record_id,
+            calibration_record_id: resolved.record_id.clone(),
             calibration_evidence: resolved.evidence.clone(),
-            calibration_review_receipt: resolved.review_receipt,
+            calibration_review_receipt: resolved.review_receipt.clone(),
             calibration_range_min_value: resolved.range_min_value,
             calibration_range_max_value: resolved.range_max_value,
             raw_data: resolved_raw,
@@ -658,15 +663,65 @@ impl ResolvedCalibration {
     }
 }
 
+/// Calibration metadata paired with digest-verified certificate and review bytes.
+///
+/// The constructor binds each verified byte wrapper to the exact artifact
+/// reference carried by the resolved record. It does not parse the artifacts,
+/// authenticate signatures, or prove that metadata was derived from the content;
+/// adapters must perform those checks before constructing this value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedCalibrationEvidence {
+    calibration: ResolvedCalibration,
+    certificate: VerifiedArtifactBytes,
+    review_receipt: VerifiedArtifactBytes,
+}
+
+impl VerifiedCalibrationEvidence {
+    pub fn new(
+        calibration: ResolvedCalibration,
+        certificate: VerifiedArtifactBytes,
+        review_receipt: VerifiedArtifactBytes,
+    ) -> Result<Self, ContractError> {
+        if certificate.reference() != &calibration.evidence {
+            return Err(ContractError::VerifiedArtifactReferenceMismatch(
+                "calibration_certificate",
+            ));
+        }
+        if review_receipt.reference() != &calibration.review_receipt {
+            return Err(ContractError::VerifiedArtifactReferenceMismatch(
+                "calibration_review_receipt",
+            ));
+        }
+        Ok(Self {
+            calibration,
+            certificate,
+            review_receipt,
+        })
+    }
+
+    pub fn calibration(&self) -> &ResolvedCalibration {
+        &self.calibration
+    }
+
+    pub fn certificate(&self) -> &VerifiedArtifactBytes {
+        &self.certificate
+    }
+
+    pub fn review_receipt(&self) -> &VerifiedArtifactBytes {
+        &self.review_receipt
+    }
+}
+
 /// Resolve a calibration reference from an independently governed evidence
-/// store. Implementations should verify artifact bytes/digests, review receipts,
-/// applicability, and traceability-chain information; a lookup by ID alone is
-/// not enough. The caller must configure and test this trust boundary.
+/// store. Implementations must hash the exact certificate and review-receipt
+/// bytes and return them through `VerifiedCalibrationEvidence`. They must also
+/// parse/bind the claims and verify signatures/trust policy; the wrapper cannot
+/// prove that the resolver is independent or that metadata came from the bytes.
 pub trait CalibrationEvidenceResolver {
     fn resolve_calibration(
         &self,
         reference: &CalibrationReference,
-    ) -> Result<ResolvedCalibration, String>;
+    ) -> Result<VerifiedCalibrationEvidence, String>;
 }
 
 /// Resolve raw acquisition bytes from an immutable reference and independently
