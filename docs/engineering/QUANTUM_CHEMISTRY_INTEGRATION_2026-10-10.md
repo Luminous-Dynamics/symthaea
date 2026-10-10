@@ -216,7 +216,7 @@ The proposal adds a serializable request schema, explicit method/basis/environme
 A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous-Dynamics/symthaea/pull/7323):
 
 - `crates/domains/symthaea-quantum-chemistry/examples/qc_native_reference_fixtures.rs` emits the exact geometry, charge, multiplicity, basis/method labels, native status/result, and legacy reference target as JSON. It preserves solver panics/non-convergence as explicit records rather than silently dropping a fixture.
-- `scripts/qc_reference_compare.py` evaluates the *same serialized coordinates* in PySCF, records solver version and input SHA-256, includes every input case in the result, and compares native/PySCF energies using a separate explicit cross-backend tolerance (default 1e-6 Hartree). It writes the diagnostic report before returning failure if anything is failed/not-comparable.
+- `scripts/qc_reference_compare.py` evaluates the *same serialized coordinates* in PySCF, requires an exact 40-character native source revision, records PySCF version, solver settings and the exact input-report SHA-256, includes every input case in the result, and compares total, electronic, and nuclear-repulsion energies using a separate explicit cross-backend tolerance (default 1e-6 Hartree). It writes the diagnostic report before returning failure if anything is failed/not-comparable.
 - The legacy reference tolerances stay as contextual metadata and are **not** reused as the cross-backend comparison threshold. The current known N2/STO-3G, H2O/6-31G and CH4/6-31G issues are expected to stay visible until root-caused.
 
 ### Usage
@@ -236,4 +236,4 @@ nix develop .#qc-verify --command python scripts/qc_reference_compare.py \
 
 The command returns nonzero when any case fails or cannot be compared. A nonzero result with a complete JSON report is a useful failure artifact, not an excuse to loosen thresholds. Cross-backend agreement is a software-validation signal, not a claim of chemical accuracy or experimental validation.
 
-**Verification status for the new scripts:** committed to a review branch, but no execution of the Rust example or PySCF comparator is claimed here; consult PR #7323's checks and run the documented paired command before treating the report as verified.
+**Verification status for the new scripts:** proposed in PR #7323, including a focused workflow that compiles the Rust example, runs the quantum-chemistry crate tests, and exercises comparator policy with a mocked backend. No local execution or actual PySCF numerical result is claimed here; the real comparison must still run in `.#qc-verify`.
