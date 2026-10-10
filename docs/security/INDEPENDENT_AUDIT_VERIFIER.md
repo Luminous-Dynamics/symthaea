@@ -1,6 +1,6 @@
 # Independent Security Audit Verifier
 
-The workflow `.github/workflows/security-audit-independent-verifier.yml` is a default-branch-owned verifier for this repository's shared audit workflow. It does not execute pull-request code. It queries the authoritative run and PR APIs, rejects stale runs and fork-originated runs, checks the exact caller workflow blob and pinned Luminous Platform engine source, then validates the aggregate verdict artifact's SHA-256 digest and required lane coverage.
+The workflow `.github/workflows/security-audit-independent-verifier.yml` is a default-branch-owned verifier for this repository's shared audit workflow. It does not execute pull-request code. It queries the authoritative run and PR APIs, rejects stale runs and fork-originated runs, checks the exact caller workflow blob and pinned Luminous Platform engine source, then validates the aggregate verdict artifact's SHA-256 digest and required lane coverage. It requires the API workflow-run `path` to exactly match the base-owned workflow path and ties the verdict workflow reference to that path and the independently matched PR number. Missing verifier self-test outcome is a failure, never an implicit success.
 
 The verifier publishes `Security Audit / Independent Verifier`. The status and workflow job do not become a merge gate until repository rules explicitly require them.
 
