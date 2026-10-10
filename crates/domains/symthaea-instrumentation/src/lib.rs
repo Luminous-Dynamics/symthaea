@@ -298,6 +298,7 @@ pub enum ContractError {
     InvalidValidityInterval,
     CalibrationReviewMustBeDistinct,
     VerifiedArtifactReferenceMismatch(&'static str),
+    EmptyEvidenceArtifact(&'static str),
     InvalidCalibrationRange,
     NonFiniteValue(&'static str),
     NegativeUncertainty(&'static str),
@@ -323,6 +324,9 @@ impl fmt::Display for ContractError {
             }
             Self::VerifiedArtifactReferenceMismatch(artifact) => {
                 write!(f, "verified bytes must match the resolved {artifact} reference")
+            }
+            Self::EmptyEvidenceArtifact(artifact) => {
+                write!(f, "{artifact} evidence must not be empty")
             }
             Self::InvalidCalibrationRange => {
                 write!(f, "calibration minimum must not exceed its maximum")
@@ -682,6 +686,16 @@ impl VerifiedCalibrationEvidence {
         certificate: VerifiedArtifactBytes,
         review_receipt: VerifiedArtifactBytes,
     ) -> Result<Self, ContractError> {
+        if certificate.byte_length() == 0 {
+            return Err(ContractError::EmptyEvidenceArtifact(
+                "calibration_certificate",
+            ));
+        }
+        if review_receipt.byte_length() == 0 {
+            return Err(ContractError::EmptyEvidenceArtifact(
+                "calibration_review_receipt",
+            ));
+        }
         if certificate.reference() != &calibration.evidence {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
                 "calibration_certificate",
