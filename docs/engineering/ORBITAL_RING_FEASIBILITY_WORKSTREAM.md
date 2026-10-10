@@ -195,11 +195,12 @@ This increment must not claim that an orbital ring is stable, cheap, safe, build
 - Monorepo space-automation plan and candid maturity assessment: https://github.com/Luminous-Dynamics/luminous-dynamics/blob/55757dfac7791d6d5d4733f7398f4ca17af215d0/symthaea/SPACE_AUTOMATION_PLAN_2026-07-06.md
 - [Orbital-ring research gap register](ORBITAL_RING_RESEARCH_GAP_REGISTER.md): source-audit priorities, failure-energy questions, debris exposure, and explicit evidence states.
 - [Failure-mode evidence note](ORBITAL_RING_FAILURE_MODE_NOTE.md): Part II source findings on skyhook load steps, lift-coil loss, cryogenic quench, inter-ring riders, and distinct ladder-collapse hazards.
+- [Load-step input/evidence ledger](ORBITAL_RING_LOAD_STEP_INPUT_LEDGER.md): definitions, units, evidence-class requirements and closure criteria for all 23 scenario inputs.
 - [F-SKYHOOK-LOAD-STEP manifest](scenarios/F_SKYHOOK_LOAD_STEP.json): 23 explicit required fields; correctly blocked until geometry, initial equilibrium, rider force law and boundary ledgers are specified.
 - [Fail-closed manifest validator](../../scripts/engineering/validate_orbital_ring_failure_manifest.py) and [its 33-check report](evidence/orbital_ring_failure_manifest_validator_selftest.json): completeness/type gates only, no physics execution.
 - [Birch power source audit script](../../scripts/engineering/orbital_ring_power_source_audit.py): repeatable arithmetic check distinguishing eddy-current drag from cryostat electrical power.
 - [Power-budget audit note](ORBITAL_RING_POWER_BUDGET_AUDIT.md): source page references, derivation, results, and open reconstruction tasks.
-- [Captured power audit JSON](evidence/orbital_ring_power_source_audit.json): deterministic output from the 12-check run.
+- [Captured power audit JSON](evidence/orbital_ring_power_source_audit.json): deterministic output from the 20-check run.
 
 ## 10. Decision requested from reviewers
 
@@ -251,26 +252,26 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 
 ### Increment RG-03a — support-load scenario gate
 
-**A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, typed vectors, support-frame quaternion, unit ring-plane normal, step/ramp consistency, rider parameters, and explicit energy/momentum boundaries. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
+**A fault-scenario contract now exists; the physics case remains blocked.** The template `docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json` records the Part II source basis and names 23 required inputs. The validator `scripts/engineering/validate_orbital_ring_failure_manifest.py` checks missing/unknown inputs, field-level provenance, typed vectors, support-frame from/to frames and epoch, support-frame quaternion, unit ring-plane normal, geometric/load consistency, step/ramp consistency, rider parameters, and explicit energy/momentum term inventories. The template intentionally has 23 unresolved inputs, `declared_state = Blocked`, `analysis_state = NotRun`, and no result artifacts.
 
 - Local syntax check: `python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py` succeeded.
-- Validator self-tests: **33 passed, 0 failed**; every single required field was removed from an otherwise complete typed fixture and independently confirmed to block the gate.
+- Validator self-tests: **65 passed, 0 failed**; every single required field was removed from an otherwise complete typed fixture and independently confirmed to block the gate.
 - Template assessment: contract validation `passed_contract_checks`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
 - Both emitted JSON reports were byte-identical on repeat and are preserved under `docs/engineering/evidence/`.
-- Validator Git blob SHA: `b81b0b8365acd3da201d5f42e46a1279edd16872`; source SHA-256: `2a6818ca9c860d40918313bbfda11184a0e0cc0c6f1f919543748a03225dee30`.
-- Template Git blob SHA: `9302886b4c076155100bc6539726822f11fd3ef3`; validation report blob: `1485c06416f5bd4fe47265a782bfc8722efca09f` (SHA-256 `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`); self-test report blob: `b584a648f9c47d8c8fffa059e852fe31ce008a81` (SHA-256 `e404277327622162944da248d710b0ca1a94eea139a693a4edd5271ac848dea6`).
+- Validator Git blob SHA: `8d3d009c865376714a4dc861ec33a992d5c7091e`; source SHA-256: `6d96e7a09bff8bbc71ae5f2d68dca18a7f557fe6f40ca415cba760adf5f1626e`.
+- Template Git blob SHA: `4f4e5403ea1b90d81877158aced84e48b19b5659`; validation report blob: `1485c06416f5bd4fe47265a782bfc8722efca09f` (SHA-256 `9c1b2f06cde708a0280151898171d3491b3410ad1b69c03ea31f358da8fcca35`); self-test report blob: `3f44118bc53f88b0cc21f060fb3b8be912a6217d` (SHA-256 `7a5c4f0d48bb538a50bc9fc5a4cad0256c56081163b698c43fb66c05617f02d6`).
 
 A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
 
 ### Checks actually performed
 
-- Read back the exact branch versions of all seventeen changed files.
+- Read back the exact branch versions of all eighteen changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
 - Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
 - Ran the column-aware power-source audit (20/20 checks) and repeated it with byte-identical JSON output; local copy's Git blob SHA matched the branch source.
-- Ran the failure-manifest validator self-test (33/33 checks); the typed completeness gate kept the 23-field scenario template Blocked and NotRun.
+- Ran the failure-manifest validator self-test (65/65 checks); the provenance and consistency gate kept the 23-field scenario template Blocked and NotRun.
 
 ### Checks not performed
 
