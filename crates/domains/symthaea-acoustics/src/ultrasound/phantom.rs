@@ -295,6 +295,13 @@ impl ExpectedEcho {
 }
 
 /// A deterministic synthetic RF trace with retained analytic echo locations.
+fn push_canonical_f64_le(bytes: &mut Vec<u8>, value: f64) {
+    // IEEE-754 has distinct +0 and -0 bit patterns. They are semantically
+    // equivalent for this fixture, so serialize both as positive zero.
+    let normalized = if value == 0.0 { 0.0 } else { value };
+    bytes.extend_from_slice(&normalized.to_le_bytes());
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SyntheticRfTrace {
     sound_speed_m_s: f64,
@@ -379,7 +386,7 @@ impl SyntheticRfTrace {
             self.pulse_cycles,
             self.duration_s,
         ] {
-            bytes.extend_from_slice(&value.to_le_bytes());
+            push_canonical_f64_le(&mut bytes, value);
         }
         bytes.extend_from_slice(&sample_count.to_le_bytes());
         bytes.extend_from_slice(&echo_count.to_le_bytes());
@@ -390,7 +397,7 @@ impl SyntheticRfTrace {
                 echo.arrival_time_s,
                 echo.fractional_sample_index,
             ] {
-                bytes.extend_from_slice(&value.to_le_bytes());
+                push_canonical_f64_le(&mut bytes, value);
             }
         }
         for sample in &self.samples {
@@ -462,6 +469,37 @@ mod tests {
         assert_eq!(&first[..8], b"SYMRF001");
         assert_eq!(first.len(), 64 + 32 + 500 * 8);
         assert_eq!(first, second);
+
+        let changed_reflector = PointReflectorPhantom::new(
+            1_540.0,
+            vec![PointReflector::new(0.01, 0.4).unwrap()],
+        )
+        .unwrap();
+        let changed_trace = changed_reflector
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .unwrap();
+        assert_ne!(first, changed_trace.canonical_bytes().unwrap());
+
+        let positive_zero = PointReflectorPhantom::new(
+            1_540.0,
+            vec![PointReflector::new(0.01, 0.0).unwrap()],
+        )
+        .unwrap();
+        let negative_zero = PointReflectorPhantom::new(
+            1_540.0,
+            vec![PointReflector::new(0.01, -0.0).unwrap()],
+        )
+        .unwrap();
+        let positive_trace = positive_zero
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .unwrap();
+        let negative_trace = negative_zero
+            .simulate_rf_trace(5_000_000.0, 20_000_000.0, 2.0, 25e-6, 1_000)
+            .unwrap();
+        assert_eq!(
+            positive_trace.canonical_bytes().unwrap(),
+            negative_trace.canonical_bytes().unwrap()
+        );
     }
 
     #[test]
