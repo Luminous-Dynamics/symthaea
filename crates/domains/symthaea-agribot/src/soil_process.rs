@@ -771,6 +771,256 @@ pub fn assess_biochar_climate(
     })
 }
 
+
+
+/// A measured output stream for an explicit physical process boundary.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservedMassStream {
+    pub stream_id: String,
+    /// Actual mass crossing the boundary, kg. Do not mix dry-basis and wet-basis values.
+    pub mass_kg: f64,
+    /// Must reference measurement evidence for a physical batch.
+    pub evidence: EvidenceRef,
+}
+
+/// Physical-batch mass accounting based on independently measured inlet and outlet streams.
+/// This deliberately differs from the algebraically inferred residual in PyrolysisBatchResult.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservedMassBalanceInput {
+    pub boundary_id: String,
+    /// Sum of all measured mass entering the declared boundary, kg. Include purge gas,
+    /// added water/agents, and other inlets when they cross the boundary.
+    pub total_input_mass_kg: f64,
+    pub input_evidence: EvidenceRef,
+    /// Enumerate every material output crossing the same boundary, including captured
+    /// solids/liquids and quantified gas streams. Unmeasured streams must not be omitted
+    /// and then treated as zero.
+    pub output_streams: Vec<ObservedMassStream>,
+    /// Relative closure tolerance, justified from the measurement/instrument procedure.
+    pub closure_tolerance_fraction: f64,
+    pub tolerance_evidence: EvidenceRef,
+    pub input_snapshot_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObservedMassClosureStatus {
+    WithinTolerance,
+    OutsideTolerance,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservedMassBalanceAssessment {
+    pub boundary_id: String,
+    pub input_snapshot_id: String,
+    pub total_input_mass_kg: f64,
+    pub total_observed_output_mass_kg: f64,
+    /// Positive: inlet mass exceeds observed outlet mass. Negative: outlets exceed inlets.
+    pub signed_residual_kg: f64,
+    pub absolute_closure_error_fraction: f64,
+    pub permitted_closure_tolerance_fraction: f64,
+    pub status: ObservedMassClosureStatus,
+    pub input_evidence: EvidenceRef,
+    pub output_streams: Vec<ObservedMassStream>,
+    pub tolerance_evidence: EvidenceRef,
+    /// Closure is a measurement-quality screen, not product-quality or process-safety approval.
+    pub scope_note: String,
+}
+
+/// Compare independently measured mass streams over an explicit boundary.
+/// Every physical mass measurement must carry EvidenceKind::Measured; a scenario or
+/// literature estimate is not accepted as evidence that a physical batch actually closed.
+/// The reported closure tolerance must be tied to an evidence record, not chosen to force a pass.
+pub fn assess_observed_mass_balance(
+    input: &ObservedMassBalanceInput,
+) -> Result<ObservedMassBalanceAssessment, SoilProcessError> {
+    if input.boundary_id.trim().is_empty() {
+        return Err(SoilProcessError::new("boundary_id", "cannot be empty"));
+    }
+    if input.input_snapshot_id.trim().is_empty() {
+        return Err(SoilProcessError::new("input_snapshot_id", "cannot be empty"));
+    }
+    positive(input.total_input_mass_kg, "total_input_mass_kg")?;
+    fraction(
+        input.closure_tolerance_fraction,
+        "closure_tolerance_fraction",
+        true,
+    )?;
+    input.input_evidence.validate("input_evidence")?;
+    if input.input_evidence.kind != EvidenceKind::Measured {
+        return Err(SoilProcessError::new(
+            "input_evidence.kind",
+            "physical-batch inlet mass requires measured evidence",
+        ));
+    }
+    input.tolerance_evidence.validate("tolerance_evidence")?;
+    if input.output_streams.is_empty() {
+        return Err(SoilProcessError::new(
+            "output_streams",
+            "at least one independently measured output stream is required",
+        ));
+    }
+
+    let mut ids = std::collections::HashSet::new();
+    let mut total_output = 0.0_f64;
+    for stream in &input.output_streams {
+        if stream.stream_id.trim().is_empty() || !ids.insert(stream.stream_id.as_str()) {
+            return Err(SoilProcessError::new(
+                "output_streams.stream_id",
+                "stream IDs must be non-empty and unique",
+            ));
+        }
+        finite_nonnegative(stream.mass_kg, "output_streams.mass_kg")?;
+        stream.evidence.validate("output_streams.evidence")?;
+        if stream.evidence.kind != EvidenceKind::Measured {
+            return Err(SoilProcessError::new(
+                "output_streams.evidence.kind",
+                "physical-batch outlet mass requires measured evidence",
+            ));
+        }
+        total_output += stream.mass_kg;
+        if !total_output.is_finite() {
+            return Err(SoilProcessError::new(
+                "output_streams",
+                "observed outlet mass total overflow",
+            ));
+        }
+    }
+
+    let signed_residual = input.total_input_mass_kg - total_output;
+    if !signed_residual.is_finite() {
+        return Err(SoilProcessError::new(
+            "signed_residual_kg",
+            "mass residual overflow",
+        ));
+    }
+    let absolute_closure_error_fraction = signed_residual.abs() / input.total_input_mass_kg;
+    if !absolute_closure_error_fraction.is_finite() {
+        return Err(SoilProcessError::new(
+            "absolute_closure_error_fraction",
+            "relative mass residual overflow",
+        ));
+    }
+    let status = if absolute_closure_error_fraction <= input.closure_tolerance_fraction {
+        ObservedMassClosureStatus::WithinTolerance
+    } else {
+        ObservedMassClosureStatus::OutsideTolerance
+    };
+
+    Ok(ObservedMassBalanceAssessment {
+        boundary_id: input.boundary_id.clone(),
+        input_snapshot_id: input.input_snapshot_id.clone(),
+        total_input_mass_kg: input.total_input_mass_kg,
+        total_observed_output_mass_kg: total_output,
+        signed_residual_kg: signed_residual,
+        absolute_closure_error_fraction,
+        permitted_closure_tolerance_fraction: input.closure_tolerance_fraction,
+        status,
+        input_evidence: input.input_evidence.clone(),
+        output_streams: input.output_streams.clone(),
+        tolerance_evidence: input.tolerance_evidence.clone(),
+        scope_note: "observed mass closure only; not product-quality, emissions, safety, nutrient-availability, or agronomic approval".into(),
+    })
+}
+
+#[cfg(test)]
+mod observed_mass_balance_tests {
+    use super::*;
+
+    fn measured(id: &str) -> EvidenceRef {
+        EvidenceRef {
+            evidence_id: id.into(),
+            kind: EvidenceKind::Measured,
+        }
+    }
+
+    fn input() -> ObservedMassBalanceInput {
+        ObservedMassBalanceInput {
+            boundary_id: "pilot-reactor-batch-001".into(),
+            total_input_mass_kg: 1_000.0,
+            input_evidence: measured("inlet-weigh-log-001"),
+            output_streams: vec![
+                ObservedMassStream {
+                    stream_id: "dry-char".into(),
+                    mass_kg: 240.0,
+                    evidence: measured("char-scale-001"),
+                },
+                ObservedMassStream {
+                    stream_id: "condensate".into(),
+                    mass_kg: 220.0,
+                    evidence: measured("condensate-scale-001"),
+                },
+                ObservedMassStream {
+                    stream_id: "gas".into(),
+                    mass_kg: 520.0,
+                    evidence: measured("gas-flow-composition-001"),
+                },
+                ObservedMassStream {
+                    stream_id: "captured-fines".into(),
+                    mass_kg: 20.0,
+                    evidence: measured("fines-scale-001"),
+                },
+            ],
+            closure_tolerance_fraction: 0.02,
+            tolerance_evidence: EvidenceRef {
+                evidence_id: "measurement-uncertainty-protocol-001".into(),
+                kind: EvidenceKind::Literature,
+            },
+            input_snapshot_id: "pilot-batch-snapshot-001".into(),
+        }
+    }
+
+    #[test]
+    fn observed_streams_close_only_from_measured_outputs() {
+        let result = assess_observed_mass_balance(&input()).unwrap();
+        assert_eq!(result.status, ObservedMassClosureStatus::WithinTolerance);
+        assert_eq!(result.total_observed_output_mass_kg, 1_000.0);
+        assert_eq!(result.signed_residual_kg, 0.0);
+        assert_eq!(result.absolute_closure_error_fraction, 0.0);
+        assert_eq!(result.output_streams.len(), 4);
+    }
+
+    #[test]
+    fn stream_gap_is_reported_not_algebraically_filled() {
+        let mut measurement = input();
+        measurement.output_streams[2].mass_kg = 480.0;
+        let result = assess_observed_mass_balance(&measurement).unwrap();
+        assert_eq!(result.signed_residual_kg, 40.0);
+        assert_eq!(result.absolute_closure_error_fraction, 0.04);
+        assert_eq!(result.status, ObservedMassClosureStatus::OutsideTolerance);
+    }
+
+    #[test]
+    fn scenario_and_duplicate_output_streams_are_rejected() {
+        let mut measurement = input();
+        measurement.output_streams[0].evidence.kind = EvidenceKind::Scenario;
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+
+        measurement = input();
+        measurement.output_streams[1].stream_id = measurement.output_streams[0].stream_id.clone();
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+    }
+
+    #[test]
+    fn invalid_tolerance_missing_streams_and_overflow_fail_closed() {
+        let mut measurement = input();
+        measurement.closure_tolerance_fraction = f64::NAN;
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+
+        measurement = input();
+        measurement.output_streams.clear();
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+
+        measurement = input();
+        measurement.output_streams[0].mass_kg = f64::MAX;
+        measurement.output_streams[1].mass_kg = f64::MAX;
+        assert!(assess_observed_mass_balance(&measurement).is_err());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
