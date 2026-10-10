@@ -582,6 +582,10 @@ fn units_map_to_the_declared_quantity_without_implicit_conversion() {
     assert_eq!(Unit::Megahertz.quantity(), Quantity::Frequency);
     assert_eq!(Unit::Microvolt.quantity(), Quantity::ElectricalPotential);
     assert_eq!(Unit::Percent.quantity(), Quantity::Dimensionless);
+    assert_eq!(
+        Unit::OxygenSaturationPercent.quantity(),
+        Quantity::OxygenSaturation
+    );
     assert_eq!(Unit::DecibelRe20Micropascal.quantity(), Quantity::SoundPressureLevel);
     // Same physical quantity, different units remain explicit; this crate does not convert.
     assert_ne!(Unit::Hertz, Unit::Megahertz);
