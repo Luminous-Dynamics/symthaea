@@ -68,13 +68,13 @@
       "reported_scope": {
         "domains": 5398,
         "trajectories": 134950,
-        "temperatures_kelvin": [
-          320,
-          450
-        ],
         "temperature_levels": 5,
         "average_trajectory_length_ns": 464,
-        "approximate_total_size_tb": 3.3
+        "approximate_total_size_tb": 3.3,
+        "temperature_range_kelvin": [
+          320,
+          450
+        ]
       },
       "revision_pinned": false,
       "disposition": "simulation_controller_pilot_candidate_not_experimental_validation",
