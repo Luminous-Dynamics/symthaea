@@ -19,8 +19,9 @@ The circular-orbit helper intentionally rejects a dynamically supported stationa
 From the Symthaea workspace:
 
 ```sh
+cargo check -p symthaea-orbital-ring
 cargo test -p symthaea-orbital-ring
-cargo fmt --check
+cargo fmt --check -p symthaea-orbital-ring
 cargo clippy -p symthaea-orbital-ring --all-targets -- -D warnings
 ```
 
