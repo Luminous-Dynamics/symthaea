@@ -98,7 +98,8 @@ Recommended division:
 - **Thermofluids and digital twin:** staged heat duty, heat-exchanger/heat-recovery scenarios, moisture control, sensors, process telemetry and calibration against a physical unit.
 - **Materials models:** source-specific composition and measured characterization (ultimate/proximate analysis, ash/minerals, pH, electrical conductivity, surface area, pore-size distributions, CEC, H/C and O/C ratios, relevant contaminants).
 - **Operations research:** choose feedstock blend, throughput, energy source/heat recovery, process conditions and product blends under explicit constraints; compute Pareto fronts rather than a single opaque 'best' recipe.
-- **Engineering facade:** the new regenerative screening module independently checks process mass/carbon/heat closure, applies user-specified hard constraints, and refuses to put candidates with a failed or unknown product-quality gate on the Pareto frontier. Scenario candidates remain visibly scenario-tagged.
+- **Engineering facade:** the regenerative screening module independently checks process mass/carbon/heat closure, applies user-specified hard constraints, and refuses to put candidates with a failed or unknown product-quality gate on the Pareto frontier. Scenario candidates remain visibly scenario-tagged.
+- **Climate inventory:** candidates can include explicit emission, removal and avoided-emission flows, each with evidence, plus a char-storage eligibility decision and durability fraction at a declared horizon. Climate can be a Pareto objective and an optional hard constraint; missing/incomplete inventory or unknown storage eligibility makes the climate objective indeterminate rather than silently zero.
 - **Causal reasoning and Symthaea planning:** recommend the next informative experiment and compare counterfactuals. Keep causal hypotheses distinct from demonstrated effects.
 - **Independent evaluator:** recompute balances and check feasibility without trusting the agent that proposed a design.
 - **Sol Atlas:** map verified suppliers, crop seasons, nutrient flows, facility capacity, demand, transportation, and uncertainty.
@@ -147,15 +148,25 @@ The target process is not 'maximum biochar yield'. It is a constrained multi-obj
 - validated wet/dry feedstock, char-yield and elemental-carbon calculations;
 - an explicitly limited sensible-heat + water vaporization duty estimate with all property inputs visible;
 - separate nutrient-stream elemental mass, recovered mass, and seasonally available mass calculations;
-- rejection of NaN/infinite, negative, out-of-range, overflow and physically inconsistent carbon inputs;
+- an evidence-gated batch climate inventory that keeps gross emissions, other removals, avoided emissions and horizon-specific char-storage credit separate;
+- no panic fallback for missing carbon-storage parameters, and no complete net climate result when the inventory is partial or carbon-storage eligibility is unknown;
 - typed evidence references for feedstock data, empirical process parameters, thermophysical properties, reactor design, stream composition, recovery parameters and plant-availability parameters; result objects retain these references;
-- tests for mass/carbon balances, thermal duty, sub-zero ambient temperature, invalid/missing evidence, nutrient recovery bounds, and serialization.
+- tests for mass/carbon balances, thermal duty, sub-zero ambient temperature, invalid/missing evidence, nutrient recovery bounds, climate accounting and serialization.
 
 `crates/domains/symthaea-engineering/src/regenerative.rs` adds:
 - candidate assessments against versioned yield, carbon-retention, supplied-heat, cost and water requirements;
-- independent re-checks of mass, carbon and declared heat-duty identities;
+- independent re-checks of process mass, carbon and declared heat-duty identities;
 - strict same-unit cost comparisons, provenance retention, and a quality gate that fails closed on unknown status;
-- a sorted, deterministic Pareto frontier that retains trade-offs instead of hiding them inside a weighted composite score.
+- optional lifecycle-climate objective and net-climate hard limit, with incomplete climate inputs marked indeterminate;
+- a sorted, deterministic Pareto frontier that retains trade-offs instead of hiding them inside a weighted composite score, and includes climate only when explicitly required.
+
+The lifecycle function is **not** an ISO-conformant life-cycle assessment or a carbon-credit verifier. It credits char storage only when the caller provides verified biogenic-sourcing eligibility and an explicit, evidence-linked durability fraction for a declared horizon. It does not infer emissions from feedstock carbon absent from char and does not invent counterfactual credits.
+
+Relevant research:
+- Qi et al. (2024), systematic review of 1,073 biochar datasets from 316 publications: biochar properties vary with feedstock, temperature and modification, supporting product-specific characterization: https://doi.org/10.1111/gcbb.13147
+- 2024 biochar LCA review: lifecycle emissions depend on feedstock, production, application and product properties; system boundaries and uncertain soil-carbon effects matter: https://doi.org/10.1016/j.scitotenv.2024.175448
+- 2025 phosphorus review: biochar effects on P availability vary across soils and application conditions: https://doi.org/10.1007/s42773-024-00415-1
+- FAOSTAT cropland nutrient balances report N, P and K flows from synthetic fertilizer, manure, atmospheric deposition, crop removal and biological fixation through 2023: https://www.fao.org/statistics/events/events-detail/cropland-nutrient-balance.-global--regional-and-country-trends--1961-2023/en
 
 The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The modules are not claimed as compile-verified until CI passes. Evidence IDs currently link to caller-managed immutable records; next integration should verify those receipts against Symthaea's shared evidence plane and require schema/version identifiers for each parameter group.
 
