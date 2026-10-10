@@ -311,6 +311,8 @@ pub enum ContractError {
     VerifiedReviewReceiptBindingMismatch,
     InvalidCalibrationCertificate(String),
     CalibrationCertificateClaimMismatch(&'static str),
+    InvalidReferenceStandardCertificate(String),
+    ReferenceStandardClaimMismatch(&'static str),
     EmptyEvidenceArtifact(&'static str),
     InvalidCalibrationRange,
     NonFiniteValue(&'static str),
@@ -347,6 +349,12 @@ impl fmt::Display for ContractError {
             }
             Self::CalibrationCertificateClaimMismatch(field) => {
                 write!(f, "resolved calibration claim does not match certificate field {field}")
+            }
+            Self::InvalidReferenceStandardCertificate(reason) => {
+                write!(f, "reference-standard certificate is invalid: {reason}")
+            }
+            Self::ReferenceStandardClaimMismatch(field) => {
+                write!(f, "reference-standard certificate claim does not match {field}")
             }
             Self::EmptyEvidenceArtifact(artifact) => {
                 write!(f, "{artifact} evidence must not be empty")
@@ -732,6 +740,7 @@ pub struct VerifiedCalibrationEvidence {
     certificate: VerifiedArtifactBytes,
     certificate_claims: CalibrationCertificate,
     reference_standard: VerifiedArtifactBytes,
+    reference_standard_claims: CalibrationCertificate,
     review_receipt: VerifiedCalibrationReviewReceipt,
 }
 
@@ -784,6 +793,21 @@ impl VerifiedCalibrationEvidence {
                 "reference_standard",
             ));
         }
+        let parsed_reference_standard = CalibrationCertificate::from_canonical_bytes(
+            reference_standard.bytes(),
+        )
+        .map_err(|error| {
+            ContractError::InvalidReferenceStandardCertificate(error.to_string())
+        })?;
+        if parsed_reference_standard.record_id() != parsed_certificate.reference_standard().artifact_id() {
+            return Err(ContractError::ReferenceStandardClaimMismatch("record_id"));
+        }
+        if parsed_reference_standard.quantity() != parsed_certificate.quantity() {
+            return Err(ContractError::ReferenceStandardClaimMismatch("quantity"));
+        }
+        if parsed_reference_standard.unit() != parsed_certificate.unit() {
+            return Err(ContractError::ReferenceStandardClaimMismatch("unit"));
+        }
         if review_receipt.artifact().reference() != &calibration.review_receipt {
             return Err(ContractError::VerifiedArtifactReferenceMismatch(
                 "calibration_review_receipt",
@@ -802,6 +826,7 @@ impl VerifiedCalibrationEvidence {
             certificate,
             certificate_claims: parsed_certificate,
             reference_standard,
+            reference_standard_claims: parsed_reference_standard,
             review_receipt,
         })
     }
@@ -820,6 +845,10 @@ impl VerifiedCalibrationEvidence {
 
     pub fn reference_standard(&self) -> &VerifiedArtifactBytes {
         &self.reference_standard
+    }
+
+    pub fn reference_standard_claims(&self) -> &CalibrationCertificate {
+        &self.reference_standard_claims
     }
 
     pub fn review_receipt(&self) -> &VerifiedCalibrationReviewReceipt {
