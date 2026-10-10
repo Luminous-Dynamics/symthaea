@@ -109,6 +109,15 @@ impl ScreeningFactor {
                 "must be finite and non-negative",
             ));
         }
+        // Use a half-difference so extreme but finite low/high values do not overflow
+        // while computing the allowed separation between treatment-level tolerances.
+        let half_level_separation = self.high_value / 2.0 - self.low_value / 2.0;
+        if self.max_absolute_deviation >= half_level_separation {
+            return Err(ScreeningDesignError::new(
+                "factors.max_absolute_deviation",
+                "must be strictly less than half the low/high separation so accepted tolerance regions cannot overlap",
+            ));
+        }
         evidence(
             &self.deviation_tolerance_evidence,
             "factors.deviation_tolerance_evidence",
@@ -1303,6 +1312,14 @@ mod tests {
         input = request();
         input.factors[0].deviation_tolerance_evidence.evidence_id.clear();
         assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.factors[0].max_absolute_deviation = 50.0;
+        assert!(generate_screening_design(&input).is_err());
+
+        input = request();
+        input.factors[0].max_absolute_deviation = 0.0;
+        assert!(generate_screening_design(&input).is_ok());
 
         input = request();
         input.factors[0].randomization_class =
