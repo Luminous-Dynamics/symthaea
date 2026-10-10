@@ -259,6 +259,17 @@ impl EngineeringManager {
         }
     }
 
+    /// Screen a regenerative soil-process design against explicit numeric requirements
+    /// and a separately evidenced quality gate. Passing is design eligibility only;
+    /// it is not a field-efficacy claim or an authorization to apply an amendment.
+    pub fn evaluate_regenerative_process(
+        &self,
+        candidate: &regenerative::RegenerativeDesignCandidate,
+        requirements: &regenerative::RegenerativeDesignRequirements,
+    ) -> Result<regenerative::RegenerativeDesignAssessment, regenerative::DesignError> {
+        regenerative::assess_regenerative_candidate(candidate, requirements)
+    }
+
     pub fn evaluate_material(
         &mut self,
         composition: &[(u16, f64)],
@@ -1591,6 +1602,13 @@ impl EngineeringManager {
                 envelope: "closed-form stability heuristic at fixed 300 K",
             },
             FacultyCapability {
+                domain: Environmental,
+                method: "evaluate_regenerative_process",
+                solver_crate: "symthaea-agribot + symthaea-engineering::regenerative",
+                checks: "feedstock mass/carbon/heat balance + requirements + product-quality gate",
+                envelope: "screening model only; no reactor kinetics, soil efficacy, or application-rate authority",
+            },
+            FacultyCapability {
                 domain: Civil,
                 method: "evaluate_structural",
                 solver_crate: "symthaea-structural",
@@ -2378,9 +2396,14 @@ mod tests {
         // Systems: control + optics + operations research.
         assert_eq!(EngineeringManager::capabilities_for(Systems).len(), 3);
         // Covered domains report true; every registry entry names a real evaluate_* method.
-        for d in [Civil, Mechanical, Electrical, Materials, Systems] {
+        for d in [Civil, Mechanical, Electrical, Materials, Environmental, Systems] {
             assert!(EngineeringManager::is_covered(d), "{d:?} should be covered");
         }
+        assert_eq!(EngineeringManager::capabilities_for(Environmental).len(), 1);
+        assert_eq!(
+            EngineeringManager::capabilities_for(Environmental)[0].method,
+            "evaluate_regenerative_process"
+        );
         for c in EngineeringManager::capabilities() {
             assert!(c.method.starts_with("evaluate_"));
             assert!(
@@ -2394,8 +2417,8 @@ mod tests {
     fn uncovered_domains_are_honestly_reported() {
         use EngineeringDomain::*;
         let gaps = EngineeringManager::uncovered_domains();
-        // These have no faculty solver yet — must be reported as gaps, not silently claimed.
-        for d in [Aerospace, ChemicalProcess, Robotics, Nuclear, Environmental] {
+        // These still have no faculty solver; report gaps rather than imply coverage.
+        for d in [Aerospace, ChemicalProcess, Robotics, Nuclear] {
             assert!(gaps.contains(&d), "{d:?} is a known gap");
             assert!(!EngineeringManager::is_covered(d));
         }
