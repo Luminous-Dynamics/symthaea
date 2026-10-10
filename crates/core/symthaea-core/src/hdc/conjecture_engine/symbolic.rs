@@ -757,6 +757,34 @@ mod conservation_evidence_tests {
     }
 
     #[test]
+    fn simplify_preserves_small_nonzero_power_exponent() {
+        let expr = SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 1e-16);
+        assert!(matches!(expr.simplify(), SymExpr::Pow(_, exponent) if exponent == 1e-16));
+    }
+
+    #[test]
+    fn simplify_preserves_near_one_power_exponent() {
+        let exponent = 1.0 + f64::EPSILON;
+        let expr = SymExpr::Pow(Box::new(SymExpr::Var("x".into())), exponent);
+        assert!(matches!(expr.simplify(), SymExpr::Pow(_, actual) if actual == exponent));
+    }
+
+    #[test]
+    fn simplify_preserves_near_one_divisor() {
+        let denominator = 1.0 + f64::EPSILON;
+        let expr = SymExpr::Div(
+            Box::new(SymExpr::Var("x".into())),
+            Box::new(SymExpr::Const(denominator)),
+        );
+        let simplified = expr.simplify();
+        assert!(matches!(simplified, SymExpr::Div(_, _)));
+        assert_eq!(
+            simplified.eval_checked(&[("x", 1.0)]),
+            Ok(1.0 / denominator)
+        );
+    }
+
+    #[test]
     fn legacy_eval_divides_by_small_nonzero_denominator() {
         let expr = SymExpr::Div(
             Box::new(SymExpr::Const(1.0)),
