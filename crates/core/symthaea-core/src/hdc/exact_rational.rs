@@ -179,7 +179,9 @@ impl ExactRational {
         Self::parse(&wire.numerator, &wire.denominator, budget)
     }
 
-    /// Export a normalized, deterministic wire value.
+    /// Export a normalized, deterministic wire value using the hard implementation cap.
+    ///
+    /// Call checked_to_wire when enforcing a stricter caller-selected budget.
     pub fn to_wire(&self) -> ExactRationalWire {
         ExactRationalWire {
             numerator: self.value.numer().to_str_radix(10),
@@ -187,12 +189,36 @@ impl ExactRational {
         }
     }
 
+    /// Export only if both normalized components fit the caller's bit budget.
+    pub fn checked_to_wire(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<ExactRationalWire, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        Ok(self.to_wire())
+    }
+
     /// Lossless, versioned, deterministic bytes for exact identity and transport.
     ///
     /// Unlike an HDC projection or a fixed-width seed, these bytes are an
     /// unambiguous representation: normalized decimal numerator and denominator
     /// components are length-prefixed and preceded by a format/version tag.
+    /// This convenience form is bounded by HARD_MAX_COMPONENT_BITS. Use
+    /// checked_canonical_encoding_bytes to enforce a stricter budget.
     pub fn canonical_encoding_bytes(&self) -> Vec<u8> {
+        self.encode_canonical_bytes()
+    }
+
+    /// Encode the exact value only if it fits the caller's bit budget.
+    pub fn checked_canonical_encoding_bytes(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Vec<u8>, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        Ok(self.encode_canonical_bytes())
+    }
+
+    fn encode_canonical_bytes(&self) -> Vec<u8> {
         const PREFIX: &[u8] = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0";
         let numerator = self.value.numer().to_str_radix(10);
         let denominator = self.value.denom().to_str_radix(10);
@@ -211,12 +237,25 @@ impl ExactRational {
     ///
     /// This finite hypervector is a useful representation for similarity and
     /// binding, but is not a lossless identifier or proof object. Use the
-    /// canonical_encoding_bytes method when exact identity matters.
+    /// canonical_encoding_bytes method when exact identity matters. This
+    /// convenience form is bounded by HARD_MAX_COMPONENT_BITS.
     pub fn to_hdc(&self) -> BinaryHV {
-        let canonical = self.canonical_encoding_bytes();
+        self.project_canonical_bytes(&self.encode_canonical_bytes())
+    }
+
+    /// Create an HDC projection only if the rational fits the caller's bit budget.
+    pub fn checked_to_hdc(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<BinaryHV, ExactRationalError> {
+        let canonical = self.checked_canonical_encoding_bytes(budget)?;
+        Ok(self.project_canonical_bytes(&canonical))
+    }
+
+    fn project_canonical_bytes(&self, canonical: &[u8]) -> BinaryHV {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"SYMTHAEA.EXACT_RATIONAL.HDC.V1\0");
-        hasher.update(&canonical);
+        hasher.update(canonical);
         let mut output = [0u8; BinaryHV::BYTES];
         hasher.finalize_xof().fill(&mut output);
         BinaryHV(output)
@@ -225,6 +264,16 @@ impl ExactRational {
     /// Convert into the legacy numeric tower only when the exact value fits.
     /// No approximation or overflow fallback is allowed on this path.
     pub fn try_to_number(&self) -> Result<Number, ExactRationalError> {
+        self.try_to_number_with_budget(RationalBudget::new(HARD_MAX_COMPONENT_BITS)?)
+    }
+
+    /// Convert only if the exact value fits the caller-selected budget and
+    /// the target fixed-width Number variant can represent it without loss.
+    pub fn try_to_number_with_budget(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Number, ExactRationalError> {
+        budget.validate_value(&self.value)?;
         if self.value.denom() == &BigInt::from(1u8) {
             if let Some(value) = self.value.numer().to_u64() {
                 return Ok(Number::Natural(value));
@@ -280,10 +329,19 @@ impl ExactRational {
 
     /// Convert to a finite f64 approximation if representable.
     ///
-    /// This is deliberately separate from exact arithmetic; None means that
-    /// the rational cannot be represented as a finite floating-point value.
+    /// This convenience form is bounded by HARD_MAX_COMPONENT_BITS. Floating
+    /// conversion is always explicitly approximate.
     pub fn to_f64_approx(&self) -> Option<f64> {
         self.value.to_f64().filter(|value| value.is_finite())
+    }
+
+    /// Approximate conversion, only after validating the caller's resource budget.
+    pub fn checked_to_f64_approx(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Option<f64>, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        Ok(self.to_f64_approx())
     }
 
     /// Add exactly, failing closed if operands or normalized result exceed budget.
@@ -489,6 +547,42 @@ mod tests {
             too_wide_denominator.try_to_number().unwrap_err(),
             ExactRationalError::ExactResultOutOfRange
         );
+    }
+
+    #[test]
+    fn export_and_conversion_boundaries_enforce_caller_budget() {
+        let wide_budget = budget(32);
+        let narrow_budget = budget(8);
+        let value = ExactRational::from_integer("65535", wide_budget).unwrap();
+
+        assert_eq!(
+            value.checked_to_wire(narrow_budget).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+        assert_eq!(
+            value.checked_canonical_encoding_bytes(narrow_budget).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+        assert_eq!(
+            value.checked_to_hdc(narrow_budget).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+        assert_eq!(
+            value.try_to_number_with_budget(narrow_budget).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+        assert_eq!(
+            value.checked_to_f64_approx(narrow_budget).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+    }
+
+    #[test]
+    fn distinct_canonical_values_produce_distinct_expected_test_vectors() {
+        let limit = budget(128);
+        let half = ExactRational::parse("1", "2", limit).unwrap();
+        let two_thirds = ExactRational::parse("2", "3", limit).unwrap();
+        assert_ne!(half.to_hdc(), two_thirds.to_hdc());
     }
 
 }
