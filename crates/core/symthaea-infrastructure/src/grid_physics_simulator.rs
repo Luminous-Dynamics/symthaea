@@ -2105,6 +2105,44 @@ mod failure_mode_tests {
     }
 
     #[test]
+    fn registry_allocation_preserves_priority_under_partial_islanded_supply() {
+        let mut sim = GridPhysicsInfrastructureSimulator::new();
+        sim.state.channels[THERMAL_RUNAWAY_RISK] = 0.5;
+        let mut cmd = InfrastructureCommand::zero();
+        cmd.torques[1] = 0.5;
+        cmd.torques[2] = 1.0;
+
+        assert_eq!(sim.try_step(&cmd, 1.0), Ok(()));
+        let ledger = sim.load_service_ledger().unwrap();
+        let record = |id: &str| {
+            ledger
+                .records
+                .iter()
+                .find(|record| record.load_id == id)
+                .unwrap()
+        };
+
+        // The 125 kW storage request covers critical community demand and
+        // protected cooling before it is allocated to deferrable demand.
+        assert!(ledger.total_served_kwh < ledger.total_demand_kwh);
+        assert!(ledger.intentional_shed_kwh > 0.0);
+        assert_eq!(record("critical-community").unserved_kwh, 0.0);
+        assert_eq!(record("critical-community").intentional_shed_kwh, 0.0);
+        assert_eq!(record("protected-cooling").unserved_kwh, 0.0);
+        assert_eq!(record("protected-cooling").intentional_shed_kwh, 0.0);
+        assert!(
+            record("deferrable-community").served_kwh
+                < record("deferrable-community").requested_kwh
+        );
+        assert!(record("community-auxiliary").served_kwh <= 1e-8);
+        assert!(verify_load_service_ledger(sim.load_registry(), ledger).is_ok());
+        assert!(GridPhysicsInfrastructureSimulator::load_ledger_matches_report(
+            ledger,
+            sim.load_service_report(),
+        ));
+    }
+
+    #[test]
     fn thermal_threshold_routes_cooling_to_the_registered_protection_bucket() {
         let policy = LoadServicePolicy::illustrative_default();
         let threshold = policy.protected_cooling_thermal_risk_threshold;
