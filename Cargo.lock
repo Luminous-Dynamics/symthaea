@@ -17911,6 +17911,7 @@ dependencies = [
  "image 0.24.9",
  "iroh",
  "lancedb",
+ "libc",
  "linux-embedded-hal",
  "log",
  "lru 0.16.4",
