@@ -8,7 +8,7 @@ pub struct DiscoveredConservation {
     pub mean_value: f64,
     /// Finite-point residual evidence after symbolic differentiation.
     /// This is not a universal proof and does not grant formal status.
-    pub symbolic_check_passed: bool,
+    pub sampled_residual_passed: bool,
 }
 
 fn build_invariant_candidates(
@@ -182,7 +182,7 @@ pub fn discover_conservation_laws(
         }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-        let symbolic_check_passed = if var < 1e-6 * mean.abs().max(1.0) {
+        let sampled_residual_passed = if var < 1e-6 * mean.abs().max(1.0) {
             assess_conservation_symbolic(sym_expr, dynamics).sampled_residual_passed
         } else {
             false
@@ -192,7 +192,7 @@ pub fn discover_conservation_laws(
             expression: format!("{}", sym_expr),
             variance: var,
             mean_value: mean,
-            symbolic_check_passed,
+            sampled_residual_passed,
             discovery_mode,
         });
     }
@@ -235,7 +235,7 @@ pub fn discover_conservation_laws_with_custom(
         }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-        let symbolic_check_passed = if var < 1e-6 * mean.abs().max(1.0) {
+        let sampled_residual_passed = if var < 1e-6 * mean.abs().max(1.0) {
             assess_conservation_symbolic(sym_expr, dynamics).sampled_residual_passed
         } else {
             false
@@ -245,7 +245,7 @@ pub fn discover_conservation_laws_with_custom(
             expression: format!("{}", sym_expr),
             variance: var,
             mean_value: mean,
-            symbolic_check_passed,
+            sampled_residual_passed,
         });
     }
     for (name, eval_fn) in &custom_candidates {
@@ -266,7 +266,7 @@ pub fn discover_conservation_laws_with_custom(
             expression: name.clone(),
             variance: var,
             mean_value: mean,
-            symbolic_check_passed: false,
+            sampled_residual_passed: false,
         });
     }
     results.sort_by(|a, b| {
@@ -460,7 +460,7 @@ pub struct AutonomousInvariant {
     pub variance: f64,
     pub mean_value: f64,
     pub complexity: usize,
-    pub symbolic_check_passed: bool,
+    pub sampled_residual_passed: bool,
     pub discovery_mode: AutonomousDiscoveryMode,
 }
 
@@ -558,7 +558,7 @@ pub fn compose_top_k_invariants(
         variance,
         mean_value,
         complexity,
-        symbolic_check_passed: false,
+        sampled_residual_passed: false,
         discovery_mode: invariants
             .first()
             .map(|inv| inv.discovery_mode)
@@ -1047,7 +1047,7 @@ fn discover_invariants_autonomous_with_mode(
         seen_means.push(mean);
 
         let expr = simplify(&population[idx]);
-        let symbolic_check_passed = if let Some(dyn_rules) = dynamics {
+        let sampled_residual_passed = if let Some(dyn_rules) = dynamics {
             if var < 1e-4 * mean.abs().max(1.0) {
                 if let Some(sym) = expr_to_sym(&expr) {
                     assess_conservation_symbolic(&sym, dyn_rules).sampled_residual_passed
@@ -1067,7 +1067,7 @@ fn discover_invariants_autonomous_with_mode(
             variance: var,
             mean_value: mean,
             complexity: expr.complexity(),
-            symbolic_check_passed,
+            sampled_residual_passed,
             discovery_mode,
         });
 
@@ -1460,7 +1460,7 @@ pub fn analyze_system_autonomous(
             conserved.len()
         );
         for inv in &conserved {
-            let symbolic_check = if inv.symbolic_check_passed {
+            let symbolic_check = if inv.sampled_residual_passed {
                 " [SYMBOLIC-CHECK]"
             } else {
                 ""
