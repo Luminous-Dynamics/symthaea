@@ -13,8 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use symthaea_agribot::soil_process::{
-    assess_biochar_climate, BiocharClimateAssessment, BiocharClimateInput, CharStorageEligibility,
-    ClimateFlow, ClimateFlowKind, ClimateInventoryStatus, EvidenceKind, EvidenceRef,
+    assess_biochar_climate, BiocharClimateAssessment, BiocharClimateInput, EvidenceRef,
     PyrolysisBatchResult,
 };
 
@@ -610,7 +609,10 @@ pub fn regenerative_pareto_frontier(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_agribot::soil_process::{EvidenceKind, PyrolysisEvidence};
+    use symthaea_agribot::soil_process::{
+        CharStorageAccounting, CharStorageEligibility, ClimateFlow, ClimateFlowKind,
+        ClimateInventoryStatus, EvidenceKind, PyrolysisEvidence,
+    };
 
     fn evidence(id: &str) -> EvidenceRef {
         EvidenceRef {
@@ -673,6 +675,30 @@ mod tests {
                 method_or_standard_id: "scenario-quality-gate-v1".into(),
             },
             climate_input: None,
+        }
+    }
+
+    fn climate_input(emissions_kg_co2e: f64) -> BiocharClimateInput {
+        BiocharClimateInput {
+            boundary_id: "scenario-boundary-v1".into(),
+            inventory_status: ClimateInventoryStatus::CompleteForDeclaredBoundary,
+            inventory_evidence: evidence("scenario-inventory"),
+            flows: vec![ClimateFlow {
+                flow_id: "process-emissions".into(),
+                kind: ClimateFlowKind::Emission,
+                kg_co2e: emissions_kg_co2e,
+                evidence: evidence("scenario-process-emissions"),
+            }],
+            char_storage: CharStorageAccounting {
+                horizon_years: 100,
+                eligibility: CharStorageEligibility::VerifiedIneligible,
+                eligibility_evidence: Some(EvidenceRef {
+                    evidence_id: "test-storage-ineligibility".into(),
+                    kind: EvidenceKind::Measured,
+                }),
+                durable_fraction_at_horizon: None,
+                persistence_evidence: None,
+            },
         }
     }
 
@@ -795,6 +821,66 @@ mod tests {
         // 48 kg feedstock C × 0.60 retention = 28.8 kg char C, impossible in 25 kg char.
         option.process.char_carbon_kg = 28.8;
         assert!(assess_regenerative_candidate(&option, &requirements()).is_err());
+    }
+
+    #[test]
+    fn climate_objective_changes_pareto_frontier_only_with_complete_ledgers() {
+        let mut requirements = requirements();
+        requirements.include_climate_objective = true;
+
+        let mut higher_emissions =
+            candidate("higher-ghg", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
+        higher_emissions.climate_input = Some(climate_input(100.0));
+
+        let mut lower_emissions =
+            candidate("lower-ghg", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
+        lower_emissions.climate_input = Some(climate_input(40.0));
+
+        let assessment =
+            assess_regenerative_candidate(&higher_emissions, &requirements).unwrap();
+        assert_eq!(
+            assessment.metrics.net_climate_kg_co2e_per_kg_dry_feedstock,
+            Some(1.0)
+        );
+        assert!(assessment.climate_assessment.is_some());
+
+        assert_eq!(
+            regenerative_pareto_frontier(
+                &[higher_emissions.clone(), lower_emissions.clone()],
+                &requirements
+            )
+            .unwrap(),
+            vec!["lower-ghg".to_string()]
+        );
+
+        higher_emissions.climate_input = None;
+        let incomplete = assess_regenerative_candidate(&higher_emissions, &requirements).unwrap();
+        assert_eq!(incomplete.eligibility, CandidateEligibility::Indeterminate);
+        assert!(regenerative_pareto_frontier(&[higher_emissions], &requirements)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn net_climate_hard_limit_is_enforced_with_signed_thresholds_supported() {
+        let mut requirements = requirements();
+        requirements.include_climate_objective = true;
+        requirements.max_net_climate_kg_co2e_per_kg_dry_feedstock = Some(0.5);
+
+        let mut option =
+            candidate("over-budget", 0.30, 0.60, 3.0, 4.0, 4.0, QualityGateStatus::Pass);
+        option.climate_input = Some(climate_input(100.0));
+        let assessment = assess_regenerative_candidate(&option, &requirements).unwrap();
+        assert_eq!(assessment.eligibility, CandidateEligibility::Ineligible);
+        assert!(assessment
+            .failed_constraints
+            .contains(&"net_climate_above_maximum".to_string()));
+
+        requirements.max_net_climate_kg_co2e_per_kg_dry_feedstock = Some(-0.1);
+        let negative_limit = assess_regenerative_candidate(&option, &requirements).unwrap();
+        assert!(negative_limit
+            .failed_constraints
+            .contains(&"net_climate_above_maximum".to_string()));
     }
 
     #[test]
