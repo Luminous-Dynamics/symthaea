@@ -316,11 +316,17 @@ impl ModelInputBundle {
     }
 
     fn compute_manifest_digest(&self) -> String {
+        // Domain separation and an explicit dependency count make the
+        // serialization unambiguous, even if a path happens to resemble a
+        // digest string. BTreeMap iteration establishes canonical ordering.
         let mut hasher = blake3::Hasher::new();
+        hash_field(&mut hasher, b"symthaea-ngspice-model-input-bundle-v1");
         hash_field(&mut hasher, self.request_id.as_bytes());
         hash_field(&mut hasher, self.primary_path.as_bytes());
         hash_field(&mut hasher, self.primary.blake3_digest().as_bytes());
+        hash_field(&mut hasher, &(self.dependencies.len() as u64).to_le_bytes());
         for (path, artifact) in &self.dependencies {
+            hash_field(&mut hasher, b"dependency");
             hash_field(&mut hasher, path.as_bytes());
             hash_field(&mut hasher, artifact.blake3_digest().as_bytes());
         }
@@ -555,6 +561,28 @@ mod tests {
         )
         .unwrap();
         assert!(bundle.dependency_bytes("models/device.lib").is_some());
+    }
+
+    #[test]
+    fn resolves_incpslt_case_insensitively() {
+        let bundle = bundle(
+            "main.cir",
+            ".InCpSlT models/params.inc\n",
+            vec![("models/params.inc", ".param gain=2\n")],
+        )
+        .unwrap();
+        assert!(bundle.dependency_bytes("models/params.inc").is_some());
+    }
+
+    #[test]
+    fn repeated_reference_to_same_dependency_is_allowed() {
+        let bundle = bundle(
+            "main.cir",
+            ".include common.inc\n.include common.inc\n",
+            vec![("common.inc", ".param gain=2\n")],
+        )
+        .unwrap();
+        assert_eq!(bundle.dependency_paths().count(), 1);
     }
 
     #[test]
