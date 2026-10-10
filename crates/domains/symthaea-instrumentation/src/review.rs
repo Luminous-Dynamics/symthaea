@@ -153,7 +153,7 @@ impl ReviewTrustStore {
         crate::sha256_hex(format!("{}\n", fields.join("\n")).as_bytes())
     }
 
-    pub fn verify(
+    fn verify(
         &self,
         receipt: &SignedCalibrationReviewReceipt,
         expected_record_id: &str,
@@ -395,9 +395,9 @@ impl ReviewTrustStoreGuard {
         })
     }
 
-    /// Admit a fresh snapshot if it advances state or exactly repeats the latest one.
-    pub fn admit(
-        &mut self,
+    /// Validate a candidate without changing the high-water mark.
+    fn check_candidate(
+        &self,
         trust_store: &ReviewTrustStore,
         now_unix_s: u64,
     ) -> Result<(), ReviewVerificationError> {
@@ -414,18 +414,21 @@ impl ReviewTrustStoreGuard {
                     received_sequence: trust_store.sequence,
                 });
             }
-            if trust_store.sequence == highest {
-                if self.last_digest.as_deref() != Some(digest.as_str()) {
-                    return Err(ReviewVerificationError::TrustSnapshotSequenceReused {
-                        sequence: highest,
-                    });
-                }
-                return Ok(());
+            if trust_store.sequence == highest
+                && self.last_digest.as_deref() != Some(digest.as_str())
+            {
+                return Err(ReviewVerificationError::TrustSnapshotSequenceReused {
+                    sequence: highest,
+                });
             }
         }
-        self.last_sequence = Some(trust_store.sequence);
-        self.last_digest = Some(digest);
         Ok(())
+    }
+
+    /// Commit a trust snapshot only after a receipt verified successfully.
+    fn record_verified(&mut self, trust_store: &ReviewTrustStore) {
+        self.last_sequence = Some(trust_store.sequence);
+        self.last_digest = Some(trust_store.canonical_digest());
     }
 }
 
@@ -451,13 +454,14 @@ impl VerifiedCalibrationReviewReceipt {
             return Err(ReviewVerificationError::EmptyReceipt);
         }
         let receipt = SignedCalibrationReviewReceipt::from_canonical_bytes(artifact.bytes())?;
-        trust_store_guard.admit(trust_store, now_unix_s)?;
+        trust_store_guard.check_candidate(trust_store, now_unix_s)?;
         trust_store.verify(
             &receipt,
             expected_record_id,
             expected_certificate,
             now_unix_s,
         )?;
+        trust_store_guard.record_verified(trust_store);
         Ok(Self {
             artifact,
             receipt,
@@ -693,6 +697,30 @@ mod tests {
     }
 
     #[test]
+    fn invalid_signature_does_not_advance_trust_store_guard() {
+        let mut receipt = signed_receipt();
+        receipt.signature[0] ^= 1;
+        let artifact = verified_artifact(&receipt);
+        let trust = trust_store();
+        let mut guard = ReviewTrustStoreGuard::default();
+
+        assert_eq!(
+            VerifiedCalibrationReviewReceipt::verify(
+                artifact,
+                &trust,
+                &mut guard,
+                "calibration-record-1",
+                &certificate(),
+                NOW,
+            )
+            .unwrap_err(),
+            ReviewVerificationError::InvalidSignature
+        );
+        assert_eq!(guard.last_sequence(), None);
+        assert_eq!(guard.checkpoint(), None);
+    }
+
+    #[test]
     fn unknown_revoked_and_expired_signers_fail_closed() {
         let receipt = signed_receipt();
         let unknown = ReviewTrustStore::new(
@@ -828,9 +856,12 @@ mod tests {
         .unwrap();
         let mut guard = ReviewTrustStoreGuard::default();
 
-        guard.admit(&initial, NOW).unwrap();
-        guard.admit(&initial, NOW).unwrap();
-        guard.admit(&advanced, NOW).unwrap();
+        guard.check_candidate(&initial, NOW).unwrap();
+        guard.record_verified(&initial);
+        guard.check_candidate(&initial, NOW).unwrap();
+        guard.record_verified(&initial);
+        guard.check_candidate(&advanced, NOW).unwrap();
+        guard.record_verified(&advanced);
         assert_eq!(guard.last_sequence(), Some(TRUST_SEQUENCE + 1));
     }
 
@@ -853,10 +884,11 @@ mod tests {
         )
         .unwrap();
         let mut guard = ReviewTrustStoreGuard::default();
-        guard.admit(&newer, NOW).unwrap();
+        guard.check_candidate(&newer, NOW).unwrap();
+        guard.record_verified(&newer);
 
         assert_eq!(
-            guard.admit(&trust_store(), NOW),
+            guard.check_candidate(&trust_store(), NOW),
             Err(ReviewVerificationError::TrustSnapshotRollback {
                 highest_sequence: TRUST_SEQUENCE + 1,
                 received_sequence: TRUST_SEQUENCE,
@@ -883,14 +915,15 @@ mod tests {
         )
         .unwrap();
         let mut guard = ReviewTrustStoreGuard::default();
-        guard.admit(&newer, NOW).unwrap();
+        guard.check_candidate(&newer, NOW).unwrap();
+        guard.record_verified(&newer);
         let (sequence, digest) = guard.checkpoint().unwrap();
         assert_eq!(sequence, TRUST_SEQUENCE + 1);
         assert_eq!(guard.last_digest(), Some(digest.as_str()));
 
         let mut restored = ReviewTrustStoreGuard::from_checkpoint(sequence, digest).unwrap();
         assert_eq!(
-            restored.admit(&trust_store(), NOW),
+            restored.check_candidate(&trust_store(), NOW),
             Err(ReviewVerificationError::TrustSnapshotRollback {
                 highest_sequence: TRUST_SEQUENCE + 1,
                 received_sequence: TRUST_SEQUENCE,
@@ -927,10 +960,11 @@ mod tests {
         )
         .unwrap();
         let mut guard = ReviewTrustStoreGuard::default();
-        guard.admit(&trust_store(), NOW).unwrap();
+        guard.check_candidate(&trust_store(), NOW).unwrap();
+        guard.record_verified(&trust_store());
 
         assert_eq!(
-            guard.admit(&replacement, NOW),
+            guard.check_candidate(&replacement, NOW),
             Err(ReviewVerificationError::TrustSnapshotSequenceReused {
                 sequence: TRUST_SEQUENCE,
             })
