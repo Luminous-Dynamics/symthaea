@@ -42,11 +42,24 @@ fn raw_reference() -> RawDataReference {
 }
 
 fn calibration_fixture_bytes() -> Vec<u8> {
-    b"symthaea-calibration-certificate-fixture-v1\ninstrument=ultrasound-research-rig-01\nchannel=rf-channel-0\nrange_hz=4000000..6000000\n".to_vec()
+    [
+        "symthaea-calibration-certificate-fixture-v1",
+        "instrument=ultrasound-research-rig-01",
+        "channel=rf-channel-0",
+        "range_hz=4000000..6000000",
+    ]
+    .join("\n")
+    .into_bytes()
 }
 
 fn review_fixture_bytes() -> Vec<u8> {
-    b"symthaea-independent-calibration-review-fixture-v1\nreview=passed\nreviewer=fixture-reviewer-01\n".to_vec()
+    [
+        "symthaea-independent-calibration-review-fixture-v1",
+        "review=passed",
+        "reviewer=fixture-reviewer-01",
+    ]
+    .join("\n")
+    .into_bytes()
 }
 
 fn calibration_digest_hex() -> String {
