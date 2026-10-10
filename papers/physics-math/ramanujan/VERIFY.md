@@ -20,7 +20,7 @@ Candidate-search claims use deterministic seed 42. The checked-in stdout and LaT
 Install Docker. Then:
 
 ```bash
-cd papers/ramanujan
+cd papers/physics-math/ramanujan
 docker build -t ramanujan-repro .
 docker run --rm ramanujan-repro
 ```
@@ -38,7 +38,7 @@ Any diff other than timing lines (`real`, `user`, `sys`) is a reproducibility fa
 Requires Rust stable ≥ 1.75 and Z3 ≥ 4.13 on `PATH`.
 
 ```bash
-cd papers/ramanujan
+cd papers/physics-math/ramanujan
 ./reproduce.sh
 ```
 
@@ -47,7 +47,7 @@ cd papers/ramanujan
 Every `.smt2` file in `proofs/` is a standalone formal proof obligation checkable by any SMT-LIB2-compliant solver. With Z3:
 
 ```bash
-for f in papers/ramanujan/proofs/*.smt2; do
+for f in papers/physics-math/ramanujan/proofs/*.smt2; do
   printf "%-40s " "$(basename $f)"
   z3 -smt2 "$f" | tail -1
 done
