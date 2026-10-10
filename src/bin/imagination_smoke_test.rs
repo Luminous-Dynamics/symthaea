@@ -59,7 +59,7 @@ fn main() {
                 movie.width, movie.height, movie.channels
             );
             println!("   | Horizon:    {} steps", movie.path_length);
-            println!("   | Coherence:  {:.4}", movie.semantic_coherence);
+            println!("   | Trajectory Continuity (proxy): {:.4}", movie.semantic_coherence);
             println!(
                 "   | Total Size: {} bytes",
                 movie.frames.iter().map(|f| f.len()).sum::<usize>()
