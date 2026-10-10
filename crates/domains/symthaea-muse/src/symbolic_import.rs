@@ -502,13 +502,11 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     tempo_events.push((position, bpm));
                 }
                 if let Some(value) = child.attribute("dynamics") {
-                    let position = musicxml_sound_position(child, cursor)?;
-                    let velocity = musicxml_dynamics_velocity(value, "sound dynamics")?;
-                    // Score stores velocity on each note, so a supported
-                    // unoffset sound dynamic can update this part's following
-                    // note events without inventing a global dynamics curve.
-                    let _ = position;
-                    current_velocity = velocity;
+                    // Non-zero effective offsets require a positioned dynamics
+                    // map. Score stores velocity per note, so supported
+                    // unoffset changes can update this part's later notes.
+                    musicxml_sound_position(child, cursor)?;
+                    current_velocity = musicxml_dynamics_velocity(value, "sound dynamics")?;
                 }
             } else if child.has_tag_name("backup") {
                 let amount = musicxml_duration(child, "backup")?;
@@ -1237,6 +1235,43 @@ mod tests {
         assert_eq!(score.notes.len(), 2);
         assert!((score.notes[0].velocity - 64.0_f32 / 127.0).abs() < 1e-7);
         assert!((score.notes[1].velocity - 45.0_f32 / 127.0).abs() < 1e-7);
+    }
+
+    #[test]
+    fn musicxml_sound_dynamics_are_scoped_to_their_part() {
+        let xml = br#"<score-partwise>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <direction><sound dynamics="71"/></direction>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+            <part id="P2"><measure number="1">
+                <attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.notes.len(), 2);
+        assert!((score.notes[0].velocity - 64.0_f32 / 127.0).abs() < 1e-7);
+        assert!((score.notes[1].velocity - 90.0_f32 / 127.0).abs() < 1e-7);
+    }
+
+    #[test]
+    fn musicxml_invalid_sound_dynamics_are_rejected() {
+        for value in ["-1", "NaN", "inf", "not-a-number"] {
+            let xml = format!(
+                r#"<score-partwise><part id="P1"><measure number="1">
+                    <attributes><divisions>1</divisions></attributes>
+                    <direction><sound dynamics="{value}"/></direction>
+                    <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+                </measure></part></score-partwise>"#
+            );
+            let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+            assert!(
+                error.contains("MusicXML sound dynamics must be"),
+                "{value}: {error}"
+            );
+        }
     }
 
     #[test]
