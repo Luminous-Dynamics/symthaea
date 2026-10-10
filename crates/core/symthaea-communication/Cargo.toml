@@ -5,14 +5,44 @@ edition = "2024"
 description = "Modality-neutral, evidence-calibrated communication contracts for Symthaea"
 license = "AGPL-3.0-or-later"
 
+[features]
+default = []
+hdc-codec = ["dep:symthaea-core"]
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
 clap = { workspace = true }
 hound = { workspace = true }
+symthaea-core = { path = "../symthaea-core", default-features = false, optional = true }
 
 [[bin]]
 name = "symthaea-comm-eval"
 path = "src/bin/eval.rs"
 
+
+[[example]]
+name = "neurosemantic_hdc_codec_n0"
+required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_interlingua_n0"
+required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_grounded_identity_n0"
+required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_grounded_identity_generalization_n0"
+required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_grounded_identity_adversarial_n0"
+required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_grounded_identity_calibration_n0"
+required-features = ["hdc-codec"]
