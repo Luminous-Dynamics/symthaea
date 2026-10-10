@@ -24,7 +24,7 @@ The initial unit set covers common engineering signals and research-healthcare p
 
 ## Fail-closed quantitative gate
 
-The strict assessment rejects:
+The strict assessment checks sequence/time ordering using a caller-maintained `MeasurementStreamGuard` and rejects:
 
 - future-dated or stale data;
 - any declared quality flag (saturation, motion artifact, lead-off, missing samples, unsynchronized clock, failed self-test, out-of-range values, unknown signal quality, etc.);
@@ -40,7 +40,7 @@ Measurement and calibration standard uncertainties are reported separately. The 
 
 ## Stream ordering
 
-`MeasurementStreamGuard` keeps the last accepted (sequence, timestamp) pair per instrument/channel. A replayed or repeated sequence and a backward timestamp are rejected without advancing the stored state. Callers must supply timestamps from a clock domain they have documented and synchronized appropriately; the guard is not itself a clock synchronization service.
+`MeasurementStreamGuard` keeps the last accepted (sequence, timestamp) pair per instrument/channel. A replayed or repeated sequence and a backward timestamp are rejected without advancing the stored state. Callers must supply timestamps from a clock domain they have documented and synchronized appropriately; the guard is not itself a clock synchronization service. The quantitative-use API requires the guard, and advances it as soon as an envelope reaches the gate—even if later quality/evidence checks reject that envelope—so a later replay cannot roll back behind a rejected observation. The guard is in-memory state, not a tamper-proof replay ledger; safety-sensitive deployments must persist/reconcile stream checkpoints across restarts and authenticate the source.
 
 ## Validation strategy
 
