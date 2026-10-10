@@ -140,6 +140,22 @@ Required tests: unit conversions; positive/finite parameter validation; circular
 
 Recompute the orbital baseline using an independently implemented analytical reference and GMAT/Orekit/Basilisk where their model scope is appropriate. For rotor/support, validate a deliberately simplified test geometry with a separate implementation before coupling it to orbit dynamics. A shared dependency is not an independent check.
 
+**C1 implemented: independent T0 arithmetic and limiting-case checker (not full Increment C).** The standard-library Python program `scripts/engineering/orbital_ring_reference_check.py` independently evaluates the four published circular-orbit fixtures, checks each table entry within half a unit of the last displayed decimal place, compares the 400 km case to the existing Rust unit-test numeric anchors, and tests three algebraic consistency relationships. It also checks a distinct, hand-checkable moving-stream limit:
+
+\[
+q_n = \lambda v_{\mathrm{inertial}}^2 / R
+\]
+
+For a steady mass stream on a fixed circular path in an inertial frame, using line density `1 kg/m`, inertial speed `3 m/s`, and path radius `10 m`, the net normal resultant is `0.9 N/m`. Tests cover zero speed, quadratic speed scaling, inverse-radius scaling, line-density scaling, and invalid/non-finite inputs. This is the **net normal resultant per unit path length**; it does not assign the load to a magnetic actuator, include a moving support frame or gravity, or establish orbital-ring equilibrium.
+
+Command from the repository root:
+
+```sh
+python3 scripts/engineering/orbital_ring_reference_check.py
+```
+
+The program emits deterministic JSON and exits nonzero on any failed check. In the local execution used for this update, all **47/47 checks passed**, and a repeat run emitted byte-identical JSON. This is a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation.
+
 ### Increment D — structural/electromagnetic/thermal interfaces
 
 Only after Increment B/C passes, specify solver input/output schemas for structural dynamics, electromagnetic support, rotor dynamics, power electronics and thermal rejection. Treat adapters as unavailable until each invokes a real solver, checks the exit status, parses a known fixture, records versions, and passes validation tests. A dry-run adapter may test orchestration, but its output must not satisfy a physics evidence obligation.
@@ -203,13 +219,23 @@ Review the architecture-mode taxonomy, frame contract, T0 equations, conservatio
 
 The kernel intentionally does not implement rotor/support equilibrium, electromagnetic force, structural dynamics, a digital twin, or a validated solver adapter.
 
+### Increment C1 — executable T0 cross-check
+
+**Implemented and executed locally; runtime verification applies to this Python checker only.** The committed script checks the published four-altitude circular-orbit table, the four 400 km Rust numeric anchors, algebraic identities, altitude-grid trends, and the inertial circular-stream limiting case with scaling and input guards.
+
+- Result: **47 passed, 0 failed**.
+- Repeated-run determinism: output was byte-identical.
+- Source SHA-256: `397ced6014bc5071ad1e8bfc2a2df167f26e206be4c83a1e5101f6a31d8e138f`.
+- Deterministic JSON report SHA-256: `2e48d531eb8ca7851838281101dde73d5c7697858fe28ea85d30b83b821c699f`.
+- The locally executed source's Git blob SHA matches the GitHub file blob SHA, confirming that the committed source is the one checked locally.
+
 ### Checks actually performed
 
-- Read back the exact branch versions of all six changed files.
+- Read back the exact branch versions of all seven changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
-- Checked balanced delimiter counts in the Rust source and enumerated the 11 test functions.
-- Independently recomputed the four documented circular-orbit rows from the stated Earth radius and gravitational parameter; all 20 printed quantities agreed within their displayed rounding tolerances.
+- Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
+- Independently recomputed the four documented circular-orbit rows and compared all values at published rounding precision via the Python reference checker.
 
 ### Checks not performed
 
@@ -217,4 +243,4 @@ The present execution environment does not have `cargo` installed. The Rust test
 
 ### Next engineering increment
 
-After the code receives an actual Rust-toolchain check, the next modelling change should still be a **derived, independently checked control-volume equation for one fully specified rotor/support geometry**. Before writing that equation, pin the reference frame, rotor velocity (inertial and relative), line density or discrete-mass representation, support motion, curvature, and system boundary. A small limiting case should be checked by hand and a separate implementation before it becomes executable code.
+Continue the analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. Increment C2 should now specify one exact rotor/support geometry and its control volume before writing a coupled equation: inertial frame and support-frame transform, inertial and relative stream velocities, line density or discrete mass elements, path curvature, support motion/acceleration, external forces, and boundary fluxes of mass, energy, and momentum. Derive the vector balance independently, show the assumptions and units, test the inertial circular-path limit covered by C1, and only then implement the bounded equation in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
