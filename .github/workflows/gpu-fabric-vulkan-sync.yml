@@ -72,7 +72,7 @@ jobs:
             -e 's/serde = { workspace = true }/serde = { version = "=1.0.228", features = ["derive"] }/' \
             -e 's/thiserror = { workspace = true }/thiserror = "=1.0.69"/' \
             .ci/vulkan-sync-workspace/Cargo.toml
-          printf '\\n[workspace]\\nresolver = "2"\\n' >> .ci/vulkan-sync-workspace/Cargo.toml
+          printf '\n[workspace]\nresolver = "2"\n' >> .ci/vulkan-sync-workspace/Cargo.toml
 
       - name: Resolve isolated dependency lock
         working-directory: .ci/vulkan-sync-workspace
