@@ -134,7 +134,8 @@ impl RawDataEvidenceResolver for MockResolver {
             .unwrap_or_else(|| reference.artifact().clone());
         ResolvedRawData::new(
             returned_artifact,
-            u64::try_from(bytes.len()).map_err(|_| "raw acquisition length overflowed")?,
+            u64::try_from(bytes.len())
+                .map_err(|_| "raw acquisition length overflowed".to_owned())?,
             "application/octet-stream",
         )
         .map_err(|error| error.to_string())
