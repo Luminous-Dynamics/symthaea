@@ -210,7 +210,12 @@ fn calibration_evidence_and_review_receipt_must_be_distinct_artifacts() {
 #[test]
 fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_provenance() {
     let assessment = measurement(1, SAMPLE_TIME_NS)
-        .assess_for_quantitative_use(SAMPLE_TIME_NS + 10, &policy(), &resolver(), &mut MeasurementStreamGuard::default())
+        .assess_for_quantitative_use(
+            SAMPLE_TIME_NS + 10,
+            &policy(),
+            &resolver(),
+            &mut MeasurementStreamGuard::default(),
+        )
         .unwrap();
     assert_eq!(assessment.age_ns, 10);
     assert_eq!(assessment.measurement_standard_uncertainty, 1_000.0);
@@ -224,13 +229,23 @@ fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_prov
 fn rejects_measurements_from_a_future_clock_or_beyond_freshness_limit() {
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS - 1, &policy(), &resolver())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS - 1,
+                &policy(),
+                &resolver(),
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::ClockInFuture
     );
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS + 500_000_001, &policy(), &resolver())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS + 500_000_001,
+                &policy(),
+                &resolver(),
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::Stale {
             age_ns: 500_000_001,
@@ -257,7 +272,13 @@ fn any_quality_flag_blocks_strict_quantitative_use() {
     input.quality_flags.dedup();
     let m = MeasurementEnvelope::new(input).unwrap();
     assert_eq!(
-        m.assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &resolver()).unwrap_err(),
+        m.assess_for_quantitative_use(
+            SAMPLE_TIME_NS,
+            &policy(),
+            &resolver(),
+            &mut MeasurementStreamGuard::default(),
+        )
+        .unwrap_err(),
         AssessmentFailure::QualityFlagsPresent(vec![
             QualityFlag::Saturated,
             QualityFlag::MotionArtifact
@@ -282,14 +303,26 @@ fn missing_raw_data_or_calibration_reference_fails_closed() {
     };
     let no_raw = MeasurementEnvelope::new(input.clone()).unwrap();
     assert_eq!(
-        no_raw.assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &resolver()).unwrap_err(),
+        no_raw.assess_for_quantitative_use(
+            SAMPLE_TIME_NS,
+            &policy(),
+            &resolver(),
+            &mut MeasurementStreamGuard::default(),
+        )
+        .unwrap_err(),
         AssessmentFailure::MissingRawDataReference
     );
     input.raw_data = Some(RawDataReference::new(artifact("raw", SHA_B)));
     input.calibration = None;
     let no_cal = MeasurementEnvelope::new(input).unwrap();
     assert_eq!(
-        no_cal.assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &resolver()).unwrap_err(),
+        no_cal.assess_for_quantitative_use(
+            SAMPLE_TIME_NS,
+            &policy(),
+            &resolver(),
+            &mut MeasurementStreamGuard::default(),
+        )
+        .unwrap_err(),
         AssessmentFailure::MissingCalibrationReference
     );
 }
@@ -301,7 +334,12 @@ fn unresolved_calibration_evidence_fails_closed() {
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &missing, &mut MeasurementStreamGuard::default())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &policy(),
+                &missing,
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::CalibrationEvidenceUnresolved("evidence artifact not found".into())
     );
@@ -324,7 +362,12 @@ fn rejects_a_resolver_result_for_a_different_calibration_artifact() {
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &wrong_artifact, &mut MeasurementStreamGuard::default())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &policy(),
+                &wrong_artifact,
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::CalibrationReferenceMismatch
     );
@@ -347,7 +390,12 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &wrong_unit, &mut MeasurementStreamGuard::default())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &policy(),
+                &wrong_unit,
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::CalibrationUnitMismatch
     );
@@ -367,7 +415,12 @@ fn rejects_wrong_calibration_unit_or_out_of_validity_time() {
     };
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS, &policy(), &out_of_date, &mut MeasurementStreamGuard::default())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &policy(),
+                &out_of_date,
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::CalibrationNotValidAtCapture
     );
@@ -378,7 +431,12 @@ fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
     let tight_measurement_policy = MeasurementPolicy::new(1_000, 999.0, 1_000.0).unwrap();
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS, &tight_measurement_policy, &resolver())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &tight_measurement_policy,
+                &resolver(),
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::MeasurementUncertaintyExceeded
     );
@@ -386,7 +444,12 @@ fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
     let tight_calibration_policy = MeasurementPolicy::new(1_000, 2_000.0, 899.0).unwrap();
     assert_eq!(
         measurement(1, SAMPLE_TIME_NS)
-            .assess_for_quantitative_use(SAMPLE_TIME_NS, &tight_calibration_policy, &resolver())
+            .assess_for_quantitative_use(
+                SAMPLE_TIME_NS,
+                &tight_calibration_policy,
+                &resolver(),
+                &mut MeasurementStreamGuard::default(),
+            )
             .unwrap_err(),
         AssessmentFailure::CalibrationUncertaintyExceeded
     );
