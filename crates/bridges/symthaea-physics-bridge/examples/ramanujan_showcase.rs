@@ -372,7 +372,7 @@ fn run_problem(
         // Conservation evidence from the symbolic assessor. This is a
         // chain-rule derivation plus six fixed numeric residual samples, not
         // a universal theorem and not a Z3 proof.
-        let verification_status = if inv.symbolic_check_passed {
+        let verification_status = if inv.sampled_residual_passed {
             "Symbolic check + 6-point residual".to_string()
         } else if inv.variance < 1e-6 {
             "Numerical".to_string()
