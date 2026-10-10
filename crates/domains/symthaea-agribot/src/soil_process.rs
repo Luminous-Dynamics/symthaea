@@ -938,6 +938,123 @@ mod tests {
         assert!(calculate_recovered_nutrients(f64::MAX, concentrations, fractions, &evidence).is_err());
     }
 
+    fn climate_evidence(id: &str, kind: EvidenceKind) -> EvidenceRef {
+        EvidenceRef {
+            evidence_id: id.into(),
+            kind,
+        }
+    }
+
+    fn climate_input(
+        status: ClimateInventoryStatus,
+        eligibility: CharStorageEligibility,
+    ) -> BiocharClimateInput {
+        let eligible = eligibility == CharStorageEligibility::VerifiedEligible;
+        BiocharClimateInput {
+            boundary_id: "batch-boundary-v1".into(),
+            inventory_status: status,
+            inventory_evidence: climate_evidence("inventory-scenario-v1", EvidenceKind::Scenario),
+            flows: vec![
+                ClimateFlow {
+                    flow_id: "process-emissions".into(),
+                    kind: ClimateFlowKind::Emission,
+                    kg_co2e: 100.0,
+                    evidence: climate_evidence("process-emissions-v1", EvidenceKind::Scenario),
+                },
+                ClimateFlow {
+                    flow_id: "other-removal".into(),
+                    kind: ClimateFlowKind::Removal,
+                    kg_co2e: 5.0,
+                    evidence: climate_evidence("other-removal-v1", EvidenceKind::Scenario),
+                },
+                ClimateFlow {
+                    flow_id: "avoided-fertilizer".into(),
+                    kind: ClimateFlowKind::AvoidedEmission,
+                    kg_co2e: 10.0,
+                    evidence: climate_evidence("avoided-fertilizer-v1", EvidenceKind::Scenario),
+                },
+            ],
+            char_storage: CharStorageAccounting {
+                horizon_years: 100,
+                eligibility,
+                eligibility_evidence: eligible.then(|| {
+                    climate_evidence("verified-biogenic-sourcing-v1", EvidenceKind::Measured)
+                }),
+                durable_fraction_at_horizon: eligible.then_some(0.8),
+                persistence_evidence: eligible.then(|| {
+                    climate_evidence("persistence-scenario-v1", EvidenceKind::Scenario)
+                }),
+            },
+        }
+    }
+
+    #[test]
+    fn climate_balance_separates_emissions_credits_and_horizon_storage() {
+        let process = calculate_pyrolysis_batch(&pyrolysis_input()).unwrap();
+        let input = climate_input(
+            ClimateInventoryStatus::CompleteForDeclaredBoundary,
+            CharStorageEligibility::VerifiedEligible,
+        );
+        let assessment = assess_biochar_climate(&process, &input).unwrap();
+
+        // 180 kg char C × 0.8 assumed durable fraction × 44/12 = 528 kg CO2e.
+        assert!((assessment.durable_char_storage_kg_co2e.unwrap() - 528.0).abs() < 1e-10);
+        assert_eq!(assessment.gross_emissions_kg_co2e, 100.0);
+        assert_eq!(assessment.other_removals_kg_co2e, 5.0);
+        assert_eq!(assessment.avoided_emissions_kg_co2e, 10.0);
+        assert!((assessment.net_kg_co2e.unwrap() - (-443.0)).abs() < 1e-10);
+        assert_eq!(assessment.horizon_years, 100);
+        assert_eq!(assessment.process_evidence, process.evidence);
+    }
+
+    #[test]
+    fn incomplete_inventory_or_unknown_storage_never_reports_net_result() {
+        let process = calculate_pyrolysis_batch(&pyrolysis_input()).unwrap();
+
+        let incomplete = climate_input(
+            ClimateInventoryStatus::Partial,
+            CharStorageEligibility::VerifiedEligible,
+        );
+        let assessment = assess_biochar_climate(&process, &incomplete).unwrap();
+        assert!(assessment.durable_char_storage_kg_co2e.is_some());
+        assert_eq!(assessment.net_kg_co2e, None);
+
+        let unknown = climate_input(
+            ClimateInventoryStatus::CompleteForDeclaredBoundary,
+            CharStorageEligibility::Unknown,
+        );
+        let assessment = assess_biochar_climate(&process, &unknown).unwrap();
+        assert_eq!(assessment.durable_char_storage_kg_co2e, None);
+        assert_eq!(assessment.net_kg_co2e, None);
+    }
+
+    #[test]
+    fn climate_ledger_rejects_unsupported_storage_credit_and_duplicate_flows() {
+        let process = calculate_pyrolysis_batch(&pyrolysis_input()).unwrap();
+
+        let mut input = climate_input(
+            ClimateInventoryStatus::CompleteForDeclaredBoundary,
+            CharStorageEligibility::VerifiedEligible,
+        );
+        input.char_storage.eligibility_evidence =
+            Some(climate_evidence("scenario-eligibility", EvidenceKind::Scenario));
+        assert!(assess_biochar_climate(&process, &input).is_err());
+
+        input = climate_input(
+            ClimateInventoryStatus::CompleteForDeclaredBoundary,
+            CharStorageEligibility::VerifiedIneligible,
+        );
+        input.flows[1].flow_id = input.flows[0].flow_id.clone();
+        assert!(assess_biochar_climate(&process, &input).is_err());
+
+        input = climate_input(
+            ClimateInventoryStatus::CompleteForDeclaredBoundary,
+            CharStorageEligibility::VerifiedEligible,
+        );
+        input.char_storage.durable_fraction_at_horizon = Some(1.01);
+        assert!(assess_biochar_climate(&process, &input).is_err());
+    }
+
     #[test]
     fn serde_roundtrip_preserves_explicit_assumptions() {
         let input = pyrolysis_input();
