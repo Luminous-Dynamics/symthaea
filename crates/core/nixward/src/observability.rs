@@ -6,13 +6,19 @@
 //! Provides:
 //! - Prometheus-compatible metrics (counters, gauges, histograms) via the `metrics` crate
 //! - Structured JSON logging via `tracing-subscriber`
-//! - A `/metrics` HTTP endpoint for scraping
+//! - A loopback-only `/metrics` HTTP endpoint for scraping
+//!
+//! The observability listener deliberately does **not** expose the internal daemon
+//! snapshot. `DaemonSnapshot` is local control-plane/UI state, not a public
+//! observability schema; future approval/authority fields must not become remotely
+//! readable merely because they are added to that internal object.
 //!
 //! Feature-gated behind `observability`.
 //!
 //! Migrated from the `prometheus` crate (which depends on unmaintained protobuf v2)
 //! to `metrics` + `metrics-exporter-prometheus` (no protobuf dependency).
 
+use std::net::SocketAddr;
 use std::sync::OnceLock;
 
 /// Global metrics handle — initialized once on daemon start.
@@ -208,9 +214,24 @@ pub fn init_tracing() {
     tracing::info!("nixward-daemon observability initialized");
 }
 
-/// Serve Prometheus metrics on the given port at `/metrics`.
+/// Default bind address for the built-in observability endpoint.
 ///
-/// This spawns a background tokio task. The caller must be inside a tokio runtime.
+/// Remote observability must be provided by a separately configured/authenticated
+/// transport or future explicit remote-observability profile. Enabling metrics is
+/// not consent to expose a control-plane listener on every network interface.
+fn default_metrics_bind_addr(port: u16) -> SocketAddr {
+    SocketAddr::from(([127, 0, 0, 1], port))
+}
+
+/// The built-in HTTP surface is deliberately metrics-only.
+fn is_public_metrics_request(method: &hyper::Method, path: &str) -> bool {
+    method == hyper::Method::GET && path == "/metrics"
+}
+
+/// Serve Prometheus metrics on loopback at `/metrics`.
+///
+/// Internal daemon state is intentionally not served from this listener. The
+/// caller must be inside a tokio runtime.
 pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use http_body_util::Full;
     use hyper::body::Bytes;
@@ -218,11 +239,10 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
     use hyper::service::service_fn;
     use hyper::{Request, Response};
     use hyper_util::rt::TokioIo;
-    use std::net::SocketAddr;
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = default_metrics_bind_addr(port);
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!(port, "Prometheus metrics endpoint listening");
+    tracing::info!(%addr, "Prometheus metrics endpoint listening on loopback");
 
     loop {
         let (stream, _) = listener.accept().await?;
@@ -230,17 +250,7 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
 
         tokio::task::spawn(async move {
             let service = service_fn(|req: Request<hyper::body::Incoming>| async move {
-                if req.method() == hyper::Method::OPTIONS {
-                    let resp = Response::builder()
-                        .header("Access-Control-Allow-Origin", "*")
-                        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
-                        .header("Access-Control-Allow-Headers", "Content-Type")
-                        .body(Full::new(Bytes::from("")))
-                        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
-                    return Ok::<_, hyper::Error>(resp);
-                }
-
-                if req.uri().path() == "/metrics" {
+                if is_public_metrics_request(req.method(), req.uri().path()) {
                     let body = match Metrics::try_global() {
                         Ok(m) => m.render(),
                         Err(e) => {
@@ -254,17 +264,6 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
                     };
                     let resp = Response::builder()
                         .header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-                        .body(Full::new(Bytes::from(body)))
-                        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
-                    Ok::<_, hyper::Error>(resp)
-                } else if req.uri().path() == "/state" || req.uri().path() == "/snapshot" {
-                    let path = crate::ipc::default_snapshot_path();
-                    let body = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
-                    let resp = Response::builder()
-                        .header("Content-Type", "application/json")
-                        .header("Access-Control-Allow-Origin", "*")
-                        .header("Access-Control-Allow-Methods", "GET, OPTIONS")
-                        .header("Access-Control-Allow-Headers", "Content-Type")
                         .body(Full::new(Bytes::from(body)))
                         .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
                     Ok::<_, hyper::Error>(resp)
@@ -287,6 +286,22 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_observability_bind_is_loopback_only() {
+        let addr = default_metrics_bind_addr(9_090);
+        assert!(addr.ip().is_loopback());
+        assert_eq!(addr.port(), 9_090);
+    }
+
+    #[test]
+    fn public_http_surface_is_metrics_only() {
+        assert!(is_public_metrics_request(&hyper::Method::GET, "/metrics"));
+        assert!(!is_public_metrics_request(&hyper::Method::POST, "/metrics"));
+        assert!(!is_public_metrics_request(&hyper::Method::GET, "/state"));
+        assert!(!is_public_metrics_request(&hyper::Method::GET, "/snapshot"));
+        assert!(!is_public_metrics_request(&hyper::Method::OPTIONS, "/metrics"));
+    }
 
     #[test]
     fn test_metrics_initialization() {
