@@ -123,7 +123,7 @@ impl SymExpr {
             SymExpr::Mul(a, b) => a.eval(vars) * b.eval(vars),
             SymExpr::Div(a, b) => {
                 let bv = b.eval(vars);
-                if bv.abs() > 1e-15 {
+                if bv != 0.0 {
                     a.eval(vars) / bv
                 } else {
                     f64::NAN
@@ -674,7 +674,7 @@ mod conservation_evidence_tests {
     #[test]
     fn non_finite_sample_evaluation_fails_closed() {
         // x - x is zero at every input, so this derivative is undefined at
-        // every sample. NaN must not be ignored by a floating-point max fold.
+        // every sample. Checked evaluation must fail closed on the domain error.
         let denominator = SymExpr::Add(
             Box::new(SymExpr::Var("x".into())),
             Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
@@ -754,6 +754,15 @@ mod conservation_evidence_tests {
             Err(SymExprEvalError::IndeterminatePower)
         );
         assert!(matches!(expr.simplify(), SymExpr::Pow(_, _)));
+    }
+
+    #[test]
+    fn legacy_eval_divides_by_small_nonzero_denominator() {
+        let expr = SymExpr::Div(
+            Box::new(SymExpr::Const(1.0)),
+            Box::new(SymExpr::Const(1e-16)),
+        );
+        assert_eq!(expr.eval(&[]), 1e16);
     }
 
     #[test]
