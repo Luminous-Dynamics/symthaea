@@ -18,6 +18,8 @@ from solar_resource_profile import (
     canonical_solar_resource_json,
     load_solar_resource_manifest,
     screen_sourced_monthly_profile,
+    solar_daylight_hours_noaa,
+    monthly_mean_daylight_hours_noaa,
     sha256_bytes,
     simulate_sourced_daily_profile,
     solar_resource_profile_sha256,
@@ -361,6 +363,35 @@ def _fixture_artifact_args(raw, manifest):
         "raw_artifact_bytes": raw,
         "transformation_artifact_bytes": b"synthetic-transform-v1",
     }
+
+
+class SolarDaylightDerivationTests(unittest.TestCase):
+    def test_noaa_daylight_is_near_equinox_duration_at_equator(self):
+        hours = solar_daylight_hours_noaa(0.0, "2020-03-20")
+        self.assertGreater(hours, 11.9)
+        self.assertLess(hours, 12.2)
+
+    def test_southern_hemisphere_solstice_seasonality(self):
+        winter = solar_daylight_hours_noaa(-26.2, "2020-06-21")
+        summer = solar_daylight_hours_noaa(-26.2, "2020-12-21")
+        self.assertGreater(winter, 10.0)
+        self.assertLess(winter, 11.0)
+        self.assertGreater(summer, 13.0)
+        self.assertLess(summer, 14.0)
+        self.assertLess(winter, summer)
+
+    def test_polar_day_and_night_are_clamped(self):
+        self.assertEqual(solar_daylight_hours_noaa(80.0, "2020-06-21"), 24.0)
+        self.assertEqual(solar_daylight_hours_noaa(80.0, "2020-12-21"), 0.0)
+
+    def test_monthly_daylight_profile_requires_all_months(self):
+        monthly = monthly_mean_daylight_hours_noaa(-26.2, "2020-01-01", "2020-12-31")
+        self.assertEqual(len(monthly), 12)
+        self.assertGreater(monthly[0], monthly[6])
+        with self.assertRaisesRegex(ValueError, "each calendar month"):
+            monthly_mean_daylight_hours_noaa(-26.2, "2020-01-01", "2020-02-01")
+        with self.assertRaisesRegex(ValueError, "latitude_deg"):
+            solar_daylight_hours_noaa(91.0, "2020-06-21")
 
 
 class SolarResourceManifestTests(unittest.TestCase):
