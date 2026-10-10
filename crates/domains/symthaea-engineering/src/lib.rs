@@ -306,6 +306,19 @@ impl EngineeringManager {
         screening_design::generate_screening_design(request)
     }
 
+    /// Recheck run order, block completeness, factorial cell coverage, replicate counts,
+    /// factor values/units, and center-point placement on a screening-plan artifact. This
+    /// structural check does not authenticate evidence or authorize experiment execution.
+    pub fn verify_regenerative_screening_design(
+        &self,
+        plan: &screening_design::ScreeningDesignPlan,
+    ) -> Result<
+        screening_design::ScreeningDesignVerificationReceipt,
+        screening_design::ScreeningDesignError,
+    > {
+        screening_design::verify_screening_design(plan)
+    }
+
     pub fn evaluate_material(
         &mut self,
         composition: &[(u16, f64)],
