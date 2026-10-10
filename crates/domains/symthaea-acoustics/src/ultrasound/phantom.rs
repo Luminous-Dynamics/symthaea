@@ -426,7 +426,7 @@ impl SyntheticRfTrace {
             }
         }
         for sample in &self.samples {
-            bytes.extend_from_slice(&sample.to_le_bytes());
+            push_canonical_f64_le(&mut bytes, *sample);
         }
         debug_assert_eq!(bytes.len(), total_bytes);
         Ok(bytes)
