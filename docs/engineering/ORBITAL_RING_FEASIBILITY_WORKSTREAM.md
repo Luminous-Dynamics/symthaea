@@ -154,7 +154,7 @@ Command from the repository root:
 python3 scripts/engineering/orbital_ring_reference_check.py
 ```
 
-The program emits deterministic JSON and exits nonzero on any failed check. In the local execution used for this update, all **47/47 checks passed**, and a repeat run emitted byte-identical JSON. This is a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation.
+The program emits deterministic JSON and exits nonzero on any failed check. In the local execution used for this update, all **47/47 checks passed**, and a repeat run emitted byte-identical JSON. This is a T0 arithmetic/limiting-case check, not a solver comparison, independent peer review of the physical derivation, or T1 validation. The symbolic derivation and fields required before coupling the model are documented in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md).
 
 ### Increment D — structural/electromagnetic/thermal interfaces
 
@@ -225,13 +225,13 @@ The kernel intentionally does not implement rotor/support equilibrium, electroma
 
 - Result: **47 passed, 0 failed**.
 - Repeated-run determinism: output was byte-identical.
-- Source SHA-256: `397ced6014bc5071ad1e8bfc2a2df167f26e206be4c83a1e5101f6a31d8e138f`.
-- Deterministic JSON report SHA-256: `2e48d531eb8ca7851838281101dde73d5c7697858fe28ea85d30b83b821c699f`.
+- Source SHA-256: `f978fef9b474f9eb304c7a55130eca4314928f3483e273bdb3a7d6f96203681d`.
+- Deterministic JSON report SHA-256: `2bdf854edc398f087ef487a4a0608c434331d3642813e5ad3332781a32676080`.
 - The locally executed source's Git blob SHA matches the GitHub file blob SHA, confirming that the committed source is the one checked locally.
 
 ### Checks actually performed
 
-- Read back the exact branch versions of all seven changed files.
+- Read back the exact branch versions of all eight changed files.
 - Confirmed the crate has no external dependencies and its location matches the root workspace's `crates/domains/*` member glob.
 - Confirmed the new crate appears in the workspace engineering metadata and the engineering roadmap links to this contract.
 - Checked balanced delimiter counts in the Rust source and enumerated the 11 Rust test functions.
@@ -243,4 +243,4 @@ The present execution environment does not have `cargo` installed. The Rust test
 
 ### Next engineering increment
 
-Continue the analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. Increment C2 should now specify one exact rotor/support geometry and its control volume before writing a coupled equation: inertial frame and support-frame transform, inertial and relative stream velocities, line density or discrete mass elements, path curvature, support motion/acceleration, external forces, and boundary fluxes of mass, energy, and momentum. Derive the vector balance independently, show the assumptions and units, test the inertial circular-path limit covered by C1, and only then implement the bounded equation in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
+Continue the analytical work in parallel with the outstanding Rust toolchain gate; do not mistake a pending Cargo/CI result for a physics research blocker. Increment C2 should now complete the scenario fields in [the control-volume note](ORBITAL_RING_CONTROL_VOLUME_NOTE.md), specifying one exact rotor/support geometry and its control volume before writing a coupled equation: inertial frame and support-frame transform, inertial and relative stream velocities, line density or discrete mass elements, path curvature, support motion/acceleration, external forces, and boundary fluxes of mass, energy, and momentum. Derive the vector balance independently, show the assumptions and units, test the inertial circular-path limit covered by C1, and only then implement the bounded equation in Rust. An external solver or independent reviewer remains necessary before claiming stronger model fidelity.
