@@ -163,6 +163,8 @@ pub struct ScreeningPowerAssessment {
     pub current_full_factorial_replicates: u32,
     pub maximum_full_factorial_replicates_supported: u32,
     pub required_full_factorial_replicates_approx: u32,
+    /// Lower-bound arithmetic difference only; this may understate the increment needed by
+    /// a realizable block/replication configuration. Consult feasible_replication_options.
     pub additional_full_factorial_replicates_approx: u32,
     /// All 14 currently supported block × within-block replication count combinations,
     /// with run-budget consequences. Not every integer from 2 through 16 is realizable.
@@ -564,8 +566,9 @@ mod tests {
     fn feasible_replication_options_round_up_unrealizable_counts_and_include_center_point_cost() {
         let mut input = request();
         input.center_point_runs_per_block = 3;
-        input.bench_scale_review.reviewed_design_sha256 =
+        let reviewed_design_sha256 =
             crate::screening_design::screening_design_sha256(&input).unwrap();
+        input.bench_scale_review.reviewed_design_sha256 = reviewed_design_sha256;
 
         // For these values, the normal approximation produces a lower-bound requirement
         // of 9 complete factorial replicates. The generator cannot express 9: B × r must
