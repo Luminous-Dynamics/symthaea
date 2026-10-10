@@ -170,7 +170,7 @@ impl CognitiveLoopService {
                 );
                 manifold.dilate(symthaea_core::hdc::HdcDimensionality::Ultra);
                 self.thermodynamic_load += estimate.dilation;
-                if manifold.hdc_dim() != peer_dim {
+                if manifold.hdc_dim() != dilation_target_dim || peer_dim > manifold.hdc_dim() {
                     return Err(ImagineFutureError::NoGeodesic);
                 }
             }
