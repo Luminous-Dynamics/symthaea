@@ -33,15 +33,15 @@ In \`resolution.rs\`, \`ExitCodeResolver::execute(&self, _timeout: Duration)\` i
 
 ### Additional call-path findings — async resolution and untested code
 
-The synchronous `ExitCodeResolver` in PR #7337 is not the only command-resolution path:
+The synchronous `ExitCodeResolver` in PR #7350 is not the only command-resolution path:
 
-- In `src/consciousness/recursive_improvement/runtime.rs`, `check_auto_resolve` invokes `sh -c ... .output().await` for `CommandSucceeds` and `systemctl ... .output().await` for `ServiceRunning`, without an explicit Tokio timeout. The polling runtime later maps a boolean to `Success`/`SafeFailure` and calls `resolve_prediction(..., 1.0)`. PR #7337 fixes the synchronous standalone resolver. [PR #7346](https://github.com/Luminous-Dynamics/symthaea/pull/7346) now proposes the async runtime timeout, process-group cleanup, and no-calibration unresolved path; these changes are still awaiting exact-head qualification.
+- In `src/consciousness/recursive_improvement/runtime.rs`, `check_auto_resolve` invokes `sh -c ... .output().await` for `CommandSucceeds` and `systemctl ... .output().await` for `ServiceRunning`, without an explicit Tokio timeout. The polling runtime later maps a boolean to `Success`/`SafeFailure` and calls `resolve_prediction(..., 1.0)`. PR #7350 proposes the synchronous standalone resolver fix. [PR #7352](https://github.com/Luminous-Dynamics/symthaea/pull/7352) proposes the async runtime timeout, process-group cleanup, and no-calibration unresolved path; these changes are still awaiting exact-head qualification.
 - In `src/coding_agent/magi_code_bridge.rs`, `compiled && tests_passed.unwrap_or(true)` means `tests_passed: None` is treated as `Success` if compilation succeeded. The API comment says `None` means no tests were run, so absent test evidence is currently promoted to success for this bridge's calibration statistics. This should remain unqualified evidence, or be represented as a distinct partial/unresolved outcome.
 - In `src/coding_agent/generation.rs`, the orchestrator passes `response.accepted` as both the compilation and test result. The code-orchestrator source says acceptance follows compiler/test verification, so this is not evidence that accepted output was untested. The concern is narrower: the bridge receives one aggregate boolean for two distinct fields and does not retain the response's verification-layer provenance. Qualification should bind the actual verification results, not only the aggregate.
 
 These are call-path findings from source inspection. They do not assert that the orchestrator always accepts untested code; they show that these APIs do not preserve the distinction between “not tested” and “verified successful” in all paths.
 
-Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts](https://github.com/Luminous-Dynamics/symthaea/issues/7336). PR #7337 addresses the synchronous resolver, PR #7346 addresses async runtime command/port deadlines, and PR #7339 addresses the coding bridge's explicit missing-test and contradictory-evidence cases. These remain unqualified until exact-head checks pass.
+Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts](https://github.com/Luminous-Dynamics/symthaea/issues/7336). PR #7350 proposes the synchronous resolver and lockfile fix, PR #7352 the async runtime command/port deadlines, and PR #7351 the coding bridge's explicit missing-test and contradictory-evidence handling. These remain unqualified until exact-head checks pass.
 
 ### Gap 3 — the MAGI capability self-model is a generic estimate, not yet qualified expertise
 
