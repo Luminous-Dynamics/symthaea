@@ -13,6 +13,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-materials = { path = "../symthaea-materials" }
+symthaea-agribot = { path = "../symthaea-agribot" }
 symthaea-structural = { path = "../symthaea-structural" }
 symthaea-grid-physics = { path = "../symthaea-grid-physics" }
 symthaea-thermofluids = { path = "../symthaea-thermofluids" }
