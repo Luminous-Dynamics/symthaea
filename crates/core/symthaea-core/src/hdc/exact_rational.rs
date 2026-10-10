@@ -12,7 +12,7 @@
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{ToPrimitive, Zero};
-use crate::hdc::{binary_hv::BinaryHV, primitive_system::seed_from_name};
+use crate::hdc::binary_hv::BinaryHV;
 use super::numeric_tower::Number;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -207,12 +207,13 @@ impl ExactRational {
     /// binding, but is not a lossless identifier or proof object. Use the
     /// canonical_encoding_bytes method when exact identity matters.
     pub fn to_hdc(&self) -> BinaryHV {
-        let material = format!(
-            "SYMTHEA.EXACT_RATIONAL.HDC.V1:{}:{}",
-            self.value.numer(),
-            self.value.denom()
-        );
-        BinaryHV::random(seed_from_name(&material))
+        let canonical = self.canonical_encoding_bytes();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"SYMTHEA.EXACT_RATIONAL.HDC.V1\\0");
+        hasher.update(&canonical);
+        let mut output = [0u8; BinaryHV::BYTES];
+        hasher.finalize_xof().fill(&mut output);
+        BinaryHV(output)
     }
 
     /// Convert into the legacy numeric tower only when the exact value fits.
@@ -435,7 +436,7 @@ mod tests {
 
         assert_eq!(half_a.canonical_encoding_bytes(), half_b.canonical_encoding_bytes());
         assert_ne!(half_a.canonical_encoding_bytes(), two_thirds.canonical_encoding_bytes());
-        assert!(half_a.canonical_encoding_bytes().starts_with(b"SYMTHEA\\0EXACT-RATIONAL\\0V1\\0"));
+        assert!(half_a.canonical_encoding_bytes().starts_with(b"SYMTHEA\0EXACT-RATIONAL\0V1\0"));
     }
 
     #[test]
