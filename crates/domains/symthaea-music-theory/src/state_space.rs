@@ -83,7 +83,11 @@ impl MusicalStateFrame {
         v[3] = bounded_unit_feature(self.mean_interval);
         v[4] = bounded_unit_feature(self.contour_asymmetry);
         v[5] = bounded_unit_feature(self.structural_intensity);
-        v[6] = if self.part_identity_available { 1.0 } else { 0.0 };
+        v[6] = if self.part_identity_available {
+            1.0
+        } else {
+            0.0
+        };
 
         let mut offset = 7;
         for (target, value) in v[offset..offset + PITCH_CLASS_BINS]
@@ -176,11 +180,7 @@ impl MusicalStateTrajectory {
     /// Windows are emitted whenever at least one note sounds, including
     /// sustain-only windows with no new attacks. Truly silent windows are
     /// omitted so silence outside a score does not create artificial recurrence.
-    pub fn from_score(
-        score: &Score,
-        window_beats: f64,
-        hop_beats: f64,
-    ) -> Result<Self, String> {
+    pub fn from_score(score: &Score, window_beats: f64, hop_beats: f64) -> Result<Self, String> {
         if !window_beats.is_finite() || window_beats <= 0.0 {
             return Err("window_beats must be finite and > 0".into());
         }
@@ -206,8 +206,7 @@ impl MusicalStateTrajectory {
         let hop_limited = (total / hop_beats).ceil();
         let window_limited = ((total - window_beats).max(0.0) / hop_beats).ceil() + 1.0;
         let estimated_windows = hop_limited.min(window_limited);
-        if !estimated_windows.is_finite()
-            || estimated_windows > MAX_TRAJECTORY_WINDOWS as f64 + 1.0
+        if !estimated_windows.is_finite() || estimated_windows > MAX_TRAJECTORY_WINDOWS as f64 + 1.0
         {
             return Err(format!(
                 "hop_beats would produce more than {MAX_TRAJECTORY_WINDOWS} trajectory windows"
@@ -232,13 +231,7 @@ impl MusicalStateTrajectory {
             let notes = notes_in_window(score, start, end);
             let active_notes = overlapping_notes_in_window(score, start, end);
             if !active_notes.is_empty() {
-                frames.push(frame_from_notes(
-                    score,
-                    start,
-                    end,
-                    &notes,
-                    &active_notes,
-                ));
+                frames.push(frame_from_notes(score, start, end, &notes, &active_notes));
             }
             if end >= total {
                 break;
@@ -353,12 +346,10 @@ impl MusicalStateTrajectory {
                     .then(|| values[group_start - 1].expect("within finite run"));
                 let right = (group_end < run_end)
                     .then(|| values[group_end + 1].expect("within finite run"));
-                let not_below_neighbor =
-                    left.is_none_or(|neighbor| value >= neighbor)
-                        && right.is_none_or(|neighbor| value >= neighbor);
-                let strictly_above_neighbor =
-                    left.is_some_and(|neighbor| value > neighbor)
-                        || right.is_some_and(|neighbor| value > neighbor);
+                let not_below_neighbor = left.is_none_or(|neighbor| value >= neighbor)
+                    && right.is_none_or(|neighbor| value >= neighbor);
+                let strictly_above_neighbor = left.is_some_and(|neighbor| value > neighbor)
+                    || right.is_some_and(|neighbor| value > neighbor);
 
                 if value >= minimum_novelty && not_below_neighbor && strictly_above_neighbor {
                     peaks.push((group_start + group_end) / 2);
@@ -442,8 +433,8 @@ fn frame_from_notes(
     let mut register_hist = [0.0; REGISTER_BINS];
 
     let tonic = score.key.tonic.value() as i32;
-    let part_identity_available = !active_notes.is_empty()
-        && active_notes.iter().all(|note| note.part.is_assigned());
+    let part_identity_available =
+        !active_notes.is_empty() && active_notes.iter().all(|note| note.part.is_assigned());
 
     for note in notes {
         let duration = finite_duration_beats(note.duration).unwrap_or(0.0).max(0.0);
@@ -652,21 +643,11 @@ mod tests {
     #[test]
     fn vector_is_fixed_width_and_transposition_invariant() {
         let a = score(
-            &[
-                note(0, 4, 0),
-                note(2, 4, 1),
-                note(4, 4, 2),
-                note(7, 4, 3),
-            ],
+            &[note(0, 4, 0), note(2, 4, 1), note(4, 4, 2), note(7, 4, 3)],
             0,
         );
         let b = score(
-            &[
-                note(2, 4, 0),
-                note(4, 4, 1),
-                note(6, 4, 2),
-                note(9, 4, 3),
-            ],
+            &[note(2, 4, 0), note(4, 4, 1), note(6, 4, 2), note(9, 4, 3)],
             2,
         );
 
@@ -691,8 +672,7 @@ mod tests {
             note(2, 4, 4),
             note(4, 4, 5),
         ];
-        let trajectory =
-            MusicalStateTrajectory::from_score(&score(&notes, 0), 3.0, 3.0).unwrap();
+        let trajectory = MusicalStateTrajectory::from_score(&score(&notes, 0), 3.0, 3.0).unwrap();
 
         assert_eq!(trajectory.frames.len(), 2);
         assert!(
@@ -702,7 +682,10 @@ mod tests {
                 > 0.99
         );
         assert!(
-            trajectory.frames[1].novelty.expect("second frame has a prior") < 0.01
+            trajectory.frames[1]
+                .novelty
+                .expect("second frame has a prior")
+                < 0.01
         );
         assert!(trajectory.recurrence_rate(0.99) > 0.9);
     }
@@ -717,8 +700,7 @@ mod tests {
             note(11, 4, 4),
             note(10, 4, 5),
         ];
-        let trajectory =
-            MusicalStateTrajectory::from_score(&score(&notes, 0), 3.0, 3.0).unwrap();
+        let trajectory = MusicalStateTrajectory::from_score(&score(&notes, 0), 3.0, 3.0).unwrap();
 
         assert_eq!(trajectory.frames.len(), 2);
         assert!(trajectory.frames[1].novelty.unwrap() > 0.01);
@@ -760,12 +742,9 @@ mod tests {
 
         // Only the G attack starts in [2, 2.5), but both notes sound for half
         // a beat inside that region. Their out-of-window tails must not count.
-        let frame = MusicalStateFrame::from_region(
-            &piece,
-            Duration::new(2, 1),
-            Duration::new(5, 2),
-        )
-        .expect("the region contains an attack");
+        let frame =
+            MusicalStateFrame::from_region(&piece, Duration::new(2, 1), Duration::new(5, 2))
+                .expect("the region contains an attack");
 
         assert_eq!(frame.event_count, 1);
         assert!((frame.pitch_class_hist[0] - 0.5).abs() < 1e-9);
@@ -782,12 +761,9 @@ mod tests {
         held.section_intensity = 0.6;
         let piece = score(&[held], 0);
 
-        let sustain = MusicalStateFrame::from_region(
-            &piece,
-            Duration::new(1, 1),
-            Duration::new(2, 1),
-        )
-        .expect("the sustained note sounds inside the frame");
+        let sustain =
+            MusicalStateFrame::from_region(&piece, Duration::new(1, 1), Duration::new(2, 1))
+                .expect("the sustained note sounds inside the frame");
         assert_eq!(sustain.event_count, 0);
         assert_eq!(sustain.onset_density, 0.0);
         assert!(sustain.part_identity_available);
@@ -798,10 +774,16 @@ mod tests {
         let trajectory = MusicalStateTrajectory::from_score(&piece, 1.0, 1.0).unwrap();
         assert_eq!(trajectory.frames.len(), 4);
         assert_eq!(trajectory.frames[0].event_count, 1);
-        assert!(trajectory.frames[1..].iter().all(|frame| frame.event_count == 0));
-        assert!(trajectory.frames[1..]
-            .iter()
-            .all(|frame| frame.pitch_class_hist[0] == 1.0));
+        assert!(
+            trajectory.frames[1..]
+                .iter()
+                .all(|frame| frame.event_count == 0)
+        );
+        assert!(
+            trajectory.frames[1..]
+                .iter()
+                .all(|frame| frame.pitch_class_hist[0] == 1.0)
+        );
         assert!((trajectory.frames[2].nearest_prior_similarity.unwrap() - 1.0).abs() < 1e-9);
         assert!(trajectory.frames[2].novelty.unwrap() < 1e-9);
     }
@@ -821,12 +803,9 @@ mod tests {
         negative_duration.part = PartId(7);
 
         let piece = score(&[held, zero_duration, negative_duration], 0);
-        let frame = MusicalStateFrame::from_region(
-            &piece,
-            Duration::new(1, 1),
-            Duration::new(3, 1),
-        )
-        .expect("the held note makes the interval musically active");
+        let frame =
+            MusicalStateFrame::from_region(&piece, Duration::new(1, 1), Duration::new(3, 1))
+                .expect("the held note makes the interval musically active");
 
         assert_eq!(frame.event_count, 0);
         assert_eq!(frame.onset_density, 0.0);
@@ -862,7 +841,11 @@ mod tests {
         negative_infinite_intensity.section_intensity = f32::NEG_INFINITY;
 
         let piece = score(
-            &[nan_intensity, infinite_intensity, negative_infinite_intensity],
+            &[
+                nan_intensity,
+                infinite_intensity,
+                negative_infinite_intensity,
+            ],
             0,
         );
         let trajectory = MusicalStateTrajectory::from_score(&piece, 1.0, 1.0).unwrap();
@@ -935,10 +918,12 @@ mod tests {
         assert!(trajectory.recurrence_pairs(f64::INFINITY).is_empty());
         assert!(trajectory.novelty_peaks(f64::NAN).is_empty());
         assert!(trajectory.novelty_peaks(f64::INFINITY).is_empty());
-        assert!(trajectory
-            .recurrence_pairs(0.0)
-            .iter()
-            .all(|(_, _, similarity)| similarity.is_finite()));
+        assert!(
+            trajectory
+                .recurrence_pairs(0.0)
+                .iter()
+                .all(|(_, _, similarity)| similarity.is_finite())
+        );
     }
 
     #[test]
@@ -998,12 +983,12 @@ mod tests {
         let notes: Vec<_> = (0..4).map(|index| note(index, 4, index as i64)).collect();
         let mut trajectory =
             MusicalStateTrajectory::from_score(&score(&notes, 0), 1.0, 1.0).unwrap();
-        for (frame, novelty) in trajectory.frames.iter_mut().zip([
-            None,
-            Some(0.7),
-            Some(0.7),
-            Some(0.7),
-        ]) {
+        for (frame, novelty) in
+            trajectory
+                .frames
+                .iter_mut()
+                .zip([None, Some(0.7), Some(0.7), Some(0.7)])
+        {
             frame.novelty = novelty;
         }
 
@@ -1030,12 +1015,9 @@ mod tests {
             MusicalStateTrajectory::from_score(&s, 1.0, 1.0).expect("valid score bound");
         assert_eq!(trajectory.frames.len(), 1);
         assert_eq!(trajectory.frames[0].event_count, 1);
-        assert!(MusicalStateFrame::from_region(
-            &s,
-            Duration::new(0, 1),
-            Duration::new(1, 1)
-        )
-        .is_some());
+        assert!(
+            MusicalStateFrame::from_region(&s, Duration::new(0, 1), Duration::new(1, 1)).is_some()
+        );
     }
 
     #[test]

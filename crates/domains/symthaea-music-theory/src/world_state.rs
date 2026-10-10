@@ -11,9 +11,7 @@ use crate::cognitive_analysis::{ScoreCognitiveProfile, profile_score_region};
 use crate::form::SectionRole;
 use crate::grammar::PerformanceDialect;
 use crate::harmony::{HarmonicFunction, Key, Tonality};
-use crate::motif_return::{
-    MotifReturnEvidence, compare_melodic_regions, melodic_notes_in_region,
-};
+use crate::motif_return::{MotifReturnEvidence, compare_melodic_regions, melodic_notes_in_region};
 use crate::obligation::ObligationPressure;
 use crate::pitch::PitchClass;
 use crate::rhythm::Duration;
@@ -75,9 +73,7 @@ impl MotifRelationObservationV1 {
     ) -> Option<Self> {
         let total = score.total_beats.beats();
         let valid_region = |start: Duration, end: Duration| {
-            start.beats() >= 0.0
-                && end.beats() > start.beats()
-                && end.beats() <= total + 1e-9
+            start.beats() >= 0.0 && end.beats() > start.beats() && end.beats() <= total + 1e-9
         };
         if !valid_region(source_start, source_end) || !valid_region(target_start, target_end) {
             return None;
@@ -89,9 +85,9 @@ impl MotifRelationObservationV1 {
         // VoiceRole is a function, not persistent line identity. Never merge
         // multiple/unassigned parts into one inferred motif sequence.
         let ambiguous_onsets = |notes: &[crate::score::ScoreNote]| {
-            notes.windows(2).any(|pair| {
-                (pair[1].onset.beats() - pair[0].onset.beats()).abs() <= 1e-9
-            })
+            notes
+                .windows(2)
+                .any(|pair| (pair[1].onset.beats() - pair[0].onset.beats()).abs() <= 1e-9)
         };
         if !source_part.is_assigned()
             || !target_part.is_assigned()
@@ -251,10 +247,7 @@ fn active_voice_roles(score: &Score, start: f64, end: f64) -> Vec<VoiceRole> {
                     return false;
                 };
                 let note_end = note_end.beats();
-                note.role == *role
-                    && note_end > onset
-                    && note_end > start
-                    && onset < end
+                note.role == *role && note_end > onset && note_end > start && onset < end
             })
         })
         .collect()
@@ -267,13 +260,7 @@ mod tests {
     use crate::pitch::Pitch;
     use crate::score::{Emphasis, PartId, ScoreNote};
 
-    fn note(
-        pc: PitchClass,
-        octave: i32,
-        onset: i64,
-        role: VoiceRole,
-        part: PartId,
-    ) -> ScoreNote {
+    fn note(pc: PitchClass, octave: i32, onset: i64, role: VoiceRole, part: PartId) -> ScoreNote {
         ScoreNote {
             part,
             pitch: Pitch::new(pc, octave),
@@ -288,27 +275,9 @@ mod tests {
 
     fn score() -> Score {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
-        score.push(note(
-            PitchClass::C,
-            4,
-            0,
-            VoiceRole::Melody,
-            PartId(1),
-        ));
-        score.push(note(
-            PitchClass::E,
-            4,
-            1,
-            VoiceRole::Harmony,
-            PartId(2),
-        ));
-        score.push(note(
-            PitchClass::G,
-            2,
-            2,
-            VoiceRole::Bass,
-            PartId(3),
-        ));
+        score.push(note(PitchClass::C, 4, 0, VoiceRole::Melody, PartId(1)));
+        score.push(note(PitchClass::E, 4, 1, VoiceRole::Harmony, PartId(2)));
+        score.push(note(PitchClass::G, 2, 2, VoiceRole::Bass, PartId(3)));
         score
     }
 
@@ -349,22 +318,28 @@ mod tests {
     #[test]
     fn motif_relation_rejects_unmeasurable_regions() {
         let piece = score();
-        assert!(MotifRelationObservationV1::from_score(
-            &piece,
-            Duration::new(0, 1),
-            Duration::new(1, 1),
-            Duration::new(1, 1),
-            Duration::new(2, 1),
-            crate::obligation::ReturnTransformation::Literal,
-        ).is_none());
-        assert!(MotifRelationObservationV1::from_score(
-            &piece,
-            Duration::new(1, 1),
-            Duration::new(2, 1),
-            Duration::new(2, 1),
-            Duration::new(3, 1),
-            crate::obligation::ReturnTransformation::Literal,
-        ).is_none());
+        assert!(
+            MotifRelationObservationV1::from_score(
+                &piece,
+                Duration::new(0, 1),
+                Duration::new(1, 1),
+                Duration::new(1, 1),
+                Duration::new(2, 1),
+                crate::obligation::ReturnTransformation::Literal,
+            )
+            .is_none()
+        );
+        assert!(
+            MotifRelationObservationV1::from_score(
+                &piece,
+                Duration::new(1, 1),
+                Duration::new(2, 1),
+                Duration::new(2, 1),
+                Duration::new(3, 1),
+                crate::obligation::ReturnTransformation::Literal,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -379,15 +354,17 @@ mod tests {
                 PartId(1),
             ));
         }
-        assert!(MotifRelationObservationV1::from_score(
-            &piece,
-            Duration::new(0, 1),
-            Duration::new(2, 1),
-            Duration::new(2, 1),
-            Duration::new(5, 1),
-            crate::obligation::ReturnTransformation::Literal,
-        )
-        .is_none());
+        assert!(
+            MotifRelationObservationV1::from_score(
+                &piece,
+                Duration::new(0, 1),
+                Duration::new(2, 1),
+                Duration::new(2, 1),
+                Duration::new(5, 1),
+                crate::obligation::ReturnTransformation::Literal,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -421,13 +398,15 @@ mod tests {
             motif_relations: vec![forged],
             ..Default::default()
         };
-        assert!(MusicalWorldStateV1::observe_region(
-            &piece,
-            Duration::new(0, 1),
-            Duration::new(3, 1),
-            context,
-        )
-        .is_none());
+        assert!(
+            MusicalWorldStateV1::observe_region(
+                &piece,
+                Duration::new(0, 1),
+                Duration::new(3, 1),
+                context,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -442,14 +421,17 @@ mod tests {
                 PartId::UNASSIGNED,
             ));
         }
-        assert!(MotifRelationObservationV1::from_score(
-            &unassigned,
-            Duration::new(0, 1),
-            Duration::new(2, 1),
-            Duration::new(2, 1),
-            Duration::new(4, 1),
-            crate::obligation::ReturnTransformation::Literal,
-        ).is_none());
+        assert!(
+            MotifRelationObservationV1::from_score(
+                &unassigned,
+                Duration::new(0, 1),
+                Duration::new(2, 1),
+                Duration::new(2, 1),
+                Duration::new(4, 1),
+                crate::obligation::ReturnTransformation::Literal,
+            )
+            .is_none()
+        );
 
         let mut ambiguous = Score::new(Key::major(PitchClass::C), 120.0, 4);
         for (pc, onset, part) in [
@@ -462,14 +444,17 @@ mod tests {
         ] {
             ambiguous.push(note(PitchClass::new(pc), 4, onset, VoiceRole::Melody, part));
         }
-        assert!(MotifRelationObservationV1::from_score(
-            &ambiguous,
-            Duration::new(0, 2),
-            Duration::new(2, 1),
-            Duration::new(2, 1),
-            Duration::new(4, 1),
-            crate::obligation::ReturnTransformation::Literal,
-        ).is_none());
+        assert!(
+            MotifRelationObservationV1::from_score(
+                &ambiguous,
+                Duration::new(0, 2),
+                Duration::new(2, 1),
+                Duration::new(2, 1),
+                Duration::new(4, 1),
+                crate::obligation::ReturnTransformation::Literal,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -499,13 +484,7 @@ mod tests {
 
     #[test]
     fn sustain_only_region_keeps_world_state_without_fabricating_attacks() {
-        let mut held = note(
-            PitchClass::C,
-            4,
-            0,
-            VoiceRole::Melody,
-            PartId(7),
-        );
+        let mut held = note(PitchClass::C, 4, 0, VoiceRole::Melody, PartId(7));
         held.duration = Duration::new(4, 1);
         let mut piece = Score::new(Key::major(PitchClass::C), 120.0, 4);
         piece.push(held);
@@ -554,18 +533,24 @@ mod tests {
     #[test]
     fn score_level_key_is_not_reported_for_out_of_bounds_regions() {
         let score = score();
-        assert!(MusicalWorldStateV1::observe_region(
-            &score,
-            Duration::new(-1, 1),
-            Duration::new(1, 1),
-            Default::default()
-        ).is_none());
-        assert!(MusicalWorldStateV1::observe_region(
-            &score,
-            Duration::new(2, 1),
-            Duration::new(4, 1),
-            Default::default()
-        ).is_none());
+        assert!(
+            MusicalWorldStateV1::observe_region(
+                &score,
+                Duration::new(-1, 1),
+                Duration::new(1, 1),
+                Default::default()
+            )
+            .is_none()
+        );
+        assert!(
+            MusicalWorldStateV1::observe_region(
+                &score,
+                Duration::new(2, 1),
+                Duration::new(4, 1),
+                Default::default()
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -578,8 +563,9 @@ mod tests {
             &score,
             Duration::new(2, 1),
             Duration::new(3, 1),
-            Default::default()
-        ).expect("silent in-score region is a valid observation");
+            Default::default(),
+        )
+        .expect("silent in-score region is a valid observation");
 
         assert!(state.temporal_state.is_none());
         assert!(!state.part_identity_available);
@@ -589,32 +575,14 @@ mod tests {
     #[test]
     fn zero_and_negative_duration_notes_do_not_create_world_state_activity() {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
-        score.push(note(
-            PitchClass::C,
-            4,
-            2,
-            VoiceRole::Melody,
-            PartId(1),
-        ));
+        score.push(note(PitchClass::C, 4, 2, VoiceRole::Melody, PartId(1)));
         score.notes[0].duration = Duration::zero();
-        let mut negative = note(
-            PitchClass::G,
-            4,
-            2,
-            VoiceRole::Bass,
-            PartId(2),
-        );
+        let mut negative = note(PitchClass::G, 4, 2, VoiceRole::Bass, PartId(2));
         negative.onset = Duration::new(5, 2);
         negative.duration = Duration::new(-1, 2);
         score.push(negative);
         // Extend the score past the observed interval without adding sound there.
-        score.push(note(
-            PitchClass::C,
-            3,
-            4,
-            VoiceRole::Bass,
-            PartId(3),
-        ));
+        score.push(note(PitchClass::C, 3, 4, VoiceRole::Bass, PartId(3)));
 
         let state = MusicalWorldStateV1::observe_region(
             &score,
