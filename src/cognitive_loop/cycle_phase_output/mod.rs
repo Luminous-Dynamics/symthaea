@@ -481,7 +481,11 @@ impl CognitiveLoopService {
                                             semantic_coherence: 0.0,
                                             trajectory: path,
                                         });
+                                } else {
+                                    self.carryover.quality.last_request_geodesic = false;
                                 }
+                            } else {
+                                self.carryover.quality.last_request_geodesic = false;
                             }
                         } else {
                             // No current goal means no new movie; avoid exposing the previous
