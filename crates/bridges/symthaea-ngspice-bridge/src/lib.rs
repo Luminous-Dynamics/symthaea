@@ -97,6 +97,7 @@ impl NgspiceBridge {
             ))
         })?;
         validate_qualified_netlist(netlist_text, &requested)?;
+        validate_requested_measurement_units(netlist_text, &requested, &self.metric_units)?;
 
         let input_digest = blake3::hash(&netlist_bytes).to_hex().to_string();
         let solver_version = self.solver_version()?;
@@ -361,6 +362,128 @@ fn validate_qualified_netlist(
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ElectricalMeasureDimension {
+    Voltage,
+    Current,
+}
+
+fn vector_dimension(expression: &str) -> Option<ElectricalMeasureDimension> {
+    let expression = expression.trim().to_ascii_lowercase();
+    let inner = expression
+        .strip_prefix("mag(")
+        .and_then(|value| value.strip_suffix(')'))
+        .unwrap_or(&expression);
+
+    if inner.starts_with("v(") && inner.ends_with(')') && inner.len() > 3 {
+        Some(ElectricalMeasureDimension::Voltage)
+    } else if inner.starts_with("i(") && inner.ends_with(')') && inner.len() > 3 {
+        Some(ElectricalMeasureDimension::Current)
+    } else {
+        None
+    }
+}
+
+/// Infer units only for the narrow measurement forms admitted in tranche one.
+/// Anything more complex must wait for a typed SPICE-expression parser.
+fn measure_dimension(tokens: &[&str]) -> Result<ElectricalMeasureDimension, SimulationError> {
+    if tokens.len() < 5 {
+        return Err(SimulationError::InvalidRequest(
+            "requested .measure statement must include an operation and one physical vector"
+                .into(),
+        ));
+    }
+
+    let operation = tokens[3];
+    let expression = tokens[4];
+    let dimension = vector_dimension(expression).ok_or_else(|| {
+        SimulationError::InvalidRequest(format!(
+            "unsupported .measure expression {expression:?}; tranche one accepts only v(node), i(source), mag(v(node)), and mag(i(source))"
+        ))
+    })?;
+
+    match operation {
+        "find" => {
+            if !tokens.iter().skip(5).any(|token| token.starts_with("at=")) {
+                return Err(SimulationError::InvalidRequest(
+                    "tranche-one FIND measurement requires an explicit AT= point".into(),
+                ));
+            }
+            Ok(dimension)
+        }
+        "max" | "min" | "avg" | "rms" | "pp" => Ok(dimension),
+        _ => Err(SimulationError::InvalidRequest(format!(
+            "unsupported .measure operation {operation:?}; tranche one accepts FIND with AT= or MAX/MIN/AVG/RMS/PP"
+        ))),
+    }
+}
+
+fn declared_measure_dimension(unit: &str) -> Option<ElectricalMeasureDimension> {
+    match unit.trim().to_ascii_lowercase().as_str() {
+        "v" | "volt" | "volts" => Some(ElectricalMeasureDimension::Voltage),
+        "a" | "amp" | "amps" | "ampere" | "amperes" => {
+            Some(ElectricalMeasureDimension::Current)
+        }
+        _ => None,
+    }
+}
+
+fn validate_requested_measurement_units(
+    netlist: &str,
+    requested: &BTreeMap<String, String>,
+    units: &BTreeMap<String, String>,
+) -> Result<(), SimulationError> {
+    let wanted: BTreeSet<_> = requested.keys().cloned().collect();
+    let mut dimensions = BTreeMap::new();
+
+    for raw_line in netlist.lines().skip(1) {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('*') {
+            continue;
+        }
+        let lower = line.to_ascii_lowercase();
+        let tokens: Vec<_> = lower.split_whitespace().collect();
+        if !matches!(tokens.first().copied(), Some(".measure" | ".meas")) || tokens.len() < 3 {
+            continue;
+        }
+
+        let name = normalize_metric(tokens[2]);
+        if !wanted.contains(&name) {
+            continue;
+        }
+        let dimension = measure_dimension(&tokens)?;
+        if dimensions.insert(name.clone(), dimension).is_some() {
+            return Err(SimulationError::InvalidRequest(format!(
+                "duplicate requested .measure expression for {name:?}"
+            )));
+        }
+    }
+
+    for name in wanted {
+        let expected = dimensions.get(&name).ok_or_else(|| {
+            SimulationError::InvalidRequest(format!(
+                "cannot determine physical dimension for requested .measure {name:?}"
+            ))
+        })?;
+        let unit = units.get(&name).ok_or_else(|| {
+            SimulationError::InvalidRequest(format!(
+                "requested .measure {name:?} requires an explicit unit"
+            ))
+        })?;
+        let declared = declared_measure_dimension(unit).ok_or_else(|| {
+            SimulationError::InvalidRequest(format!(
+                "unit {unit:?} for requested .measure {name:?} is outside tranche one's supported electrical units (V/A)"
+            ))
+        })?;
+        if declared != *expected {
+            return Err(SimulationError::InvalidRequest(format!(
+                "unit {unit:?} for requested .measure {name:?} conflicts with the dimension inferred from its .measure expression"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn parse_measurements(
     log: &str,
     requested: &BTreeMap<String, String>,
@@ -585,6 +708,32 @@ mod tests {
     fn configured_metric_units_are_case_insensitive() {
         let bridge = NgspiceBridge::default().with_metric_unit("VMAX", "V");
         assert_eq!(bridge.metric_units.get("vmax").map(String::as_str), Some("V"));
+    }
+
+    #[test]
+    fn requested_measure_units_must_match_expression_dimension() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        let voltage_units = BTreeMap::from([("vmax".to_string(), "V".to_string())]);
+        assert!(validate_requested_measurement_units(safe_netlist(), &requested, &voltage_units).is_ok());
+
+        let current_units = BTreeMap::from([("vmax".to_string(), "A".to_string())]);
+        assert!(validate_requested_measurement_units(safe_netlist(), &requested, &current_units).is_err());
+    }
+
+    #[test]
+    fn unsupported_measurement_expression_fails_closed() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        let units = BTreeMap::from([("vmax".to_string(), "V".to_string())]);
+        let unsupported = safe_netlist().replace("MAX v(out)", "MAX v(out)+i(V1)");
+        assert!(validate_requested_measurement_units(&unsupported, &requested, &units).is_err());
+    }
+
+    #[test]
+    fn ac_current_magnitude_is_dimensioned_as_amperes() {
+        let requested = canonical_requested_metrics(&request(&["i_peak"])).unwrap();
+        let netlist = "* fixture\nV1 in 0 AC 1\nR1 in 0 10\n.ac dec 100 1 1000\n.measure ac i_peak MAX mag(i(V1))\n.print ac mag(i(V1))\n.end\n";
+        let units = BTreeMap::from([("i_peak".to_string(), "A".to_string())]);
+        assert!(validate_requested_measurement_units(netlist, &requested, &units).is_ok());
     }
 
     #[test]
