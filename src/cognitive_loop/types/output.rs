@@ -89,6 +89,10 @@ pub struct MentalMovie {
     pub height: u32,
     pub channels: usize,
     pub path_length: usize,
+    /// Legacy wire/API field name. Stores mean adjacent-state coherence in [0, 1],
+    /// using the vision manifold's local transition-coherence proxy. This describes
+    /// trajectory continuity, not semantic grounding, prediction accuracy, or
+    /// subjective experience. 0.0 means no score was available.
     pub semantic_coherence: f32,
     /// Raw mathematical trajectory (HDC vectors) used to generate the frames.
     pub trajectory: Vec<symthaea_core::core::ContinuousHV>,
