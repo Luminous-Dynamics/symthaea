@@ -81,7 +81,7 @@ class DiagnosticLoopContractTests(unittest.TestCase):
         report = self.changed()
         report["proposals"][0]["status"] = "executed"
         errors = VALIDATOR.validate_report(report)
-        self.assertTrue(any("requires a matching authorization_decision receipt" in error for error in errors), errors)
+        self.assertTrue(any("requires an authorization_decision receipt" in error for error in errors), errors)
 
     def test_authorized_status_requires_receipt(self):
         report = self.changed()
@@ -120,6 +120,67 @@ class DiagnosticLoopContractTests(unittest.TestCase):
         report["assessment"]["security_status"] = "pass"
         errors = VALIDATOR.validate_report(report)
         self.assertTrue(any("security_status must match" in error for error in errors), errors)
+
+    def test_proposal_digest_binds_exact_action_content(self):
+        report = self.changed()
+        report["proposals"][0]["scope"] = "All endpoints and all resolver paths"
+        errors = VALIDATOR.validate_report(report)
+        self.assertTrue(any("proposal_digest does not bind" in error for error in errors), errors)
+
+    def test_post_approval_scope_change_invalidates_authorization_binding(self):
+        report = self.changed()
+        proposal = report["proposals"][0]
+        original_digest = proposal["proposal_digest"]
+        proposal["status"] = "executed"
+        proposal["scope"] = "All endpoints and all resolver paths"
+        proposal["proposal_digest"] = VALIDATOR.action_content_digest(proposal)
+        auth = {
+            "receipt_id": "R-AUTH", "receipt_type": "authorization_decision",
+            "evaluator_id": "authority-service-v1", "scenario_id": report["run"]["scenario"]["scenario_id"],
+            "scenario_revision": report["run"]["scenario"]["revision"],
+            "scenario_digest": report["run"]["scenario"]["scenario_digest"],
+            "status": "pass", "evidence_refs": ["E-CTRL-1"],
+            "payload": {"decision": "authorized", "proposal_id": proposal["proposal_id"], "proposal_digest": original_digest},
+            "receipt_digest": "0" * 64,
+        }
+        auth["receipt_digest"] = VALIDATOR.content_digest(auth, "receipt_digest")
+        report["evaluator_receipts"].append(auth)
+        proposal["authority_receipt_ref"] = "R-AUTH"
+        authority_step = next(step for step in report["steps"] if step["phase"] == "authority_check")
+        authority_step["authority_status"] = "authorized"
+        authority_step["proposal_refs"] = [proposal["proposal_id"]]
+        authority_step["receipt_refs"] = ["R-AUTH"]
+        errors = VALIDATOR.validate_report(report)
+        self.assertTrue(any("exact proposal digest" in error for error in errors), errors)
+
+    def test_valid_authorization_binds_digest_and_process_step(self):
+        report = self.changed()
+        proposal = report["proposals"][0]
+        proposal["status"] = "approved"
+        auth = {
+            "receipt_id": "R-AUTH", "receipt_type": "authorization_decision",
+            "evaluator_id": "authority-service-v1", "scenario_id": report["run"]["scenario"]["scenario_id"],
+            "scenario_revision": report["run"]["scenario"]["revision"],
+            "scenario_digest": report["run"]["scenario"]["scenario_digest"],
+            "status": "pass", "evidence_refs": ["E-CTRL-1"],
+            "payload": {"decision": "authorized", "proposal_id": proposal["proposal_id"], "proposal_digest": proposal["proposal_digest"]},
+            "receipt_digest": "0" * 64,
+        }
+        auth["receipt_digest"] = VALIDATOR.content_digest(auth, "receipt_digest")
+        report["evaluator_receipts"].append(auth)
+        proposal["authority_receipt_ref"] = "R-AUTH"
+        authority_step = next(step for step in report["steps"] if step["phase"] == "authority_check")
+        authority_step["authority_status"] = "authorized"
+        authority_step["proposal_refs"] = [proposal["proposal_id"]]
+        authority_step["receipt_refs"] = ["R-AUTH"]
+        self.assertEqual(VALIDATOR.validate_report(report), [])
+
+    def test_boolean_scenario_revision_does_not_equal_integer_one(self):
+        report = self.changed()
+        report["evaluator_receipts"][0]["scenario_revision"] = True
+        self.redigest_receipt(report["evaluator_receipts"][0])
+        errors = VALIDATOR.validate_report(report)
+        self.assertTrue(any("scenario_revision must be a positive integer" in error for error in errors), errors)
 
     def test_malformed_untrusted_values_fail_closed_without_traceback(self):
         report = self.changed()
