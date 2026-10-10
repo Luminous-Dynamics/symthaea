@@ -191,20 +191,31 @@ fn calibration_intervals_must_be_non_empty() {
 
 #[test]
 fn calibration_evidence_and_review_receipt_must_be_distinct_artifacts() {
-    assert_eq!(
-        ResolvedCalibration::new(
-            "calibration-17",
-            artifact("same-artifact", SHA_A),
-            artifact("same-artifact", SHA_A),
-            Quantity::Frequency,
-            Unit::Hertz,
-            SAMPLE_TIME_NS - 1,
-            SAMPLE_TIME_NS + 2_000_000_000,
-            900.0,
-        )
-        .unwrap_err(),
-        ContractError::CalibrationReviewMustBeDistinct
-    );
+    let cases = [
+        // Exact duplicate artifact.
+        (artifact("same-artifact", SHA_A), artifact("same-artifact", SHA_A)),
+        // Different aliases for identical content are not independent evidence.
+        (artifact("certificate", SHA_A), artifact("review", SHA_A)),
+        // Same alias pointing at different content is also suspicious.
+        (artifact("same-id", SHA_A), artifact("same-id", SHA_B)),
+    ];
+
+    for (evidence, receipt) in cases {
+        assert_eq!(
+            ResolvedCalibration::new(
+                "calibration-17",
+                evidence,
+                receipt,
+                Quantity::Frequency,
+                Unit::Hertz,
+                SAMPLE_TIME_NS - 1,
+                SAMPLE_TIME_NS + 2_000_000_000,
+                900.0,
+            )
+            .unwrap_err(),
+            ContractError::CalibrationReviewMustBeDistinct
+        );
+    }
 }
 
 #[test]
@@ -456,11 +467,12 @@ fn excessive_measurement_or_calibration_uncertainty_fails_closed() {
 }
 
 #[test]
-fn stream_guard_rejects_duplicate_sequences_and_time_reversal_without_advancing_state() {
+fn stream_guard_consumes_new_sequence_even_when_timestamp_regresses() {
     let first = measurement(7, SAMPLE_TIME_NS);
     let duplicate = measurement(7, SAMPLE_TIME_NS + 1);
     let backward_time = measurement(8, SAMPLE_TIME_NS - 1);
-    let next = measurement(8, SAMPLE_TIME_NS + 1);
+    let retry_same_sequence = measurement(8, SAMPLE_TIME_NS + 1);
+    let next = measurement(9, SAMPLE_TIME_NS + 1);
 
     let mut guard = MeasurementStreamGuard::default();
     guard.observe(&first).unwrap();
@@ -474,6 +486,10 @@ fn stream_guard_rejects_duplicate_sequences_and_time_reversal_without_advancing_
             previous_ns: SAMPLE_TIME_NS,
             received_ns: SAMPLE_TIME_NS - 1
         }
+    );
+    assert_eq!(
+        guard.observe(&retry_same_sequence).unwrap_err(),
+        StreamOrderFailure::SequenceNotIncreasing { previous: 8, received: 8 }
     );
     guard.observe(&next).unwrap();
 }
