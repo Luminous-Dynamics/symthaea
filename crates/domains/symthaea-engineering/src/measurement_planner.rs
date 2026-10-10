@@ -5,8 +5,8 @@
 //!
 //! This module does not run a statistical design-of-experiments algorithm or estimate
 //! causal effects. It ranks supplied measurement options only when they target a currently
-//! unresolved numeric constraint, using explicit domain weights, estimated interval-width
-//! reduction, and same-unit cost. The score is a transparent heuristic, not calibrated
+//! unresolved numeric constraint, using explicit domain weights, a declared benefit fraction (interval narrowing or
+//! acquisition of missing required data), and same-unit cost. The score is a transparent heuristic, not calibrated
 //! expected value of information or a guarantee that the measurement will resolve a decision.
 
 use serde::{Deserialize, Serialize};
