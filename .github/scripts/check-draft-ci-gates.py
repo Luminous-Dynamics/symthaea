@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed if ci.yml can enqueue heavyweight jobs for a draft PR.
+"""Fail closed if ci.yml can enqueue heavyweight jobs unsafely.
 
 This is intentionally a tiny structural ratchet rather than a general YAML
 interpreter. The full CI workflow is large and runner-expensive; the contract
@@ -13,6 +13,10 @@ we need to preserve is correspondingly narrow:
   runner admission because they are evaluated only after the job has started;
 * the only root jobs without a draft guard are jobs already restricted away
   from pull_request events (SBOM and scheduled/manual stress tests);
+* pull_request liveness must include ready_for_review and converted_to_draft;
+* automatic pull_request work must stay in the stable `CI-${github.ref}-auto`
+  concurrency family with cancel-in-progress enabled;
+* manual workflow_dispatch evidence must keep a unique run-id concurrency key;
 * adding/removing/renaming a CI job requires an explicit update here.
 
 GitHub evaluates jobs.<job_id>.if before matrix expansion, so a false root-job
@@ -39,6 +43,15 @@ GOVERNANCE_DRAFT_GUARD = (
     "if: github.event_name == 'pull_request' && "
     "github.event.pull_request.draft == false"
 )
+
+REQUIRED_PULL_REQUEST_TYPES = (
+    "    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]"
+)
+REQUIRED_CONCURRENCY_GROUP = (
+    "  group: ${{ github.workflow }}-${{ github.ref }}-"
+    "${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}"
+)
+REQUIRED_CANCEL = "  cancel-in-progress: true"
 
 DIRECT_GENERIC = {
     "fmt",
@@ -128,6 +141,40 @@ def parse_jobs(text: str) -> dict[str, str]:
             fail(f"duplicate top-level job id {name!r}")
         jobs[name] = "\n".join(lines[start:end]) + "\n"
     return jobs
+
+
+def require_ci_lifecycle(text: str) -> None:
+    lines = text.splitlines()
+    try:
+        pr_index = lines.index("  pull_request:")
+    except ValueError:
+        fail("top-level pull_request trigger is missing")
+
+    if pr_index + 1 >= len(lines) or lines[pr_index + 1] != REQUIRED_PULL_REQUEST_TYPES:
+        observed = lines[pr_index + 1] if pr_index + 1 < len(lines) else None
+        fail(
+            "full CI pull_request lifecycle drifted: expected exact next line "
+            f"{REQUIRED_PULL_REQUEST_TYPES!r}, observed={observed!r}"
+        )
+
+    if "  pull_request_target:" in lines:
+        fail("ci.yml must not use pull_request_target for full-CI lifecycle")
+
+    try:
+        group_index = lines.index(REQUIRED_CONCURRENCY_GROUP)
+    except ValueError:
+        observed = [line for line in lines if line.strip().startswith("group:")]
+        fail(
+            "full CI concurrency group drifted; automatic PR work and manual "
+            f"evidence separation are no longer proven: observed={observed!r}"
+        )
+
+    observed_cancel = lines[group_index + 1] if group_index + 1 < len(lines) else None
+    if observed_cancel != REQUIRED_CANCEL:
+        fail(
+            "full CI exact concurrency group must be immediately followed by "
+            f"{REQUIRED_CANCEL!r}; observed={observed_cancel!r}"
+        )
 
 
 def require_exact_line(block: str, line: str, job: str) -> None:
@@ -238,6 +285,7 @@ def main() -> int:
     self_test_job_scope_parser()
 
     text = CI_PATH.read_text(encoding="utf-8")
+    require_ci_lifecycle(text)
     jobs = parse_jobs(text)
 
     observed = set(jobs)
@@ -268,6 +316,8 @@ def main() -> int:
     require_exact_line(jobs["test"], GENERIC_DRAFT_GUARD, "test")
 
     print("draft_ci_gate_check=PASS")
+    print("ci_pr_lifecycle_revocation=PASS")
+    print("ci_manual_dispatch_isolation=PASS")
     print(f"ci_jobs_total={len(jobs)}")
     print(f"direct_generic_guarded={len(DIRECT_GENERIC)}")
     print(f"direct_special_guarded={len(DIRECT_SPECIAL)}")
