@@ -204,7 +204,7 @@ None of levels 1–8 implies level 9. A favorable reaction energy is not a barri
 
 ## Current implementation checkpoint (2026-10-10)
 
-The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `3d883973247815559d9f4e1c895557d6e4ac7142`.
+The first code increment is proposed in [PR #7322: typed, resource-bounded QC request preflight](https://github.com/Luminous-Dynamics/symthaea/pull/7322). Its current head at this checkpoint is `739687a23333a2a00849c30ff755f49bb8d4e1b5`.
 
 The proposal adds a serializable request schema, explicit method/basis/environment/Bohr declarations, charge/electron/spin consistency checks, finite and non-coincident geometry checks, supported basis-data checks, SCF-setting validation, and request-level atom/basis/iteration budgets. It retains the built basis and overlap-derived independent-basis rank in an immutable preflight result, checks electron capacity against that rank after linear-dependence removal, and uses signed arithmetic for the spin split to avoid overflow on 32-bit/WASM targets. It does not run SCF or claim energy accuracy.
 
@@ -224,7 +224,7 @@ A follow-on implementation is proposed in [PR #7323](https://github.com/Luminous
 From the repository root in a Rust-enabled environment:
 
 ```sh
-cargo run -p symthaea-quantum-chemistry --example qc_native_reference_fixtures > /tmp/qc-native.json
+SYMTHAEA_GIT_SHA="$(git rev-parse HEAD)" cargo run -p symthaea-quantum-chemistry --example qc_native_reference_fixtures > /tmp/qc-native.json
 ```
 
 Then in the PySCF verification environment:
