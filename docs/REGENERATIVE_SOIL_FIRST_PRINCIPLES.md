@@ -189,6 +189,22 @@ Relevant research:
 
 The test fixture values are **illustrative scenarios, not recommendations or measured plant performance**. The modules are not claimed as compile-verified until CI passes. Evidence IDs currently link to caller-managed immutable records; next integration should verify those receipts against Symthaea's shared evidence plane and require schema/version identifiers for each parameter group.
 
+## Preregistered bench-scale screening design
+
+The new `symthaea_engineering::screening_design` module creates an executable **schedule specification** for a bounded numeric-factor screening experiment. The initial implementation is intentionally a two-level full factorial rather than a fractional factorial: two to six quantitative factors, complete blocks, a fixed randomization seed, independently randomized treatment order within each block, and an exact copy of the declared request in the plan output. This yields (2^k) unique low/high combinations, with all combinations present in each block. The planner is bounded at 1,100 scheduled runs.
+
+Before schedule generation, the request must identify the preregistration and input snapshot, objective, primary hypothesis, analysis-plan ID, each factor's low/high values and evidence references, blocks, independent replicate counts, and one primary endpoint with a minimum practically meaningful difference. It also requires a bench-scale review whose status approves the exact protocol ID; scenario-only review evidence is rejected. This gate only allows generation of a *bench-scale schedule*—it does not authorize equipment operation, a field trial, product release, or soil application.
+
+Each block contains every factorial treatment setting. Treatment runs are Fisher–Yates shuffled with a versioned SplitMix64 pseudo-random stream; the seed and algorithm ID are retained so the schedule is reproducible. Optional center-point controls can be disabled or set to 3–5 per block; when used, every factor is at its numerical midpoint and controls are placed deterministically, evenly across the block with controls at the beginning and end. That follows NIST's guidance that center points help monitor stability and curvature, but the control pattern does not replace a response-surface study.
+
+There are explicit limits: this implementation accepts numeric factors only, does not generate fractional designs for many-factor screens, does not calculate power or sample size from variance, and does not analyze responses. The declared meaningful difference is not automatically a detectable effect. The statistical analysis, treatment feasibility, instrument capability, randomization protocol, adverse-event/stopping rules, and product/worker/environment safety review still require an informed reviewer before execution.
+
+Methodological sources:
+- NIST/SEMATECH, [selecting an experimental design](https://www.itl.nist.gov/div898/handbook/pri/section3/pri33.htm): design choice depends on objectives and factor count; screening and response-surface objectives need different designs.
+- NIST/SEMATECH, [two-level full factorial designs](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3331.htm): a (2^k) design covers every combination of k factors at low/high levels.
+- NIST/SEMATECH, [blocking full factorial designs](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3333.htm): nuisance variation can be managed by blocks, with explicit attention to effects potentially confounded with blocking.
+- NIST/SEMATECH, [adding center points](https://itl.nist.gov/div898/handbook/pri/section3/pri337.htm): center points can assess process stability and curvature and should be distributed across the experiment.
+
 ## Evidence update and implications for the model
 
 A focused literature refresh adds an important constraint: the correct target is not “maximize biochar” but “choose a safe, economically viable intervention for a specific soil × crop × climate × management context.”
