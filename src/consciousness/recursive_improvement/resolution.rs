@@ -190,7 +190,7 @@ impl ExitCodeResolver {
 
         let status = loop {
             match child.try_wait() {
-                Ok(Some(status)) => break Some(status),
+                Ok(Some(status)) => break status,
                 Ok(None) if started.elapsed() >= timeout => {
                     let _ = child.kill();
                     let _ = child.wait();
