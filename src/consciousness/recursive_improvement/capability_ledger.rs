@@ -1306,6 +1306,30 @@ mod tests {
         );
         assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
 
+        // Reuse the same forecast ID/sequence/subject in a different ledger but change
+        // the committed probability/context. The original valid signature must not transfer.
+        let mut transplanted_ledger = setup_claim_with_policy(ledger.qualification_policy.clone());
+        transplanted_ledger.record_forecast(CapabilityForecast {
+            forecast_id: "signed-forecast".to_string(),
+            claim_id: "rust-debugging".to_string(),
+            claim_sha256: "f".repeat(64),
+            subject: subject(),
+            sequence: 1,
+            context_id: "transplanted-context".to_string(),
+            split: CapabilitySplit::HeldOut,
+            predicted_success_probability: 0.8,
+            expected_compute_units: 2.0,
+            predicted_failure_mode: None,
+        }).unwrap();
+        assert_eq!(
+            transplanted_ledger.verify_and_resolve_signed_receipt(signed.clone(), evidence),
+            Err(CapabilityLedgerError::ForecastCommitmentMismatch)
+        );
+        assert_eq!(
+            transplanted_ledger.metrics("rust-debugging").unwrap().resolved_count,
+            0
+        );
+
         ledger.verify_and_resolve_signed_receipt(signed, evidence).unwrap();
         assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 1);
     }
