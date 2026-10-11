@@ -106,6 +106,8 @@ pub enum ExactRationalError {
     DivisionByZero,
     /// Parsing, an operand, or a result exceeded the configured resource budget.
     ResourceLimitExceeded,
+    /// A legacy numeric-tower rational violates its documented canonical form.
+    InvalidNumericTowerRational,
     /// The exact value cannot be represented by the fixed-width numeric tower.
     ExactResultOutOfRange,
     /// An approximate floating-point input cannot be imported as an exact rational.
@@ -118,6 +120,7 @@ impl fmt::Display for ExactRationalError {
             Self::InvalidBudget => write!(f, "invalid rational bit budget"),
             Self::InvalidInteger => write!(f, "invalid decimal integer"),
             Self::InvalidCanonicalEncoding => write!(f, "invalid canonical rational encoding"),
+            Self::InvalidNumericTowerRational => write!(f, "numeric-tower rational is not in canonical form"),
             Self::ZeroDenominator => write!(f, "rational denominator cannot be zero"),
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::ResourceLimitExceeded => write!(f, "rational resource budget exceeded"),
@@ -400,7 +403,24 @@ impl ExactRational {
             Number::Natural(value) => Self::from_integer(&value.to_string(), budget),
             Number::Integer(value) => Self::from_integer(&value.to_string(), budget),
             Number::Rational { numerator, denominator } => {
-                Self::parse(&numerator.to_string(), &denominator.to_string(), budget)
+                if *denominator == 0 {
+                    return Err(ExactRationalError::ZeroDenominator);
+                }
+                let exact = Self::parse(
+                    &numerator.to_string(),
+                    &denominator.to_string(),
+                    budget,
+                )?;
+                // Number::Rational promises a reduced numerator and positive
+                // denominator. Reject malformed variants rather than silently
+                // normalizing them across a strict provenance boundary.
+                if *denominator < 0
+                    || exact.numerator_str() != numerator.to_string()
+                    || exact.denominator_str() != denominator.to_string()
+                {
+                    return Err(ExactRationalError::InvalidNumericTowerRational);
+                }
+                Ok(exact)
             }
             Number::Real(_) => Err(ExactRationalError::ApproximateInput),
         }
@@ -806,6 +826,21 @@ mod tests {
 
         let zero = ExactRational::from_integer("0", limit).unwrap();
         assert_eq!(zero.to_f64_approx(), Some(0.0));
+    }
+
+    #[test]
+    fn exact_numeric_import_rejects_noncanonical_rational_variants() {
+        let limit = budget(64);
+        for malformed in [
+            Number::Rational { numerator: 2, denominator: 4 },
+            Number::Rational { numerator: 0, denominator: 5 },
+            Number::Rational { numerator: 1, denominator: -2 },
+        ] {
+            assert_eq!(
+                ExactRational::try_from_number_exact(&malformed, limit).unwrap_err(),
+                ExactRationalError::InvalidNumericTowerRational
+            );
+        }
     }
 
     #[test]
