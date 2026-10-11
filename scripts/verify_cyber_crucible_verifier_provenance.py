@@ -20,6 +20,8 @@ import sys
 import tempfile
 from typing import Any, Callable
 
+from scripts.package_cyber_crucible_verifier import BundleError, verify_bundle
+
 POLICY_VERSION = "cyber-crucible-verifier-provenance-policy.v1"
 IN_TOTO_STATEMENT_V1 = "https://in-toto.io/Statement/v1"
 SLSA_PROVENANCE_V1 = "https://slsa.dev/provenance/v1"
@@ -138,6 +140,64 @@ def _hash_regular_file(path: Path, label: str) -> str:
         return digest.hexdigest()
     finally:
         os.close(fd)
+
+
+
+MAX_ARTIFACT_BYTES = 128 * 1024 * 1024
+
+
+def _copy_artifact_to_private_snapshot(source: Path, destination: Path) -> str:
+    """Hash one opened artifact while copying its exact bytes into a private temp dir.
+
+    The attestation verifier and bundle parser must inspect the same byte snapshot
+    that was hashed against operator policy. Passing the original path to a second
+    process allows a writable-path race between digest calculation and file open.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        source_fd = os.open(source, flags)
+    except OSError as exc:
+        raise ProvenanceVerificationError("verifier artifact could not be opened safely") from exc
+
+    destination_fd: int | None = None
+    try:
+        source_info = os.fstat(source_fd)
+        if not stat.S_ISREG(source_info.st_mode):
+            raise ProvenanceVerificationError("verifier artifact must be a regular file")
+        if source_info.st_size < 0 or source_info.st_size > MAX_ARTIFACT_BYTES:
+            raise ProvenanceVerificationError("verifier artifact exceeds the 128 MiB size limit")
+        create_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            destination_fd = os.open(destination, create_flags, 0o600)
+        except OSError as exc:
+            raise ProvenanceVerificationError("private verifier snapshot could not be created safely") from exc
+
+        digest = hashlib.sha256()
+        total = 0
+        with os.fdopen(source_fd, "rb", closefd=True) as source_file:
+            source_fd = -1
+            with os.fdopen(destination_fd, "wb", closefd=True) as destination_file:
+                destination_fd = None
+                while True:
+                    chunk = source_file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_ARTIFACT_BYTES:
+                        raise ProvenanceVerificationError("verifier artifact exceeds the 128 MiB size limit")
+                    digest.update(chunk)
+                    destination_file.write(chunk)
+                destination_file.flush()
+                os.fsync(destination_file.fileno())
+        if total != source_info.st_size:
+            raise ProvenanceVerificationError("verifier artifact size changed while taking a snapshot")
+        os.chmod(destination, 0o400)
+        return digest.hexdigest()
+    finally:
+        if source_fd >= 0:
+            os.close(source_fd)
+        if destination_fd is not None:
+            os.close(destination_fd)
 
 
 def _validate_policy(policy: Any) -> dict[str, Any]:
@@ -370,45 +430,59 @@ def verify_verifier_provenance(
     *,
     runner: Callable[..., Any] | None = None,
 ) -> dict[str, Any]:
-    """Verify artifact digest, attestation identity, and SLSA provenance policy.
+    """Verify attestation and deterministic bundle inventory on one byte snapshot.
 
     GitHub CLI verifies the cryptographic attestation, issuer, signer workflow,
-    source ref/digest, predicate type, and runner policy. This function then checks
-    the artifact subject and policy-sensitive SLSA predicate fields. Output is
-    non-authorizing and does not prove runtime integrity.
+    source ref/digest, predicate type, and runner policy. This function snapshots
+    the artifact once, pins its digest, verifies the attestation against that
+    snapshot, then validates the exact same snapshot's manifest. Output is
+    non-authorizing and does not prove the live process executed the bundle.
     """
     validated_policy = _validate_policy(policy)
     artifact = _safe_regular_file(str(Path(artifact_path).absolute()), "artifact")
-    artifact_digest_before = _hash_regular_file(artifact, "verifier artifact")
-    if artifact_digest_before != validated_policy["artifact_sha256"]:
-        raise ProvenanceVerificationError("verifier artifact digest does not match operator policy")
-
     cli_path = Path(validated_policy["gh_cli_path"])
     cli_digest_before = _hash_regular_file(cli_path, "GitHub CLI")
     if cli_digest_before != validated_policy["gh_cli_sha256"]:
         raise ProvenanceVerificationError("GitHub CLI binary digest does not match operator policy")
 
-    output = _run_attestation_verification(artifact, validated_policy, runner=runner)
-    artifact_digest_after = _hash_regular_file(artifact, "verifier artifact")
-    cli_digest_after = _hash_regular_file(cli_path, "GitHub CLI")
-    if artifact_digest_after != artifact_digest_before:
-        raise ProvenanceVerificationError("verifier artifact changed during provenance verification")
-    if cli_digest_after != cli_digest_before:
-        raise ProvenanceVerificationError("GitHub CLI binary changed during provenance verification")
+    with tempfile.TemporaryDirectory(prefix="symthaea-verifier-snapshot-") as snapshot_directory:
+        snapshot = Path(snapshot_directory) / "cyber-crucible-verifier-v1.tar.gz"
+        artifact_digest = _copy_artifact_to_private_snapshot(artifact, snapshot)
+        if artifact_digest != validated_policy["artifact_sha256"]:
+            raise ProvenanceVerificationError("verifier artifact digest does not match operator policy")
 
-    statement = _single_verified_statement(output)
-    verified_claims = _validate_statement(statement, validated_policy, artifact_digest_after)
-    return {
-        "schema_version": "cyber-crucible-verifier-provenance-result.v1",
-        "provenance_verified": True,
-        "attestation_signature_verified": True,
-        "verified_transparency_timestamp_present": True,
-        "verification_tool": "gh attestation verify",
-        "policy_id": validated_policy["policy_id"],
-        "policy_digest": json_digest(validated_policy),
-        **verified_claims,
-        "non_authorizing": True,
-    }
+        output = _run_attestation_verification(snapshot, validated_policy, runner=runner)
+        if _hash_regular_file(snapshot, "verifier artifact snapshot") != artifact_digest:
+            raise ProvenanceVerificationError("private verifier snapshot changed during attestation verification")
+        if _hash_regular_file(cli_path, "GitHub CLI") != cli_digest_before:
+            raise ProvenanceVerificationError("GitHub CLI binary changed during verification")
+
+        statement = _single_verified_statement(output)
+        verified_claims = _validate_statement(statement, validated_policy, artifact_digest)
+        try:
+            bundle_result = verify_bundle(
+                snapshot,
+                expected_source_commit=validated_policy["source_commit"],
+            )
+        except BundleError as exc:
+            raise ProvenanceVerificationError(f"attested artifact is not a valid deterministic verifier bundle: {exc}") from exc
+        if bundle_result["bundle_sha256"] != artifact_digest:
+            raise ProvenanceVerificationError("verified bundle digest differs from the attested artifact digest")
+
+        return {
+            "schema_version": "cyber-crucible-verifier-provenance-result.v1",
+            "provenance_verified": True,
+            "attestation_signature_verified": True,
+            "verified_transparency_timestamp_present": True,
+            "bundle_verified": True,
+            "bundle_schema_version": bundle_result["schema_version"],
+            "bundle_file_count": bundle_result["file_count"],
+            "verification_tool": "gh attestation verify",
+            "policy_id": validated_policy["policy_id"],
+            "policy_digest": json_digest(validated_policy),
+            **verified_claims,
+            "non_authorizing": True,
+        }
 
 
 def main(argv: list[str] | None = None) -> int:
