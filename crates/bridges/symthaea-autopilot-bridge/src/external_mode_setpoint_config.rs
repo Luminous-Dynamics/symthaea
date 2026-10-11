@@ -581,8 +581,11 @@ pub enum Px4ExternalModeSetpointConfigOutcomeV1 {
         /// Maximum wait allowed by the profile.
         max_reply_wait_ns: u64,
     },
-    /// No reply was observed before the profile's response-wait ceiling.
-    ReplyMissing {
+    /// The capture contains no correlated reply before the local deadline.
+    ///
+    /// This alone cannot distinguish PX4 nonresponse from transport, decoder, or
+    /// capture loss; it records only the absence in this evidence window.
+    ReplyNotObservedBeforeDeadline {
         /// Age of the request in the companion clock.
         request_age_ns: u64,
         /// Maximum wait allowed by the profile.
@@ -723,7 +726,7 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
                 .elapsed_since(&self.request.submitted_at)
                 .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
             return if request_age_ns > self.profile.max_reply_wait_ns {
-                Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyMissing {
+                Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline {
                     request_age_ns,
                     max_reply_wait_ns: self.profile.max_reply_wait_ns,
                 })
@@ -1199,7 +1202,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_reply_is_awaiting_then_missing_after_the_declared_deadline() {
+    fn missing_reply_is_awaiting_then_not_observed_after_the_declared_deadline() {
         assert!(matches!(
             assessment(request(), None, 1_100_000_000).outcome().unwrap(),
             Px4ExternalModeSetpointConfigOutcomeV1::AwaitingReply {
@@ -1209,7 +1212,7 @@ mod tests {
         ));
         assert!(matches!(
             assessment(request(), None, 1_300_000_001).outcome().unwrap(),
-            Px4ExternalModeSetpointConfigOutcomeV1::ReplyMissing {
+            Px4ExternalModeSetpointConfigOutcomeV1::ReplyNotObservedBeforeDeadline {
                 request_age_ns: 300_000_001,
                 ..
             }
