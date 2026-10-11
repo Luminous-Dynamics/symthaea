@@ -1,0 +1,124 @@
+# Focused software-contract qualification for Symthaea evidence surfaces.
+#
+# This lane exists to answer a narrow question quickly: does the exact PR head
+# satisfy the evidence-plane / psych-bench software contracts it changes?
+# It does NOT replace repository-wide CI and does NOT establish empirical or
+# scientific evidence about Symthaea, Butlin indicators, or consciousness.
+
+name: Evidence Contract Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/evidence-contract.yml'
+      - 'scripts/qualify-evidence-contract.sh'
+      - 'crates/core/symthaea-evidence-plane/**'
+      - 'crates/domains/symthaea-psych-bench/**'
+      - 'crates/core/symthaea-core/**'
+      - 'src/cognitive_loop/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/config.toml'
+      - 'rust-toolchain*'
+  workflow_dispatch:
+
+# Automatic runs may supersede older heads for the same PR. Deliberate manual
+# runs receive a unique group so a later push cannot cancel a requested exact-
+# head qualification attempt.
+concurrency:
+  group: evidence-contract-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  EVIDENCE_RUNNER_LABEL: ubuntu-24.04
+
+jobs:
+  evidence-contract:
+    name: Exact-head evidence contracts
+    # Match the already-audited focused Spore qualification convention: pin
+    # the OS generation rather than the moving ubuntu-latest alias. The hosted
+    # image still evolves; the qualifier records the observed runtime/toolchain.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact qualified head
+        # actions/checkout v4 release-line commit already audited by #406/#438.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/evidence-contract.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/evidence-contract.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/evidence-contract.yml; then
+            echo 'mutable major-version GitHub Action tag found in evidence qualification workflow' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc --version
+          cargo --version
+
+      - name: Install focused system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev
+
+      - name: Qualify evidence contracts
+        env:
+          QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          EVIDENCE_CONTRACT_RECEIPT: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
+        run: bash scripts/qualify-evidence-contract.sh
+
+      - name: Publish receipt digest
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RECEIPT" ]]; then
+            echo 'No qualification receipt was produced; execution did not reach the receipt-bearing verifier.'
+            exit 0
+          fi
+          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          echo "evidence-contract receipt_sha256=$digest"
+          {
+            echo
+            echo "- receipt SHA-256: \`$digest\`"
+            echo '- receipt bytes are not independently signed; this digest is witnessed by the workflow log.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: evidence-contract-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
+          if-no-files-found: warn
+          retention-days: 14
