@@ -20,6 +20,25 @@ PROVENANCE_CLASSES = {"primary_source", "derived", "engineering_assumption", "me
 PROVENANCE_STATES = {"not_reviewed", "independently_reviewed", "rejected"}
 
 
+def reject_duplicate_keys(pairs):
+    """Reject duplicate JSON object keys instead of silently keeping the last value."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def reject_nonstandard_constant(value):
+    """Reject NaN/Infinity tokens, which are not valid JSON numbers."""
+    raise ValueError(f"non-standard JSON numeric constant: {value}")
+
+
+def parse_manifest_json(text):
+    return json.loads(text, object_pairs_hook=reject_duplicate_keys, parse_constant=reject_nonstandard_constant)
+
+
 def finite(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
@@ -344,6 +363,18 @@ def self_test():
     check("object_required_fields_fails_closed_without_exception", r["validation_state"]=="failed_contract_checks" and any("required_fields must be the exact ordered list" in e for e in r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["skyhook_support_locations_rad"]=[1e-10,2*math.pi-1e-10,2.0]; c["declared_state"]="Blocked"; r=assess(c)
     check("support_angles_duplicate_across_zero_wrap_block", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1 and any("unique modulo 2π" in e for e in r["type_errors"]))
+    try:
+        parse_manifest_json('{"schema":"first","schema":"second"}')
+        duplicate_key_rejected = False
+    except ValueError as exc:
+        duplicate_key_rejected = "duplicate JSON object key: schema" in str(exc)
+    check("duplicate_json_object_keys_rejected", duplicate_key_rejected)
+    try:
+        parse_manifest_json('{"required_inputs":{"ring_radius_m":NaN}}')
+        nonstandard_number_rejected = False
+    except ValueError as exc:
+        nonstandard_number_rejected = "non-standard JSON numeric constant: NaN" in str(exc)
+    check("nonstandard_nan_token_rejected", nonstandard_number_rejected)
     report={"schema":"luminous-dynamics.orbital-ring-manifest-self-test/v1",
             "checks_passed":sum(t["status"]=="passed" for t in tests),"checks_failed":sum(t["status"]!="passed" for t in tests),
             "checks":tests,"interpretation":"Contract and provenance checks only; review-ready does not mean physically validated or safe."}
@@ -355,8 +386,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__); p.add_argument("manifest",nargs="?"); p.add_argument("--self-test",action="store_true"); a=p.parse_args()
     if a.self_test: return self_test()
     if not a.manifest: p.error("manifest path required unless --self-test is used")
-    try: m=json.loads(Path(a.manifest).read_text(encoding="utf-8"))
-    except (OSError,json.JSONDecodeError) as exc:
+    try: m=parse_manifest_json(Path(a.manifest).read_text(encoding="utf-8"))
+    except (OSError,ValueError) as exc:
         print(json.dumps({"validation_state":"failed_to_read_manifest","error":str(exc)},sort_keys=True)); return 2
     r=assess(m); print(json.dumps(r,indent=2,sort_keys=True,allow_nan=False))
     return 0 if r["validation_state"]=="passed_contract_checks" else 1
