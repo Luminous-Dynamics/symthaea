@@ -650,7 +650,7 @@ mod tests {
     }
 
     #[test]
-    fn test_near_zero_baseline_passes() {
+    fn test_near_zero_baseline_is_not_qualified() {
         let mut baseline = make_test_snapshot("baseline", 0.90);
         // Insert a near-zero metric
         baseline.metrics.get_mut("TestBench").unwrap().insert(
@@ -675,9 +675,13 @@ mod tests {
             },
         );
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
-        // Near-zero baseline should always pass (no div-by-zero)
+        // The exploratory summary must not turn an undefined percentage
+        // comparison into a positive pass, even though no division occurs.
         assert!(!report.has_regressions());
         assert_eq!(report.summary.total_metrics, 2);
+        let summary = report.format_summary();
+        assert!(summary.contains("near zero"));
+        assert!(!summary.contains("All metrics within baseline CI"));
     }
 
     #[test]
