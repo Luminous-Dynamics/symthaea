@@ -1,0 +1,103 @@
+{
+  "schema": "symthaea.bio-millennium.challenge-source-manifest.v1",
+  "manifest_generation": 1,
+  "source_subject": {
+    "publisher": "FutureHouse / Edison Scientific",
+    "announcement_title": "Millennium Problems for Biology",
+    "announcement_url": "https://www.futurehouse.org/news/millennium-problems-for-biology",
+    "living_site_url": "https://millenniumproblems.bio/",
+    "published_date": "2026-09-23",
+    "retrieved_date": "2026-09-27",
+    "living_project": true,
+    "source_snapshot_vendored": false,
+    "acceptance_criteria_transcribed": false
+  },
+  "local_authority": {
+    "classification": "source-manifest-only",
+    "scientific_result_claimed": false,
+    "challenge_solved_claimed": false,
+    "experimental_authority_granted": false,
+    "notes": "This manifest freezes source identity, publication/retrieval dates, order, IDs, and titles only. It does not freeze or reinterpret the living site's detailed acceptance criteria."
+  },
+  "challenges": [
+    {
+      "id": "MPB-2026-09-23-01",
+      "ordinal": 1,
+      "slug": "origins-of-life",
+      "title": "Origins of life"
+    },
+    {
+      "id": "MPB-2026-09-23-02",
+      "ordinal": 2,
+      "slug": "cryopreservation",
+      "title": "Cryopreservation"
+    },
+    {
+      "id": "MPB-2026-09-23-03",
+      "ordinal": 3,
+      "slug": "reverse-translatase",
+      "title": "The reverse translatase"
+    },
+    {
+      "id": "MPB-2026-09-23-04",
+      "ordinal": 4,
+      "slug": "improve-rubisco",
+      "title": "Improve Rubisco"
+    },
+    {
+      "id": "MPB-2026-09-23-05",
+      "ordinal": 5,
+      "slug": "quadruplet-cell",
+      "title": "The quadruplet cell"
+    },
+    {
+      "id": "MPB-2026-09-23-06",
+      "ordinal": 6,
+      "slug": "somatic-limb-regeneration",
+      "title": "Somatic limb regeneration"
+    },
+    {
+      "id": "MPB-2026-09-23-07",
+      "ordinal": 7,
+      "slug": "bacterial-production-of-gene-therapies",
+      "title": "Bacterial production of gene therapies"
+    },
+    {
+      "id": "MPB-2026-09-23-08",
+      "ordinal": 8,
+      "slug": "programmable-proteases",
+      "title": "Programmable proteases"
+    },
+    {
+      "id": "MPB-2026-09-23-09",
+      "ordinal": 9,
+      "slug": "cell-penetrating-protein-binders",
+      "title": "Cell-penetrating protein binders"
+    },
+    {
+      "id": "MPB-2026-09-23-10",
+      "ordinal": 10,
+      "slug": "protein-amplification-chain-reaction",
+      "title": "Protein amplification chain reaction"
+    },
+    {
+      "id": "MPB-2026-09-23-11",
+      "ordinal": 11,
+      "slug": "5-prime-polymerases",
+      "title": "5' polymerases"
+    },
+    {
+      "id": "MPB-2026-09-23-12",
+      "ordinal": 12,
+      "slug": "new-nitrogenases",
+      "title": "New nitrogenases"
+    }
+  ],
+  "invariants": [
+    "source order is preserved exactly as published in the 2026-09-23 FutureHouse announcement",
+    "a later edit of the living external challenge does not mutate this manifest generation",
+    "detailed acceptance criteria require a separately source-bound contract generation",
+    "local surrogate benchmarks must not be represented as official challenge criteria",
+    "source identity or title/order changes require a new manifest generation rather than in-place reinterpretation"
+  ]
+}
