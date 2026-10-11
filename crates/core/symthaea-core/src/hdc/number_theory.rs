@@ -669,10 +669,23 @@ impl ModularRing {
         engine.gcd(a, self.modulus) == 1
     }
 
-    /// Euler's totient function: count of units in Z/nZ
+    /// Euler's totient function, computed from the distinct prime factors of the modulus.
+    ///
+    /// Uses phi(n) = n * product(1 - 1/p) over distinct prime factors p of n,
+    /// avoiding the previous linear scan over every residue. Prime moduli therefore
+    /// benefit from the deterministic Miller-Rabin fast path in factorize().
+    /// By convention, phi(1) = 1.
     pub fn euler_totient(&self) -> u64 {
         self.assert_valid_modulus();
-        (1..self.modulus).filter(|&a| self.is_unit(a)).count() as u64
+
+        let factorization = NumberTheoryEngine::new().factorize(self.modulus);
+        let mut totient = self.modulus;
+        for (prime, _) in factorization.factors {
+            // Divide first: this stays exact and avoids an unnecessary product
+            // that could overflow even if the final totient is representable.
+            totient = (totient / prime) * (prime - 1);
+        }
+        totient
     }
 }
 
@@ -816,6 +829,28 @@ mod tests {
     fn test_euler_totient() {
         let ring = ModularRing::new(12);
         assert_eq!(ring.euler_totient(), 4); // {1, 5, 7, 11}
+        assert_eq!(ModularRing::new(1).euler_totient(), 1); // phi(1) = 1 by convention
+    }
+
+    #[test]
+    fn test_euler_totient_matches_coprime_count_for_small_moduli() {
+        let engine = NumberTheoryEngine::new();
+        for modulus in 1u64..=128 {
+            let expected = (1..=modulus)
+                .filter(|&a| engine.gcd(a, modulus) == 1)
+                .count() as u64;
+            assert_eq!(
+                ModularRing::new(modulus).euler_totient(),
+                expected,
+                "modulus={modulus}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_euler_totient_handles_large_u64_prime_without_residue_scan() {
+        let prime = 18_446_744_073_709_551_557u64;
+        assert_eq!(ModularRing::new(prime).euler_totient(), prime - 1);
     }
 
     #[test]
