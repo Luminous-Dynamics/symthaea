@@ -203,15 +203,15 @@ jobs:
         shell: bash
         env:
           NATIVE_OUTCOME: ${{ steps.native_sweep.outcome }}
-          PYSF_COMPARISON_OUTCOME: ${{ steps.pyscf_comparison.outcome }}
+          PYSCF_COMPARISON_OUTCOME: ${{ steps.pyscf_comparison.outcome }}
         run: |
           set -euo pipefail
           if [[ "$NATIVE_OUTCOME" != "success" ]]; then
             printf 'Native DFT grid sweep outcome was %s\n' "$NATIVE_OUTCOME" >&2
             exit 1
           fi
-          if [[ "$PYSF_COMPARISON_OUTCOME" != "success" ]]; then
-            printf 'Matched-grid PySCF comparison outcome was %s\n' "$PYSF_COMPARISON_OUTCOME" >&2
+          if [[ "$PYSCF_COMPARISON_OUTCOME" != "success" ]]; then
+            printf 'Matched-grid PySCF comparison outcome was %s\n' "$PYSCF_COMPARISON_OUTCOME" >&2
             exit 1
           fi
 
