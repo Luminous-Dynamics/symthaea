@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 USER_AGENT = "LuminousDynamics-ProteinResearch/1.0"
+ALLOWED_ZENODO_HOSTS = {"zenodo.org", "www.zenodo.org", "api.zenodo.org"}
 DEFAULT_TIMEOUT_SECONDS = 30
 MAX_METADATA_BYTES = 25 * 1024 * 1024
 CHUNK_BYTES = 1024 * 1024
@@ -34,10 +35,27 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def validate_final_response_url(response: Any, action: str) -> None:
+    """Reject unexpected HTTP redirects when the response exposes its final URL."""
+    geturl = getattr(response, "geturl", None)
+    if not callable(geturl):  # urllib responses expose geturl; lightweight test doubles may not.
+        return
+    final_url = geturl()
+    parsed = urlparse(final_url)
+    if (
+        parsed.scheme != "https"
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.hostname not in ALLOWED_ZENODO_HOSTS
+    ):
+        raise FetchError(f"refusing {action} after redirect to a non-Zenodo or non-HTTPS URL: {final_url!r}")
+
+
 def request_bytes(url: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> bytes:
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     try:
         with urlopen(request, timeout=timeout) as response:
+            validate_final_response_url(response, "metadata retrieval")
             raw = response.read(MAX_METADATA_BYTES + 1)
             if len(raw) > MAX_METADATA_BYTES:
                 raise FetchError(f"metadata response exceeded {MAX_METADATA_BYTES} bytes")
@@ -140,6 +158,7 @@ def download_verified(
     try:
         try:
             with urlopen(request, timeout=timeout) as response, temporary_path.open("wb") as out:
+                validate_final_response_url(response, "file download")
                 while True:
                     chunk = response.read(CHUNK_BYTES)
                     if not chunk:
