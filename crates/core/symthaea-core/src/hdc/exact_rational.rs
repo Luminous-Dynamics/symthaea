@@ -815,6 +815,14 @@ mod tests {
     }
 
     #[test]
+    fn float_conversion_retains_smallest_positive_subnormal() {
+        let limit = RationalBudget::default();
+        let denominator = (BigInt::from(1u8) << 1074usize).to_str_radix(10);
+        let smallest = ExactRational::parse("1", &denominator, limit).unwrap();
+        assert_eq!(smallest.to_f64_approx(), Some(f64::from_bits(1)));
+    }
+
+    #[test]
     fn float_conversion_reports_overflow_and_total_underflow() {
         let limit = RationalBudget::default();
         let huge = format!("1{}", "0".repeat(1_100));
