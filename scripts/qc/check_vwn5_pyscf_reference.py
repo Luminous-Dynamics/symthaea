@@ -60,25 +60,20 @@ def main() -> int:
     args = parser.parse_args()
 
     # Record and assert the actual functional identifiers resolved by this
-    # PySCF/Libxc build. This prevents a renamed alias from silently changing
-    # the comparison while retaining the same display string.
+    # PySCF/Libxc build. Use the documented two-part name parser for the
+    # compound LDA exchange + VWN correlation expression.
     xc_codes = getattr(libxc, "XC_CODES", {})
     expected_x_id = xc_codes.get("LDA_X")
     expected_c_id = xc_codes.get("LDA_C_VWN")
     if expected_x_id is None or expected_c_id is None:
         raise RuntimeError("PySCF/Libxc does not expose expected LDA_X / LDA_C_VWN codes")
 
-    _, pure_terms = libxc.parse_xc(",vwn")
-    _, compound_terms = libxc.parse_xc("lda,vwn")
-    if len(pure_terms) != 1 or pure_terms[0][0] != expected_c_id:
-        raise RuntimeError(f",vwn did not resolve only to LDA_C_VWN: {pure_terms}")
-    if (
-        len(compound_terms) != 2
-        or compound_terms[0][0] != expected_x_id
-        or compound_terms[1][0] != expected_c_id
-    ):
+    parsed_x_id, parsed_c_id = libxc.parse_xc_name("lda,vwn")
+    if parsed_x_id != expected_x_id or parsed_c_id != expected_c_id:
         raise RuntimeError(
-            f"lda,vwn did not resolve to ordered LDA_X + LDA_C_VWN terms: {compound_terms}"
+            "lda,vwn resolved to unexpected Libxc IDs: "
+            f"X={parsed_x_id} C={parsed_c_id}; "
+            f"expected X={expected_x_id} C={expected_c_id}"
         )
 
     densities = np.asarray([entry[0] for entry in REFERENCES], dtype=float)
@@ -131,10 +126,8 @@ def main() -> int:
         "scipy_version": scipy.__version__,
         "backend": "PySCF Libxc",
         "functional_ids": {
-            "LDA_X": int(expected_x_id),
-            "LDA_C_VWN": int(expected_c_id),
-            "pure_c_terms": [[int(code), float(factor)] for code, factor in pure_terms],
-            "compound_terms": [[int(code), float(factor)] for code, factor in compound_terms],
+            "LDA_X": int(parsed_x_id),
+            "LDA_C_VWN": int(parsed_c_id),
         },
         "correlation_functional": ",vwn",
         "compound_functional": "lda,vwn",
