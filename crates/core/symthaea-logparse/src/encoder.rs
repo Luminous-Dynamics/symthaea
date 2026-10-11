@@ -173,16 +173,65 @@ pub fn encode(event: &LogEvent) -> Hdv {
 /// is discarded after mapping known IDs into a small semantic family. Unknown IDs
 /// share an `unknown` bucket. Numeric IDs can collide across providers, so this
 /// heuristic must be evaluated cross-corpus before use in production.
-fn event_family(event_id: u32) -> &'static str {
-    match event_id {
-        4624 | 4625 | 4634 | 4647 | 4648 | 4768 | 4769 | 4771 | 4776 => "authentication",
-        1 | 4688 | 4689 => "process",
-        11 => "file",
-        3 | 5156 => "network",
-        12 | 13 | 14 | 4657 => "registry",
-        4697 | 4698 | 4699 | 4700 | 4702 | 7040 | 7045 => "service_task",
-        4103 | 4104 => "scripting",
-        4656 | 4660 | 4663 => "object_access",
+fn normalized_source_token(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .map(|ch| ch.to_ascii_lowercase())
+        .collect()
+}
+
+/// Recognize a small number of provider namespaces without retaining their raw
+/// names in the ablation vector. Unrecognized namespaces fail closed to unknown.
+fn provider_family(provider: &str, component: &str) -> &'static str {
+    let provider = normalized_source_token(provider);
+    let component = normalized_source_token(component);
+
+    if provider.contains("sysmon") || component.contains("sysmon") {
+        "sysmon"
+    } else if provider.contains("securityauditing")
+        || (provider.is_empty() && component == "security")
+    {
+        "security_audit"
+    } else if provider.contains("servicecontrolmanager") {
+        "service_control_manager"
+    } else if provider.contains("powershell") || component.contains("powershell") {
+        "powershell"
+    } else {
+        "unknown"
+    }
+}
+
+/// Coarse, provider-aware Windows event family used by the domain-invariant
+/// ablation. The same numeric EventID in an unrelated namespace is not assumed
+/// to have the same meaning. Provider/channel tokens select the namespace only;
+/// raw provider/channel names are never encoded into the resulting vector.
+fn event_family(provider: &str, component: &str, event_id: u32) -> &'static str {
+    match provider_family(provider, component) {
+        "sysmon" => match event_id {
+            1 => "process",
+            3 => "network",
+            11 => "file",
+            12 | 13 | 14 => "registry",
+            _ => "unknown",
+        },
+        "security_audit" => match event_id {
+            4624 | 4625 | 4634 | 4647 | 4648 | 4768 | 4769 | 4771 | 4776 => "authentication",
+            4688 | 4689 => "process",
+            4657 => "registry",
+            4697 | 4698 | 4699 | 4700 | 4702 => "service_task",
+            4656 | 4660 | 4663 => "object_access",
+            5156 => "network",
+            _ => "unknown",
+        },
+        "service_control_manager" => match event_id {
+            7036 | 7040 | 7045 => "service_task",
+            _ => "unknown",
+        },
+        "powershell" => match event_id {
+            4103 | 4104 => "scripting",
+            _ => "unknown",
+        },
         _ => "unknown",
     }
 }
@@ -254,7 +303,7 @@ fn canonical_field_key(key: &str) -> String {
 ///
 /// Compared with [`encode`], this version:
 /// - drops raw provider and component strings;
-/// - maps known numeric Windows EventIDs into coarse event families;
+/// - maps EventIDs into coarse families within recognized provider namespaces;
 /// - canonicalizes common structured-field name aliases;
 /// - retains source, severity, and field values as separate channels.
 ///
@@ -268,7 +317,10 @@ pub fn encode_domain_invariant(event: &LogEvent) -> Hdv {
     parts.push(bind(role_severity(), &severity_hv(event.severity)));
     parts.push(bind(
         role_event_id(),
-        &hash_hv(&format!("EVENT_FAMILY::{}", event_family(event.event_id))),
+        &hash_hv(&format!(
+            "EVENT_FAMILY::{}",
+            event_family(&event.provider, &event.component, event.event_id)
+        )),
     ));
 
     if !event.fields.is_empty() {
@@ -351,18 +403,72 @@ mod tests {
 
     #[test]
     fn domain_invariant_encoding_buckets_known_event_id_families() {
-        let a = encode_domain_invariant(&ev("provider-a", 4624, ""));
-        let b = encode_domain_invariant(&ev("provider-b", 4625, ""));
-        let c = encode_domain_invariant(&ev("provider-c", 4688, ""));
+        let a = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4624,
+            "",
+        ));
+        let b = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4625,
+            "",
+        ));
+        let c = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        ));
 
-        assert_eq!(a, b, "4624 and 4625 are both authentication-family events");
-        assert_ne!(a, c, "authentication and process families must remain distinct");
+        assert_eq!(a, b, "security authentication IDs share a family");
+        assert_ne!(a, c, "authentication and process families remain distinct");
+    }
+
+    #[test]
+    fn domain_invariant_encoding_maps_equivalent_families_across_providers() {
+        let sysmon_process = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Sysmon",
+            1,
+            "",
+        ));
+        let security_process = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        ));
+        assert_eq!(sysmon_process, security_process);
+
+        let sysmon_network = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Sysmon",
+            3,
+            "",
+        ));
+        let security_network = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            5156,
+            "",
+        ));
+        assert_eq!(sysmon_network, security_network);
+    }
+
+    #[test]
+    fn domain_invariant_encoding_does_not_conflate_event_ids_across_namespaces() {
+        let sysmon_file = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Sysmon",
+            11,
+            "",
+        ));
+        let unknown_id_eleven = encode_domain_invariant(&ev(
+            "Vendor-Unknown-Provider",
+            11,
+            "",
+        ));
+        assert_ne!(sysmon_file, unknown_id_eleven);
     }
 
     #[test]
     fn unknown_event_ids_do_not_leak_raw_numeric_id() {
-        let a = encode_domain_invariant(&ev("provider-a", 90001, ""));
-        let b = encode_domain_invariant(&ev("provider-b", 90002, ""));
+        let a = encode_domain_invariant(&ev("Microsoft-Windows-Sysmon", 90001, ""));
+        let b = encode_domain_invariant(&ev("Microsoft-Windows-Sysmon", 90002, ""));
         assert_eq!(a, b, "unmapped IDs intentionally share the unknown family");
     }
 
