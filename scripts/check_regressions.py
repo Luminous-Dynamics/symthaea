@@ -7,8 +7,8 @@
 Symthaea Benchmark Regression Checker
 Reference: BENCHMARKING_STRATEGY.md Section 36
 
-Analyzes benchmark results and detects performance regressions.
-Uses statistical tests to determine significance.
+Analyzes Criterion point-estimate changes and reports effect sizes.
+The checker fails closed when the caller requires a missing baseline to be present.
 """
 
 import argparse
