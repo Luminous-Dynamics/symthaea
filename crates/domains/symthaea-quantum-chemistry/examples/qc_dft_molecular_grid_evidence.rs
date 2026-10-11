@@ -129,8 +129,7 @@ fn main() {
             match try_kohn_sham_dft(molecule, &basis, &config) {
                 Ok(result) => {
                     let receipt_present = result.solver_diagnostics.is_some();
-                    let electron_integral_finite =
-                        result.integrated_electron_count.is_finite()
+                    let electron_integral_finite = result.integrated_electron_count.is_finite()
                         && result.integrated_electron_count_abs_error.is_finite();
                     all_solver_receipts_present &= receipt_present;
                     all_scf_converged &= result.converged;
