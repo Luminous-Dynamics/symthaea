@@ -59,6 +59,21 @@ The consumer validates the existing diagnostic-loop contract, checks the exact i
 
 Do not place signing private keys in the subject workspace or source repository. The signing service should construct receipts only after it has independently computed the decision and bound context. This repository contains a verifier, not a production decision-signing key or signing service.
 
+## Next production gate: authenticate verifier build provenance
+
+The `verifier_build_digest` in this receipt is a binding, not proof that the named binary was built from trusted source or that the running process executed those bytes. Before using this decision path outside qualification tests, verify a signed provenance statement for the exact verifier artifact.
+
+A production provenance verifier should independently check:
+
+- The provenance subject digest equals the externally expected verifier artifact digest.
+- The builder identity, source repository, exact source commit, workflow identity/ref, and build invocation match operator-pinned expectations.
+- The provenance signature is trusted and its transparency-log or timestamp evidence is valid where the deployment depends on those properties.
+- Missing provenance, subject mismatch, untrusted builder identity, source/ref mismatch, or invalid signature is a hard rejection.
+
+The expected builder and source identities must come from verifier-operator policy, not values copied out of the attestation. Keep the provenance artifact/bundle digest and verifier-policy revision available for audit. Do not silently replace the current Ed25519 decision-receipt format with a new supply-chain format; verify provenance as a separate prerequisite and record the resulting assurance.
+
+Relevant primary references: [SLSA Build Provenance v1](https://github.com/slsa-framework/slsa/blob/main/spec/build-provenance.md) describes provenance for verifying how artifacts were produced. [Sigstore verification documentation](https://docs.sigstore.dev/cosign/verifying/verify/) describes signature/identity verification, and the [Sigstore bundle specification](https://docs.sigstore.dev/about/bundle/) describes verification material, transparency-log entries, and signed timestamps. These are design references for the next gate, not implemented capabilities in this PR.
+
 ## Status and non-claims
 
 The implementation and regression suite are a contract tranche, not a qualification result. Test files use deterministic test-only key material. The public fixture is not a hidden oracle. Passing schema/unit tests does not establish cross-domain cybersecurity competence or authorization for live containment.
