@@ -2375,22 +2375,26 @@ mod tests {
             (
                 "ArmingCheckRequest v1",
                 "79a30af500ecf3661169f62a50edfe0f02fbcd8f",
+                "msg/versioned/ArmingCheckRequest.msg",
             ),
             (
                 "ArmingCheckReply v1",
                 "604539e49066546e518c7ebaec8b6f1a7cc97285",
+                "msg/versioned/ArmingCheckReply.msg",
             ),
             (
                 "RegisterExtComponentReply v1",
                 "17ff6765c9a1980f1cec163a0ff38aea07491a12",
+                "msg/versioned/RegisterExtComponentReply.msg",
             ),
             (
                 "SetpointConfigReply v1",
                 "d5c8cb562461a2826f782d3ec8ee5a5c65674471",
+                "msg/versioned/SetpointConfigReply.msg",
             ),
         ];
         assert_eq!(corpus.provenance.source_contracts.len(), pinned_contracts.len());
-        for (message, blob_sha) in pinned_contracts {
+        for (message, blob_sha, expected_path) in pinned_contracts {
             let matching = corpus
                 .provenance
                 .source_contracts
@@ -2403,15 +2407,20 @@ mod tests {
                 contract.source_blob_sha, blob_sha,
                 "source blob changed for {message}"
             );
+            let revision_and_path = contract
+                .source_url
+                .strip_prefix("https://github.com/PX4/PX4-Autopilot/blob/")
+                .unwrap_or_else(|| panic!("unexpected source URL for {message}"));
+            let (revision, path) = revision_and_path
+                .split_once('/')
+                .unwrap_or_else(|| panic!("source URL is missing its path for {message}"));
             assert!(
-                contract.source_url.starts_with(
-                    "https://github.com/PX4/PX4-Autopilot/blob/"
-                ),
-                "unexpected source URL for {message}"
+                revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit()),
+                "source revision is not an immutable commit SHA for {message}"
             );
-            assert!(
-                contract.source_url.contains("/msg/versioned/"),
-                "non-versioned message source for {message}"
+            assert_eq!(
+                path, expected_path,
+                "source URL names the wrong message definition for {message}"
             );
         }
 
