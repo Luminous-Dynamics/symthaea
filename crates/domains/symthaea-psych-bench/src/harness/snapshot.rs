@@ -41,6 +41,9 @@ pub enum RegressionSeverity {
     Warning,
     /// >10% degradation below baseline CI.
     Critical,
+    /// The metric cannot be meaningfully classified (e.g. a near-zero baseline).
+    /// This is a comparison-integrity state, not a scientific regression finding.
+    Unqualified,
 }
 
 /// Comparison result for a single metric.
@@ -88,6 +91,9 @@ pub struct RegressionSummary {
     pub warnings: usize,
     /// Number of metrics with critical regressions.
     pub critical: usize,
+    /// Number of metrics for which this comparison could not be qualified.
+    #[serde(default)]
+    pub unqualified: usize,
 }
 
 impl RegressionSnapshot {
@@ -170,22 +176,53 @@ impl RegressionSnapshot {
             errors.push("Snapshot name is empty".to_string());
         }
 
-        if self.metrics.is_empty() {
+        let metric_count: usize = self.metrics.values().map(BTreeMap::len).sum();
+        if metric_count == 0 {
             errors.push("Snapshot contains no benchmark metrics".to_string());
         }
 
         for (bench, bench_metrics) in &self.metrics {
+            if bench_metrics.is_empty() {
+                errors.push(format!("{bench}: benchmark contains no metrics"));
+            }
             for (metric_name, val) in bench_metrics {
+                if val.n == 0 {
+                    errors.push(format!(
+                        "{}/{}: sample count n must be greater than zero",
+                        bench, metric_name
+                    ));
+                }
                 if !val.mean.is_finite() {
                     errors.push(format!(
                         "{}/{}: mean is not finite ({:?})",
                         bench, metric_name, val.mean
                     ));
                 }
-                if !val.std_dev.is_finite() {
+                if !val.std_dev.is_finite() || val.std_dev < 0.0 {
                     errors.push(format!(
-                        "{}/{}: std_dev is not finite ({:?})",
+                        "{}/{}: std_dev must be finite and non-negative ({:?})",
                         bench, metric_name, val.std_dev
+                    ));
+                }
+                if !val.ci_lower.is_finite() {
+                    errors.push(format!(
+                        "{}/{}: ci_lower is not finite ({:?})",
+                        bench, metric_name, val.ci_lower
+                    ));
+                }
+                if !val.ci_upper.is_finite() {
+                    errors.push(format!(
+                        "{}/{}: ci_upper is not finite ({:?})",
+                        bench, metric_name, val.ci_upper
+                    ));
+                }
+                if val.ci_lower.is_finite()
+                    && val.ci_upper.is_finite()
+                    && val.ci_lower > val.ci_upper
+                {
+                    errors.push(format!(
+                        "{}/{}: ci_lower exceeds ci_upper ({:?} > {:?})",
+                        bench, metric_name, val.ci_lower, val.ci_upper
                     ));
                 }
             }
@@ -217,8 +254,91 @@ impl RegressionSnapshot {
     }
 }
 
+
+/// Errors that disqualify a strict regression comparison before any metric
+/// deltas are interpreted. These describe comparison integrity, not scientific
+/// findings such as an indicator being NotDemonstrated or Contradicted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SnapshotComparisonError {
+    InvalidSnapshot {
+        side: &'static str,
+        errors: Vec<String>,
+    },
+    UnsupportedSchemaVersion {
+        side: &'static str,
+        found: String,
+        expected: String,
+    },
+    MissingBenchmark(String),
+    UnexpectedBenchmark(String),
+    MissingMetric {
+        benchmark: String,
+        metric: String,
+    },
+    UnexpectedMetric {
+        benchmark: String,
+        metric: String,
+    },
+    NearZeroBaseline {
+        benchmark: String,
+        metric: String,
+    },
+    InvalidThresholdPolicy,
+}
+
+impl std::fmt::Display for SnapshotComparisonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidSnapshot { side, errors } => {
+                write!(f, "{side} snapshot is invalid: {}", errors.join("; "))
+            }
+            Self::UnsupportedSchemaVersion { side, found, expected } => write!(
+                f,
+                "{side} snapshot schema {found:?} is not supported for strict comparison; expected {expected:?}"
+            ),
+            Self::MissingBenchmark(name) => {
+                write!(f, "current snapshot is missing baseline benchmark {name:?}")
+            }
+            Self::UnexpectedBenchmark(name) => {
+                write!(f, "current snapshot contains unexpected benchmark {name:?}")
+            }
+            Self::MissingMetric { benchmark, metric } => write!(
+                f,
+                "current snapshot is missing baseline metric {benchmark:?}/{metric:?}"
+            ),
+            Self::UnexpectedMetric { benchmark, metric } => write!(
+                f,
+                "current snapshot contains unexpected metric {benchmark:?}/{metric:?}"
+            ),
+            Self::NearZeroBaseline { benchmark, metric } => write!(
+                f,
+                "baseline metric {benchmark:?}/{metric:?} is near zero; percentage regression comparison is not qualified"
+            ),
+            Self::InvalidThresholdPolicy => write!(
+                f,
+                "regression thresholds must be finite and non-negative, with critical_pct greater than warning_pct"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for SnapshotComparisonError {}
+
+const MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON: f64 = 1e-10;
+
+fn baseline_mean_is_near_zero(mean: f64) -> bool {
+    mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON
+}
+
 impl RegressionReport {
-    /// Compare current results against a baseline snapshot.
+    /// Compare current results against a baseline snapshot using the intersection
+    /// of benchmark/metric keys.
+    ///
+    /// This is an exploratory compatibility API: missing baseline/current keys
+    /// are skipped, and the percentage policy assumes higher-is-better metrics.
+    /// Do not use this method to qualify an evidence baseline or integrity lane.
+    /// Such callers must use `compare_strict_metric_population()` and separately
+    /// verify execution identity and metric direction.
     ///
     /// `warning_pct` and `critical_pct` are degradation thresholds expressed as
     /// fractions (e.g., 0.05 for 5%, 0.10 for 10%). A regression is flagged only
@@ -236,8 +356,12 @@ impl RegressionReport {
             if let Some(current_metrics) = current.metrics.get(bench_name) {
                 for (metric_name, baseline_val) in baseline_metrics {
                     if let Some(current_val) = current_metrics.get(metric_name) {
-                        // Skip metrics where baseline is near zero (avoid div-by-zero)
-                        if baseline_val.mean.abs() < 1e-10 {
+                        // Percentage changes are undefined/unreliable for near-zero baselines.
+                        // The strict comparison API rejects these before reaching
+                        // this exploratory comparator. This legacy path avoids
+                        // division by zero; format_summary() explicitly marks such
+                        // reports as not qualified.
+                        if baseline_mean_is_near_zero(baseline_val.mean) {
                             results.push(RegressionResult {
                                 benchmark: bench_name.clone(),
                                 metric: metric_name.clone(),
@@ -246,7 +370,7 @@ impl RegressionReport {
                                 baseline_ci_upper: baseline_val.ci_upper,
                                 current_mean: current_val.mean,
                                 delta_pct: 0.0,
-                                severity: RegressionSeverity::Pass,
+                                severity: RegressionSeverity::Unqualified,
                             });
                             continue;
                         }
@@ -291,6 +415,10 @@ impl RegressionReport {
             .iter()
             .filter(|r| r.severity == RegressionSeverity::Critical)
             .count();
+        let unqualified = results
+            .iter()
+            .filter(|r| r.severity == RegressionSeverity::Unqualified)
+            .count();
 
         Self {
             baseline_name: baseline.name.clone(),
@@ -298,11 +426,95 @@ impl RegressionReport {
             results,
             summary: RegressionSummary {
                 total_metrics: total,
-                passed: total - warnings - critical,
+                passed: total - warnings - critical - unqualified,
                 warnings,
                 critical,
+                unqualified,
             },
         }
+    }
+
+    /// Compare snapshots only when they contain exactly the same benchmark
+    /// and metric population.
+    ///
+    /// This prevents missing/filtered metrics from silently disappearing from
+    /// the intersection-based exploratory comparison below. The result is
+    /// still only a metric-population comparison: callers must separately
+    /// qualify execution identity and metric direction before treating it as
+    /// evidence-integrity authority.
+    pub fn compare_strict_metric_population(
+        baseline: &RegressionSnapshot,
+        current: &RegressionSnapshot,
+        warning_pct: f64,
+        critical_pct: f64,
+    ) -> Result<Self, SnapshotComparisonError> {
+        if !warning_pct.is_finite()
+            || warning_pct < 0.0
+            || !critical_pct.is_finite()
+            || critical_pct <= warning_pct
+        {
+            return Err(SnapshotComparisonError::InvalidThresholdPolicy);
+        }
+
+        for (side, snapshot) in [("baseline", baseline), ("current", current)] {
+            if snapshot.schema_version != SNAPSHOT_SCHEMA_VERSION {
+                return Err(SnapshotComparisonError::UnsupportedSchemaVersion {
+                    side,
+                    found: snapshot.schema_version.clone(),
+                    expected: SNAPSHOT_SCHEMA_VERSION.to_string(),
+                });
+            }
+            if let Err(errors) = snapshot.validate() {
+                return Err(SnapshotComparisonError::InvalidSnapshot { side, errors });
+            }
+        }
+
+        for benchmark in baseline.metrics.keys() {
+            if !current.metrics.contains_key(benchmark) {
+                return Err(SnapshotComparisonError::MissingBenchmark(benchmark.clone()));
+            }
+        }
+        for benchmark in current.metrics.keys() {
+            if !baseline.metrics.contains_key(benchmark) {
+                return Err(SnapshotComparisonError::UnexpectedBenchmark(benchmark.clone()));
+            }
+        }
+
+        for (benchmark, baseline_metrics) in &baseline.metrics {
+            let current_metrics = current
+                .metrics
+                .get(benchmark)
+                .expect("benchmark key sets were reconciled above");
+            for metric in baseline_metrics.keys() {
+                if !current_metrics.contains_key(metric) {
+                    return Err(SnapshotComparisonError::MissingMetric {
+                        benchmark: benchmark.clone(),
+                        metric: metric.clone(),
+                    });
+                }
+            }
+            for metric in current_metrics.keys() {
+                if !baseline_metrics.contains_key(metric) {
+                    return Err(SnapshotComparisonError::UnexpectedMetric {
+                        benchmark: benchmark.clone(),
+                        metric: metric.clone(),
+                    });
+                }
+            }
+        }
+
+        for (benchmark, metrics) in &baseline.metrics {
+            for (metric, value) in metrics {
+                if baseline_mean_is_near_zero(value.mean) {
+                    return Err(SnapshotComparisonError::NearZeroBaseline {
+                        benchmark: benchmark.clone(),
+                        metric: metric.clone(),
+                    });
+                }
+            }
+        }
+
+        Ok(Self::compare(baseline, current, warning_pct, critical_pct))
     }
 
     /// Returns `true` if any metric has a Critical regression.
@@ -311,8 +523,16 @@ impl RegressionReport {
     }
 
     /// Returns `true` if any metric has a Warning or Critical regression.
+    ///
+    /// This excludes unqualified comparisons, which are not scientific
+    /// regressions. Call `has_unqualified_metrics()` separately.
     pub fn has_regressions(&self) -> bool {
         self.summary.warnings > 0 || self.summary.critical > 0
+    }
+
+    /// Returns `true` if any metric could not be validly compared.
+    pub fn has_unqualified_metrics(&self) -> bool {
+        self.summary.unqualified > 0
     }
 
     /// Format as a human-readable summary string.
@@ -323,11 +543,12 @@ impl RegressionReport {
             self.current_name, self.baseline_name
         ));
         out.push_str(&format!(
-            "Metrics: {} total, {} pass, {} warning, {} critical\n\n",
+            "Metrics: {} total, {} pass, {} warning, {} critical, {} unqualified\n\n",
             self.summary.total_metrics,
             self.summary.passed,
             self.summary.warnings,
-            self.summary.critical
+            self.summary.critical,
+            self.summary.unqualified
         ));
 
         // Only show non-passing metrics
@@ -337,6 +558,7 @@ impl RegressionReport {
                     RegressionSeverity::Warning => "WARN",
                     RegressionSeverity::Critical => "CRIT",
                     RegressionSeverity::Pass => "PASS",
+                    RegressionSeverity::Unqualified => "UNQUALIFIED",
                 };
                 out.push_str(&format!(
                     "[{}] {}/{}: {:.4} -> {:.4} ({:+.1}%)\n",
@@ -350,11 +572,263 @@ impl RegressionReport {
             }
         }
 
-        if !self.has_regressions() {
+        if self.results.is_empty() {
+            // An empty intersection is not a successful regression check.
+            // This message also protects the legacy exploratory API from
+            // presenting zero observed comparisons as an all-pass result.
+            out.push_str("No comparable metrics; this report is not a qualified comparison.\n");
+        } else if self.summary.unqualified > 0 {
+            out.push_str(
+                "At least one baseline metric is near zero; percentage comparison is not qualified.\n",
+            );
+        } else if !self.has_regressions() {
             out.push_str("All metrics within baseline CI. No regressions detected.\n");
         }
 
         out
+    }
+}
+
+#[cfg(test)]
+mod strict_population_tests {
+    use super::*;
+    use crate::harness::report::MetricValue;
+
+    fn snapshot(
+        name: &str,
+        values: &[(&str, &[(&str, f64)])],
+    ) -> RegressionSnapshot {
+        let mut metrics = BTreeMap::new();
+        for (benchmark, benchmark_metrics) in values {
+            let mut per_benchmark = BTreeMap::new();
+            for (metric, mean) in *benchmark_metrics {
+                per_benchmark.insert(
+                    (*metric).to_string(),
+                    MetricValue {
+                        mean: *mean,
+                        std_dev: 0.01,
+                        n: 20,
+                        ci_lower: *mean - 0.02,
+                        ci_upper: *mean + 0.02,
+                    },
+                );
+            }
+            metrics.insert((*benchmark).to_string(), per_benchmark);
+        }
+        RegressionSnapshot {
+            name: name.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            git_hash: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
+            config_summary: "strict comparison unit fixture".to_string(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            metrics,
+        }
+    }
+
+    #[test]
+    fn intersection_report_with_no_comparable_metrics_does_not_claim_pass() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert!(report.results.is_empty());
+        let summary = report.format_summary();
+        assert!(summary.contains("No comparable metrics"));
+        assert!(!summary.contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_zero_sample_count() {
+        let mut invalid = snapshot("zero-n", &[("NBack", &[("accuracy", 0.8)])]);
+        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().n = 0;
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("sample count n")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_negative_dispersion() {
+        let mut invalid = snapshot("negative-sd", &[("NBack", &[("accuracy", 0.8)])]);
+        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().std_dev = -0.1;
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("finite and non-negative")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_nonfinite_or_reversed_confidence_bounds() {
+        let mut nonfinite = snapshot("nonfinite-ci", &[("NBack", &[("accuracy", 0.8)])]);
+        let metric = nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        metric.ci_lower = f64::INFINITY;
+        let errors = nonfinite.validate().unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("ci_lower is not finite")));
+
+        let mut reversed = snapshot("reversed-ci", &[("NBack", &[("accuracy", 0.8)])]);
+        let metric = reversed.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        metric.ci_lower = 0.9;
+        metric.ci_upper = 0.7;
+        let errors = reversed.validate().unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("ci_lower exceeds ci_upper")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_nonempty_benchmark_map_with_no_metrics() {
+        let mut invalid = snapshot("empty-inner", &[]);
+        invalid.metrics.insert("NBack".to_string(), BTreeMap::new());
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("no benchmark metrics")));
+        assert!(errors.iter().any(|error| error.contains("benchmark contains no metrics")));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_missing_benchmark() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::MissingBenchmark("NBack".to_string())
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_missing_metric() {
+        let baseline = snapshot(
+            "baseline",
+            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
+        );
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::MissingMetric {
+                benchmark: "NBack".to_string(),
+                metric: "latency".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unexpected_benchmark() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot(
+            "current",
+            &[
+                ("NBack", &[("accuracy", 0.81)]),
+                ("Stroop", &[("accuracy", 0.7)]),
+            ],
+        );
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnexpectedBenchmark("Stroop".to_string())
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_empty_current_population() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[]);
+        assert!(matches!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10),
+            Err(SnapshotComparisonError::InvalidSnapshot { side: "current", .. })
+        ));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unexpected_metrics() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot(
+            "current",
+            &[("NBack", &[("accuracy", 0.81), ("new_metric", 1.0)])],
+        );
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnexpectedMetric {
+                benchmark: "NBack".to_string(),
+                metric: "new_metric".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_accepts_exact_matching_population() {
+        let baseline = snapshot(
+            "baseline",
+            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
+        );
+        let current = snapshot(
+            "current",
+            &[("NBack", &[("accuracy", 0.81), ("latency", 4.1)])],
+        );
+        let report = RegressionReport::compare_strict_metric_population(
+            &baseline, &current, 0.05, 0.10,
+        )
+        .unwrap();
+        assert_eq!(report.summary.total_metrics, 2);
+        assert_eq!(report.results.len(), 2);
+    }
+
+    #[test]
+    fn exploratory_summary_marks_near_zero_baseline_unqualified() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        let summary = report.format_summary();
+        assert!(summary.contains("near zero"));
+        assert!(!summary.contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_near_zero_baseline_instead_of_marking_pass() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::NearZeroBaseline {
+                benchmark: "NBack".to_string(),
+                metric: "accuracy".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_invalid_threshold_policy() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        for (warning, critical) in [
+            (f64::NAN, 0.10),
+            (-0.01, 0.10),
+            (0.05, f64::INFINITY),
+            (0.10, 0.05),
+            (0.05, 0.05),
+        ] {
+            assert_eq!(
+                RegressionReport::compare_strict_metric_population(
+                    &baseline, &current, warning, critical
+                ).unwrap_err(),
+                SnapshotComparisonError::InvalidThresholdPolicy
+            );
+        }
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unsupported_schema_version() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let mut current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        current.schema_version = "999.0".to_string();
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnsupportedSchemaVersion {
+                side: "current",
+                found: "999.0".to_string(),
+                expected: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            }
+        );
     }
 }
 
@@ -447,7 +921,7 @@ mod tests {
     }
 
     #[test]
-    fn test_near_zero_baseline_passes() {
+    fn test_near_zero_baseline_is_not_qualified() {
         let mut baseline = make_test_snapshot("baseline", 0.90);
         // Insert a near-zero metric
         baseline.metrics.get_mut("TestBench").unwrap().insert(
@@ -472,9 +946,20 @@ mod tests {
             },
         );
         let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
-        // Near-zero baseline should always pass (no div-by-zero)
+        // The exploratory summary must not turn an undefined percentage
+        // comparison into a positive pass, even though no division occurs.
         assert!(!report.has_regressions());
+        assert!(report.has_unqualified_metrics());
         assert_eq!(report.summary.total_metrics, 2);
+        assert_eq!(report.summary.passed, 1);
+        assert_eq!(report.summary.unqualified, 1);
+        assert!(report.results.iter().any(|result| {
+            result.metric == "near_zero" && result.severity == RegressionSeverity::Unqualified
+        }));
+        let summary = report.format_summary();
+        assert!(summary.contains("near zero"));
+        assert!(summary.contains("UNQUALIFIED"));
+        assert!(!summary.contains("All metrics within baseline CI"));
     }
 
     #[test]
