@@ -8,17 +8,17 @@ import json
 import math
 import sys
 
-SCHEMA = "luminous-dynamics.orbital-ring-reference-check/v2"
+SCHEMA = "luminous-dynamics.orbital-ring-reference-check/v3"
 MU = 3.986_004_418e14  # m^3/s^2
 EARTH_RADIUS_KM = 6_378.137
 ALTITUDES_KM = (200.0, 300.0, 400.0, 500.0, 600.0)
 FIXTURES = {
-    200.0: {"radius_km": 6578.137, "circumference_km": 41331.65, "speed_km_s": 7.78426, "period_min": 88.494, "specific_kinetic_energy_mj_kg": 30.297},
-    300.0: {"radius_km": 6678.137, "circumference_km": 41959.97, "speed_km_s": 7.72576, "period_min": 90.520, "specific_kinetic_energy_mj_kg": 29.844},
-    400.0: {"radius_km": 6778.137, "circumference_km": 42588.29, "speed_km_s": 7.66856, "period_min": 92.560, "specific_kinetic_energy_mj_kg": 29.403},
-    500.0: {"radius_km": 6878.137, "circumference_km": 43216.61, "speed_km_s": 7.61261, "period_min": 94.616, "specific_kinetic_energy_mj_kg": 28.976},
+    200.0: {"radius_km": 6578.137, "circumference_km": 41331.65, "speed_km_s": 7.78426, "period_min": 88.494, "specific_kinetic_energy_mj_kg": 30.297, "specific_orbital_energy_mj_kg": -30.297},
+    300.0: {"radius_km": 6678.137, "circumference_km": 41959.97, "speed_km_s": 7.72576, "period_min": 90.520, "specific_kinetic_energy_mj_kg": 29.844, "specific_orbital_energy_mj_kg": -29.844},
+    400.0: {"radius_km": 6778.137, "circumference_km": 42588.29, "speed_km_s": 7.66856, "period_min": 92.560, "specific_kinetic_energy_mj_kg": 29.403, "specific_orbital_energy_mj_kg": -29.403},
+    500.0: {"radius_km": 6878.137, "circumference_km": 43216.61, "speed_km_s": 7.61261, "period_min": 94.616, "specific_kinetic_energy_mj_kg": 28.976, "specific_orbital_energy_mj_kg": -28.976},
     # Historical altitude anchor only; this row is an ideal circular two-body reference.
-    600.0: {"radius_km": 6978.137, "circumference_km": 43844.93, "speed_km_s": 7.55787, "period_min": 96.687, "specific_kinetic_energy_mj_kg": 28.561},
+    600.0: {"radius_km": 6978.137, "circumference_km": 43844.93, "speed_km_s": 7.55787, "period_min": 96.687, "specific_kinetic_energy_mj_kg": 28.561, "specific_orbital_energy_mj_kg": -28.561},
 }
 HISTORICAL_SOURCE_REFERENCE = {
     "citation": "Paul Birch, Orbital Ring Systems and Jacob's Ladders — I (1982), p. 476",
@@ -26,7 +26,7 @@ HISTORICAL_SOURCE_REFERENCE = {
     "claim": "Birch lists 300 km and 600 km as representative suitable ORS heights in the ladder analysis.",
     "use_boundary": "Reference altitude only; these ideal circular two-body values do not establish the actual orbital-ring path, equilibrium, or feasibility.",
 }
-DIGITS = {"radius_km": 3, "circumference_km": 2, "speed_km_s": 5, "period_min": 3, "specific_kinetic_energy_mj_kg": 3}
+DIGITS = {"radius_km": 3, "circumference_km": 2, "speed_km_s": 5, "period_min": 3, "specific_kinetic_energy_mj_kg": 3, "specific_orbital_energy_mj_kg": 3}
 RUST_ANCHORS_400 = {
     "circumference_km": (42588.2908, 0.001),
     "speed_km_s": (7.6685582, 1e-6),
@@ -42,9 +42,11 @@ def calculate(h_km):
     v_m_s = math.sqrt(MU / r_m)
     t_s = 2.0 * math.pi * math.sqrt(r_m**3 / MU)
     e_j_kg = 0.5 * v_m_s**2
+    epsilon_j_kg = e_j_kg - MU / r_m
     return {"altitude_km": h_km, "radius_km": r_km,
             "circumference_km": c_m / 1000.0, "speed_km_s": v_m_s / 1000.0,
-            "period_min": t_s / 60.0, "specific_kinetic_energy_mj_kg": e_j_kg / 1e6}
+            "period_min": t_s / 60.0, "specific_kinetic_energy_mj_kg": e_j_kg / 1e6,
+            "specific_orbital_energy_mj_kg": epsilon_j_kg / 1e6}
 
 
 def normal_force_per_length(line_density_kg_m, inertial_speed_m_s, path_radius_m):
@@ -82,6 +84,7 @@ def main():
             ("kepler_speed_squared_radius", v*v*r, MU),
             ("period_equals_circumference_over_speed", t, c/v),
             ("specific_kinetic_energy", e, 0.5*v*v),
+            ("specific_orbital_energy", row["specific_orbital_energy_mj_kg"] * 1e6, -MU/(2*r)),
         ):
             check(f"invariant.{int(h)}km.{name}", observed, expected,
                   max(abs(expected)*5e-12, 1e-9), "Numerical consistency only.")
@@ -142,7 +145,7 @@ def main():
                         "omitted": ["drag", "J2", "third bodies", "Earth rotation", "ring-support physics"]},
         "historical_source_reference": HISTORICAL_SOURCE_REFERENCE,
         "formulae": {"radius": "r = R_E + h", "circumference": "C = 2*pi*r", "speed": "v = sqrt(mu/r)",
-                     "period": "T = 2*pi*sqrt(r^3/mu)", "specific_kinetic_energy": "e_k = 0.5*v^2"},
+                     "period": "T = 2*pi*sqrt(r^3/mu)", "specific_kinetic_energy": "e_k = 0.5*v^2", "specific_orbital_energy": "epsilon = e_k - mu/r = -mu/(2*r) for a circular two-body orbit"},
         "stream_kinematics_limit": {
             "geometry": "steady mass stream following a fixed circular path in an inertial frame",
             "line_density_kg_m": 1.0, "inertial_speed_m_s": 3.0, "path_radius_m": 10.0,
