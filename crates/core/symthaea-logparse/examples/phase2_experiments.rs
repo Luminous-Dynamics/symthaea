@@ -6,8 +6,9 @@
 //!   1. **Scale-up**: train on the full sbousseaden corpus (post per-file
 //!      cap), not the 1000-event downsample. Does the test accuracy move?
 //!
-//!   2. **5-fold cross-validation**: stratified 5-fold CV on sbousseaden.
-//!      Turn the single-split number into a mean ± std confidence interval.
+//!   2. **Grouped 5-fold cross-validation**: keep each EVTX source file entirely
+//!      within one fold, so neighboring events from one capture cannot appear
+//!      in both train and test.
 //!
 //!   3. **Cross-corpus OOD**: train on sbousseaden, test on OTRF
 //!      Security-Datasets (Mordor-format JSONL). Measures whether the
@@ -78,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ----------------------------------------------------------------
     // Experiment 1: Scale-up single 80/20 split on full sbousseaden
     // ----------------------------------------------------------------
-    println!("\n=== Experiment 1: scale-up (sbousseaden full corpus, 80/20 split) ===");
+    println!("\n=== Experiment 1: scale-up (sbousseaden full corpus, grouped 80/20 split) ===");
     let (tr_hv, tr_y, te_hv, te_y) =
         symthaea_logparse::probe::grouped_stratified_split(
             &sbou_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
@@ -99,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ----------------------------------------------------------------
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
     // ----------------------------------------------------------------
-    println!("\n=== Experiment 2: 5-fold stratified CV on sbousseaden ===");
+    println!("\n=== Experiment 2: grouped 5-fold CV on sbousseaden ===");
     let fold_accs = run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, cfg)?;
     let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
     let var = fold_accs.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / fold_accs.len() as f32;
