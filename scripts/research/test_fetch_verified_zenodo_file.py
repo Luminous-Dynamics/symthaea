@@ -67,6 +67,20 @@ class VerifiedZenodoFetchTests(unittest.TestCase):
         with self.assertRaisesRegex(zenodo.FetchError, "exact basename"):
             zenodo.parse_file_metadata(self.record, "../PeptoneDBs.tar.gz")
 
+    def test_embedded_credentials_in_download_url_are_rejected(self) -> None:
+        self.record["files"][0]["links"]["content"] = "https://user:password@zenodo.org/data.tar.gz"
+        with self.assertRaisesRegex(zenodo.FetchError, "not hosted on HTTPS Zenodo"):
+            zenodo.parse_file_metadata(self.record, "PeptoneDBs.tar.gz")
+
+    def test_existing_sidecar_is_not_overwritten_by_default(self) -> None:
+        item = zenodo.parse_file_metadata(self.record, "PeptoneDBs.tar.gz")
+        self.output.mkdir()
+        sidecar = self.output / "PeptoneDBs.tar.gz.zenodo.json"
+        sidecar.write_text("preserve", encoding="utf-8")
+        with self.assertRaisesRegex(zenodo.FetchError, "sidecar already exists"):
+            zenodo.download_verified(item, self.output, len(self.payload))
+        self.assertEqual(sidecar.read_text(encoding="utf-8"), "preserve")
+
     def test_size_cap_blocks_before_any_download_request(self) -> None:
         item = zenodo.parse_file_metadata(self.record, "PeptoneDBs.tar.gz")
         with patch.object(zenodo, "urlopen") as mocked:
