@@ -545,14 +545,6 @@ mod tests {
     fn grouped_fold_assignment_keeps_groups_intact_and_stratifies_every_fold() {
         let labels = vec![
             "a".into(), "a".into(), "a".into(), "a".into(),
-            "b".into(), "b".into(), "b".into(), "b".into(),
-        ];
-        let groups = vec![
-            "a1".into(), "a1".into(), "a2".into(), "a2".into(),
-            "b1".into(), "b1".into(), "b2".into(), "b2".into(),
-        ];
-        let labels = vec![
-            "a".into(), "a".into(), "a".into(), "a".into(),
             "a".into(), "a".into(), "b".into(), "b".into(),
             "b".into(), "b".into(), "b".into(), "b".into(),
         ];
@@ -572,7 +564,7 @@ mod tests {
             for fold in 0..3 {
                 assert!(
                     labels.iter().zip(folds.iter()).any(|(actual, assigned)| {
-                        actual == label && *assigned == fold
+                        actual.as_str() == label && *assigned == fold
                     }),
                     "label {label} missing from fold {fold}"
                 );
