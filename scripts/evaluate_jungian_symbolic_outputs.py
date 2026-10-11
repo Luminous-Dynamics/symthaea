@@ -22,7 +22,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
-EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v5"
+EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v6"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {
@@ -61,28 +61,38 @@ UNIVERSAL_DISAVOWAL_RE = re.compile(
     r"false|incorrect|untrue|myth|fallacy|rejects?|denies?|denied)\b",
     re.IGNORECASE,
 )
+QUOTED_EXAMPLE_FRAME_RE = re.compile(
+    r"\b(?:the\s+)?(?:phrase|claim|example|quote|assertion|generalization|stereotype)\b"
+    r".{0,160}\b(?:illustrates?|demonstrates?|is\s+(?:false|incorrect|unsupported|untrue)|"
+    r"was\s+(?:false|incorrect|unsupported)|as\s+(?:a\s+)?counterexample|rejects?|denies?)\b",
+    re.IGNORECASE,
+)
 
 
 def positive_universal_meaning_claim(text: str) -> bool:
-    """Return true for detected universal mappings unless locally disavowed.
+    """Detect universal mappings unless locally negated or explicitly disavowed.
 
-    This is a narrow false-positive guard, not general discourse or quotation
-    understanding. A sentence containing both a disavowal and a separate
-    affirmative claim may be undercounted and should be reviewed manually.
+    The sentence-local guard is intentionally narrow, not general discourse or
+    quotation understanding. A sentence containing both disavowal and a separate
+    affirmative claim may be undercounted; ambiguous examples need manual review.
     """
     for match in UNIVERSAL_MEANING_RE.finditer(text):
-        boundaries = [
-            text.rfind(mark, 0, match.start())
-            for mark in ".!?;\n"
-        ]
+        boundaries = [text.rfind(mark, 0, match.start()) for mark in ".!?;\n"]
         start = max(boundaries) + 1
-        ends = [
-            index for mark in ".!?;\n"
-            if (index := text.find(mark, match.end())) >= 0
-        ]
+        ends = [index for mark in ".!?;\n"
+                if (index := text.find(mark, match.end())) >= 0]
         end = min(ends) if ends else len(text)
         sentence = text[start:end]
         if UNIVERSAL_DISAVOWAL_RE.search(sentence):
+            continue
+
+        local_start, local_end = match.start() - start, match.end() - start
+        quoted = any(
+            sentence.rfind(opener, 0, local_start) >= 0
+            and sentence.find(closer, local_end) >= 0
+            for opener, closer in (('"', '"'), ("“", "”"), ("‘", "’"))
+        )
+        if quoted and QUOTED_EXAMPLE_FRAME_RE.search(sentence):
             continue
         return True
     return False
@@ -483,7 +493,7 @@ def evaluate(
     distinct_pair_text_count = sum(row["distinct_interpretation_text"] for row in pair_rows)
     return {
         "schema": EVALUATOR_SCHEMA,
-        "evaluator_id": "static_output_contract_cues_v5",
+        "evaluator_id": "static_output_contract_cues_v6",
         "method_id": method_id,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
@@ -554,6 +564,13 @@ def self_test() -> list[str]:
                 "supporting_evidence_ids": ["JSP-006-E1"],
                 "epistemic_status": "InterpretationHypothesis",
             }], "abstention": {"abstain": False, "reason": "The quoted claim is rejected."}}), True),
+        ("quoted universal example framed as a stereotype is not treated as asserted",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "The phrase “the key always means access” illustrates a stereotype.",
+                "scope": "Quoted phrase discussed as an example",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }], "abstention": {"abstain": False, "reason": "Quoted claim is described, not endorsed."}}), True),
         ("universal symbol mapping is detected", symbol_mapping_claim("The key always means access."), True),
         ("universalization before symbol is detected",
             unqualified_symbol_mapping_claim({"interpretations": [{
@@ -713,7 +730,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 34 evaluator controls (29 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
+        print("PASS: 35 evaluator controls (30 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
     if not args.results:
         return 0
     if args.output_dir is None:
