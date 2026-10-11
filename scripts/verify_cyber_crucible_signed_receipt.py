@@ -303,6 +303,10 @@ def verify_receipt(
     payload = _validate_payload(receipt["payload"])
     expected = _context(expected_context)
     keys = _validate_policy(trust_policy)
+    try:
+        trust_policy_digest = hashlib.sha256(rfc8785.dumps(trust_policy)).hexdigest()
+    except Exception as exc:
+        raise VerificationError(f"trust policy cannot be RFC 8785 canonicalized: {exc}") from exc
 
     # Bind every context field from the trusted caller to the signed payload.
     for key, value in expected.items():
@@ -352,7 +356,7 @@ def verify_receipt(
         "schema_version": "cyber-crucible-receipt-verification-result.v1",
         "signature_verified": True,
         "trust_policy_id": trust_policy["policy_id"],
-        "trust_policy_digest": hashlib.sha256(rfc8785.dumps(trust_policy)).hexdigest(),
+        "trust_policy_digest": trust_policy_digest,
         "receipt_id": payload["receipt_id"],
         "key_id": payload["key_id"],
         "evaluator_id": payload["evaluator_id"],
