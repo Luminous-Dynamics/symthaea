@@ -575,6 +575,216 @@ impl RegressionReport {
 }
 
 #[cfg(test)]
+mod strict_population_tests {
+    use super::*;
+    use crate::harness::report::MetricValue;
+
+    fn snapshot(
+        name: &str,
+        values: &[(&str, &[(&str, f64)])],
+    ) -> RegressionSnapshot {
+        let mut metrics = BTreeMap::new();
+        for (benchmark, benchmark_metrics) in values {
+            let mut per_benchmark = BTreeMap::new();
+            for (metric, mean) in *benchmark_metrics {
+                per_benchmark.insert(
+                    (*metric).to_string(),
+                    MetricValue {
+                        mean: *mean,
+                        std_dev: 0.01,
+                        n: 20,
+                        ci_lower: *mean - 0.02,
+                        ci_upper: *mean + 0.02,
+                    },
+                );
+            }
+            metrics.insert((*benchmark).to_string(), per_benchmark);
+        }
+        RegressionSnapshot {
+            name: name.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            git_hash: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
+            config_summary: "strict comparison unit fixture".to_string(),
+            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            metrics,
+        }
+    }
+
+    #[test]
+    fn intersection_report_with_no_comparable_metrics_does_not_claim_pass() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert!(report.results.is_empty());
+        let summary = report.format_summary();
+        assert!(summary.contains("No comparable metrics"));
+        assert!(!summary.contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_zero_sample_count() {
+        let mut invalid = snapshot("zero-n", &[("NBack", &[("accuracy", 0.8)])]);
+        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().n = 0;
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("sample count n")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_negative_dispersion() {
+        let mut invalid = snapshot("negative-sd", &[("NBack", &[("accuracy", 0.8)])]);
+        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().std_dev = -0.1;
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("finite and non-negative")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_nonfinite_or_reversed_confidence_bounds() {
+        let mut nonfinite = snapshot("nonfinite-ci", &[("NBack", &[("accuracy", 0.8)])]);
+        nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().ci_lower = f64::INFINITY;
+        assert!(nonfinite.validate().unwrap_err().iter().any(|error| error.contains("ci_lower is not finite")));
+
+        let mut reversed = snapshot("reversed-ci", &[("NBack", &[("accuracy", 0.8)])]);
+        let metric = reversed.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        metric.ci_lower = 0.9;
+        metric.ci_upper = 0.7;
+        assert!(reversed.validate().unwrap_err().iter().any(|error| error.contains("ci_lower exceeds ci_upper")));
+    }
+
+    #[test]
+    fn snapshot_validation_rejects_nonempty_benchmark_map_with_no_metrics() {
+        let mut invalid = snapshot("empty-inner", &[]);
+        invalid.metrics.insert("NBack".to_string(), BTreeMap::new());
+        let errors = invalid.validate().unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("no benchmark metrics")));
+        assert!(errors.iter().any(|error| error.contains("benchmark contains no metrics")));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_missing_benchmark() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::MissingBenchmark("NBack".to_string())
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_missing_metric() {
+        let baseline = snapshot(
+            "baseline",
+            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
+        );
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::MissingMetric {
+                benchmark: "NBack".to_string(),
+                metric: "latency".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unexpected_benchmark() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)]), ("Stroop", &[("accuracy", 0.7)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnexpectedBenchmark("Stroop".to_string())
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_empty_current_population() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[]);
+        assert!(matches!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10),
+            Err(SnapshotComparisonError::InvalidSnapshot { side: "current", .. })
+        ));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unexpected_metrics() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot(
+            "current",
+            &[("NBack", &[("accuracy", 0.81), ("new_metric", 1.0)])],
+        );
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnexpectedMetric {
+                benchmark: "NBack".to_string(),
+                metric: "new_metric".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_accepts_exact_matching_population() {
+        let baseline = snapshot(
+            "baseline",
+            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
+        );
+        let current = snapshot(
+            "current",
+            &[("NBack", &[("accuracy", 0.81), ("latency", 4.1)])],
+        );
+        let report = RegressionReport::compare_strict_metric_population(
+            &baseline, &current, 0.05, 0.10,
+        )
+        .unwrap();
+        assert_eq!(report.summary.total_metrics, 2);
+        assert_eq!(report.results.len(), 2);
+    }
+
+    #[test]
+    fn exploratory_summary_marks_near_zero_baseline_unqualified() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        let summary = report.format_summary();
+        assert!(summary.contains("near zero"));
+        assert!(!summary.contains("All metrics within baseline CI"));
+    }
+
+    #[test]
+    fn strict_comparison_rejects_near_zero_baseline_instead_of_marking_pass() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::NearZeroBaseline {
+                benchmark: "NBack".to_string(),
+                metric: "accuracy".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_unsupported_schema_version() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let mut current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        current.schema_version = "999.0".to_string();
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::UnsupportedSchemaVersion {
+                side: "current",
+                found: "999.0".to_string(),
+                expected: SNAPSHOT_SCHEMA_VERSION.to_string(),
+            }
+        );
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -881,215 +1091,5 @@ mod tests {
         let loaded = RegressionSnapshot::from_json(&json).unwrap();
         assert_eq!(loaded.schema_version, SNAPSHOT_SCHEMA_VERSION);
         assert_eq!(loaded.name, "roundtrip");
-    }
-}
-
-#[cfg(test)]
-mod strict_population_tests {
-    use super::*;
-    use crate::harness::report::MetricValue;
-
-    fn snapshot(
-        name: &str,
-        values: &[(&str, &[(&str, f64)])],
-    ) -> RegressionSnapshot {
-        let mut metrics = BTreeMap::new();
-        for (benchmark, benchmark_metrics) in values {
-            let mut per_benchmark = BTreeMap::new();
-            for (metric, mean) in *benchmark_metrics {
-                per_benchmark.insert(
-                    (*metric).to_string(),
-                    MetricValue {
-                        mean: *mean,
-                        std_dev: 0.01,
-                        n: 20,
-                        ci_lower: *mean - 0.02,
-                        ci_upper: *mean + 0.02,
-                    },
-                );
-            }
-            metrics.insert((*benchmark).to_string(), per_benchmark);
-        }
-        RegressionSnapshot {
-            name: name.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            git_hash: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()),
-            config_summary: "strict comparison unit fixture".to_string(),
-            schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
-            metrics,
-        }
-    }
-
-    #[test]
-    fn intersection_report_with_no_comparable_metrics_does_not_claim_pass() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
-        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
-        assert!(report.results.is_empty());
-        let summary = report.format_summary();
-        assert!(summary.contains("No comparable metrics"));
-        assert!(!summary.contains("All metrics within baseline CI"));
-    }
-
-    #[test]
-    fn snapshot_validation_rejects_zero_sample_count() {
-        let mut invalid = snapshot("zero-n", &[("NBack", &[("accuracy", 0.8)])]);
-        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().n = 0;
-        let errors = invalid.validate().unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("sample count n")));
-    }
-
-    #[test]
-    fn snapshot_validation_rejects_negative_dispersion() {
-        let mut invalid = snapshot("negative-sd", &[("NBack", &[("accuracy", 0.8)])]);
-        invalid.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().std_dev = -0.1;
-        let errors = invalid.validate().unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("finite and non-negative")));
-    }
-
-    #[test]
-    fn snapshot_validation_rejects_nonfinite_or_reversed_confidence_bounds() {
-        let mut nonfinite = snapshot("nonfinite-ci", &[("NBack", &[("accuracy", 0.8)])]);
-        nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().ci_lower = f64::INFINITY;
-        assert!(nonfinite.validate().unwrap_err().iter().any(|error| error.contains("ci_lower is not finite")));
-
-        let mut reversed = snapshot("reversed-ci", &[("NBack", &[("accuracy", 0.8)])]);
-        let metric = reversed.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
-        metric.ci_lower = 0.9;
-        metric.ci_upper = 0.7;
-        assert!(reversed.validate().unwrap_err().iter().any(|error| error.contains("ci_lower exceeds ci_upper")));
-    }
-
-    #[test]
-    fn snapshot_validation_rejects_nonempty_benchmark_map_with_no_metrics() {
-        let mut invalid = snapshot("empty-inner", &[]);
-        invalid.metrics.insert("NBack".to_string(), BTreeMap::new());
-        let errors = invalid.validate().unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("no benchmark metrics")));
-        assert!(errors.iter().any(|error| error.contains("benchmark contains no metrics")));
-    }
-
-    #[test]
-    fn strict_comparison_rejects_missing_benchmark() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
-        assert_eq!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
-                .unwrap_err(),
-            SnapshotComparisonError::MissingBenchmark("NBack".to_string())
-        );
-    }
-
-    #[test]
-    fn strict_comparison_rejects_missing_metric() {
-        let baseline = snapshot(
-            "baseline",
-            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
-        );
-        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
-        assert_eq!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
-                .unwrap_err(),
-            SnapshotComparisonError::MissingMetric {
-                benchmark: "NBack".to_string(),
-                metric: "latency".to_string(),
-            }
-        );
-    }
-
-    #[test]
-    fn strict_comparison_rejects_unexpected_benchmark() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)]), ("Stroop", &[("accuracy", 0.7)])]);
-        assert_eq!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
-                .unwrap_err(),
-            SnapshotComparisonError::UnexpectedBenchmark("Stroop".to_string())
-        );
-    }
-
-    #[test]
-    fn strict_comparison_rejects_empty_current_population() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let current = snapshot("current", &[]);
-        assert!(matches!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10),
-            Err(SnapshotComparisonError::InvalidSnapshot { side: "current", .. })
-        ));
-    }
-
-    #[test]
-    fn strict_comparison_rejects_unexpected_metrics() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let current = snapshot(
-            "current",
-            &[("NBack", &[("accuracy", 0.81), ("new_metric", 1.0)])],
-        );
-        assert_eq!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
-                .unwrap_err(),
-            SnapshotComparisonError::UnexpectedMetric {
-                benchmark: "NBack".to_string(),
-                metric: "new_metric".to_string(),
-            }
-        );
-    }
-
-    #[test]
-    fn strict_comparison_accepts_exact_matching_population() {
-        let baseline = snapshot(
-            "baseline",
-            &[("NBack", &[("accuracy", 0.8), ("latency", 4.0)])],
-        );
-        let current = snapshot(
-            "current",
-            &[("NBack", &[("accuracy", 0.81), ("latency", 4.1)])],
-        );
-        let report = RegressionReport::compare_strict_metric_population(
-            &baseline, &current, 0.05, 0.10,
-        )
-        .unwrap();
-        assert_eq!(report.summary.total_metrics, 2);
-        assert_eq!(report.results.len(), 2);
-    }
-
-    #[test]
-    fn exploratory_summary_marks_near_zero_baseline_unqualified() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
-        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
-        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
-        let summary = report.format_summary();
-        assert!(summary.contains("near zero"));
-        assert!(!summary.contains("All metrics within baseline CI"));
-    }
-
-    #[test]
-    fn strict_comparison_rejects_near_zero_baseline_instead_of_marking_pass() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
-        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
-        assert_eq!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
-                .unwrap_err(),
-            SnapshotComparisonError::NearZeroBaseline {
-                benchmark: "NBack".to_string(),
-                metric: "accuracy".to_string(),
-            }
-        );
-    }
-
-    #[test]
-    fn strict_comparison_rejects_unsupported_schema_version() {
-        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let mut current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
-        current.schema_version = "999.0".to_string();
-        assert_eq!(
-            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
-                .unwrap_err(),
-            SnapshotComparisonError::UnsupportedSchemaVersion {
-                side: "current",
-                found: "999.0".to_string(),
-                expected: SNAPSHOT_SCHEMA_VERSION.to_string(),
-            }
-        );
     }
 }
