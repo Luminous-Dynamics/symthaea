@@ -380,6 +380,13 @@ class SolarDaylightDerivationTests(unittest.TestCase):
         self.assertLess(summer, 14.0)
         self.assertLess(winter, summer)
 
+    def test_leap_year_fractional_year_uses_366_days(self):
+        # Pinned output from the stated NOAA-style declination approximation.
+        leap_year_value = solar_daylight_hours_noaa(-26.2, "2020-03-01")
+        self.assertAlmostEqual(leap_year_value, 12.624565749898128, places=7)
+        # A fixed 365-day denominator produces ~12.620365 h for this input.
+        self.assertNotAlmostEqual(leap_year_value, 12.620365107247496, places=3)
+
     def test_polar_day_and_night_are_clamped(self):
         self.assertEqual(solar_daylight_hours_noaa(80.0, "2020-06-21"), 24.0)
         self.assertEqual(solar_daylight_hours_noaa(80.0, "2020-12-21"), 0.0)
