@@ -73,6 +73,24 @@ fn gcd_u128(mut a: u128, mut b: u128) -> u128 {
     a
 }
 
+/// Floor square root using integer Newton iteration.
+///
+/// Uses u128 intermediates for the averaging step, and never makes a floating
+/// point decision about whether an integer is a perfect square.
+fn integer_sqrt_u64(value: u64) -> u64 {
+    if value < 2 {
+        return value;
+    }
+    let n = u128::from(value);
+    let mut current = n;
+    let mut next = (current + n / current) / 2;
+    while next < current {
+        current = next;
+        next = (current + n / current) / 2;
+    }
+    current as u64
+}
+
 /// Normalize an exact fraction in a wider intermediate type.
 ///
 /// Returns None for a zero denominator or for a sign normalization that cannot
@@ -311,6 +329,8 @@ pub enum NumericArithmeticError {
     ZeroToNegativePower,
     /// A nonzero power underflowed completely to floating-point zero.
     UnderflowToZero,
+    /// A negative real value cannot be square-rooted in the real numeric tower.
+    NegativeSquareRoot,
     /// An input Real was NaN or infinite.
     NonFiniteOperand,
     /// A finite input operation produced a non-finite floating-point result.
@@ -328,6 +348,7 @@ impl std::fmt::Display for NumericArithmeticError {
             Self::IndeterminatePower => write!(f, "zero raised to zero is indeterminate"),
             Self::ZeroToNegativePower => write!(f, "zero cannot be raised to a negative exponent"),
             Self::UnderflowToZero => write!(f, "nonzero power underflowed to floating-point zero"),
+            Self::NegativeSquareRoot => write!(f, "negative input has no real square root"),
             Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
             Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
             Self::ExactResultOutOfRange => {
@@ -1280,77 +1301,97 @@ impl NumericTower {
     /// Returns Natural if a is a perfect square, otherwise promotes to Real.
     /// Returns `None` for negative inputs (no real square root).
     pub fn sqrt(&self, a: &Number) -> Option<NumberResult> {
-        let val = a.to_f64();
-        if val < 0.0 {
+        // Reject malformed legacy rational variants before any floating conversion.
+        if let Number::Rational { numerator, denominator } = a {
+            if *denominator <= 0 || *numerator < 0 {
+                return None;
+            }
+        }
+        if matches!(a, Number::Integer(value) if *value < 0)
+            || matches!(a, Number::Real(value) if *value < 0.0)
+        {
             return None;
         }
 
         let mut proof_trace = vec![format!("Square root: sqrt({})", a)];
-
         let result = match a {
             Number::Natural(n) => {
-                let isqrt = (*n as f64).sqrt().round() as u64;
-                if isqrt.wrapping_mul(isqrt) == *n {
-                    proof_trace.push(format!("Perfect square: sqrt({n}) = {isqrt} (stays in N)"));
-                    Number::Natural(isqrt)
+                let root = integer_sqrt_u64(*n);
+                if root * root == *n {
+                    proof_trace.push(format!("Perfect square: sqrt({n}) = {root} (stays in N)"));
+                    Number::Natural(root)
                 } else {
-                    let root = (*n as f64).sqrt();
-                    proof_trace.push(format!("Promotion N -> R: sqrt({n}) = {root} (irrational)"));
-                    Number::Real(root)
+                    let value = (*n as f64).sqrt();
+                    proof_trace.push(format!("Promotion N -> R: sqrt({n}) = {value} (approximate)"));
+                    Number::Real(value)
                 }
             }
             Number::Integer(n) => {
-                if *n < 0 {
-                    return None;
-                }
-                let un = *n as u64;
-                let isqrt = (un as f64).sqrt().round() as u64;
-                if isqrt.wrapping_mul(isqrt) == un {
-                    proof_trace.push(format!(
-                        "Perfect square: sqrt({n}) = {isqrt} (narrows to N)"
-                    ));
-                    Number::Natural(isqrt)
+                let unsigned = u64::try_from(*n).ok()?;
+                let root = integer_sqrt_u64(unsigned);
+                if root * root == unsigned {
+                    proof_trace.push(format!("Perfect square: sqrt({n}) = {root} (narrows to N)"));
+                    Number::Natural(root)
                 } else {
-                    let root = (un as f64).sqrt();
-                    proof_trace.push(format!("Promotion Z -> R: sqrt({n}) = {root} (irrational)"));
-                    Number::Real(root)
+                    let value = (unsigned as f64).sqrt();
+                    proof_trace.push(format!("Promotion Z -> R: sqrt({n}) = {value} (approximate)"));
+                    Number::Real(value)
                 }
             }
-            Number::Rational {
-                numerator,
-                denominator,
-            } => {
-                if *numerator < 0 {
-                    return None;
-                }
-                let val_f64 = *numerator as f64 / *denominator as f64;
-                let root = val_f64.sqrt();
-                // Check if the result is rational: sqrt(p/q) is rational iff sqrt(p) and sqrt(q) are integers
-                let sqrt_num = (*numerator as f64).sqrt().round() as i64;
-                let sqrt_den = (*denominator as f64).sqrt().round() as i64;
-                if sqrt_num.wrapping_mul(sqrt_num) == *numerator
-                    && sqrt_den.wrapping_mul(sqrt_den) == *denominator
-                {
-                    proof_trace.push(format!(
-                        "Rational sqrt: sqrt({numerator}/{denominator}) = {sqrt_num}/{sqrt_den} (stays in Q)"
-                    ));
-                    Self::from_rational(sqrt_num, sqrt_den)
+            Number::Rational { numerator, denominator } => {
+                if *numerator == 0 {
+                    proof_trace.push("Exact rational zero: sqrt(0) = 0".to_string());
+                    Number::Natural(0)
                 } else {
-                    proof_trace.push(format!(
-                        "Promotion Q -> R: sqrt({numerator}/{denominator}) = {root} (irrational)"
-                    ));
-                    Number::Real(root)
+                    let numerator_root = integer_sqrt_u64(*numerator as u64);
+                    let denominator_root = integer_sqrt_u64(*denominator as u64);
+                    if numerator_root * numerator_root == *numerator as u64
+                        && denominator_root * denominator_root == *denominator as u64
+                    {
+                        proof_trace.push(format!(
+                            "Exact rational square root: sqrt({numerator}/{denominator}) = {numerator_root}/{denominator_root}"
+                        ));
+                        Self::from_rational(numerator_root as i64, denominator_root as i64)
+                    } else {
+                        let value = (*numerator as f64 / *denominator as f64).sqrt();
+                        proof_trace.push(format!(
+                            "Promotion Q -> R: sqrt({numerator}/{denominator}) = {value} (approximate)"
+                        ));
+                        Number::Real(value)
+                    }
                 }
             }
-            Number::Real(x) => {
-                let root = x.sqrt();
-                proof_trace.push(format!("Real sqrt: sqrt({x}) = {root}"));
+            Number::Real(value) => {
+                let root = value.sqrt();
+                proof_trace.push(format!("Real sqrt: sqrt({value}) = {root}; exactness is not claimed."));
                 Number::Real(root)
             }
         };
 
         let input_domains = [a.domain()];
         Some(self.build_result(result, "sqrt".to_string(), proof_trace, &input_domains))
+    }
+
+    /// Checked real-domain square root: rejects malformed, negative, and
+    /// non-finite inputs/results; exact perfect squares remain exact.
+    pub fn checked_sqrt(
+        &self,
+        value: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        Self::validate_checked_operand(value)?;
+        if Self::number_is_negative(value) {
+            return Err(NumericArithmeticError::NegativeSquareRoot);
+        }
+        let result = self
+            .sqrt(value)
+            .ok_or(NumericArithmeticError::NegativeSquareRoot)?;
+        Self::validate_checked_result(&result.number)?;
+        let precision = if matches!(result.number, Number::Real(_)) {
+            ArithmeticPrecision::Approximate
+        } else {
+            ArithmeticPrecision::Exact
+        };
+        Ok(NumericArithmeticResult { result, precision })
     }
 
     // ========================================================================
@@ -2348,6 +2389,57 @@ mod tests {
             tower.checked_divide(&Number::Natural(1), &Number::Real(-0.0)).unwrap_err(),
             NumericArithmeticError::DivisionByZero
         );
+    }
+
+    #[test]
+    fn integer_square_root_is_exact_at_u64_boundaries() {
+        assert_eq!(integer_sqrt_u64(0), 0);
+        assert_eq!(integer_sqrt_u64(1), 1);
+        assert_eq!(integer_sqrt_u64(2), 1);
+        assert_eq!(integer_sqrt_u64(3), 1);
+        assert_eq!(integer_sqrt_u64(4), 2);
+        assert_eq!(integer_sqrt_u64(u64::MAX), u32::MAX as u64);
+        for root in [2u64, 3, 17, 65_535, u32::MAX as u64] {
+            let square = root * root;
+            assert_eq!(integer_sqrt_u64(square), root);
+            if square < u64::MAX {
+                assert_eq!(integer_sqrt_u64(square + 1), root);
+            }
+        }
+    }
+
+    #[test]
+    fn sqrt_keeps_zero_and_perfect_squares_exact() {
+        let tower = NumericTower::new();
+        assert!(matches!(tower.sqrt(&Number::Rational { numerator: 0, denominator: 7 }).unwrap().number, Number::Natural(0)));
+        assert!(matches!(tower.sqrt(&Number::Natural(u64::MAX)).unwrap().number, Number::Real(value) if value.is_finite()));
+        assert!(matches!(tower.sqrt(&Number::Rational { numerator: 4, denominator: 9 }).unwrap().number, Number::Rational { numerator: 2, denominator: 3 }));
+    }
+
+    #[test]
+    fn checked_sqrt_rejects_negative_nonfinite_and_malformed_inputs() {
+        let tower = NumericTower::new();
+        assert_eq!(tower.checked_sqrt(&Number::Integer(-1)).unwrap_err(), NumericArithmeticError::NegativeSquareRoot);
+        assert_eq!(tower.checked_sqrt(&Number::Real(f64::NAN)).unwrap_err(), NumericArithmeticError::NonFiniteOperand);
+        assert_eq!(tower.checked_sqrt(&Number::Rational { numerator: 1, denominator: 0 }).unwrap_err(), NumericArithmeticError::InvalidRationalOperand);
+        assert_eq!(tower.checked_sqrt(&Number::Rational { numerator: 2, denominator: 4 }).unwrap_err(), NumericArithmeticError::NonCanonicalRationalOperand);
+        assert_eq!(tower.checked_sqrt(&Number::Rational { numerator: 1, denominator: -2 }).unwrap_err(), NumericArithmeticError::NonCanonicalRationalOperand);
+    }
+
+    #[test]
+    fn checked_sqrt_classifies_exact_and_approximate_results() {
+        let tower = NumericTower::new();
+        let exact = tower.checked_sqrt(&Number::Natural(144)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.number, Number::Natural(12)));
+
+        let approximate = tower.checked_sqrt(&Number::Natural(2)).unwrap();
+        assert_eq!(approximate.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(approximate.result.number, Number::Real(value) if value.is_finite() && (value * value - 2.0).abs() < 1e-14));
+
+        let exact_ratio = tower.checked_sqrt(&Number::Rational { numerator: 4, denominator: 9 }).unwrap();
+        assert_eq!(exact_ratio.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact_ratio.result.number, Number::Rational { numerator: 2, denominator: 3 }));
     }
 
     #[test]
