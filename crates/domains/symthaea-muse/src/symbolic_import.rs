@@ -135,9 +135,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     }
                     let bpm = 60_000_000.0 / micros_per_quarter as f32;
                     if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
-                        return Err(
-                            "MIDI tempo must be finite and between 20 and 320 BPM".into(),
-                        );
+                        return Err("MIDI tempo must be finite and between 20 and 320 BPM".into());
                     }
                     tempo_events.push((tick, micros_per_quarter));
                 }
@@ -156,9 +154,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                         );
                     }
                     if !(1..=16).contains(&numerator) {
-                        return Err(
-                            "MIDI time-signature numerator must be in 1..=16".into(),
-                        );
+                        return Err("MIDI time-signature numerator must be in 1..=16".into());
                     }
                     meter_events.push((tick, (numerator, denominator_power)));
                 }
@@ -277,9 +273,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
             .tick
             .checked_sub(onset)
             .filter(|duration| *duration > 0)
-            .ok_or_else(|| {
-                "MIDI note-on/off pair must span at least one tick".to_string()
-            })?;
+            .ok_or_else(|| "MIDI note-on/off pair must span at least one tick".to_string())?;
         push_raw_note(
             &mut notes,
             RawNote {
@@ -293,8 +287,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     }
     if pending.values().any(|starts| !starts.is_empty()) {
         return Err(
-            "MIDI file ends with unmatched note-on events; refusing to infer note durations"
-                .into(),
+            "MIDI file ends with unmatched note-on events; refusing to infer note durations".into(),
         );
     }
 
@@ -314,7 +307,15 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
 
     // Canonical ordering makes serialized import identity reproducible
     // between process runs.
-    notes.sort_by_key(|note| (note.onset, note.track, note.pitch, note.duration, note.velocity));
+    notes.sort_by_key(|note| {
+        (
+            note.onset,
+            note.track,
+            note.pitch,
+            note.duration,
+            note.velocity,
+        )
+    });
     let roles = roles_by_track(&notes);
     let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
     let key = if minor {
@@ -629,9 +630,9 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 ]
                 .iter()
                 .any(|attribute| child.attribute(*attribute).is_some())
-                || child.children().any(|node| {
-                    node.is_element() && !node.has_tag_name("offset")
-                })
+                    || child
+                        .children()
+                        .any(|node| node.is_element() && !node.has_tag_name("offset"))
                 {
                     return Err(
                         "MusicXML sound uses unsupported playback attributes or children; tempo/dynamics-only sound directives are supported"
@@ -644,7 +645,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     })?;
                     if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
                         return Err(
-                            "MusicXML tempo must be finite and between 20 and 320 BPM".into(),
+                            "MusicXML tempo must be finite and between 20 and 320 BPM".into()
                         );
                     }
                     let position = musicxml_sound_position(child, cursor)?;
@@ -660,9 +661,9 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             } else if child.has_tag_name("backup") {
                 let amount = musicxml_duration(child, "backup")?;
                 let amount = Duration::new(amount, divisions);
-                cursor = cursor
-                    .checked_sub(amount)
-                    .ok_or_else(|| "MusicXML backup timing is not exactly representable".to_string())?;
+                cursor = cursor.checked_sub(amount).ok_or_else(|| {
+                    "MusicXML backup timing is not exactly representable".to_string()
+                })?;
                 if cursor.num() < 0 {
                     return Err("MusicXML backup moves before the start of a part".into());
                 }
@@ -681,9 +682,10 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 }
                 // A tied note segment would be imported as a fresh attack
                 // because Score currently has no tie/sustain-link metadata.
-                if child.descendants().any(|node| {
-                    node.has_tag_name("tie") || node.has_tag_name("tied")
-                }) {
+                if child
+                    .descendants()
+                    .any(|node| node.has_tag_name("tie") || node.has_tag_name("tied"))
+                {
                     return Err(
                         "MusicXML ties are not supported by the single-note-event importer; refusing to turn tied segments into reattacks"
                             .into(),
@@ -704,9 +706,10 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                             .into(),
                     );
                 }
-                if child.children().any(|node| {
-                    node.has_tag_name("instrument") || node.has_tag_name("play")
-                }) {
+                if child
+                    .children()
+                    .any(|node| node.has_tag_name("instrument") || node.has_tag_name("play"))
+                {
                     return Err(
                         "MusicXML note uses an unsupported instrument or playback-technique child"
                             .into(),
@@ -912,9 +915,7 @@ fn stable_midi_metadata<T: Copy + Eq>(
 /// fallback as proof of opening context. A key event first seen after tick zero
 /// only establishes later metadata and cannot describe the opening in a
 /// single-key Score.
-fn stable_midi_key_metadata(
-    events: &[(u64, (i8, bool))],
-) -> Result<(i8, bool), String> {
+fn stable_midi_key_metadata(events: &[(u64, (i8, bool))]) -> Result<(i8, bool), String> {
     let Some((first_tick, first_value)) = events.iter().min_by_key(|event| event.0).copied() else {
         return Ok((0, false));
     };
@@ -967,9 +968,7 @@ fn musicxml_metronome_tempo(node: roxmltree::Node<'_, '_>) -> Result<f32, String
         "MusicXML metronome per-minute value must be a single numeric BPM".to_string()
     })?;
     if !bpm.is_finite() || !(20.0..=320.0).contains(&bpm) {
-        return Err(
-            "MusicXML metronome tempo must be finite and between 20 and 320 BPM".into(),
-        );
+        return Err("MusicXML metronome tempo must be finite and between 20 and 320 BPM".into());
     }
     Ok(bpm)
 }
@@ -995,9 +994,9 @@ fn stable_musicxml_metadata<T: Copy + PartialEq>(
                 "MusicXML {name} changes cannot be represented by a {schema_field} Score"
             ));
         }
-        let order = position.checked_cmp(earliest_position).ok_or_else(|| {
-            format!("MusicXML {name} event positions cannot be compared exactly")
-        })?;
+        let order = position
+            .checked_cmp(earliest_position)
+            .ok_or_else(|| format!("MusicXML {name} event positions cannot be compared exactly"))?;
         if order == std::cmp::Ordering::Less {
             earliest_position = position;
         }
@@ -1019,9 +1018,8 @@ fn musicxml_sound_position(
     position: Duration,
 ) -> Result<Duration, String> {
     if let Some(offset) = node.children().find(|child| child.has_tag_name("offset")) {
-        let value = node_i64(offset).ok_or_else(|| {
-            "MusicXML sound tempo offset must be an integer".to_string()
-        })?;
+        let value = node_i64(offset)
+            .ok_or_else(|| "MusicXML sound tempo offset must be an integer".to_string())?;
         if value != 0 {
             return Err(
                 "MusicXML non-zero sound or direction tempo offsets are not supported by the single-tempo Score importer"
@@ -1035,10 +1033,7 @@ fn musicxml_sound_position(
     let mut ancestor = node.parent();
     while let Some(parent) = ancestor {
         if parent.has_tag_name("direction") {
-            if let Some(offset) = parent
-                .children()
-                .find(|child| child.has_tag_name("offset"))
-            {
+            if let Some(offset) = parent.children().find(|child| child.has_tag_name("offset")) {
                 let value = node_i64(offset).ok_or_else(|| {
                     "MusicXML tempo direction offset must be an integer".to_string()
                 })?;
@@ -1270,8 +1265,7 @@ mod tests {
     fn midi_low_note_velocity_is_preserved_without_amplifying_floor() {
         let track = [
             0, 0x90, 60, 1, // lowest positive MIDI note-on velocity
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let score = parse_midi(&midi_file(&track)).unwrap();
         assert_eq!(score.notes.len(), 1);
@@ -1284,37 +1278,25 @@ mod tests {
 
     #[test]
     fn midi_same_tick_note_on_and_note_off_are_rejected_not_lengthened() {
-        let track = [
-            0, 0x90, 60, 100,
-            0, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
-        ];
+        let track = [0, 0x90, 60, 100, 0, 0x80, 60, 0, 0, 0xFF, 0x2F, 0];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("must span at least one tick"), "{error}");
     }
 
     #[test]
     fn midi_unmatched_note_on_at_end_of_track_is_rejected() {
-        let track = [
-            0, 0x90, 60, 100,
-            0, 0xFF, 0x2F, 0,
-        ];
+        let track = [0, 0x90, 60, 100, 0, 0xFF, 0x2F, 0];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("ends with unmatched note-on events"), "{error}");
+        assert!(
+            error.contains("ends with unmatched note-on events"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_channel_ten_notes_are_rejected_instead_of_silently_dropped() {
-        let pitched_track = [
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
-        ];
-        let channel_ten_track = [
-            0, 0x99, 35, 100,
-            100, 0x89, 35, 0,
-            0, 0xFF, 0x2F, 0,
-        ];
+        let pitched_track = [0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0];
+        let channel_ten_track = [0, 0x99, 35, 100, 100, 0x89, 35, 0, 0, 0xFF, 0x2F, 0];
         let tracks: [&[u8]; 2] = [&pitched_track, &channel_ten_track];
         let error = parse_midi(&midi_file_with_tracks(&tracks)).unwrap_err();
         assert!(
@@ -1327,9 +1309,7 @@ mod tests {
     fn midi_program_change_is_rejected_instead_of_silently_dropped() {
         let track = [
             0, 0xC0, 5, // program 5 changes the channel instrument
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("unsupported playback event"), "{error}");
@@ -1339,9 +1319,7 @@ mod tests {
     fn midi_sustain_controller_is_rejected_instead_of_shortening_notes() {
         let track = [
             0, 0xB0, 64, 127, // sustain pedal down
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("unsupported playback event"), "{error}");
@@ -1351,9 +1329,7 @@ mod tests {
     fn midi_pitch_bend_is_rejected_instead_of_flattening_sounding_pitch() {
         let track = [
             0, 0xE0, 0, 127, // non-neutral pitch bend
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("unsupported playback event"), "{error}");
@@ -1363,76 +1339,72 @@ mod tests {
     fn midi_port_routing_is_rejected_before_cross_track_note_pairing() {
         let track = [
             0, 0xFF, 0x21, 1, 1, // select non-default MIDI port
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("MIDI port-routing metadata is not supported"), "{error}");
+        assert!(
+            error.contains("MIDI port-routing metadata is not supported"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_smpte_start_offset_is_rejected_in_beat_relative_score() {
         let track = [
             0, 0xFF, 0x54, 5, 0, 0, 0, 0, 0, // zero-valued valid SMPTE offset
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("MIDI SMPTE start offsets are not supported"), "{error}");
+        assert!(
+            error.contains("MIDI SMPTE start offsets are not supported"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_unknown_meta_event_is_rejected_instead_of_dropped() {
         let track = [
             0, 0xFF, 0x70, 1, 0x7D, // unknown meta-event 0x70
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("MIDI unknown meta-event type 0x70"), "{error}");
+        assert!(
+            error.contains("MIDI unknown meta-event type 0x70"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_system_exclusive_events_are_rejected_instead_of_dropped() {
         let track = [
             0, 0xF0, 2, 0x7D, 0xF7, // vendor-specific SysEx payload
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("MIDI System Exclusive events are not supported"), "{error}");
+        assert!(
+            error.contains("MIDI System Exclusive events are not supported"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_escape_events_are_rejected_instead_of_dropped() {
         let track = [
             0, 0xF7, 1, 0x01, // arbitrary synthesizer escape payload
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("MIDI escape events are not supported"), "{error}");
+        assert!(
+            error.contains("MIDI escape events are not supported"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_note_on_and_note_off_pair_across_format_one_tracks() {
-        let note_on_track = [
-            0, 0x90, 60, 100,
-            0, 0xFF, 0x2F, 0,
-        ];
-        let note_off_track = [
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
-        ];
-        let score = parse_midi(&midi_file_with_tracks(&[
-            &note_off_track,
-            &note_on_track,
-        ])).unwrap();
+        let note_on_track = [0, 0x90, 60, 100, 0, 0xFF, 0x2F, 0];
+        let note_off_track = [100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0];
+        let score = parse_midi(&midi_file_with_tracks(&[&note_off_track, &note_on_track])).unwrap();
         assert_eq!(score.notes.len(), 1);
         assert_eq!(score.notes[0].part, PartId(1));
         assert_eq!(score.notes[0].onset, Duration::zero());
@@ -1441,10 +1413,7 @@ mod tests {
 
     #[test]
     fn midi_note_off_without_active_matching_note_is_rejected() {
-        let track = [
-            0, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
-        ];
+        let track = [0, 0x80, 60, 0, 0, 0xFF, 0x2F, 0];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("no matching active note-on"), "{error}");
     }
@@ -1477,9 +1446,12 @@ mod tests {
         </measure></part></score-partwise>"#;
         let score = parse_musicxml(xml).unwrap();
         assert_eq!(score.notes.len(), 2);
-        assert!(score.notes.iter().all(|note| {
-            (note.velocity - 64.0_f32 / 127.0).abs() < 1e-7
-        }));
+        assert!(
+            score
+                .notes
+                .iter()
+                .all(|note| { (note.velocity - 64.0_f32 / 127.0).abs() < 1e-7 })
+        );
     }
 
     #[test]
@@ -1541,16 +1513,15 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("exceeds the representable MIDI velocity range"), "{error}");
+        assert!(
+            error.contains("exceeds the representable MIDI velocity range"),
+            "{error}"
+        );
     }
 
     #[test]
     fn musicxml_unsupported_sound_playback_semantics_are_rejected() {
-        for directive in [
-            r#"pizzicato="yes""#,
-            r#"pan="45""#,
-            r#"damper-pedal="yes""#,
-        ] {
+        for directive in [r#"pizzicato="yes""#, r#"pan="45""#, r#"damper-pedal="yes""#] {
             let xml = format!(
                 r#"<score-partwise><part id="P1"><measure number="1">
                     <attributes><divisions>1</divisions></attributes>
@@ -1574,7 +1545,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("tempo/dynamics-only sound directives are supported"), "{error}");
+        assert!(
+            error.contains("tempo/dynamics-only sound directives are supported"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1584,7 +1558,10 @@ mod tests {
             <note time-only="2"><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("end-dynamics, attack, release, pizzicato, or time-only"), "{error}");
+        assert!(
+            error.contains("end-dynamics, attack, release, pizzicato, or time-only"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1594,7 +1571,10 @@ mod tests {
             <note><instrument id="P1-I1"/><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("unsupported instrument or playback-technique child"), "{error}");
+        assert!(
+            error.contains("unsupported instrument or playback-technique child"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1817,7 +1797,10 @@ mod tests {
                 "<direction><direction-type><dynamics><f/></dynamics></direction-type></direction><note><pitch>",
             );
         let error = parse_musicxml(xml.as_bytes()).unwrap_err();
-        assert!(error.contains("notated <dynamics> markings are not mapped"), "{error}");
+        assert!(
+            error.contains("notated <dynamics> markings are not mapped"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1829,7 +1812,10 @@ mod tests {
                 "<part-list><score-part id=\"P1\"><part-name>Solo</part-name><midi-instrument id=\"P1-I1\"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument></score-part></part-list><part id=\"P1\">",
             );
         let error = parse_musicxml(xml.as_bytes()).unwrap_err();
-        assert!(error.contains("<midi-instrument> routing/program metadata"), "{error}");
+        assert!(
+            error.contains("<midi-instrument> routing/program metadata"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1845,13 +1831,19 @@ mod tests {
             </part></measure>
         </score-timewise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("score-timewise organization is not supported"), "{error}");
+        assert!(
+            error.contains("score-timewise organization is not supported"),
+            "{error}"
+        );
     }
 
     #[test]
     fn non_score_musicxml_root_is_rejected_explicitly() {
         let error = parse_musicxml(br#"<root><part id="P1"/></root>"#).unwrap_err();
-        assert!(error.contains("is not a supported score-partwise document"), "{error}");
+        assert!(
+            error.contains("is not a supported score-partwise document"),
+            "{error}"
+        );
     }
 
     fn json_score_with_one_note() -> Score {
@@ -1964,7 +1956,10 @@ mod tests {
             <note><pitch><step>C</step><octave>10</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("outside the MIDI pitch range 0..=127"), "{error}");
+        assert!(
+            error.contains("outside the MIDI pitch range 0..=127"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2014,7 +2009,10 @@ mod tests {
             <note><grace slash="yes"/><pitch><step>B</step><octave>4</octave></pitch>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("grace notes are not yet supported"), "{error}");
+        assert!(
+            error.contains("grace notes are not yet supported"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2024,7 +2022,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("divisions must be a positive integer"), "{error}");
+        assert!(
+            error.contains("divisions must be a positive integer"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2043,13 +2044,9 @@ mod tests {
         // Two same-pitch note-ons before either note-off must not overwrite
         // the earlier onset or collapse two notes into one.
         let bytes = [
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0,
-            b'M', b'T', b'r', b'k', 0, 0, 0, 20,
-            0, 0x90, 60, 100,
-            100, 0x90, 60, 80,
-            100, 0x80, 60, 0,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0, b'M', b'T', b'r', b'k', 0, 0,
+            0, 20, 0, 0x90, 60, 100, 100, 0x90, 60, 80, 100, 0x80, 60, 0, 100, 0x80, 60, 0, 0,
+            0xFF, 0x2F, 0,
         ];
         let score = parse_midi(&bytes).unwrap();
         assert_eq!(score.notes.len(), 2);
@@ -2068,15 +2065,11 @@ mod tests {
         // constant-tempo despite traversal order.
         let later_track = [
             100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 100
-            0, 0x90, 62, 100,
-            100, 0x80, 62, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 62, 100, 100, 0x80, 62, 0, 0, 0xFF, 0x2F, 0,
         ];
         let initial_track = [
             0, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 0
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let tracks: [&[u8]; 2] = [&later_track, &initial_track];
         let score = parse_midi(&midi_file_with_tracks(&tracks)).unwrap();
@@ -2088,21 +2081,20 @@ mod tests {
     fn midi_late_nondefault_tempo_is_rejected_against_default_120_bpm() {
         let track = [
             100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 100
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+        assert!(
+            error.contains("changes from the default at a non-zero tick"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_late_nondefault_key_is_rejected_without_opening_context() {
         let track = [
             100, 0xFF, 0x59, 2, 1, 0, // G major at tick 100
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(
@@ -2115,9 +2107,7 @@ mod tests {
     fn midi_late_default_key_does_not_prove_opening_key_context() {
         let track = [
             100, 0xFF, 0x59, 2, 0, 0, // C major appears only at tick 100
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(
@@ -2130,12 +2120,13 @@ mod tests {
     fn midi_late_nondefault_meter_is_rejected_against_default_four_four() {
         let track = [
             100, 0xFF, 0x58, 4, 3, 2, 24, 8, // 3/4 at tick 100
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("changes from the default at a non-zero tick"), "{error}");
+        assert!(
+            error.contains("changes from the default at a non-zero tick"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2143,9 +2134,7 @@ mod tests {
         let track = [
             0, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM at tick 0
             100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // same value later
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let score = parse_midi(&midi_file(&track)).unwrap();
         assert_eq!(score.tempo_bpm, 150.0);
@@ -2156,24 +2145,26 @@ mod tests {
         let track = [
             0, 0xFF, 0x51, 3, 0x07, 0xA1, 0x20, // 120 BPM
             100, 0xFF, 0x51, 3, 0x06, 0x1A, 0x80, // 150 BPM
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("tempo changes cannot be represented"), "{error}");
+        assert!(
+            error.contains("tempo changes cannot be represented"),
+            "{error}"
+        );
     }
 
     #[test]
     fn midi_non_quarter_meter_is_rejected_instead_of_flattened() {
         let track = [
             0, 0xFF, 0x58, 4, 4, 3, 24, 8, // 4/8, denominator power 3
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("denominators other than quarter notes"), "{error}");
+        assert!(
+            error.contains("denominators other than quarter notes"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2181,12 +2172,13 @@ mod tests {
         let track = [
             0, 0xFF, 0x59, 2, 0, 0, // C major
             100, 0xFF, 0x59, 2, 1, 0, // G major
-            0, 0x90, 60, 100,
-            100, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 100, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
-        assert!(error.contains("key changes cannot be represented"), "{error}");
+        assert!(
+            error.contains("key changes cannot be represented"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2197,7 +2189,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("finite and between 20 and 320 BPM"), "{error}");
+        assert!(
+            error.contains("finite and between 20 and 320 BPM"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2331,7 +2326,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("non-zero tempo direction offsets are not supported"), "{error}");
+        assert!(
+            error.contains("non-zero tempo direction offsets are not supported"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2381,7 +2379,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("beat units other than undotted quarter notes"), "{error}");
+        assert!(
+            error.contains("beat units other than undotted quarter notes"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2392,7 +2393,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("only undotted quarter-note metronome marks"), "{error}");
+        assert!(
+            error.contains("only undotted quarter-note metronome marks"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2403,7 +2407,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("only undotted quarter-note metronome marks"), "{error}");
+        assert!(
+            error.contains("only undotted quarter-note metronome marks"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2416,7 +2423,10 @@ mod tests {
             <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("tempo changes cannot be represented"), "{error}");
+        assert!(
+            error.contains("tempo changes cannot be represented"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2430,7 +2440,10 @@ mod tests {
             </measure>
         </part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("meter changes cannot be represented"), "{error}");
+        assert!(
+            error.contains("meter changes cannot be represented"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2440,7 +2453,10 @@ mod tests {
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("denominators other than quarter notes"), "{error}");
+        assert!(
+            error.contains("denominators other than quarter notes"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2454,14 +2470,17 @@ mod tests {
             </measure>
         </part></score-partwise>"#;
         let error = parse_musicxml(xml).unwrap_err();
-        assert!(error.contains("key changes cannot be represented"), "{error}");
+        assert!(
+            error.contains("key changes cannot be represented"),
+            "{error}"
+        );
     }
 
     #[test]
     fn zero_ticks_per_beat_midi_is_rejected_without_panicking() {
         let bytes = [
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 0, 0,
-            b'M', b'T', b'r', b'k', 0, 0, 0, 4, 0, 0xFF, 0x2F, 0,
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 0, 0, b'M', b'T', b'r', b'k', 0, 0, 0,
+            4, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&bytes).unwrap_err();
         assert!(error.contains("non-zero ticks-per-beat"), "{error}");
