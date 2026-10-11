@@ -11,6 +11,13 @@ on:
     paths:
       - 'crates/domains/symthaea-fractal-time-lab/**'
 
+concurrency:
+  # Only the newest automatic validation for a branch/PR is authoritative.
+  # Supersede stale queued/running heads so focused lab checks cannot amplify
+  # repository-wide runner pressure during rapid iteration.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
