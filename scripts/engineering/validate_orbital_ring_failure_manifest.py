@@ -227,7 +227,9 @@ def assess(m):
         root = err.split(":", 1)[0].split(".", 1)[0]
         if root in FIELDS:
             blocking.add(root)
-    expected = "Blocked" if blocking else "ReadyForIndependentReview"
+    # Structural errors are fatal to readiness too. Keep the reported expected gate
+    # Blocked whenever either field-level blockers or schema/contract errors exist.
+    expected = "Blocked" if blocking or structural else "ReadyForIndependentReview"
     if m.get("declared_state") != expected: structural.append("declared_state inconsistent with completeness, provenance, and consistency checks")
     return {
         "schema": "luminous-dynamics.orbital-ring-manifest-validation/v1",
@@ -348,19 +350,23 @@ def self_test():
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["initial_path_constraint"]="unspecified"; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("missing_path_constraint_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and bool(r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["scenario_version"]=1; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
-    check("scenario_version_mismatch_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and "scenario_version must be 2 for scenario schema v2" in r["structural_errors"])
+    check("scenario_version_mismatch_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked" and "scenario_version must be 2 for scenario schema v2" in r["structural_errors"])
     r=assess([])
     check("non_object_manifest_fails_closed_without_exception", r["validation_state"]=="failed_contract_checks" and "manifest must be a JSON object" in r["structural_errors"])
     c=json.loads(json.dumps(m)); c["required_inputs"]=[]; r=assess(c)
     check("non_object_required_inputs_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and "required_inputs must be an object" in r["structural_errors"])
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["ring_radiuss_m"]=7e6; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
-    check("unexpected_input_key_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and any("required_inputs contains unknown keys" in e for e in r["structural_errors"]))
+    check("unexpected_input_key_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked" and any("required_inputs contains unknown keys" in e for e in r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["input_provenance"]["ring_radiuss_m"]=fixture_provenance()["ring_radius_m"]; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("unexpected_provenance_key_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and any("input_provenance contains unknown keys" in e for e in r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_fields"]=None; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("non_list_required_fields_fails_closed_without_exception", r["validation_state"]=="failed_contract_checks" and any("required_fields must be the exact ordered list" in e for e in r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_fields"]={"value":list(FIELDS)}; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("object_required_fields_fails_closed_without_exception", r["validation_state"]=="failed_contract_checks" and any("required_fields must be the exact ordered list" in e for e in r["structural_errors"]))
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_fields"]=["ring_radius_m"]; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
+    check("required_fields_subset_fails_closed_and_blocks_promotion", r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked" and any("required_fields must be the exact ordered list" in e for e in r["structural_errors"]))
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["input_provenance"]["rider_force_law_extra"]=fixture_provenance()["rider_force_law"]; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
+    check("unexpected_provenance_key_keeps_expected_gate_blocked", r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked" and any("input_provenance contains unknown keys" in e for e in r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["required_inputs"]["skyhook_support_locations_rad"]=[1e-10,2*math.pi-1e-10,2.0]; c["declared_state"]="Blocked"; r=assess(c)
     check("support_angles_duplicate_across_zero_wrap_block", r["expected_gate_state"]=="Blocked" and r["blocking_field_count"]==1 and any("unique modulo 2π" in e for e in r["type_errors"]))
     try:
