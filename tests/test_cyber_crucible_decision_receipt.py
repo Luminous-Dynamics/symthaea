@@ -63,6 +63,7 @@ class DecisionReceiptTests(unittest.TestCase):
             "scenario_revision": 3,
             "scenario_digest": "1" * 64,
             "input_receipt_digest": "2" * 64,
+            "report_digest": "6" * 64,
             "evaluator_policy_digest": "3" * 64,
             "verifier_build_digest": "4" * 64,
             "decision_nonce": b64url(bytes(range(32, 64))),
@@ -112,6 +113,12 @@ class DecisionReceiptTests(unittest.TestCase):
         result = self.verify(self.make_receipt(decision="reject"))
         self.assertTrue(result["decision_receipt_verified"])
         self.assertEqual(result["decision"], "reject")
+
+    def test_non_string_decision_is_rejected_without_type_error(self):
+        receipt = self.make_receipt()
+        receipt["payload"]["decision"] = []
+        with self.assertRaises(DecisionVerificationError):
+            self.verify(receipt)
 
     def test_payload_mutation_invalidates_signature(self):
         receipt = self.make_receipt()
