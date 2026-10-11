@@ -30,6 +30,7 @@
 //! - Verifier time (ms) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 //! - Proof size (bytes) — measured for Binius, ANALYTIC ESTIMATE for Winterfell
 
+mod boolean_gadgets;
 mod bundling;
 mod cfc_temporal;
 mod fl_triple_stack;
@@ -369,21 +370,21 @@ fn main() {
 
     // Hamming similarity
     println!("\n\n{}", "=".repeat(60));
-    println!("HDC HAMMING SIMILARITY BENCHMARK");
+    println!("HDC HAMMING DISTANCE PROOF BENCHMARK");
     println!("{}", "=".repeat(60));
 
     let hamming = hamming::bench_hamming(256); // 256 words = 16,384 bits
 
     println!(
-        "\n  Hamming similarity: {} AND constraints for {}-bit vectors",
+        "\n  Hamming distance circuit: {} AND constraints for {}-bit vectors",
         hamming.and_constraints,
         hamming.dim_words * 64
     );
-    println!("  XOR diff computation: FREE. Only accumulation costs AND.");
+    println!("  Circuit constrains popcount(XOR) and sums counts; re-run before comparing historical timings.");
 
     // CfC temporal proofs
     println!("\n\n{}", "=".repeat(60));
-    println!("CfC TEMPORAL PROOF BENCHMARKS");
+    println!("BITWISE TEMPORAL RECURRENCE PROOF BENCHMARKS");
     println!("{}", "=".repeat(60));
 
     let cfc_small = cfc_temporal::bench_cfc_temporal(8, 10); // 8 neurons, 10 steps
@@ -408,76 +409,74 @@ fn main() {
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    println!("\nKey insight: CfC closed-form h(t) = h + σ*(x_inf - h) requires");
-    println!("exactly 1 AND constraint per neuron per timestep in Binius.");
-    println!("XOR additions (delta computation, state update) are FREE.");
-    println!("LTC with RK4 would need ~16x more constraints for ODE integration.");
+    println!("These circuits prove a packed-bit recurrence with a witness-supplied gate.");
+    println!("They do not encode numeric fixed-point CfC arithmetic.");
+    println!("Historical timing and LTC/RK4 ratios are not numerical-CfC comparisons.");
 
     // CfC with sigmoid (Sprint 8.3)
     println!("\n\n{}", "=".repeat(60));
-    println!("CfC SIGMOID BENCHMARK");
+    println!("MASKED-GATE TEMPORAL RECURRENCE BENCHMARK");
     println!("{}", "=".repeat(60));
 
     let sig_result = sigmoid::bench_cfc_with_sigmoid(64, 100);
 
-    println!("\n  CfC 64N×100T WITH in-circuit sigmoid:");
+    println!("\n  64N×100T masked-gate demo (not an in-circuit sigmoid):");
     println!(
         "    {} AND constraints (vs ~7,360 without sigmoid)",
         sig_result.and_constraints
     );
-    println!("    Sigmoid adds ~1 AND per neuron per step");
+    println!("    The 8-bit mask is not a numerical sigmoid approximation.");
 
     // Triple Stack: HDC + FHE + ZKP
     println!("\n\n{}", "=".repeat(60));
-    println!("TRIPLE STACK: HDC-OTP + BINIUS");
+    println!("OPAQUE-WORD XOR RELATION PROOF");
     println!("{}", "=".repeat(60));
 
     let triple = triple_stack::bench_triple_stack(256); // 16,384 bits
 
     println!(
-        "\n  Triple stack: {} AND constraints for {}-bit encrypted binding",
+        "\n  XOR relation: {} AND constraints for {}-bit packed-word output",
         triple.and_constraints,
         triple.dim_words * 64
     );
-    println!("  SAME as plaintext XOR binding — encryption adds ZERO proof overhead");
+    println!("  Proves c = a XOR b for opaque words; it does not prove OTP encryption or mask generation.");
 
-    // FL Triple Stack
+    // Strict bitwise majority over private packed-word inputs. This is a Boolean
+    // circuit demo, not encrypted-gradient aggregation or a federated-learning protocol.
     println!("\n\n{}", "=".repeat(60));
-    println!("FL TRIPLE STACK: ENCRYPTED GRADIENT AGGREGATION");
+    println!("BITWISE MAJORITY PROOF BENCHMARK (OPAQUE WORDS)");
     println!("{}", "=".repeat(60));
 
-    let fl_3 = fl_triple_stack::bench_fl_triple_stack(3, 64); // 3 participants, 4096 bits
-    let fl_8 = fl_triple_stack::bench_fl_triple_stack(8, 64); // 8 participants, 4096 bits
-    let fl_16 = fl_triple_stack::bench_fl_triple_stack(16, 64); // 16 participants, 4096 bits
+    let majority_3 = fl_triple_stack::bench_bitwise_majority(3, 64);
+    let majority_8 = fl_triple_stack::bench_bitwise_majority(8, 64);
+    let majority_16 = fl_triple_stack::bench_bitwise_majority(16, 64);
 
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║            FL TRIPLE STACK SUMMARY                           ║");
+    println!("║              BITWISE MAJORITY PROOF SUMMARY                  ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ Participants │ AND Constr. │ Prove (ms) │ Proof (KB)       ║");
+    println!("║ Inputs × 4Kbit │ AND Constraints │ Prove (ms) │ Proof (KB)  ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!(
-        "║  3 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
-        fl_3.and_constraints,
-        fl_3.prove_time_ms,
-        fl_3.proof_size_bytes as f64 / 1024.0
+        "║  3 × 4Kbit     │ {:>14} │ {:>10.1} │ {:>10.1}  ║",
+        majority_3.and_constraints,
+        majority_3.prove_time_ms,
+        majority_3.proof_size_bytes as f64 / 1024.0
     );
     println!(
-        "║  8 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
-        fl_8.and_constraints,
-        fl_8.prove_time_ms,
-        fl_8.proof_size_bytes as f64 / 1024.0
+        "║  8 × 4Kbit     │ {:>14} │ {:>10.1} │ {:>10.1}  ║",
+        majority_8.and_constraints,
+        majority_8.prove_time_ms,
+        majority_8.proof_size_bytes as f64 / 1024.0
     );
     println!(
-        "║ 16 × 4Kbit    │ {:>10} │ {:>10.1} │ {:>10.1}       ║",
-        fl_16.and_constraints,
-        fl_16.prove_time_ms,
-        fl_16.proof_size_bytes as f64 / 1024.0
+        "║ 16 × 4Kbit     │ {:>14} │ {:>10.1} │ {:>10.1}  ║",
+        majority_16.and_constraints,
+        majority_16.prove_time_ms,
+        majority_16.proof_size_bytes as f64 / 1024.0
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
-
-    println!("\n  Key: ALL XOR (encryption + aggregation counting) is FREE.");
-    println!("  Only majority-vote comparison costs AND constraints.");
-    println!("  Encryption adds ZERO proof overhead (OTP = XOR = field addition).");
+    println!("Tie policy: an output bit is 1 only when strictly more than half the inputs have it set.");
+    println!("No OTP, numeric-gradient, or federated-learning semantics are included.");
 
     // Output JSON for paper data
     println!("\n--- JSON (for paper) ---");
