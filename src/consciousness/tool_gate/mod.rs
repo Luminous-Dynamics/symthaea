@@ -9,12 +9,14 @@
 //! - **Fallback strategies**: always computed when blocked
 //! - **NixOS backward compatibility**: wraps existing PhiGate
 
+pub mod business_adapter;
 pub mod classifier;
 pub mod fallback;
 pub mod nixos_adapter;
 pub mod types;
 
 // Re-export key types
+pub use business_adapter::{BusinessCognitiveAssessment, BusinessCognitiveClearance};
 pub use classifier::{classify, gate};
 pub use fallback::{fallback_frustration_cost, select_contextual_fallback};
 pub use nixos_adapter::tool_descriptor_from_shell_command;
