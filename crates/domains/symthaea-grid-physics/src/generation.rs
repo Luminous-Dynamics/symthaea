@@ -17,6 +17,22 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Validation failures from the solar, wind, and synthetic-weather models.
+///
+/// Callers that consume telemetry or forecast data should use the checked
+/// `try_*` methods so malformed observations remain distinguishable from a
+/// genuine zero-generation result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GenerationModelError {
+    NonFiniteInput,
+    NegativeIrradiance,
+    NegativeWindSpeed,
+    InvalidSolarConfiguration,
+    InvalidWindConfiguration,
+    InvalidSyntheticProfile,
+    NonFiniteOutput,
+}
+
 /// A fixed-tilt PV array, PVWatts v5-style.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SolarArray {
@@ -35,17 +51,67 @@ pub struct SolarArray {
 }
 
 impl SolarArray {
-    /// AC power output (kW) given plane-of-array irradiance (W/m^2) and
-    /// ambient temperature (°C).
-    pub fn ac_power_kw(&self, irradiance_w_per_m2: f64, ambient_temp_c: f64) -> f64 {
-        if irradiance_w_per_m2 <= 0.0 {
-            return 0.0;
+    /// Checked AC power estimate in kW for plane-of-array irradiance (W/m²)
+    /// and ambient temperature (°C).
+    ///
+    /// Returns an error for non-finite observations, negative irradiance,
+    /// invalid model parameters, or arithmetic overflow. Invalid telemetry
+    /// must not be confused with the physical zero-output nighttime case.
+    pub fn try_ac_power_kw(
+        &self,
+        irradiance_w_per_m2: f64,
+        ambient_temp_c: f64,
+    ) -> Result<f64, GenerationModelError> {
+        if !irradiance_w_per_m2.is_finite() || !ambient_temp_c.is_finite() {
+            return Err(GenerationModelError::NonFiniteInput);
         }
+        if irradiance_w_per_m2 < 0.0 {
+            return Err(GenerationModelError::NegativeIrradiance);
+        }
+        if !self.rated_capacity_kw.is_finite()
+            || self.rated_capacity_kw < 0.0
+            || !self.noct_c.is_finite()
+            || !self.temp_coefficient_per_c.is_finite()
+            || !self.inverter_efficiency.is_finite()
+            || !(0.0..=1.0).contains(&self.inverter_efficiency)
+            || !self.system_losses.is_finite()
+            || !(0.0..1.0).contains(&self.system_losses)
+        {
+            return Err(GenerationModelError::InvalidSolarConfiguration);
+        }
+        if irradiance_w_per_m2 == 0.0 || self.rated_capacity_kw == 0.0 {
+            return Ok(0.0);
+        }
+
         // NOCT cell-temperature model.
         let cell_temp_c = ambient_temp_c + (self.noct_c - 20.0) / 800.0 * irradiance_w_per_m2;
-        let temp_derate = (1.0 + self.temp_coefficient_per_c * (cell_temp_c - 25.0)).max(0.0);
+        let raw_temp_derate =
+            1.0 + self.temp_coefficient_per_c * (cell_temp_c - 25.0);
+        if !raw_temp_derate.is_finite() {
+            return Err(GenerationModelError::NonFiniteOutput);
+        }
+        let temp_derate = raw_temp_derate.max(0.0);
         let dc_power_kw = self.rated_capacity_kw * (irradiance_w_per_m2 / 1000.0) * temp_derate;
-        (dc_power_kw * (1.0 - self.system_losses) * self.inverter_efficiency).max(0.0)
+        let ac_power_kw =
+            (dc_power_kw * (1.0 - self.system_losses) * self.inverter_efficiency).max(0.0);
+        if !cell_temp_c.is_finite()
+            || !temp_derate.is_finite()
+            || !dc_power_kw.is_finite()
+            || !ac_power_kw.is_finite()
+        {
+            return Err(GenerationModelError::NonFiniteOutput);
+        }
+        Ok(ac_power_kw)
+    }
+
+    /// Backwards-compatible conservative wrapper.
+    ///
+    /// Invalid data maps to zero generation so malformed input cannot
+    /// manufacture a positive estimate. New ingestion/qualification code
+    /// should call `try_ac_power_kw` and retain the explicit error.
+    pub fn ac_power_kw(&self, irradiance_w_per_m2: f64, ambient_temp_c: f64) -> f64 {
+        self.try_ac_power_kw(irradiance_w_per_m2, ambient_temp_c)
+            .unwrap_or(0.0)
     }
 }
 
@@ -63,8 +129,32 @@ pub struct WindTurbine {
 }
 
 impl WindTurbine {
-    pub fn power_kw(&self, wind_speed_m_s: f64) -> f64 {
-        if wind_speed_m_s < self.cut_in_speed_m_s || wind_speed_m_s >= self.cut_out_speed_m_s {
+    /// Checked wind power estimate in kW.
+    ///
+    /// Requires finite, non-negative wind speed and a physically ordered
+    /// turbine curve: 0 <= cut-in < rated < cut-out.
+    pub fn try_power_kw(&self, wind_speed_m_s: f64) -> Result<f64, GenerationModelError> {
+        if !wind_speed_m_s.is_finite() {
+            return Err(GenerationModelError::NonFiniteInput);
+        }
+        if wind_speed_m_s < 0.0 {
+            return Err(GenerationModelError::NegativeWindSpeed);
+        }
+        if !self.rated_capacity_kw.is_finite()
+            || self.rated_capacity_kw < 0.0
+            || !self.cut_in_speed_m_s.is_finite()
+            || !self.rated_speed_m_s.is_finite()
+            || !self.cut_out_speed_m_s.is_finite()
+            || self.cut_in_speed_m_s < 0.0
+            || self.cut_in_speed_m_s >= self.rated_speed_m_s
+            || self.rated_speed_m_s >= self.cut_out_speed_m_s
+        {
+            return Err(GenerationModelError::InvalidWindConfiguration);
+        }
+
+        let power_kw = if wind_speed_m_s < self.cut_in_speed_m_s
+            || wind_speed_m_s >= self.cut_out_speed_m_s
+        {
             0.0
         } else if wind_speed_m_s < self.rated_speed_m_s {
             let v3 = wind_speed_m_s.powi(3);
@@ -73,7 +163,20 @@ impl WindTurbine {
             self.rated_capacity_kw * (v3 - vci3) / (vr3 - vci3)
         } else {
             self.rated_capacity_kw
+        };
+        if !power_kw.is_finite() {
+            return Err(GenerationModelError::NonFiniteOutput);
         }
+        Ok(power_kw)
+    }
+
+    /// Backwards-compatible conservative wrapper.
+    ///
+    /// Invalid data maps to zero power so malformed weather cannot create
+    /// fictitious generation. Use `try_power_kw` when validation errors
+    /// must remain observable.
+    pub fn power_kw(&self, wind_speed_m_s: f64) -> f64 {
+        self.try_power_kw(wind_speed_m_s).unwrap_or(0.0)
     }
 }
 
@@ -82,20 +185,62 @@ impl WindTurbine {
 /// otherwise. For scenario/test harnesses only -- real deployments should
 /// use measured/forecasted irradiance (e.g. Terra Atlas's Open-Meteo feed),
 /// not this.
+pub fn try_synthetic_irradiance_w_per_m2(
+    time_of_day_hours: f64,
+    peak_irradiance_w_per_m2: f64,
+    sunrise_hour: f64,
+    sunset_hour: f64,
+) -> Result<f64, GenerationModelError> {
+    if !time_of_day_hours.is_finite()
+        || !peak_irradiance_w_per_m2.is_finite()
+        || !sunrise_hour.is_finite()
+        || !sunset_hour.is_finite()
+    {
+        return Err(GenerationModelError::NonFiniteInput);
+    }
+    if peak_irradiance_w_per_m2 < 0.0 {
+        return Err(GenerationModelError::NegativeIrradiance);
+    }
+    if !(0.0..=24.0).contains(&time_of_day_hours)
+        || !(0.0..=24.0).contains(&sunrise_hour)
+        || !(0.0..=24.0).contains(&sunset_hour)
+        || sunset_hour <= sunrise_hour
+    {
+        return Err(GenerationModelError::InvalidSyntheticProfile);
+    }
+    if time_of_day_hours <= sunrise_hour
+        || time_of_day_hours >= sunset_hour
+        || peak_irradiance_w_per_m2 == 0.0
+    {
+        return Ok(0.0);
+    }
+    let day_fraction = (time_of_day_hours - sunrise_hour) / (sunset_hour - sunrise_hour);
+    let irradiance = (peak_irradiance_w_per_m2
+        * (std::f64::consts::PI * day_fraction).sin())
+    .max(0.0);
+    if irradiance.is_finite() {
+        Ok(irradiance)
+    } else {
+        Err(GenerationModelError::NonFiniteOutput)
+    }
+}
+
+/// Backwards-compatible conservative wrapper for test-only synthetic data.
+/// Invalid inputs yield zero; qualification code should call the checked
+/// method so invalid profile parameters are visible.
 pub fn synthetic_irradiance_w_per_m2(
     time_of_day_hours: f64,
     peak_irradiance_w_per_m2: f64,
     sunrise_hour: f64,
     sunset_hour: f64,
 ) -> f64 {
-    if time_of_day_hours <= sunrise_hour
-        || time_of_day_hours >= sunset_hour
-        || sunset_hour <= sunrise_hour
-    {
-        return 0.0;
-    }
-    let day_fraction = (time_of_day_hours - sunrise_hour) / (sunset_hour - sunrise_hour);
-    (peak_irradiance_w_per_m2 * (std::f64::consts::PI * day_fraction).sin()).max(0.0)
+    try_synthetic_irradiance_w_per_m2(
+        time_of_day_hours,
+        peak_irradiance_w_per_m2,
+        sunrise_hour,
+        sunset_hour,
+    )
+    .unwrap_or(0.0)
 }
 
 #[cfg(test)]
@@ -213,6 +358,76 @@ mod tests {
             prev = p;
             v += 0.5;
         }
+    }
+
+    #[test]
+    fn test_checked_wind_rejects_nan_instead_of_returning_rated_power() {
+        let turbine = WindTurbine {
+            rated_capacity_kw: 2000.0,
+            cut_in_speed_m_s: 3.0,
+            rated_speed_m_s: 12.0,
+            cut_out_speed_m_s: 25.0,
+        };
+        assert_eq!(
+            turbine.try_power_kw(f64::NAN),
+            Err(GenerationModelError::NonFiniteInput)
+        );
+        // Compatibility callers remain conservative: invalid data cannot
+        // manufacture full rated power.
+        assert_eq!(turbine.power_kw(f64::NAN), 0.0);
+    }
+
+    #[test]
+    fn test_checked_wind_rejects_invalid_curve_ordering() {
+        let turbine = WindTurbine {
+            rated_capacity_kw: 2000.0,
+            cut_in_speed_m_s: 12.0,
+            rated_speed_m_s: 12.0,
+            cut_out_speed_m_s: 25.0,
+        };
+        assert_eq!(
+            turbine.try_power_kw(15.0),
+            Err(GenerationModelError::InvalidWindConfiguration)
+        );
+    }
+
+    #[test]
+    fn test_checked_solar_distinguishes_nan_from_nighttime_zero() {
+        let array = default_array();
+        assert_eq!(
+            array.try_ac_power_kw(f64::NAN, 25.0),
+            Err(GenerationModelError::NonFiniteInput)
+        );
+        assert_eq!(array.try_ac_power_kw(0.0, 25.0), Ok(0.0));
+        assert_eq!(array.ac_power_kw(f64::NAN, 25.0), 0.0);
+    }
+
+    #[test]
+    fn test_checked_solar_rejects_invalid_inverter_efficiency() {
+        let array = SolarArray {
+            inverter_efficiency: f64::NAN,
+            ..default_array()
+        };
+        assert_eq!(
+            array.try_ac_power_kw(800.0, 25.0),
+            Err(GenerationModelError::InvalidSolarConfiguration)
+        );
+    }
+
+    #[test]
+    fn test_checked_synthetic_profile_rejects_nan_clock_and_negative_peak() {
+        assert_eq!(
+            try_synthetic_irradiance_w_per_m2(f64::NAN, 1000.0, 6.0, 18.0),
+            Err(GenerationModelError::NonFiniteInput)
+        );
+        assert_eq!(
+            try_synthetic_irradiance_w_per_m2(12.0, -1.0, 6.0, 18.0),
+            Err(GenerationModelError::NegativeIrradiance)
+        );
+        assert_eq!(
+            try_synthetic_irradiance_w_per_m2(12.0, 1000.0, 18.0, 6.0),
+            Err(GenerationModelError::InvalidSyntheticProfile)
+        );
     }
 
     #[test]
