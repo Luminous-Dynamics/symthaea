@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-content-fabric"
+version = "0.1.0"
+edition = "2024"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+description = "Authority-free Symthaea HDC shadow planner for the Mycelix Content Fabric external-planner protocol"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+symthaea-core = { path = "../../core/symthaea-core", default-features = false }
+
+[dev-dependencies]
+serde_json = { workspace = true }
