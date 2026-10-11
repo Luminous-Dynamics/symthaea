@@ -35,7 +35,7 @@ nix develop -c cargo run --example muse_vocal_release_gate \
   --diffsinger-worker scripts/diffsinger_worker.sh
 ```
 
-**Important known blocker:** `scripts/diffsinger_worker.py` currently declares and returns `44100` Hz, while `examples/diffsinger_worker_smoke.rs` asserts `24000` Hz. The Rust bridge forwards the worker's rate without resampling. The actual vocoder's authoritative native rate has not been verified from a pinned model config or an observed render in this documentation update. Until it is, treat the DiffSinger result as experimental and do not promote it based on the harness output alone. Never fix this by merely relabeling WAV metadata; identify the actual rate, make any resampling explicit, and update a focused regression test.
+**Important known blocker:** `scripts/diffsinger_worker.py` declares and returns `44100` Hz, and this branch aligns `examples/diffsinger_worker_smoke.rs` to that declared rate. The Rust bridge forwards the worker's rate without resampling. This assertion checks interface consistency only; the actual native rate of the externally provisioned ONNX voicebank has not been verified from its pinned config or an observed render. Until that verification exists, treat DiffSinger results as experimental and do not promote them based on the harness output alone. Never fix a mismatch by merely relabeling WAV metadata; identify the actual rate and record any explicit resampling.
 
 ## Interpreting the gate
 
