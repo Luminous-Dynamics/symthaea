@@ -2715,6 +2715,7 @@ mod tests {
         let back: PerformedNoteEvent = serde_json::from_str(&json).unwrap();
         assert!(back.source_note_id.is_none());
     }
+
     #[test]
     fn imported_motif_summary_defaults_missing_source_part_id_for_legacy_records() {
         let legacy = r#"{"occurrence_count":2,"midi_pitches":[60,62,64],"identity_note":"legacy record","confidence":0.42}"#;
@@ -2724,6 +2725,4 @@ mod tests {
         let round_trip = serde_json::to_string(&decoded).unwrap();
         assert!(!round_trip.contains("source_part_id"));
     }
-
-
 }
