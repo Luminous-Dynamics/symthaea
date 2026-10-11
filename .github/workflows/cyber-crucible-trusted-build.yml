@@ -170,7 +170,7 @@ jobs:
           name: cyber-crucible-verifier-v1
           path: ${{ runner.temp }}/cyber-crucible-verifier-v1.tar.gz
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   release-approval:
     if: github.repository == 'Luminous-Dynamics/symthaea'
