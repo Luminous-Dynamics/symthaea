@@ -167,6 +167,126 @@ pub fn encode(event: &LogEvent) -> Hdv {
     bundle(&parts)
 }
 
+/// Coarse Windows event family used by the domain-invariant ablation.
+///
+/// This is intentionally an ablation, not a replacement for \`encode\`: the numeric EventID
+/// is discarded after mapping known IDs into a small semantic family. Unknown IDs
+/// share an \`unknown\` bucket. Numeric IDs can collide across providers, so this
+/// heuristic must be evaluated cross-corpus before use in production.
+fn event_family(event_id: u32) -> &'static str {
+    match event_id {
+        4624 | 4625 | 4634 | 4647 | 4648 | 4768 | 4769 | 4771 | 4776 => "authentication",
+        1 | 4688 | 4689 => "process",
+        11 => "file",
+        3 | 5156 => "network",
+        12 | 13 | 14 | 4657 => "registry",
+        4697 | 4698 | 4699 | 4700 | 4702 | 7040 | 7045 => "service_task",
+        4103 | 4104 => "scripting",
+        4656 | 4660 | 4663 => "object_access",
+        _ => "unknown",
+    }
+}
+
+/// Canonicalize common field-name aliases so casing/producer spelling differences
+/// do not produce different key hypervectors. Unrecognized keys are normalized
+/// to lowercase ASCII alphanumerics with underscores; values remain unchanged in
+/// this first ablation to keep the experiment interpretable.
+fn canonical_field_key(key: &str) -> String {
+    let compact: String = key
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    let canonical = match compact.as_str() {
+        "targetusername" | "username" | "user" | "accountname" | "subjectusername"
+        | "subjectuser" | "useraccount" => "identity_user",
+        "ipaddress" | "sourceip" | "sourceaddress" | "clientaddress" | "remoteaddress" => {
+            "network_address"
+        }
+        "destinationip" | "destinationaddress" | "destaddress" | "remoteip" => {
+            "network_destination"
+        }
+        "logontype" | "logintype" => "authentication_logon_type",
+        "authenticationpackagename" | "authpackage" => "authentication_package",
+        "commandline" | "processcommandline" | "processcmdline" => "process_command_line",
+        "image" | "newprocessname" | "processname" | "executable" | "processpath" => {
+            "process_executable"
+        }
+        "parentimage" | "parentprocessname" | "parentprocess" => "process_parent",
+        "targetfilename" | "filename" | "filepath" | "filepathname" => "file_path",
+        "servicename" | "service" => "service_name",
+        "status" | "substatus" | "statuscode" | "returncode" => "result_status",
+        "processid" | "newprocessid" => "process_id",
+        "parentprocessid" => "parent_process_id",
+        "hash" | "hashes" | "filehash" => "file_hash",
+        "objectname" | "registrykey" | "keyname" => "object_name",
+        _ => {
+            let normalized: String = key
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() {
+                        c.to_ascii_lowercase()
+                    } else {
+                        '_'
+                    }
+                })
+                .collect();
+            let mut compacted = String::with_capacity(normalized.len());
+            let mut previous_underscore = false;
+            for ch in normalized.chars() {
+                if ch == '_' {
+                    if !previous_underscore {
+                        compacted.push(ch);
+                    }
+                    previous_underscore = true;
+                } else {
+                    compacted.push(ch);
+                    previous_underscore = false;
+                }
+            }
+            return compacted.trim_matches('_').to_string();
+        }
+    };
+    canonical.to_string()
+}
+
+/// Experimental domain-invariant encoder for cross-corpus ablation.
+///
+/// Compared with [\`encode\`], this version:
+/// - drops raw provider and component strings;
+/// - maps known numeric Windows EventIDs into coarse event families;
+/// - canonicalizes common structured-field name aliases;
+/// - retains source, severity, and field values as separate channels.
+///
+/// It is deliberately additive: existing \`encode\` behavior and historical
+/// benchmark results remain reproducible. This is not yet an OCSF mapper and
+/// does not normalize high-cardinality field values; cross-corpus gains must be
+/// measured rather than presumed.
+pub fn encode_domain_invariant(event: &LogEvent) -> Hdv {
+    let mut parts: Vec<Hdv> = Vec::with_capacity(4);
+    parts.push(bind(role_source(), &source_hv(event.source)));
+    parts.push(bind(role_severity(), &severity_hv(event.severity)));
+    parts.push(bind(
+        role_event_id(),
+        &hash_hv(&format!("EVENT_FAMILY::{}", event_family(event.event_id))),
+    ));
+
+    if !event.fields.is_empty() {
+        let kv: Vec<Hdv> = event
+            .fields
+            .iter()
+            .map(|(key, value)| {
+                bind(
+                    &hash_hv(&format!("FIELD::{}", canonical_field_key(key))),
+                    &hash_hv(value),
+                )
+            })
+            .collect();
+        parts.push(bind(role_fields(), &bundle(&kv)));
+    }
+    bundle(&parts)
+}
+
 /// Cosine similarity on bipolar HVs. Range [-1, 1].
 pub fn cosine(a: &Hdv, b: &Hdv) -> f32 {
     let dot: i32 = a.iter().zip(b.iter()).map(|(x, y)| (x * y) as i32).sum();
@@ -202,6 +322,48 @@ mod tests {
             host: None,
             label: None,
         }
+    }
+
+    #[test]
+    fn domain_invariant_encoding_ignores_raw_provider_and_component() {
+        let mut a = ev("Vendor-A-Provider", 4624, "ignored message");
+        a.component = "Security".into();
+        a.fields.insert("TargetUserName".into(), "alice".into());
+
+        let mut b = ev("Vendor-B-Provider", 4624, "different ignored message");
+        b.component = "OtherComponent".into();
+        b.fields.insert("TargetUserName".into(), "alice".into());
+
+        assert_ne!(encode(&a), encode(&b), "baseline must retain producer metadata");
+        assert_eq!(encode_domain_invariant(&a), encode_domain_invariant(&b));
+    }
+
+    #[test]
+    fn domain_invariant_encoding_canonicalizes_common_field_aliases() {
+        let mut a = ev("provider-a", 4624, "");
+        a.fields.insert("TargetUserName".into(), "alice".into());
+
+        let mut b = ev("provider-b", 4624, "");
+        b.fields.insert("user".into(), "alice".into());
+
+        assert_eq!(encode_domain_invariant(&a), encode_domain_invariant(&b));
+    }
+
+    #[test]
+    fn domain_invariant_encoding_buckets_known_event_id_families() {
+        let a = encode_domain_invariant(&ev("provider-a", 4624, ""));
+        let b = encode_domain_invariant(&ev("provider-b", 4625, ""));
+        let c = encode_domain_invariant(&ev("provider-c", 4688, ""));
+
+        assert_eq!(a, b, "4624 and 4625 are both authentication-family events");
+        assert_ne!(a, c, "authentication and process families must remain distinct");
+    }
+
+    #[test]
+    fn unknown_event_ids_do_not_leak_raw_numeric_id() {
+        let a = encode_domain_invariant(&ev("provider-a", 90001, ""));
+        let b = encode_domain_invariant(&ev("provider-b", 90002, ""));
+        assert_eq!(a, b, "unmapped IDs intentionally share the unknown family");
     }
 
     #[test]
