@@ -41,6 +41,9 @@ pub enum RegressionSeverity {
     Warning,
     /// >10% degradation below baseline CI.
     Critical,
+    /// The metric cannot be meaningfully classified (e.g. a near-zero baseline).
+    /// This is a comparison-integrity state, not a scientific regression finding.
+    Unqualified,
 }
 
 /// Comparison result for a single metric.
@@ -88,6 +91,9 @@ pub struct RegressionSummary {
     pub warnings: usize,
     /// Number of metrics with critical regressions.
     pub critical: usize,
+    /// Number of metrics for which this comparison could not be qualified.
+    #[serde(default)]
+    pub unqualified: usize,
 }
 
 impl RegressionSnapshot {
@@ -361,7 +367,7 @@ impl RegressionReport {
                                 baseline_ci_upper: baseline_val.ci_upper,
                                 current_mean: current_val.mean,
                                 delta_pct: 0.0,
-                                severity: RegressionSeverity::Pass,
+                                severity: RegressionSeverity::Unqualified,
                             });
                             continue;
                         }
@@ -406,6 +412,10 @@ impl RegressionReport {
             .iter()
             .filter(|r| r.severity == RegressionSeverity::Critical)
             .count();
+        let unqualified = results
+            .iter()
+            .filter(|r| r.severity == RegressionSeverity::Unqualified)
+            .count();
 
         Self {
             baseline_name: baseline.name.clone(),
@@ -413,9 +423,10 @@ impl RegressionReport {
             results,
             summary: RegressionSummary {
                 total_metrics: total,
-                passed: total - warnings - critical,
+                passed: total - warnings - critical - unqualified,
                 warnings,
                 critical,
+                unqualified,
             },
         }
     }
@@ -501,8 +512,16 @@ impl RegressionReport {
     }
 
     /// Returns `true` if any metric has a Warning or Critical regression.
+    ///
+    /// This excludes unqualified comparisons, which are not scientific
+    /// regressions. Call `has_unqualified_metrics()` separately.
     pub fn has_regressions(&self) -> bool {
         self.summary.warnings > 0 || self.summary.critical > 0
+    }
+
+    /// Returns `true` if any metric could not be validly compared.
+    pub fn has_unqualified_metrics(&self) -> bool {
+        self.summary.unqualified > 0
     }
 
     /// Format as a human-readable summary string.
@@ -513,11 +532,12 @@ impl RegressionReport {
             self.current_name, self.baseline_name
         ));
         out.push_str(&format!(
-            "Metrics: {} total, {} pass, {} warning, {} critical\n\n",
+            "Metrics: {} total, {} pass, {} warning, {} critical, {} unqualified\n\n",
             self.summary.total_metrics,
             self.summary.passed,
             self.summary.warnings,
-            self.summary.critical
+            self.summary.critical,
+            self.summary.unqualified
         ));
 
         // Only show non-passing metrics
@@ -527,6 +547,7 @@ impl RegressionReport {
                     RegressionSeverity::Warning => "WARN",
                     RegressionSeverity::Critical => "CRIT",
                     RegressionSeverity::Pass => "PASS",
+                    RegressionSeverity::Unqualified => "UNQUALIFIED",
                 };
                 out.push_str(&format!(
                     "[{}] {}/{}: {:.4} -> {:.4} ({:+.1}%)\n",
@@ -545,11 +566,7 @@ impl RegressionReport {
             // This message also protects the legacy exploratory API from
             // presenting zero observed comparisons as an all-pass result.
             out.push_str("No comparable metrics; this report is not a qualified comparison.\n");
-        } else if self
-            .results
-            .iter()
-            .any(|result| result.baseline_mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON)
-        {
+        } else if self.summary.unqualified > 0 {
             out.push_str(
                 "At least one baseline metric is near zero; percentage comparison is not qualified.\n",
             );
@@ -678,9 +695,16 @@ mod tests {
         // The exploratory summary must not turn an undefined percentage
         // comparison into a positive pass, even though no division occurs.
         assert!(!report.has_regressions());
+        assert!(report.has_unqualified_metrics());
         assert_eq!(report.summary.total_metrics, 2);
+        assert_eq!(report.summary.passed, 1);
+        assert_eq!(report.summary.unqualified, 1);
+        assert!(report.results.iter().any(|result| {
+            result.metric == "near_zero" && result.severity == RegressionSeverity::Unqualified
+        }));
         let summary = report.format_summary();
         assert!(summary.contains("near zero"));
+        assert!(summary.contains("UNQUALIFIED"));
         assert!(!summary.contains("All metrics within baseline CI"));
     }
 
