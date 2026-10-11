@@ -136,9 +136,13 @@ impl std::fmt::Display for IterativeEvolutionError {
             } => write!(
                 f,
                 "iterative step requires at least {requested_at_least} substeps, budget is {max_substeps}"
+                    
             ),
             Self::NonFiniteOutput { index } => {
-                write!(f, "iterative evolution produced a non-finite state at index {index}; state rolled back")
+                write!(
+                    f,
+                    "iterative evolution produced a non-finite state at index {index}; state rolled back"
+                )
             }
         }
     }
@@ -1311,7 +1315,10 @@ impl HdcLtcUnifiedNeuron {
             self.running_var = running_var_before;
             return Err(IterativeEvolutionError::NonFiniteOutput { index });
         }
-        if !self.running_mean.is_finite() || !self.running_var.is_finite() || !self.total_time.is_finite() {
+        if !self.running_mean.is_finite()
+            || !self.running_var.is_finite()
+            || !self.total_time.is_finite()
+        {
             self.state = state_before;
             self.total_time = total_time_before;
             self.update_count = update_count_before;
@@ -3233,6 +3240,23 @@ mod checked_iterative_evolution_tests {
         );
         assert_eq!(bad_parameter.evolution_clock(), (0.0, 0));
         assert_eq!(bad_parameter.state().norm(), 0.0);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn legacy_iterative_wrapper_panics_before_over_budget_work() {
+        let mut neuron = neuron();
+        let input = input();
+        let state = neuron.state().clone();
+        let clock = neuron.evolution_clock();
+        let mean = neuron.running_mean;
+        let var = neuron.running_var;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            neuron.evolve_closed_form_iterative(f32::MAX, &input);
+        }));
+        assert!(result.is_err(), "legacy wrapper must reject over-budget work");
+        assert_unchanged(&neuron, &state, clock, mean, var);
     }
 
     #[test]
