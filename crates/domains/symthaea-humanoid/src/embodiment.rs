@@ -2,14 +2,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! EmbodimentBridge implementation for the bipedal humanoid platform.
+//!
+//! The public bridge deliberately does not apply learned motor output directly.
+//! Goal-directed commands cross the shared [`HumanoidExecutionPipeline`], which
+//! composes deterministic whole-body control with final command projection.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::controller::HumanoidController;
 use crate::encoder::HumanoidHdcEncoder;
+use crate::execution::HumanoidExecutionPipeline;
 use crate::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
-use crate::types::{HumanoidCommand, HumanoidConfig};
+use crate::types::{
+    ActuationMode, HumanoidCommand, HumanoidConfig, HumanoidPdGains, HumanoidTask,
+    pd_standing_baseline,
+};
 
 pub use symthaea_core::embodiment::{
     EmbodimentResult, EmbodimentTelemetry, GROUNDING_SENSORIMOTOR, MoralGateInput,
@@ -26,6 +34,8 @@ pub enum HumanoidFallbackStage {
 /// Bipedal humanoid embodiment bridge.
 pub struct HumanoidEmbodiment {
     controller: HumanoidController,
+    pipeline: HumanoidExecutionPipeline,
+    pd_gains: HumanoidPdGains,
     simulator: SimpleHumanoidSimulator,
     encoder: HumanoidHdcEncoder,
     last_perception: Option<ContinuousHV>,
@@ -43,13 +53,20 @@ pub struct HumanoidEmbodiment {
 impl HumanoidEmbodiment {
     /// Gravity-compensation torque baseline applied to hip pitch joints during StandingLock.
     const GRAVITY_COMP_BASELINE: f32 = 0.05;
+    /// The generic bridge has no training curriculum, so it requests the
+    /// hierarchy's minimum retained deterministic baseline rather than full PD
+    /// curriculum authority.
+    const EMBODIMENT_BASELINE_WEIGHT: f32 = 0.0;
 
     pub fn new(genesis: &GenesisSeed) -> Self {
         let config = HumanoidConfig::default();
+        let morphology = config.morphology;
         let simulator = SimpleHumanoidSimulator::new();
         let num_actuators = simulator.state().joint_angles.len();
         Self {
             controller: HumanoidController::new(genesis, &config),
+            pipeline: HumanoidExecutionPipeline::new(morphology),
+            pd_gains: HumanoidPdGains::for_morphology(morphology),
             simulator,
             encoder: HumanoidHdcEncoder::new(genesis, 32),
             last_perception: None,
@@ -92,12 +109,13 @@ impl HumanoidEmbodiment {
     }
 
     fn apply_standing_lock(&self, cmd: &mut HumanoidCommand) {
-        // Zero all torques as the default safe state
+        // Zero all torques as the default safe state.
         for t in cmd.torques.iter_mut() {
             *t = 0.0;
         }
-        // Dynamically resolve hip pitch joints from the morphology layout map
-        let names = crate::morphology::HumanoidMorphology::Dmc21.joint_names();
+        // Resolve hip pitch joints from the active morphology rather than the
+        // legacy DMC21 constants.
+        let names = self.pipeline.morphology().joint_names();
         for (idx, name) in names.iter().enumerate() {
             if name.contains("hip_y") && idx < cmd.torques.len() {
                 cmd.torques[idx] = Self::GRAVITY_COMP_BASELINE;
@@ -114,26 +132,44 @@ impl HumanoidEmbodiment {
         if let Some(m) = self.moral_safety {
             self.current_safety = self.current_safety.max(m);
         }
-        let gain = self.current_safety.motor_gain();
 
-        let mut cmd = self.controller.forward(thought_hv, dt);
-
-        // ── StandingLock fallback for Red tier ──────────────────────
-        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+        let state = self.simulator.state().clone();
+        let cmd = if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            // Red revokes goal-directed authority. Minimum-safe fallback retains
+            // the force it needs to execute, but still crosses final projection.
             self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
-            self.apply_standing_lock(&mut cmd);
+            let mut fallback = HumanoidCommand::zero_for(self.num_actuators);
+            self.apply_standing_lock(&mut fallback);
+            self.pipeline
+                .authorize_fallback(
+                    &fallback,
+                    &state,
+                    ActuationMode::NormalizedTorque,
+                    dt as f64,
+                )
+                .command
         } else {
             self.fallback_stage = HumanoidFallbackStage::StandingLock;
             self.fallback_cycles_in_stage = 0;
-            if gain < 1.0 {
-                for t in cmd.torques.iter_mut() {
-                    *t *= gain;
-                }
-            }
-        }
+
+            let learned_residual = self.controller.forward(thought_hv, dt);
+            let baseline = pd_standing_baseline(&state, &self.pd_gains);
+            self.pipeline
+                .authorize(
+                    HumanoidTask::Stand,
+                    &state,
+                    &baseline,
+                    &learned_residual,
+                    Self::EMBODIMENT_BASELINE_WEIGHT,
+                    0.0,
+                    self.current_safety.motor_gain(),
+                    ActuationMode::NormalizedTorque,
+                    dt as f64,
+                )
+                .command
+        };
 
         self.last_control_effort = cmd.control_effort();
-
         self.simulator.step(&cmd, dt as f64);
 
         let perception = self.encoder.encode(self.simulator.state());
@@ -170,6 +206,7 @@ impl HumanoidEmbodiment {
     pub fn reset(&mut self) {
         self.simulator.reset();
         self.controller.reset();
+        self.pipeline.reset();
         self.encoder.reset();
         self.last_perception = None;
         self.total_steps = 0;
@@ -310,7 +347,7 @@ mod tests {
             torques: vec![1.0; 21],
         };
         bridge.apply_standing_lock(&mut cmd);
-        let names = crate::morphology::HumanoidMorphology::Dmc21.joint_names();
+        let names = bridge.pipeline.morphology().joint_names();
         let hip_indices: Vec<usize> = names
             .iter()
             .enumerate()
