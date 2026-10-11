@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cyber-crucible-verifier-provenance-policy-v1.schema.json",
+  "title": "Cyber Crucible verifier artifact provenance policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "repository",
+    "source_ref",
+    "source_commit",
+    "workflow_path",
+    "signer_repository",
+    "signer_workflow_path",
+    "signer_workflow_commit",
+    "oidc_issuer",
+    "builder_id",
+    "build_type",
+    "artifact_name",
+    "artifact_sha256",
+    "gh_cli_path",
+    "gh_cli_sha256",
+    "expected_external_parameters",
+    "deny_self_hosted_runners"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-crucible-verifier-provenance-policy.v1"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "source_ref": {
+      "type": "string",
+      "pattern": "^refs/tags/cyber-crucible-verifier-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "workflow_path": {
+      "type": "string",
+      "pattern": "^\\.github/workflows/.+\\.(yml|yaml)$"
+    },
+    "signer_workflow_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "oidc_issuer": {
+      "const": "https://token.actions.githubusercontent.com"
+    },
+    "builder_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "build_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gh_cli_path": {
+      "type": "string",
+      "pattern": "^/.+"
+    },
+    "gh_cli_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "expected_external_parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow"
+      ],
+      "properties": {
+        "workflow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "ref",
+            "path"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "release": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "vars": {
+          "type": "object",
+          "minProperties": 1
+        }
+      },
+      "not": {
+        "required": [
+          "inputs",
+          "release"
+        ]
+      }
+    },
+    "deny_self_hosted_runners": {
+      "const": true
+    },
+    "signer_repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "signer_workflow_path": {
+      "type": "string",
+      "pattern": "^\\.github/workflows/.+\\.(yml|yaml)$"
+    }
+  }
+}

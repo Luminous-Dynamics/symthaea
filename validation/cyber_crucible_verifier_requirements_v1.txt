@@ -1,0 +1,13 @@
+# Fully version-pinned runtime/test dependency closure for Cyber Crucible verifier v1.
+# The trusted build installs wheels only; missing compatible wheels fail closed.
+# Install with: python -m pip install --only-binary=:all: -r validation/cyber_crucible_verifier_requirements_v1.txt
+attrs==26.1.0
+cffi==2.1.1
+cryptography==50.0.2
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+pycparser==2.23
+referencing==0.37.0
+rfc8785==0.1.4
+rpds-py==2026.9.1
+typing-extensions==4.15.0
