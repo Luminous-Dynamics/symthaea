@@ -38,17 +38,31 @@ jobs:
           EXPECTED_SOURCE_REF: ${{ inputs.source_ref }}
           EXPECTED_SOURCE_COMMIT: ${{ inputs.source_commit }}
         run: |
-          if ! printf '%s' "$EXPECTED_SOURCE_REF" | grep -Eq '^refs/tags/cyber-crucible-verifier-v[0-9]+\.[0-9]+\.[0-9]+
-          if ! printf '%s' "$EXPECTED_SOURCE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "REJECTED: source_commit must be a 40-character lowercase Git SHA" >&2
-            exit 2
-          fi
-          ACTUAL_SOURCE_COMMIT="$(git rev-parse HEAD)"
-          test "$ACTUAL_SOURCE_COMMIT" = "$EXPECTED_SOURCE_COMMIT" || {
-            echo "REJECTED: checked-out commit differs from independently supplied source_commit" >&2
-            exit 2
-          }
-          printf 'source_ref=%s\nsource_commit=%s\n' "$EXPECTED_SOURCE_REF" "$ACTUAL_SOURCE_COMMIT"
+          python - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+
+          source_ref = os.environ["EXPECTED_SOURCE_REF"]
+          source_commit = os.environ["EXPECTED_SOURCE_COMMIT"]
+          if re.fullmatch(r"refs/tags/cyber-crucible-verifier-v[0-9]+\.[0-9]+\.[0-9]+", source_ref) is None:
+              print("REJECTED: source_ref must be a semantic-version verifier release tag", file=sys.stderr)
+              raise SystemExit(2)
+          if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+              print("REJECTED: source_commit must be a 40-character lowercase Git SHA", file=sys.stderr)
+              raise SystemExit(2)
+          actual = subprocess.run(
+              ["git", "rev-parse", "HEAD"],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.strip()
+          if actual != source_commit:
+              print("REJECTED: checked-out commit differs from expected source commit", file=sys.stderr)
+              raise SystemExit(2)
+          print(f"source_ref={source_ref}\nsource_commit={actual}")
+          PY
 
       - name: Set up pinned Python security release
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
