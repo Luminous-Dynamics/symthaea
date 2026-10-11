@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build-test-and-attest:
     # Security-critical: update this SHA only after review of the trusted reusable workflow.
-    uses: Luminous-Dynamics/symthaea/.github/workflows/cyber-crucible-trusted-build.yml@661af65d4804b3c2f5eeb2d8ff7ff16b60df59b0
+    uses: Luminous-Dynamics/symthaea/.github/workflows/cyber-crucible-trusted-build.yml@12b20f1f0960f3c133680ac41593077264fd8c63
     with:
       source_ref: ${{ github.ref }}
       source_commit: ${{ github.sha }}
