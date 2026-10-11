@@ -1205,6 +1205,27 @@ mod tests {
     }
 
     #[test]
+    fn verifier_rejects_resealed_receipt_with_changed_initial_state() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("well-formed receipt should be constructed");
+
+        receipt.initial_state[0] = 2.0;
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
     fn changing_system_definition_changes_receipt_identity() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let formula = harmonic_energy();
