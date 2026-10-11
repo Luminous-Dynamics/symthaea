@@ -1288,17 +1288,22 @@ mod tests {
 
     #[test]
     fn checked_rk4_reaches_horizon_despite_repeated_addition_roundoff() {
-        let orbit = checked_rk4_trajectory(
-            harmonic_rhs,
-            &[1.0, 0.0, 0.0, 1.0],
-            4.0,
-            0.01,
-        )
-        .expect("a complete 400-step orbit must not fail due to accumulated time rounding");
-        assert_eq!(orbit.len(), 401);
-        assert!(orbit.iter().all(|state| {
-            state.len() == 4 && state.iter().all(|value| value.is_finite())
-        }));
+        for (t_end, dt, expected_steps) in [
+            (4.0, 0.01, 400usize),
+            (1.0, 0.1, 10usize),
+        ] {
+            let orbit = checked_rk4_trajectory(
+                harmonic_rhs,
+                &[1.0, 0.0, 0.0, 1.0],
+                t_end,
+                dt,
+            )
+            .expect("a complete orbit must not fail due to accumulated time rounding");
+            assert_eq!(orbit.len(), expected_steps + 1);
+            assert!(orbit.iter().all(|state| {
+                state.len() == 4 && state.iter().all(|value| value.is_finite())
+            }));
+        }
     }
 
     #[test]
