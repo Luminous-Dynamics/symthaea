@@ -2158,6 +2158,30 @@ mod tests {
     }
 
     #[test]
+    fn reply_record_schema_v2_does_not_change_px4_message_version() {
+        let reply = arming_reply(8, 3, false, 1_350_000_000);
+        assert_eq!(
+            reply.schema_version,
+            PX4_EXTERNAL_MODE_ARMING_CHECK_REPLY_SCHEMA_V2
+        );
+        assert_eq!(reply.message_version, 1);
+        assert!(reply
+            .reply_evidence_id()
+            .unwrap()
+            .starts_with("symthaea.autopilot.px4.arming-check-reply.v2:"));
+
+        let request = arming_request(1 << 3);
+        assert_eq!(request.schema_version, PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1);
+
+        let mut old_schema = reply;
+        old_schema.schema_version = PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1;
+        assert_eq!(
+            old_schema.validate().unwrap_err(),
+            Px4ExternalModeArmingCheckError::UnsupportedSchemaVersion { found: 1 }
+        );
+    }
+
+    #[test]
     fn duplicate_captures_share_source_fingerprint_but_keep_distinct_observation_ids() {
         let events = [
             Px4ExternalModeArmingCheckEventV1::default();
@@ -2188,7 +2212,8 @@ mod tests {
         // request_id=0, and the old payload is mislabeled into the new capture window.
         // The PX4 source timestamp still proves that it predates the new request.
         let window = "arming-check.fixture.cycle-after-wrap";
-        let request = arming_request_in_window(0, 1_500_000, window, 1 << 3, 1_300_000_000);
+        let request =
+            arming_request_in_window(0, 257_250_000, window, 1 << 3, 1_300_000_000);
         let previous_cycle_reply = arming_reply_in_window_with_diagnostics(
             window,
             0,
