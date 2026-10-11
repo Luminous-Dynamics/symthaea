@@ -281,6 +281,15 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(verifier.VerificationError, "replay rejected"):
             self.verify(receipt, replay_ledger=ledger)
 
+    def test_replay_ledger_rejects_symlink_path(self):
+        target = Path(self.temp.name) / "unrelated-file"
+        target.write_bytes(b"leave this file untouched")
+        alias = Path(self.temp.name) / "replay.sqlite3"
+        alias.symlink_to(target)
+        with self.assertRaisesRegex(verifier.VerificationError, "replay ledger path must not be a symlink"):
+            verifier.ReplayLedger(alias).consume(signed_receipt()["payload"], NOW)
+        self.assertEqual(target.read_bytes(), b"leave this file untouched")
+
     def test_concurrent_replay_consumption_accepts_exactly_one_call(self):
         receipt = signed_receipt()
         ledger_path = Path(self.temp.name) / "concurrent-replay.sqlite3"
