@@ -46,8 +46,8 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 ## Performance
 
 - **Neuron evolution**: O(D) per step, independent of dt; it is not O(1) in the hypervector dimension
-- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses the state-norm reduction into the update pass; it assumes the caller supplies valid dimensions and finite values
-- **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and numerical finiteness before mutation (with an extra O(D) preflight scan)
+- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses a scaled sum-of-squares norm reduction into the update pass; it assumes the caller supplies valid dimensions and well-scaled finite values. State components are revisited only when the norm bound is exceeded
+- **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and finite inputs/parameters, then verifies the evolved state; if arithmetic overflow produces a non-finite result, it restores the prior state and counters. Validation and rollback safety add O(D) scans and a state clone
 - **Small-step stability**: CfC interpolation uses `-expm1(-dt / tau)` to avoid cancellation for tiny positive dt
 - **fast_tanh**: Rational approximation (max 0.4% error) that auto-vectorizes on modern CPUs
 - **Deterministic**: Initialization is seed-controlled for reproducibility
