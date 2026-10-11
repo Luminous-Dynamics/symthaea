@@ -293,7 +293,7 @@ def main() -> int:
         "functional": "LDA_X + LDA_C_VWN (PySCF alias lda,vwn)",
         "grid_matching": {
             "radial_rule": "Symthaea Becke map + second-kind Gauss-Chebyshev nodes and weights",
-            "angular_rule": "Lebedev-Laaikov node count selected by the Symthaea preset; no pruning",
+            "angular_rule": "Lebedev–Laikov node count selected by the Symthaea preset; no pruning",
             "partition": "original Becke three-pass polynomial; no radius adjustment",
             "radial_scales": "exact hard-coded per-element scales used by Symthaea",
             "intent": "matched quadrature isolates implementation differences from grid-choice differences",
