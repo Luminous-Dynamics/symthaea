@@ -276,11 +276,189 @@ pub fn stratified_split(
     (train_hvs, train_labels, test_hvs, test_labels)
 }
 
+/// Grouped stratified train/test split for leakage-resistant evaluation.
+///
+/// A group is indivisible: all events from one source file, capture, or scenario
+/// are assigned to exactly one side. Every group must have a single label, and
+/// every label must have at least two groups so both train and test contain that
+/// class. Groups are sorted by their stable string ID before deterministic
+/// seeded shuffling; input row order therefore does not affect group assignment.
+pub fn grouped_stratified_split(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+    train_frac: f32,
+    seed: u64,
+) -> Result<(Vec<Hdv>, Vec<String>, Vec<Hdv>, Vec<String>), String> {
+    if hvs.len() != labels.len() || labels.len() != groups.len() {
+        return Err(format!(
+            "length mismatch: hvs={}, labels={}, groups={}",
+            hvs.len(),
+            labels.len(),
+            groups.len()
+        ));
+    }
+    if hvs.is_empty() {
+        return Err("cannot split an empty corpus".to_string());
+    }
+    if !train_frac.is_finite() || train_frac <= 0.0 || train_frac >= 1.0 {
+        return Err("train_frac must be finite and strictly between 0 and 1".to_string());
+    }
+    if labels.iter().any(|label| label.is_empty()) || groups.iter().any(|group| group.is_empty()) {
+        return Err("labels and group IDs must be non-empty".to_string());
+    }
+
+    // label -> group ID -> row indices; BTreeMap makes the seed's meaning
+    // independent of HashMap iteration order.
+    let mut by_label: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, Vec<usize>>,
+    > = Default::default();
+    let mut group_labels: std::collections::BTreeMap<&str, &str> = Default::default();
+    for (index, (label, group)) in labels.iter().zip(groups.iter()).enumerate() {
+        if let Some(existing) = group_labels.get(group.as_str()) {
+            if *existing != label.as_str() {
+                return Err(format!(
+                    "group {group:?} contains multiple labels: {existing:?} and {label:?}"
+                ));
+            }
+        } else {
+            group_labels.insert(group.as_str(), label.as_str());
+        }
+        by_label
+            .entry(label.clone())
+            .or_default()
+            .entry(group.clone())
+            .or_default()
+            .push(index);
+    }
+
+    let mut state = seed.max(1);
+    let mut train_hvs = Vec::new();
+    let mut train_labels = Vec::new();
+    let mut test_hvs = Vec::new();
+    let mut test_labels = Vec::new();
+
+    for (label, group_map) in by_label {
+        let mut group_ids: Vec<String> = group_map.keys().cloned().collect();
+        if group_ids.len() < 2 {
+            return Err(format!(
+                "label {label:?} has {} distinct groups; need at least two for a grouped train/test split",
+                group_ids.len()
+            ));
+        }
+        for i in (1..group_ids.len()).rev() {
+            let j = (xorshift(&mut state) as usize) % (i + 1);
+            group_ids.swap(i, j);
+        }
+        let n_train_groups = ((group_ids.len() as f32 * train_frac).floor() as usize)
+            .clamp(1, group_ids.len() - 1);
+        let train_group_count = n_train_groups;
+
+        for (position, group_id) in group_ids.iter().enumerate() {
+            let indices = &group_map[group_id];
+            if position < train_group_count {
+                for &index in indices {
+                    train_hvs.push(hvs[index].clone());
+                    train_labels.push(label.clone());
+                }
+            } else {
+                for &index in indices {
+                    test_hvs.push(hvs[index].clone());
+                    test_labels.push(label.clone());
+                }
+            }
+        }
+    }
+
+    if train_hvs.is_empty() || test_hvs.is_empty() {
+        return Err("grouped split produced an empty train or test partition".to_string());
+    }
+    Ok((train_hvs, train_labels, test_hvs, test_labels))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::encoder::encode;
     use crate::fixtures::generate_synthetic_corpus;
+
+    #[test]
+    fn grouped_split_keeps_each_group_on_one_side_and_every_label_on_both() {
+        let hvs = vec![vec![1], vec![2], vec![3], vec![4], vec![5], vec![6], vec![7], vec![8]];
+        let labels = vec![
+            "a".to_string(), "a".to_string(), "a".to_string(), "a".to_string(),
+            "b".to_string(), "b".to_string(), "b".to_string(), "b".to_string(),
+        ];
+        let groups = vec![
+            "a-1".to_string(), "a-1".to_string(), "a-2".to_string(), "a-2".to_string(),
+            "b-1".to_string(), "b-1".to_string(), "b-2".to_string(), "b-2".to_string(),
+        ];
+        let (tx, ty, vx, vy) =
+            grouped_stratified_split(&hvs, &labels, &groups, 0.5, 7).expect("valid grouped split");
+
+        let mut train_groups = std::collections::BTreeSet::new();
+        let mut test_groups = std::collections::BTreeSet::new();
+        for (hv, group) in tx.iter().zip(groups.iter().filter(|g| train_groups.insert((*g).clone()))) {
+            let _ = (hv, group);
+        }
+        // Reconstruct group membership from unique sample values; every pair in a
+        // group has adjacent IDs and must remain on the same side.
+        let train_values: std::collections::BTreeSet<i32> = tx.iter().map(|x| x[0]).collect();
+        let test_values: std::collections::BTreeSet<i32> = vx.iter().map(|x| x[0]).collect();
+        for (left, right) in [(1, 2), (3, 4), (5, 6), (7, 8)] {
+            assert!(
+                (train_values.contains(&left) && train_values.contains(&right))
+                    || (test_values.contains(&left) && test_values.contains(&right)),
+                "group containing values {left} and {right} was split"
+            );
+        }
+        assert!(train_values.is_disjoint(&test_values));
+        assert!(["a", "b"].iter().all(|l| ty.iter().any(|y| y == l)));
+        assert!(["a", "b"].iter().all(|l| vy.iter().any(|y| y == l)));
+        let _ = (train_groups, test_groups);
+    }
+
+    #[test]
+    fn grouped_split_is_deterministic() {
+        let hvs = vec![vec![1], vec![2], vec![3], vec![4], vec![5], vec![6]];
+        let labels = vec!["a".to_string(), "a".into(), "a".into(), "a".into(), "b".into(), "b".into()];
+        let groups = vec!["a1".into(), "a2".into(), "a3".into(), "a4".into(), "b1".into(), "b2".into()];
+        let a = grouped_stratified_split(&hvs, &labels, &groups, 0.5, 11).unwrap();
+        let b = grouped_stratified_split(&hvs, &labels, &groups, 0.5, 11).unwrap();
+        assert_eq!(a.0, b.0);
+        assert_eq!(a.1, b.1);
+        assert_eq!(a.2, b.2);
+        assert_eq!(a.3, b.3);
+    }
+
+    #[test]
+    fn grouped_split_rejects_group_with_conflicting_labels() {
+        let hvs = vec![vec![1], vec![2], vec![3], vec![4]];
+        let labels = vec!["a".into(), "b".into(), "a".into(), "b".into()];
+        let groups = vec!["same".into(), "same".into(), "a2".into(), "b2".into()];
+        let error = grouped_stratified_split(&hvs, &labels, &groups, 0.5, 1).unwrap_err();
+        assert!(error.contains("multiple labels"));
+    }
+
+    #[test]
+    fn grouped_split_rejects_label_with_only_one_group() {
+        let hvs = vec![vec![1], vec![2], vec![3]];
+        let labels = vec!["a".into(), "a".into(), "b".into()];
+        let groups = vec!["a1".into(), "a1".into(), "b1".into()];
+        let error = grouped_stratified_split(&hvs, &labels, &groups, 0.5, 1).unwrap_err();
+        assert!(error.contains("need at least two"));
+    }
+
+    #[test]
+    fn grouped_split_rejects_invalid_parameters_and_lengths() {
+        let hvs = vec![vec![1], vec![2]];
+        let labels = vec!["a".into(), "a".into()];
+        let groups = vec!["a1".into(), "a2".into()];
+        assert!(grouped_stratified_split(&hvs, &labels, &groups[..1], 0.5, 1).is_err());
+        assert!(grouped_stratified_split(&hvs, &labels, &groups, 1.0, 1).is_err());
+        assert!(grouped_stratified_split(&hvs, &labels, &groups, f32::NAN, 1).is_err());
+    }
 
     #[test]
     fn probe_learns_synthetic_classes() {
