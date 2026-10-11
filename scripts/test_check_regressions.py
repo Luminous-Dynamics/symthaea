@@ -64,5 +64,47 @@ class CriterionBaselineTests(unittest.TestCase):
             self.assertIn("Required Criterion baseline", stderr.getvalue())
 
 
+    def test_required_baseline_rejects_partial_benchmark_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_estimates(root / "quick" / "harmonic" / "main" / "estimates.json", 100.0)
+            write_estimates(root / "quick" / "removed" / "main" / "estimates.json", 90.0)
+            write_estimates(root / "quick" / "harmonic" / "new" / "estimates.json", 100.0)
+            write_estimates(root / "quick" / "added" / "new" / "estimates.json", 100.0)
+
+            stderr = io.StringIO()
+            with patch.object(sys, "argv", [
+                "check_regressions.py", "--results", str(root), "--require-baseline"
+            ]), redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                main()
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("Incomplete Criterion comparison", stderr.getvalue())
+            self.assertIn("current benchmarks missing a baseline: quick/added", stderr.getvalue())
+            self.assertIn("baseline benchmarks missing current results: quick/removed", stderr.getvalue())
+
+    def test_rejects_non_finite_estimate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            estimate = root / "quick" / "harmonic" / "new" / "estimates.json"
+            write_estimates(estimate, float("nan"))
+
+            with self.assertRaisesRegex(ValueError, "non-finite"):
+                load_criterion_results(root)
+
+    def test_rejects_incoherent_thresholds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            stderr = io.StringIO()
+            with patch.object(sys, "argv", [
+                "check_regressions.py", "--results", str(root),
+                "--threshold", "10", "--critical-threshold", "5"
+            ]), redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                main()
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("critical-threshold must be >=", stderr.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
