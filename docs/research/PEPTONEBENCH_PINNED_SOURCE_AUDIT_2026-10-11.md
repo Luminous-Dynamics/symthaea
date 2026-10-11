@@ -82,9 +82,11 @@ The normal minimization path is initialized deterministically by the current cal
 **Gate C — Symthaea controller adapter**
 Only after Gate B is reproduced: expose candidate selection/resource allocation to Symthaea while keeping experimental observables and evaluation-only metadata inaccessible to the controller. The specialist generator/forward model stays identical across arms. Compare uniform/fixed, conventional heuristic, Symthaea without HDC, and full Symthaea under a matched call/compute budget. Evaluate primary held-out evidence once, after targets, splits, code versions, resource caps, metrics, exclusions, and stopping rules are frozen.
 
-## Run-record contract
+## Run-record contract and executable validator
 
-A fail-closed JSON Schema has been added at [PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json](PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json). It freezes preregistration/source identities, accounts for every expected target, separates raw/refined/held-out metric roles, captures resource use and artifacts, and requires failed/missing results to remain explicit. The schema is not yet wired into a runtime validator and is not evidence that a run has occurred.
+The fail-closed JSON Schema at [PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json](PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json) is now enforced by [validate_protein_dynamics_run.py](../../scripts/research/validate_protein_dynamics_run.py). It checks schema conformance, the exact frozen target-manifest digest, unique and expected target identities, finite metrics, observable-role consistency, explicit failure codes, target conformer counts, resource-total reconciliation, artifact path containment, and local output SHA-256 values. Remote/absolute artifact paths are refused rather than incorrectly marked verified.
+
+Sixteen adversarial unit tests are in [test_validate_protein_dynamics_run.py](../../scripts/research/test_validate_protein_dynamics_run.py), with instructions in [the validator guide](PROTEIN_DYNAMICS_RUN_RECORD_VALIDATOR.md). The test suite loads the production schema when executed from a repository checkout. The available sandbox did not contain a repository checkout, so the local 16-test run exercised semantic guards with an isolated minimal-schema fixture; production-schema integration has not yet been executed here. No run record has been created, and the validator is not evidence that a benchmark or biological claim has passed.
 
 ## Current decision
 
