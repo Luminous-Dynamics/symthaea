@@ -19,15 +19,20 @@ use symthaea_hdc_ltc::{ContinuousHV, HdcLtcUnifiedNeuron, NeuronConfig};
 fn main() {
     println!(
         concat!(
-            "dimension,dt_seconds,mode,iterations,elapsed_ns,",
+            "dimension,hypervector_bytes,dt_seconds,mode,iterations,elapsed_ns,",
             "ns_per_component_update,component_updates_per_second,final_state_norm"
         )
     );
 
-    for dimension in [256_usize, 1_024, 4_096, 16_384] {
-        // Keep the approximate amount of coordinate work per row comparable while
-        // retaining at least 100 iterations for the largest vector.
-        let iterations = (1_000_000_usize / dimension).max(100);
+    const DIMENSIONS: &[usize] = &[256, 1_024, 4_096, 16_384, 65_536];
+    const TARGET_COMPONENT_UPDATES: usize = 2_000_000;
+    const MIN_ITERATIONS: usize = 50;
+
+    for &dimension in DIMENSIONS {
+        // Keep coordinate work per row approximately comparable across dimensions;
+        // cap the minimum sample count so 64K receives a meaningful measurement too.
+        let iterations = (TARGET_COMPONENT_UPDATES / dimension).max(MIN_ITERATIONS);
+        let hypervector_bytes = dimension * std::mem::size_of::<f32>();
         let input = ContinuousHV::new_random(dimension, 0xCFC0_2026 ^ dimension as u64);
 
         for (dt_index, dt) in [1.0e-6_f32, 0.1, 100.0].into_iter().enumerate() {
@@ -73,7 +78,7 @@ fn main() {
 
                 println!(
                     concat!(
-                        "{dimension},{dt},{mode},{iterations},{elapsed_ns},",
+                        "{dimension},{hypervector_bytes},{dt},{mode},{iterations},{elapsed_ns},",
                         "{ns_per_component_update:.6},{component_updates_per_second:.3},",
                         "{final_state_norm:.8}"
                     )
