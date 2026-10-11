@@ -250,6 +250,8 @@ class ReplayLedger:
 
     def consume(self, payload: dict[str, Any], now: datetime) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.is_symlink():
+            raise VerificationError("replay ledger path must not be a symlink")
         created = False
         if not self.path.exists():
             try:
@@ -261,6 +263,8 @@ class ReplayLedger:
                 os.close(fd)
                 created = True
         try:
+            if self.path.is_symlink() or not self.path.is_file():
+                raise VerificationError("replay ledger path must be a regular file, not a symlink")
             os.chmod(self.path, 0o600)
             with sqlite3.connect(self.path, timeout=10, isolation_level=None) as db:
                 db.execute("PRAGMA busy_timeout=10000")
