@@ -197,7 +197,21 @@ impl std::fmt::Display for MathValue {
 // ============================================================================
 
 /// Convert a numeric tower `Number` into a `MathValue`.
-fn number_to_math_value(n: &Number) -> MathValue {
+fn rational_components_are_canonical(numerator: i64, denominator: i64) -> bool {
+    if denominator <= 0 {
+        return false;
+    }
+    let mut a = numerator.unsigned_abs();
+    let mut b = denominator as u64;
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a == 1
+}
+
+/// Convert a numeric tower `Number` into a `MathValue`.
     match n {
         Number::Natural(v) => MathValue::Natural(*v),
         Number::Integer(v) => MathValue::Integer(*v),
@@ -608,6 +622,11 @@ impl UnifiedMathEngine {
             MathValue::Rational { denominator: 0, .. } => {
                 Err(NumericArithmeticError::InvalidRationalOperand)
             }
+            MathValue::Rational { numerator, denominator }
+                if !rational_components_are_canonical(*numerator, *denominator) =>
+            {
+                Err(NumericArithmeticError::NonCanonicalRationalOperand)
+            }
             MathValue::Real(number) if !number.is_finite() => {
                 Err(NumericArithmeticError::NonFiniteOperand)
             }
@@ -653,6 +672,46 @@ impl UnifiedMathEngine {
         b: &MathValue,
     ) -> Result<CheckedMathResult, NumericArithmeticError> {
         self.checked_arithmetic(a, b, "divide")
+    }
+
+    /// Checked square root with exactness metadata and strict operand validation.
+    ///
+    /// Perfect real-domain squares retain Exact precision; irrational roots and
+    /// complex-domain roots are explicitly Approximate. Unlike the compatibility
+    /// sqrt method, malformed rationals, non-finite inputs, and non-finite results
+    /// return typed errors.
+    pub fn checked_sqrt(
+        &self,
+        a: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(a)?;
+
+        let is_negative = match a {
+            MathValue::Integer(value) => *value < 0,
+            MathValue::Rational { numerator, denominator } => {
+                *denominator > 0 && *numerator < 0
+            }
+            MathValue::Real(value) => *value < 0.0,
+            _ => false,
+        };
+
+        if a.is_complex() || is_negative {
+            let root = a.to_complex().sqrt();
+            if !root.re.is_finite() || !root.im.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result_unary(root, a, "sqrt"),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let number = a.to_tower_number();
+        let root = self.tower.checked_sqrt(&number)?;
+        Ok(CheckedMathResult {
+            result: self.from_tower_result_unary(&root.result, a, "sqrt"),
+            precision: root.precision,
+        })
     }
 
     /// Square root: sqrt(a).
@@ -1141,6 +1200,43 @@ mod tests {
     // ====================================================================
     // sqrt(-1) → Complex
     // ====================================================================
+
+    #[test]
+    fn test_checked_sqrt_preserves_exact_and_marks_approximate_roots() {
+        let e = engine();
+        let exact = e.checked_sqrt(&MathValue::Natural(144)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(12)));
+
+        let irrational = e.checked_sqrt(&MathValue::Natural(2)).unwrap();
+        assert_eq!(irrational.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(irrational.result.value, MathValue::Real(value) if value.is_finite()));
+
+        let complex = e.checked_sqrt(&MathValue::Integer(-4)).unwrap();
+        assert_eq!(complex.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(complex.result.value, MathValue::Complex { re, im } if re.abs() < 1e-12 && (im - 2.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn test_checked_sqrt_rejects_bad_inputs_and_results() {
+        let e = engine();
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Rational { numerator: 1, denominator: 0 }).unwrap_err(),
+            NumericArithmeticError::InvalidRationalOperand
+        );
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Rational { numerator: 2, denominator: 4 }).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Real(f64::NAN)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            e.checked_sqrt(&MathValue::Complex { re: f64::INFINITY, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
 
     #[test]
     fn test_sqrt_negative_one_is_i() {
