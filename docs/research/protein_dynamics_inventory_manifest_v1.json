@@ -37,7 +37,10 @@
         "verify publisher-provided checksum for the data archive, or explicitly record its absence; preserve the downloaded archive and compute a local SHA-256 before extraction",
         "implement fail-closed run-record validator and adversarial tests (implementation committed)",
         "run validator tests against the repository's production schema and preserve local test output",
-        "create and hash the target-specific run bundle before reference execution"
+        "create and hash the target-specific run bundle before reference execution",
+        "inspect current Zenodo metadata for Predictions.tar.gz and PeptoneDBs.tar.gz and record size/checksum before any download",
+        "prefer a score-only replay using precomputed predictions before rebuilding forward models",
+        "verify downloaded publisher checksum and preserve archive plus raw metadata snapshot"
       ],
       "revision": "f161b5220a52ebd1a715c91a68beef125101608e",
       "revision_url": "https://github.com/PeptoneLtd/peptonebench/commit/f161b5220a52ebd1a715c91a68beef125101608e",
@@ -286,5 +289,20 @@
     "adversarial_test_cases": 16,
     "production_schema_selected_by_tests_when_repository_checkout_available": true,
     "execution_record_created": false
+  },
+  "source_acquisition": {
+    "tool_path": "scripts/research/fetch_verified_zenodo_file.py",
+    "test_path": "scripts/research/test_fetch_verified_zenodo_file.py",
+    "guide_path": "docs/research/PROTEIN_DYNAMICS_SOURCE_ACQUISITION.md",
+    "metadata_only_by_default": true,
+    "download_requires_explicit_byte_cap": true,
+    "download_verifies_publisher_checksum_and_size": true,
+    "keeps_raw_metadata_snapshot_and_local_sha256": true,
+    "archive_extraction_automatic": false,
+    "offline_mocked_test_cases": 15,
+    "offline_mocked_tests_passed": true,
+    "live_zenodo_query_performed": false,
+    "publisher_archive_checksum_observed": false,
+    "archive_downloaded": false
   }
 }
