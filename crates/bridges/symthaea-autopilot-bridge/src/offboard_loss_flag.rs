@@ -622,7 +622,10 @@ mod tests {
     #[test]
     fn specific_offboard_loss_flag_is_not_the_generic_failsafe_state() {
         let value = assessment(
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(11, 2_000, true, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(11, 2_000, true, 1_100_000_000),
+            ],
             1_200_000_000,
         );
         assert!(matches!(
@@ -640,7 +643,10 @@ mod tests {
     #[test]
     fn a_fresh_false_flag_is_only_the_latest_reported_input_value() {
         let value = assessment(
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(11, 2_000, false, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(11, 2_000, false, 1_100_000_000),
+            ],
             1_200_000_000,
         );
         assert!(matches!(
@@ -656,7 +662,10 @@ mod tests {
     #[test]
     fn stale_outcome_preserves_but_does_not_promote_the_last_flag() {
         let value = assessment(
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(11, 2_000, true, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(11, 2_000, true, 1_100_000_000),
+            ],
             2_100_000_001,
         );
         assert!(matches!(
@@ -672,7 +681,10 @@ mod tests {
     #[test]
     fn observation_age_boundary_is_inclusive() {
         let boundary = assessment(
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(11, 2_000, false, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(11, 2_000, false, 1_100_000_000),
+            ],
             2_100_000_000,
         );
         assert!(matches!(
@@ -683,7 +695,10 @@ mod tests {
             }
         ));
         let over = assessment(
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(11, 2_000, false, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(11, 2_000, false, 1_100_000_000),
+            ],
             2_100_000_001,
         );
         assert!(matches!(over.outcome().unwrap(), Px4OffboardLossFlagOutcomeV1::Stale { .. }));
@@ -712,7 +727,10 @@ mod tests {
         let gap = Px4OffboardLossFlagAssessmentV1::new(
             profile(),
             ts(1_200_000_000),
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(12, 2_000, true, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(12, 2_000, true, 1_100_000_000),
+            ],
         );
         assert_eq!(
             gap.unwrap_err(),
@@ -781,7 +799,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardLossFlagAssessmentV1::new(profile(), ts(1_100_000_000), vec![wrong_target]).unwrap_err(),
+            Px4OffboardLossFlagAssessmentV1::new(
+                profile(),
+                ts(1_100_000_000),
+                vec![wrong_target],
+            )
+            .unwrap_err(),
             Px4OffboardLossFlagError::TargetMismatch
         );
         let wrong_producer = Px4OffboardLossFlagObservationV1::new(
@@ -797,7 +820,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardLossFlagAssessmentV1::new(profile(), ts(1_100_000_000), vec![wrong_producer]).unwrap_err(),
+            Px4OffboardLossFlagAssessmentV1::new(
+                profile(),
+                ts(1_100_000_000),
+                vec![wrong_producer],
+            )
+            .unwrap_err(),
             Px4OffboardLossFlagError::ProducerMismatch
         );
         let wrong_clock = Px4OffboardLossFlagObservationV1::new(
@@ -813,7 +841,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Px4OffboardLossFlagAssessmentV1::new(profile(), ts(1_100_000_000), vec![wrong_clock]).unwrap_err(),
+            Px4OffboardLossFlagAssessmentV1::new(
+                profile(),
+                ts(1_100_000_000),
+                vec![wrong_clock],
+            )
+            .unwrap_err(),
             Px4OffboardLossFlagError::ReceiverClockMismatch
         );
     }
@@ -834,7 +867,10 @@ mod tests {
     #[test]
     fn serde_mutation_and_profile_change_are_detected() {
         let value = assessment(
-            vec![observation(10, 1_000, false, 1_000_000_000), observation(11, 2_000, true, 1_100_000_000)],
+            vec![
+                observation(10, 1_000, false, 1_000_000_000),
+                observation(11, 2_000, true, 1_100_000_000),
+            ],
             1_200_000_000,
         );
         let bytes = serde_json::to_vec(&value).unwrap();
