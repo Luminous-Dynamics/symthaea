@@ -291,9 +291,9 @@ fn validate_voice_monophony(score: &Score, issues: &mut Vec<ScoreValidationIssue
         notes.sort_by(|left, right| left.1.onset.beats().total_cmp(&right.1.onset.beats()));
         for pair in notes.windows(2) {
             let previous_end_exact = pair[0].1.onset.checked_add(pair[0].1.duration);
-            let previous_end = previous_end_exact.map(Duration::beats).unwrap_or_else(|| {
-                pair[0].1.onset.beats() + pair[0].1.duration.beats()
-            });
+            let previous_end = previous_end_exact
+                .map(Duration::beats)
+                .unwrap_or_else(|| pair[0].1.onset.beats() + pair[0].1.duration.beats());
             let overlaps = previous_end_exact
                 .and_then(|end| end.checked_cmp(pair[1].1.onset))
                 .is_none_or(|ordering| ordering == std::cmp::Ordering::Greater);
@@ -742,22 +742,13 @@ mod tests {
     fn excessive_note_by_beat_work_is_rejected_before_per_beat_scans() {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
         for _ in 0..5_000 {
-            score
-                .try_push(note(60, 0, 1, VoiceRole::Harmony))
-                .unwrap();
+            score.try_push(note(60, 0, 1, VoiceRole::Harmony)).unwrap();
         }
-        score
-            .try_push(note(48, 0, 999, VoiceRole::Bass))
-            .unwrap();
-        score
-            .try_push(note(60, 0, 999, VoiceRole::Melody))
-            .unwrap();
+        score.try_push(note(48, 0, 999, VoiceRole::Bass)).unwrap();
+        score.try_push(note(60, 0, 999, VoiceRole::Melody)).unwrap();
 
         assert_eq!(score.total_beats, Duration::new(999, 1));
-        assert!(
-            score.notes.len() as u128 * 1_000
-                > MAX_PER_BEAT_VALIDATION_NOTE_PROBES
-        );
+        assert!(score.notes.len() as u128 * 1_000 > MAX_PER_BEAT_VALIDATION_NOTE_PROBES);
 
         let report = validate_score(&score, &ScoreValidationConfig::default());
         assert!(
