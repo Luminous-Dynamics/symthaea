@@ -9,8 +9,6 @@
 #[cfg(feature = "glyph_codex")]
 use serde_json::{Value, json};
 #[cfg(feature = "glyph_codex")]
-use std::cmp::Ordering;
-#[cfg(feature = "glyph_codex")]
 use std::path::{Path, PathBuf};
 #[cfg(feature = "glyph_codex")]
 use symthaea::hdc::glyph_basis::{
@@ -238,6 +236,7 @@ fn run() -> Result<(), String> {
         "glyph_source_blob": args.glyph_source_blob,
         "glyph_registry_source_blob": args.registry_source_blob,
         "dimension": DIMENSION,
+        "registry_size": registry.len(),
         "encoder_profile": {
             "type": "TextHdcEncoder",
             "ngram_size": 3,
