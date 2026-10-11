@@ -137,10 +137,10 @@ fn checked_rk4_trajectory(
         return None;
     }
     let max_steps = estimated_steps as usize;
-    let mut t = 0.0_f64;
     let mut state = initial.to_vec();
     let mut states = Vec::with_capacity(max_steps.saturating_add(1));
     states.push(state.clone());
+    let mut reached_end = false;
 
     let derivative = |values: &[f64], time: f64| -> Option<Vec<f64>> {
         if values.len() != dimension || values.iter().any(|value| !value.is_finite()) {
@@ -153,11 +153,21 @@ fn checked_rk4_trajectory(
         Some(output)
     };
 
-    for _ in 0..max_steps {
+    // Compute each time from its integer step index rather than repeated addition.
+    // Repeated addition can leave the final time a few ulps below t_end
+    // (for example 400 additions of 0.01), incorrectly rejecting a complete orbit.
+    for step in 0..max_steps {
+        let t = (step as f64 * dt).min(t_end);
         if t >= t_end {
+            reached_end = true;
             break;
         }
-        let h = dt.min(t_end - t);
+        let next_t = if step + 1 == max_steps {
+            t_end
+        } else {
+            ((step + 1) as f64 * dt).min(t_end)
+        };
+        let h = next_t - t;
         if !h.is_finite() || h <= 0.0 || t + h <= t {
             return None;
         }
@@ -175,11 +185,14 @@ fn checked_rk4_trajectory(
         if state.iter().any(|value| !value.is_finite()) {
             return None;
         }
-        t += h;
         states.push(state.clone());
+        if next_t == t_end {
+            reached_end = true;
+            break;
+        }
     }
 
-    if t < t_end {
+    if !reached_end {
         return None;
     }
     Some(states)
@@ -1271,6 +1284,21 @@ mod tests {
         assert!(!result.passed);
         assert_eq!(result.failure, Some(AutonomousHoldoutFailure::IdenticalSeeds));
         assert_eq!(result.trajectories_checked, 0);
+    }
+
+    #[test]
+    fn checked_rk4_reaches_horizon_despite_repeated_addition_roundoff() {
+        let orbit = checked_rk4_trajectory(
+            harmonic_rhs,
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+        )
+        .expect("a complete 400-step orbit must not fail due to accumulated time rounding");
+        assert_eq!(orbit.len(), 401);
+        assert!(orbit.iter().all(|state| {
+            state.len() == 4 && state.iter().all(|value| value.is_finite())
+        }));
     }
 
     #[test]
