@@ -164,7 +164,6 @@ pub fn validate_invariant_holdout(
         || !dt.is_finite()
         || dt <= 0.0
         || !(t_max / dt).is_finite()
-        || t_max / dt > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
         || !threshold.is_finite()
         || threshold < 0.0
     {
@@ -189,9 +188,10 @@ pub fn validate_invariant_holdout(
             AutonomousHoldoutFailure::ZeroTrajectories,
         );
     }
-    let estimated_steps = (t_max / dt).ceil() as usize;
+    let estimated_steps = (t_max / dt).ceil();
     if holdout_trajectories > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
-        || estimated_steps.saturating_mul(holdout_trajectories)
+        || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
+        || (estimated_steps as usize).saturating_mul(holdout_trajectories)
             > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS
     {
         return failed_holdout(
@@ -552,7 +552,12 @@ fn holdout_record_is_consistent(
     t_max: f64,
     dt: f64,
 ) -> bool {
-    if !holdout.threshold.is_finite()
+    if !t_max.is_finite()
+        || t_max <= 0.0
+        || !dt.is_finite()
+        || dt <= 0.0
+        || !(t_max / dt).is_finite()
+        || !holdout.threshold.is_finite()
         || holdout.threshold < 0.0
         || !holdout.max_lie_derivative_variance.is_finite()
         || holdout.max_lie_derivative_variance < 0.0
@@ -562,8 +567,16 @@ fn holdout_record_is_consistent(
     {
         return false;
     }
+    let estimated_steps = (t_max / dt).ceil();
+    let budget_exceeded = holdout.requested_trajectories
+        > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
+        || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
+        || (estimated_steps as usize).saturating_mul(holdout.requested_trajectories)
+            > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS;
+
     if holdout.passed {
-        return holdout.failure.is_none()
+        return !budget_exceeded
+            && holdout.failure.is_none()
             && holdout.requested_trajectories > 0
             && holdout.trajectories_checked == holdout.requested_trajectories
             && holdout.max_lie_derivative_variance <= holdout.threshold;
@@ -576,21 +589,15 @@ fn holdout_record_is_consistent(
         Some(AutonomousHoldoutFailure::ZeroTrajectories) => {
             holdout.requested_trajectories == 0 && holdout.trajectories_checked == 0
         }
-        Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded) => {
-            let estimated_steps = (t_max / dt).ceil();
-            holdout.requested_trajectories > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
-                || !estimated_steps.is_finite()
-                || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
-                || (estimated_steps as usize)
-                    .saturating_mul(holdout.requested_trajectories)
-                    > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS
-        }
+        Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded) => budget_exceeded,
         Some(AutonomousHoldoutFailure::IncompleteCoverage) => {
-            holdout.requested_trajectories > 0
+            !budget_exceeded
+                && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked < holdout.requested_trajectories
         }
         Some(AutonomousHoldoutFailure::ThresholdExceeded) => {
-            holdout.requested_trajectories > 0
+            !budget_exceeded
+                && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked == holdout.requested_trajectories
                 && holdout.max_lie_derivative_variance > holdout.threshold
         }
