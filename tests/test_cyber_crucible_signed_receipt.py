@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -289,6 +291,34 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         receipt["signature"] += "="
         with self.assertRaisesRegex(verifier.VerificationError, "unpadded base64url"):
             self.verify(receipt)
+
+    def test_cli_verifies_files_and_rejects_second_consumption(self):
+        receipt = signed_receipt()
+        receipt_path = Path(self.temp.name) / "receipt.json"
+        policy_path = Path(self.temp.name) / "trust-policy.json"
+        context_path = Path(self.temp.name) / "expected-context.json"
+        for path, value in (
+            (receipt_path, receipt),
+            (policy_path, policy()),
+            (context_path, context(receipt)),
+        ):
+            path.write_text(json.dumps(value), encoding="utf-8")
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve().parents[1] / "scripts" / "verify_cyber_crucible_signed_receipt.py"),
+            "--receipt", str(receipt_path),
+            "--trust-policy", str(policy_path),
+            "--expected-context", str(context_path),
+            "--replay-db", str(self.replay_db),
+        ]
+        first = subprocess.run(command, text=True, capture_output=True, check=False)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        result = json.loads(first.stdout)
+        self.assertTrue(result["signature_verified"])
+        self.assertTrue(result["non_authorizing"])
+        second = subprocess.run(command, text=True, capture_output=True, check=False)
+        self.assertEqual(second.returncode, 2)
+        self.assertIn("replay rejected", second.stderr)
 
     def test_duplicate_json_member_is_rejected_before_parsing(self):
         path = Path(self.temp.name) / "duplicate.json"
