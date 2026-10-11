@@ -148,7 +148,7 @@ impl std::fmt::Display for EnergyStudyBindingError {
                 f.write_str("a bound step payload differs from the original scheduler receipt")
             }
             Self::UnderlyingReceipt(error) => {
-                write!(f, "underlying scheduler receipt failed independent verification: {error}")
+                write!(f, "underlying scheduler receipt failed independent verification: {error:?}")
             }
             Self::UnderlyingComparison(error) => {
                 write!(f, "underlying policy comparison failed verification: {error:?}")
