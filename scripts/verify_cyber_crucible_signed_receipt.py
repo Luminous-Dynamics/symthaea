@@ -12,6 +12,7 @@ import argparse
 import base64
 import binascii
 import json
+import hashlib
 import os
 import re
 import sqlite3
@@ -351,15 +352,24 @@ def verify_receipt(
         "schema_version": "cyber-crucible-receipt-verification-result.v1",
         "signature_verified": True,
         "trust_policy_id": trust_policy["policy_id"],
+        "trust_policy_digest": hashlib.sha256(rfc8785.dumps(trust_policy)).hexdigest(),
         "receipt_id": payload["receipt_id"],
         "key_id": payload["key_id"],
         "evaluator_id": payload["evaluator_id"],
         "role": payload["role"],
         "status": payload["status"],
+        "campaign_id": payload["campaign_id"],
+        "subject_id": payload["subject_id"],
+        "attempt_id": payload["attempt_id"],
+        "run_nonce": payload["run_nonce"],
+        "issued_at": payload["issued_at"],
+        "expires_at": payload["expires_at"],
         "scenario_id": payload["scenario_id"],
         "scenario_revision": payload["scenario_revision"],
         "scenario_digest": payload["scenario_digest"],
         "evidence_digest": payload["evidence_digest"],
+        "proposal_id": payload["proposal_id"],
+        "proposal_digest": payload["proposal_digest"],
         "replay_checked": replay_ledger is not None,
         "non_authorizing": True,
     }
