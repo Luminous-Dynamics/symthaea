@@ -106,6 +106,7 @@ jobs:
               f"- Corpus: `{data['corpus_id']} v{data['corpus_version']}`",
               f"- Split: `{data['corpus_split']}` (exposed development only)",
               f"- Corpus SHA-256: `{data['corpus_sha256']}`",
+              f"- Corpus Git blob SHA-1: `{data['corpus_git_blob_sha1']}`",
               f"- Runner SHA-256: `{data['runner_sha256']}`",
               f"- Source revision: `{data['source_revision']}`",
               "",
