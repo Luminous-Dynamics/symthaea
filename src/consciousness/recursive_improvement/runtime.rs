@@ -1225,6 +1225,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn modified_runtime_queue_copy_cannot_replace_canonical_resolver_contract() {
+        use crate::consciousness::recursive_improvement::{RiskTier, WorldActionContext, Resolution};
+
+        let config = RuntimeConfig {
+            persistence_config: PersistenceConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let runtime = MagiLoopRuntime::new(config).unwrap();
+
+        let (mut queued_copy, calibration_before) = {
+            let mut persistent = runtime.model.lock();
+            let calibration_before = persistent.model().calibration().total_predictions();
+            let mut action =
+                WorldActionContext::new("shell_command", "run the predeclared command")
+                    .with_risk_tier(RiskTier::Observation);
+            action.metadata.insert("magi.resolver.program".into(), "sh".into());
+            action.metadata.insert("magi.resolver.arg0".into(), "-c".into());
+            action.metadata.insert("magi.resolver.arg1".into(), "exit 0".into());
+            let prediction = persistent.model_mut().predict(
+                "Command succeeds",
+                OutcomeCategory::Success,
+                0.8,
+                action,
+            );
+            (prediction, calibration_before)
+        };
+
+        // Mutate only the runtime copy after the model's canonical pending forecast is recorded.
+        queued_copy
+            .action_context
+            .metadata
+            .insert("magi.resolver.arg1".into(), "exit 1".into());
+        runtime.queue_prediction(
+            queued_copy,
+            Some(AutoResolveType::CommandSucceeds("exit 1".to_string())),
+        );
+
+        runtime.resolve_pending().await.unwrap();
+
+        let persistent = runtime.model.lock();
+        let model = persistent.model();
+        assert_eq!(model.calibration().total_predictions(), calibration_before);
+        assert_eq!(model.loop_state().predictions_resolved, 0);
+        assert_eq!(model.loop_state().loop_iterations, 0);
+        assert!(model.pending_predictions().is_empty());
+        assert_eq!(model.unresolved_predictions().len(), 1);
+        assert!(matches!(
+            model.unresolved_predictions().back().map(|prediction| &prediction.resolution),
+            Some(Resolution::Unclear { reason, .. })
+                if reason.contains("authority mismatch")
+        ));
+    }
+
+    #[tokio::test]
     async fn test_runtime_creation() {
         let config = RuntimeConfig {
             persistence_config: PersistenceConfig {
