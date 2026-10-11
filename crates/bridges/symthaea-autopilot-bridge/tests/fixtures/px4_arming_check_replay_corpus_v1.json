@@ -97,5 +97,32 @@
       "config_assessed_at_ns": 1200000000,
       "duplicate_second_received_at_ns": 1360000000
     }
-  ]
+  ],
+  "provenance": {
+    "fixture_kind": "synthetic_scenario_parameters",
+    "raw_wire_capture": false,
+    "note": "Scenarios are synthesized by the Rust test harness from named parameter sets. This corpus contains no captured PX4 frame bytes and does not qualify a live decoder or vehicle.",
+    "source_contracts": [
+      {
+        "message": "ArmingCheckRequest v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/ArmingCheckRequest.msg",
+        "source_blob_sha": "79a30af500ecf3661169f62a50edfe0f02fbcd8f"
+      },
+      {
+        "message": "ArmingCheckReply v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/ArmingCheckReply.msg",
+        "source_blob_sha": "604539e49066546e518c7ebaec8b6f1a7cc97285"
+      },
+      {
+        "message": "RegisterExtComponentReply v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/e0488b19e573e4e016a8066ad00164099a22e46c/msg/versioned/RegisterExtComponentReply.msg",
+        "source_blob_sha": "17ff6765c9a1980f1cec163a0ff38aea07491a12"
+      },
+      {
+        "message": "SetpointConfigReply v1",
+        "source_url": "https://github.com/PX4/PX4-Autopilot/blob/main/msg/versioned/SetpointConfigReply.msg",
+        "source_blob_sha": "d5c8cb562461a2826f782d3ec8ee5a5c65674471"
+      }
+    ]
+  }
 }
