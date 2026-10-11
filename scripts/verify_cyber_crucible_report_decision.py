@@ -34,6 +34,28 @@ class ReportDecisionBindingError(ValueError):
     """Report identity or bytes do not match the trusted decision context."""
 
 
+def validate_input_receipt_binding(input_receipt: Any, expected_context: Any) -> str:
+    """Bind the exact upstream signed receipt artifact to trusted expected context.
+
+    The decision receipt authenticates what the independent verifier decided about
+    this exact envelope. This function checks artifact linkage; it does not replace
+    independent verification of the upstream signature.
+    """
+    if not isinstance(input_receipt, dict) or set(input_receipt) != {"payload", "signature"}:
+        raise ReportDecisionBindingError("input receipt envelope must contain exactly payload and signature")
+    payload = input_receipt.get("payload")
+    signature = input_receipt.get("signature")
+    if not isinstance(payload, dict) or not isinstance(signature, str) or not signature:
+        raise ReportDecisionBindingError("input receipt payload/signature has invalid shape")
+    digest = canonical_json_digest(input_receipt)
+    if digest != expected_context.get("input_receipt_digest"):
+        raise ReportDecisionBindingError("input receipt digest does not match trusted expected context")
+    for field in ("campaign_id", "subject_id", "attempt_id", "scenario_id", "scenario_revision", "scenario_digest"):
+        if payload.get(field) != expected_context.get(field):
+            raise ReportDecisionBindingError(f"input receipt does not match expected context field: {field}")
+    return digest
+
+
 def validate_report_binding(report: Any, expected_context: Any) -> str:
     """Verify the digest and stable run identity before authenticating its decision.
 
@@ -75,6 +97,7 @@ def validate_report_binding(report: Any, expected_context: Any) -> str:
 
 def verify_report_decision(
     report: Any,
+    input_receipt: Any,
     decision_receipt: Any,
     decision_trust_policy: Any,
     expected_context: Any,
@@ -82,6 +105,7 @@ def verify_report_decision(
     replay_ledger: ReplayLedger,
     now=None,
 ) -> dict[str, Any]:
+    input_receipt_digest = validate_input_receipt_binding(input_receipt, expected_context)
     report_digest = validate_report_binding(report, expected_context)
     report_errors = validate_report(report)
     if report_errors:
@@ -96,6 +120,7 @@ def verify_report_decision(
         replay_ledger=replay_ledger,
     )
     result["report_contract_valid"] = True
+    result["input_receipt_digest"] = input_receipt_digest
     result["report_digest"] = report_digest
     return result
 
@@ -103,6 +128,7 @@ def verify_report_decision(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", required=True, help="diagnostic-loop report JSON")
+    parser.add_argument("--input-receipt", required=True, help="exact upstream signed receipt envelope JSON")
     parser.add_argument("--decision-receipt", required=True, help="signed verifier-decision receipt JSON")
     parser.add_argument("--trust-policy", required=True, help="operator-controlled decision signer policy JSON")
     parser.add_argument("--expected-context", required=True, help="independently supplied trusted expected context JSON")
@@ -111,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = verify_report_decision(
             load_json(args.report),
+            load_json(args.input_receipt),
             load_json(args.decision_receipt),
             load_json(args.trust_policy),
             load_json(args.expected_context),
