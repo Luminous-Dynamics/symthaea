@@ -1,0 +1,41 @@
+name: Xtask Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'xtask/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain*'
+      - '.github/workflows/xtask-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xtask-qualification-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  xtask:
+    name: Xtask (fmt, tests, clippy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format xtask
+        run: cargo fmt --check --package xtask
+
+      - name: Test xtask
+        run: cargo test --locked -p xtask
+
+      - name: Clippy xtask (all targets)
+        run: cargo clippy --locked -p xtask --all-targets -- -D warnings
