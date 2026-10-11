@@ -1,0 +1,151 @@
+name: PARADOX-A0 Static Audit
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/paradox-a0-static-audit.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-a0-static-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  RUNNER_SHA: ${{ github.event.pull_request.head.sha }}
+  RUNNER_BASE_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+  A0_SHA: 3a82ed5495c2c55460634373e428fcb0374a5491
+  G2B_SHA: 09d83a1d1fddbbbd30e4eba7cc95946c8eab871f
+  TOOL_DIR: tools/paradox_a0_native_readout
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact runner plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RUNNER_SHA }}
+          fetch-depth: 2
+
+      - name: Bind runner plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RUNNER_SHA}"
+          test "$(git rev-parse HEAD^)" = "${RUNNER_BASE_SHA}"
+          test "$(git rev-list --count "${RUNNER_BASE_SHA}..${RUNNER_SHA}")" = 1
+          test -z "$(git status --porcelain --untracked-files=all)"
+          changed="$(git diff --name-only "${RUNNER_BASE_SHA}" "${RUNNER_SHA}")"
+          test "${changed}" = '.github/workflows/paradox-a0-static-audit.yml'
+
+      - name: Checkout exact frozen A0 subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.A0_SHA }}
+          fetch-depth: 64
+
+      - name: Bind A0 subject and research-only surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${A0_SHA}"
+          test "$(git rev-parse HEAD^)" = "${G2B_SHA}"
+          test "$(git rev-list --count "${G2B_SHA}..${A0_SHA}")" = 1
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+          actual="$(git diff --name-only "${G2B_SHA}" "${A0_SHA}" | sort)"
+          expected="$(cat <<'EOF' | sort
+          tools/paradox_a0_native_readout/LATENT_READOUT.md
+          tools/paradox_a0_native_readout/README.md
+          tools/paradox_a0_native_readout/a0r_contract_audit.py
+          tools/paradox_a0_native_readout/a0r_latent_contract.json
+          tools/paradox_a0_native_readout/a0r_receipt_audit.py
+          tools/paradox_a0_native_readout/a0r_receipt_contract.json
+          tools/paradox_a0_native_readout/a0r_statistics.json
+          tools/paradox_a0_native_readout/a0r_statistics_audit.py
+          tools/paradox_a0_native_readout/audit.py
+          tools/paradox_a0_native_readout/gap_report.py
+          tools/paradox_a0_native_readout/reachability.json
+          tools/paradox_a0_native_readout/registry.json
+          EOF
+          )"
+          test "${actual}" = "${expected}"
+
+      - name: Syntax-check frozen Python audit plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+          from pathlib import Path
+          root = Path('tools/paradox_a0_native_readout')
+          files = sorted(root.glob('*.py'))
+          assert files, 'no Python audit files found'
+          for path in files:
+              compile(path.read_text(encoding='utf-8'), str(path), 'exec')
+          print(f'python-static-compile PASS files={len(files)}')
+          PY
+
+      - name: Run native inventory audit
+        run: PYTHONDONTWRITEBYTECODE=1 python3 "${TOOL_DIR}/audit.py"
+
+      - name: Run latent-readout contract audit
+        run: PYTHONDONTWRITEBYTECODE=1 python3 "${TOOL_DIR}/a0r_contract_audit.py"
+
+      - name: Run statistics contract audit
+        run: PYTHONDONTWRITEBYTECODE=1 python3 "${TOOL_DIR}/a0r_statistics_audit.py"
+
+      - name: Run measurement-receipt static audit
+        run: PYTHONDONTWRITEBYTECODE=1 python3 "${TOOL_DIR}/a0r_receipt_audit.py"
+
+      - name: Derive and validate representation-to-policy gap report
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="${RUNNER_TEMP}/paradox-a0-gap-report.json"
+          PYTHONDONTWRITEBYTECODE=1 python3 "${TOOL_DIR}/gap_report.py" > "${report}"
+          python3 - "${report}" <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import sys
+
+          envelope = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          report = envelope['report']
+          assert report['schema_version'] == 'PARADOX-A0-GAP-REPORT-V1'
+          assert report['authority'] == 'DevelopmentOnly / derived from frozen source inventory'
+          assert report['production_subject_sha'] == 'eb73527d05a913e79d1f05135ad6b06c1da8e2ee'
+          assert report['g2b_subject_sha'] == '09d83a1d1fddbbbd30e4eba7cc95946c8eab871f'
+          assert set(report['responses']) == {
+              'Commit',
+              'CommitConditionally',
+              'AbstainPreservePlurality',
+              'ReflexiveUpdate',
+              'RequestRepresentationRevision',
+          }
+          canonical = (json.dumps(report, sort_keys=True, separators=(',', ':')) + '\n').encode()
+          digest = hashlib.sha256(canonical).hexdigest()
+          assert envelope['report_sha256'] == digest
+          print(f'gap-report-sha256={digest}')
+          for response, row in sorted(report['responses'].items()):
+              print(f"gap {response}={row['gap_class']}")
+          PY
+
+      - name: Enforce no behavioral execution surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${A0_SHA}"
+          test "$(git rev-parse HEAD^)" = "${G2B_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          ! find "${TOOL_DIR}" -maxdepth 1 -type f -name '*.rs' -print -quit | grep -q .
+          ! grep -R -E 'qualification_census|generate_fixture\(|CognitiveLoopService::new|cargo (run|test)|confirmatory_execution_allowed[[:space:]]*:[[:space:]]*true' "${TOOL_DIR}" --include='*.py' --include='*.json'
+
+      - name: Postflight A0 immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${A0_SHA}"
+          test "$(git rev-parse HEAD^)" = "${G2B_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
