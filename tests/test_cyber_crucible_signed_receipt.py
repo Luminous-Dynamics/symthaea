@@ -126,10 +126,13 @@ class SignedReceiptVerifierTests(unittest.TestCase):
 
     def verify(self, receipt=None, trust=None, expected=None, **kwargs):
         receipt = receipt or signed_receipt()
+        ledger = kwargs.pop("replay_ledger", None)
+        if ledger is None:
+            ledger = verifier.ReplayLedger(self.replay_db)
         return verifier.verify_receipt(
             receipt, trust or policy(), expected or context(receipt),
             now=kwargs.pop("now", NOW),
-            replay_ledger=kwargs.pop("replay_ledger", None),
+            replay_ledger=ledger,
         )
 
     def test_rfc8032_ed25519_known_answer_vector(self):
@@ -188,6 +191,11 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         receipt["payload"]["unbound_security_claim"] = True
         errors = list(Draft202012Validator(schema).iter_errors(receipt))
         self.assertTrue(any("Additional properties are not allowed" in error.message for error in errors), errors)
+
+    def test_replay_ledger_is_mandatory_for_receipt_acceptance(self):
+        receipt = signed_receipt()
+        with self.assertRaisesRegex(verifier.VerificationError, "persistent replay ledger is required"):
+            verifier.verify_receipt(receipt, policy(), context(receipt), now=NOW)
 
     def test_valid_receipt_is_signature_verified_but_non_authorizing(self):
         result = self.verify(replay_ledger=verifier.ReplayLedger(self.replay_db))
