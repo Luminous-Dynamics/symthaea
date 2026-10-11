@@ -1457,6 +1457,30 @@ mod tests {
         );
         assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
 
+        // The same JSON with extra leading whitespace is parseable but not canonical. Even a
+        // valid signature over its exact digest must not bypass the canonical evidence profile.
+        let mut noncanonical_bytes = Vec::with_capacity(evidence.len() + 1);
+        noncanonical_bytes.push(b' ');
+        noncanonical_bytes.extend_from_slice(&evidence);
+        let mut noncanonical_receipt = signed.receipt.clone();
+        noncanonical_receipt.receipt_sha256 =
+            hex::encode(Sha256::digest(&noncanonical_bytes));
+        let noncanonical_signature = key.sign(
+            &noncanonical_receipt.canonical_signing_payload().unwrap(),
+        );
+        let noncanonical_signed = SignedCapabilityOutcomeReceipt {
+            receipt: noncanonical_receipt,
+            signature_hex: hex::encode(noncanonical_signature.to_bytes()),
+        };
+        assert_eq!(
+            ledger.verify_and_resolve_signed_receipt(
+                noncanonical_signed,
+                &noncanonical_bytes,
+            ),
+            Err(CapabilityLedgerError::NonCanonicalEvidencePayload)
+        );
+        assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
+
         // Reuse the same forecast ID/sequence/subject in a different ledger but change
         // the committed probability/context. The original valid signature must not transfer.
         let mut transplanted_ledger = setup_claim_with_policy(ledger.qualification_policy.clone());
