@@ -92,5 +92,5 @@ jobs:
             exit 1
           fi
 
-      - name: Run checked DFT propagation and fail-closed regression tests
-        run: cargo test --locked -p symthaea-quantum-chemistry --lib dft::xc::tests
+      - name: Run checked DFT, grid, and fail-closed regression tests
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib dft::
