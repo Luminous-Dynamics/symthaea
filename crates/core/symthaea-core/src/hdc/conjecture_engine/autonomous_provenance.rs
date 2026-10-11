@@ -465,6 +465,8 @@ fn search_config_is_consistent(
         || config.tournament_size == 0
         || config.diverse_trajectory_count == 0
         || config.seed != discovery_seed
+        || config.lambda < 0.0
+        || config.orthogonality_penalty < 0.0
         || config.mutation_rate < 0.0
         || config.mutation_rate > 1.0
         || config.prior_composition_rate < 0.0
@@ -922,6 +924,50 @@ mod tests {
         let mut tampered = receipt.clone();
         tampered.holdout_seed += 1;
         assert!(!verify_autonomous_discovery_receipt_v1(&tampered));
+    }
+
+    #[test]
+    fn cold_receipt_contains_the_sanitized_effective_search_config() {
+        let mut config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        config.known_invariants.push(Expr::Var("x".into()));
+        config.orthogonality_penalty = 4.0;
+        config.prior_composition_rate = 0.6;
+        config.prior_fragment_bonus = 0.5;
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs,
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            2,
+            701,
+            1e-2,
+        );
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        )
+        .expect("cold mode must sanitize prior-dependent configuration");
+        assert!(receipt.search_config.disable_macro_seeds);
+        assert_eq!(receipt.search_config.prior_composition_rate, 0.0);
+        assert_eq!(receipt.search_config.prior_fragment_bonus, 1.0);
+        assert_eq!(receipt.search_config.orthogonality_penalty, 1.0);
+        assert!(receipt.search_config.known_invariant_formulas.is_empty());
+        assert!(receipt.search_config.extra_seed_template_formulas.is_empty());
+        assert!(verify_autonomous_discovery_receipt_v1(&receipt));
     }
 
     #[test]
