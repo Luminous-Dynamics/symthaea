@@ -212,10 +212,6 @@ pub struct ImportedMotifSummary {
     /// Total exact pitch-interval-contour windows, including overlapping windows
     /// and matches beyond the stored evidence cap.
     pub occurrence_count: usize,
-    /// Greedily selected non-overlapping occurrences. None means a legacy record
-    /// predates this distinction; this is not a musical-importance judgment.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub independent_occurrence_count: Option<usize>,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
     /// Legacy heuristic score retained for wire compatibility; not a calibrated
@@ -238,6 +234,10 @@ pub struct ImportedMotifSummary {
     /// None means an older record did not state whether its evidence was complete.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occurrence_evidence_complete: Option<bool>,
+    /// Greedily selected non-overlapping occurrences. None means a legacy record
+    /// predates this distinction; this is not a musical-importance judgment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub independent_occurrence_count: Option<usize>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
