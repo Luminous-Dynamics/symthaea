@@ -2792,4 +2792,28 @@ mod tests {
         assert!(!round_trip.contains("source_part_id"));
         assert!(!round_trip.contains("matched_occurrences"));
     }
+
+    #[test]
+    fn independent_occurrence_count_is_appended_after_legacy_wire_fields() {
+        let summary = ImportedMotifSummary {
+            occurrence_count: 5,
+            midi_pitches: vec![60, 61, 62, 63],
+            identity_note: "test contour".to_string(),
+            confidence: 0.42,
+            source_part_id: Some(1),
+            pitch_interval_pattern: vec![1, 1, 1],
+            onset_deltas: Vec::new(),
+            matched_occurrences: Vec::new(),
+            occurrence_evidence_complete: Some(true),
+            independent_occurrence_count: Some(2),
+        };
+        let serialized = serde_json::to_string(&summary).unwrap();
+        let last_legacy_field = serialized
+            .find("\"occurrence_evidence_complete\"")
+            .expect("existing evidence-completeness field is serialized");
+        let appended_field = serialized
+            .find("\"independent_occurrence_count\"")
+            .expect("independent count is serialized when present");
+        assert!(last_legacy_field < appended_field);
+    }
 }
