@@ -11,7 +11,7 @@
 - Web Portal (live at symthaea.luminousdynamics.io)
 - Soma mobile embodiment (screen vision, gesture recognition, metabolism)
 - Space coordination (multi-party negotiation, trust-weighted fusion)
-- External validation (ETHICS 94.5%, ARC-AGI, Sleep-EDF, DMC Humanoid)
+- ETHICS evaluation repair: prior 94.5% headline retracted; cross-domain pilot unqualified; task-matched commonsense diagnostic added (full suite pending). Other evaluations retain their own qualification status.
 - Mycelix hardening (fail-open fixes, dedup via zome-helpers, observability)
 
 ## In Progress
