@@ -17,14 +17,17 @@ class RunRecordValidatorTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.record_path = self.root / "record.json"
         self.targets_path = self.root / "expected-targets.json"
-        self.schema_path = self.root / "schema.json"
+        production_schema = Path(__file__).resolve().parents[2] / "docs/research/PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json"
+        self.schema_path = production_schema if production_schema.is_file() else self.root / "schema.json"
         self.artifact_root = self.root / "artifacts"
         self.artifact_root.mkdir()
-        # Test the semantic guard independently of the production schema's type constraints.
-        self.schema_path.write_text(json.dumps({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "type": "object",
-        }), encoding="utf-8")
+        # In the repository, exercise against the real production schema. Outside the repo
+        # (for example, this isolated test run), use a minimal schema to test semantic guards.
+        if not production_schema.is_file():
+            self.schema_path.write_text(json.dumps({
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+            }), encoding="utf-8")
         self.targets = {"target_ids": ["A", "B"]}
         self.write_targets()
         (self.artifact_root / "result.csv").write_text("target,score\nA,0.5\n", encoding="utf-8")
