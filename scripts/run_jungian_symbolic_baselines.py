@@ -421,45 +421,48 @@ def write_result_bundle(corpus: dict[str, Any], corpus_digest: str, source_revis
     return hashlib.sha256(raw).hexdigest()
 
 
-def summarize_method(cases: list[dict[str, Any]], predictions: dict[str, list[str]]) -> dict[str, Any]:
-    required_total = required_hit = forbidden_total = forbidden_hit = 0
-    case_required_misses = case_forbidden_hits = 0
+def summarize_method(cases: list[dict[str, Any]], declared_codes_by_case: dict[str, list[str]]) -> dict[str, Any]:
+    """Measure hand-authored implementation claims against the rubric; not output behavior."""
+    required_total = required_match_total = forbidden_total = forbidden_claim_total = 0
+    case_missing_required = case_forbidden_claims = 0
     per_case = []
     for case in cases:
         required = set(case["required_behaviors"])
         forbidden = set(case["forbidden_behaviors"])
-        emitted = set(predictions[case["id"]])
-        req_hit = required & emitted
-        forb_hit = forbidden & emitted
+        declared = set(declared_codes_by_case[case["id"]])
+        req_matches = required & declared
+        forbidden_claims = forbidden & declared
         required_total += len(required)
-        required_hit += len(req_hit)
+        required_match_total += len(req_matches)
         forbidden_total += len(forbidden)
-        forbidden_hit += len(forb_hit)
-        case_required_misses += int(bool(required - emitted))
-        case_forbidden_hits += int(bool(forb_hit))
+        forbidden_claim_total += len(forbidden_claims)
+        case_missing_required += int(bool(required - declared))
+        case_forbidden_claims += int(bool(forbidden_claims))
         per_case.append({
             "case_id": case["id"],
-            "required_codes": sorted(required),
-            "emitted_codes": sorted(emitted),
-            "required_hits": sorted(req_hit),
-            "required_misses": sorted(required - emitted),
-            "forbidden_codes": sorted(forbidden),
-            "forbidden_hits": sorted(forb_hit),
-            "rubric_case_pass": not bool(required - emitted) and not bool(forb_hit),
+            "rubric_required_codes": sorted(required),
+            "implementation_declared_codes": sorted(declared),
+            "declared_required_code_matches": sorted(req_matches),
+            "declared_required_codes_not_claimed": sorted(required - declared),
+            "rubric_forbidden_codes": sorted(forbidden),
+            "declared_forbidden_code_claims": sorted(forbidden_claims),
+            "all_required_codes_declared_without_forbidden_claim": not bool(required - declared) and not bool(forbidden_claims),
         })
     return {
-        "required_code_total": required_total,
-        "required_code_hits": required_hit,
-        "required_code_misses": required_total - required_hit,
-        "required_code_recall": required_hit / required_total if required_total else None,
-        "forbidden_code_total": forbidden_total,
-        "forbidden_code_hits": forbidden_hit,
-        "cases_missing_at_least_one_required_code": case_required_misses,
-        "cases_with_at_least_one_forbidden_flag": case_forbidden_hits,
-        "rubric_case_pass_count": sum(row["rubric_case_pass"] for row in per_case),
+        "metric_semantics": "declared_rubric_coverage_only",
+        "declared_required_code_total": required_total,
+        "declared_required_code_matches": required_match_total,
+        "declared_required_code_nonmatches": required_total - required_match_total,
+        "declared_required_code_claim_coverage": required_match_total / required_total if required_total else None,
+        "rubric_forbidden_code_total": forbidden_total,
+        "declared_forbidden_code_claims": forbidden_claim_total,
+        "cases_not_claiming_all_required_codes": case_missing_required,
+        "cases_declaring_at_least_one_forbidden_code": case_forbidden_claims,
+        "cases_declaring_all_required_codes_without_forbidden_claims": sum(
+            row["all_required_codes_declared_without_forbidden_claim"] for row in per_case
+        ),
         "per_case": per_case,
     }
-
 
 def run_method(cases: list[dict[str, Any]], method) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
     results: list[dict[str, Any]] = []
@@ -953,7 +956,8 @@ def main() -> int:
                 ),
             },
             "claim_ceiling": "Rule output and rubric agreement only; HDC output is representation-level retrieval only. No psychological truth, archetype validity, clinical efficacy, or consciousness claim.",
-            "metric_warning": "Required/forbidden behavior labels are hand-authored development rubrics. Scores are not blinded human evaluation, scientific accuracy, model generalization, or holdout performance.",
+            "metric_warning": "Coverage scores the behavior codes manually declared by each hand-authored baseline implementation; it does not infer behavior from output text and is not independent output evaluation, psychological accuracy, model generalization, or holdout performance.",
+            "metric_semantics": "declared_rubric_coverage_only",
             "glyph_projection_artifact": glyph_projection_meta,
             "context_pair_diagnostics": (
                 context_pair_diagnostics(corpus, glyph_projection_by_id, projection)
@@ -995,6 +999,7 @@ def main() -> int:
                 "config_sha256": config_hashes[method_id],
                 "execution_replay": "byte-identical within this process",
                 "summary": {k: v for k, v in summary.items() if k != "per_case"},
+                "metric_semantics": summary["metric_semantics"],
             })
 
         if glyph_projection_by_id is not None:
@@ -1025,10 +1030,10 @@ def main() -> int:
                 "methods": [
                     {
                         "method_id": method_id,
-                        "emitted_behavior_codes": signals_by_method[method_id][case["id"]],
-                        "required_hits": sorted(set(case["required_behaviors"]) & set(signals_by_method[method_id][case["id"]])),
-                        "required_misses": sorted(set(case["required_behaviors"]) - set(signals_by_method[method_id][case["id"]])),
-                        "forbidden_hits": sorted(set(case["forbidden_behaviors"]) & set(signals_by_method[method_id][case["id"]])),
+                        "implementation_declared_codes": signals_by_method[method_id][case["id"]],
+                        "declared_required_code_matches": sorted(set(case["required_behaviors"]) & set(signals_by_method[method_id][case["id"]])),
+                        "declared_required_codes_not_claimed": sorted(set(case["required_behaviors"]) - set(signals_by_method[method_id][case["id"]])),
+                        "declared_forbidden_code_claims": sorted(set(case["forbidden_behaviors"]) & set(signals_by_method[method_id][case["id"]])),
                     }
                     for method_id, _, _ in methods
                 ],
