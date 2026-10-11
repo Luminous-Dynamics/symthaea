@@ -21,6 +21,15 @@ CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 RESULT_SCHEMA = "symthaea-jungian-normalized-results-v1"
 EXPECTED_CASE_COUNT = 14
 HEX_256 = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_HEX = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+CORPUS_KEYS = {
+    "schema", "corpus_id", "version", "status", "split", "source_policy", "purpose",
+    "claim_ceiling", "output_contract", "behavior_vocabulary", "forbidden_vocabulary", "cases",
+}
+OUTPUT_CONTRACT_KEYS = {
+    "required_top_level_fields", "observation_fields", "interpretation_fields",
+    "epistemic_status_values", "abstention_fields", "constraints",
+}
 
 CASE_KEYS = {"id", "task", "input_text", "evidence_spans", "required_behaviors", "forbidden_behaviors", "oracle_note"}
 SPAN_KEYS = {"id", "text"}
@@ -71,6 +80,7 @@ def validate_corpus(data: Any) -> list[str]:
     errors: list[str] = []
     try:
         require(isinstance(data, dict), "corpus: expected object")
+        exact_keys(data, CORPUS_KEYS, "corpus")
         require(data.get("schema") == CORPUS_SCHEMA, "corpus: unexpected schema")
         require(data.get("corpus_id") == "JUNG-001C-DEV-001", "corpus: unexpected corpus_id")
         require(data.get("version") == 1, "corpus: version mismatch; version and validator must be reviewed together")
@@ -83,7 +93,14 @@ def validate_corpus(data: Any) -> list[str]:
         behavior = set(unique_strings(data.get("behavior_vocabulary"), "behavior_vocabulary"))
         forbidden = set(unique_strings(data.get("forbidden_vocabulary"), "forbidden_vocabulary"))
         require(not (behavior & forbidden), "behavior vocabularies overlap")
-        require(isinstance(data.get("output_contract"), dict), "output_contract: expected object")
+        contract = exact_keys(data.get("output_contract"), OUTPUT_CONTRACT_KEYS, "output_contract")
+        require(contract["required_top_level_fields"] == ["case_id", "observations", "interpretations", "open_questions", "abstention"], "output_contract: top-level fields changed")
+        require(contract["observation_fields"] == ["evidence_id", "exact_span", "source_scope"], "output_contract: observation fields changed")
+        require(contract["interpretation_fields"] == ["hypothesis_id", "statement", "scope", "supporting_evidence_ids", "contradicting_evidence_ids", "epistemic_status"], "output_contract: interpretation fields changed")
+        require(contract["epistemic_status_values"] == ["InterpretationHypothesis", "ScholarlyInterpretation", "OpenQuestion"], "output_contract: epistemic status vocabulary changed")
+        require(contract["abstention_fields"] == ["abstain", "reason"], "output_contract: abstention fields changed")
+        unique_strings(contract["constraints"], "output_contract.constraints")
+        require(bool(contract["constraints"]), "output_contract.constraints: must be nonempty")
         cases = data.get("cases")
         require(isinstance(cases, list), "cases: expected array")
         require(len(cases) == EXPECTED_CASE_COUNT, f"cases: expected {EXPECTED_CASE_COUNT}, got {len(cases)}")
@@ -135,7 +152,7 @@ def validate_results(data: Any, corpus: dict[str, Any]) -> list[str]:
         require(top.get("schema") == RESULT_SCHEMA, "results: unexpected schema")
         require(top.get("corpus_id") == corpus["corpus_id"], "results: corpus_id mismatch")
         require(top.get("corpus_version") == corpus["version"], "results: corpus_version mismatch")
-        require(nonempty_string(top.get("source_revision"), "source_revision"), "results: missing source_revision")
+        require(isinstance(top.get("source_revision"), str) and COMMIT_HEX.fullmatch(top["source_revision"]) is not None, "results: source_revision must be a full lowercase Git object ID")
         require(nonempty_string(top.get("implementation_id"), "implementation_id"), "results: missing implementation_id")
         require(isinstance(top.get("config_sha256"), str) and HEX_256.fullmatch(top["config_sha256"]) is not None, "results: config_sha256 must be 64 lowercase hex characters")
         require(isinstance(top.get("results"), list), "results.results: expected array")
@@ -180,6 +197,7 @@ def validate_results(data: Any, corpus: dict[str, Any]) -> list[str]:
                 supports = unique_strings(hypothesis["supporting_evidence_ids"], f"{hw}.supporting_evidence_ids")
                 contradicts = unique_strings(hypothesis["contradicting_evidence_ids"], f"{hw}.contradicting_evidence_ids")
                 require(set(supports + contradicts) <= set(spans), f"{hw}: reference to evidence outside the frozen case")
+                require(set(supports + contradicts) <= observed_ids, f"{hw}: cited evidence must also appear in observations")
                 require(not (set(supports) & set(contradicts)), f"{hw}: evidence cannot both support and contradict the same hypothesis")
                 if hypothesis["epistemic_status"] != "OpenQuestion":
                     require(bool(supports), f"{hw}: non-question interpretation needs explicit supporting evidence")
