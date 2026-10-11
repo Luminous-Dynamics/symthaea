@@ -634,6 +634,8 @@ pub enum EvidenceMergeError {
     UnknownIndicatorId(String),
     /// Two or more `AblationResult`s target the same indicator ID.
     DuplicateIndicatorId(String),
+    /// A declared seed identity appears more than once in the bundle.
+    DuplicateSeedIdentity(u64),
     /// The bundle's schema version doesn't match what this code understands.
     SchemaVersionMismatch { expected: u32, found: u32 },
     /// An `AblationResult`'s cached `indicator_dropped`/`benchmark_degraded`/
@@ -663,6 +665,9 @@ impl std::fmt::Display for EvidenceMergeError {
             }
             EvidenceMergeError::DuplicateIndicatorId(id) => {
                 write!(f, "duplicate ablation result for indicator id {id:?}")
+            }
+            EvidenceMergeError::DuplicateSeedIdentity(seed) => {
+                write!(f, "duplicate seed identity {seed}; seed entries are not independent runs")
             }
             EvidenceMergeError::SchemaVersionMismatch { expected, found } => write!(
                 f,
@@ -880,6 +885,13 @@ pub fn annotate_with_ablation_results(
         });
     }
 
+    let mut seen_seeds: HashSet<u64> = HashSet::new();
+    for &seed in &bundle.seeds {
+        if !seen_seeds.insert(seed) {
+            return Err(EvidenceMergeError::DuplicateSeedIdentity(seed));
+        }
+    }
+
     let known_ids: HashSet<&str> = report.indicators.iter().map(|i| i.id.as_str()).collect();
     let mut seen_ids: HashSet<&str> = HashSet::new();
     for result in &bundle.ablations {
@@ -932,16 +944,46 @@ pub fn annotate_with_ablation_results(
         let causal_effect = EffectEstimate::new(
             result.baseline_indicator_score,
             result.ablated_indicator_score,
-            bundle.seeds.len().max(1),
+            bundle.seeds.len(),
         );
         let functional_effect = EffectEstimate::new(
             result.baseline_benchmark_accuracy,
             result.ablated_benchmark_accuracy,
-            bundle.seeds.len().max(1),
+            bundle.seeds.len(),
         );
 
         let quality = ablation_probe_quality(result);
         indicator.probe_quality = Some(quality);
+
+        if !quality.qualifies_for_ablation_interpretation() {
+            push_annotation_once(
+                &mut indicator.annotations,
+                EvidenceAnnotation::KnownConfound(format!(
+                    concat!(
+                        "ablation probe quality insufficient to interpret ({:?}); ",
+                        "baseline={:.4}, ablated={:.4} — not treated as a scientific result"
+                    ),
+                    quality.degeneracy,
+                    result.baseline_indicator_score,
+                    result.ablated_indicator_score
+                )),
+            );
+        }
+
+        let seed_lineage_missing = bundle.seeds.is_empty();
+        if seed_lineage_missing {
+            push_annotation_once(
+                &mut indicator.annotations,
+                EvidenceAnnotation::KnownConfound(
+                    concat!(
+                        "Butlin evidence bundle contains no seed identities; ",
+                        "observed scores are retained for diagnostics and cannot ",
+                        "authorize a support tier"
+                    )
+                    .to_string(),
+                ),
+            );
+        }
 
         // Fallback provenance is genuinely unknown at this layer (see
         // `ablation_probe_quality`'s doc comment) -- disclose that plainly
@@ -982,28 +1024,37 @@ pub fn annotate_with_ablation_results(
         // precondition for trusting it. See
         // `qualifies_for_ablation_interpretation()`'s doc comment for why
         // this differs from `qualifies_as_observed()`.
-        indicator.outcome = if !quality.qualifies_for_ablation_interpretation() {
-            push_annotation_once(
-                &mut indicator.annotations,
-                EvidenceAnnotation::KnownConfound(format!(
-                    "ablation probe quality insufficient to interpret ({:?}); \
-                     baseline={:.4}, ablated={:.4} — not treated as a scientific result",
-                    quality.degeneracy,
-                    result.baseline_indicator_score,
-                    result.ablated_indicator_score
-                )),
-            );
+        indicator.outcome = if seed_lineage_missing
+            || !quality.qualifies_for_ablation_interpretation()
+        {
             EvidenceOutcome::Inconclusive
         } else if classification.contradicted {
             EvidenceOutcome::Contradicted
         } else if !classification.indicator_dropped {
             EvidenceOutcome::NotDemonstrated
         } else if classification.benchmark_degraded && benchmark_measurement_is_valid(result) {
+            // The legacy bundle preserves the downstream measurement, but
+            // it does not carry a typed identity proving that this benchmark
+            // arm executed the same intervention as the indicator ablation.
+            // A proxy/configuration-only degradation is diagnostic evidence,
+            // not proof of the same-mechanism causal chain. Keep the observed
+            // external behavior visible while fail-closing the support tier.
             push_annotation_once(
                 &mut indicator.annotations,
                 EvidenceAnnotation::ExternalBehavior,
             );
-            EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
+            push_annotation_once(
+                &mut indicator.annotations,
+                EvidenceAnnotation::KnownConfound(
+                    concat!(
+                        "legacy ButlinEvidenceBundle lacks typed same-intervention provenance; ",
+                        "downstream degradation is retained as diagnostic-only and cannot authorize ",
+                        "FunctionallySupported"
+                    )
+                    .to_string(),
+                ),
+            );
+            EvidenceOutcome::Supported(SupportTier::CausallySupported)
         } else {
             // Either the downstream benchmark genuinely didn't degrade, or
             // it looked like it did but the accuracy pair itself is
@@ -1920,4 +1971,89 @@ mod tests {
             }
         );
     }
+    #[test]
+    fn test_legacy_bundle_cannot_promote_proxy_downstream_effect_to_functional_support() {
+        let report = ButlinIndicatorReport::from_indicators(vec![stub_indicator(
+            "AE-2",
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        )]);
+        let bundle = ButlinEvidenceBundle {
+            schema_version: REPORT_SCHEMA_VERSION,
+            commit_sha: "fixture".into(),
+            config_hash: "fixture".into(),
+            seeds: vec![7],
+            generated_at: "fixture".into(),
+            ablations: vec![stub_ablation_result("AE-2", true, true, false)],
+        };
+
+        let merged = annotate_with_ablation_results(report, &bundle).unwrap();
+        let ae2 = &merged.indicators[0];
+        assert_eq!(
+            ae2.outcome,
+            EvidenceOutcome::Supported(SupportTier::CausallySupported)
+        );
+        assert_eq!(merged.functionally_supported_count, 0);
+        assert_eq!(merged.causally_supported_count, 1);
+        assert_eq!(ae2.causal_effect.unwrap().seed_count, 1);
+        assert_eq!(ae2.functional_effect.unwrap().seed_count, 1);
+        assert!(ae2.annotations.iter().any(|annotation| matches!(
+            annotation,
+            EvidenceAnnotation::KnownConfound(message)
+                if message.contains("same-intervention provenance")
+                    && message.contains("diagnostic-only")
+        )));
+        assert!(ae2.annotations.contains(&EvidenceAnnotation::ExternalBehavior));
+    }
+
+    #[test]
+    fn empty_seed_identity_is_diagnostic_only_and_cannot_support_a_tier() {
+        let report = ButlinIndicatorReport::from_indicators(vec![stub_indicator(
+            "AE-2",
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        )]);
+        let bundle = ButlinEvidenceBundle {
+            schema_version: REPORT_SCHEMA_VERSION,
+            commit_sha: "fixture".into(),
+            config_hash: "fixture".into(),
+            seeds: vec![],
+            generated_at: "fixture".into(),
+            ablations: vec![stub_ablation_result("AE-2", true, true, false)],
+        };
+
+        let merged = annotate_with_ablation_results(report, &bundle).unwrap();
+        let ae2 = &merged.indicators[0];
+        assert_eq!(ae2.causal_effect.unwrap().seed_count, 0);
+        assert_eq!(ae2.functional_effect.unwrap().seed_count, 0);
+        assert_eq!(ae2.outcome, EvidenceOutcome::Inconclusive);
+        assert_eq!(merged.causally_supported_count, 0);
+        assert_eq!(merged.functionally_supported_count, 0);
+        assert!(ae2.annotations.iter().any(|annotation| matches!(
+            annotation,
+            EvidenceAnnotation::KnownConfound(message)
+                if message.contains("no seed identities")
+                    && message.contains("cannot")
+        )));
+    }
+
+    #[test]
+    fn duplicate_seed_identity_is_rejected_before_evidence_merge() {
+        let report = ButlinIndicatorReport::from_indicators(vec![stub_indicator(
+            "AE-2",
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        )]);
+        let bundle = ButlinEvidenceBundle {
+            schema_version: REPORT_SCHEMA_VERSION,
+            commit_sha: "fixture".into(),
+            config_hash: "fixture".into(),
+            seeds: vec![7, 7],
+            generated_at: "fixture".into(),
+            ablations: vec![stub_ablation_result("AE-2", true, true, false)],
+        };
+
+        assert_eq!(
+            annotate_with_ablation_results(report, &bundle).unwrap_err(),
+            EvidenceMergeError::DuplicateSeedIdentity(7)
+        );
+    }
+
 }
