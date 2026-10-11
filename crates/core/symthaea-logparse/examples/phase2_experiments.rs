@@ -59,8 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load OTRF (walk the staged dirs, parse every .json file)
     // ----------------------------------------------------------------
     println!("\n[load] OTRF corpus from {otrf_dir}");
-    let (otrf_events, _otrf_groups) =
-        load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
+    let otrf_events = load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
     let otrf_labels: Vec<String> = otrf_events
         .iter()
         .map(|e| e.label.clone().unwrap())
@@ -317,7 +316,7 @@ fn load_otrf_corpus(
     corpus_dir: &PathBuf,
     keep_labels: &[&str],
     max_per_dir: usize,
-) -> Result<(Vec<LogEvent>, Vec<String>), Box<dyn std::error::Error>> {
+) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
     let labels_path = corpus_dir.join("labels.csv");
     let labels_csv = std::fs::read_to_string(&labels_path)?;
     let mut dir_labels: HashMap<String, String> = HashMap::new();
@@ -332,7 +331,7 @@ fn load_otrf_corpus(
         .collect::<Result<_, _>>()?;
     paths.sort();
 
-    let mut rows: Vec<(LogEvent, String)> = Vec::new();
+    let mut out: Vec<LogEvent> = Vec::new();
     for path in paths {
         if !path.is_dir() {
             continue;
@@ -355,14 +354,12 @@ fn load_otrf_corpus(
                 .take(max_per_dir)
                 .collect()
         };
-        let group_id = format!("otrf:{dname}");
         for mut ev in capped {
             ev.label = Some(label.clone());
-            rows.push((ev, group_id.clone()));
+            out.push(ev);
         }
     }
-    let (events, groups): (Vec<LogEvent>, Vec<String>) = rows.into_iter().unzip();
-    Ok((events, groups))
+    Ok(out)
 }
 
 /// Stratified k-fold cross-validation with source groups kept intact.
