@@ -409,8 +409,16 @@ mod tests {
             );
         }
         assert!(train_values.is_disjoint(&test_values));
-        assert!(["a", "b"].iter().all(|l| ty.iter().any(|y| y == l)));
-        assert!(["a", "b"].iter().all(|l| vy.iter().any(|y| y == l)));
+        assert!(
+            ["a", "b"]
+                .iter()
+                .all(|label| ty.iter().any(|actual| actual.as_str() == *label))
+        );
+        assert!(
+            ["a", "b"]
+                .iter()
+                .all(|label| vy.iter().any(|actual| actual.as_str() == *label))
+        );
     }
 
     #[test]
