@@ -1,12 +1,14 @@
 {
   "current_reference_checker": {
-    "expected_check_count": 68,
-    "git_blob_sha": "422a77f90dbf21a6b8dba6175193116c2a89cb15",
+    "expected_check_count": 70,
+    "git_blob_sha": "285f9d1c0423c7fcb88eec541626c05c064abd7a",
     "path": "scripts/engineering/orbital_ring_reference_check.py",
-    "sha256": "934ae71d6b1db63dba1ee276c9144593efd0945b20e3f6d929340a0c93215332",
+    "sha256": "2dab9ac78d49ae2502df48387632ad2b3da821179237c80abae3707aa4f9e69b",
     "unexecuted_check_ids": [
       "circular_stream.zero_density_large_finite_speed_is_zero",
-      "circular_stream.nonfinite_result_rejected"
+      "circular_stream.nonfinite_result_rejected",
+      "circular_stream.input_guard.nonnumeric_density_rejected",
+      "circular_stream.input_guard.boolean_density_rejected"
     ]
   },
   "current_validator": {
@@ -15,7 +17,7 @@
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
     "sha256": "44b3e8500221879be9efeb0faedc95d5873df4c3a063c080bc19338afbaaeb25"
   },
-  "execution_note": "Validator suite (88 expected checks) and reference-checker suite (68 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow verifies exact Git blob and SHA-256 identities, repeats outputs byte-for-byte, and compares the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors, malformed populated fields/provenance, declared-state mismatch and non-finite stream-force results must fail closed; all reference checks remain T0 arithmetic/contract evidence, not a physical feasibility result.",
+  "execution_note": "Validator suite (88 expected checks) and reference-checker suite (70 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow verifies exact Git blob and SHA-256 identities, repeats outputs byte-for-byte, and compares the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors, malformed populated fields/provenance, declared-state mismatch, nonnumeric inputs, and non-finite stream-force results must fail closed; all reference checks remain T0 arithmetic/contract evidence, not a physical feasibility result.",
   "last_executed_reference_check": {
     "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
     "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
