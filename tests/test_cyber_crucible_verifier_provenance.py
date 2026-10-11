@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from jsonschema import Draft202012Validator, ValidationError
+from scripts.package_cyber_crucible_verifier import build_bundle
 
 from scripts.verify_cyber_crucible_verifier_provenance import (
     GITHUB_OIDC_ISSUER,
@@ -36,14 +37,15 @@ class VerifierProvenanceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="cyber provenance ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.artifact = self.root / "verifier artifact.bin"
-        self.artifact.write_bytes(b"unit-test verifier artifact\0v1")
+        self.artifact = self.root / "cyber-crucible-verifier-v1.tar.gz"
+        self.repository = "Luminous-Dynamics/symthaea"
+        self.source_ref = "refs/tags/cyber-crucible-verifier-v1.0.0"
+        self.source_commit = "a" * 40
+        repository_root = Path(__file__).resolve().parents[1]
+        build_bundle(repository_root, self.artifact, self.source_commit)
         self.gh = self.root / "operator-pinned-gh"
         self.gh.write_bytes(b"fixture-only fake gh CLI")
         self.gh.chmod(0o700)
-        self.repository = "Luminous-Dynamics/symthaea"
-        self.source_ref = "refs/tags/verifier-v1.0.0"
-        self.source_commit = "a" * 40
         self.workflow_path = ".github/workflows/cyber-crucible-verifier-release.yml"
         self.policy = {
             "schema_version": POLICY_VERSION,
@@ -58,7 +60,7 @@ class VerifierProvenanceTests(unittest.TestCase):
             "oidc_issuer": GITHUB_OIDC_ISSUER,
             "builder_id": "https://github.com/actions/runner",
             "build_type": "https://actions.github.io/buildtypes/workflow/v1",
-            "artifact_name": "dist/symthaea-verifier",
+            "artifact_name": "dist/cyber-crucible-verifier-v1.tar.gz",
             "artifact_sha256": sha256_file(self.artifact),
             "gh_cli_path": str(self.gh),
             "gh_cli_sha256": sha256_file(self.gh),
