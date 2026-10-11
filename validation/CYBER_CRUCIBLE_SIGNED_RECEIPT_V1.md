@@ -28,7 +28,7 @@ The signed bytes are:
 
 where JCS is the JSON Canonicalization Scheme specified by [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html). The detached signature is not included in the signed payload. The algorithm is fixed to Ed25519; the receipt cannot negotiate a weaker algorithm. Duplicate JSON member names are rejected before objects are used.
 
-The required signed bindings include the receipt ID, key and evaluator IDs, evaluator role, campaign ID, a 32-byte random one-time run nonce, strict UTC-second issuance/expiry timestamps, exact scenario ID/revision/digest, and evidence digest. Authorization-decision receipts additionally require the exact proposed action ID and immutable proposal digest. The expected context is supplied independently by the caller; it must never be reconstructed from the untrusted receipt being verified.
+The required signed bindings include the receipt ID, key and evaluator IDs, evaluator role, campaign ID, exact subject ID and attempt ID, a 32-byte random one-time run nonce, strict UTC-second issuance/expiry timestamps, exact scenario ID/revision/digest, and evidence digest. The verifier requires the caller to supply the expected subject and attempt independently, preventing a receipt from being relabeled to a different candidate or run. Authorization-decision receipts additionally require the exact proposed action ID and immutable proposal digest. The expected context is supplied independently by the caller; it must never be reconstructed from the untrusted receipt being verified.
 
 ## Trust policy
 
