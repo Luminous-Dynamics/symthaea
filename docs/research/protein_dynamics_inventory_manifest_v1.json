@@ -299,10 +299,11 @@
     "download_verifies_publisher_checksum_and_size": true,
     "keeps_raw_metadata_snapshot_and_local_sha256": true,
     "archive_extraction_automatic": false,
-    "offline_mocked_test_cases": 15,
+    "offline_mocked_test_cases": 17,
     "offline_mocked_tests_passed": true,
     "live_zenodo_query_performed": false,
     "publisher_archive_checksum_observed": false,
-    "archive_downloaded": false
+    "archive_downloaded": false,
+    "redirect_host_enforcement": true
   }
 }
