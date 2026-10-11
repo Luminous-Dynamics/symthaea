@@ -26,10 +26,11 @@
 //! - `⊕` is HDC bundling (normalized sum)
 //! - `τ(||x||)` is state-dependent time constant
 //!
-//! ## Closed-Form Solution
+//! ## Closed-Form Update
 //!
-//! Like CfC networks, we derive a solver-free closed-form update with O(D) work
-//! per jump, independent of the elapsed time horizon Δt at fixed dimension:
+//! Like CfC networks, this uses a solver-free closed-form update with O(D) work
+//! per jump, independent of the elapsed time horizon Δt at fixed dimension. For
+//! nonlinear, state-dependent equilibrium, this update is an approximation:
 //! ```text
 //! x(t+Δt) = x_∞ + (x(t) - x_∞) * exp(-Δt/τ)
 //! ```
@@ -1081,8 +1082,8 @@ impl HdcLtcUnifiedNeuron {
     /// 2. Apply closed-form exponential decay for each sub-step
     /// 3. Recompute equilibrium after each sub-step
     ///
-    /// This achieves O(dt/tau) complexity instead of O(1) but provides accuracy
-    /// comparable to RK4 integration.
+    /// This achieves O(D × dt/tau) work instead of O(D) for one jump, but provides
+    /// improved accuracy by recomputing the equilibrium at every substep.
     ///
     /// ## Parameters
     ///
