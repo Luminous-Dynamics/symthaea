@@ -1,9 +1,9 @@
 {
   "current_reference_checker": {
-    "expected_check_count": 56,
-    "git_blob_sha": "1162b0762422cf0f230b9ae556b4c780464d264f",
+    "expected_check_count": 66,
+    "git_blob_sha": "a7c39906e9f5cf34711630e1813e4b4f67527eef",
     "path": "scripts/engineering/orbital_ring_reference_check.py",
-    "sha256": "f59cb6e5625aba24a9ef69c5bdebef360aaef5e058fda2de0f589c1ecb9d80a8"
+    "sha256": "c4eabd9a2e02f246d7d337926b9a8f0e422f1eced879d1ed57c2c26b1ffc98c2"
   },
   "current_validator": {
     "expected_self_test_check_count": 84,
@@ -11,7 +11,7 @@
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
     "sha256": "ec7e01912c730df7bd0d9afb3eedced99be30de264cabc5d690278e2c72fbd81"
   },
-  "execution_note": "Validator suite (84 expected checks) and reference-checker suite (56 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify the exact current hashes, repeat outputs byte-for-byte, and compare the blocked template report. The last executed counts apply only to the exact historical source blobs listed here.",
+  "execution_note": "Validator suite (84 expected checks) and reference-checker suite (66 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify the exact current hashes, repeat outputs byte-for-byte, and compare the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here.",
   "last_executed_reference_check": {
     "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
     "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
