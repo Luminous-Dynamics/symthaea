@@ -59,6 +59,15 @@
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
 
+/// Stable interpolation coefficient alpha = 1 - exp(-dt / tau).
+///
+/// `exp_m1` preserves small positive updates that may be rounded away by
+/// direct subtraction when dt is tiny compared with tau.
+#[inline]
+fn cfc_interpolation_alpha(dt: f32, tau: f32) -> f32 {
+    -(-dt / tau).exp_m1()
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -716,9 +725,10 @@ impl HdcLtcUnifiedNeuron {
         // Sigmoid gating with steepness control
         let sigma_base = 1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
 
-        // Time-scaled gating: larger dt → more interpolation toward equilibrium
-        let decay = (-dt / tau).exp();
-        let sigma = 1.0 - decay * (1.0 - sigma_base);
+        // Time-scaled gating: larger dt → more interpolation toward equilibrium.
+        // Use exp_m1 to avoid cancellation when dt is tiny relative to tau.
+        let interpolation = cfc_interpolation_alpha(dt, tau);
+        let sigma = sigma_base + (1.0 - sigma_base) * interpolation;
 
         sigma.clamp(0.0, 1.0)
     }
@@ -1045,10 +1055,10 @@ impl HdcLtcUnifiedNeuron {
         // Compute effective tau
         let tau = self.compute_tau(input);
 
-        // Pure exponential decay: σ = 1 - exp(-dt/τ)
-        // Clamp exponent to prevent f32 underflow (ln(f32::MIN_POSITIVE) ≈ -87.3)
-        let decay = (-dt / tau).max(-87.0).exp();
-        let sigma = 1.0 - decay;
+        // Pure exponential interpolation: σ = 1 - exp(-dt/τ).
+        // Clamp exponent to prevent f32 underflow, and use exp_m1 for small dt.
+        let exponent = (-dt / tau).max(-87.0);
+        let sigma = -exponent.exp_m1();
 
         // Analytical solution (exact only if x_∞ were constant)
         let weighted_equilibrium = x_inf.scale(sigma);
@@ -1502,8 +1512,7 @@ impl HdcLtcUnifiedNeuron {
 
         // Tau and sigma
         let tau = self.compute_tau(input);
-        let decay = (-dt / tau).exp();
-        let sigma = 1.0 - decay;
+        let sigma = cfc_interpolation_alpha(dt, tau);
 
         // New state: x' = σ × x_∞ + (1-σ) × x
         let new_state = x_inf.scale(sigma).add(&self.state.scale(1.0 - sigma));
@@ -2451,6 +2460,31 @@ mod tests {
 
         // Equilibrium should be bounded (due to tanh activation)
         assert!(equilibrium.values.iter().all(|&x| x >= -1.0 && x <= 1.0));
+    }
+
+    #[test]
+    fn test_cfc_interpolation_alpha_preserves_tiny_updates() {
+        let dt = 1.0e-8_f32;
+        let tau = 0.1_f32;
+        let alpha = cfc_interpolation_alpha(dt, tau);
+        let first_order = dt / tau;
+        assert!(alpha > 0.0, "small positive dt must produce a positive update");
+        assert!(
+            (alpha - first_order).abs() / first_order < 1.0e-5,
+            "alpha={alpha}, first_order={first_order}"
+        );
+
+        for (dt, tau) in [
+            (1.0e-4_f32, 0.1_f32),
+            (0.01_f32, 0.5_f32),
+            (1.0_f32, 10.0_f32),
+            (1.0e6_f32, 0.001_f32),
+        ] {
+            let alpha = cfc_interpolation_alpha(dt, tau);
+            let direct = 1.0 - (-dt / tau).exp();
+            assert!(alpha.is_finite() && (0.0..=1.0).contains(&alpha));
+            assert!((alpha - direct).abs() < 2.0e-6);
+        }
     }
 
     #[test]
