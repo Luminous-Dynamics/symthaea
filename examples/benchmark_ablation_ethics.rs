@@ -483,9 +483,11 @@ fn predict_ethics(
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║              ETHICS Ablation Study                           ║");
-    println!("║   Measuring contribution of each component                   ║");
+    println!("║      LEGACY ETHICS ABLATION (NOT QUALIFIED)                   ║");
+    println!("║   In-sample experiment, not external accuracy evidence       ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
+    println!("WARNING: same ethics.json supplies per-category training and evaluation.");
+    println!("These results are in-sample and must not be interpreted as held-out ETHICS accuracy.\n");
 
     let ethics_path = format!("{}/ethics.json", DATASETS_PATH);
     if !Path::new(&ethics_path).exists() {
@@ -599,7 +601,7 @@ fn main() {
         let total_correct: usize = cat_results.values().map(|(c, _)| c).sum();
         let total_total: usize = cat_results.values().map(|(_, t)| t).sum();
         println!(
-            "  ETHICS avg: {}/{} ({:.1}%)  [{:.1}s]\n",
+            "  Legacy in-sample label agreement: {}/{} ({:.1}%)  [{:.1}s]\n",
             total_correct,
             total_total,
             total_correct as f64 / total_total as f64 * 100.0,
