@@ -79,8 +79,9 @@ const MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS: usize = 5_000_000;
 const MAX_AUTONOMOUS_STATE_DIMENSION: usize = 4096;
 const MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY: f64 = 10_000_000.0;
 const MAX_AUTONOMOUS_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
-/// Match the informative-conservation gate: at least half of samples must have
-/// a gradient at least 1% of that trajectory's maximum gradient magnitude.
+/// Match the shared informative-conservation gate: at least half of samples
+/// must have squared gradient magnitude >= 1% of the trajectory maximum squared
+/// gradient (equivalent to 10% of peak gradient amplitude).
 const MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION: f64 = 0.5;
 
 fn failed_holdout(
