@@ -67,8 +67,10 @@ use tokio::time::interval;
 use super::{
     ActiveInferenceBridge, ActiveInferenceBridgeConfig, CalibrationQuality, ConstraintGate,
     ConstraintGateConfig, DryRunReason, ExecutionMode, MagiPersistentModel, OutcomeCategory,
-    PersistenceConfig, PredictionDomain, SupervisionReason, WorldPrediction,
+    PersistenceConfig, PredictionDomain, ResolutionAuthority, ResourceExpectation,
+    SupervisionReason, WorldPrediction,
 };
+use std::path::Path;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RUNTIME STATE
@@ -342,6 +344,65 @@ pub enum AutoResolveType {
     ServiceRunning(String),
     /// Timeout (assume failure)
     Timeout(Duration),
+}
+
+/// Validate that the configured runtime observer is the resolver committed in the prediction.
+///
+/// This is a contract-consistency check, not a cryptographic receipt verifier. Command-backed
+/// observers are accepted only when the exact program/argv is pinned in the prediction's action
+/// metadata and the declared exit-code policy is exactly zero-success. Resource observations
+/// support only Exists/NotExists and require an exact path match. Unsupported authority kinds
+/// fail closed and remain unresolved.
+fn auto_resolve_contract_error(
+    prediction: &WorldPrediction,
+    auto: &AutoResolveType,
+) -> Option<String> {
+    const PROGRAM: &str = "magi.resolver.program";
+    const ARG0: &str = "magi.resolver.arg0";
+    const ARG1: &str = "magi.resolver.arg1";
+
+    let metadata = &prediction.action_context.metadata;
+    let command_is_pinned = |program: &str, arg0: &str, arg1: &str| {
+        metadata.get(PROGRAM).map(String::as_str) == Some(program)
+            && metadata.get(ARG0).map(String::as_str) == Some(arg0)
+            && metadata.get(ARG1).map(String::as_str) == Some(arg1)
+    };
+
+    let matches = match (auto, &prediction.resolution_contract.resolver) {
+        (
+            AutoResolveType::FileExists(path),
+            ResolutionAuthority::ResourceState {
+                path: expected_path,
+                expected_state: ResourceExpectation::Exists | ResourceExpectation::NotExists,
+            },
+        ) => expected_path.as_path() == Path::new(path),
+        (
+            AutoResolveType::CommandSucceeds(command),
+            ResolutionAuthority::ExitCode { success_codes },
+        ) => {
+            success_codes.as_slice() == [0] && command_is_pinned("sh", "-c", command)
+        }
+        (
+            AutoResolveType::ServiceRunning(service),
+            ResolutionAuthority::ExitCode { success_codes },
+        ) => {
+            success_codes.as_slice() == [0]
+                && command_is_pinned("systemctl", "is-active", service)
+        }
+        // A timer does not observe a process/resource result. Its expiry is handled separately
+        // as the declared task-level deadline and does not enter this observer path.
+        (AutoResolveType::Timeout(_), _) => true,
+        _ => false,
+    };
+
+    if matches {
+        None
+    } else {
+        Some(format!(
+            "runtime auto-resolver does not match the prediction's declared ResolutionAuthority ({:?})",
+            prediction.resolution_contract.resolver
+        ))
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -713,13 +774,13 @@ impl MagiLoopRuntime {
             },
         }
 
-        let snapshot: Vec<(String, Option<Instant>, Option<AutoResolveType>)> = {
+        let snapshot: Vec<(WorldPrediction, Option<Instant>, Option<AutoResolveType>)> = {
             let pending = self.pending.lock();
             pending
                 .iter()
                 .map(|pred| {
                     (
-                        pred.prediction.id.clone(),
+                        pred.prediction.clone(),
                         pred.deadline,
                         pred.auto_resolve.clone(),
                     )
@@ -728,7 +789,8 @@ impl MagiLoopRuntime {
         };
 
         let mut actions = Vec::new();
-        for (prediction_id, deadline, auto) in snapshot {
+        for (prediction, deadline, auto) in snapshot {
+            let prediction_id = prediction.id.clone();
             // Explicit prediction deadlines keep their documented contract: once the stated
             // observation window expires, Timeout is resolved as a task-level failure. This is
             // distinct from a resolver process timing out while trying to observe the task.
@@ -743,7 +805,15 @@ impl MagiLoopRuntime {
             let Some(auto) = auto else {
                 continue;
             };
-            match self.check_auto_resolve(&auto).await {
+            if let Some(reason) = auto_resolve_contract_error(&prediction, &auto) {
+                actions.push(ResolutionAction::Unresolved {
+                    prediction_id,
+                    disposition: "authority mismatch",
+                    reason,
+                });
+                continue;
+            }
+            match self.check_auto_resolve(&prediction, &auto).await {
                 AutoResolveAttempt::Observed(success) => {
                     actions.push(ResolutionAction::Observed {
                         prediction_id,
@@ -851,11 +921,31 @@ impl MagiLoopRuntime {
         Ok(())
     }
 
-    /// Check if an auto-resolve condition is met.
-    async fn check_auto_resolve(&self, auto: &AutoResolveType) -> AutoResolveAttempt {
+    /// Check an auto-resolve condition only after the contract binding has passed.
+    async fn check_auto_resolve(
+        &self,
+        prediction: &WorldPrediction,
+        auto: &AutoResolveType,
+    ) -> AutoResolveAttempt {
         match auto {
             AutoResolveType::FileExists(path) => {
-                AutoResolveAttempt::Observed(std::path::Path::new(path).exists())
+                let exists = Path::new(path).exists();
+                let expected = match &prediction.resolution_contract.resolver {
+                    ResolutionAuthority::ResourceState {
+                        expected_state: ResourceExpectation::Exists,
+                        ..
+                    } => true,
+                    ResolutionAuthority::ResourceState {
+                        expected_state: ResourceExpectation::NotExists,
+                        ..
+                    } => false,
+                    _ => {
+                        return AutoResolveAttempt::Unclear(
+                            "resource observer reached execution without a matching resource-state authority".to_string(),
+                        );
+                    }
+                };
+                AutoResolveAttempt::Observed(exists == expected)
             }
             AutoResolveType::CommandSucceeds(cmd) => {
                 let mut command = tokio::process::Command::new("sh");
@@ -938,6 +1028,74 @@ mod tests {
         assert_eq!(result, AutoResolveAttempt::Observed(false));
     }
 
+    #[test]
+    fn runtime_resolver_rejects_authority_mismatch() {
+        let action = super::super::WorldActionContext::new("test_execution", "run tests");
+        let prediction = WorldPrediction::new(
+            "Tests pass",
+            OutcomeCategory::Success,
+            0.8,
+            action,
+            super::super::ResolutionContract::code_execution("tests/**/*.rs"),
+        );
+
+        let mismatch = auto_resolve_contract_error(
+            &prediction,
+            &AutoResolveType::CommandSucceeds("exit 0".to_string()),
+        );
+        assert!(mismatch.is_some());
+    }
+
+    #[test]
+    fn runtime_command_requires_exact_pinned_argv_and_exit_policy() {
+        let mut action =
+            super::super::WorldActionContext::new("shell_command", "run pinned command");
+        action.metadata.insert("magi.resolver.program".into(), "sh".into());
+        action.metadata.insert("magi.resolver.arg0".into(), "-c".into());
+        action.metadata.insert("magi.resolver.arg1".into(), "exit 0".into());
+        let prediction = WorldPrediction::new(
+            "Command succeeds",
+            OutcomeCategory::Success,
+            0.8,
+            action,
+            super::super::ResolutionContract::shell_command(),
+        );
+
+        assert!(auto_resolve_contract_error(
+            &prediction,
+            &AutoResolveType::CommandSucceeds("exit 0".to_string()),
+        )
+        .is_none());
+        assert!(auto_resolve_contract_error(
+            &prediction,
+            &AutoResolveType::CommandSucceeds("exit 1".to_string()),
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn runtime_resource_observer_requires_exact_supported_state() {
+        let action = super::super::WorldActionContext::new("file_operation", "check artifact");
+        let prediction = WorldPrediction::new(
+            "Artifact exists",
+            OutcomeCategory::Success,
+            0.8,
+            action,
+            super::super::ResolutionContract::file_operation("target/artifact"),
+        );
+
+        assert!(auto_resolve_contract_error(
+            &prediction,
+            &AutoResolveType::FileExists("target/artifact".to_string()),
+        )
+        .is_none());
+        assert!(auto_resolve_contract_error(
+            &prediction,
+            &AutoResolveType::FileExists("target/other".to_string()),
+        )
+        .is_some());
+    }
+
     #[tokio::test]
     async fn live_runtime_observation_does_not_train_world_calibration() {
         use crate::consciousness::recursive_improvement::{RiskTier, WorldActionContext};
@@ -954,12 +1112,19 @@ mod tests {
         let (prediction, calibration_before) = {
             let mut persistent = runtime.model.lock();
             let calibration_before = persistent.model().calibration().total_predictions();
+            let mut action = WorldActionContext::new(
+                "shell_command",
+                "run a local command",
+            )
+            .with_risk_tier(RiskTier::Observation);
+            action.metadata.insert("magi.resolver.program".into(), "sh".into());
+            action.metadata.insert("magi.resolver.arg0".into(), "-c".into());
+            action.metadata.insert("magi.resolver.arg1".into(), "exit 0".into());
             let prediction = persistent.model_mut().predict(
                 "Command succeeds",
                 OutcomeCategory::Success,
                 0.8,
-                WorldActionContext::new("command", "run a local command")
-                    .with_risk_tier(RiskTier::Observation),
+                action,
             );
             (prediction, calibration_before)
         };
