@@ -16,6 +16,10 @@ Every passage is synthetic and included directly in the JSON. The fixture contai
 
 The corpus tests the discipline of a symbolic interpretation pipeline, not the truth of Jung's theories. Successful fixture handling does not establish an archetype detector, validated complex/individuation measure, clinical effectiveness, a collective unconscious, consciousness, or subjective experience.
 
+## Research update
+
+Rößler's 2026 review, [A Late Confirmation? Review of C. G. Jung's Understanding of Dreams in the Light of Modern Dream Research](https://pmc.ncbi.nlm.nih.gov/articles/PMC13381552/), argues that parts of Jung's dream framework can be discussed alongside contemporary hypotheses such as the continuity hypothesis of dreaming and the default mode network. It is a scholarly synthesis, not proof that symbols have universal meanings or that a computer can infer a dreamer's hidden state. The implementation consequence here is deliberately narrow: allow context, dialogue, competing readings, and uncertainty to shape a reading rather than imposing a fixed symbol dictionary. The probe does not score therapy or dream-analysis outcomes.
+
 ## Required response discipline
 
 Each result is keyed by the exact case ID and preserves observations separately from interpretation hypotheses. Every evidence reference must resolve to an exact span in the case text or an explicitly named source snippet. Candidate interpretations should name the scope and list both supporting and contradicting evidence IDs; absent evidence must not be manufactured.
