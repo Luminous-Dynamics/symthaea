@@ -1,0 +1,695 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:protein-dynamics-run-record:1.0.0",
+  "title": "Protein Dynamics Benchmark Run Record",
+  "description": "Fail-closed execution/provenance record. It records experimental, simulation, and prediction tracks separately and prevents same-observable reweighting scores from being labeled independent validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_status",
+    "created_at",
+    "preregistration",
+    "software",
+    "environment",
+    "source_inputs",
+    "targets",
+    "resource_accounting",
+    "output_artifacts",
+    "attestations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^protein-dynamics-[a-z0-9][a-z0-9-]{0,80}$"
+    },
+    "run_status": {
+      "enum": [
+        "preflight_passed",
+        "running",
+        "complete",
+        "incomplete",
+        "failed"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "preregistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_sha256",
+        "target_manifest_sha256",
+        "metric_spec_sha256",
+        "stopping_rule_sha256",
+        "frozen_at",
+        "target_set_frozen",
+        "metrics_frozen"
+      ],
+      "properties": {
+        "protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metric_spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "stopping_rule_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "frozen_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "target_set_frozen": {
+          "const": true
+        },
+        "metrics_frozen": {
+          "const": true
+        }
+      }
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symthaea_commit",
+        "symthaea_worktree_clean",
+        "adapter_commit",
+        "peptonebench_revision",
+        "evaluator_revision"
+      ],
+      "properties": {
+        "symthaea_commit": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "symthaea_worktree_clean": {
+          "type": "boolean"
+        },
+        "adapter_commit": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "peptonebench_revision": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "evaluator_revision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Immutable evaluator version or commit; must not be a mutable branch name."
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_image_or_platform",
+        "architecture",
+        "python_version",
+        "dependency_inventory_sha256",
+        "forward_model_images",
+        "resource_policy"
+      ],
+      "properties": {
+        "os_image_or_platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rust_toolchain": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dependency_inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "forward_model_images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "immutable_digest"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "immutable_digest": {
+                "type": "string",
+                "pattern": "^(sha256:)?[a-f0-9]{64}$"
+              }
+            }
+          }
+        },
+        "resource_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu_limit",
+            "memory_limit_bytes",
+            "gpu_policy",
+            "wall_time_limit_seconds"
+          ],
+          "properties": {
+            "cpu_limit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "memory_limit_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "gpu_policy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "wall_time_limit_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "source_inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input_id",
+          "source_uri",
+          "source_revision",
+          "sha256",
+          "evidence_class",
+          "license_status"
+        ],
+        "properties": {
+          "input_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "source_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "evidence_class": {
+            "enum": [
+              "experimental",
+              "simulation_generated",
+              "prediction",
+              "benchmark_code",
+              "environment"
+            ]
+          },
+          "license_status": {
+            "enum": [
+              "verified",
+              "restricted_with_approval",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "experiment_group_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "condition_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exposure_notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "resource_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_seconds",
+        "cpu_time_seconds",
+        "peak_rss_bytes",
+        "gpu_time_seconds",
+        "specialist_calls",
+        "candidate_conformers_generated"
+      ],
+      "properties": {
+        "wall_time_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cpu_time_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peak_rss_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gpu_time_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "specialist_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_conformers_generated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimated_cost_amount": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "estimated_cost_currency": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z]{3}$"
+        }
+      }
+    },
+    "output_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "uri_or_relative_path",
+          "sha256",
+          "kind"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uri_or_relative_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "kind": {
+            "enum": [
+              "stdout",
+              "stderr",
+              "metrics",
+              "weights",
+              "ensemble",
+              "plot",
+              "target_outcome_table",
+              "environment_report",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "attestations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "all_expected_targets_accounted",
+        "failures_retained",
+        "all_claimed_output_hashes_verified",
+        "held_out_observables_sealed_until_scoring"
+      ],
+      "properties": {
+        "all_expected_targets_accounted": {
+          "type": "boolean"
+        },
+        "failures_retained": {
+          "type": "boolean"
+        },
+        "all_claimed_output_hashes_verified": {
+          "type": "boolean"
+        },
+        "held_out_observables_sealed_until_scoring": {
+          "type": "boolean"
+        },
+        "independent_reviewer_or_reproduction": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitCommit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "target_group_id",
+        "evidence_class",
+        "outcome",
+        "candidate_conformers",
+        "valid_conformers",
+        "invalid_conformers",
+        "metrics",
+        "diagnostics"
+      ],
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_group_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Groups homologous/related constructs, replicas, conditions and publication lineage as preregistered."
+        },
+        "evidence_class": {
+          "enum": [
+            "experimental",
+            "simulation_generated",
+            "prediction"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "PASS_WITH_VALID_METRICS",
+            "FAIL_EXECUTION",
+            "FAIL_INVALID_OR_MISSING_METRICS",
+            "EXCLUDED_PREDECLARED",
+            "NOT_RUN"
+          ]
+        },
+        "candidate_conformers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_conformers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid_conformers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exclusion_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preregistered_exclusion_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metric"
+          }
+        },
+        "diagnostics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "optimizer_retry_count",
+            "warnings",
+            "error_codes"
+          ],
+          "properties": {
+            "optimizer_retry_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "error_codes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "optimizer_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "PASS_WITH_VALID_METRICS"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "metrics": {
+                "minItems": 1
+              },
+              "valid_conformers": {
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "EXCLUDED_PREDECLARED"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "required": [
+              "exclusion_reason",
+              "preregistered_exclusion_rule"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "FAIL_EXECUTION",
+                  "FAIL_INVALID_OR_MISSING_METRICS",
+                  "EXCLUDED_PREDECLARED",
+                  "NOT_RUN"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "metrics": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_name",
+        "value",
+        "unit",
+        "observable_id",
+        "evaluation_role",
+        "observable_overlap"
+      ],
+      "properties": {
+        "metric_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observable_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evaluation_role": {
+          "enum": [
+            "pre_reweight_compatibility",
+            "post_reweight_same_observable",
+            "independent_held_out_observable",
+            "simulation_only"
+          ]
+        },
+        "observable_overlap": {
+          "enum": [
+            "unknown",
+            "used_for_generation",
+            "used_for_selection",
+            "used_for_reweighting",
+            "held_out_unseen",
+            "not_applicable"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evaluation_role": {
+                "const": "independent_held_out_observable"
+              }
+            },
+            "required": [
+              "evaluation_role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observable_overlap": {
+                "const": "held_out_unseen"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluation_role": {
+                "const": "post_reweight_same_observable"
+              }
+            },
+            "required": [
+              "evaluation_role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observable_overlap": {
+                "const": "used_for_reweighting"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "run_status": {
+            "const": "complete"
+          }
+        },
+        "required": [
+          "run_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attestations": {
+            "properties": {
+              "all_expected_targets_accounted": {
+                "const": true
+              },
+              "failures_retained": {
+                "const": true
+              },
+              "all_claimed_output_hashes_verified": {
+                "const": true
+              },
+              "held_out_observables_sealed_until_scoring": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
