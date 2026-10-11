@@ -1,0 +1,97 @@
+name: Math Structural Extraction Receipt Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/schemas/math-structural-extraction-receipt-v1.schema.json"
+      - ".github/scripts/validate-math-structural-extraction-receipt.py"
+      - ".github/workflows/math-structural-extraction-receipt.yml"
+      - "data/benchmarks/math_structural_extraction_subject_v1.json"
+      - "docs/research/MATH_STRUCTURAL_EXTRACTION_RECEIPT_V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-extraction-contract:
+    name: Validate extraction receipt contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR subject with lineage history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Semantic contract self-tests
+        run: >-
+          python3 .github/scripts/validate-math-structural-extraction-receipt.py
+          --subject data/benchmarks/math_structural_extraction_subject_v1.json
+          --self-test
+
+      - name: Verify frozen predecessor Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_at() {
+            local commit="$1"
+            local path="$2"
+            local expected="$3"
+            local actual
+            actual="$(git rev-parse "${commit}:${path}")"
+            printf '%s  %s:%s\n' "$actual" "$commit" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_at d52e08164ce44201dea3fa56b78dfb93dd35cfd3 \
+            crates/core/symthaea-core/examples/math_structural_hdc_q0.rs \
+            35ab3f0d51dc7298d80836f5efec2878a73bb75d
+
+          check_at 1f38f8d0a217df7fd01715602058234c85cfe58c \
+            crates/core/symthaea-core/examples/math_structural_retrieval_q0.rs \
+            1b1253b976a0a918d149b0acbb0a85e65f9f1f39
+
+          check_at 1f38f8d0a217df7fd01715602058234c85cfe58c \
+            data/benchmarks/math_structural_q0_v1.json \
+            491ffb02d0540974345534f266b9976a6597e548
+
+          # Holdout identity only. Do not compile, import, score, or rank it here.
+          check_at b7619f80440d12d57bef5e24c3377b158ec5714d \
+            crates/core/symthaea-core/examples/support/math_structural_q0_holdout_v1.rs \
+            ccd0715b1030b88b7ed1d82f52bfbb8ffd70eaac
+
+      - name: Verify preparation environment remains unchanged in this tranche
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_head_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:${path}")"
+            printf '%s  HEAD:%s\n' "$actual" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_head_blob crates/core/symthaea-core/src/hdc/binary_hv.rs \
+            22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056
+          check_head_blob crates/core/symthaea-core/src/hdc/fol_formula_ext.rs \
+            fd1a575a000b214ad56de449ded94458c2f3a3e3
+          check_head_blob crates/core/symthaea-core/src/hdc/logic_engine.rs \
+            701f77f53b6aedc27c7498e908611329e892daca
+          check_head_blob crates/core/symthaea-core/src/hdc/primitive_system/mod.rs \
+            b65be8cb245f7022752821cb69ad28da0961d931
+          check_head_blob crates/core/symthaea-core/Cargo.toml \
+            64c70df9ca1e1ba80e996ef8f2c8ac0d026d45ba
+          check_head_blob Cargo.lock \
+            1d5b6c3dffb474fabef0f8237c6741b4f252bc62
+
+      - name: Holdout firewall static guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/math-structural-extraction-receipt.yml
+          # The only holdout reference in this contract lane must remain identity-only.
+          ! grep -E 'cargo .*math_structural_q0_holdout|python.*math_structural_q0_holdout|run.*math_structural_q0_holdout' "$workflow"
+          echo 'PASS: holdout remains identity-only in extraction-contract lane'

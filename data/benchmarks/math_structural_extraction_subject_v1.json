@@ -1,0 +1,72 @@
+{
+  "version": "math-structural-extraction-subject-v1",
+  "authority": "MeasurementOnly",
+  "preparation_base_commit": "a884f7770f7df98a9a955881cf03e813d709d7de",
+  "source_lineage": {
+    "hdc": {
+      "commit": "d52e08164ce44201dea3fa56b78dfb93dd35cfd3",
+      "path": "crates/core/symthaea-core/examples/math_structural_hdc_q0.rs",
+      "blob": "35ab3f0d51dc7298d80836f5efec2878a73bb75d",
+      "encoder_id": "symthaea-math-structural-hdc-v1"
+    },
+    "canonical_ast": {
+      "commit": "1f38f8d0a217df7fd01715602058234c85cfe58c",
+      "path": "crates/core/symthaea-core/examples/math_structural_retrieval_q0.rs",
+      "blob": "1b1253b976a0a918d149b0acbb0a85e65f9f1f39",
+      "encoder_id": "canonical-ast-sparse-v1"
+    },
+    "development_fixture": {
+      "commit": "1f38f8d0a217df7fd01715602058234c85cfe58c",
+      "path": "data/benchmarks/math_structural_q0_v1.json",
+      "blob": "491ffb02d0540974345534f266b9976a6597e548"
+    },
+    "holdout": {
+      "commit": "b7619f80440d12d57bef5e24c3377b158ec5714d",
+      "path": "crates/core/symthaea-core/examples/support/math_structural_q0_holdout_v1.rs",
+      "blob": "ccd0715b1030b88b7ed1d82f52bfbb8ffd70eaac",
+      "holdout_id": "math-structural-q0-holdout-v1"
+    }
+  },
+  "qualification_gate": {
+    "subject_commit": "694ef48e53296c2c6fe39a9c07927085b2f2754f",
+    "workflow_name": "Math Structural Q0 Qualification",
+    "workflow_run_id": 35459503395,
+    "required_conclusion": "success"
+  },
+  "stable_environment_at_preparation": [
+    {
+      "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+      "blob": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056"
+    },
+    {
+      "path": "crates/core/symthaea-core/src/hdc/fol_formula_ext.rs",
+      "blob": "fd1a575a000b214ad56de449ded94458c2f3a3e3"
+    },
+    {
+      "path": "crates/core/symthaea-core/src/hdc/logic_engine.rs",
+      "blob": "701f77f53b6aedc27c7498e908611329e892daca"
+    },
+    {
+      "path": "crates/core/symthaea-core/src/hdc/primitive_system/mod.rs",
+      "blob": "b65be8cb245f7022752821cb69ad28da0961d931"
+    },
+    {
+      "path": "crates/core/symthaea-core/Cargo.toml",
+      "blob": "64c70df9ca1e1ba80e996ef8f2c8ac0d026d45ba"
+    },
+    {
+      "path": "Cargo.lock",
+      "blob": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+    }
+  ],
+  "extraction_policy": {
+    "kind": "RelocationOnly",
+    "representation_rule_changes_allowed": false,
+    "encoder_ids_may_change": false,
+    "examples_must_delegate_to_library": true,
+    "independent_implementation_count_per_representation": 1,
+    "holdout_ranking_evaluation_allowed": false,
+    "holdout_score_emission_allowed": false,
+    "blind_holdout_compatibility_digest_allowed": true
+  }
+}
