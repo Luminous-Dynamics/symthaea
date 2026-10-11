@@ -984,6 +984,24 @@ mod tests {
     // ── Forward evolution ──────────────────────────────────────────────────
 
     #[test]
+    fn checked_evolution_supports_256k_dimension() {
+        const DIMENSION: usize = 262_144;
+        let config = NeuronConfig {
+            dim: DIMENSION,
+            ..NeuronConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 0x256_000);
+        let input = ContinuousHV::new_random(DIMENSION, 0x256_001);
+
+        assert_eq!(neuron.state().dim(), DIMENSION);
+        assert_eq!(neuron.try_evolve_closed_form_fused(1.0e-6, &input), Ok(()));
+        assert_eq!(neuron.state().dim(), DIMENSION);
+        assert_eq!(neuron.update_count(), 1);
+        assert!(neuron.state().values.iter().all(|value| value.is_finite()));
+        assert!(neuron.state().norm().is_finite());
+    }
+
+    #[test]
     fn checked_evolution_supports_64k_dimension() {
         const DIMENSION: usize = 65_536;
         let config = NeuronConfig {
