@@ -174,6 +174,7 @@ Starter references:
 - McGovern et al. (2025), [Eigenmodes of the deep unconscious](https://academic.oup.com/nc/article/2025/1/niaf039/8293123): offers a predictive-processing/neuroscience synthesis and testable hypotheses; it should be treated as a proposal, not consensus proof.
 - Goodwyn (2024), [Demystifying Jung's “Archetypes” with Embodied Cognition](https://guilfordjournals.com/doi/10.1521/pdps.2024.52.3.283): argues for an embodied-cognition reinterpretation.
 - Sullivan (2024), [Revisiting Jung's Theory of Archetypes](https://guilfordjournals.com/doi/10.1521/pdps.2024.52.3.253): critiques the arguments advanced for contemporary empirical relevance.
+- Rößler (2026), [A Late Confirmation? Review of C. G. Jung's Understanding of Dreams in the Light of Modern Dream Research](https://pmc.ncbi.nlm.nih.gov/articles/PMC13381552/): argues for connections between Jung's dream framework and contemporary hypotheses about dreaming. Treat this as a scholarly synthesis, not proof of universal symbol meanings or a validated computational inference method.
 
 Read and compare these rather than treating any single paper as the verdict.
 
