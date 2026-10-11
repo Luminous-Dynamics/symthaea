@@ -90,6 +90,16 @@ pub enum NeuronStepError {
     NonFiniteInput { index: usize },
     /// A non-finite state component would poison future temporal state.
     NonFiniteState { index: usize },
+    /// A deserialized or corrupted internal parameter vector has the wrong dimension.
+    ParameterDimensionMismatch {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    /// A non-finite internal parameter would poison future temporal state.
+    NonFiniteParameter { field: &'static str, index: usize },
+    /// A required numerical configuration value is invalid.
+    InvalidConfiguration { field: &'static str },
 }
 
 impl std::fmt::Display for NeuronStepError {
@@ -109,6 +119,18 @@ impl std::fmt::Display for NeuronStepError {
             }
             Self::NonFiniteState { index } => {
                 write!(f, "state component {index} is not finite")
+            }
+            Self::ParameterDimensionMismatch { field, expected, actual } => {
+                write!(
+                    f,
+                    "parameter {field} dimension mismatch: expected {expected}, got {actual}"
+                )
+            }
+            Self::NonFiniteParameter { field, index } => {
+                write!(f, "parameter {field} component {index} is not finite")
+            }
+            Self::InvalidConfiguration { field } => {
+                write!(f, "neuron configuration field {field} is invalid")
             }
         }
     }
@@ -213,6 +235,30 @@ impl HdcLtcUnifiedNeuron {
             return Err(NeuronStepError::InvalidDeltaTime);
         }
         let expected = self.config.dim;
+        if expected == 0 {
+            return Err(NeuronStepError::InvalidConfiguration { field: "dim" });
+        }
+        if !self.config.tau_base.is_finite() || self.config.tau_base <= 0.0 {
+            return Err(NeuronStepError::InvalidConfiguration { field: "tau_base" });
+        }
+        if !self.config.tau_min.is_finite()
+            || self.config.tau_min <= 0.0
+            || !self.config.tau_max.is_finite()
+            || self.config.tau_max < self.config.tau_min
+        {
+            return Err(NeuronStepError::InvalidConfiguration { field: "tau_min/tau_max" });
+        }
+        if !self.config.tau_coupling.is_finite() {
+            return Err(NeuronStepError::InvalidConfiguration { field: "tau_coupling" });
+        }
+        if !self.config.gating_steepness.is_finite() {
+            return Err(NeuronStepError::InvalidConfiguration { field: "gating_steepness" });
+        }
+        if let Activation::BoundedTanh { bound } = self.config.activation {
+            if !bound.is_finite() {
+                return Err(NeuronStepError::InvalidConfiguration { field: "activation.bound" });
+            }
+        }
         if input.dim() != expected {
             return Err(NeuronStepError::InputDimensionMismatch {
                 expected,
@@ -230,6 +276,24 @@ impl HdcLtcUnifiedNeuron {
         }
         if let Some(index) = self.state.values.iter().position(|value| !value.is_finite()) {
             return Err(NeuronStepError::NonFiniteState { index });
+        }
+        for (field, vector) in [
+            ("weight_hv", &self.weight_hv),
+            ("input_mask", &self.input_mask),
+            ("tau_modulator", &self.tau_modulator),
+            ("gate_weight", &self.gate_weight),
+            ("gate_bias", &self.gate_bias),
+        ] {
+            if vector.dim() != expected {
+                return Err(NeuronStepError::ParameterDimensionMismatch {
+                    field,
+                    expected,
+                    actual: vector.dim(),
+                });
+            }
+            if let Some(index) = vector.values.iter().position(|value| !value.is_finite()) {
+                return Err(NeuronStepError::NonFiniteParameter { field, index });
+            }
         }
         if dt == 0.0 {
             return Ok(());
@@ -578,6 +642,43 @@ mod tests {
         );
         assert_eq!(neuron.state(), &before);
         assert_eq!(neuron.update_count(), 0);
+    }
+
+    #[test]
+    fn checked_step_rejects_corrupt_state_and_deserialized_parameters() {
+        let input = ContinuousHV::new_random(256, 100);
+
+        let mut wrong_state = HdcLtcUnifiedNeuron::new(small_config(), 42);
+        wrong_state.set_state(ContinuousHV::new(255));
+        assert_eq!(
+            wrong_state.try_evolve_closed_form_fused(0.1, &input),
+            Err(NeuronStepError::StateDimensionMismatch {
+                expected: 256,
+                actual: 255,
+            })
+        );
+
+        let neuron = HdcLtcUnifiedNeuron::new(small_config(), 42);
+        let mut serialized = serde_json::to_value(&neuron).unwrap();
+        serialized["weight_hv"]["values"] = serde_json::json!(vec![0.0_f32; 255]);
+        let mut corrupt: HdcLtcUnifiedNeuron = serde_json::from_value(serialized).unwrap();
+        assert_eq!(
+            corrupt.try_evolve_closed_form_fused(0.1, &input),
+            Err(NeuronStepError::ParameterDimensionMismatch {
+                field: "weight_hv",
+                expected: 256,
+                actual: 255,
+            })
+        );
+
+        let mut nonfinite_state = HdcLtcUnifiedNeuron::new(small_config(), 43);
+        let mut values = nonfinite_state.state().values.clone();
+        values[9] = f32::INFINITY;
+        nonfinite_state.set_state(ContinuousHV::from_values(values));
+        assert_eq!(
+            nonfinite_state.try_evolve_closed_form_fused(0.1, &input),
+            Err(NeuronStepError::NonFiniteState { index: 9 })
+        );
     }
 
     #[test]
