@@ -24,6 +24,9 @@ jobs:
           set -euo pipefail
           reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
           mkdir -p "$reports"
+          git rev-parse HEAD > "$reports/commit_sha.txt"
+          git hash-object scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_git_blob_sha.txt"
+          sha256sum scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_sha256.txt"
 
       - name: Match committed verification status to current source
         shell: bash
@@ -54,9 +57,6 @@ jobs:
           set -euo pipefail
           reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
           mkdir -p "$reports"
-          git rev-parse HEAD > "$reports/commit_sha.txt"
-          git hash-object scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_git_blob_sha.txt"
-          sha256sum scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_sha256.txt"
           python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$reports/self-test-a.json"
           python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$reports/self-test-b.json"
           cmp "$reports/self-test-a.json" "$reports/self-test-b.json"
