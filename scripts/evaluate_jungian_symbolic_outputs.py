@@ -560,6 +560,65 @@ def self_test() -> list[str]:
             failures.append(f"{name}: wrong exception type {type(exc).__name__}: {exc}")
         else:
             failures.append(f"{name}: invalid JSON was accepted")
+
+    # Exercise the full normalized-bundle schema and exact-source binding
+    # using a neutral fixture; no interpretation is asserted.
+    try:
+        corpus_bytes = DEFAULT_CORPUS.read_bytes()
+        corpus = load_json_bytes(corpus_bytes)
+        require(isinstance(corpus, dict), "self-test corpus must be an object")
+        require(git_blob_sha1(corpus_bytes) == EXPECTED_CORPUS_GIT_BLOB_SHA1,
+                "self-test corpus differs from the reviewed Git blob")
+        source_revision = "0" * 40
+        neutral_bundle = {
+            "schema": OUTPUT_SCHEMA,
+            "corpus_id": corpus["corpus_id"],
+            "corpus_version": corpus["version"],
+            "corpus_sha256": hashlib.sha256(corpus_bytes).hexdigest(),
+            "source_revision": source_revision,
+            "implementation_id": "evaluator_self_test",
+            "config_sha256": "0" * 64,
+            "results": [
+                {
+                    "case_id": case["id"],
+                    "observations": [
+                        {
+                            "evidence_id": span["id"],
+                            "exact_span": span["text"],
+                            "source_scope": "InputText",
+                        }
+                        for span in case["evidence_spans"]
+                    ],
+                    "interpretations": [],
+                    "open_questions": [],
+                    "abstention": {
+                        "abstain": False,
+                        "reason": "Self-test fixture; no interpretation asserted.",
+                    },
+                }
+                for case in corpus["cases"]
+            ],
+        }
+        neutral_bytes = canonical_json(neutral_bundle)
+        validate_bundle(
+            neutral_bytes, corpus_bytes, corpus,
+            hashlib.sha256(corpus_bytes).hexdigest(), source_revision,
+        )
+    except Exception as exc:
+        failures.append(f"neutral normalized-bundle/source-binding positive control failed: {type(exc).__name__}: {exc}")
+    try:
+        wrong_revision_bundle = {**neutral_bundle, "source_revision": "1" * 40}
+        validate_bundle(
+            canonical_json(wrong_revision_bundle), corpus_bytes, corpus,
+            hashlib.sha256(corpus_bytes).hexdigest(), source_revision,
+        )
+    except AuditError as exc:
+        if "does not match expected exact source revision" not in str(exc):
+            failures.append(f"wrong-revision control: unexpected AuditError: {exc}")
+    except Exception as exc:
+        failures.append(f"wrong-revision control: wrong exception type {type(exc).__name__}: {exc}")
+    else:
+        failures.append("wrong-revision control: mismatched source revision was accepted")
     return failures
 
 
@@ -582,7 +641,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 21 evaluator controls (18 text-cue, 1 context contrast, 2 JSON integrity)")
+        print("PASS: 23 evaluator controls (18 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
     if not args.results:
         return 0
     if args.output_dir is None:
