@@ -33,7 +33,7 @@ B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
 
 PAYLOAD_FIELDS = {
     "schema_version", "algorithm", "receipt_id", "key_id", "evaluator_id",
-    "role", "campaign_id", "run_nonce", "issued_at", "expires_at",
+    "role", "campaign_id", "subject_id", "attempt_id", "run_nonce", "issued_at", "expires_at",
     "scenario_id", "scenario_revision", "scenario_digest", "evidence_digest",
     "status", "proposal_id", "proposal_digest",
 }
@@ -111,13 +111,15 @@ def _context(context: Any) -> dict[str, Any]:
     if not isinstance(context, dict):
         raise VerificationError("expected context must be an object")
     required = {
-        "campaign_id", "run_nonce", "scenario_id", "scenario_revision",
+        "campaign_id", "subject_id", "attempt_id", "run_nonce", "scenario_id", "scenario_revision",
         "scenario_digest", "evidence_digest", "role",
     }
     allowed = required | {"proposal_id", "proposal_digest"}
     if required - context.keys() or context.keys() - allowed:
         raise VerificationError("expected context has missing or unknown members")
     _text(context["campaign_id"], "expected campaign_id")
+    _text(context["subject_id"], "expected subject_id")
+    _text(context["attempt_id"], "expected attempt_id")
     _text(context["scenario_id"], "expected scenario_id")
     if not isinstance(context["scenario_revision"], int) or isinstance(context["scenario_revision"], bool) or not 1 <= context["scenario_revision"] <= (2**53 - 1):
         raise VerificationError("expected scenario_revision must be a safe positive integer")
@@ -185,7 +187,7 @@ def _validate_payload(payload: Any) -> dict[str, Any]:
         raise VerificationError("only Ed25519 signatures are accepted")
     if not isinstance(payload["receipt_id"], str) or not RECEIPT_ID.fullmatch(payload["receipt_id"]):
         raise VerificationError("receipt_id must be 32 lowercase hexadecimal characters")
-    for field in ("key_id", "evaluator_id", "campaign_id", "scenario_id"):
+    for field in ("key_id", "evaluator_id", "campaign_id", "subject_id", "attempt_id", "scenario_id"):
         _text(payload[field], f"payload.{field}")
     if not isinstance(payload["role"], str) or payload["role"] not in ROLES:
         raise VerificationError("payload.role is unsupported")
