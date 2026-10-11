@@ -111,6 +111,17 @@ fn validate_dft_grid(grid: &DftGrid) -> Result<(), ScfSolveError> {
                 });
             }
         }
+
+        // The generated Lebedev/radial/Becke grid uses non-negative weights.
+        // A negative finite weight is a malformed quadrature rule, not a
+        // harmless non-finite-value case.
+        if point.weight < 0.0 {
+            return Err(ScfSolveError::InvalidNumericInput {
+                stage: "DFT integration-grid weight",
+                index: point_index,
+                value: point.weight,
+            });
+        }
     }
     Ok(())
 }
@@ -806,6 +817,30 @@ mod tests {
     }
 
     #[test]
+    fn try_dft_keeps_solver_success_separate_from_scf_convergence() {
+        let molecule = Molecule::h2();
+        let basis = Sto3g::build(&molecule);
+        let config = DftConfig {
+            max_iterations: 0,
+            ..DftConfig::default()
+        };
+
+        let result = try_kohn_sham_dft(&molecule, &basis, &config)
+            .expect("the initial checked core solve should succeed independently");
+        assert!(!result.converged, "no SCF iterations were requested");
+        assert_eq!(result.n_iterations, 0);
+        assert!(result.total_energy.is_finite());
+        assert!(result.solver_error.is_none());
+        assert!(result.n_grid_points > 0);
+
+        let receipt = result
+            .solver_diagnostics
+            .expect("a successful initial solve must produce a numerical receipt");
+        assert_eq!(receipt.generalized_eigensolve_count, 1);
+        assert!(receipt.max_generalized_eigenpair_residual.is_finite());
+    }
+
+    #[test]
     fn try_dft_rejects_non_finite_overlap_before_eri_or_scf() {
         let mol = Molecule::h2();
         let mut basis = Sto3g::build(&mol);
@@ -844,6 +879,27 @@ mod tests {
                 stage: "DFT integration grid",
                 index: 1
             })
+        ));
+    }
+
+    #[test]
+    fn checked_dft_grid_rejects_negative_quadrature_weights() {
+        let grid = DftGrid {
+            points: vec![crate::dft::grid::GridPoint {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                weight: -1.0,
+            }],
+        };
+
+        assert!(matches!(
+            validate_dft_grid(&grid),
+            Err(ScfSolveError::InvalidNumericInput {
+                stage: "DFT integration-grid weight",
+                index: 0,
+                value,
+            }) if value == -1.0
         ));
     }
 
