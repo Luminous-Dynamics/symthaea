@@ -11,10 +11,10 @@ The baseline encoder directly binds raw `provider`, `event_id`, and `component`.
 ## What v1 changes
 
 - Omits raw provider and component strings.
-- Maps a bounded list of known Windows EventIDs into coarse families: authentication, process, file, network, registry, service/task, scripting, and object access.
+- Uses provider/channel tokens only to select a recognized namespace (Sysmon, Security Auditing, Service Control Manager, or PowerShell), then maps only known IDs within that namespace into coarse families. Raw provider/component strings are discarded from the vector; unknown providers or IDs map to an `unknown` family.
 - Maps common structured-field aliases to canonical field names (for example, `TargetUserName` and `user` to `identity_user`).
 - Preserves source, severity, and raw field values. High-cardinality value normalization and free-text message encoding are intentionally not included in v1 so this remains a narrow, interpretable ablation.
-- Uses an `unknown` family for unmapped numeric IDs. Event IDs can collide across providers, so the mapping is a heuristic, not a universal taxonomy.
+- Uses an `unknown` family for unmapped IDs and unknown namespaces. Known semantic families can be shared across recognized providers (for example, Sysmon process-create and Security process-create events); a colliding numeric ID from an unknown provider does not inherit that meaning. This mapping remains a bounded heuristic, not a universal taxonomy.
 
 The implementation is **not OCSF-compliant**. The long-term direction should be to normalize inputs through a versioned, vendor-neutral schema such as [OCSF](https://github.com/ocsf/ocsf-schema), rather than growing a large ad-hoc alias table indefinitely.
 
