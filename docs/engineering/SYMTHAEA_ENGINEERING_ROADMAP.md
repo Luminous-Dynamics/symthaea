@@ -19,6 +19,20 @@ Symthaea already has several primitives that map well to engineering work:
 
 The main gap is not another internal physics engine. The gap is a disciplined interface layer that lets Symthaea ask for simulations, track assumptions, maintain live twins, and require proof/evidence before acting.
 
+## Orbital-ring research boundary (added 2026-10-10)
+
+The separate `symthaea-orbital-ring` crate begins a T0 feasibility workflow. It is deliberately not an orbital-ring simulator. Its first increment provides:
+
+- checked, named SI boundary types for basic lengths, masses, durations, and energy;
+- explicit architecture, reference-frame, gravity-model, and atmospheric-drag assumptions;
+- a closed-form Earth point-mass circular-orbit reference calculation, restricted to the freely orbiting architecture;
+- energy and momentum ledger residuals in a declared Earth-centred inertial frame;
+- deterministic unit tests for reference values, unsupported architecture rejection, invalid inputs, ledger balance, and unexplained residuals.
+
+The kernel intentionally has no rotor-speed/support-force formula. The stationary supported-ring force balance is not uniquely defined until the physical architecture, coordinate frames, moving-mass velocity, support geometry, and boundary assumptions have been reviewed. The equations for an ideal free circular orbit must never be cited as evidence that a dynamically supported stationary ring is in equilibrium.
+
+Implementation contract and fidelity gates: [ORBITAL_RING_FEASIBILITY_WORKSTREAM.md](ORBITAL_RING_FEASIBILITY_WORKSTREAM.md). Current work is on a draft PR; it is research scaffolding, not a validated design or solver result.
+
 ## Crate Setup
 
 The engineering setup is intentionally split into four small crates:

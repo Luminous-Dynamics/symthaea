@@ -1,0 +1,210 @@
+{
+  "checks": [
+    {
+      "id": "eddy_drag.equivalent_speed_positive_finite",
+      "note": "Computed using the paper's Eq. (73) coefficient with its stated aluminium conductivity and illustrative 5 cm sheet.",
+      "observed": 0.8991804694457363,
+      "status": "passed"
+    },
+    {
+      "expected": 0.9,
+      "id": "eddy_drag.equivalent_speed_reference",
+      "observed": 0.8991804694457363,
+      "status": "passed",
+      "tolerance": 0.02
+    },
+    {
+      "id": "eddy_drag.example_power_finite_positive",
+      "observed": 179836093.88914725,
+      "status": "passed"
+    },
+    {
+      "expected": 200000000.0,
+      "id": "eddy_drag.example_power_reproduced",
+      "note": "Uses the paper's rounded example lift force of 2e8 N; compares to the stated ~0.2 GW example.",
+      "observed": 179836093.88914725,
+      "status": "passed",
+      "tolerance": 30000000.0
+    },
+    {
+      "id": "eddy_drag.power_finite_positive",
+      "observed": 449590234722.8681,
+      "status": "passed"
+    },
+    {
+      "expected": 500000000000.0,
+      "id": "eddy_drag.power_scale_reproduced",
+      "note": "Within 12% of the paper's approximate 500 GW statement; inputs include a rounded force estimate.",
+      "observed": 449590234722.8681,
+      "status": "passed",
+      "tolerance": 60000000000.0
+    },
+    {
+      "expected": 100.0,
+      "id": "cryo_pair_1.ratio_is_100",
+      "note": "Birch 1982, p. 483, \u00a73.4; source numbers are transcribed as published, not assumed to share identical normalization.",
+      "observed": 100.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "expected": 100.0,
+      "id": "cryo_pair_2.ratio_is_100",
+      "note": "Birch 1982, p. 485, Table 8; source numbers are transcribed as published, not assumed to share identical normalization.",
+      "observed": 100.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "expected": 5.0,
+      "id": "cryo_reported_cold_load_scale_factor_5",
+      "observed": 5.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "expected": 5.0,
+      "id": "cryo_reported_wall_plug_scale_factor_5",
+      "observed": 5.0,
+      "status": "passed",
+      "tolerance": 1e-12
+    },
+    {
+      "id": "table8.orbital_length_positive",
+      "observed": 44166666.66666667,
+      "status": "passed"
+    },
+    {
+      "id": "table8.geosynchronous_length_positive",
+      "observed": 44000000.0,
+      "status": "passed"
+    },
+    {
+      "expected": 0.0,
+      "id": "table8.inferred_ring_lengths_agree_within_1pct",
+      "observed": 0.0037807183364840444,
+      "status": "passed",
+      "tolerance": 0.01
+    },
+    {
+      "expected": false,
+      "id": "table8.cryo_row_assigned_to_support_column",
+      "note": "The scanned Table 8 leaves the orbital-ring cryogenic row blank and places 10 W/m in the geosynchronous/support column.",
+      "observed": false,
+      "status": "passed"
+    },
+    {
+      "expected": 500000000.0,
+      "id": "table8.10w_per_m_reconstructs_500mw_total",
+      "note": "Uses the length implied by the geosynchronous/support-column total per-ring superconductor mass divided by its mass-per-length row.",
+      "observed": 440000000.0,
+      "status": "passed",
+      "tolerance": 75000000.0
+    },
+    {
+      "id": "table8.implied_radius_positive_finite",
+      "observed": 7002817.496043395,
+      "status": "passed"
+    },
+    {
+      "id": "table8.implied_altitude_positive_finite",
+      "observed": 624680.4960433953,
+      "status": "passed"
+    },
+    {
+      "expected": 0.0,
+      "id": "table8.support_length_within_1pct_of_600km_circular_path",
+      "note": "Comparison benchmark only: 600 km is discussed as a representative ORS height in the paper; this does not prove the Table 8 design uses that exact altitude.",
+      "observed": 0.00353683168493186,
+      "status": "passed",
+      "tolerance": 0.01
+    },
+    {
+      "id": "stored_energy_finite_positive",
+      "observed": 1.792e+16,
+      "status": "passed"
+    },
+    {
+      "expected": 1.792e+16,
+      "id": "stored_energy_reference_17_92_PJ",
+      "note": "Conditional arithmetic only: assign the cited 8 km/s speed magnitude to the entire cited 5.6e8 kg mass.",
+      "observed": 1.792e+16,
+      "status": "passed",
+      "tolerance": 1.0
+    }
+  ],
+  "checks_failed": 0,
+  "checks_passed": 20,
+  "conditional_stored_energy": {
+    "caveat": "Not a failure-release or damage prediction.",
+    "mass_kg": 560000000.0,
+    "specific_kinetic_energy_j_kg": 32000000.0,
+    "speed_m_s": 8000.0,
+    "total_energy_j": 1.792e+16,
+    "total_energy_pj": 17.92
+  },
+  "cryogenic_pairs": [
+    {
+      "cold_side_heat_load_w": 100000000.0,
+      "cryostat_electrical_power_w": 10000000000.0,
+      "electrical_to_cold_load_ratio": 100.0,
+      "source_location": "Birch 1982, p. 483, \u00a73.4"
+    },
+    {
+      "cold_side_heat_load_w": 500000000.0,
+      "cryostat_electrical_power_w": 50000000000.0,
+      "electrical_to_cold_load_ratio": 100.0,
+      "source_location": "Birch 1982, p. 485, Table 8"
+    }
+  ],
+  "eddy_drag_example": {
+    "aluminum_conductivity_s_m": 35400000.0,
+    "calculated_power_gw": 449.5902347228681,
+    "calculated_power_w": 449590234722.8681,
+    "equivalent_drag_speed_m_s": 0.8991804694457363,
+    "example_calculated_power_gw": 0.17983609388914726,
+    "example_skyhook_lift_force_n": 200000000.0,
+    "example_source_approximation_gw": 0.2,
+    "formula_from_paper": "P_E = F_L * 2/(mu_0 * sigma * delta)",
+    "interpretation": "Electromagnetic eddy-current drag estimate for the stated conducting-sheet model; distinct from superconducting cryostat wall-plug power.",
+    "mu_0_h_m": 1.2566370614359173e-06,
+    "precessing_force_n": 500000000000.0,
+    "sheet_thickness_m": 0.05,
+    "source_approximation_gw": 500.0
+  },
+  "evidence_state": "passed_at_specified_fidelity",
+  "failed_check_ids": [],
+  "schema": "luminous-dynamics.orbital-ring-power-source-audit/v1",
+  "scope": "Source-number arithmetic audit only; not full source reconstruction or engineering feasibility analysis.",
+  "source": {
+    "author": "Paul Birch",
+    "pages": {
+      "cryogenic_paragraph": 483,
+      "electromagnetic_drag": 482,
+      "table_8": 485
+    },
+    "title": "Orbital Ring Systems and Jacob's Ladders \u2014 I",
+    "url": "https://nss.org/wp-content/uploads/Orbital-Rings.pdf",
+    "year": 1982
+  },
+  "source_reconstruction_warning": "The p. 483 paragraph gives about 100 MW heat loss / 10 GW cryostat power; Table 8 gives 5e8 W / 5e10 W. The paired ratios agree at 100:1. The 10 W/m row is populated under the geosynchronous/support column; dividing its 8.8e7 kg mass by 2.0 kg/m implies a 44.0 Mm support length and 440 MW heat loss, close to the table total. The orbital rings are described as not needing active cryogenic equipment because they sit within the fixed ring vacuum flask. This does not explain why the earlier paragraph's separate superconducting-surface estimate is five times lower or establish the exact physical geometry/configuration.",
+  "table8_length_reconstruction": {
+    "600km_reference_circular_path_length_m": 43844927.869886234,
+    "caveat": "Column-aware arithmetic: the 10 W/m cryogenic row is populated only under the geosynchronous/support column; applying it to that column implies about 440 MW. Does not independently establish the exact physical geometry or explain the p. 483 100 MW estimate.",
+    "cryogenic_heat_loss_column": "geosynchronous_support",
+    "cryogenic_heat_loss_per_length_w_m": 10.0,
+    "earth_equatorial_radius_m_assumed_for_altitude": 6378137.0,
+    "equivalent_circular_radius_m": 7002817.496043395,
+    "geosynchronous_ring_length_implied_m": 44000000.0,
+    "geosynchronous_superconductor_mass_per_length_kg_m": 2.0,
+    "geosynchronous_superconductor_mass_per_ring_kg": 88000000.0,
+    "length_based_heat_load_w": 440000000.0,
+    "orbital_ring_active_cryostat": false,
+    "orbital_ring_length_implied_m": 44166666.66666667,
+    "orbital_superconductor_mass_per_length_kg_m": 1.2,
+    "orbital_superconductor_mass_per_ring_kg": 53000000.0,
+    "relative_support_length_difference_from_600km_reference": 0.00353683168493186,
+    "support_column_equivalent_circular_altitude_m": 624680.4960433953,
+    "table_reported_total_heat_load_w": 500000000.0
+  }
+}

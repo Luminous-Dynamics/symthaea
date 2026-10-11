@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-orbital-ring"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic T0 dimensional and reference-model kernel for orbital-ring research"
+
+[dependencies]
