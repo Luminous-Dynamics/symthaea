@@ -99,6 +99,7 @@ jobs:
           python3 scripts/evaluate_jungian_symbolic_outputs.py --self-test
           python3 scripts/evaluate_jungian_symbolic_outputs.py \
             --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --source-revision "$SOURCE_REVISION" \
             --results "$OUT/keyword_dictionary_foil_v0.normalized.json" \
             --results "$OUT/context_guardrails_rules_v0.normalized.json" \
             --output-dir "$OUT"
@@ -151,7 +152,7 @@ jobs:
               "",
               "## Independent output-side audit (static cues; not semantic accuracy)",
               "",
-              "| Baseline | Text/evidence checks | Cases satisfying all local checks | Pair text-contrast checks |",
+              "| Baseline | Text/evidence checks | Cases satisfying all local checks | Pairs with distinct text (not correctness) |",
               "|---|---:|---:|---:|",
           ])
           for item in data["methods"]:
@@ -162,7 +163,7 @@ jobs:
               lines.append(
                   f"| {item['method_id']} | {audit['checks_passed']}/{audit['checks_total']} | "
                   f"{audit['case_contracts_passed']}/{audit['case_count']} | "
-                  f"{audit['pair_checks_passed']}/{audit['pair_checks_total']} |"
+                  f"{audit['distinct_pair_text_count']}/{audit['context_pair_count']} |"
               )
           lines.extend([
               "",
