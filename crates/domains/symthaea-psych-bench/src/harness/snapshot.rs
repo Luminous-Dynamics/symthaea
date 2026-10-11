@@ -475,7 +475,12 @@ impl RegressionReport {
             }
         }
 
-        if !self.has_regressions() {
+        if self.results.is_empty() {
+            // An empty intersection is not a successful regression check.
+            // This message also protects the legacy exploratory API from
+            // presenting zero observed comparisons as an all-pass result.
+            out.push_str("No comparable metrics; this report is not a qualified comparison.\n");
+        } else if !self.has_regressions() {
             out.push_str("All metrics within baseline CI. No regressions detected.\n");
         }
 
@@ -816,6 +821,17 @@ mod strict_population_tests {
             schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
             metrics,
         }
+    }
+
+    #[test]
+    fn intersection_report_with_no_comparable_metrics_does_not_claim_pass() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("Stroop", &[("accuracy", 0.7)])]);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        assert!(report.results.is_empty());
+        let summary = report.format_summary();
+        assert!(summary.contains("No comparable metrics"));
+        assert!(!summary.contains("All metrics within baseline CI"));
     }
 
     #[test]
