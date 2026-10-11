@@ -1,0 +1,46 @@
+name: JUNG-001C deterministic development-probe validator
+
+on:
+  pull_request:
+    paths:
+      - 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md'
+      - 'docs/research/data/jungian_symbolic_probe_v1.json'
+      - 'scripts/validate_jungian_symbolic_probe.py'
+      - '.github/workflows/jungian-symbolic-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact event head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Capture pinned artifact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "head=$(git rev-parse HEAD)"
+          echo "python_path=$(command -v python3)"
+          python3 --version
+          python3 - <<'PY'
+          import hashlib, pathlib, platform, sys
+          p = pathlib.Path("docs/research/data/jungian_symbolic_probe_v1.json")
+          print("python_implementation=" + platform.python_implementation())
+          print("python_version_full=" + sys.version.replace("\n", " "))
+          print("corpus_sha256=" + hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
+
+      - name: Validate corpus and hostile mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_jungian_symbolic_probe.py --self-test
