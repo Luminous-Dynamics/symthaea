@@ -193,6 +193,9 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         self.assertTrue(result["replay_checked"])
         self.assertTrue(result["non_authorizing"])
         self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["subject_id"], "symthaea-candidate-A")
+        self.assertEqual(result["attempt_id"], "attempt-2026-10-11-0001")
+        self.assertRegex(result["trust_policy_digest"], r"^[0-9a-f]{64}$")
 
     def test_receipt_or_signed_payload_mutation_breaks_signature(self):
         receipt = signed_receipt()
