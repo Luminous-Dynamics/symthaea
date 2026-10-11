@@ -232,9 +232,14 @@ class ReplayLedger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         created = False
         if not self.path.exists():
-            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
-            os.close(fd)
-            created = True
+            try:
+                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            except FileExistsError:
+                # Another verifier initialized the same protected ledger concurrently.
+                pass
+            else:
+                os.close(fd)
+                created = True
         try:
             os.chmod(self.path, 0o600)
             with sqlite3.connect(self.path, timeout=10, isolation_level=None) as db:
