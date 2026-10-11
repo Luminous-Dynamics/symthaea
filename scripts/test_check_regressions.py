@@ -7,7 +7,7 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
-from check_regressions import analyze_regressions, load_baseline, load_criterion_results, main
+from check_regressions import analyze_regressions, load_baseline, load_criterion_changes, load_criterion_results, main
 
 
 def write_estimates(path: Path, mean: float, std_dev: float = 1.0, median: float | None = None) -> None:
@@ -16,6 +16,31 @@ def write_estimates(path: Path, mean: float, std_dev: float = 1.0, median: float
         "mean": {"point_estimate": mean},
         "std_dev": {"point_estimate": std_dev},
         "median": {"point_estimate": mean if median is None else median},
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def write_change_estimate(path: Path, change: float, lower: float, upper: float, confidence: float = 0.95) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "mean": {
+            "point_estimate": change,
+            "confidence_interval": {
+                "lower_bound": lower,
+                "upper_bound": upper,
+                "confidence_level": confidence,
+            },
+            "standard_error": 0.01,
+        },
+        "median": {
+            "point_estimate": change,
+            "confidence_interval": {
+                "lower_bound": lower,
+                "upper_bound": upper,
+                "confidence_level": confidence,
+            },
+            "standard_error": 0.01,
+        },
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -40,6 +65,7 @@ class CriterionBaselineTests(unittest.TestCase):
             root = Path(temp_dir)
             write_estimates(root / "quick" / "harmonic" / "main" / "estimates.json", 100.0)
             write_estimates(root / "quick" / "harmonic" / "new" / "estimates.json", 115.0)
+            write_change_estimate(root / "quick" / "harmonic" / "change" / "estimates.json", 0.15, 0.12, 0.18)
 
             regressions, has_critical = analyze_regressions(
                 root, threshold=5.0, critical_threshold=10.0, baseline_name="main"
@@ -71,6 +97,7 @@ class CriterionBaselineTests(unittest.TestCase):
             write_estimates(root / "quick" / "removed" / "main" / "estimates.json", 90.0)
             write_estimates(root / "quick" / "harmonic" / "new" / "estimates.json", 100.0)
             write_estimates(root / "quick" / "added" / "new" / "estimates.json", 100.0)
+            write_change_estimate(root / "quick" / "harmonic" / "change" / "estimates.json", 0.0, -0.02, 0.02)
 
             stderr = io.StringIO()
             with patch.object(sys, "argv", [
@@ -82,6 +109,21 @@ class CriterionBaselineTests(unittest.TestCase):
             self.assertIn("Incomplete Criterion comparison", stderr.getvalue())
             self.assertIn("current benchmarks missing a baseline: quick/added", stderr.getvalue())
             self.assertIn("baseline benchmarks missing current results: quick/removed", stderr.getvalue())
+
+    def test_required_baseline_rejects_missing_change_estimate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_estimates(root / "quick" / "harmonic" / "main" / "estimates.json", 100.0)
+            write_estimates(root / "quick" / "harmonic" / "new" / "estimates.json", 100.0)
+
+            stderr = io.StringIO()
+            with patch.object(sys, "argv", [
+                "check_regressions.py", "--results", str(root), "--require-baseline"
+            ]), redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                main()
+
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("missing Criterion change estimates", stderr.getvalue())
 
     def test_rejects_non_finite_estimate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
