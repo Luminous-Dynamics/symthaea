@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-search-experiment-v1.schema.json",
+  "title": "Symthaea Mathematical Search Experiment Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "experiment_id", "stage", "frozen_before_evaluation",
+    "challenge_set_sha256", "corpus_snapshot_sha256", "knowledge_boundary_sha256",
+    "statistical_plan_sha256", "budget_contract_sha256", "toolchain_manifest_sha256",
+    "human_intervention_policy_sha256", "encoder_sha256", "seeds", "primary_endpoints",
+    "secondary_endpoints", "negative_controls", "manipulation_checks", "arms"
+  ],
+  "properties": {
+    "schema_version": {"const": "symthaea.math-search-experiment.v1"},
+    "experiment_id": {"type": "string", "minLength": 1},
+    "stage": {"enum": ["Q0StructuralRetrieval", "Q1BlindSolvedTransfer", "Q2CrossDomainTransfer", "Q3FormalConjecturesRediscovery", "Q4ResearchHeldOut"]},
+    "frozen_before_evaluation": {"const": true},
+    "challenge_set_sha256": {"$ref": "#/$defs/sha256"},
+    "corpus_snapshot_sha256": {"$ref": "#/$defs/sha256"},
+    "knowledge_boundary_sha256": {"$ref": "#/$defs/sha256"},
+    "statistical_plan_sha256": {"$ref": "#/$defs/sha256"},
+    "budget_contract_sha256": {"$ref": "#/$defs/sha256"},
+    "toolchain_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "human_intervention_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "encoder_sha256": {"$ref": "#/$defs/sha256"},
+    "seeds": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "integer", "minimum": 0}},
+    "primary_endpoints": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["FormallySolvedRate", "VerifiedUsefulLemmaRate", "ValidCounterexamples", "ProofCallsPerSolved", "SearchNodesPerSolved", "NormalizedComputePerSolved", "TimeToFirstUsefulLemma", "CrossDomainTransferRate", "RepeatedFailureRate", "FalsePruningRate"]}},
+    "secondary_endpoints": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "negative_controls": {"type": "array", "minItems": 5, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "manipulation_checks": {"type": "array", "minItems": 4, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "arms": {"type": "array", "minItems": 3, "maxItems": 4, "items": {"$ref": "#/$defs/arm"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["arm_id", "retrieval_kind", "budget_contract_sha256", "challenge_set_sha256", "corpus_snapshot_sha256", "knowledge_boundary_sha256", "toolchain_manifest_sha256", "encoder_sha256", "negative_search_memory", "evolutionary_search"],
+      "properties": {
+        "arm_id": {"enum": ["A", "B", "C", "D"]},
+        "retrieval_kind": {"type": "string", "minLength": 1},
+        "budget_contract_sha256": {"$ref": "#/$defs/sha256"},
+        "challenge_set_sha256": {"$ref": "#/$defs/sha256"},
+        "corpus_snapshot_sha256": {"$ref": "#/$defs/sha256"},
+        "knowledge_boundary_sha256": {"$ref": "#/$defs/sha256"},
+        "toolchain_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "encoder_sha256": {"$ref": "#/$defs/sha256"},
+        "negative_search_memory": {"type": "boolean"},
+        "evolutionary_search": {"const": false}
+      }
+    }
+  }
+}
