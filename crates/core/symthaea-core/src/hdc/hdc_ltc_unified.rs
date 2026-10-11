@@ -72,8 +72,9 @@ fn cfc_interpolation_alpha(dt: f32, tau: f32) -> f32 {
 
 /// Default work budget for iterative HDC-LTC evolution (maximum coordinate sweeps).
 ///
-/// At the default 100 ms base time constant, this permits a 40.96 s horizon at the
-/// conservative tau/10 substep policy. Callers predicting longer horizons should choose
+/// At the default 100 ms base time constant, the worst-case input adjustment lowers
+/// effective tau to 80 ms. This budget therefore permits a 32.768 s horizon at the
+/// conservative effective-tau/10 policy. Callers predicting longer horizons should choose
 /// an explicit larger budget or use the O(D)-per-jump closed-form approximation.
 pub const DEFAULT_MAX_ITERATIVE_SUBSTEPS: usize = 4096;
 
@@ -1193,7 +1194,7 @@ impl HdcLtcUnifiedNeuron {
         if !self.config.tau_base.is_finite() || self.config.tau_base <= 0.0 {
             return Err(IterativeEvolutionError::InvalidConfiguration { field: "tau_base" });
         }
-        if !self.config.backbone_tau.is_finite() {
+        if !self.config.backbone_tau.is_finite() || self.config.backbone_tau < 0.0 {
             return Err(IterativeEvolutionError::InvalidConfiguration { field: "backbone_tau" });
         }
         if !self.config.fourier_amplitude.is_finite() {
@@ -1271,10 +1272,16 @@ impl HdcLtcUnifiedNeuron {
             return Ok(());
         }
 
-        // Compute N in f64 before converting to usize. A finite f32 dt divided by a
-        // tiny positive time constant can still exceed usize range.
-        let requested_steps =
-            ((dt as f64) / (self.config.tau_base as f64 / 10.0)).ceil().max(1.0);
+        // Compute N in f64 before converting to usize. The dynamics clamp effective tau
+        // to [0.01, 10] seconds and the input-similarity factor can reduce tau by 20%.
+        // A non-negative backbone_tau can only increase tau as the state norm grows, so
+        // clamp(0.8 * tau_base, 0.01, 10) is a conservative lower bound for every substep.
+        // Use that bound rather than raw tau_base: the latter both under-resolves large
+        // configured taus (because compute_tau caps at 10s) and overworks tiny taus (floor
+        // at 10ms). f64 arithmetic avoids overflow during the duration/bound division.
+        let min_effective_tau = (self.config.tau_base * 0.8).clamp(0.01, 10.0);
+        let max_substep = min_effective_tau as f64 / 10.0;
+        let requested_steps = ((dt as f64) / max_substep).ceil().max(1.0);
         // `usize::MAX as f64` rounds up on 64-bit targets. Reject equality too,
         // so a rounded 2^64 request cannot pass a `usize::MAX` budget and saturate on cast.
         if requested_steps >= usize::MAX as f64 || requested_steps > max_substeps as f64 {
@@ -3245,6 +3252,77 @@ mod checked_iterative_evolution_tests {
         );
         assert_eq!(invalid_tau.evolution_clock(), (0.0, 0));
         assert_eq!(invalid_tau.state().norm(), 0.0);
+    }
+
+    #[test]
+    fn checked_iterative_substep_budget_uses_clamped_effective_tau() {
+        let input = input();
+
+        // Large tau_base is capped by compute_tau() at 10 seconds. The budget must
+        // reflect the 1-second maximum substep, not tau_base / 10 = 10 seconds.
+        let mut capped_tau = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                tau_base: 100.0,
+                backbone_tau: 0.0,
+                ..UnifiedConfig::default()
+            },
+            4242,
+        );
+        let state = capped_tau.state().clone();
+        let clock = capped_tau.evolution_clock();
+        let mean = capped_tau.running_mean;
+        let var = capped_tau.running_var;
+        assert!(matches!(
+            capped_tau.try_evolve_closed_form_iterative(1_000.0, &input, 100),
+            Err(IterativeEvolutionError::SubstepBudgetExceeded {
+                requested_at_least: 1_000,
+                max_substeps: 100
+            })
+        ));
+        assert_unchanged(&capped_tau, &state, clock, mean, var);
+
+        // Tiny tau_base is floored by compute_tau() at 10ms, so a 10ms horizon
+        // needs ten substeps, not the ten thousand implied by the raw tau_base.
+        let mut floored_tau = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                tau_base: 1.0e-6,
+                backbone_tau: 0.0,
+                ..UnifiedConfig::default()
+            },
+            4343,
+        );
+        assert_eq!(
+            floored_tau.try_evolve_closed_form_iterative(0.01, &input, 10),
+            Ok(())
+        );
+        assert_eq!(floored_tau.evolution_clock().1, 1);
+        assert!((floored_tau.total_time() - 0.01).abs() < 1.0e-7);
+    }
+
+    #[test]
+    fn checked_iterative_rejects_negative_backbone_tau() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                backbone_tau: -0.1,
+                ..UnifiedConfig::default()
+            },
+            4242,
+        );
+        let input = input();
+        let state = neuron.state().clone();
+        let clock = neuron.evolution_clock();
+        let mean = neuron.running_mean;
+        let var = neuron.running_var;
+        assert_eq!(
+            neuron.try_evolve_closed_form_iterative(0.1, &input, 100),
+            Err(IterativeEvolutionError::InvalidConfiguration {
+                field: "backbone_tau"
+            })
+        );
+        assert_unchanged(&neuron, &state, clock, mean, var);
     }
 
     #[test]
