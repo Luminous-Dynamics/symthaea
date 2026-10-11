@@ -338,12 +338,7 @@ fn lebedev_50() -> Vec<(f64, f64, f64, f64)> {
  * (three distinct coordinates). We emit normalized weights summing to 1;
  * the radial quadrature supplies the missing 4π solid-angle factor.
  */
-fn lebedev_orbit(
-    code: u8,
-    a: f64,
-    b: f64,
-    weight: f64,
-) -> Vec<(f64, f64, f64, f64)> {
+fn lebedev_orbit(code: u8, a: f64, b: f64, weight: f64) -> Vec<(f64, f64, f64, f64)> {
     let mut points = Vec::new();
     let signs = [1.0_f64, -1.0_f64];
 
@@ -672,12 +667,7 @@ mod tests {
         }
 
         for powers in [[29, 0, 0], [17, 4, 2], [9, 7, 1], [1, 14, 14]] {
-            assert_spherical_moment(
-                &pts,
-                powers,
-                0.0,
-                "Lebedev-302 odd-parity moment",
-            );
+            assert_spherical_moment(&pts, powers, 0.0, "Lebedev-302 odd-parity moment");
         }
     }
 
