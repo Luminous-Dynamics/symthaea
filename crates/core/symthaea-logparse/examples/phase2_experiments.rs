@@ -555,7 +555,7 @@ fn run_repeated_grouped_kfold(
     let mut repeat_means = Vec::with_capacity(seeds.len());
     for (index, &seed) in seeds.iter().enumerate() {
         println!(
-            "\\n  grouped CV repeat {} of {} (split seed={seed:#x})",
+            "\n  grouped CV repeat {} of {} (split seed={seed:#x})",
             index + 1,
             seeds.len()
         );
