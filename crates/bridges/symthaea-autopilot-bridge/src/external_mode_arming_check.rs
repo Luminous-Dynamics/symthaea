@@ -46,6 +46,8 @@ pub struct Px4ExternalModeRegistrationBindingV1 {
     pub firmware_profile_id: String,
     /// PX4 boot/session identity supplied by the adapter.
     pub source_boot_session_id: String,
+    /// Raw RegisterExtComponentReply timestamp, microseconds since PX4 boot.
+    pub source_timestamp_us_raw: u64,
     /// Registration request ID echoed by RegisterExtComponentReply.
     pub registration_request_id: u64,
     /// Registered component name as observed.
@@ -60,6 +62,8 @@ pub struct Px4ExternalModeRegistrationBindingV1 {
     pub mode_id_raw: i8,
     /// Raw mode-executor ID; -1 represents PX4's invalid sentinel.
     pub mode_executor_id_raw: i8,
+    /// Whether PX4 says the registered mode cannot be selected by the user.
+    pub not_user_selectable: bool,
     /// Companion-clock time when the registration reply was observed.
     pub received_at: TimestampV1,
     /// Domain-separated commitment to all preceding registration evidence.
@@ -74,6 +78,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
         target_instance_id: impl Into<String>,
         firmware_profile_id: impl Into<String>,
         source_boot_session_id: impl Into<String>,
+        source_timestamp_us_raw: u64,
         registration_request_id: u64,
         component_name: impl Into<String>,
         px4_ros2_api_version: u16,
@@ -81,6 +86,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
         arming_check_id_raw: i8,
         mode_id_raw: i8,
         mode_executor_id_raw: i8,
+        not_user_selectable: bool,
         received_at: TimestampV1,
     ) -> Result<Self, Px4ExternalModeArmingCheckError> {
         let mut item = Self {
@@ -89,6 +95,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
             target_instance_id: target_instance_id.into(),
             firmware_profile_id: firmware_profile_id.into(),
             source_boot_session_id: source_boot_session_id.into(),
+            source_timestamp_us_raw,
             registration_request_id,
             component_name: component_name.into(),
             px4_ros2_api_version,
@@ -96,6 +103,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
             arming_check_id_raw,
             mode_id_raw,
             mode_executor_id_raw,
+            not_user_selectable,
             received_at,
             registration_digest_hex: String::new(),
         };
@@ -156,6 +164,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
         feed_str(&mut hasher, &self.target_instance_id);
         feed_str(&mut hasher, &self.firmware_profile_id);
         feed_str(&mut hasher, &self.source_boot_session_id);
+        hasher.update(&self.source_timestamp_us_raw.to_le_bytes());
         hasher.update(&self.registration_request_id.to_le_bytes());
         feed_str(&mut hasher, &self.component_name);
         hasher.update(&self.px4_ros2_api_version.to_le_bytes());
@@ -163,6 +172,7 @@ impl Px4ExternalModeRegistrationBindingV1 {
         hasher.update(&self.arming_check_id_raw.to_le_bytes());
         hasher.update(&self.mode_id_raw.to_le_bytes());
         hasher.update(&self.mode_executor_id_raw.to_le_bytes());
+        hasher.update(&[u8::from(self.not_user_selectable)]);
         feed_str(&mut hasher, self.received_at.clock_domain.as_str());
         hasher.update(&self.received_at.nanoseconds.to_le_bytes());
         digest_hex(hasher.finalize().as_bytes())
@@ -1329,6 +1339,7 @@ mod tests {
             "vehicle.slot-a",
             "px4.v1.18.external-mode.fixture.v1",
             "px4.boot.fixture.session-a",
+            850_000,
             991,
             "org.luminous.fixture.mode",
             1,
@@ -1336,6 +1347,7 @@ mod tests {
             arming_check_id,
             mode_id,
             -1,
+            false,
             ts(900_000_000),
         )
         .unwrap()
@@ -1513,6 +1525,7 @@ mod tests {
             "vehicle.slot-a",
             "px4.v1.18.external-mode.fixture.v1",
             "px4.boot.fixture.session-b",
+            850_000,
             991,
             "org.luminous.fixture.mode",
             1,
@@ -1520,6 +1533,7 @@ mod tests {
             3,
             42,
             -1,
+            false,
             ts(900_000_000),
         )
         .unwrap();
@@ -1719,6 +1733,7 @@ mod tests {
                 "vehicle.slot-a",
                 "px4.v1.18.external-mode.fixture.v1",
                 "px4.boot.fixture.session-a",
+                1,
                 991,
                 "org.luminous.fixture.mode",
                 1,
@@ -1726,6 +1741,7 @@ mod tests {
                 3,
                 42,
                 -1,
+                false,
                 ts(1),
             )
             .unwrap(),
