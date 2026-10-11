@@ -1,0 +1,155 @@
+name: Lean Benchmark Admission Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/lean-benchmark-admission-integrity.yml'
+      - 'patches/science/lean-benchmark-admission-integrity-v1.patch'
+      - 'crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs'
+      - 'crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/lean-benchmark-admission-integrity-v1.patch
+
+jobs:
+  qualify:
+    name: Prove admitted-proof benchmark leak and qualify fail-closed accounting
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates src || {
+            echo 'qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Install deterministic accepting Lean stub
+        run: |
+          cat > /tmp/fake-lean <<'SH'
+          #!/usr/bin/env bash
+          exit 0
+          SH
+          chmod +x /tmp/fake-lean
+
+      - name: Prove current benchmark counts admitted theorem as success
+        env:
+          LEAN_PATH_BIN: /tmp/fake-lean
+          LEAN_CHECK: '1'
+          PROPTAUTS_OUT_DIR: /tmp/proptauts-negative
+        run: |
+          FILE=crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+          cp "$FILE" /tmp/prove_proptauts.rs.orig
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs')
+          s = p.read_text()
+          needle = '    vec![\n        // ─── Identity & reflexive implications'
+          replacement = (
+              '    vec![\n'
+              '        Fixture {\n'
+              '            name: "negative_control_unproved_atom",\n'
+              '            description: "P (not a closed tautology)",\n'
+              '            goal: p(),\n'
+              '        },\n'
+              '        // ─── Identity & reflexive implications'
+          )
+          assert needle in s
+          p.write_text(s.replace(needle, replacement, 1))
+          PY
+          set +e
+          cargo run --quiet --locked -p symthaea-lean-bridge --example prove_proptauts > /tmp/proptauts-before.csv 2> /tmp/proptauts-before.err
+          rc=$?
+          set -e
+          test "$rc" -eq 0
+          grep -F 'negative_control_unproved_atom' /tmp/proptauts-before.csv | grep -F ',true,accepted,'
+          grep -F '1 sorry' /tmp/proptauts-before.err
+          cp /tmp/prove_proptauts.rs.orig "$FILE"
+          git diff --exit-code -- "$FILE"
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet admission-aware benchmark semantics
+        run: |
+          grep -F 'CheckOutcome::Accepted if contains_sorry' crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs
+          grep -F '"accepted_with_admission"' crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs
+          grep -F 'CheckOutcome::Accepted if contains_sorry' crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+          grep -F 'let mut admitted = 0usize;' crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+          grep -F 'rejected > 0 || admitted > 0' crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+
+      - name: Prove admitted theorem now fails the proof benchmark
+        env:
+          LEAN_PATH_BIN: /tmp/fake-lean
+          LEAN_CHECK: '1'
+          PROPTAUTS_OUT_DIR: /tmp/proptauts-repaired
+        run: |
+          FILE=crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+          cp "$FILE" /tmp/prove_proptauts.rs.patched
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs')
+          s = p.read_text()
+          needle = '    vec![\n        // ─── Identity & reflexive implications'
+          replacement = (
+              '    vec![\n'
+              '        Fixture {\n'
+              '            name: "negative_control_unproved_atom",\n'
+              '            description: "P (not a closed tautology)",\n'
+              '            goal: p(),\n'
+              '        },\n'
+              '        // ─── Identity & reflexive implications'
+          )
+          assert needle in s
+          p.write_text(s.replace(needle, replacement, 1))
+          PY
+          set +e
+          cargo run --quiet --locked -p symthaea-lean-bridge --example prove_proptauts > /tmp/proptauts-after.csv 2> /tmp/proptauts-after.err
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          grep -F 'negative_control_unproved_atom' /tmp/proptauts-after.csv | grep -F ',true,accepted_with_admission,'
+          grep -F 'admitted=1' /tmp/proptauts-after.err
+          cp /tmp/prove_proptauts.rs.patched "$FILE"
+
+      - name: Keep environment-acceptance baseline distinct
+        run: |
+          # miniF2F-v2 intentionally measures whether upstream files type-check,
+          # including admitted upstream files; it is not a generated-proof gate.
+          git diff --exit-code HEAD -- crates/bridges/symthaea-lean-bridge/examples/prove_minif2f_v2.rs
+
+      - name: Format, check, and lint examples
+        run: |
+          cargo fmt --check -p symthaea-lean-bridge
+          cargo check --locked -p symthaea-lean-bridge --examples
+          cargo clippy --locked -p symthaea-lean-bridge --examples -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that Symthaea-generated Lean benchmark files containing admissions cannot be counted as proved merely because Lean accepts them.'
+          echo 'It does not change the miniF2F-v2 environment-acceptance baseline, establish theorem correctness beyond the checked Lean files, prove translation identity, or establish scientific/action authority.'
