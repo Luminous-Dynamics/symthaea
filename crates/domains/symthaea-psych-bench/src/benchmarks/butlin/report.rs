@@ -533,7 +533,6 @@ impl EffectEstimate {
     /// Invalid dispersion is rejected rather than stored. Call
     /// `try_with_std_dev()` when the value can be invalid or comes from
     /// untrusted input, so validation can be handled without a panic.
-    #[deprecated(note = "use try_with_std_dev for fallible validation")]
     pub fn with_std_dev(mut self, std_dev: f64) -> Self {
         assert!(
             std_dev.is_finite() && std_dev >= 0.0,
@@ -2106,7 +2105,7 @@ mod effect_estimate_persistence_tests {
     fn valid_effect_estimate_round_trips_with_canonical_derived_fields() {
         let original = EffectEstimate::try_new(0.8, 0.4, 4)
             .unwrap()
-            .with_std_dev(0.05)
+            .try_with_std_dev(0.05)
             .unwrap();
         let json = serde_json::to_string(&original).unwrap();
         let restored: EffectEstimate = serde_json::from_str(&json).unwrap();
