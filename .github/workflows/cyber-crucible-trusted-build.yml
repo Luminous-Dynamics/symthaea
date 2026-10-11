@@ -46,7 +46,7 @@ jobs:
 
           source_ref = os.environ["EXPECTED_SOURCE_REF"]
           source_commit = os.environ["EXPECTED_SOURCE_COMMIT"]
-          if re.fullmatch(r"refs/tags/cyber-crucible-verifier-v[0-9]+\.[0-9]+\.[0-9]+", source_ref) is None:
+          if re.fullmatch(r"refs/tags/cyber-crucible-verifier-v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", source_ref) is None:
               print("REJECTED: source_ref must be a semantic-version verifier release tag", file=sys.stderr)
               raise SystemExit(2)
           if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
