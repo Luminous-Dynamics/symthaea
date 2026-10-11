@@ -3203,9 +3203,20 @@ mod checked_iterative_evolution_tests {
     fn checked_iterative_rejects_zero_budget_and_invalid_configuration() {
         let mut neuron = neuron();
         let input = input();
+        let original_state = neuron.state().clone();
+        let original_clock = neuron.evolution_clock();
+        let original_mean = neuron.running_mean;
+        let original_var = neuron.running_var;
         assert_eq!(
             neuron.try_evolve_closed_form_iterative(0.1, &input, 0),
             Err(IterativeEvolutionError::InvalidSubstepBudget)
+        );
+        assert_unchanged(
+            &neuron,
+            &original_state,
+            original_clock,
+            original_mean,
+            original_var,
         );
 
         let mut invalid_tau = HdcLtcUnifiedNeuron::new(
