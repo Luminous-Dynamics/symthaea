@@ -357,6 +357,16 @@ fn auto_resolve_contract_error(
     prediction: &WorldPrediction,
     auto: &AutoResolveType,
 ) -> Option<String> {
+    // The resolver authority is meaningful only for the action type its contract names.
+    // Reject mismatched pairs before any observer or deadline fallback is allowed to run.
+    if prediction.resolution_contract.action_type != prediction.action_context.action_type {
+        return Some(format!(
+            "prediction action type mismatch: action context declares {:?}, but resolution contract declares {:?}",
+            prediction.action_context.action_type,
+            prediction.resolution_contract.action_type
+        ));
+    }
+
     const PROGRAM: &str = "magi.resolver.program";
     const ARG0: &str = "magi.resolver.arg0";
     const ARG1: &str = "magi.resolver.arg1";
@@ -1053,7 +1063,7 @@ mod tests {
 
     #[test]
     fn runtime_resolver_rejects_authority_mismatch() {
-        let action = super::super::WorldActionContext::new("test_execution", "run tests");
+        let action = super::super::WorldActionContext::new("code_execution", "run tests");
         let prediction = WorldPrediction::new(
             "Tests pass",
             OutcomeCategory::Success,
@@ -1067,6 +1077,35 @@ mod tests {
             &AutoResolveType::CommandSucceeds("exit 0".to_string()),
         );
         assert!(mismatch.is_some());
+        assert!(mismatch.unwrap().contains("declared ResolutionAuthority"));
+    }
+
+    #[test]
+    fn runtime_resolver_rejects_action_contract_type_mismatch() {
+        let mut action =
+            super::super::WorldActionContext::new("shell_command", "run pinned command");
+        action.metadata.insert("magi.resolver.program".into(), "sh".into());
+        action.metadata.insert("magi.resolver.arg0".into(), "-c".into());
+        action.metadata.insert("magi.resolver.arg1".into(), "exit 0".into());
+        let prediction = WorldPrediction::new(
+            "Command succeeds",
+            OutcomeCategory::Success,
+            0.8,
+            action,
+            super::super::ResolutionContract::new(
+                "different_action_type",
+                super::super::ResolutionAuthority::exit_success(),
+            ),
+        );
+
+        let mismatch = auto_resolve_contract_error(
+            &prediction,
+            &AutoResolveType::CommandSucceeds("exit 0".to_string()),
+        );
+        assert!(matches!(
+            mismatch.as_deref(),
+            Some(reason) if reason.contains("action type mismatch")
+        ));
     }
 
     #[test]
