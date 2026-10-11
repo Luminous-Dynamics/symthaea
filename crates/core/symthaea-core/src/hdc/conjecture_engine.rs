@@ -110,7 +110,7 @@ use gp_support::{
 /// data) against the same metric the real search optimizes.
 pub use gp_support::{
     fd_gradient, gradient_informativeness_fraction, is_informatively_conserved,
-    lie_derivative_variance,
+    lie_derivative_variance, GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR,
 };
 /// IIT falsifiable-prediction test: does coupling hypothesis memory into
 /// experiment selection track measurable integration (Φ)? See
