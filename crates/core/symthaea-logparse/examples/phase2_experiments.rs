@@ -17,11 +17,12 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-logparse --example phase2_experiments --release -- \
-//!     /tmp/evtx-staged /tmp/otrf-staged [--domain-invariant-ablation] [--scenario-level-evaluation]
+//!     /tmp/evtx-staged /tmp/otrf-staged [--domain-invariant-ablation]
+//!     [--scenario-level-evaluation]
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-use symthaea_logparse::scenario::{ScenarioEmbedding, aggregate_scenarios};
+use symthaea_logparse::scenario::{aggregate_scenarios, ScenarioEmbedding};
 use symthaea_logparse::encoder::{
     DOMAIN_INVARIANT_ENCODER_VERSION, Hdv, encode, encode_domain_invariant,
 };
