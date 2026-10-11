@@ -18,7 +18,10 @@ use symthaea_hdc_ltc::{ContinuousHV, HdcLtcUnifiedNeuron, NeuronConfig};
 
 fn main() {
     println!(
-        "dimension,dt_seconds,mode,iterations,elapsed_ns,ns_per_component_update,component_updates_per_second,final_state_norm"
+        concat!(
+            "dimension,dt_seconds,mode,iterations,elapsed_ns,",
+            "ns_per_component_update,component_updates_per_second,final_state_norm"
+        )
     );
 
     for dimension in [256_usize, 1_024, 4_096, 16_384] {
@@ -69,7 +72,11 @@ fn main() {
                 let final_state_norm = black_box(neuron.state().norm());
 
                 println!(
-                    "{dimension},{dt},{mode},{iterations},{elapsed_ns},{ns_per_component_update:.6},{component_updates_per_second:.3},{final_state_norm:.8}"
+                    concat!(
+                        "{dimension},{dt},{mode},{iterations},{elapsed_ns},",
+                        "{ns_per_component_update:.6},{component_updates_per_second:.3},",
+                        "{final_state_norm:.8}"
+                    )
                 );
             }
         }
