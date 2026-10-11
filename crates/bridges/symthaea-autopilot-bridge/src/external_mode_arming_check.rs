@@ -2571,7 +2571,7 @@ mod tests {
             }
         }
 
-        assert_eq!(case_ids.len(), 6, "corpus case count changed unexpectedly");
+        assert_eq!(case_ids.len(), 8, "corpus case count changed unexpectedly");
     }
 
     #[test]
