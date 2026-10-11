@@ -13,7 +13,9 @@ we need to preserve is correspondingly narrow:
   runner admission because they are evaluated only after the job has started;
 * the only root jobs without a draft guard are jobs already restricted away
   from pull_request events (SBOM and scheduled/manual stress tests);
-* adding/removing/renaming a CI job requires an explicit update here.
+* ordinary adding/removing/renaming of CI jobs requires an explicit update here;
+* the only census exception is a `nixward-*-focused` PR runner with the exact
+  draft guard defined below.
 
 GitHub evaluates jobs.<job_id>.if before matrix expansion, so a false root-job
 condition prevents matrix legs from requesting runners. A skipped `needs`
@@ -97,6 +99,8 @@ EXPECTED_JOBS = (
 JOB_HEADER = re.compile(r"^  ([A-Za-z0-9_-]+):\s*$")
 JOB_LEVEL_IF = re.compile(r"^    if:\s*(.*)$")
 STATUS_CHECK = re.compile(r"\b(?:always|cancelled|failure|success)\s*\(")
+FOCUSED_NIXWARD_JOB = re.compile(r"^nixward-[a-z0-9-]+-focused$")
+FOCUSED_NIXWARD_GUARD = GOVERNANCE_DRAFT_GUARD
 BLOCK_MARKERS = {"|", "|-", "|+", ">", ">-", ">+"}
 
 
@@ -234,19 +238,83 @@ def self_test_job_scope_parser() -> None:
             )
 
 
+def validate_focused_nixward_job(job: str, block: str) -> None:
+    if not FOCUSED_NIXWARD_JOB.fullmatch(job):
+        fail(f"job {job!r} is not an admissible focused Nixward job id")
+    require_exact_line(block, FOCUSED_NIXWARD_GUARD, job)
+    expression = job_level_if_expression(block, job)
+    if expression != "github.event_name == 'pull_request' && github.event.pull_request.draft == false":
+        fail(
+            f"focused Nixward job {job!r} must use the exact PR-only draft guard; "
+            f"observed_expression={expression!r}"
+        )
+    if STATUS_CHECK.search(expression):
+        fail(
+            f"focused Nixward job {job!r} must not use a status-check function"
+        )
+
+
+def classify_unexpected_jobs(jobs: dict[str, str]) -> set[str]:
+    """Return structurally admitted focused jobs; reject every other surprise."""
+    focused: set[str] = set()
+    for job in jobs:
+        if job in EXPECTED_JOBS:
+            continue
+        if FOCUSED_NIXWARD_JOB.fullmatch(job):
+            validate_focused_nixward_job(job, jobs[job])
+            focused.add(job)
+            continue
+    return focused
+
+
+def self_test_focused_job_admission() -> None:
+    safe = """  nixward-receipt-focused:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - run: true
+"""
+    validate_focused_nixward_job(
+        "nixward-receipt-focused",
+        safe,
+    )
+
+    unsafe_guard = safe.replace(
+        "github.event_name == 'pull_request' && github.event.pull_request.draft == false",
+        "github.event_name == 'pull_request'",
+    )
+    try:
+        validate_focused_nixward_job("nixward-receipt-focused", unsafe_guard)
+    except SystemExit:
+        pass
+    else:
+        fail("internal self-test failed: unsafe focused guard was admitted")
+
+    unsafe_name = safe
+    try:
+        validate_focused_nixward_job("nixward-receipt", unsafe_name)
+    except SystemExit:
+        pass
+    else:
+        fail("internal self-test failed: incorrectly named focused job was admitted")
+
+
 def main() -> int:
     self_test_job_scope_parser()
+    self_test_focused_job_admission()
 
     text = CI_PATH.read_text(encoding="utf-8")
     jobs = parse_jobs(text)
 
     observed = set(jobs)
-    if observed != EXPECTED_JOBS:
-        missing = sorted(EXPECTED_JOBS - observed)
-        unexpected = sorted(observed - EXPECTED_JOBS)
+    missing = sorted(EXPECTED_JOBS - observed)
+    focused = classify_unexpected_jobs(jobs)
+    unexpected = sorted(observed - EXPECTED_JOBS - focused)
+    if missing or unexpected:
         fail(
             "top-level CI job census changed without updating the draft-safety "
-            f"ratchet: missing={missing!r} unexpected={unexpected!r}"
+            f"ratchet: missing={missing!r} unexpected={unexpected!r} "
+            f"admitted_focused={sorted(focused)!r}"
         )
 
     for job in sorted(DIRECT_GENERIC):
@@ -273,6 +341,7 @@ def main() -> int:
     print(f"direct_special_guarded={len(DIRECT_SPECIAL)}")
     print(f"transitively_guarded_via_test={len(DEPENDENT_ON_TEST)}")
     print(f"non_pull_request_roots={len(NON_PULL_REQUEST_ROOTS)}")
+    print("focused_nixward_jobs_admitted=checked")
     print("job_scope_status_override_check=PASS")
     return 0
 
