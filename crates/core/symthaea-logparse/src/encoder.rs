@@ -33,6 +33,10 @@ use std::sync::OnceLock;
 /// Hypervector dimensionality. Matches `symthaea-core` for direct comparison.
 pub const HDC_DIM: usize = 16_384;
 
+/// Stable identifier for the experimental cross-corpus encoding contract.
+/// Change this value when the namespace map, field canonicalization, or family semantics change.
+pub const DOMAIN_INVARIANT_ENCODER_VERSION: &str = "cyber-logparse-domain-invariant-v1";
+
 /// Bipolar hypervector: each element is -1 or +1, stored as i8 for cache.
 pub type Hdv = Vec<i8>;
 
@@ -167,6 +171,198 @@ pub fn encode(event: &LogEvent) -> Hdv {
     bundle(&parts)
 }
 
+/// Coarse Windows event family used by the domain-invariant ablation.
+///
+/// This is intentionally an ablation, not a replacement for `encode`: the numeric EventID
+/// is discarded after mapping known IDs into a small semantic family. Unknown IDs
+/// share an `unknown` bucket. Numeric IDs can collide across providers, so this
+/// heuristic must be evaluated cross-corpus before use in production.
+fn normalized_source_token(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .map(|ch| ch.to_ascii_lowercase())
+        .collect()
+}
+
+/// Recognize a small number of provider namespaces without retaining their raw
+/// names in the ablation vector. Unrecognized namespaces fail closed to unknown.
+fn provider_family(provider: &str, component: &str) -> &'static str {
+    let provider = normalized_source_token(provider);
+    let component = normalized_source_token(component);
+
+    let provider_hint = if provider.contains("sysmon") {
+        Some("sysmon")
+    } else if provider.contains("securityauditing") {
+        Some("security_audit")
+    } else if provider.contains("servicecontrolmanager") {
+        Some("service_control_manager")
+    } else if provider.contains("powershell") {
+        Some("powershell")
+    } else {
+        None
+    };
+
+    let component_hint = if component.contains("sysmon") {
+        Some("sysmon")
+    } else if component.contains("powershell") {
+        Some("powershell")
+    } else if provider.is_empty() && component == "security" {
+        Some("security_audit")
+    } else {
+        None
+    };
+
+    match (provider_hint, component_hint) {
+        (Some(provider), Some(component)) if provider != component => "unknown",
+        (Some(provider), _) => provider,
+        (None, Some(component)) => component,
+        (None, None) => "unknown",
+    }
+}
+
+/// Coarse, provider-aware Windows event family used by the domain-invariant
+/// ablation. The same numeric EventID in an unrelated namespace is not assumed
+/// to have the same meaning. Provider/channel tokens select the namespace only;
+/// raw provider/channel names are never encoded into the resulting vector.
+fn event_family(provider: &str, component: &str, event_id: u32) -> &'static str {
+    match provider_family(provider, component) {
+        "sysmon" => match event_id {
+            1 => "process",
+            3 => "network",
+            11 => "file",
+            12 | 13 | 14 => "registry",
+            _ => "unknown",
+        },
+        "security_audit" => match event_id {
+            4624 | 4625 | 4634 | 4647 | 4648 | 4768 | 4769 | 4771 | 4776 => "authentication",
+            4688 | 4689 => "process",
+            4657 => "registry",
+            4697 | 4698 | 4699 | 4700 | 4702 => "service_task",
+            4656 | 4660 | 4663 => "object_access",
+            5156 => "network",
+            _ => "unknown",
+        },
+        "service_control_manager" => match event_id {
+            7036 | 7040 | 7045 => "service_task",
+            _ => "unknown",
+        },
+        "powershell" => match event_id {
+            4103 | 4104 => "scripting",
+            _ => "unknown",
+        },
+        _ => "unknown",
+    }
+}
+
+/// Canonicalize common field-name aliases so casing/producer spelling differences
+/// do not produce different key hypervectors. Unrecognized keys are normalized
+/// to lowercase ASCII alphanumerics with underscores; values remain unchanged in
+/// this first ablation to keep the experiment interpretable.
+fn canonical_field_key(key: &str) -> String {
+    let compact: String = key
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    let canonical = match compact.as_str() {
+        "targetusername" | "username" | "user" | "accountname" | "subjectusername"
+        | "subjectuser" | "useraccount" => "identity_user",
+        "ipaddress" | "sourceip" | "sourceaddress" | "clientaddress" | "remoteaddress" => {
+            "network_address"
+        }
+        "destinationip" | "destinationaddress" | "destaddress" | "remoteip" => {
+            "network_destination"
+        }
+        "logontype" | "logintype" => "authentication_logon_type",
+        "authenticationpackagename" | "authpackage" => "authentication_package",
+        "commandline" | "processcommandline" | "processcmdline" => "process_command_line",
+        "image" | "newprocessname" | "processname" | "executable" | "processpath" => {
+            "process_executable"
+        }
+        "parentimage" | "parentprocessname" | "parentprocess" => "process_parent",
+        "targetfilename" | "filename" | "filepath" | "filepathname" => "file_path",
+        "servicename" | "service" => "service_name",
+        "status" | "substatus" | "statuscode" | "returncode" => "result_status",
+        "processid" | "newprocessid" => "process_id",
+        "parentprocessid" => "parent_process_id",
+        "hash" | "hashes" | "filehash" => "file_hash",
+        "objectname" | "registrykey" | "keyname" => "object_name",
+        _ => {
+            let normalized: String = key
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() {
+                        c.to_ascii_lowercase()
+                    } else {
+                        '_'
+                    }
+                })
+                .collect();
+            let mut compacted = String::with_capacity(normalized.len());
+            let mut previous_underscore = false;
+            for ch in normalized.chars() {
+                if ch == '_' {
+                    if !previous_underscore {
+                        compacted.push(ch);
+                    }
+                    previous_underscore = true;
+                } else {
+                    compacted.push(ch);
+                    previous_underscore = false;
+                }
+            }
+            return compacted.trim_matches('_').to_string();
+        }
+    };
+    canonical.to_string()
+}
+
+/// Experimental domain-invariant encoder for cross-corpus ablation.
+///
+/// Compared with [`encode`], this version:
+/// - drops raw provider and component strings;
+/// - maps EventIDs into coarse families within recognized provider namespaces;
+/// - canonicalizes common structured-field name aliases;
+/// - retains source, severity, and field values as separate channels.
+///
+/// It is deliberately additive: existing `encode` behavior and historical
+/// benchmark results remain reproducible. This is not yet an OCSF mapper and
+/// does not normalize high-cardinality field values; cross-corpus gains must be
+/// measured rather than presumed.
+pub fn encode_domain_invariant(event: &LogEvent) -> Hdv {
+    let mut parts: Vec<Hdv> = Vec::with_capacity(4);
+    parts.push(bind(role_source(), &source_hv(event.source)));
+    parts.push(bind(role_severity(), &severity_hv(event.severity)));
+    parts.push(bind(
+        role_event_id(),
+        &hash_hv(&format!(
+            "{}::EVENT_FAMILY::{}",
+            DOMAIN_INVARIANT_ENCODER_VERSION,
+            event_family(&event.provider, &event.component, event.event_id)
+        )),
+    ));
+
+    if !event.fields.is_empty() {
+        let kv: Vec<Hdv> = event
+            .fields
+            .iter()
+            .map(|(key, value)| {
+                bind(
+                    &hash_hv(&format!(
+                        "{}::FIELD::{}",
+                        DOMAIN_INVARIANT_ENCODER_VERSION,
+                        canonical_field_key(key)
+                    )),
+                    &hash_hv(value),
+                )
+            })
+            .collect();
+        parts.push(bind(role_fields(), &bundle(&kv)));
+    }
+    bundle(&parts)
+}
+
 /// Cosine similarity on bipolar HVs. Range [-1, 1].
 pub fn cosine(a: &Hdv, b: &Hdv) -> f32 {
     let dot: i32 = a.iter().zip(b.iter()).map(|(x, y)| (x * y) as i32).sum();
@@ -202,6 +398,139 @@ mod tests {
             host: None,
             label: None,
         }
+    }
+
+    #[test]
+    fn domain_invariant_encoding_ignores_raw_provider_and_component() {
+        let mut a = ev("Vendor-A-Provider", 4624, "ignored message");
+        a.component = "Security".into();
+        a.fields.insert("TargetUserName".into(), "alice".into());
+
+        let mut b = ev("Vendor-B-Provider", 4624, "different ignored message");
+        b.component = "OtherComponent".into();
+        b.fields.insert("TargetUserName".into(), "alice".into());
+
+        assert_ne!(encode(&a), encode(&b), "baseline must retain producer metadata");
+        assert_eq!(encode_domain_invariant(&a), encode_domain_invariant(&b));
+    }
+
+    #[test]
+    fn domain_invariant_encoding_canonicalizes_common_field_aliases() {
+        let mut a = ev("provider-a", 4624, "");
+        a.fields.insert("TargetUserName".into(), "alice".into());
+
+        let mut b = ev("provider-b", 4624, "");
+        b.fields.insert("user".into(), "alice".into());
+
+        assert_eq!(encode_domain_invariant(&a), encode_domain_invariant(&b));
+    }
+
+    #[test]
+    fn domain_invariant_encoding_buckets_known_event_id_families() {
+        let a = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4624,
+            "",
+        ));
+        let b = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4625,
+            "",
+        ));
+        let c = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        ));
+
+        assert_eq!(a, b, "security authentication IDs share a family");
+        assert_ne!(a, c, "authentication and process families remain distinct");
+    }
+
+    #[test]
+    fn domain_invariant_encoding_maps_equivalent_families_across_providers() {
+        let sysmon_process = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Sysmon",
+            1,
+            "",
+        ));
+        let security_process = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        ));
+        assert_eq!(sysmon_process, security_process);
+
+        let sysmon_network = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Sysmon",
+            3,
+            "",
+        ));
+        let security_network = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            5156,
+            "",
+        ));
+        assert_eq!(sysmon_network, security_network);
+    }
+
+    #[test]
+    fn domain_invariant_encoding_uses_security_channel_when_provider_is_missing() {
+        let mut channel_only = ev("", 4624, "");
+        channel_only.component = "Security".into();
+        let provider_labeled = ev("Microsoft-Windows-Security-Auditing", 4625, "");
+        assert_eq!(
+            encode_domain_invariant(&channel_only),
+            encode_domain_invariant(&provider_labeled)
+        );
+    }
+
+    #[test]
+    fn domain_invariant_encoding_rejects_conflicting_provider_and_channel_hints() {
+        let conflicting = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        ));
+        let unknown_namespace = encode_domain_invariant(&ev(
+            "Vendor-Unknown-Provider",
+            90001,
+            "",
+        ));
+        let mut conflicting_event = ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        );
+        conflicting_event.component = "Microsoft-Windows-Sysmon/Operational".into();
+        assert_eq!(
+            encode_domain_invariant(&conflicting_event),
+            unknown_namespace,
+            "contradictory provider and channel hints must fail closed"
+        );
+        assert_ne!(conflicting, unknown_namespace);
+    }
+
+    #[test]
+    fn domain_invariant_encoding_does_not_conflate_event_ids_across_namespaces() {
+        let sysmon_file = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Sysmon",
+            11,
+            "",
+        ));
+        let unknown_id_eleven = encode_domain_invariant(&ev(
+            "Vendor-Unknown-Provider",
+            11,
+            "",
+        ));
+        assert_ne!(sysmon_file, unknown_id_eleven);
+    }
+
+    #[test]
+    fn unknown_event_ids_do_not_leak_raw_numeric_id() {
+        let a = encode_domain_invariant(&ev("Microsoft-Windows-Sysmon", 90001, ""));
+        let b = encode_domain_invariant(&ev("Microsoft-Windows-Sysmon", 90002, ""));
+        assert_eq!(a, b, "unmapped IDs intentionally share the unknown family");
     }
 
     #[test]

@@ -60,13 +60,12 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         .and_then(|x| x.as_str())
         .map(|s| s.to_string());
 
+    // Never narrow a 64-bit input with `as u32`: an oversized EventID
+    // could wrap into a legitimate security event ID (e.g. 4624).
     let event_id = obj
         .get("EventID")
-        .and_then(|x| {
-            x.as_u64()
-                .or_else(|| x.as_str().and_then(|s| s.parse::<u64>().ok()))
-        })
-        .unwrap_or(0) as u32;
+        .and_then(parse_event_id)
+        .unwrap_or(0);
 
     let level_str = obj.get("Level").and_then(|x| {
         x.as_str()
@@ -118,8 +117,9 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         };
         if sval.len() > 256 {
             // Mordor/Splunk include huge blobs; truncate for the encoder so
-            // hash collisions don't obscure short-field structure.
-            fields.insert(k.clone(), sval[..256].to_string());
+            // hash collisions don't obscure short-field structure. The helper
+            // stops at a UTF-8 boundary instead of panicking on non-ASCII data.
+            fields.insert(k.clone(), truncate_utf8(&sval, 256).to_string());
         } else {
             fields.insert(k.clone(), sval);
         }
@@ -137,6 +137,24 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         host,
         label: None,
     })
+}
+
+/// Parse an EventID without allowing oversized values to wrap into known IDs.
+fn parse_event_id(value: &serde_json::Value) -> Option<u32> {
+    if let Some(number) = value.as_u64() {
+        return u32::try_from(number).ok();
+    }
+    value.as_str().and_then(|text| text.parse::<u32>().ok())
+}
+
+/// Return the longest prefix of `value` that fits within `max_bytes`
+/// without splitting a UTF-8 code point.
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
+    let mut end = value.len().min(max_bytes);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
 }
 
 fn parse_level(s: &str) -> Option<Severity> {
@@ -162,6 +180,57 @@ fn parse_level(s: &str) -> Option<Severity> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn field_truncation_preserves_utf8_boundaries() {
+        // A 3-byte character makes byte offset 256 land inside a code point.
+        let long = "漢".repeat(100);
+        let value = serde_json::json!({
+            "SourceName": "Microsoft-Windows-Security-Auditing",
+            "Channel": "Security",
+            "EventID": 4624,
+            "LongField": long,
+        });
+        let event = json_to_log_event(&value).expect("object should parse");
+        let truncated = &event.fields["LongField"];
+        assert!(truncated.len() <= 256);
+        assert_eq!(truncated.len(), 255);
+        assert!(truncated.chars().all(|c| c == '漢'));
+    }
+
+    #[test]
+    fn event_id_parsing_rejects_values_that_would_wrap() {
+        let overflow = u32::MAX as u64 + 4624;
+        assert_eq!(parse_event_id(&serde_json::json!(4624)), Some(4624));
+        assert_eq!(parse_event_id(&serde_json::json!("4624")), Some(4624));
+        assert_eq!(parse_event_id(&serde_json::json!(overflow)), None);
+        assert_eq!(parse_event_id(&serde_json::json!(overflow.to_string())), None);
+
+        for event_id in [
+            serde_json::json!(overflow),
+            serde_json::json!(overflow.to_string()),
+        ] {
+            let value = serde_json::json!({
+                "SourceName": "Microsoft-Windows-Security-Auditing",
+                "Channel": "Security",
+                "EventID": event_id,
+            });
+            let event = json_to_log_event(&value).expect("object should parse");
+            assert_eq!(event.event_id, 0, "invalid IDs fail closed to unknown");
+        }
+    }
+
+    #[test]
+    fn utf8_truncation_handles_short_and_zero_limits() {
+        assert_eq!(truncate_utf8("security", 256), "security");
+        assert_eq!(truncate_utf8("漢字", 0), "");
+        assert_eq!(truncate_utf8("漢字", 4), "漢");
+    }
+}
+
 /// Convenience wrapper: parse every `.json` file under a directory tree.
 pub fn parse_jsonl_tree(root: &Path) -> Result<Vec<LogEvent>> {
     let mut out = Vec::new();
@@ -170,9 +239,14 @@ pub fn parse_jsonl_tree(root: &Path) -> Result<Vec<LogEvent>> {
 }
 
 fn visit(dir: &Path, out: &mut Vec<LogEvent>) -> Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    // read_dir order is filesystem-dependent. Sorting is necessary for
+    // deterministic corpus construction and seeded training runs.
+    let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<std::io::Result<_>>()?;
+    paths.sort();
+
+    for path in paths {
         if path.is_dir() {
             visit(&path, out)?;
         } else if path.extension().and_then(|s| s.to_str()) == Some("json") {

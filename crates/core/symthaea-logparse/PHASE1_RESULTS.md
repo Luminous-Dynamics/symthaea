@@ -1,6 +1,13 @@
 # Phase 1 results — real EVTX-ATTACK-SAMPLES corpus
 
 **Date:** 2026-04-14
+
+## Retrospective evaluation caveat (2026-10-11)
+
+The in-corpus single-split and five-fold figures below were generated with event-level stratification. The historical `stratified_split` and `run_kfold` assigned events individually, so events from the same source EVTX file could appear in both training and test folds. The recorded **0.817 ± 0.018** CV result therefore does not establish source-file/capture-level generalization and may be optimistic. Treat it as a historical event-level result; do not compare it directly with the grouped split/fold protocol introduced in the Cyber Crucible LogParse ablation PR.
+
+The **0.168 OTRF cross-corpus accuracy** is a different measurement: OTRF was held out as a separate corpus and remains evidence of poor cross-collection transfer in that recorded run. It should not be discarded because of the in-corpus split flaw. None of these values was newly reproduced by the 2026-10-11 changes.
+
 **Corpus:** sbousseaden/EVTX-ATTACK-SAMPLES (`git clone --depth 1`)
 **Commit:** [to be added]
 
