@@ -38,6 +38,19 @@ pub enum NixOSCommand {
     EnvInstall { packages: Vec<String> },
     /// nix-env -e (user package remove)
     EnvRemove { packages: Vec<String> },
+    /// Explicit systemd service lifecycle operation.
+    Service {
+        operation: ServiceOperation,
+        name: String,
+    },
+    /// Switch the NixOS system profile to an exact generation.
+    GenerationSwitch { generation: u32 },
+    /// Roll back the active NixOS system configuration.
+    GenerationRollback,
+    /// Delete all but the newest `keep_last` system generations.
+    GenerationDeleteOld { keep_last: usize },
+    /// Delete system generations older than `days`.
+    GenerationDeleteOlderThan { days: u32 },
     /// nix-env --rollback (user profile rollback)
     EnvRollback,
     /// nix search (package search)
@@ -61,6 +74,17 @@ pub enum NixOSCommand {
     },
 }
 
+/// Systemd service lifecycle operations represented as structured authority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServiceOperation {
+    Start,
+    Stop,
+    Restart,
+    Reload,
+    Enable,
+    Disable,
+}
+
 /// Channel operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChannelOperation {
@@ -77,6 +101,7 @@ pub enum FlakeOperation {
     Lock { inputs: Vec<String> },
     Show,
     Check,
+    Init { template: Option<String> },
 }
 
 /// Safety levels for commands
@@ -105,6 +130,16 @@ impl SafetyLevel {
     pub fn required_phi(&self) -> f32 {
         ConsciousnessThresholds::default().threshold_for(self.to_action_type())
     }
+}
+
+fn rebuild_has_unguarded_extra_args(command: &NixOSCommand) -> bool {
+    matches!(
+        command,
+        NixOSCommand::RebuildSwitch { extra_args, .. }
+            | NixOSCommand::RebuildTest { extra_args, .. }
+            | NixOSCommand::RebuildBoot { extra_args, .. }
+            if !extra_args.is_empty()
+    )
 }
 
 impl NixOSCommand {
@@ -142,6 +177,10 @@ impl NixOSCommand {
             } => SafetyLevel::ReadOnly,
 
             Self::EnvInstall { .. } => SafetyLevel::UserModify,
+            Self::Service { .. } => SafetyLevel::SystemModify,
+            Self::GenerationSwitch { .. } => SafetyLevel::SystemCritical,
+            Self::GenerationRollback => SafetyLevel::SystemCritical,
+            Self::GenerationDeleteOld { .. } | Self::GenerationDeleteOlderThan { .. } => SafetyLevel::Destructive,
             Self::EnvRemove { .. } => SafetyLevel::UserModify,
             Self::EnvRollback => SafetyLevel::UserModify,
             Self::Channel {
@@ -157,6 +196,9 @@ impl NixOSCommand {
                 operation: FlakeOperation::Update { .. },
             } => SafetyLevel::UserModify,
             Self::Flake {
+                operation: FlakeOperation::Init { .. },
+            } => SafetyLevel::UserModify,
+            Self::Flake {
                 operation: FlakeOperation::Lock { .. },
             } => SafetyLevel::UserModify,
             Self::HomeManagerSwitch { .. } => SafetyLevel::UserModify,
@@ -168,7 +210,9 @@ impl NixOSCommand {
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
 
-            Self::Custom { safety_level, .. } => *safety_level,
+            // `Custom` is an ungoverned compatibility channel. Its embedded
+            // label is diagnostic metadata only and must never grant a lower risk tier.
+            Self::Custom { .. } => SafetyLevel::Destructive,
         }
     }
 
@@ -176,25 +220,12 @@ impl NixOSCommand {
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
-                })
+                Some(NixOSCommand::GenerationRollback)
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
                 Some(NixOSCommand::EnvRollback)
             }
-            Self::HomeManagerSwitch { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "sh".to_string(),
-                    args: vec![
-                        "-c".to_string(),
-                        "home-manager generations | head -2 | tail -1 | awk '{print $NF}' | xargs -I {} {}/activate".to_string(),
-                    ],
-                    safety_level: SafetyLevel::UserModify,
-                })
-            }
+            Self::HomeManagerSwitch { .. } => None,
             _ => None,
         }
     }
@@ -235,6 +266,48 @@ impl NixOSCommand {
                 args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
+            Self::Service { operation, name } => {
+                let action = match operation {
+                    ServiceOperation::Start => "start",
+                    ServiceOperation::Stop => "stop",
+                    ServiceOperation::Restart => "restart",
+                    ServiceOperation::Reload => "reload",
+                    ServiceOperation::Enable => "enable",
+                    ServiceOperation::Disable => "disable",
+                };
+                ("systemctl".to_string(), vec![action.to_string(), name.clone()])
+            }
+            Self::GenerationSwitch { generation } => (
+                "nix-env".to_string(),
+                vec![
+                    "--switch-generation".to_string(),
+                    generation.to_string(),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::GenerationRollback => (
+                "nixos-rebuild".to_string(),
+                vec!["switch".to_string(), "--rollback".to_string()],
+            ),
+            Self::GenerationDeleteOld { keep_last } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("+{keep_last}"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::GenerationDeleteOlderThan { days } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("{days}d"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
             Self::EnvInstall { packages } => {
                 let mut args = Vec::with_capacity(1 + packages.len());
                 args.push("-iA".to_string());
@@ -307,6 +380,14 @@ impl NixOSCommand {
                     "nix".to_string(),
                     vec!["flake".to_string(), "check".to_string()],
                 ),
+                FlakeOperation::Init { template } => {
+                    let mut args = vec!["flake".to_string(), "init".to_string()];
+                    if let Some(template) = template {
+                        args.push("--template".to_string());
+                        args.push(template.clone());
+                    }
+                    ("nix".to_string(), args)
+                },
             },
             Self::HomeManagerSwitch { flake } => {
                 let cap = if flake.is_some() { 3 } else { 1 };
@@ -454,6 +535,21 @@ impl NixOSExecutor {
     /// re-checking a synthetic score. See
     /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        if !self.dry_run {
+            if matches!(&command, NixOSCommand::Custom { .. }) {
+                return ExecutionResult::Blocked {
+                    reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
+                    safety_level: SafetyLevel::Destructive,
+                };
+            }
+            if rebuild_has_unguarded_extra_args(&command) {
+                return ExecutionResult::Blocked {
+                    reason: "nixos-rebuild extra_args require individually typed authority".to_string(),
+                    safety_level: command.safety_level(),
+                };
+            }
+        }
+
         let safety = command.safety_level();
         let required_phi = safety.required_phi();
 
@@ -575,6 +671,21 @@ impl NixOSExecutor {
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        if !self.dry_run {
+            if matches!(&command, NixOSCommand::Custom { .. }) {
+                return ExecutionResult::Blocked {
+                    reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
+                    safety_level: SafetyLevel::Destructive,
+                };
+            }
+            if rebuild_has_unguarded_extra_args(&command) {
+                return ExecutionResult::Blocked {
+                    reason: "nixos-rebuild extra_args require individually typed authority".to_string(),
+                    safety_level: command.safety_level(),
+                };
+            }
+        }
+
         let (cmd, args) = command.to_command();
 
         info!(
@@ -674,6 +785,22 @@ mod tests {
         };
         assert_eq!(search.safety_level(), SafetyLevel::ReadOnly);
 
+        let service = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            name: "nginx.service".to_string(),
+        };
+        assert_eq!(service.safety_level(), SafetyLevel::SystemModify);
+        let (bin, args) = service.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "nginx.service"]);
+
+        let generation = NixOSCommand::GenerationSwitch { generation: 42 };
+        assert_eq!(generation.safety_level(), SafetyLevel::SystemCritical);
+        let (bin, args) = generation.to_command();
+        assert_eq!(bin, "nix-env");
+        assert_eq!(args[0], "--switch-generation");
+        assert_eq!(args[1], "42");
+
         let install = NixOSCommand::EnvInstall {
             packages: vec!["vim".to_string()],
         };
@@ -711,6 +838,28 @@ mod tests {
     }
 
     #[test]
+    fn test_all_service_operations_have_structured_systemctl_mapping() {
+        let cases = [
+            (ServiceOperation::Start, "start"),
+            (ServiceOperation::Stop, "stop"),
+            (ServiceOperation::Restart, "restart"),
+            (ServiceOperation::Reload, "reload"),
+            (ServiceOperation::Enable, "enable"),
+            (ServiceOperation::Disable, "disable"),
+        ];
+        for (operation, expected_action) in cases {
+            let command = NixOSCommand::Service {
+                operation,
+                name: "sshd.service".to_string(),
+            };
+            let (bin, args) = command.to_command();
+            assert_eq!(bin, "systemctl");
+            assert_eq!(args, vec![expected_action, "sshd.service"]);
+            assert_eq!(command.safety_level(), SafetyLevel::SystemModify);
+        }
+    }
+
+    #[test]
     fn test_rollback_commands() {
         let rebuild = NixOSCommand::RebuildSwitch {
             flake: None,
@@ -736,6 +885,78 @@ mod tests {
         assert_eq!(SafetyLevel::UserModify.required_phi(), 0.3);
         assert_eq!(SafetyLevel::SystemCritical.required_phi(), 0.4);
         assert_eq!(SafetyLevel::Destructive.required_phi(), 0.6);
+    }
+
+    #[tokio::test]
+    async fn test_custom_command_cannot_mint_authority_from_read_only_label() {
+        let custom = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "touch /tmp/nixward-custom-bypass".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        let mut executor = NixOSExecutor::new();
+        let result = executor.execute(custom.clone(), 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { reason, safety_level: SafetyLevel::Destructive }
+                if reason.contains("unguarded Custom")
+        ));
+
+        let result = executor.execute_confirmed(custom, 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { reason, safety_level: SafetyLevel::Destructive }
+                if reason.contains("unguarded Custom")
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_custom_command_remains_previewable_in_dry_run() {
+        let custom = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "touch /tmp/nixward-custom-bypass".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let result = executor.execute(custom, 1.0).await;
+        match result {
+            ExecutionResult::Success { stdout, .. } => assert!(stdout.contains("[DRY-RUN]")),
+            other => panic!("expected dry-run preview, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_extra_args_cannot_expand_real_authority() {
+        let commands = [
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec!["--target-host".into(), "host.example".into()],
+            },
+            NixOSCommand::RebuildTest {
+                flake: None,
+                extra_args: vec!["--use-remote-sudo".into()],
+            },
+            NixOSCommand::RebuildBoot {
+                flake: None,
+                extra_args: vec!["--upgrade".into()],
+            },
+        ];
+        for command in commands {
+            let mut executor = NixOSExecutor::new();
+            let result = executor.execute(command.clone(), 1.0).await;
+            assert!(matches!(
+                result,
+                ExecutionResult::Blocked { reason, .. }
+                    if reason.contains("extra_args require individually typed authority")
+            ));
+
+            let result = executor.execute_confirmed(command, 1.0).await;
+            assert!(matches!(
+                result,
+                ExecutionResult::Blocked { reason, .. }
+                    if reason.contains("extra_args require individually typed authority")
+            ));
+        }
     }
 
     #[tokio::test]
@@ -930,13 +1151,13 @@ mod tests {
     fn test_custom_auto_classify_search() {
         let cmd =
             NixOSCommand::custom_auto("nix", vec!["search".into(), "nixpkgs".into(), "vim".into()]);
-        assert_eq!(cmd.safety_level(), SafetyLevel::ReadOnly);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
     fn test_custom_auto_classify_rebuild() {
         let cmd = NixOSCommand::custom_auto("nixos-rebuild", vec!["switch".into()]);
-        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
@@ -947,9 +1168,9 @@ mod tests {
 
     #[test]
     fn test_custom_auto_classify_unknown() {
-        // Unknown commands default to SystemCritical (conservative)
+        // Unknown Custom commands are always treated as Destructive.
         let cmd = NixOSCommand::custom_auto("some-unknown-tool", vec![]);
-        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
@@ -959,10 +1180,27 @@ mod tests {
             args: vec!["hello".to_string()],
             safety_level: SafetyLevel::ReadOnly,
         };
-        assert_eq!(custom.safety_level(), SafetyLevel::ReadOnly);
+        assert_eq!(custom.safety_level(), SafetyLevel::Destructive);
         let (bin, args) = custom.to_command();
         assert_eq!(bin, "echo");
         assert_eq!(args, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_custom_safety_label_cannot_lower_risk() {
+        for claimed in [
+            SafetyLevel::ReadOnly,
+            SafetyLevel::UserModify,
+            SafetyLevel::SystemModify,
+            SafetyLevel::SystemCritical,
+        ] {
+            let custom = NixOSCommand::Custom {
+                command: "echo".to_string(),
+                args: vec!["hello".to_string()],
+                safety_level: claimed,
+            };
+            assert_eq!(custom.safety_level(), SafetyLevel::Destructive);
+        }
     }
 
     #[test]
@@ -1008,7 +1246,10 @@ mod tests {
         assert!(switch.rollback_command().is_some());
         assert!(test.rollback_command().is_some());
         assert!(boot.rollback_command().is_some());
-        assert!(hm.rollback_command().is_some());
+        assert!(
+            hm.rollback_command().is_none(),
+            "Home Manager shell rollback must remain fail-closed until a typed operation exists"
+        );
         assert!(
             gc.rollback_command().is_none(),
             "GC should not have rollback"

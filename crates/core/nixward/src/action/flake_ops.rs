@@ -122,10 +122,10 @@ impl FlakeOps {
             args.push("--template".to_string());
             args.push(tmpl.to_string());
         }
-        NixOSCommand::Custom {
-            command: "nix".to_string(),
-            args,
-            safety_level: SafetyLevel::UserModify,
+        NixOSCommand::Flake {
+            operation: FlakeOperation::Init {
+                template: template.map(str::to_string),
+            },
         }
     }
 
@@ -239,6 +239,7 @@ mod tests {
         assert_eq!(bin, "nix");
         assert!(args.contains(&"init".to_string()));
         assert!(args.contains(&"--template".to_string()));
+        assert_eq!(cmd.safety_level(), crate::action::executor::SafetyLevel::UserModify);
     }
 
     #[test]

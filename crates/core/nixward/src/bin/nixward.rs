@@ -8,7 +8,7 @@
 
 use clap::Parser;
 use nixward::action::config_writer::ConfigWriter;
-use nixward::action::executor::NixOSCommand;
+use nixward::action::executor::{ExecutionResult, NixOSCommand, NixOSExecutor};
 use nixward::action::flake_ops::FlakeOps;
 use nixward::action::gc_manager::GcManager;
 use nixward::action::generation_manager::GenerationManager;
@@ -335,22 +335,53 @@ fn cmd_execute(cmd: NixOSCommand, dry_run: bool, phi_override: Option<f64>) {
         return;
     }
 
-    let (bin, args) = cmd.to_command();
-    if dry_run {
-        println!("  [DRY-RUN] Would execute: {} {}", bin, args.join(" "));
-    } else {
-        println!("  Executing: {} {}", bin, args.join(" "));
-        let status = std::process::Command::new(&bin).args(&args).status();
-        match status {
-            Ok(s) if s.success() => println!("  Done."),
-            Ok(s) => {
-                eprintln!("  Command failed with exit code: {:?}", s.code());
-                std::process::exit(1);
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("  Failed to create governed execution runtime: {e}");
+            std::process::exit(1);
+        }
+    };
+    let mut executor = NixOSExecutor::new().with_dry_run(dry_run);
+    let result = runtime.block_on(executor.execute(cmd, phi));
+    match result {
+        ExecutionResult::Success { stdout, stderr, .. } => {
+            if !stdout.is_empty() {
+                print!("{}", stdout);
+                if !stdout.ends_with('\\n') {
+                    println!();
+                }
+            } else if dry_run {
+                println!("  [DRY-RUN] governed execution preview complete");
             }
-            Err(e) => {
-                eprintln!("  Failed to execute: {}", e);
-                std::process::exit(1);
+            if !stderr.is_empty() {
+                eprint!("{}", stderr);
             }
+        }
+        ExecutionResult::RolledBack { error, rollback_output } => {
+            eprintln!("  Command failed and rollback succeeded: {error}");
+            if !rollback_output.is_empty() {
+                eprintln!("  Rollback output: {rollback_output}");
+            }
+            std::process::exit(1);
+        }
+        ExecutionResult::FailedNoRollback { error, rollback_error } => {
+            eprintln!("  Governed command failed: {error}");
+            if let Some(rollback_error) = rollback_error {
+                eprintln!("  Rollback unavailable/failed: {rollback_error}");
+            }
+            std::process::exit(1);
+        }
+        ExecutionResult::Blocked { reason, .. } => {
+            eprintln!("  Governed execution blocked: {reason}");
+            std::process::exit(1);
+        }
+        ExecutionResult::PendingConfirmation { required_phi, .. } => {
+            eprintln!("  Governed execution requires confirmation (Phi >= {required_phi:.2})");
+            std::process::exit(1);
         }
     }
 }

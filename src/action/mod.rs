@@ -873,6 +873,104 @@ impl From<PolicyViolation> for ExecutionError {
     }
 }
 
+/// Return whether a real `ActionIR::RunCommand` would cross into an
+/// authority-sensitive execution family that must be handled by a governed
+/// typed effect instead of the generic command executor.
+///
+/// This is deliberately narrower than a complete command sandbox. It exists
+/// to stop executable-name allowlisting from becoming implicit authority for
+/// system lifecycle, Nix profile/system mutation, or command-wrapper escape
+/// hatches.
+pub(crate) fn executor_command_requires_governed_authority(program: &str, args: &[String]) -> bool {
+    let basename = Path::new(program)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(program)
+        .to_ascii_lowercase();
+    let verb = args
+        .first()
+        .map(|arg| arg.to_ascii_lowercase());
+
+    match basename.as_str() {
+        // Process/shell/environment wrappers can invoke an otherwise protected
+        // program through a second argv layer.
+        "sh" | "bash" | "dash" | "zsh" | "fish" | "env" | "sudo" | "doas" | "pkexec"
+        | "xargs" | "busybox" | "timeout" | "nohup" | "setsid" | "stdbuf" | "ionice"
+        | "chroot" | "nsenter" | "nice" | "watch" | "daemonize" | "runuser" | "su"
+        | "parallel" | "script" | "expect" => true,
+
+        // systemd lifecycle is always governed; only the explicitly
+        // observational verbs remain in the generic command plane.
+        "systemctl" => !matches!(
+            verb.as_deref(),
+            Some("status" | "show" | "list-units" | "list-unit-files" | "is-active")
+        ),
+
+        // `nixos-rebuild build` and `dry-run` do not switch the live system.
+        // Everything else is treated as authority-sensitive.
+        "nixos-rebuild" => !matches!(verb.as_deref(), Some("build" | "dry-run")),
+
+        // Nix profile/environment commands mutate persistent user state except
+        // for the explicit query forms.
+        "nix-env" => !matches!(verb.as_deref(), Some("-q" | "--query")),
+
+        // `nix-shell` can execute arbitrary commands inside the constructed
+        // environment (for example via `--run`), so it is a second-stage
+        // execution wrapper rather than a generic observational command.
+        "nix-shell" => true,
+
+        // `nix` is capability-broad. Only a small, explicit observational
+        // subset is safe to leave in the generic executor.
+        "nix" => match (verb.as_deref(), args.get(1).map(|arg| arg.to_ascii_lowercase())) {
+            (Some("search" | "eval" | "path-info"), _) => false,
+            (Some("flake"), Some(subcommand))
+                if matches!(subcommand.as_str(), "show" | "metadata") => false,
+            _ => true,
+        },
+
+        // `find` is observational until its executable actions are enabled;
+        // those actions create a second argv execution layer.
+                "find" => args.iter().any(|arg| matches!(arg.as_str(),
+            "-exec" | "-execdir" | "-ok" | "-okdir" | "-delete" | "-fprint" | "-fprint0"
+                | "-fprintf" | "-fls"
+        )),
+
+        // Other well-known system lifecycle/configuration planes should not be
+        // smuggled through a generic executable allowlist.
+        "nix-store"
+        | "nix-channel"
+        | "nix-collect-garbage"
+        | "nmcli"
+        | "loginctl"
+        | "networkctl"
+        | "resolvectl"
+        | "ip"
+        | "nft"
+        | "iptables"
+        | "firewall-cmd"
+        | "systemd-run"
+        | "systemd-cryptenroll"
+        | "udevadm"
+        | "cryptsetup"
+        | "mount"
+        | "umount"
+        | "reboot"
+        | "shutdown"
+        | "poweroff"
+        | "halt"
+        | "timedatectl"
+        | "localectl"
+        | "hostnamectl"
+        | "useradd"
+        | "userdel"
+        | "usermod"
+        | "passwd"
+        | "chpasswd" => true,
+
+        _ => false,
+    }
+}
+
 /// Execution mode for commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {
@@ -1224,6 +1322,13 @@ impl SimpleExecutor {
                     args: args.clone(),
                 },
                 ExecutionMode::Real => {
+                    if executor_command_requires_governed_authority(program, args) {
+                        return Err(ExecutionError::Unsupported(format!(
+                            "authority-sensitive command '{}' requires governed typed execution",
+                            program
+                        )));
+                    }
+
                     let mut cmd = Command::new(program);
                     cmd.args(args);
                     cmd.envs(env);
@@ -1682,6 +1787,131 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod executor_authority_tests {
+    use super::executor_command_requires_governed_authority;
+
+    fn args(parts: &[&str]) -> Vec<String> {
+        parts.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn blocks_nix_profile_mutation_even_when_nix_is_allowlisted() {
+        assert!(executor_command_requires_governed_authority(
+            "nix",
+            &args(&["profile", "install", "nixpkgs#hello"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix",
+            &args(&["store", "gc"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix-collect-garbage",
+            &args(&["-d"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix-channel",
+            &args(&["--update"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "nix",
+            &args(&["search", "nixpkgs", "hello"])
+        ));
+    }
+
+    #[test]
+    fn blocks_nix_env_mutation_and_allows_query() {
+        assert!(executor_command_requires_governed_authority(
+            "nix-env",
+            &args(&["-e", "hello"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "nix-env",
+            &args(&["--query"])
+        ));
+    }
+
+    #[test]
+    fn blocks_system_mutation_and_wrapper_escape_hatches() {
+        assert!(executor_command_requires_governed_authority(
+            "systemctl",
+            &args(&["restart", "sshd.service"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "systemctl",
+            &args(&["status", "sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "env",
+            &args(&["systemctl", "restart", "sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "sh",
+            &args(&["-c", "systemctl restart sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "timeout",
+            &args(&["1", "systemctl", "restart", "sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nice",
+            &args(&["systemctl", "restart", "sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-exec", "systemctl", "restart", "sshd.service", ";"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-execdir", "nix-env", "-e", "hello", ";"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "/usr/bin/env",
+            &args(&["nix", "profile", "install", "nixpkgs#hello"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nix-shell",
+            &args(&["-p", "hello", "--run", "systemctl restart sshd.service"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-delete"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-fprint", "/tmp/out"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-ok", "systemctl", "restart", "sshd.service", ";"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "find",
+            &args(&["/tmp", "-type", "f", "-maxdepth", "1"])
+        ));
+    }
+
+    #[test]
+    fn blocks_nixos_rebuild_mutation_but_preserves_non_switching_modes() {
+        assert!(executor_command_requires_governed_authority(
+            "nixos-rebuild",
+            &args(&["switch"])
+        ));
+        assert!(executor_command_requires_governed_authority(
+            "nixos-rebuild",
+            &args(&["test"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "nixos-rebuild",
+            &args(&["build"])
+        ));
+        assert!(!executor_command_requires_governed_authority(
+            "nixos-rebuild",
+            &args(&["dry-run"])
+        ));
+    }
 }
 
 #[cfg(test)]
