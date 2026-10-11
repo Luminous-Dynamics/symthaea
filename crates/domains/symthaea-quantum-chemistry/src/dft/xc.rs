@@ -79,6 +79,13 @@ pub struct DftResult {
     /// Number of grid points used by a successful numerical result.
     /// Zero in a fail-closed compatibility result with `solver_error = Some(...)`.
     pub n_grid_points: usize,
+    /// Electron count integrated from the final density on the actual DFT grid.
+    /// This is a quadrature diagnostic, not an SCF convergence or chemical-accuracy claim.
+    /// NaN indicates the checked solver failed before a final density was available.
+    pub integrated_electron_count: f64,
+    /// Absolute difference between the integrated grid electron count and the
+    /// integer electron count from the molecular charge/nuclear charges.
+    pub integrated_electron_count_abs_error: f64,
     /// Error emitted by the fallible solver when the legacy wrapper must fail closed.
     /// If set, energies are NaN, orbital vectors are empty, `converged` is false,
     /// `n_iterations` and `n_grid_points` are zero, and diagnostics are absent.
@@ -164,6 +171,8 @@ fn kohn_sham_dft_with_eigensolver_budget(
             converged: false,
             n_basis: basis.n_basis(),
             n_grid_points: 0,
+            integrated_electron_count: f64::NAN,
+            integrated_electron_count_abs_error: f64::NAN,
             solver_error: Some(error.to_string()),
             solver_diagnostics: None,
         },
@@ -468,6 +477,25 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
     // validate each component. Fixed-point convergence remains a separate flag.
     let rho_final = compute_density_at_grid(&density, &basis_at_grid, n, grid.n_points());
     ensure_finite_values("DFT final electron density on grid", &rho_final)?;
+    let integrated_electron_count: f64 = rho_final
+        .iter()
+        .zip(&grid.points)
+        .map(|(rho, point)| rho * point.weight)
+        .sum();
+    if !integrated_electron_count.is_finite() {
+        return Err(ScfSolveError::NonFiniteNumericValue {
+            stage: "DFT integrated electron count",
+            index: 0,
+        });
+    }
+    let integrated_electron_count_abs_error =
+        (integrated_electron_count - electron_count as f64).abs();
+    if !integrated_electron_count_abs_error.is_finite() {
+        return Err(ScfSolveError::NonFiniteNumericValue {
+            stage: "DFT integrated electron-count error",
+            index: 0,
+        });
+    }
     let mut e_xc_final = 0.0;
     for (g, pt) in grid.points.iter().enumerate() {
         let rho_g = rho_final[g];
@@ -519,6 +547,8 @@ fn try_kohn_sham_dft_with_eigensolver_budget(
         converged,
         n_basis: n,
         n_grid_points: grid.n_points(),
+        integrated_electron_count,
+        integrated_electron_count_abs_error,
         solver_error: None,
         solver_diagnostics: Some(solver_diagnostics),
     })
