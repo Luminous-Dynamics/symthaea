@@ -67,12 +67,20 @@ jobs:
           OUT="$RUNNER_TEMP/jungian-baseline-capture"
           mkdir -p "$OUT"
           SOURCE_REVISION="$(git rev-parse HEAD)"
-          cargo run --quiet --bin jungian_glyph_projection_probe --features glyph_codex -- \
+          cargo run --quiet --no-default-features --bin jungian_glyph_projection_probe --features glyph_codex -- \
             --corpus docs/research/data/jungian_symbolic_probe_v1.json \
             --output "$OUT/glyph_projection.json" \
             --source-revision "$SOURCE_REVISION" \
             --glyph-source-blob "$(git rev-parse HEAD:src/hdc/glyph_basis.rs)" \
             --registry-source-blob "$(git rev-parse HEAD:src/hdc/glyph_registry_data.rs)"
+          cargo run --quiet --no-default-features --bin jungian_glyph_projection_probe --features glyph_codex -- \
+            --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --output "$OUT/glyph_projection.repeat.json" \
+            --source-revision "$SOURCE_REVISION" \
+            --glyph-source-blob "$(git rev-parse HEAD:src/hdc/glyph_basis.rs)" \
+            --registry-source-blob "$(git rev-parse HEAD:src/hdc/glyph_registry_data.rs)"
+          cmp --silent "$OUT/glyph_projection.json" "$OUT/glyph_projection.repeat.json"
+          rm "$OUT/glyph_projection.repeat.json"
           python3 scripts/run_jungian_symbolic_baselines.py \
             --output-dir "$OUT" \
             --source-revision "$SOURCE_REVISION" \
