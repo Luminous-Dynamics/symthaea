@@ -665,7 +665,7 @@ mod tests {
 // as evidence that a real benchmark run has not regressed.
 
 #[cfg(test)]
-mod tests {
+mod snapshot_comparison_tests {
     use super::*;
 
     fn fixture_snapshot(name: &str, mean: f64) -> RegressionSnapshot {
