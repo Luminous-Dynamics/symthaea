@@ -1,0 +1,37 @@
+{
+  "schema": "symthaea.ci.terminal-zombie-contract.v1",
+  "authority": "RunnerPlaneContractOnly",
+  "workflow": "ci.yml",
+  "event": "pull_request",
+  "candidate_parent_status": "in_progress",
+  "minimum_stale_minutes": 30,
+  "classification_requires": [
+    "fresh parent run still reports in_progress",
+    "one or more child jobs exist",
+    "every paginated child job reports completed",
+    "every child job has a valid completed_at timestamp",
+    "latest child completion is at least 30 minutes old",
+    "parent run metadata has not updated for at least 30 minutes"
+  ],
+  "hard_exclusions": [
+    "any child job is queued, waiting, pending, requested, or in_progress",
+    "zero child jobs",
+    "workflow is not ci.yml",
+    "event is not pull_request",
+    "parent status is not in_progress",
+    "parent or child timestamps are invalid or too recent"
+  ],
+  "recovery": {
+    "first_action": "normal cancel",
+    "on_http_409": "one force-cancel attempt",
+    "on_second_http_409": "record unresolved platform state and stop mutating that run",
+    "repeat_force_cancel_same_reconciliation": false
+  },
+  "authority_boundary": {
+    "may_change_runner_plane_state": true,
+    "may_change_repository_files": false,
+    "may_change_pr_state": false,
+    "may_rerun_jobs": false,
+    "scientific_authority": false
+  }
+}
