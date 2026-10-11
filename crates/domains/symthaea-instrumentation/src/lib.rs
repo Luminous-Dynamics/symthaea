@@ -343,11 +343,11 @@ impl fmt::Display for ContractError {
             }
             Self::CalibrationReviewAuthorizationMissing => write!(
                 f,
-                "calibration evidence requires root-authorized reviewer identity and independence proof"
+                "calibration evidence requires reviewer authorization proof"
             ),
             Self::CalibrationReviewAuthorizationMismatch => write!(
                 f,
-                "review authorization must target this certificate provider and remain organizationally distinct"
+                "review authorization provider or organization mismatch"
             ),
             Self::VerifiedArtifactReferenceMismatch(artifact) => {
                 write!(f, "verified bytes must match the resolved {artifact} reference")
