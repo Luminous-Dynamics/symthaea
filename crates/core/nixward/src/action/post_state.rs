@@ -90,7 +90,12 @@ impl NixVerifiedPostStateObservationV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemdJobEvidenceV1 {
     pub id: u32,
+    /// JobType implied by the exact typed dispatch operation.
     pub job_type: NixSystemdJobTypeV1,
+    /// Independently observed from the live Job object when it remained queryable.
+    /// None means the Job completed/disappeared before JobType could be observed.
+    #[serde(default)]
+    pub observed_job_type: Option<NixSystemdJobTypeV1>,
     /// Canonical unit name carried by systemd's JobRemoved signal.
     pub unit: String,
     /// Unique D-Bus owner of org.freedesktop.systemd1 for this job epoch.
@@ -129,11 +134,20 @@ impl NixSystemdJobEvidenceV1 {
             return Err(NixPostStateErrorV1::InvalidJobObjectPath);
         }
         require_nonempty(&self.result, "systemd job result")?;
+        if let Some(observed) = self.observed_job_type
+            && observed != self.job_type
+        {
+            return Err(NixPostStateErrorV1::JobTypeMismatch);
+        }
         Ok(())
     }
 
     pub fn succeeded(&self) -> bool {
         self.result == "done"
+    }
+
+    pub fn observed_job_type(&self) -> Option<NixSystemdJobTypeV1> {
+        self.observed_job_type
     }
 }
 
@@ -558,6 +572,9 @@ pub struct NixPostStateReceiptV1 {
     pub operation: NixServiceOperationKindV1,
     pub systemd_job_id: Option<u32>,
     pub systemd_job_type: Option<NixSystemdJobTypeV1>,
+    /// Independently observed JobType from the live systemd Job object, when available.
+    #[serde(default)]
+    pub systemd_job_type_observed: Option<NixSystemdJobTypeV1>,
     pub systemd_job_unit: Option<String>,
     pub systemd_job_object_path: Option<String>,
     pub systemd_job_result: Option<String>,
@@ -739,6 +756,10 @@ impl NixPostStateReceiptV1 {
         let (
             systemd_job_id,
             systemd_job_type,
+            systemd_job_type_observed: observation
+                .systemd_job
+                .as_ref()
+                .and_then(|job| job.observed_job_type()),
             systemd_job_unit,
             systemd_job_object_path,
             systemd_job_result,
@@ -1096,6 +1117,13 @@ impl NixPostStateReceiptV1 {
                     if Some(job_type) != NixSystemdJobTypeV1::for_operation(self.operation) {
                         return Err(NixPostStateErrorV1::InvalidClaim);
                     }
+                    if let Some(observed_job_type) = self.systemd_job_type_observed
+                        && observed_job_type != job_type
+                    {
+                        return Err(NixPostStateErrorV1::JobTypeMismatch);
+                    }
+                } else if self.systemd_job_type_observed.is_some() {
+                    return Err(NixPostStateErrorV1::JobTypeMismatch);
                 }
                 if let (Some(job_unit), Some(job_object_path), Some(job_id)) = (
                     self.systemd_job_unit.as_deref(),
@@ -1152,6 +1180,13 @@ impl NixPostStateReceiptV1 {
         put_u8(&mut h, operation_tag(self.operation));
         put_opt_u32(&mut h, self.systemd_job_id);
         match self.systemd_job_type {
+            Some(job_type) => {
+                put_u8(&mut h, 1);
+                put_u8(&mut h, job_type.discriminant());
+            }
+            None => put_u8(&mut h, 0),
+        }
+        match self.systemd_job_type_observed {
             Some(job_type) => {
                 put_u8(&mut h, 1);
                 put_u8(&mut h, job_type.discriminant());
@@ -1605,6 +1640,8 @@ pub enum NixPostStateErrorV1 {
     InvalidJobUnit,
     #[error("invalid systemd job object path")]
     InvalidJobObjectPath,
+    #[error("observed systemd JobType does not match the expected typed operation")]
+    JobTypeMismatch,
     #[error("invalid stability window")]
     InvalidStabilityWindow,
     #[error("stability window is too short")]
@@ -1995,6 +2032,7 @@ mod tests {
                 NixSystemdJobEvidenceV1 {
                     id: 7,
                     job_type,
+                    observed_job_type: Some(job_type),
                     unit: "nginx.service".to_string(),
                     object_path: "/org/freedesktop/systemd1/job/7".to_string(),
                     result: "done".to_string(),
@@ -2137,6 +2175,40 @@ mod tests {
         assert_eq!(
             receipt.postcondition,
             NixPostconditionAssessmentV1::Satisfied
+        );
+    }
+
+    #[test]
+    fn job_type_observation_is_optional_for_fast_completed_jobs() {
+        let mut evidence = NixSystemdJobEvidenceV1 {
+            id: 7,
+            job_type: NixSystemdJobTypeV1::Restart,
+            observed_job_type: None,
+            unit: "nginx.service".to_string(),
+            object_path: "/org/freedesktop/systemd1/job/7".to_string(),
+            result: "done".to_string(),
+            manager_owner: ":1.123".to_string(),
+        };
+        assert!(evidence.validate_shape().is_ok());
+
+        evidence.observed_job_type = Some(NixSystemdJobTypeV1::Restart);
+        assert!(evidence.validate_shape().is_ok());
+    }
+
+    #[test]
+    fn contradictory_observed_job_type_fails_closed() {
+        let evidence = NixSystemdJobEvidenceV1 {
+            id: 7,
+            job_type: NixSystemdJobTypeV1::Restart,
+            observed_job_type: Some(NixSystemdJobTypeV1::Start),
+            unit: "nginx.service".to_string(),
+            object_path: "/org/freedesktop/systemd1/job/7".to_string(),
+            result: "done".to_string(),
+            manager_owner: ":1.123".to_string(),
+        };
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixPostStateErrorV1::JobTypeMismatch
         );
     }
 
@@ -2359,6 +2431,10 @@ mod tests {
 
         let mut changed = receipt.clone();
         changed.systemd_job_id = Some(8);
+
+         let mut changed = receipt.clone();
+         changed.systemd_job_type_observed = None;
+         variants.push(changed);
         variants.push(changed);
 
         let mut changed = receipt.clone();
