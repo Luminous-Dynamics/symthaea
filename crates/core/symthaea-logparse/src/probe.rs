@@ -16,6 +16,7 @@
 //!     not trust a framework's defaults
 
 use crate::encoder::Hdv;
+use std::collections::BTreeMap;
 
 /// Trained one-vs-rest logistic regression.
 pub struct LogisticProbe {
@@ -235,6 +236,146 @@ impl LogisticProbe {
         }
         correct as f32 / hvs.len() as f32
     }
+}
+
+/// Per-class binary view of a multiclass evaluation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassMetrics {
+    pub support: usize,
+    pub predicted: usize,
+    pub true_positive: usize,
+    pub false_positive: usize,
+    pub false_negative: usize,
+    pub precision: f32,
+    pub recall: f32,
+    pub f1: f32,
+}
+
+/// Deterministic multiclass evaluation report with an explicit confusion matrix.
+///
+/// Zero-denominator precision/recall values are defined as 0.0 rather than NaN,
+/// so missing or never-predicted classes remain visible in macro metrics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassificationReport {
+    pub samples: usize,
+    pub correct: usize,
+    pub accuracy: f32,
+    pub macro_precision: f32,
+    pub macro_recall: f32,
+    pub macro_f1: f32,
+    /// Rows are actual classes; columns are predicted classes.
+    pub confusion_matrix: BTreeMap<String, BTreeMap<String, usize>>,
+    pub per_class: BTreeMap<String, ClassMetrics>,
+}
+
+/// Compute classification metrics from ground-truth names and predicted indices.
+pub fn classification_report(
+    labels: &[String],
+    predictions: &[usize],
+    class_names: &[String],
+) -> Result<ClassificationReport, String> {
+    if labels.len() != predictions.len() {
+        return Err(format!(
+            "prediction/label length mismatch: predictions={}, labels={}",
+            predictions.len(),
+            labels.len()
+        ));
+    }
+    if labels.is_empty() {
+        return Err("cannot evaluate an empty label set".to_string());
+    }
+    if class_names.is_empty() {
+        return Err("class_names must not be empty".to_string());
+    }
+
+    let mut names_seen = std::collections::BTreeSet::new();
+    for class in class_names {
+        if class.is_empty() || !names_seen.insert(class.as_str()) {
+            return Err("class_names must contain unique, non-empty names".to_string());
+        }
+    }
+
+    let known_classes: std::collections::BTreeSet<&str> =
+        class_names.iter().map(String::as_str).collect();
+    let mut confusion_matrix: BTreeMap<String, BTreeMap<String, usize>> = class_names
+        .iter()
+        .map(|actual| {
+            (
+                actual.clone(),
+                class_names
+                    .iter()
+                    .map(|predicted| (predicted.clone(), 0usize))
+                    .collect(),
+            )
+        })
+        .collect();
+
+    let mut correct = 0usize;
+    for (actual, &predicted_index) in labels.iter().zip(predictions.iter()) {
+        if !known_classes.contains(actual.as_str()) {
+            return Err(format!("unknown ground-truth class {actual:?}"));
+        }
+        let predicted = class_names
+            .get(predicted_index)
+            .ok_or_else(|| format!("predicted class index {predicted_index} is out of range"))?;
+        *confusion_matrix
+            .get_mut(actual)
+            .and_then(|row| row.get_mut(predicted))
+            .expect("matrix contains all validated class pairs") += 1;
+        if actual == predicted {
+            correct += 1;
+        }
+    }
+
+    let mut per_class = BTreeMap::new();
+    for class in class_names {
+        let row = &confusion_matrix[class];
+        let support: usize = row.values().sum();
+        let true_positive = row[class];
+        let false_negative = support - true_positive;
+        let predicted: usize = confusion_matrix.values().map(|row| row[class]).sum();
+        let false_positive = predicted - true_positive;
+        let precision = if predicted == 0 {
+            0.0
+        } else {
+            true_positive as f32 / predicted as f32
+        };
+        let recall = if support == 0 {
+            0.0
+        } else {
+            true_positive as f32 / support as f32
+        };
+        let f1 = if precision + recall == 0.0 {
+            0.0
+        } else {
+            2.0 * precision * recall / (precision + recall)
+        };
+        per_class.insert(
+            class.clone(),
+            ClassMetrics {
+                support,
+                predicted,
+                true_positive,
+                false_positive,
+                false_negative,
+                precision,
+                recall,
+                f1,
+            },
+        );
+    }
+
+    let class_count = class_names.len() as f32;
+    Ok(ClassificationReport {
+        samples: labels.len(),
+        correct,
+        accuracy: correct as f32 / labels.len() as f32,
+        macro_precision: per_class.values().map(|m| m.precision).sum::<f32>() / class_count,
+        macro_recall: per_class.values().map(|m| m.recall).sum::<f32>() / class_count,
+        macro_f1: per_class.values().map(|m| m.f1).sum::<f32>() / class_count,
+        confusion_matrix,
+        per_class,
+    })
 }
 
 /// Stratified train/test split by label.
@@ -637,6 +778,61 @@ mod tests {
         );
         assert!(grouped_fold_assignment(&labels, &mixed_groups, 1, 1).is_err());
         assert!(grouped_fold_assignment(&labels, &mixed_groups[..3], 2, 1).is_err());
+    }
+
+    #[test]
+    fn classification_report_computes_precision_recall_f1_and_confusion_matrix() {
+        let classes = vec!["a".to_string(), "b".to_string()];
+        let labels = vec!["a".to_string(), "a".to_string(), "b".to_string(), "b".to_string()];
+        let predictions = vec![0usize, 1, 1, 1];
+        let report = classification_report(&labels, &predictions, &classes).unwrap();
+
+        assert_eq!(report.samples, 4);
+        assert_eq!(report.correct, 3);
+        assert!((report.accuracy - 0.75).abs() < 1e-6);
+        assert_eq!(report.confusion_matrix["a"]["a"], 1);
+        assert_eq!(report.confusion_matrix["a"]["b"], 1);
+        assert_eq!(report.confusion_matrix["b"]["a"], 0);
+        assert_eq!(report.confusion_matrix["b"]["b"], 2);
+
+        let a = &report.per_class["a"];
+        assert_eq!(a.support, 2);
+        assert_eq!(a.predicted, 1);
+        assert_eq!(a.true_positive, 1);
+        assert_eq!(a.false_positive, 0);
+        assert_eq!(a.false_negative, 1);
+        assert!((a.precision - 1.0).abs() < 1e-6);
+        assert!((a.recall - 0.5).abs() < 1e-6);
+        assert!((a.f1 - (2.0 / 3.0)).abs() < 1e-6);
+
+        let b = &report.per_class["b"];
+        assert_eq!(b.support, 2);
+        assert_eq!(b.predicted, 3);
+        assert_eq!(b.true_positive, 2);
+        assert_eq!(b.false_positive, 1);
+        assert_eq!(b.false_negative, 0);
+        assert!((b.precision - (2.0 / 3.0)).abs() < 1e-6);
+        assert!((b.recall - 1.0).abs() < 1e-6);
+        assert!((b.f1 - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn classification_report_fails_closed_on_bad_inputs() {
+        let classes = vec!["a".to_string(), "b".to_string()];
+        let labels = vec!["a".to_string()];
+        assert!(classification_report(&labels, &[0, 1], &classes).is_err());
+        assert!(classification_report(&[], &[], &classes).is_err());
+        assert!(classification_report(&labels, &[2], &classes).is_err());
+        assert!(classification_report(&["other".to_string()], &[0], &classes).is_err());
+        assert!(classification_report(&labels, &[0], &[]).is_err());
+        assert!(
+            classification_report(
+                &labels,
+                &[0],
+                &["a".to_string(), "a".to_string()]
+            )
+            .is_err()
+        );
     }
 
     #[test]
