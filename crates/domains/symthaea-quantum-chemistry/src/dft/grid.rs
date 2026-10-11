@@ -62,8 +62,16 @@ impl DftGrid {
                 let r = r_bs * (1.0 + xi) / (1.0 - xi); // Becke mapping
                 let dr = 2.0 * r_bs / ((1.0 - xi) * (1.0 - xi)); // dr/dxi
 
-                let radial_weight =
-                    PI / (n_radial as f64 + 1.0) * (1.0 - xi * xi).sqrt() * r * r * dr;
+                // Lebedev angular weights are normalized to sum to 1, so include
+                // the full solid angle here to represent the 3D volume element.
+                let radial_weight = 4.0
+                    * PI
+                    * PI
+                    / (n_radial as f64 + 1.0)
+                    * (1.0 - xi * xi).sqrt()
+                    * r
+                    * r
+                    * dr;
 
                 // Angular grid
                 for &(theta_x, theta_y, theta_z, ang_weight) in &angular_points {
@@ -458,5 +466,27 @@ mod tests {
                 assert!(d2 > 1e-12, "duplicate points at indices {i} and {j}");
             }
         }
+    }
+
+    #[test]
+    fn test_single_atom_grid_integrates_three_dimensional_gaussian() {
+        // ∫ exp(-r²) d³r = π^(3/2). This also detects a missing 4π
+        // factor when the angular Lebedev weights are normalized to sum to 1.
+        let atom = Atom::new(1, 0.0, 0.0, 0.0);
+        let grid = DftGrid::build(&[atom], GridQuality::Coarse);
+        let numerical_integral: f64 = grid
+            .points
+            .iter()
+            .map(|point| {
+                let r2 = point.x * point.x + point.y * point.y + point.z * point.z;
+                point.weight * (-r2).exp()
+            })
+            .sum();
+        let exact_integral = PI.powf(1.5);
+
+        assert!(
+            (numerical_integral - exact_integral).abs() < 1e-3,
+            "3D Gaussian integral = {numerical_integral}, expected {exact_integral}"
+        );
     }
 }
