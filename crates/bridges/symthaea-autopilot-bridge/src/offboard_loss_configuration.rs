@@ -74,6 +74,8 @@ impl Px4MavlinkParameterEncodingV1 {
 pub struct Px4MavlinkParameterValueV1 {
     /// Canonically decoded PARAM_VALUE.param_id (expected to match an allowlisted name).
     pub param_id: String,
+    /// Exact fixed-width PARAM_VALUE.param_id payload including padding/terminator.
+    pub param_id_bytes: [u8; 16],
     /// Exact IEEE-754 storage bits received in PARAM_VALUE.param_value.
     pub param_value_bits: u32,
     /// Raw MAV_PARAM_TYPE numeric value (6 = INT32, 9 = REAL32).
@@ -150,11 +152,17 @@ impl Px4MavlinkParameterValueV1 {
         {
             return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
         }
+        let mut expected_id_bytes = [0_u8; 16];
+        expected_id_bytes[..self.param_id.len()].copy_from_slice(self.param_id.as_bytes());
+        if self.param_id_bytes != expected_id_bytes {
+            return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
+        }
         Ok(())
     }
 
     fn feed_digest(&self, hasher: &mut blake3::Hasher) {
         feed_str(hasher, &self.param_id);
+        hasher.update(&self.param_id_bytes);
         hasher.update(&self.param_value_bits.to_le_bytes());
         hasher.update(&[self.param_type_raw]);
         hasher.update(&self.param_count.to_le_bytes());
@@ -362,6 +370,8 @@ pub struct Px4OffboardLossConfigurationProfileV1 {
     pub expected_source_component_id: u8,
     /// Declared wire encoding mode from AUTOPILOT_VERSION capabilities or prior profile.
     pub parameter_encoding: Px4MavlinkParameterEncodingV1,
+    /// Identity of AUTOPILOT_VERSION capability evidence or compatibility basis.
+    pub parameter_encoding_evidence_id: String,
     /// Clock used to compare parameter receive timestamps.
     pub receiver_clock_domain: ClockDomainId,
     /// Parameters required for this particular firmware profile.
@@ -386,6 +396,7 @@ impl Px4OffboardLossConfigurationProfileV1 {
         expected_source_system_id: u8,
         expected_source_component_id: u8,
         parameter_encoding: Px4MavlinkParameterEncodingV1,
+        parameter_encoding_evidence_id: impl Into<String>,
         receiver_clock_domain: ClockDomainId,
         mut required_parameters: Vec<Px4OffboardLossParameterNameV1>,
         max_capture_skew_ns: u64,
@@ -402,6 +413,7 @@ impl Px4OffboardLossConfigurationProfileV1 {
             expected_source_system_id,
             expected_source_component_id,
             parameter_encoding,
+            parameter_encoding_evidence_id: parameter_encoding_evidence_id.into(),
             receiver_clock_domain,
             required_parameters,
             max_capture_skew_ns,
@@ -430,6 +442,10 @@ impl Px4OffboardLossConfigurationProfileV1 {
         validate_identifier(&self.firmware_profile_id, "firmware_profile_id")?;
         validate_identifier(&self.producer_profile_id, "producer_profile_id")?;
         validate_identifier(&self.source_boot_session_id, "source_boot_session_id")?;
+        validate_identifier(
+            &self.parameter_encoding_evidence_id,
+            "parameter_encoding_evidence_id",
+        )?;
         self.receiver_clock_domain
             .validate()
             .map_err(Px4OffboardLossConfigurationError::Timestamp)?;
@@ -467,6 +483,7 @@ impl Px4OffboardLossConfigurationProfileV1 {
             self.expected_source_component_id,
             self.parameter_encoding.digest_tag(),
         ]);
+        feed_str(&mut hasher, &self.parameter_encoding_evidence_id);
         feed_str(&mut hasher, self.receiver_clock_domain.as_str());
         hasher.update(&(self.required_parameters.len() as u64).to_le_bytes());
         for name in &self.required_parameters {
@@ -870,8 +887,12 @@ mod tests {
             Px4OffboardLossParameterNameV1::ComOblAct => (100, 11),
             Px4OffboardLossParameterNameV1::ComOblRcAct => (100, 12),
         };
+        let param_id = value.parameter_name().as_str();
+        let mut param_id_bytes = [0_u8; 16];
+        param_id_bytes[..param_id.len()].copy_from_slice(param_id.as_bytes());
         Px4MavlinkParameterValueV1 {
-            param_id: value.parameter_name().as_str().to_owned(),
+            param_id: param_id.to_owned(),
+            param_id_bytes,
             param_value_bits,
             param_type_raw: match value {
                 Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(_) => 9,
@@ -927,6 +948,7 @@ mod tests {
             1,
             1,
             Px4MavlinkParameterEncodingV1::Bytewise,
+            "px4.autopilot-version.capabilities.fixture.bytewise.v1",
             clock(),
             vec![
                 Px4OffboardLossParameterNameV1::ComOfLossT,
@@ -961,6 +983,10 @@ mod tests {
                 "px4.firmware-profile.fixture.v1",
                 "px4.param.decoder.fixture.v1",
                 "px4.boot.fixture.session-a",
+                1,
+                1,
+                Px4MavlinkParameterEncodingV1::Bytewise,
+                "px4.autopilot-version.capabilities.fixture.bytewise.v1",
                 clock(),
                 vec![Px4OffboardLossParameterNameV1::ComOfLossT],
                 200,
@@ -1030,6 +1056,44 @@ mod tests {
                 capture_skew_ns: 201,
                 max_capture_skew_ns: 200,
             }
+        );
+    }
+
+    #[test]
+    fn parameter_wire_type_and_bits_must_match_the_interpreted_value() {
+        let timeout_value =
+            Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(1.0_f32.to_bits());
+        let mut wrong_type = wire_for(timeout_value);
+        wrong_type.param_type_raw = 6;
+        assert_eq!(
+            wrong_type.validate_for(timeout_value),
+            Err(Px4OffboardLossConfigurationError::ParameterTypeMismatch {
+                expected: 9,
+                found: 6,
+            })
+        );
+
+        let action_value = Px4OffboardLossParameterValueV1::RcActionI32(6);
+        let mut wrong_bits = wire_for(action_value);
+        wrong_bits.param_value_bits = 7;
+        assert_eq!(
+            wrong_bits.validate_for(action_value),
+            Err(Px4OffboardLossConfigurationError::WireValueMismatch)
+        );
+    }
+
+    #[test]
+    fn c_style_action_encoding_is_numeric_not_bytewise() {
+        let value = Px4OffboardLossParameterValueV1::RcActionI32(6);
+        let mut wire = wire_for(value);
+        wire.encoding = Px4MavlinkParameterEncodingV1::CStyleCast;
+        wire.param_value_bits = 6.0_f32.to_bits();
+        assert_eq!(wire.validate_for(value), Ok(()));
+
+        wire.encoding = Px4MavlinkParameterEncodingV1::Bytewise;
+        assert_eq!(
+            wire.validate_for(value),
+            Err(Px4OffboardLossConfigurationError::WireValueMismatch)
         );
     }
 
