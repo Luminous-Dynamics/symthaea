@@ -8,7 +8,6 @@ use nalgebra::DMatrix;
 
 use super::{EntropyConfig, JointDistribution, TruePartition, TruePhiResult, VectorDistribution};
 
-
 /// Maximum graph size for the dense spectral heuristic. Larger inputs abstain
 /// rather than paying unbounded cubic eigensolver cost.
 const MAX_DENSE_SPECTRAL_NODES: usize = 256;
