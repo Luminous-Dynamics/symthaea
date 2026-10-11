@@ -76,6 +76,8 @@ pub mod genesis;
 /// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
 #[allow(missing_docs)]
 pub mod hdc;
+/// Shared deterministic HDC encoding primitives for normalized ordered values.
+pub mod hdc_encoding;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
 /// Metrics, tracing, and introspection.

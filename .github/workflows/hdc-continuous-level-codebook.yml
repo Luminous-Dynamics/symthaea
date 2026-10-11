@@ -1,0 +1,83 @@
+# HDC-ENC-001 focused qualification lane.
+#
+# This lane qualifies only the shared normalized linear-level encoder, its
+# public facade export, and the preregistered public-surface conformance test.
+# It intentionally does not migrate or qualify every existing domain encoder.
+
+name: HDC Continuous Level Codebook
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/hdc_encoding.rs"
+      - "crates/core/symthaea-core/src/lib.rs"
+      - "crates/core/symthaea-core/tests/hdc_linear_level_golden.rs"
+      - ".github/workflows/hdc-continuous-level-codebook.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-core/src/hdc_encoding.rs"
+      - "crates/core/symthaea-core/src/lib.rs"
+      - "crates/core/symthaea-core/tests/hdc_linear_level_golden.rs"
+      - ".github/workflows/hdc-continuous-level-codebook.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hdc-continuous-level-codebook-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: HDC-ENC-001 Exact-Head Qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact candidate and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain)"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain
+        run: |
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Check formatting
+        run: cargo fmt --check -p symthaea-core
+
+      - name: Check core library
+        run: cargo check -p symthaea-core --lib --locked
+
+      - name: Run focused codebook unit tests
+        run: cargo test -p symthaea-core --lib hdc_encoding::tests --locked
+
+      - name: Run independent public-surface conformance tests
+        run: cargo test -p symthaea-core --test hdc_linear_level_golden --locked
+
+      - name: Lint core library and conformance test
+        run: cargo clippy -p symthaea-core --lib --test hdc_linear_level_golden --locked -- -D warnings
+
+      - name: Verify tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
