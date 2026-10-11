@@ -11,7 +11,9 @@ Install the pinned dependencies used by the path-scoped workflow:
     python3 -m pip install "cryptography==50.0.2" "rfc8785==0.1.4"
     python3 -m unittest discover -s tests -p "test_cyber_crucible_signed_receipt.py" -v
 
-The test uses the Ed25519 known-answer vector from RFC 8032 and a public, test-only key fixture for end-to-end mutation tests. The corresponding private seed is intentionally a public test vector and MUST NEVER be used for operational signing.
+The test uses the Ed25519 known-answer vector from RFC 8032, an RFC 8785 number-serialization vector, and a public, test-only key fixture for end-to-end mutation tests. The corresponding private seed is intentionally a public test vector and MUST NEVER be used for operational signing.
+
+The signed-receipt cases also run through the existing diagnostic-loop workflow when this stacked PR is part of its merge candidate. The dedicated workflow in this branch is retained as an independently scoped entry point, but new-workflow-only path filters are not treated as sufficient evidence: the parent workflow owns activation for the stacked diff.
 
 ## Receipt envelope and signature input
 
