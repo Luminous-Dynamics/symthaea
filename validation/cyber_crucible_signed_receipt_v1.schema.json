@@ -26,7 +26,7 @@
       "additionalProperties": false,
       "required": [
         "schema_version", "algorithm", "receipt_id", "key_id", "evaluator_id",
-        "role", "campaign_id", "subject_id", "attempt_id", "run_nonce", "issued_at", "expires_at",
+        "role", "campaign_id", "subject_id", "attempt_id", "receipt_nonce", "issued_at", "expires_at",
         "scenario_id", "scenario_revision", "scenario_digest", "evidence_digest",
         "status", "proposal_id", "proposal_digest"
       ],
@@ -45,7 +45,7 @@
         "campaign_id": { "type": "string", "minLength": 1 },
         "subject_id": { "type": "string", "minLength": 1 },
         "attempt_id": { "type": "string", "minLength": 1 },
-        "run_nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "receipt_nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
         "issued_at": { "$ref": "#/$defs/utcSecond" },
         "expires_at": { "$ref": "#/$defs/utcSecond" },
         "scenario_id": { "type": "string", "minLength": 1 },
