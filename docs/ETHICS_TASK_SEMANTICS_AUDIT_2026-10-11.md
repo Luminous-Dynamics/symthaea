@@ -45,6 +45,17 @@ The current source pilot sets N_PER_DOMAIN = 200, across four domains: **800 row
 
 The first-N selection is deterministic but is not representative sampling. Public availability of benchmark labels also means an official test split is not a secret holdout against iterative development. Keep test-hard and newly authored counterfactual examples for robustness checks, without tuning thresholds on them.
 
+## Distinct legacy model pipelines and additional validity defects
+
+The live Stage-1 pilot, older HDC classifier, composite benchmark, and ablation script are different experiments. Their headline percentages must not be compared as if they measured the same model under the same evaluation contract.
+
+- `examples/benchmark_ablation_ethics.rs` loads `ethics.json` into the evaluation set and passes the same file to `train_per_cat`. That function trains per-category classifiers from those examples, which are then scored again. Results for configurations using those classifiers are **in-sample**, not held-out accuracy. The historical per-category ablation gain must not be reported as evidence of generalization.
+- `examples/benchmark_ethics_hdc.rs` has separate train/test file paths, but its legacy `load_labeled_csv` extracts data by splitting each raw line at the first comma rather than using a CSV parser. Quoted commas/fields and extra columns can therefore become part of the model input. It also flattens deontology's scenario and excuse instead of preserving their typed relation. Further, it selects a per-category “best” method using `max(ngram_retrain_acc, moral_acc)` on the **test** scores; that selected “best” aggregate is test-set-selected and is not a clean unbiased final estimate. Predeclared method scores should be reported separately.
+- `examples/benchmark_moral_unified.rs` is a legacy composite across several datasets and model components with multiple evaluation paths. Its exact output needs a run manifest identifying dataset revision, split, task adapter, model configuration and the scoring function; the existence of train/test-looking fields does not prove every component followed the same split contract.
+- The live 56.2% pilot and historical 92.9% trained/composite figures are not direct before/after measurements: they use materially different paths and their underlying artifacts are not yet reconciled. Do not conclude either that the architecture regressed from 92.9% to 56.2% or that the trained 92.9% configuration generalizes.
+
+These source-level findings are enough to invalidate the *unqualified claims*, but not enough to assign a single corrected full-suite score. Preserve each legacy program for investigation; qualify its output and build a new task-matched harness rather than merely adjusting a reported percentage.
+
 ## Corrected immediate scope
 
 A new examples/ethics_commonsense_holdout.rs evaluates **only the commonsense task**, on the full standard test CSV and, when present, the full hard-test CSV. It uses the existing live-path scalar scorer with the task's actual binary target and a fixed zero threshold. It reports confusion counts, accuracy, balanced accuracy, precision, recall, specificity, majority-class baseline, row count, split path, and BLAKE3 digest of the exact source file.
