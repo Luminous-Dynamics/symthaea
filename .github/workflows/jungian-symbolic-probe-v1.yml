@@ -170,9 +170,32 @@ jobs:
           test -z "$(git status --porcelain)"
 
       - name: Upload reproducibility packet
+        id: reproducibility
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jungian-probe-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.baselines.outputs.output_dir }}/*.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Record immutable artifact identity
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.reproducibility.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.reproducibility.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.reproducibility.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          test -n "$ARTIFACT_ID"
+          test -n "$ARTIFACT_DIGEST"
+          echo "artifact_id=$ARTIFACT_ID"
+          echo "artifact_sha256=$ARTIFACT_DIGEST"
+          {
+            echo ""
+            echo "## Immutable artifact receipt"
+            echo ""
+            echo "- Artifact ID: `$ARTIFACT_ID`"
+            echo "- Artifact SHA-256: `$ARTIFACT_DIGEST`"
+            echo "- Artifact URL: $ARTIFACT_URL"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
