@@ -1,0 +1,205 @@
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+index 7cfb3be..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+@@ -183,7 +183,10 @@ pub struct Conjecture {
+     pub fitness: f64,
+     /// Verification status
+     pub status: ConjectureStatus,
+-    /// Bayesian confidence (updated through verification)
++    /// Legacy heuristic evidence score in `[0, 1]`.
++    ///
++    /// This is not a calibrated posterior probability and must not be used as
++    /// scientific authority. Prefer the typed verification status and the
++    /// component assessment returned by `verify_heuristic_evidence`.
+     pub confidence: f64,
+     /// How this conjecture may contribute to macro promotion.
+     pub macro_promotion_tier: MacroPromotionTier,
+@@ -3070,10 +3073,10 @@ mod tests {
+     // ════════════════════════════════════════════════════════════════════
+ 
+     #[test]
+-    fn test_bayesian_confidence_updating() {
+-        let mut bc = BayesianConfidence::new();
++    fn test_heuristic_beta_evidence_score_updating() {
++        let mut bc = HeuristicBetaEvidenceScore::new();
+         assert!((bc.mean() - 0.5).abs() < 0.01, "uniform prior → 0.5");
+         bc.record_success(3.0);
+-        assert!(bc.mean() > 0.7, "strong evidence → high confidence");
++        assert!(bc.mean() > 0.7, "positive heuristic weight raises score");
+ 
+-        let mut bad = BayesianConfidence::new();
++        let mut bad = HeuristicBetaEvidenceScore::new();
+         bad.record_failure(5.0);
+-        assert!(bad.mean() < 0.2, "refutation → low: {:.3}", bad.mean());
++        assert!(bad.mean() < 0.2, "negative heuristic weight lowers score: {:.3}", bad.mean());
+     }
+ }
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+index 6d8d3f0..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+@@ -125,23 +125,65 @@ pub(crate) fn clear_eml_metadata_cache() {
+     EML_METADATA_CACHE.write().clear();
+ }
+ 
+-/// Beta-distribution confidence tracker for conjectures.
++/// Beta-shaped heuristic evidence accumulator for conjectures.
++///
++/// `alpha`/`beta` are pseudo-count-like bookkeeping values driven by
++/// hand-assigned weights. The contributing checks are not modeled as
++/// conditionally independent Bernoulli trials and can reuse overlapping
++/// observations. Therefore [`mean`](Self::mean) is a legacy scalar score,
++/// **not** a calibrated Bayesian posterior probability.
+ #[derive(Debug, Clone)]
+-pub struct BayesianConfidence {
++pub struct HeuristicBetaEvidenceScore {
+     pub alpha: f64,
+     pub beta: f64,
+ }
+ 
+-impl BayesianConfidence {
++impl HeuristicBetaEvidenceScore {
+     pub fn new() -> Self {
+         Self {
+             alpha: 1.0,
+@@ -160,10 +202,47 @@ impl BayesianConfidence {
+     }
+ }
+ 
++/// Backwards-compatible name for the historical score type.
++///
++/// New scientific code should use [`HeuristicBetaEvidenceScore`] so the type
++/// name does not imply calibrated Bayesian inference.
++pub type BayesianConfidence = HeuristicBetaEvidenceScore;
++
++/// Component-level record of the heuristic checks used for one conjecture.
++///
++/// These fields expose what contributed to the legacy scalar without claiming
++/// that the components are independent evidence or that their weights have a
++/// probabilistic interpretation.
++#[derive(Debug, Clone, PartialEq)]
++pub struct HeuristicEvidenceAssessment {
++    pub source: String,
++    pub formula: String,
++    pub training_success_weight: f64,
++    pub holdout_test_mse: Option<f64>,
++    pub holdout_success_weight: f64,
++    pub holdout_failure_weight: f64,
++    pub bounded_checked_points: usize,
++    pub bounded_success_weight: f64,
++    pub refutation_counterexample: Option<f64>,
++    pub refutation_failure_weight: f64,
++    pub legacy_beta_score: f64,
++}
++
+ impl ConjectureEngine {
+-    /// Verify all conjectures using Bayesian confidence updating.
+-    pub fn verify_bayesian(&mut self, max_n: usize) {
++    /// Run the historical weighted verification heuristic while retaining its
++    /// component contributions explicitly.
++    ///
++    /// The returned score is intentionally not called a posterior. Training
++    /// fit, held-out fit, and bounded checks can share an upstream dataset, so
++    /// their weights must not be interpreted as independent evidence counts.
++    pub fn verify_heuristic_evidence(
++        &mut self,
++        max_n: usize,
++    ) -> Vec<HeuristicEvidenceAssessment> {
+         let observations = self.observations.clone();
++        let mut assessments = Vec::with_capacity(self.conjectures.len());
+ 
+         for conjecture in &mut self.conjectures {
+-            let mut confidence = BayesianConfidence::new();
++            let mut score = HeuristicBetaEvidenceScore::new();
++            let mut assessment = HeuristicEvidenceAssessment {
++                source: conjecture.source.clone(),
++                formula: conjecture.formula_str.clone(),
++                training_success_weight: 0.0,
++                holdout_test_mse: None,
++                holdout_success_weight: 0.0,
++                holdout_failure_weight: 0.0,
++                bounded_checked_points: 0,
++                bounded_success_weight: 0.0,
++                refutation_counterexample: None,
++                refutation_failure_weight: 0.0,
++                legacy_beta_score: 0.5,
++            };
+ 
+             if conjecture.training_mse < 1e-6 {
+-                confidence.record_success(1.0);
++                score.record_success(1.0);
++                assessment.training_success_weight = 1.0;
+             } else if conjecture.training_mse < 1.0 {
+-                confidence.record_success(0.5);
++                score.record_success(0.5);
++                assessment.training_success_weight = 0.5;
+             }
+ 
+             if let Some(sequence) = observations.iter().find(|s| s.name == conjecture.source) {
+                 let (_, test) = sequence.train_test_split();
+                 if !test.is_empty() {
+                     let test_mse = compute_mse(&conjecture.formula, &test);
++                    assessment.holdout_test_mse = test_mse.is_finite().then_some(test_mse);
+                     if test_mse.is_finite() && test_mse < conjecture.training_mse * 2.0 {
+-                        confidence.record_success(1.0);
++                        score.record_success(1.0);
++                        assessment.holdout_success_weight = 1.0;
+                         conjecture.status = ConjectureStatus::NumericallyTested { test_mse };
+                         elevate_macro_promotion_tier(
+                             conjecture,
+@@ -181,7 +260,8 @@ impl ConjectureEngine {
+                             MacroPromotionTier::RecurrentNumerical,
+                         );
+                     } else if test_mse.is_finite() {
+-                        confidence.record_failure(1.0);
++                        score.record_failure(1.0);
++                        assessment.holdout_failure_weight = 1.0;
+                     }
+                 }
+             }
+@@ -199,21 +279,39 @@ impl ConjectureEngine {
+                     if !predicted.is_finite() || (predicted - y).abs() > y.abs() * 0.01 + 1e-10 {
+                         all_match = false;
+                         conjecture.status = ConjectureStatus::Refuted { counterexample: x };
+                         conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
+-                        confidence.record_failure(5.0);
++                        score.record_failure(5.0);
++                        assessment.refutation_counterexample = Some(x);
++                        assessment.refutation_failure_weight = 5.0;
+                         break;
+                     }
+                     checked += 1;
+                 }
+             }
++            assessment.bounded_checked_points = checked;
+ 
+             if all_match && checked > 10 {
+-                confidence.record_success(3.0);
++                score.record_success(3.0);
++                assessment.bounded_success_weight = 3.0;
+                 conjecture.status = ConjectureStatus::BoundedChecked {
+                     checked_points: checked,
+                     max_n,
+@@ -221,8 +319,19 @@ impl ConjectureEngine {
+                 elevate_macro_promotion_tier(conjecture, MacroPromotionTier::RecurrentNumerical);
+             }
+ 
+-            conjecture.confidence = confidence.mean();
++            assessment.legacy_beta_score = score.mean();
++            conjecture.confidence = assessment.legacy_beta_score;
++            assessments.push(assessment);
+         }
++
++        assessments
++    }
++
++    /// Backwards-compatible wrapper for the historical API name.
++    ///
++    /// This method does not perform calibrated Bayesian inference. New code
++    /// should call [`Self::verify_heuristic_evidence`] and inspect the returned
++    /// components alongside typed [`ConjectureStatus`] evidence.
++    pub fn verify_bayesian(&mut self, max_n: usize) {
++        let _ = self.verify_heuristic_evidence(max_n);
+     }
+ }

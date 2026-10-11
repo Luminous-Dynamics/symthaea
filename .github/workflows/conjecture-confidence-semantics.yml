@@ -1,0 +1,84 @@
+name: Conjecture Confidence Semantics
+
+on:
+  pull_request:
+    paths:
+      - 'patches/science/conjecture-confidence-semantics-v1.patch'
+      - '.github/workflows/conjecture-confidence-semantics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze qualification-only branch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          base="${{ github.event.pull_request.base.sha }}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/science/conjecture-confidence-semantics-v1\.patch|\.github/workflows/conjecture-confidence-semantics\.yml)$' || true)"
+          test -z "$unexpected" || { echo "unexpected branch drift:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Prove current-main naming and weighting boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+          grep -F 'pub struct BayesianConfidence' "$file"
+          grep -F 'Verify all conjectures using Bayesian confidence updating.' "$file"
+          grep -F 'confidence.record_success(3.0);' "$file"
+          grep -F 'confidence.record_failure(5.0);' "$file"
+          grep -F '/// Bayesian confidence (updated through verification)' crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/science/conjecture-confidence-semantics-v1.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet heuristic semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta=crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+          engine=crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+          grep -F 'pub struct HeuristicBetaEvidenceScore' "$meta"
+          grep -F 'pub type BayesianConfidence = HeuristicBetaEvidenceScore;' "$meta"
+          grep -F 'pub struct HeuristicEvidenceAssessment' "$meta"
+          grep -F 'pub fn verify_heuristic_evidence' "$meta"
+          grep -F 'let _ = self.verify_heuristic_evidence(max_n);' "$meta"
+          grep -F 'not a calibrated Bayesian posterior probability' "$meta"
+          grep -F 'component assessment returned by `verify_heuristic_evidence`' "$engine"
+          ! grep -Fq '/// Bayesian confidence (updated through verification)' "$engine"
+          ! grep -Fq 'Verify all conjectures using Bayesian confidence updating.' "$meta"
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Focused score regression
+        run: cargo +1.96.0 test -p symthaea-core --features abstract_thought heuristic_beta_evidence_score_updating -- --nocapture
+
+      - name: Package check
+        run: cargo +1.96.0 check -p symthaea-core --features abstract_thought
+
+      - name: Strict library Clippy
+        run: cargo +1.96.0 clippy -p symthaea-core --features abstract_thought --lib -- -D warnings
