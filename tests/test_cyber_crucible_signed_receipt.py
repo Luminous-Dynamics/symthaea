@@ -361,6 +361,37 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(verifier.VerificationError, "duplicate key_id"):
             self.verify(trust=trust)
 
+    def test_trust_policy_rejects_same_key_material_alias(self):
+        trust = policy()
+        alias = copy.deepcopy(trust["keys"][0])
+        alias["key_id"] = "aliased-key-id"
+        alias["evaluator_id"] = "different-evaluator"
+        alias["roles"] = ["functional_verdict"]
+        trust["keys"].append(alias)
+        with self.assertRaisesRegex(verifier.VerificationError, "duplicate public key material"):
+            self.verify(trust=trust)
+
+    def test_trust_policy_keeps_functional_and_security_evaluators_independent(self):
+        trust = policy()
+        other_private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+        other_public = other_private.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        second = copy.deepcopy(trust["keys"][0])
+        second["key_id"] = "test-key-functional"
+        second["public_key"] = b64url(other_public)
+        second["roles"] = ["functional_verdict"]
+        trust["keys"][0]["roles"] = ["security_verdict"]
+        trust["keys"].append(second)
+        with self.assertRaisesRegex(verifier.VerificationError, "both independent verdict roles"):
+            self.verify(trust=trust)
+
+    def test_trust_policy_separates_evaluation_from_authorization(self):
+        trust = policy(["security_verdict", "authorization_decision"])
+        with self.assertRaisesRegex(verifier.VerificationError, "cannot both evaluate and authorize"):
+            self.verify(trust=trust)
+
     def test_bool_is_not_accepted_as_scenario_revision(self):
         receipt = signed_receipt()
         receipt["payload"]["scenario_revision"] = True
