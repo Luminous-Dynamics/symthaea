@@ -74,7 +74,7 @@ jobs:
           sha256 = Path(sys.argv[3]).read_text(encoding="utf-8").split()[0]
           assert current["git_blob_sha"] == blob, (current["git_blob_sha"], blob)
           assert current["sha256"] == sha256, (current["sha256"], sha256)
-          assert current["expected_self_test_check_count"] == 82, current
+          assert current["expected_self_test_check_count"] == 84, current
           print("verification status matches current validator blob, SHA-256, and 82-check contract")
           PY
 
