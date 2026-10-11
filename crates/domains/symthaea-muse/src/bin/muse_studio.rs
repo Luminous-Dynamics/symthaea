@@ -2393,9 +2393,7 @@ fn audition_clip_score(
             .notes
             .iter()
             .map(|note| note.onset)
-            .min_by(|left, right| {
-                left.checked_cmp(*right).unwrap_or(Ordering::Equal)
-            })
+            .min_by(|left, right| left.checked_cmp(*right).unwrap_or(Ordering::Equal))
             .ok_or_else(|| "cannot audition a score without notes".to_string())?
     };
     let candidate_end = clip_start
@@ -2458,8 +2456,8 @@ fn audition_clip_score(
 fn render_import_audition(
     score: &symthaea_music_theory::Score,
 ) -> Result<(Vec<u8>, &'static str, bool, f64, f64), (StatusCode, String)> {
-    let (audition_score, clipped, start_seconds) = audition_clip_score(score)
-        .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
+    let (audition_score, clipped, start_seconds) =
+        audition_clip_score(score).map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
     let duration_seconds = audition_score.seconds();
     if symthaea_muse::fluid_render::available().is_some() {
         let path =
@@ -2723,8 +2721,13 @@ async fn import_music(
         // used, purely to pick a timbre for playback (see
         // `render_import_audition`'s doc comment and
         // `instrumentation_note` below for why this still isn't neutral).
-        let (wav, audio_renderer, audition_clipped, audition_start_seconds, audition_duration_seconds) =
-            render_import_audition(&score)?;
+        let (
+            wav,
+            audio_renderer,
+            audition_clipped,
+            audition_start_seconds,
+            audition_duration_seconds,
+        ) = render_import_audition(&score)?;
         let summary = ImportedWorkSummary {
             manifest,
             analysis,
