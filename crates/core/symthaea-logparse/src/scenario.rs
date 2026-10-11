@@ -41,6 +41,30 @@ pub struct ScenarioEmbedding {
     pub vector: Hdv,
 }
 
+/// Validate that source and held-out scenario sets are non-empty and carry the
+/// same representation mode. This keeps feature contracts explicit at the point
+/// where vectors from separate corpora are compared.
+pub fn validate_matching_scenario_modes(
+    source: &[ScenarioEmbedding],
+    held_out: &[ScenarioEmbedding],
+) -> Result<ScenarioEncodingMode, String> {
+    let Some(first) = source.first() else {
+        return Err("source scenario set is empty".to_string());
+    };
+    if held_out.is_empty() {
+        return Err("held-out scenario set is empty".to_string());
+    }
+    let expected_mode = first.encoding_mode;
+    if source
+        .iter()
+        .chain(held_out.iter())
+        .any(|scenario| scenario.encoding_mode != expected_mode)
+    {
+        return Err("scenario encoder modes differ between source and held-out data".to_string());
+    }
+    Ok(expected_mode)
+}
+
 fn position_roles() -> &'static [Hdv; POSITION_BUCKETS] {
     static ROLES: OnceLock<[Hdv; POSITION_BUCKETS]> = OnceLock::new();
     ROLES.get_or_init(|| {
@@ -270,6 +294,52 @@ mod tests {
         )
         .unwrap();
         assert_eq!(ordered_a[0].vector, ordered_b[0].vector);
+    }
+
+    #[test]
+    fn mode_validation_accepts_matching_representations() {
+        let vector = random_hv(123);
+        let labels = vec!["execution".into()];
+        let groups = vec!["source-a".into()];
+        let source = aggregate_scenarios(&[vector.clone()], &labels, &groups).unwrap();
+        let held_out = aggregate_scenarios(&[vector.clone()], &labels, &["otrf-a".into()]).unwrap();
+        assert_eq!(
+            validate_matching_scenario_modes(&source, &held_out).unwrap(),
+            ScenarioEncodingMode::OrderlessBundle
+        );
+
+        let ordered_source = aggregate_ordered_scenarios(&[vector.clone()], &labels, &groups).unwrap();
+        let ordered_held_out =
+            aggregate_ordered_scenarios(&[vector], &labels, &["otrf-a".into()]).unwrap();
+        assert_eq!(
+            validate_matching_scenario_modes(&ordered_source, &ordered_held_out).unwrap(),
+            ScenarioEncodingMode::RelativeRecordPosition
+        );
+    }
+
+    #[test]
+    fn mode_validation_rejects_empty_or_mixed_representations() {
+        let vector = random_hv(123);
+        let labels = vec!["execution".into()];
+        let source = aggregate_scenarios(
+            std::slice::from_ref(&vector),
+            &labels,
+            &["source-a".into()],
+        )
+        .unwrap();
+        let held_out_ordered = aggregate_ordered_scenarios(
+            std::slice::from_ref(&vector),
+            &labels,
+            &["otrf-a".into()],
+        )
+        .unwrap();
+        assert!(
+            validate_matching_scenario_modes(&source, &held_out_ordered)
+                .unwrap_err()
+                .contains("modes differ")
+        );
+        assert!(validate_matching_scenario_modes(&[], &held_out_ordered).is_err());
+        assert!(validate_matching_scenario_modes(&source, &[]).is_err());
     }
 
     #[test]
