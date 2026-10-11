@@ -942,7 +942,7 @@ def main() -> int:
             "runtime_profile": {
                 "python_implementation": platform.python_implementation(),
                 "python_version": platform.python_version(),
-                "python_version_full": sys.version.replace("\\n", " "),
+                "python_version_full": sys.version.replace("\n", " "),
                 "platform": platform.platform(),
                 "architecture": platform.machine(),
                 "rustc_version": os.environ.get("SYMTHAEA_RUSTC_VERSION", "not-provided"),
