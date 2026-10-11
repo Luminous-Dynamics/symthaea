@@ -960,8 +960,8 @@ mod tests {
             .expect("test receipt must name a previously recorded forecast")
             .forecast_commitment_blake3
             .clone();
-        // Synthetic unit-test admission only. Production code has no public token constructor;
-        // real issuance must be added inside the reviewed independent-verifier path.
+        // Synthetic unit-test admission only. Production issuance is isolated in the
+        // identity-feature receipt verifier; this helper must never be used outside tests.
         // The sequence makes fixture roots unique within a ledger unless a test intentionally
         // reuses a receipt root to exercise replay rejection.
         let verification_root = format!("{:064x}", receipt.sequence);
@@ -1416,6 +1416,7 @@ mod tests {
         assert_eq!(
             VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
                 receipt,
+                "a".repeat(64),
                 "symthaea-evidence-verifier",
                 "v1",
                 "not-a-digest",
