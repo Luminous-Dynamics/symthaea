@@ -895,9 +895,14 @@ impl NumericTower {
         let mut proof_trace = vec![format!("Power: {}^{}", base, exponent)];
 
         let result = match exponent {
-            // Integer exponent (natural or negative integer)
-            Number::Natural(exp) => self.integer_power(base, *exp as i64, &mut proof_trace),
-            Number::Integer(exp) => self.integer_power(base, *exp, &mut proof_trace),
+            // Widen first: every u64 natural exponent fits in i128. Narrowing it
+            // to i64 changes values above i64::MAX into negative exponents.
+            Number::Natural(exp) => {
+                self.integer_power(base, i128::from(*exp), &mut proof_trace)
+            }
+            Number::Integer(exp) => {
+                self.integer_power(base, i128::from(*exp), &mut proof_trace)
+            }
             // Rational or real exponent → always ℝ
             _ => {
                 let b = base.to_f64();
@@ -913,83 +918,165 @@ impl NumericTower {
     }
 
     /// Compute base^exp for integer exponents.
-    fn integer_power(&self, base: &Number, exp: i64, proof_trace: &mut Vec<String>) -> Number {
+    /// Exponentiate a nonnegative exponent without narrowing it to u32/i32.
+    ///
+    /// The logarithmic checked-power helpers preserve exact results when possible;
+    /// the compatibility path uses an explicit Real approximation only after the
+    /// fixed-width exact representation is exceeded.
+    fn integer_power(&self, base: &Number, exp: i128, proof_trace: &mut Vec<String>) -> Number {
         if exp == 0 {
             proof_trace.push("Any number to the 0th power is 1".to_string());
             return Number::Natural(1);
         }
 
+        let magnitude = exp.unsigned_abs();
         if exp > 0 {
-            match base {
-                Number::Natural(b) => {
-                    let result = (*b as u128).pow(exp as u32);
-                    if result <= u64::MAX as u128 {
-                        proof_trace.push(format!("Natural power: {b}^{exp} = {result}"));
-                        Number::Natural(result as u64)
-                    } else {
-                        proof_trace.push(format!("Overflow to Real: {b}^{exp}"));
-                        Number::Real((*b as f64).powi(exp as i32))
-                    }
-                }
-                Number::Integer(b) => {
-                    // Use wrapping to handle overflow gracefully
-                    let abs_result = (b.unsigned_abs() as u128).pow(exp as u32);
-                    let is_negative = *b < 0 && exp % 2 == 1;
-                    if abs_result <= i64::MAX as u128 {
-                        let val = if is_negative {
-                            -(abs_result as i64)
-                        } else {
-                            abs_result as i64
-                        };
-                        proof_trace.push(format!("Integer power: {b}^{exp} = {val}"));
-                        Self::from_i64(val)
-                    } else {
-                        proof_trace.push(format!("Overflow to Real: {b}^{exp}"));
-                        Number::Real((*b as f64).powi(exp as i32))
-                    }
-                }
-                Number::Rational {
-                    numerator,
-                    denominator,
-                } => {
-                    let num_pow = (*numerator as i128).pow(exp as u32);
-                    let den_pow = (*denominator as i128).pow(exp as u32);
-                    if num_pow.unsigned_abs() <= i64::MAX as u128 && den_pow <= i64::MAX as i128 {
-                        proof_trace.push(format!(
-                            "Rational power: ({numerator}/{denominator})^{exp} = {num_pow}/{den_pow}"
-                        ));
-                        Self::from_rational(num_pow as i64, den_pow as i64)
-                    } else {
-                        proof_trace.push(format!(
-                            "Overflow to Real: ({numerator}/{denominator})^{exp}"
-                        ));
-                        Number::Real((base.to_f64()).powi(exp as i32))
-                    }
-                }
-                Number::Real(x) => {
-                    let result = x.powi(exp as i32);
-                    proof_trace.push(format!("Real power: {x}^{exp} = {result}"));
-                    Number::Real(result)
-                }
+            return self.positive_integer_power(base, magnitude, proof_trace);
+        }
+
+        // Use unsigned_abs so i64::MIN (widened to i128) never overflows when
+        // its positive magnitude is formed.
+        proof_trace.push(format!(
+            "Negative exponent: {}^{} = 1 / {}^{}",
+            base, exp, base, magnitude
+        ));
+        let positive_power = self.positive_integer_power(base, magnitude, proof_trace);
+        match positive_power {
+            Number::Natural(n) if n != 0 && n <= i64::MAX as u64 => {
+                Self::from_rational(1, n as i64)
             }
-        } else {
-            // Negative exponent: a^(-n) = 1 / a^n
-            proof_trace.push(format!(
-                "Negative exponent: {}^{} = 1 / {}^{}",
-                base, exp, base, -exp
-            ));
-            let pos_power = self.integer_power(base, -exp, proof_trace);
-            match pos_power {
-                Number::Natural(n) if n != 0 => Self::from_rational(1, n as i64),
-                Number::Integer(n) if n != 0 => Self::from_rational(1, n),
-                Number::Rational {
-                    numerator,
-                    denominator,
-                } if numerator != 0 => Self::from_rational(denominator, numerator),
-                Number::Real(x) if x.abs() > 1e-15 => Number::Real(1.0 / x),
-                _ => Number::Real(f64::INFINITY),
+            Number::Natural(n) if n != 0 => {
+                proof_trace.push(format!(
+                    "Reciprocal denominator {n} exceeds exact Rational storage; returning an approximate Real."
+                ));
+                Number::Real(1.0 / n as f64)
+            }
+            Number::Integer(n) if n != 0 => Self::from_rational(1, n),
+            Number::Rational { numerator, denominator } if numerator != 0 => {
+                Self::from_rational(denominator, numerator)
+            }
+            Number::Real(x) if x != 0.0 => Number::Real(1.0 / x),
+            _ => Number::Real(f64::INFINITY),
+        }
+    }
+
+    /// Compute a positive integer power, using exact logarithmic work where possible.
+    fn positive_integer_power(
+        &self,
+        base: &Number,
+        exponent: u128,
+        proof_trace: &mut Vec<String>,
+    ) -> Number {
+        if exponent == 0 {
+            return Number::Natural(1);
+        }
+
+        match base {
+            Number::Natural(value) => {
+                if let Some(exact) = Self::checked_pow_u128(u128::from(*value), exponent) {
+                    if exact <= u128::from(u64::MAX) {
+                        proof_trace.push(format!("Natural power: {value}^{exponent} = {exact}"));
+                        return Number::Natural(exact as u64);
+                    }
+                }
+                proof_trace.push(format!("Overflow to Real: {value}^{exponent}"));
+                Number::Real((*value as f64).powf(exponent as f64))
+            }
+            Number::Integer(value) => {
+                let negative = *value < 0 && exponent % 2 == 1;
+                if let Some(magnitude) =
+                    Self::checked_pow_u128(u128::from(value.unsigned_abs()), exponent)
+                {
+                    let exact_limit = if negative {
+                        u128::from(i64::MAX as u64) + 1
+                    } else {
+                        u128::from(i64::MAX as u64)
+                    };
+                    if magnitude <= exact_limit {
+                        let exact = if negative && magnitude == (1u128 << 63) {
+                            i64::MIN
+                        } else if negative {
+                            -(magnitude as i64)
+                        } else {
+                            magnitude as i64
+                        };
+                        proof_trace.push(format!("Integer power: {value}^{exponent} = {exact}"));
+                        return Self::from_i64(exact);
+                    }
+                }
+                proof_trace.push(format!("Overflow to Real: {value}^{exponent}"));
+                let approximate = (value.unsigned_abs() as f64).powf(exponent as f64);
+                Number::Real(if negative { -approximate } else { approximate })
+            }
+            Number::Rational { numerator, denominator } => {
+                let numerator_power =
+                    Self::checked_pow_i128(i128::from(*numerator), exponent);
+                let denominator_power =
+                    Self::checked_pow_i128(i128::from(*denominator), exponent);
+                if let (Some(numerator_power), Some(denominator_power)) =
+                    (numerator_power, denominator_power)
+                {
+                    if let Some(exact) =
+                        Self::number_from_fraction_i128(numerator_power, denominator_power)
+                    {
+                        proof_trace.push(format!(
+                            "Rational power: ({numerator}/{denominator})^{exponent} = {numerator_power}/{denominator_power}"
+                        ));
+                        return exact;
+                    }
+                }
+                proof_trace.push(format!(
+                    "Overflow to Real: ({numerator}/{denominator})^{exponent}"
+                ));
+                let base_value = base.to_f64();
+                let magnitude = base_value.abs().powf(exponent as f64);
+                Number::Real(if base_value.is_sign_negative() && exponent % 2 == 1 {
+                    -magnitude
+                } else {
+                    magnitude
+                })
+            }
+            Number::Real(value) => {
+                let magnitude = value.abs().powf(exponent as f64);
+                let result = if value.is_sign_negative() && exponent % 2 == 1 {
+                    -magnitude
+                } else {
+                    magnitude
+                };
+                proof_trace.push(format!("Real power: {value}^{exponent} = {result}"));
+                Number::Real(result)
             }
         }
+    }
+
+    /// Checked exponentiation by squaring over u128, without exponent narrowing.
+    fn checked_pow_u128(mut base: u128, mut exponent: u128) -> Option<u128> {
+        let mut result = 1u128;
+        while exponent != 0 {
+            if exponent & 1 == 1 {
+                result = result.checked_mul(base)?;
+            }
+            exponent >>= 1;
+            if exponent != 0 {
+                base = base.checked_mul(base)?;
+            }
+        }
+        Some(result)
+    }
+
+    /// Checked exponentiation by squaring over i128, without exponent narrowing.
+    fn checked_pow_i128(mut base: i128, mut exponent: u128) -> Option<i128> {
+        let mut result = 1i128;
+        while exponent != 0 {
+            if exponent & 1 == 1 {
+                result = result.checked_mul(base)?;
+            }
+            exponent >>= 1;
+            if exponent != 0 {
+                base = base.checked_mul(base)?;
+            }
+        }
+        Some(result)
     }
 
     /// Negate a number: -a.
@@ -1736,6 +1823,58 @@ mod tests {
             ),
             "2^(-1) = 1/2, got {:?}",
             r.number
+        );
+    }
+
+    #[test]
+    fn large_natural_exponent_does_not_wrap_to_negative() {
+        let tower = NumericTower::new();
+        let result = tower.power(
+            &Number::Natural(2),
+            &Number::Natural(u64::MAX),
+        );
+        assert!(
+            matches!(result.number, Number::Real(value) if value.is_infinite() && value.is_sign_positive()),
+            "2^u64::MAX must overflow to positive Real infinity, not a reciprocal: {:?}",
+            result.number
+        );
+    }
+
+    #[test]
+    fn exponent_above_u32_does_not_narrow_to_zero() {
+        let tower = NumericTower::new();
+        let result = tower.power(
+            &Number::Natural(2),
+            &Number::Natural(u64::from(u32::MAX) + 1),
+        );
+        assert!(
+            matches!(result.number, Number::Real(value) if value.is_infinite() && value.is_sign_positive()),
+            "2^(u32::MAX + 1) must not become 2^0: {:?}",
+            result.number
+        );
+    }
+
+    #[test]
+    fn minimum_integer_exponent_does_not_overflow_when_negated() {
+        let tower = NumericTower::new();
+        let result = tower.power(
+            &Number::Integer(-1),
+            &Number::Integer(i64::MIN),
+        );
+        assert_eq!(result.number, Number::Natural(1));
+    }
+
+    #[test]
+    fn reciprocal_of_wide_natural_does_not_wrap_denominator() {
+        let tower = NumericTower::new();
+        let result = tower.power(
+            &Number::Natural(u64::MAX),
+            &Number::Integer(-1),
+        );
+        assert!(
+            matches!(result.number, Number::Real(value) if value.is_finite() && value > 0.0 && value < 1e-18),
+            "unrepresentable exact reciprocal should be approximate positive Real: {:?}",
+            result.number
         );
     }
 
