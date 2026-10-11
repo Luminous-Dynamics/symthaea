@@ -65,6 +65,10 @@ pub struct AutonomousHoldoutValidation {
     pub median_lie_derivative_variance: f64,
     /// Minimum gradient-informativeness fraction across successfully scored orbits.
     pub min_gradient_informativeness_fraction: f64,
+    /// Shared squared-gradient floor used to compute the preceding metric.
+    pub gradient_informativeness_relative_squared_floor: f64,
+    /// Required minimum fraction for a passing holdout.
+    pub required_gradient_informativeness_fraction: f64,
     pub threshold: f64,
     pub passed: bool,
     pub failure: Option<AutonomousHoldoutFailure>,
@@ -79,9 +83,7 @@ const MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS: usize = 5_000_000;
 const MAX_AUTONOMOUS_STATE_DIMENSION: usize = 4096;
 const MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY: f64 = 10_000_000.0;
 const MAX_AUTONOMOUS_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
-/// Match the shared informative-conservation gate: at least half of samples
-/// must have squared gradient magnitude >= 1% of the trajectory maximum squared
-/// gradient (equivalent to 10% of peak gradient amplitude).
+/// Require at least half of holdout orbits to pass the shared gradient-information floor.
 const MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION: f64 = 0.5;
 
 fn failed_holdout(
@@ -104,6 +106,10 @@ fn failed_holdout(
         max_lie_derivative_variance: max_variance,
         median_lie_derivative_variance: f64::MAX,
         min_gradient_informativeness_fraction,
+        gradient_informativeness_relative_squared_floor:
+            GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR,
+        required_gradient_informativeness_fraction:
+            MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION,
         threshold,
         passed: false,
         failure: Some(failure),
@@ -385,6 +391,10 @@ fn validate_invariant_holdout_inner(
         max_lie_derivative_variance: max_variance,
         median_lie_derivative_variance: median,
         min_gradient_informativeness_fraction,
+        gradient_informativeness_relative_squared_floor:
+            GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR,
+        required_gradient_informativeness_fraction:
+            MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION,
         threshold,
         passed,
         failure,
@@ -417,6 +427,8 @@ pub fn validate_invariant_holdout(
     result.assessment_context_blake3 = assessment_context_digest(
         &format!("{}", candidate), &variable_names, initial_state, search_config.seed,
         holdout_seed, t_max, dt, holdout_trajectories, threshold,
+        GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR,
+        MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION,
         &system.system_id, &system.definition_blake3,
     );
     result
@@ -499,11 +511,13 @@ fn assessment_context_digest(
     dt: f64,
     requested_trajectories: usize,
     threshold: f64,
+    gradient_informativeness_relative_squared_floor: f64,
+    required_gradient_informativeness_fraction: f64,
     system_id: &str,
     system_definition_blake3: &str,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hash_string(&mut hasher, "symthaea-autonomous-holdout-context-v2");
+    hash_string(&mut hasher, "symthaea-autonomous-holdout-context-v3");
     hash_string(&mut hasher, candidate_formula);
     hash_string(&mut hasher, system_id);
     hash_string(&mut hasher, system_definition_blake3);
@@ -521,6 +535,8 @@ fn assessment_context_digest(
     hash_f64(&mut hasher, dt);
     hash_usize(&mut hasher, requested_trajectories);
     hash_f64(&mut hasher, threshold);
+    hash_f64(&mut hasher, gradient_informativeness_relative_squared_floor);
+    hash_f64(&mut hasher, required_gradient_informativeness_fraction);
     hasher.finalize().to_hex().to_string()
 }
 
@@ -701,6 +717,10 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub median_lie_derivative_variance: f64,
     /// Minimum gradient-informativeness fraction across successfully scored orbits.
     pub min_gradient_informativeness_fraction: f64,
+    /// Shared squared-gradient floor used to compute the preceding metric.
+    pub gradient_informativeness_relative_squared_floor: f64,
+    /// Required minimum fraction for a passing holdout.
+    pub required_gradient_informativeness_fraction: f64,
     pub threshold: f64,
     pub holdout_passed: bool,
     pub holdout_failure: Option<AutonomousHoldoutFailure>,
@@ -792,6 +812,8 @@ pub fn build_autonomous_discovery_receipt_v1(
     let expected_assessment_context = assessment_context_digest(
         &formula, &receipt_variable_names, initial_state, config.seed, holdout.holdout_seed,
         t_max, dt, holdout.requested_trajectories, holdout.threshold,
+        holdout.gradient_informativeness_relative_squared_floor,
+        holdout.required_gradient_informativeness_fraction,
         &normalized_system_id, &system_definition_blake3,
     );
     if holdout.assessment_context_blake3 != expected_assessment_context {
@@ -821,6 +843,10 @@ pub fn build_autonomous_discovery_receipt_v1(
         max_lie_derivative_variance: holdout.max_lie_derivative_variance,
         median_lie_derivative_variance: holdout.median_lie_derivative_variance,
         min_gradient_informativeness_fraction: holdout.min_gradient_informativeness_fraction,
+        gradient_informativeness_relative_squared_floor:
+            holdout.gradient_informativeness_relative_squared_floor,
+        required_gradient_informativeness_fraction:
+            holdout.required_gradient_informativeness_fraction,
         threshold: holdout.threshold,
         holdout_passed: holdout.passed,
         holdout_failure: holdout.failure,
@@ -855,6 +881,10 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         max_lie_derivative_variance: receipt.max_lie_derivative_variance,
         median_lie_derivative_variance: receipt.median_lie_derivative_variance,
         min_gradient_informativeness_fraction: receipt.min_gradient_informativeness_fraction,
+        gradient_informativeness_relative_squared_floor:
+            receipt.gradient_informativeness_relative_squared_floor,
+        required_gradient_informativeness_fraction:
+            receipt.required_gradient_informativeness_fraction,
         threshold: receipt.threshold,
         passed: receipt.holdout_passed,
         failure: receipt.holdout_failure,
@@ -906,6 +936,8 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
             &receipt.candidate_formula, &receipt.variable_names, &receipt.initial_state,
             receipt.discovery_seed, receipt.holdout_seed, receipt.t_max, receipt.dt,
             receipt.requested_trajectories, receipt.threshold,
+            receipt.gradient_informativeness_relative_squared_floor,
+            receipt.required_gradient_informativeness_fraction,
             &receipt.system_id, &receipt.system_definition_blake3,
         )
         && compute_receipt_digest(receipt) == receipt.receipt_blake3
@@ -937,6 +969,10 @@ fn holdout_record_is_consistent(
         || holdout.median_lie_derivative_variance < 0.0
         || !holdout.min_gradient_informativeness_fraction.is_finite()
         || !(0.0..=1.0).contains(&holdout.min_gradient_informativeness_fraction)
+        || holdout.gradient_informativeness_relative_squared_floor
+            != GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR
+        || holdout.required_gradient_informativeness_fraction
+            != MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
         || holdout.trajectories_checked > holdout.requested_trajectories
     {
         return false;
@@ -1061,6 +1097,8 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_f64(&mut hasher, receipt.max_lie_derivative_variance);
     hash_f64(&mut hasher, receipt.median_lie_derivative_variance);
     hash_f64(&mut hasher, receipt.min_gradient_informativeness_fraction);
+    hash_f64(&mut hasher, receipt.gradient_informativeness_relative_squared_floor);
+    hash_f64(&mut hasher, receipt.required_gradient_informativeness_fraction);
     hash_f64(&mut hasher, receipt.threshold);
     hasher.update(&[u8::from(receipt.holdout_passed)]);
     let failure = receipt.holdout_failure
@@ -1504,6 +1542,57 @@ mod tests {
     }
 
     #[test]
+    fn verifier_rejects_resealed_receipt_with_changed_gradient_policy() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(),
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            3,
+            701,
+            1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        ).expect("well-formed receipt should be constructed");
+
+        receipt.required_gradient_informativeness_fraction = 0.1;
+        receipt.assessment_context_blake3 = assessment_context_digest(
+            &receipt.candidate_formula,
+            &receipt.variable_names,
+            &receipt.initial_state,
+            receipt.discovery_seed,
+            receipt.holdout_seed,
+            receipt.t_max,
+            receipt.dt,
+            receipt.requested_trajectories,
+            receipt.threshold,
+            receipt.gradient_informativeness_relative_squared_floor,
+            receipt.required_gradient_informativeness_fraction,
+            &receipt.system_id,
+            &receipt.system_definition_blake3,
+        );
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
     fn builder_rejects_rehashed_zero_trajectory_record_with_identical_seeds() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let formula = harmonic_energy();
@@ -1540,6 +1629,8 @@ mod tests {
             0.01,
             holdout.requested_trajectories,
             holdout.threshold,
+            holdout.gradient_informativeness_relative_squared_floor,
+            holdout.required_gradient_informativeness_fraction,
             &holdout.system_id,
             &holdout.system_definition_blake3,
         );
@@ -1671,6 +1762,8 @@ mod tests {
             receipt.dt,
             receipt.requested_trajectories,
             receipt.threshold,
+            receipt.gradient_informativeness_relative_squared_floor,
+            receipt.required_gradient_informativeness_fraction,
             &receipt.system_id,
             &receipt.system_definition_blake3,
         );
