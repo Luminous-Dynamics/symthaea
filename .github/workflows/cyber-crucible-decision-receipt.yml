@@ -1,0 +1,134 @@
+name: Cyber Crucible Verifier Decision Receipt Contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/*cyber_crucible*"
+      - "tests/test_cyber_crucible_*"
+      - "validation/cyber_crucible_*"
+      - "validation/CYBER_CRUCIBLE_*"
+      - ".github/workflows/cyber-crucible-*"
+      - "scripts/verify_cyber_crucible_decision_receipt.py"
+      - "scripts/verify_cyber_crucible_report_decision.py"
+      - "scripts/verify_cyber_crucible_verifier_provenance.py"
+      - "tests/test_cyber_crucible_decision_receipt.py"
+      - "tests/test_cyber_crucible_report_decision.py"
+      - "tests/test_cyber_crucible_verifier_provenance.py"
+      - "validation/cyber_crucible_verifier_decision_v1.schema.json"
+      - "validation/cyber_crucible_decision_trust_policy_v1.schema.json"
+      - "validation/cyber_crucible_verifier_provenance_policy_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_VERIFIER_DECISION_V1.md"
+      - ".github/workflows/cyber-crucible-decision-receipt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/*cyber_crucible*"
+      - "tests/test_cyber_crucible_*"
+      - "validation/cyber_crucible_*"
+      - "validation/CYBER_CRUCIBLE_*"
+      - ".github/workflows/cyber-crucible-*"
+      - "scripts/verify_cyber_crucible_decision_receipt.py"
+      - "scripts/verify_cyber_crucible_report_decision.py"
+      - "scripts/verify_cyber_crucible_verifier_provenance.py"
+      - "tests/test_cyber_crucible_decision_receipt.py"
+      - "tests/test_cyber_crucible_report_decision.py"
+      - "tests/test_cyber_crucible_verifier_provenance.py"
+      - "validation/cyber_crucible_verifier_decision_v1.schema.json"
+      - "validation/cyber_crucible_decision_trust_policy_v1.schema.json"
+      - "validation/cyber_crucible_verifier_provenance_policy_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_VERIFIER_DECISION_V1.md"
+      - ".github/workflows/cyber-crucible-decision-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  decision-receipt-contract:
+    name: Decision signature, context, policy, expiry, and replay regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.15"
+      - name: Install fully pinned verification dependency closure
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: -r validation/cyber_crucible_verifier_requirements_v1.txt
+          python -m pip check
+      - name: Install SHA-pinned actionlint for release workflow syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.12"
+          archive="actionlint_1.7.12_linux_amd64.tar.gz"
+          expected="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          curl -fsSLo "/tmp/actionlint_1.7.12_linux_amd64.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+          echo "$expected  /tmp/$archive" | sha256sum -c -
+          mkdir -p /tmp/actionlint
+          tar -xzf "/tmp/$archive" -C /tmp/actionlint actionlint
+          /tmp/actionlint/actionlint -version
+
+      - name: Lint release and verifier contract workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/actionlint/actionlint -color -shellcheck "" -pyflakes "" \
+            .github/workflows/cyber-crucible-decision-receipt.yml \
+            .github/workflows/cyber-crucible-trusted-build.yml \
+            .github/workflows/cyber-crucible-verifier-release.yml
+
+      - name: Parse-check all verifier and regression Python sources
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          paths = sorted(Path("scripts").glob("*cyber_crucible*.py"))
+          paths += sorted(Path("tests").glob("test_cyber_crucible_*.py"))
+          for path in paths:
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+              print(f"Python syntax PASS: {path}")
+          PY
+
+      - name: Meta-validate decision schemas
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          for name in (
+              "cyber_crucible_verifier_decision_v1.schema.json",
+              "cyber_crucible_decision_trust_policy_v1.schema.json",
+              "cyber_crucible_verifier_provenance_policy_v1.schema.json",
+          ):
+              schema = json.loads((Path("validation") / name).read_text(encoding="utf-8"))
+              Draft202012Validator.check_schema(schema)
+              print(f"Draft 2020-12 schema meta-validation PASS: {name}")
+          PY
+      - name: Run deterministic decision, report, provenance, and bundle regressions
+        run: |
+          python -m unittest discover -s tests -p "test_cyber_crucible_decision_receipt.py" -v
+          python -m unittest discover -s tests -p "test_cyber_crucible_report_decision.py" -v
+          python -m unittest discover -s tests -p "test_cyber_crucible_verifier_provenance.py" -v
+          python -m unittest discover -s tests -p "test_cyber_crucible_verifier_bundle.py" -v
+      - name: Build and compare deterministic verifier bundles
+        run: |
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          python scripts/package_cyber_crucible_verifier.py build \
+            --root . \
+            --output "$RUNNER_TEMP/cyber-crucible-verifier-a.tar.gz" \
+            --source-commit "$SOURCE_COMMIT"
+          python scripts/package_cyber_crucible_verifier.py build \
+            --root . \
+            --output "$RUNNER_TEMP/cyber-crucible-verifier-b.tar.gz" \
+            --source-commit "$SOURCE_COMMIT"
+          cmp --silent "$RUNNER_TEMP/cyber-crucible-verifier-a.tar.gz" "$RUNNER_TEMP/cyber-crucible-verifier-b.tar.gz"
+          python scripts/package_cyber_crucible_verifier.py verify \
+            --bundle "$RUNNER_TEMP/cyber-crucible-verifier-a.tar.gz" \
+            --expected-source-commit "$SOURCE_COMMIT"
+          sha256sum "$RUNNER_TEMP/cyber-crucible-verifier-a.tar.gz"
