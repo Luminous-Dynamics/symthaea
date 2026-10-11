@@ -70,7 +70,9 @@ jobs:
           python-version: "3.12.15"
 
       - name: Install only pinned contract dependencies
-        run: python -m pip install --disable-pip-version-check -r validation/cyber_crucible_verifier_requirements_v1.txt
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: -r validation/cyber_crucible_verifier_requirements_v1.txt
+          python -m pip check
 
       - name: Meta-validate all verifier JSON schemas
         run: |
