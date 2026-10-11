@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-sif-bridge"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Sovereign Intelligence Fabric bindings for Symthaea verifiable minimum-disclosure queries"
+
+[dependencies]
+blake3.workspace = true
+serde.workspace = true
