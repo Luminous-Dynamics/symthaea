@@ -790,6 +790,9 @@ mod tests {
         assert_eq!(report.samples, 4);
         assert_eq!(report.correct, 3);
         assert!((report.accuracy - 0.75).abs() < 1e-6);
+        assert!((report.macro_precision - (5.0 / 6.0)).abs() < 1e-6);
+        assert!((report.macro_recall - 0.75).abs() < 1e-6);
+        assert!((report.macro_f1 - (22.0 / 30.0)).abs() < 1e-6);
         assert_eq!(report.confusion_matrix["a"]["a"], 1);
         assert_eq!(report.confusion_matrix["a"]["b"], 1);
         assert_eq!(report.confusion_matrix["b"]["a"], 0);
