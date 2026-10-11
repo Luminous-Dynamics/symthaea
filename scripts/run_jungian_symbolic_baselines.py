@@ -682,6 +682,119 @@ def context_pair_diagnostics(
         })
     return rows
 
+
+def self_test_glyph_projection_validator(
+    corpus: dict[str, Any],
+    corpus_bytes: bytes,
+    source_revision: str,
+) -> list[str]:
+    """Positive and adversarial tests for the actual-HDC receipt validator."""
+    case_rows = []
+    for case in corpus["cases"]:
+        full_scores = [
+            {"index": index, "modality": f"Modality{index:02d}", "cosine_similarity": 1.0 - index / 10.0}
+            for index in range(11)
+        ]
+        top_modalities = [
+            {
+                "rank": rank,
+                "index": index,
+                "modality": f"Modality{index:02d}",
+                "cosine_similarity": 1.0 - index / 10.0,
+            }
+            for rank, index in enumerate(range(5), start=1)
+        ]
+        top_glyphs = [
+            {
+                "rank": rank,
+                "glyph_id": f"G{index:02d}",
+                "name": f"Glyph {index:02d}",
+                "class": "SyntheticTestOnly",
+                "field_modality": f"Modality{index:02d}",
+                "cosine_similarity": 1.0 - index / 10.0,
+                "core_function": "validator self-test fixture",
+                "echo_phrase": "not a psychological interpretation",
+            }
+            for rank, index in enumerate(range(5), start=1)
+        ]
+        case_rows.append({
+            "case_id": case["id"],
+            "input_blake3": "0" * 64,
+            "input_sha256": hashlib.sha256(case["input_text"].encode("utf-8")).hexdigest(),
+            "modality_scores": full_scores,
+            "top_modalities": top_modalities,
+            "top_glyphs": top_glyphs,
+        })
+    pair_rows = [
+        {"left_case_id": corpus["cases"][left]["id"], "right_case_id": corpus["cases"][right]["id"], "cosine_similarity": 0.0}
+        for left in range(len(corpus["cases"]))
+        for right in range(left + 1, len(corpus["cases"]))
+    ]
+    fixture = {
+        "schema": "symthaea-jungian-glyph-projection-v1",
+        "corpus_id": corpus["corpus_id"],
+        "corpus_version": corpus["version"],
+        "corpus_status": "DevelopmentProbe",
+        "corpus_split": "ExposedDevelopment",
+        "corpus_blake3": "0" * 64,
+        "corpus_sha256": hashlib.sha256(corpus_bytes).hexdigest(),
+        "source_revision": source_revision,
+        "glyph_source_blob": "1" * 40,
+        "glyph_registry_source_blob": "2" * 40,
+        "encoder_source_blob": "3" * 40,
+        "dimension": 16384,
+        "registry_size": 70,
+        "encoder_profile": {
+            "type": "TextHdcEncoder",
+            "ngram_size": 3,
+            "trigram_weight": 0.5,
+            "sentiment_weight": 0.2,
+            "seed_profile": "the exact committed TextHdcEncoder implementation",
+        },
+        "basis_profile": "synthetic validator fixture",
+        "registry_profile": "synthetic validator fixture",
+        "retrieval": "cosine similarity only; nearest-neighbor association is not an interpretation or truth score",
+        "claim_ceiling": "validator fixture only",
+        "pairwise_input_similarity_profile": "Cosine between whole-text TextHdcEncoder outputs; reflects this committed lexical/morphological/positional encoding only, not semantic truth.",
+        "pairwise_input_similarity": pair_rows,
+        "cases": case_rows,
+    }
+
+    failures: list[str] = []
+    try:
+        validate_glyph_projection(fixture, corpus, corpus_bytes, source_revision)
+    except Exception as exc:
+        failures.append(f"positive projection-receipt fixture rejected: {exc}")
+
+    mutations: list[tuple[str, dict[str, Any], str]] = []
+    mutation = json.loads(json.dumps(fixture))
+    mutation["corpus_sha256"] = "f" * 64
+    mutations.append(("corpus digest mismatch rejected", mutation, "corpus SHA-256"))
+    mutation = json.loads(json.dumps(fixture))
+    mutation["cases"][0]["input_sha256"] = "f" * 64
+    mutations.append(("input digest mismatch rejected", mutation, "input SHA-256"))
+    mutation = json.loads(json.dumps(fixture))
+    mutation["cases"][0]["top_modalities"][0], mutation["cases"][0]["top_modalities"][1] = mutation["cases"][0]["top_modalities"][1], mutation["cases"][0]["top_modalities"][0]
+    mutations.append(("modality rank corruption rejected", mutation, "invalid top modality rank"))
+    mutation = json.loads(json.dumps(fixture))
+    mutation["pairwise_input_similarity"][0], mutation["pairwise_input_similarity"][1] = mutation["pairwise_input_similarity"][1], mutation["pairwise_input_similarity"][0]
+    mutations.append(("pair ordering corruption rejected", mutation, "canonical corpus order"))
+    mutation = json.loads(json.dumps(fixture))
+    mutation["encoder_source_blob"] = "not-a-git-blob"
+    mutations.append(("encoder source identity corruption rejected", mutation, "encoder_source_blob malformed"))
+
+    for name, mutated, expected_error in mutations:
+        try:
+            validate_glyph_projection(mutated, corpus, corpus_bytes, source_revision)
+            failures.append(name + ": mutation unexpectedly accepted")
+        except BaselineError as exc:
+            if expected_error not in str(exc):
+                failures.append(f"{name}: expected {expected_error!r}, received {str(exc)!r}")
+        except Exception as exc:
+            failures.append(f"{name}: wrong exception type {type(exc).__name__}: {exc}")
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
@@ -700,6 +813,10 @@ def main() -> int:
         require(len(cases) == 14 and len({c["id"] for c in cases}) == len(cases), "unexpected or duplicate corpus case set")
         corpus_digest = hashlib.sha256(corpus_bytes).hexdigest()
         runner_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        projection_test_failures = self_test_glyph_projection_validator(corpus, corpus_bytes, args.source_revision)
+        if projection_test_failures:
+            raise BaselineError("Glyph projection validator self-test failures: " + "; ".join(projection_test_failures))
+        print("PASS Glyph projection validator self-test: valid receipt plus five hostile mutations")
         args.output_dir.mkdir(parents=True, exist_ok=True)
 
         glyph_projection_by_id = None
