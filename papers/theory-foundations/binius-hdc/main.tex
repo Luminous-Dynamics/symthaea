@@ -31,7 +31,7 @@ Luminous Dynamics\\
 Hyperdimensional Computing (HDC) uses high-dimensional binary vectors and operations such as XOR binding, majority bundling, and permutation. In a binary-field proof system, XOR is addition and therefore does not require nonlinear AND/MUL gates. This paper reports a Binius64 circuit for a 16,384-bit XOR relation and a public harness that generates and verifies the resulting proof. The circuit's reported constraint total also includes equality-wiring overhead.
 
 The public artifact does not implement a Winterfell XOR prover in its benchmark harness: its Winterfell comparison is an analytic estimate. Accordingly, the same-scale cross-backend speedup and constraint-reduction ratios previously reported are retracted pending a reproducible, measured baseline. The Hamming circuit and multi-input majority circuits are being corrected to match their stated functions; historical measurements for those circuits are superseded. The temporal demo proves a packed-bit recurrence with witness-supplied gates, not numerical fixed-point CfC dynamics. Health-attestation and federated-learning end-to-end claims are outside what this public artifact currently reproduces.
-\end{abstract}\end{abstract}
+\end{abstract}
 
 \noindent\textbf{Keywords:} zero-knowledge proofs, hyperdimensional computing, binary fields, STARKs, Binius, privacy-preserving machine learning, CfC networks
 \vspace{1em}
@@ -112,8 +112,8 @@ In $\mathrm{GF}(2^{64})$, addition is bitwise XOR on the underlying 64-bit repre
 \end{proof}
 
 \begin{corollary}[Bundling Cost]
-Majority-vote bundling of $n$ vectors over $D$ bits requires $O(D \cdot \log n)$ AND constraints (for the threshold comparison), plus $O(D \cdot n)$ free XOR additions for the vote counting.
-\end{corollary}
+The corrected generic circuit uses a bit-sliced binary counter followed by a per-lane threshold comparison. Its straightforward construction uses $O(D \cdot n \log n)$ bit-level gates; optimized constraint counts and timings must be measured from the corrected circuit rather than inferred from the former pairwise-AND implementation.
+\end{corollary}\end{corollary}
 
 \begin{corollary}[Permutation Cost]
 Cyclic permutation $\rho^k(\mathbf{v})$ requires zero constraints---it is a reindexing of the multilinear polynomial's variables in the Binius commitment scheme.
@@ -129,7 +129,7 @@ Table~\ref{tab:alignment} summarizes the constraint costs.
 \toprule
 \textbf{Operation} & \textbf{Binius} & \textbf{Prime STARK} & \textbf{Ratio} & \textbf{Measured} \\
 \midrule
-XOR binding ($D$ bits) & 0 AND & $4D$ & $\infty$ & 256 vs 1,020 (256-bit) \\
+XOR binding ($D$ bits) & linear Binius relation & not measured & not claimed & Winterfell baseline absent \\
 Majority bundle ($n{=}3$) & corrected bit-sliced circuit & -- & -- & historical count superseded \\
 Majority bundle ($n{=}8$) & corrected bit-sliced circuit & -- & -- & historical count superseded \\
 Cyclic permutation & 0 & $O(D)$ & $\infty$ & (reindexing) \\
@@ -138,33 +138,18 @@ Cyclic permutation & 0 & $O(D)$ & $\infty$ & (reindexing) \\
 \end{table}
 
 % ============================================================================
-\section{CfC Temporal Proofs}
+\section{Packed-bit Temporal Recurrence Demonstration}
 \label{sec:cfc}
-% ============================================================================
 
-The CfC closed-form step decomposes in Binius as:
+The public temporal benchmark uses packed 64-bit words and bitwise XOR/AND gates, with a witness-supplied gating word. It does not encode the numerical CfC equation over fixed-point or floating-point values.
 
-\begin{align}
-\delta &= x_\infty \oplus h \quad &\text{(XOR: FREE)} \\
-p &= \sigma \wedge \delta \quad &\text{(AND: 1 constraint)} \\
-h' &= h \oplus p \quad &\text{(XOR: FREE)}
-\end{align}
+The numerical CfC update contains ordinary numeric subtraction, multiplication, and a sigmoid-like gating term. Those operations are not interchangeable with bitwise XOR and AND. The prior one-AND-per-neuron-per-timestep count applies only to the packed-bit relation, not to numerical CfC. The prior comparison to LTC+RK4 and the claim of a $16\times$ proof advantage are therefore withdrawn until equivalent numerical circuits, constrained gate computations, and reference-based correctness tests are implemented.
 
-where $\sigma$ is provided as a \emph{witness} (precomputed sigmoid value). Each CfC timestep thus costs \textbf{exactly 1 AND constraint per neuron} in Binius, with 2 free XOR operations.
-
-\textbf{Important caveat}: The quoted cost is for the update relation \emph{given a supplied gating value}. Proving that $\sigma$ was correctly computed from $f(t)$ via sigmoid would require additional constraints (e.g., a lookup table or piecewise approximation). The end-to-end cost of proving a complete CfC step including sigmoid computation remains future work.
-
-For comparison, an LTC network with RK4 integration requires $S \approx 16$ substeps per timestep, each involving multiple multiplications:
-$$\text{CfC: } N \cdot T \text{ ANDs} \quad \text{vs.} \quad \text{LTC+RK4: } \sim 16 \cdot N \cdot T \text{ ANDs}$$
-
-This gives CfC a \textbf{$\sim$16$\times$ constraint advantage} for temporal proof generation.
-
-% ============================================================================
 \section{System Design: DASTARK}
 \label{sec:system}
 % ============================================================================
 
-We integrate these findings into DASTARK, a dual-backend ZKP system deployed across the Mycelix decentralized platform:
+We describe a proposed dual-backend ZKP architecture for Mycelix. The public artifacts in this repository do not independently establish a production deployment across the Mycelix platform:
 
 \begin{itemize}
     \item \textbf{Binius backend}: HDC-native operations (binding, bundling, CfC evolution). Zero-cost XOR, minimal AND constraints.
@@ -184,7 +169,7 @@ pub trait ProofBackend: Send + Sync {
 }
 \end{lstlisting}
 
-The system is deployed across 11 Holochain clusters with unique domain tags preventing cross-protocol replay (e.g., \texttt{ZTML:Health:RecordAttest:v1}).
+The proposed architecture uses domain tags to mitigate cross-protocol replay (e.g., \texttt{ZTML:Health:RecordAttest:v1}). This document does not establish deployment across 11 Holochain clusters.
 
 % ============================================================================
 \section{What Is Free, What Is Not}
@@ -194,11 +179,11 @@ The system is deployed across 11 Holochain clusters with unique domain tags prev
 To prevent overreading the ``zero-cost XOR'' claim, we explicitly enumerate the cost structure:
 
 \begin{itemize}
-    \item \textbf{Free} (zero non-linear constraints): XOR/addition, cyclic permutation (reindexing), subtraction.
+    \item \textbf{Free} (zero non-linear constraints): word-level XOR/addition. A permutation that only reorders whole packed words can be a reindexing; arbitrary bit-level cyclic rotation within/across packed words requires rotation/shift logic and must be costed separately.
     \item \textbf{Cheap} (1 AND per operation): Bitwise AND, comparison gates, threshold checks.
     \item \textbf{Structural overhead}: \texttt{assert\_eq} bookkeeping (256 ANDs for 16,384-bit binding in our benchmark---from constraint wiring, not the XOR operation itself).
-    \item \textbf{Witness assumptions}: Sigmoid/gating values in CfC proofs are witness-supplied and range-checked, not computed inside the circuit. The quoted CfC cost is for the \emph{update relation given a supplied gating value}, not for proving the full neural computation end-to-end.
-    \item \textbf{Bundling evidence}: the former generic $n>3$ circuit implemented AND reduction, not majority. It is corrected in the public source; previous n>3 numbers are superseded until rerun.
+    \item \textbf{Witness assumptions}: temporal demos use witness-supplied packed-bit gates. They do not constrain or verify a numerical sigmoid or prove the numerical CfC update.
+    \item \textbf{Bundling evidence}: the former generic $n>3$ circuit implemented AND reduction, not majority. The correction branch uses a bit-sliced counter; all prior n>3 measurements are superseded until rerun.
 \end{itemize}
 
 \subsection{Claim Hierarchy}
@@ -207,9 +192,9 @@ We distinguish four levels of evidence strength:
 
 \begin{enumerate}
     \item \textbf{Provable algebraic result}: XOR binding is linear in binary-field STARK AIR and incurs zero non-linear constraints. This follows from the definition of $\mathrm{GF}(2^k)$ addition.
-    \item \textbf{Measured implementation result}: Binius benchmark on 16,384-bit binding produces 256 AND constraints (structural only) with real cryptographic proof generation and verification.
+    \item \textbf{Measured implementation result}: the public harness generates and verifies a Binius proof for a 16,384-bit packed-word XOR relation; 256 structural AND constraints were reported in a historical run and must be refreshed on this branch.
     \item \textbf{Cross-backend comparison}: not established by the public harness. Its Winterfell figures are analytic estimates; no same-scale Winterfell XOR proof is executed by the public benchmark.
-    \item \textbf{Forward-looking implication}: Binary-field STARKs are the natural proof system for XOR-dominant HDC workloads. The triple-stack (HDC+FHE+ZKP) remains speculative.
+    \item \textbf{Forward-looking implication}: binary-field proof systems are a promising fit for XOR-dominant workloads. The triple-stack and application-level conclusions remain speculative until their complete semantics and deployment paths are independently validated.
 \end{enumerate}
 
 % ============================================================================
@@ -292,7 +277,7 @@ The earlier health-attestation latency table and federated-learning aggregate fi
 
     \item \textbf{Sigmoid approximation.} Our CfC benchmark with in-circuit sigmoid uses an 8-bit mask approximation ($\sigma(x) \approx x \wedge \texttt{0xFF}$), not a numerically accurate sigmoid. A production-grade piecewise linear sigmoid would require additional AND constraints (estimated 5--10 per neuron per step vs our current 2).
 
-    \item \textbf{Bundling uses tree reduction.} Our majority-vote bundling uses pairwise AND reduction, which computes logical AND (not true majority vote for $n > 2$). True majority for $n = 3$ uses the correct formula; for $n = 8$, the tree reduction gives a conservative upper bound on AND constraints.
+    \item \textbf{Prior bundling results superseded.} The former generic $n>3$ circuit used pairwise AND reduction, not majority. The correction branch replaces it with bit-sliced strict majority; historical timing and constraint counts require rerunning.
 
     \item \textbf{Single-machine benchmarks.} All measurements use a single AMD Ryzen workstation. Network effects, DHT storage costs, and multi-validator verification latency are not captured.
 
