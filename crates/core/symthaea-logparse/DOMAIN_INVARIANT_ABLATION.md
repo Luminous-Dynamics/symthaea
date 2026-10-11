@@ -35,7 +35,10 @@ The ordinary baseline experiments now use source-file-grouped train/test and 5-f
 - OOD accuracy;
 - macro precision, macro recall, and macro F1;
 - per-class support, predicted count, TP/FP/FN, precision, recall, F1, and the full confusion matrix;
-- the corresponding raw-encoder metrics for direct comparison.
+- the corresponding raw-encoder metrics for direct comparison;
+- a margin-ranked selective-prediction curve at 50%, 75%, 90%, and 100% target coverage, reporting accepted accuracy and macro recall for both encoders.
+
+The selective curve uses the top-1 minus top-2 model-logit margin to rank examples, then describes performance when the least-separated classifications are withheld. This margin is **not a calibrated probability**; the curve does not establish a safe production threshold. Any actual abstention policy needs a separate validation split, per-class coverage analysis, and explicit review of the cost of false negatives versus analyst workload.
 
 Accuracy alone can be dominated by common classes; read it alongside macro metrics and the confusion matrix. Class-level false positives here mean confusion among the labeled attack classes—not false alarms on benign enterprise activity. The staged OTRF corpus does not provide the benign control needed to measure operational false-positive rates. The script prints measurements from the currently staged corpora; do not copy historical values into a new result as if it had been reproduced.
 
