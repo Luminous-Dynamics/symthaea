@@ -51,13 +51,16 @@ def signed_receipt(
     digest: str | None = None,
     proposal_id: str | None = None,
     proposal_digest: str | None = None,
+    key_id: str = "test-key-1",
+    evaluator_id: str = "independent-security-evaluator",
+    signer: Ed25519PrivateKey = PRIVATE,
 ) -> dict:
     payload = {
         "schema_version": verifier.SCHEMA_VERSION,
         "algorithm": "Ed25519",
         "receipt_id": receipt_id,
-        "key_id": "test-key-1",
-        "evaluator_id": "independent-security-evaluator",
+        "key_id": key_id,
+        "evaluator_id": evaluator_id,
         "role": role,
         "campaign_id": "campaign-2026-10-A",
         "subject_id": "symthaea-candidate-A",
@@ -74,7 +77,7 @@ def signed_receipt(
         "proposal_digest": proposal_digest,
     }
     payload_bytes = verifier.canonical_signed_bytes(payload)
-    signature = PRIVATE.sign(payload_bytes)
+    signature = signer.sign(payload_bytes)
     return {"payload": payload, "signature": b64url(signature)}
 
 
@@ -276,6 +279,43 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         self.verify(receipt, replay_ledger=ledger)
         with self.assertRaisesRegex(verifier.VerificationError, "replay rejected"):
             self.verify(receipt, replay_ledger=ledger)
+
+    def test_independent_receipts_for_one_attempt_can_each_be_consumed(self):
+        trust = policy(["security_verdict"])
+        functional_private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+        functional_public = functional_private.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        trust["keys"].append({
+            "key_id": "test-key-functional",
+            "evaluator_id": "independent-functional-evaluator",
+            "public_key": b64url(functional_public),
+            "roles": ["functional_verdict"],
+            "not_before": "2026-01-01T00:00:00Z",
+            "not_after": "2027-01-01T00:00:00Z",
+            "revoked_at": None,
+        })
+        security_receipt = signed_receipt()
+        functional_receipt = signed_receipt(
+            role="functional_verdict",
+            nonce="B" * 43,
+            receipt_id="11112222333344445555666677778888",
+            key_id="test-key-functional",
+            evaluator_id="independent-functional-evaluator",
+            signer=functional_private,
+        )
+        ledger = verifier.ReplayLedger(self.replay_db)
+        security_result = verifier.verify_receipt(
+            security_receipt, trust, context(security_receipt), now=NOW, replay_ledger=ledger
+        )
+        functional_result = verifier.verify_receipt(
+            functional_receipt, trust, context(functional_receipt), now=NOW, replay_ledger=ledger
+        )
+        self.assertTrue(security_result["replay_checked"])
+        self.assertTrue(functional_result["replay_checked"])
+        self.assertEqual(security_result["attempt_id"], functional_result["attempt_id"])
+        self.assertNotEqual(security_result["receipt_nonce"], functional_result["receipt_nonce"])
 
     def test_invalid_signature_does_not_burn_nonce(self):
         receipt = signed_receipt()
