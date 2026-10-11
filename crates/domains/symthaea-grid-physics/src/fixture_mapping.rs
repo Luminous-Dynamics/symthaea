@@ -14,6 +14,7 @@
 use serde::{Deserialize, Serialize};
 
 const MAX_MAPPED_INTERVALS: usize = 1_000_000;
+pub const ENERGY_STUDY_PROFILE_MAPPING_SCHEMA_VERSION: u16 = 1;
 
 /// Parsed interval-energy inputs after their source bytes have been checked by
 /// the upstream manifest/artifact verifier.
@@ -125,10 +126,12 @@ impl EnergyStudyProfilesV1 {
             return Err(EnergyProfileMappingError::ProfileLengthMismatch);
         }
 
-        for index in 0..count {
-            let load = self.load_kwh_per_interval[index];
-            let critical = self.critical_load_kwh_per_interval[index];
-            let generation = self.renewable_generation_kwh_per_interval[index];
+        for ((&load, &critical), &generation) in self
+            .load_kwh_per_interval
+            .iter()
+            .zip(&self.critical_load_kwh_per_interval)
+            .zip(&self.renewable_generation_kwh_per_interval)
+        {
             if [load, critical, generation]
                 .iter()
                 .any(|value| !value.is_finite() || *value < 0.0)
@@ -154,7 +157,7 @@ impl EnergyStudyProfilesV1 {
         };
 
         Ok(MappedEnergyStudyProfilesV1 {
-            schema_version: 1,
+            schema_version: ENERGY_STUDY_PROFILE_MAPPING_SCHEMA_VERSION,
             start_unix_seconds: self.start_unix_seconds,
             interval_seconds: self.interval_seconds,
             interval_count: count,
@@ -204,13 +207,18 @@ mod tests {
             mapped.grid_available_by_interval,
             vec![true, true, true, true, false, false, true, true]
         );
-        for (actual, expected) in mapped.load_kw.iter().zip([8.0, 10.0, 12.0, 16.0, 20.0, 20.0, 14.0, 12.0]) {
+        let expected_load_kw = [8.0, 10.0, 12.0, 16.0, 20.0, 20.0, 14.0, 12.0];
+        for (actual, expected) in mapped.load_kw.iter().zip(expected_load_kw) {
             close(*actual, expected);
         }
-        for (actual, expected) in mapped.critical_load_kw.iter().zip([4.0, 4.0, 4.8, 6.0, 6.0, 6.0, 4.8, 4.0]) {
+
+        let expected_critical_load_kw = [4.0, 4.0, 4.8, 6.0, 6.0, 6.0, 4.8, 4.0];
+        for (actual, expected) in mapped.critical_load_kw.iter().zip(expected_critical_load_kw) {
             close(*actual, expected);
         }
-        for (actual, expected) in mapped.renewable_generation_kw.iter().zip([0.0, 0.4, 2.0, 4.0, 2.0, 0.0, 0.0, 0.0]) {
+
+        let expected_generation_kw = [0.0, 0.4, 2.0, 4.0, 2.0, 0.0, 0.0, 0.0];
+        for (actual, expected) in mapped.renewable_generation_kw.iter().zip(expected_generation_kw) {
             close(*actual, expected);
         }
         assert_eq!(
