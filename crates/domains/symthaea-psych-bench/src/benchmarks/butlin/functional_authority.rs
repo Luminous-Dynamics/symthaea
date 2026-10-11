@@ -161,13 +161,22 @@ impl CausalObservation {
         validate_finite_measurement(&metric_id, baseline_mean, intervention_mean)?;
         validate_std_dev(&metric_id, standard_deviation)?;
 
-        let mut effect = EffectEstimate::new(
+        let mut effect = EffectEstimate::try_new(
             baseline_mean,
             intervention_mean,
             intervention.seeds().len(),
-        );
+        )
+        .map_err(|_| FunctionalAuthorityError::InvalidMeasurement {
+            metric_id: metric_id.clone(),
+            reason: MeasurementInvalidReason::NonFinite,
+        })?;
         if let Some(sd) = standard_deviation {
-            effect = effect.with_std_dev(sd);
+            effect = effect.with_std_dev(sd).map_err(|_| {
+                FunctionalAuthorityError::InvalidMeasurement {
+                    metric_id: metric_id.clone(),
+                    reason: MeasurementInvalidReason::InvalidStandardDeviation,
+                }
+            })?;
         }
         Ok(Self {
             intervention,
@@ -225,13 +234,22 @@ impl FunctionalAccuracyObservation {
         }
         validate_std_dev(&benchmark_id, standard_deviation)?;
 
-        let mut effect = EffectEstimate::new(
+        let mut effect = EffectEstimate::try_new(
             baseline_mean,
             intervention_mean,
             intervention.seeds().len(),
-        );
+        )
+        .map_err(|_| FunctionalAuthorityError::InvalidMeasurement {
+            metric_id: benchmark_id.clone(),
+            reason: MeasurementInvalidReason::NonFinite,
+        })?;
         if let Some(sd) = standard_deviation {
-            effect = effect.with_std_dev(sd);
+            effect = effect.with_std_dev(sd).map_err(|_| {
+                FunctionalAuthorityError::InvalidMeasurement {
+                    metric_id: benchmark_id.clone(),
+                    reason: MeasurementInvalidReason::InvalidStandardDeviation,
+                }
+            })?;
         }
         Ok(Self {
             intervention,
