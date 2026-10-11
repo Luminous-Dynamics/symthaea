@@ -158,13 +158,26 @@ pub fn AddMusicPage() -> impl IntoView {
                             <span><small>"Territory"</small><strong>"Unclassified"</strong></span>
                         </div>
                         <p>"Muse preserved the work as source-native. Section and motif findings remain reconstructed suggestions until you confirm them."</p>
-                        {analysis.motifs.first().cloned().map(|motif| view! {
-                            <div class="import-motif-result">
-                                <strong>"Possible opening motif"</strong>
-                                <span>{format!("{} notes · {} occurrence{} · {:.0}% confidence",
-                                    motif.midi_pitches.len(), motif.occurrence_count,
-                                    if motif.occurrence_count == 1 { "" } else { "s" }, motif.confidence * 100.0)}</span>
-                            </div>
+                        {analysis.motifs.first().cloned().map(|motif| {
+                            let heading = match motif.independent_occurrence_count {
+                                Some(count) if count > 1 => "Possible recurring contour",
+                                Some(_) => "Provisional opening contour",
+                                None => "Provisional contour summary",
+                            };
+                            let independent_text = motif.independent_occurrence_count
+                                .map(|count| format!("{} non-overlapping occurrence{}",
+                                    count, if count == 1 { "" } else { "s" }))
+                                .unwrap_or_else(|| "Independent occurrence count unavailable (legacy record)".to_string());
+                            view! {
+                                <div class="import-motif-result">
+                                    <strong>{heading}</strong>
+                                    <span>{format!("{} notes · {} exact pitch-contour window{}",
+                                        motif.midi_pitches.len(), motif.occurrence_count,
+                                        if motif.occurrence_count == 1 { "" } else { "s" })}</span>
+                                    <span class="muted small">{independent_text}</span>
+                                    <span class="muted small">"Symbolic pitch-contour evidence only; rhythm is not a match gate, and confidence is not calibrated."</span>
+                                </div>
+                            }
                         })}
                         <div class="import-actions">
                             <button type="button" on:click=move |_| muse.play_review_audio(
