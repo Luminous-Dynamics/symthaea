@@ -154,6 +154,7 @@ class RunRecordValidatorTests(unittest.TestCase):
     def test_complete_record_requires_exact_target_census(self) -> None:
         self.record["run_status"] = "complete"
         self.record["targets"].append(self.target("B", 0.4))
+        self.record["resource_accounting"]["candidate_conformers_generated"] = 6
         self.record["attestations"]["all_expected_targets_accounted"] = True
         errors, _, _ = self.run_validator()
         self.assertEqual(errors, [])
@@ -200,6 +201,11 @@ class RunRecordValidatorTests(unittest.TestCase):
         self.record["output_artifacts"][0]["uri_or_relative_path"] = "../outside.csv"
         errors, _, _ = self.run_validator()
         self.assertTrue(any("escapes artifact root" in x for x in errors))
+
+    def test_resource_total_must_match_target_ledger(self) -> None:
+        self.record["resource_accounting"]["candidate_conformers_generated"] = 99
+        errors, _, _ = self.run_validator()
+        self.assertTrue(any("resource_accounting.candidate_conformers_generated" in x for x in errors))
 
     def test_wrong_target_id_type_is_rejected(self) -> None:
         self.record["targets"][0]["target_id"] = ["A"]
