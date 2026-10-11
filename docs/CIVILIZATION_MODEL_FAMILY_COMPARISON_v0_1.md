@@ -31,6 +31,15 @@ Reference: [McMillen & Levin (2024), *Collective intelligence: A unifying concep
 
 Use the four AQAL quadrants—individual interior, individual exterior, collective interior and collective exterior—as a **coverage checklist** to prevent the model from omitting subjective experience, observable behavior, shared culture, or institutional/material structure. A quadrant is not itself a measurable variable or causal mechanism. Only operationalize constructs that have declared definitions and defensible measurements. Do not treat Integral developmental levels as ground truth, diagnose individuals from aggregate proxies, or derive rights and authority from a developmental score.
 
+### Current research update (2026)
+
+Two current papers refine the division of labor above:
+
+- Friston et al., [*Active inference and artificial reasoning* (Nature Communications, 2026)](https://www.nature.com/articles/s41467-026-77209-5), studies selecting informative outcomes to discover rules in partially observed discrete models. It may inform an *epistemic-exploration* policy variant or experimental-design component. Its demonstration assumes a known generative-model family and a structured task; it is not evidence that active inference predicts social systems or human populations. Treat it as a candidate mechanism to test, not a universal cognition engine.
+- Haase & Pokutta, [*Beyond static responses: multi-agent LLM systems as a new paradigm for social science research* (Humanities and Social Sciences Communications, 2026)](https://www.nature.com/articles/s41599-026-08832-2), reviews agentic LLM architectures for social-science research and highlights reproducibility, bias, ethical oversight and the lack of standardized evaluation. The proposed framework itself has not yet been systematically validated across diverse implementations. This reinforces the choice to keep LLM-driven simulated populations out of the primary model-family benchmark until behavioral fidelity and replication are demonstrated.
+
+Practical consequence: separate **belief/model learning**, **action/policy selection**, **social interaction**, and **institutional rules** into independently switchable mechanisms. A model may use active inference for epistemic exploration while a simpler policy governs allocation; the experiment must be able to compare these components without conflating them.
+
 ### Additional modeling traditions
 
 Use agent-based modeling to represent heterogeneity and interaction; stock-flow consistent/system-dynamics models for accumulation, depletion and delays; network science for topology and dependencies; institutional/social-ecological frameworks for rules and shared resources; and causal inference for separating explanation from prediction. These methods answer different questions and should be coupled only where a documented mechanism connects them.
