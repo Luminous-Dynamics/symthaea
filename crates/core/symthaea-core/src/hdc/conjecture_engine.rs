@@ -37,6 +37,8 @@ use parking_lot::RwLock;
 
 #[path = "conjecture_engine/autonomous.rs"]
 mod autonomous;
+#[path = "conjecture_engine/autonomous_provenance.rs"]
+mod autonomous_provenance;
 #[path = "conjecture_engine/cfc_smoothing.rs"]
 mod cfc_smoothing;
 #[path = "conjecture_engine/conjecture_metadata.rs"]
@@ -68,6 +70,7 @@ mod symbolic;
 #[path = "conjecture_engine/verification.rs"]
 mod verification;
 pub use autonomous::*;
+pub use autonomous_provenance::*;
 /// CfC-style closed-form smoothing for noisy/irregular observations. See
 /// `cfc_smoothing.rs` module docs.
 pub use cfc_smoothing::{CfcSmoother, NaiveEmaSmoother};
