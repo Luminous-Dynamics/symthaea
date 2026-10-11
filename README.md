@@ -91,7 +91,7 @@ The previous Hamming result is superseded: its circuit summed/truncated XOR-word
 | `symthaea-core` | HDC vectors, CfC neurons, consciousness math | 3K+ |
 | `mycelix-zkp-core` | ZKP infrastructure: backends, circuits, Dilithium5, domain tags | 65+ |
 | `hdc-zkp-bench` | Binius benchmark circuits (XOR, bundling, CfC, FL, Hamming) | Benchmarks |
-| `symthaea-zkproof` | Consciousness attestation (RISC0) + cycle integrity | 23+ |
+| `symthaea-zkproof` | Computation attestation (RISC0) + cycle-integrity proof demo; not proof of consciousness | 23+ |
 | `symthaea-spore` | Browser WASM kernel (324 KB) | 183 |
 | `symthaea-broca` | Language generation (CfC-HDC thought-to-text) | 229+ |
 
@@ -205,7 +205,7 @@ Architecture diagrams are conceptual; they are not evidence that every pictured 
 
 ## Cryptographic Primitives Relevant to Regulated Domains
 
-**None of the following is a compliance certification.** These are working cryptographic primitives that a compliant system in each domain would plausibly need — no accredited assessment, legal review, or regulatory audit has been performed on any of them.
+**None of the following is a compliance certification.** These rows describe proposed application patterns, not end-to-end capabilities established by the current public proof harness. No accredited assessment, legal review, or regulatory audit has been performed.
 
 | Regulation | What the primitive demonstrates | What it is NOT |
 |------------|----------------------------------|-----------------|
