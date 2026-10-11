@@ -72,7 +72,12 @@ pub fn analyze_render_cleanliness(samples: &[f32], sample_rate: u32) -> RenderCl
         .sqrt();
     let normalized_peak_sample_delta = peak_sample_delta / rms.max(1e-9);
     let normalized_first_difference_rms = difference_rms / rms.max(1e-9);
-    let render_cleanliness_pass = finite
+    // Empty/degenerate stems and invalid rates have no meaningful
+    // continuity evidence. Do not let vacuous finite()/zero-delta metrics
+    // turn absent audio into a clean render.
+    let valid_signal = samples.len() >= 2 && sample_rate >= 8_000;
+    let render_cleanliness_pass = valid_signal
+        && finite
         && peak_sample_delta <= 0.12
         && contextual_click_events == 0
         && normalized_first_difference_rms <= 0.75;
@@ -415,6 +420,18 @@ mod tests {
         let clicked = analyze_render_cleanliness(&samples, rate);
         assert!(!clicked.render_cleanliness_pass, "{clicked:?}");
         assert!(clicked.contextual_click_events > 0);
+    }
+
+    #[test]
+    fn standalone_cleanliness_rejects_empty_degenerate_and_invalid_rate_inputs() {
+        let empty = analyze_render_cleanliness(&[], 48_000);
+        assert!(!empty.render_cleanliness_pass, "{empty:?}");
+
+        let one_sample = analyze_render_cleanliness(&[0.1], 48_000);
+        assert!(!one_sample.render_cleanliness_pass, "{one_sample:?}");
+
+        let invalid_rate = analyze_render_cleanliness(&[0.1, 0.1], 0);
+        assert!(!invalid_rate.render_cleanliness_pass, "{invalid_rate:?}");
     }
 
     #[test]
