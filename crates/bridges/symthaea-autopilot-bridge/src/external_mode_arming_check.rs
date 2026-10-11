@@ -1089,6 +1089,11 @@ impl Px4ExternalModeArmingCheckAssessmentV1 {
             if reply.registration_id != self.registration.arming_check_id_raw as u8 {
                 return Err(Px4ExternalModeArmingCheckError::ReplyRegistrationIdMismatch);
             }
+            // Both raw source timestamps are PX4 boot-relative microseconds. They may
+            // be compared to one another only after the boot/session profile has matched.
+            if reply.source_timestamp_us_raw < self.request.source_timestamp_us_raw {
+                return Err(Px4ExternalModeArmingCheckError::ReplySourceTimestampRegression);
+            }
             if reply.received_at.nanoseconds < self.request.received_at.nanoseconds {
                 return Err(Px4ExternalModeArmingCheckError::ReceiveOrderRegression);
             }
@@ -1315,6 +1320,9 @@ pub enum Px4ExternalModeArmingCheckError {
     /// Reply registration_id did not match RegisterExtComponentReply.
     #[error("ArmingCheckReply registration ID mismatch")]
     ReplyRegistrationIdMismatch,
+    /// PX4's source timestamp on the reply predates the correlated request timestamp.
+    #[error("ArmingCheckReply PX4 source timestamp preceded its request")]
+    ReplySourceTimestampRegression,
     /// Reply was received before its request.
     #[error("ArmingCheckReply receive time preceded its request")]
     ReceiveOrderRegression,
@@ -1507,6 +1515,7 @@ mod tests {
             registration_id,
             local_alt,
             received_ns,
+            1_250_000,
             0,
             false,
             false,
@@ -1525,6 +1534,7 @@ mod tests {
         registration_id: u8,
         local_alt: bool,
         received_ns: u64,
+        source_timestamp_us_raw: u64,
         health_component_index: u8,
         health_component_is_present: bool,
         health_component_warning: bool,
@@ -1538,7 +1548,7 @@ mod tests {
             "px4.v1.18.external-mode.fixture.v1",
             "px4.boot.fixture.session-a",
             "arming-check.fixture.cycle-1",
-            1_250_000,
+            source_timestamp_us_raw,
             req_id,
             registration_id,
             health_component_index,
@@ -1784,6 +1794,40 @@ mod tests {
     }
 
     #[test]
+    fn reply_source_timestamp_before_request_fails_closed_despite_later_receive_time() {
+        let reply = arming_reply_with_diagnostics(
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_199_999,
+            0,
+            false,
+            false,
+            false,
+            0,
+            [
+                Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+            ],
+        )
+        .unwrap();
+        let value = Px4ExternalModeArmingCheckAssessmentV1::new(
+            profile(),
+            registration(true, 3, 42),
+            config_assessment(42, true, 0, 1_200_000_000),
+            arming_request(1 << 3),
+            Some(reply),
+            ts(1_400_000_000),
+        )
+        .unwrap();
+        assert_eq!(
+            value.validate().unwrap_err(),
+            Px4ExternalModeArmingCheckError::ReplySourceTimestampRegression
+        );
+    }
+
+    #[test]
     fn absent_reply_is_not_promoted_to_component_failure() {
         let value = assessment(
             registration(true, 3, 42),
@@ -1950,7 +1994,7 @@ mod tests {
             log_levels: 0xA5,
         };
         let reply = arming_reply_with_diagnostics(
-            8, 3, false, 1_350_000_000, 2, true, true, false, 1, events,
+            8, 3, false, 1_350_000_000, 1_250_000, 2, true, true, false, 1, events,
         )
         .unwrap();
         assert_eq!(reply.health_component_index, 2);
@@ -1987,6 +2031,7 @@ mod tests {
             3,
             false,
             1_350_000_000,
+            1_250_000,
             0,
             false,
             false,
