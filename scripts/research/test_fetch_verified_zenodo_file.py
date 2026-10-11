@@ -12,6 +12,15 @@ from unittest.mock import patch
 import fetch_verified_zenodo_file as zenodo
 
 
+class URLResponse(BytesIO):
+    def __init__(self, payload: bytes, final_url: str):
+        super().__init__(payload)
+        self.final_url = final_url
+
+    def geturl(self) -> str:
+        return self.final_url
+
+
 class VerifiedZenodoFetchTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -38,6 +47,20 @@ class VerifiedZenodoFetchTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temp.cleanup()
+
+    def test_metadata_redirect_to_untrusted_host_is_rejected(self) -> None:
+        with patch.object(zenodo, "urlopen", return_value=URLResponse(b"{}", "https://evil.invalid/api/records/1")):
+            with self.assertRaisesRegex(zenodo.FetchError, "redirect to a non-Zenodo"):
+                zenodo.request_bytes("https://zenodo.org/api/records/1")
+
+    def test_file_redirect_to_untrusted_host_discards_partial(self) -> None:
+        item = zenodo.parse_file_metadata(self.record, "PeptoneDBs.tar.gz")
+        response = URLResponse(self.payload, "https://evil.invalid/archive.tar.gz")
+        with patch.object(zenodo, "urlopen", return_value=response):
+            with self.assertRaisesRegex(zenodo.FetchError, "redirect to a non-Zenodo"):
+                zenodo.download_verified(item, self.output, len(self.payload))
+        self.assertFalse((self.output / "PeptoneDBs.tar.gz").exists())
+        self.assertEqual(list(self.output.glob("*.part")) + list(self.output.glob(".*.part")), [])
 
     def test_record_id_must_be_numeric(self) -> None:
         with self.assertRaises(zenodo.FetchError):
