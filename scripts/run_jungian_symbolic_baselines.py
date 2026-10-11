@@ -503,6 +503,16 @@ def self_test(cases: list[dict[str, Any]], methods: list[tuple[str, Any, dict[st
     if "describe_narrative_change_only" not in contextual_by_id[narrative["id"]][1]:
         failures.append("context rules missed narrative-change-only control")
 
+    # The deliberately weak lexical foil must expose the two newly declared
+    # failure modes, rather than receiving a false clean score from an
+    # under-specified rubric.
+    for selector in ("avoids the cellar in three scenes", "cross the river"):
+        case = find_case(selector)
+        emitted = set(lexical_by_id[case["id"]][1])
+        for forbidden_code in ("treat_keyword_overlap_as_evidence", "claim_universal_symbol_meaning"):
+            if forbidden_code not in emitted or forbidden_code not in case["forbidden_behaviors"]:
+                failures.append(f"lexical-overreach negative control is not instrumented for {case['id']}:{forbidden_code}")
+
     # Required/forbidden annotations and oracle prose must not affect predictions.
     for case in cases:
         mutated = {
@@ -583,13 +593,26 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_by
             names.add(score["modality"])
             value = score["cosine_similarity"]
             require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and -1 <= value <= 1, f"{case_id}: invalid modality similarity")
-        for field in ("top_modalities", "top_glyphs"):
-            values = row[field]
-            require(isinstance(values, list) and len(values) == 5, f"{case_id}: {field} must contain top five")
-            for rank, item in enumerate(values, start=1):
-                require(isinstance(item, dict) and item.get("rank") == rank, f"{case_id}: invalid {field} rank")
-                metric = item.get("cosine_similarity")
-                require(isinstance(metric, (int, float)) and not isinstance(metric, bool) and math.isfinite(metric) and -1 <= metric <= 1, f"{case_id}: invalid {field} similarity")
+        top_modalities = row["top_modalities"]
+        require(isinstance(top_modalities, list) and len(top_modalities) == 5, f"{case_id}: top_modalities must contain top five")
+        expected_top = sorted(scores, key=lambda item: (-item["cosine_similarity"], item["index"]))[:5]
+        for rank, (item, expected) in enumerate(zip(top_modalities, expected_top, strict=True), start=1):
+            require(isinstance(item, dict) and set(item) == {"rank", "index", "modality", "cosine_similarity"}, f"{case_id}: top modality schema mismatch")
+            require(item["rank"] == rank, f"{case_id}: invalid top modality rank")
+            require(item["index"] == expected["index"] and item["modality"] == expected["modality"], f"{case_id}: top modality ranking does not derive from full modality scores")
+            require(item["cosine_similarity"] == expected["cosine_similarity"], f"{case_id}: top modality score mismatches full score row")
+
+        top_glyphs = row["top_glyphs"]
+        require(isinstance(top_glyphs, list) and len(top_glyphs) == 5, f"{case_id}: top_glyphs must contain top five")
+        for rank, item in enumerate(top_glyphs, start=1):
+            require(isinstance(item, dict) and set(item) == {"rank", "glyph_id", "name", "class", "field_modality", "cosine_similarity", "core_function", "echo_phrase"}, f"{case_id}: top glyph schema mismatch")
+            require(item["rank"] == rank, f"{case_id}: invalid top glyph rank")
+            metric = item.get("cosine_similarity")
+            require(isinstance(metric, (int, float)) and not isinstance(metric, bool) and math.isfinite(metric) and -1 <= metric <= 1, f"{case_id}: invalid top glyph similarity")
+            if rank > 1:
+                previous = top_glyphs[rank - 2]
+                previous_metric = previous["cosine_similarity"]
+                require(previous_metric > metric or (previous_metric == metric and previous["glyph_id"] <= item["glyph_id"]), f"{case_id}: top glyphs not sorted by descending similarity/stable ID")
         glyph_ids = [glyph.get("glyph_id") for glyph in row["top_glyphs"]]
         require(all(isinstance(gid, str) and gid for gid in glyph_ids) and len(set(glyph_ids)) == 5, f"{case_id}: duplicate/missing glyph ID")
         by_id[case_id] = row
