@@ -2080,3 +2080,113 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod effect_estimate_persistence_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn valid_effect_estimate_round_trips_with_canonical_derived_fields() {
+        let original = EffectEstimate::try_new(0.8, 0.4, 4)
+            .unwrap()
+            .with_std_dev(0.05)
+            .unwrap();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: EffectEstimate = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored, original);
+        assert_eq!(restored.absolute_change, -0.4);
+        assert_eq!(restored.relative_change, Some(-0.5));
+    }
+
+    #[test]
+    fn persisted_inconsistent_absolute_change_is_rejected() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["absolute_change"] = json!(123.0);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("absolute change"));
+    }
+
+    #[test]
+    fn persisted_inconsistent_relative_change_is_rejected() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["relative_change"] = json!(999.0);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("relative change"));
+    }
+
+    #[test]
+    fn near_zero_baseline_requires_canonical_absent_relative_change() {
+        let estimate = EffectEstimate::try_new(0.0, 0.5, 3).unwrap();
+        assert_eq!(estimate.relative_change, None);
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["relative_change"] = json!(0.5);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("zero-baseline policy"));
+    }
+
+    #[test]
+    fn negative_or_nonfinite_dispersion_is_rejected() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        let mut value = serde_json::to_value(estimate).unwrap();
+        value["standard_deviation"] = json!(-0.01);
+
+        let err = serde_json::from_value::<EffectEstimate>(value).unwrap_err();
+        assert!(err.to_string().contains("standard deviation"));
+
+        assert_eq!(
+            EffectEstimate::try_new(0.8, 0.4, 4)
+                .unwrap()
+                .with_std_dev(f64::NAN)
+                .unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+        assert_eq!(
+            EffectEstimate::try_new(0.8, 0.4, 4)
+                .unwrap()
+                .with_std_dev(-0.1)
+                .unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+    }
+
+    #[test]
+    fn nonfinite_means_and_overflowed_derived_values_cannot_enter_validated_path() {
+        assert_eq!(
+            EffectEstimate::try_new(f64::NAN, 0.2, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteBaselineMean
+        );
+        assert_eq!(
+            EffectEstimate::try_new(0.2, f64::INFINITY, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteInterventionMean
+        );
+        assert_eq!(
+            EffectEstimate::try_new(-f64::MAX, f64::MAX, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteAbsoluteChange
+        );
+    }
+
+    #[test]
+    fn zero_seed_count_is_preserved_without_inference() {
+        let estimate = EffectEstimate::try_new(0.8, 0.4, 0).unwrap();
+        let restored: EffectEstimate =
+            serde_json::from_str(&serde_json::to_string(&estimate).unwrap()).unwrap();
+        assert_eq!(restored.seed_count, 0);
+    }
+
+    #[test]
+    fn mutated_public_derived_field_fails_validation_before_authority_use() {
+        let mut estimate = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        estimate.absolute_change = 99.0;
+        assert_eq!(
+            estimate.validate().unwrap_err(),
+            EffectEstimateValidationError::InconsistentAbsoluteChange
+        );
+    }
+}
