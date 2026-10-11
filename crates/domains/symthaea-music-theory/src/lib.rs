@@ -39,6 +39,8 @@ pub mod composer;
 pub mod contrapuntal_foundry;
 pub mod counterpoint;
 pub mod describe;
+pub mod development_context;
+pub mod development_program;
 pub mod diversity_plan;
 pub mod explorer;
 pub mod fingerprint;
@@ -69,6 +71,17 @@ pub mod pitch;
 pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
+pub mod prog_suite_contextual_harmony;
+pub mod prog_suite_contextual_harmony_comparison;
+pub mod prog_suite_contextual_harmony_lockbox;
+pub mod prog_suite_contextual_harmony_panel;
+pub mod prog_suite_development_context;
+pub mod prog_suite_development_program;
+pub mod prog_suite_replay_evidence;
+pub mod prog_suite_subject_bound;
+pub mod prog_suite_work_architecture;
+pub mod prog_suite_work_bridge;
+pub mod prog_suite_work_evidence;
 pub mod renaissance;
 pub mod rhythm;
 pub mod rhythmic_identity;
@@ -76,10 +89,24 @@ pub mod scale;
 pub mod score;
 pub mod score_validation;
 pub mod sonata;
+pub mod sonata_work_bridge;
+pub mod sonata_work_evidence;
+pub mod sonata_work_evidence_coverage;
 pub mod spec;
 pub mod spelling;
 pub mod style;
+pub mod temporal_map;
+pub mod temporal_midi_projection;
+pub mod temporal_score;
+pub mod thematic_identity;
+pub mod thematic_retrograde_evidence;
+pub mod thematic_score_evidence;
+pub mod thematic_source_material;
 pub mod voicing;
+pub mod work_metric_architecture;
+pub mod work_obligation;
+pub mod work_plan;
+pub mod work_tonal_trajectory;
 
 pub use accompaniment::Accompaniment;
 pub use cadence::Cadence;
@@ -92,6 +119,15 @@ pub use composer::{
     compose_with_spec_and_form,
 };
 pub use counterpoint::{has_parallel_perfect, parallel_perfect_violations};
+pub use development_context::{
+    DEVELOPMENT_CONTEXT_VERSION, DevelopmentStageContextV1,
+    WorkDevelopmentContextErrorV1, WorkDevelopmentContextV1,
+    derive_work_development_context,
+};
+pub use development_program::{
+    DEVELOPMENT_PROGRAM_VERSION, DevelopmentEvidenceRequirementV1, DevelopmentGraphProjectionV1,
+    DevelopmentOperationV1, DevelopmentProgramErrorV1, DevelopmentProgramV1, DevelopmentStageV1,
+};
 pub use form::{Form, Section, SectionRole};
 pub use grammar::{
     GrammarEngine, GrammarFamily, GrammarPlanEvidence, GrammarProfile, GrammarRealization,
@@ -123,6 +159,81 @@ pub use obligation::{
 };
 pub use phrase::{Period, Phrase};
 pub use pitch::{Interval, IntervalQuality, Pitch, PitchClass};
+pub use prog_suite::{
+    PROG_SUITE_BARS_PER_SECTION, PROG_SUITE_METER_FIT_VERSION, PROG_SUITE_PLAN_VERSION,
+    ProgSuiteMeterFitReceiptV1, ProgSuitePlanErrorV1, ProgSuitePlanV1,
+    ProgSuiteRealizationV1, ProgSuiteSectionCarrierV1, ProgSuiteSectionCarriersV1,
+    ProgSuiteSectionPlanV1, ProgSuiteTransformV1, derive_prog_suite_section_carriers,
+    plan_prog_suite, realize_prog_suite_with_plan,
+};
+pub use prog_suite_contextual_harmony::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_VERSION, ProgSuiteContextualHarmonyErrorV1,
+    ProgSuiteContextualHarmonyNonClaimV1, ProgSuiteContextualHarmonyPlanV1,
+    ProgSuiteContextualHarmonyProfileV1, ProgSuiteContextualHarmonyReceiptV1,
+    ProgSuiteHarmonicNarrativeRoleV1, derive_prog_suite_contextual_harmony,
+};
+pub use prog_suite_contextual_harmony_comparison::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_COMPARISON_VERSION,
+    ProgSuiteContextualHarmonyComparisonErrorV1, ProgSuiteContextualHarmonyComparisonV1,
+    ProgSuiteEventDifferenceSummaryV1, ProgSuiteHarmonyComparisonAuthorityV1,
+    ProgSuiteHarmonyComparisonNonClaimV1, ProgSuiteSectionHarmonyComparisonV1,
+    ProgSuiteVoiceComparisonV1, derive_prog_suite_contextual_harmony_comparison,
+};
+pub use prog_suite_contextual_harmony_lockbox::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_LOCKBOX_MOTIF_COUNT,
+    PROG_SUITE_CONTEXTUAL_HARMONY_LOCKBOX_SUBJECT_COUNT,
+    PROG_SUITE_CONTEXTUAL_HARMONY_LOCKBOX_VERSION,
+    ProgSuiteContextualHarmonyLockboxErrorV1, ProgSuiteContextualHarmonyLockboxV1,
+    ProgSuiteHarmonyLockboxAggregationV1, ProgSuiteHarmonyLockboxAnalysisPlanV1,
+    ProgSuiteHarmonyLockboxEndpointV1, ProgSuiteHarmonyLockboxMotifV1,
+    ProgSuiteHarmonyLockboxNonClaimV1, ProgSuiteHarmonyLockboxPrimaryUnitV1,
+    ProgSuiteHarmonyLockboxStatusV1, ProgSuiteHarmonyLockboxSubjectV1,
+    predeclare_prog_suite_contextual_harmony_motif_lockbox_v1,
+};
+pub use prog_suite_contextual_harmony_panel::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_PANEL_VERSION,
+    PROG_SUITE_CONTEXTUAL_HARMONY_PILOT_SEEDS, ProgSuiteContextualHarmonyPanelErrorV1,
+    ProgSuiteContextualHarmonyPanelV1, ProgSuiteHarmonyPanelNonClaimV1,
+    ProgSuiteHarmonyPanelSubjectV1, ProgSuiteHarmonyPanelSummaryV1,
+    ProgSuiteHarmonyPilotIntentV1, ProgSuiteHarmonyPilotSeedPolicyV1,
+    ProgSuiteHarmonySectionIncidenceV1, ProgSuiteHarmonyVoiceIncidenceV1,
+    derive_prog_suite_contextual_harmony_pilot_panel,
+};
+pub use prog_suite_development_context::{
+    PROG_SUITE_DEVELOPMENT_CONTEXT_VERSION, ProgSuiteDevelopmentContextErrorV1,
+    ProgSuiteDevelopmentContextV1, derive_prog_suite_development_context,
+};
+pub use prog_suite_development_program::{
+    PROG_SUITE_DEVELOPMENT_PROGRAM_VERSION, ProgSuiteDevelopmentProgramErrorV1,
+    ProgSuiteDevelopmentProgramV1, derive_prog_suite_development_program,
+};
+pub use prog_suite_replay_evidence::{
+    PROG_SUITE_REPLAY_EVIDENCE_VERSION, ProgSuiteReplayAuthorityV1,
+    ProgSuiteReplayEvidenceErrorV1, ProgSuiteReplayEvidenceV1, ProgSuiteReplayNonClaimV1,
+    ProgSuiteScoreReplayDifferenceV1, ProgSuiteScoreReplayReceiptV1,
+    ProgSuiteStageMechanismReceiptV1, derive_prog_suite_replay_evidence,
+};
+pub use prog_suite_subject_bound::{
+    PROG_SUITE_SUBJECT_BOUND_PLAN_VERSION, PROG_SUITE_SUBJECT_BOUND_REALIZATION_VERSION,
+    ProgSuiteSubjectBoundErrorV1, ProgSuiteSubjectBoundPlanV1,
+    ProgSuiteSubjectBoundRealizationV1, bind_prog_suite_subject,
+    realize_prog_suite_subject_bound,
+};
+pub use prog_suite_work_architecture::{
+    PROG_SUITE_WORK_ARCHITECTURE_VERSION, ProgSuiteWorkArchitectureErrorV1,
+    ProgSuiteWorkArchitectureV1, derive_prog_suite_work_architecture,
+};
+pub use prog_suite_work_bridge::{
+    PROG_SUITE_WORK_BRIDGE_VERSION, ProgSuiteMeterProjectionV1,
+    ProgSuiteSectionWorkBindingV1, ProgSuiteWorkBindingV1, ProgSuiteWorkBridgeErrorV1,
+    ProgSuiteWorkRealizationBindingV1, bind_prog_suite_realization, bridge_prog_suite_plan,
+};
+pub use prog_suite_work_evidence::{
+    PROG_SUITE_WORK_EVIDENCE_VERSION, TONIC_ANCHOR_MIN_DURATION_SHARE,
+    ProgSuiteTonalCenterProjectionV1, ProgSuiteTonicAnchorEvidenceV1,
+    ProgSuiteWorkEvidenceErrorV1, ProgSuiteWorkEvidenceRecordV1, ProgSuiteWorkEvidenceSourceV1,
+    ProgSuiteWorkEvidenceV1, derive_prog_suite_work_evidence,
+};
 pub use rhythm::Duration;
 pub use rhythmic_identity::{RhythmicIdentityReport, rhythmic_identity_report};
 pub use scale::{Mode, Scale};
@@ -136,7 +247,72 @@ pub use sonata::{
     SonataSectionKind, SonataVerificationMetric, plan_sonata, realize_sonata_with_plan,
     verify_sonata_obligations,
 };
+pub use sonata_work_bridge::{
+    SONATA_WORK_BRIDGE_VERSION, SonataSectionWorkBindingV1, SonataWorkBindingV1,
+    SonataWorkBridgeErrorV1, bridge_native_sonata_plan, validate_native_sonata_plan,
+};
+pub use sonata_work_evidence::{
+    NativeEvidencePreservationV1, SONATA_WORK_EVIDENCE_VERSION,
+    SonataEvidenceCacheReceiptV1, SonataEvidenceProjectionLossV1, SonataWorkEvidenceErrorV1,
+    SonataWorkEvidenceV1, WorkEvidenceStatusV1, WorkObligationEvidenceRecordV1,
+    derive_sonata_work_evidence,
+};
+pub use sonata_work_evidence_coverage::{
+    SONATA_WORK_EVIDENCE_COVERAGE_VERSION, SonataWorkEvidenceCoverageErrorV1,
+    SonataWorkEvidenceCoverageRecordV1, SonataWorkEvidenceCoverageV1,
+    SonataWorkEvidenceSourceV1, derive_sonata_work_evidence_coverage,
+};
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
 pub use style::Style;
+pub use temporal_map::{
+    TEMPORAL_MAP_VERSION, TempoV1, TemporalMapErrorV1, TemporalMapV1, TemporalPointV1,
+};
+pub use temporal_midi_projection::{
+    DEFAULT_MIDI_TICKS_PER_QUARTER, MIDI_TEMPORAL_PROJECTION_VERSION,
+    MeterMidiProjectionReceiptV1, MidiTemporalMetaEventV1, MidiTemporalMetaKindV1,
+    MidiTemporalProjectionErrorV1, MidiTemporalProjectionPolicyV1, MidiTemporalProjectionV1,
+    TempoMidiProjectionReceiptV1, project_temporal_score_to_midi,
+};
+pub use temporal_score::{TEMPORAL_SCORE_VERSION, TemporalScoreErrorV1, TemporalScoreV1};
+pub use thematic_identity::{
+    THEMATIC_IDENTITY_GRAPH_VERSION, ThematicDerivationV1, ThematicGraphErrorV1,
+    ThematicIdentityGraphV1, ThematicIdentityV1, ThematicOriginV1,
+    ThematicTransformationClassV1,
+};
+pub use thematic_retrograde_evidence::{
+    THEMATIC_RETROGRADE_EVIDENCE_VERSION, ThematicRetrogradeEvidenceSetV1,
+    ThematicRetrogradeEvidenceV1, ThematicRetrogradeStatusV1,
+    measure_thematic_retrograde_evidence,
+};
+pub use thematic_score_evidence::{
+    MIN_THEMATIC_MELODY_NOTES, THEMATIC_SCORE_EVIDENCE_VERSION,
+    ThematicDerivationEvidenceStatusV1, ThematicDerivationObservationV1,
+    ThematicIdentityObservationStatusV1, ThematicIdentityObservationV1,
+    ThematicMelodyFingerprintV1, ThematicScoreEvidenceErrorV1, ThematicScoreEvidenceV1,
+    ThematicTransformationMeasurementV1, measure_thematic_graph,
+};
+pub use thematic_source_material::{
+    THEMATIC_SOURCE_MATERIAL_PLAN_VERSION, ThematicSourceMaterialErrorV1,
+    ThematicSourceMaterialPlanV1, ThematicSourceMaterialV1,
+};
 pub use voicing::{lead_bass, lead_upper};
+pub use work_metric_architecture::{
+    WORK_METRIC_ARCHITECTURE_VERSION, MetricArchitectureCoverageV1, MetricRegionRoleV1,
+    MetricRegionV1, MetricTransitionRelationV1, MetricTransitionV1,
+    WorkMetricArchitectureErrorV1, WorkMetricArchitectureV1,
+};
+pub use work_obligation::{
+    ObligationDueWindowV2, WORK_OBLIGATION_PLAN_VERSION, WorkObligationErrorV2,
+    WorkObligationKindV2, WorkObligationPlanV2, WorkObligationV2,
+};
+pub use work_plan::{
+    FormalFunctionV1, HIERARCHICAL_WORK_PLAN_VERSION, HierarchicalWorkPlanV1,
+    WorkNodeKindV1, WorkNodeV1, WorkPlanErrorV1,
+};
+pub use work_tonal_trajectory::{
+    WORK_TONAL_TRAJECTORY_VERSION, TonalClosurePolicyV1, TonalRegionRoleV1,
+    TonalRegionV1, TonalRelationV1, TonalTrajectoryCoverageV1, TonalTransitionIntentV1,
+    TonalTransitionV1, WorkTonalTrajectoryErrorV1, WorkTonalTrajectoryV1,
+    classify_tonal_relation,
+};
