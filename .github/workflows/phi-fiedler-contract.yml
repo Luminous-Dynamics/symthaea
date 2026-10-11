@@ -1,0 +1,83 @@
+name: PHI Fiedler Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/symthaea-core/src/consciousness_metrics/**"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "crates/core/symthaea-observation-attestation/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/scripts/check-workflow-draft-safety.py"
+      - ".github/workflows/phi-fiedler-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phi-fiedler-contract-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fiedler-contract:
+    name: Checked MI-graph Fiedler regressions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR head or dispatched source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert checkout matches requested source head
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse --verify 'HEAD^{commit}')"
+          if [[ "$actual" != "$EXPECTED_SOURCE_SHA" ]]; then
+            printf 'source HEAD mismatch: expected=%s actual=%s\n' "$EXPECTED_SOURCE_SHA" "$actual" >&2
+            exit 1
+          fi
+
+      - name: Record source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## PHI Fiedler exact-source validation"
+            echo
+            printf -- '- Source commit: `%s`\n' "$(git rev-parse --verify 'HEAD^{commit}')"
+            printf -- '- Source tree: `%s`\n' "$(git rev-parse --verify 'HEAD^{tree}')"
+            printf -- '- Cargo.lock blob: `%s`\n' "$(git rev-parse HEAD:Cargo.lock)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # pinned upstream revision
+        with:
+          toolchain: 1.96.0
+
+      - name: Check formatting of changed Rust files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --check --edition 2024 --config skip_children=true \
+            crates/core/symthaea-core/src/consciousness_metrics/calculator.rs \
+            crates/core/symthaea-core/src/consciousness_metrics/tests/core_tests.rs \
+            crates/core/symthaea-core/src/consciousness_metrics/tests/mod.rs \
+            crates/core/symthaea-core/src/consciousness_metrics/tests/spectral_fiedler_tests.rs
+
+      - name: Preflight workspace prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f crates/core/symthaea-observation-attestation/Cargo.toml
+          grep -Fq 'name = "symthaea-observation-attestation"' Cargo.lock
+
+      - name: Run focused Fiedler and spectral graph regressions
+        run: cargo test --locked -p symthaea-core --lib fiedler
