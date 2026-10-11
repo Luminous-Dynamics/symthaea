@@ -86,6 +86,8 @@ pub enum IterativeEvolutionError {
     InvalidDeltaTime,
     InvalidConfiguration { field: &'static str },
     InvalidSubstepBudget,
+    /// A positive requested interval became zero when divided into f32 substeps.
+    SubstepUnderflow,
     InputDimensionMismatch { expected: usize, actual: usize },
     StateDimensionMismatch { expected: usize, actual: usize },
     ParameterDimensionMismatch {
@@ -112,6 +114,10 @@ impl std::fmt::Display for IterativeEvolutionError {
                 write!(f, "iterative evolution configuration field {field} is invalid")
             }
             Self::InvalidSubstepBudget => write!(f, "max_substeps must be greater than zero"),
+            Self::SubstepUnderflow => write!(
+                f,
+                "positive dt is too small to represent the requested substep in f32"
+            ),
             Self::InputDimensionMismatch { expected, actual } => {
                 write!(f, "input dimension mismatch: expected {expected}, got {actual}")
             }
@@ -1280,6 +1286,12 @@ impl HdcLtcUnifiedNeuron {
         }
         let n_steps = requested_steps as usize;
         let sub_dt = dt / n_steps as f32;
+        // A positive outer dt can be smaller than the least representable f32 substep
+        // after division (e.g. the smallest subnormal dt split into ten updates). Do not
+        // silently execute zero-duration dynamics while advancing the outer clock.
+        if sub_dt == 0.0 {
+            return Err(IterativeEvolutionError::SubstepUnderflow);
+        }
 
         let state_before = self.state.clone();
         let total_time_before = self.total_time;
@@ -3275,6 +3287,31 @@ mod checked_iterative_evolution_tests {
             neuron.evolve_closed_form_iterative(f32::MAX, &input);
         }));
         assert!(result.is_err(), "legacy wrapper must reject over-budget work");
+        assert_unchanged(&neuron, &state, clock, mean, var);
+    }
+
+    #[test]
+    fn checked_iterative_rejects_substep_underflow_before_mutation() {
+        let tiny = f32::from_bits(1);
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                tau_base: tiny,
+                ..UnifiedConfig::default()
+            },
+            4242,
+        );
+        let input = ContinuousHV::zero(256);
+        let state = neuron.state().clone();
+        let clock = neuron.evolution_clock();
+        let mean = neuron.running_mean;
+        let var = neuron.running_var;
+
+        // tau/10 requests ten substeps, but the f32 dt/10 rounds to zero.
+        assert_eq!(
+            neuron.try_evolve_closed_form_iterative(tiny, &input, 100),
+            Err(IterativeEvolutionError::SubstepUnderflow)
+        );
         assert_unchanged(&neuron, &state, clock, mean, var);
     }
 
