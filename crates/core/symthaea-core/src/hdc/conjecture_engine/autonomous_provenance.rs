@@ -313,7 +313,7 @@ pub fn validate_invariant_holdout(
 pub enum AutonomousDiscoveryReceiptError {
     InvalidSourceRevision,
     EmptySystemId,
-    EmptySystemDefinition,
+    InvalidSystemDefinition,
     EmptyCandidate,
     InvalidVariables,
     InvalidInitialState,
@@ -445,10 +445,12 @@ pub fn build_autonomous_discovery_receipt_v1(
     if system_id.trim().is_empty() {
         return Err(AutonomousDiscoveryReceiptError::EmptySystemId);
     }
-    if system_definition_canonical.trim().is_empty() {
-        return Err(AutonomousDiscoveryReceiptError::EmptySystemDefinition);
+    if !system_definition_canonical.starts_with("system-definition-v1\n")
+        || system_definition_canonical.contains('\r')
+    {
+        return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition);
     }
-    // Hash the exact canonical UTF-8 bytes here instead of trusting a supplied
+    // Hash the exact versioned UTF-8 bytes here instead of trusting a supplied
     // digest string. The caller must retain this definition as a separate artifact.
     let system_definition_blake3 =
         blake3::hash(system_definition_canonical.as_bytes()).to_hex().to_string();
@@ -1006,7 +1008,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_system_definition_is_rejected() {
+    fn unversioned_or_noncanonical_system_definition_is_rejected() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
@@ -1014,13 +1016,30 @@ mod tests {
             harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
         );
-        let result = build_autonomous_discovery_receipt_v1(
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", "", &config, &[], &candidate,
-            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
-            4.0, 0.01, &holdout,
-        );
-        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::EmptySystemDefinition);
+        let invalid_definitions = [
+            "",
+            "harmonic-oscillator-v1\nxdot=vx",
+            "system-definition-v1\\r\\nmodel",
+        ];
+        for invalid_definition in invalid_definitions {
+            let result = build_autonomous_discovery_receipt_v1(
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "harmonic-oscillator-v1",
+                invalid_definition,
+                &config,
+                &[],
+                &candidate,
+                &["x", "y", "vx", "vy"],
+                &[1.0, 0.0, 0.0, 1.0],
+                4.0,
+                0.01,
+                &holdout,
+            );
+            assert_eq!(
+                result.unwrap_err(),
+                AutonomousDiscoveryReceiptError::InvalidSystemDefinition
+            );
+        }
     }
 
     #[test]
