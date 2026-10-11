@@ -1271,16 +1271,18 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
     // A singleton is evidence of the opening pattern, not a repetition claim.
     let (selected_signature, selected_stats) = selected.unwrap_or_else(|| {
         let note_len = notes.len().min(6);
-        (
-            signature_for(0, note_len),
-            PatternStats {
+        let opening_signature = signature_for(0, note_len);
+        let stats = patterns
+            .get(&opening_signature)
+            .copied()
+            .unwrap_or(PatternStats {
                 note_len,
                 first_start: 0,
                 occurrence_count: 1,
                 independent_occurrence_count: 1,
                 next_non_overlapping_start: note_len,
-            },
-        )
+            });
+        (opening_signature, stats)
     });
     let motif_len = selected_stats.note_len;
     let midi_pitches: Vec<u8> = notes
