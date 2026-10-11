@@ -61,6 +61,42 @@ jobs:
             "cryptography==50.0.2" \
             "rfc8785==0.1.4" \
             "jsonschema==4.26.0"
+      - name: Install SHA-pinned actionlint for release workflow syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.12"
+          archive="actionlint_1.7.12_linux_amd64.tar.gz"
+          expected="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          curl -fsSLo "/tmp/actionlint_1.7.12_linux_amd64.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+          echo "$expected  /tmp/$archive" | sha256sum -c -
+          mkdir -p /tmp/actionlint
+          tar -xzf "/tmp/$archive" -C /tmp/actionlint actionlint
+          /tmp/actionlint/actionlint -version
+
+      - name: Lint release and verifier contract workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/actionlint/actionlint -color -shellcheck "" -pyflakes "" \
+            .github/workflows/cyber-crucible-decision-receipt.yml \
+            .github/workflows/cyber-crucible-trusted-build.yml \
+            .github/workflows/cyber-crucible-verifier-release.yml
+
+      - name: Parse-check all verifier and regression Python sources
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          paths = sorted(Path("scripts").glob("*cyber_crucible*.py"))
+          paths += sorted(Path("tests").glob("test_cyber_crucible_*.py"))
+          for path in paths:
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+              print(f"Python syntax PASS: {path}")
+          PY
+
       - name: Meta-validate decision schemas
         run: |
           python - <<'PY'
