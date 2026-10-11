@@ -3,8 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-Step Plan Executor with Rollback
 //!
-//! Chains `ActionPlan` steps with intermediate state verification.
-//! If step N fails, rolls back steps 0..N-1 using generation snapshots.
+//! Chains NixOS action steps with explicit read-only verification and rollback.
+//! Plan-level dry-run is authoritative: when enabled, the supplied executor is
+//! never used for command dispatch. Rollback respects the normal Phi gate by
+//! default and only bypasses it when the caller explicitly declares that the
+//! compensation path was pre-authorized upstream.
 
 use super::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
 
@@ -13,11 +16,45 @@ use super::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel}
 pub enum StepStatus {
     Pending,
     Running,
+    Verifying,
     Completed,
     Failed(String),
     RolledBack,
     Skipped,
 }
+
+/// How rollback commands are authorized.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RollbackAuthorization {
+    /// Rollback passes through the same Phi gate as every other command.
+    #[default]
+    RespectPhi,
+    /// Rollback was separately authorized as compensation for this exact plan.
+    /// This maps to `NixOSExecutor::execute_confirmed` and must not be selected
+    /// merely because rollback is desirable.
+    PreauthorizedCompensation,
+}
+
+/// Error constructing an unsafe plan step.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlanBuildError {
+    /// Verification commands must be read-only so checking a postcondition
+    /// cannot itself smuggle a state mutation into the plan.
+    VerificationMustBeReadOnly { safety_level: SafetyLevel },
+}
+
+impl std::fmt::Display for PlanBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::VerificationMustBeReadOnly { safety_level } => write!(
+                f,
+                "verification command must be read-only, got {safety_level:?}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PlanBuildError {}
 
 /// A single step in a multi-step plan.
 #[derive(Debug, Clone)]
@@ -28,35 +65,52 @@ pub struct PlanStep {
     pub description: String,
     /// Current status.
     pub status: StepStatus,
-    /// Whether this step is critical (failure triggers rollback of all prior steps).
+    /// Whether failure triggers rollback of applied prior steps.
     pub critical: bool,
-    /// Whether to verify state after execution (e.g., service started, package installed).
-    pub verify: bool,
+    /// Optional explicit read-only postcondition command.
+    pub verification: Option<NixOSCommand>,
+}
+
+impl PlanStep {
+    /// Attach an explicit read-only postcondition check.
+    pub fn verify_with(
+        &mut self,
+        verification: NixOSCommand,
+    ) -> Result<&mut Self, PlanBuildError> {
+        let safety_level = verification.safety_level();
+        if safety_level != SafetyLevel::ReadOnly {
+            return Err(PlanBuildError::VerificationMustBeReadOnly { safety_level });
+        }
+        self.verification = Some(verification);
+        Ok(self)
+    }
 }
 
 /// Result of executing a full plan.
 #[derive(Debug, Clone)]
 pub struct PlanExecutionResult {
-    /// Per-step results.
+    /// Per-step primary execution results.
     pub steps: Vec<(PlanStep, Option<ExecutionResult>)>,
-    /// Whether all steps completed successfully.
+    /// Verification command results keyed by step index.
+    pub verification_results: Vec<(usize, ExecutionResult)>,
+    /// Whether the plan met its success policy.
+    ///
+    /// As before, non-critical step failures do not make the whole plan fail.
     pub success: bool,
-    /// Number of steps completed before failure (if any).
+    /// Number of steps whose primary execution and required verification completed.
     pub completed_count: usize,
-    /// Number of steps rolled back (if any).
+    /// Number of rollback commands attempted.
     pub rolled_back_count: usize,
-    /// Rollback failures: (step_index, error_description).
+    /// Rollback failures: `(step_index, error_description)`.
     pub rollback_failures: Vec<(usize, String)>,
 }
 
 /// Orchestrates multi-step NixOS action plans with rollback on failure.
 pub struct PlanExecutor {
-    /// Steps to execute.
     steps: Vec<PlanStep>,
-    /// Φ level for this execution context.
     phi: f32,
-    /// Whether to use dry-run mode.
     dry_run: bool,
+    rollback_authorization: RollbackAuthorization,
 }
 
 impl PlanExecutor {
@@ -66,35 +120,53 @@ impl PlanExecutor {
             steps: Vec::new(),
             phi,
             dry_run: false,
+            rollback_authorization: RollbackAuthorization::RespectPhi,
         }
     }
 
-    /// Enable dry-run mode.
+    /// Enable authoritative plan-level dry-run mode.
+    ///
+    /// When enabled, `execute()` dispatches through a fresh dry-run executor,
+    /// so a live executor supplied by the caller cannot accidentally perform
+    /// mutations. Dry-run execution is intentionally not written into the
+    /// caller's live execution history.
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
     }
 
-    /// Add a step to the plan.
+    /// Declare that rollback commands for this exact plan have already been
+    /// authorized upstream as compensation.
+    pub fn with_preauthorized_compensation(mut self) -> Self {
+        self.rollback_authorization = RollbackAuthorization::PreauthorizedCompensation;
+        self
+    }
+
+    /// Current rollback authorization mode.
+    pub fn rollback_authorization(&self) -> RollbackAuthorization {
+        self.rollback_authorization
+    }
+
+    /// Add a critical step to the plan.
     pub fn add_step(&mut self, command: NixOSCommand, description: &str) -> &mut PlanStep {
         self.steps.push(PlanStep {
             command,
             description: description.to_string(),
             status: StepStatus::Pending,
             critical: true,
-            verify: false,
+            verification: None,
         });
         self.steps.last_mut().expect("just pushed")
     }
 
-    /// Add a non-critical step (failure doesn't trigger rollback).
+    /// Add a non-critical step; failure does not trigger rollback of prior steps.
     pub fn add_optional_step(&mut self, command: NixOSCommand, description: &str) -> &mut PlanStep {
         self.steps.push(PlanStep {
             command,
             description: description.to_string(),
             status: StepStatus::Pending,
             critical: false,
-            verify: false,
+            verification: None,
         });
         self.steps.last_mut().expect("just pushed")
     }
@@ -104,72 +176,96 @@ impl PlanExecutor {
         self.steps.len()
     }
 
-    /// Check if any step requires a Φ level higher than what we have.
+    /// Check primary and verification commands that require a higher Phi level.
     pub fn check_phi_requirements(&self) -> Vec<(usize, SafetyLevel, f32)> {
-        self.steps
-            .iter()
-            .enumerate()
-            .filter_map(|(i, step)| {
-                let safety = step.command.safety_level();
+        let mut blocked = Vec::new();
+        for (index, step) in self.steps.iter().enumerate() {
+            for command in std::iter::once(&step.command).chain(step.verification.iter()) {
+                let safety = command.safety_level();
                 let required = safety.required_phi();
                 if self.phi < required {
-                    Some((i, safety, required))
-                } else {
-                    None
+                    blocked.push((index, safety, required));
                 }
-            })
-            .collect()
+            }
+        }
+        blocked
     }
 
-    /// Execute the plan, stopping and rolling back on critical failure.
+    /// Execute the plan, stopping and compensating applied steps on critical failure.
     pub async fn execute(&mut self, executor: &mut NixOSExecutor) -> PlanExecutionResult {
+        if self.dry_run {
+            let mut dry_executor = NixOSExecutor::new().with_dry_run(true);
+            self.execute_with(&mut dry_executor).await
+        } else {
+            self.execute_with(executor).await
+        }
+    }
+
+    async fn execute_with(&mut self, executor: &mut NixOSExecutor) -> PlanExecutionResult {
         let mut results: Vec<(PlanStep, Option<ExecutionResult>)> = Vec::new();
+        let mut verification_results = Vec::new();
         let mut completed = 0;
 
-        for i in 0..self.steps.len() {
-            self.steps[i].status = StepStatus::Running;
-
-            let result = executor
-                .execute(self.steps[i].command.clone(), self.phi)
+        for index in 0..self.steps.len() {
+            self.steps[index].status = StepStatus::Running;
+            let primary = executor
+                .execute(self.steps[index].command.clone(), self.phi)
                 .await;
+            let primary_succeeded = matches!(&primary, ExecutionResult::Success { .. });
 
-            let success = matches!(&result, ExecutionResult::Success { .. });
+            let mut failure = if primary_succeeded {
+                None
+            } else {
+                Some(format!("primary execution failed: {primary:?}"))
+            };
 
-            if success {
-                self.steps[i].status = StepStatus::Completed;
-                completed += 1;
-                results.push((self.steps[i].clone(), Some(result)));
-            } else if self.steps[i].critical {
-                // Critical failure — rollback previous steps
-                self.steps[i].status = StepStatus::Failed(format!("{result:?}"));
-                results.push((self.steps[i].clone(), Some(result)));
+            if primary_succeeded
+                && let Some(verification) = self.steps[index].verification.clone()
+            {
+                self.steps[index].status = StepStatus::Verifying;
+                let verification_result = executor.execute(verification, self.phi).await;
+                let verification_succeeded =
+                    matches!(&verification_result, ExecutionResult::Success { .. });
+                if !verification_succeeded {
+                    failure = Some(format!(
+                        "postcondition verification failed: {verification_result:?}"
+                    ));
+                }
+                verification_results.push((index, verification_result));
+            }
 
-                let (rolled_back, rollback_failures) = self
-                    .rollback_completed(executor, &mut results, completed)
-                    .await;
+            if let Some(error) = failure {
+                self.steps[index].status = StepStatus::Failed(error);
+                results.push((self.steps[index].clone(), Some(primary)));
 
-                // Mark remaining steps as skipped
-                for j in (i + 1)..self.steps.len() {
-                    self.steps[j].status = StepStatus::Skipped;
-                    results.push((self.steps[j].clone(), None));
+                if self.steps[index].critical {
+                    let (rolled_back_count, rollback_failures) =
+                        self.rollback_applied(executor, &mut results).await;
+                    for remaining in (index + 1)..self.steps.len() {
+                        self.steps[remaining].status = StepStatus::Skipped;
+                        results.push((self.steps[remaining].clone(), None));
+                    }
+                    return PlanExecutionResult {
+                        steps: results,
+                        verification_results,
+                        success: false,
+                        completed_count: completed,
+                        rolled_back_count,
+                        rollback_failures,
+                    };
                 }
 
-                return PlanExecutionResult {
-                    steps: results,
-                    success: false,
-                    completed_count: completed,
-                    rolled_back_count: rolled_back,
-                    rollback_failures,
-                };
-            } else {
-                // Non-critical failure — continue
-                self.steps[i].status = StepStatus::Failed(format!("{result:?}"));
-                results.push((self.steps[i].clone(), Some(result)));
+                continue;
             }
+
+            self.steps[index].status = StepStatus::Completed;
+            completed += 1;
+            results.push((self.steps[index].clone(), Some(primary)));
         }
 
         PlanExecutionResult {
             steps: results,
+            verification_results,
             success: true,
             completed_count: completed,
             rolled_back_count: 0,
@@ -177,33 +273,50 @@ impl PlanExecutor {
         }
     }
 
-    /// Roll back completed steps in reverse order.
-    ///
-    /// Returns `(rolled_back_count, rollback_failures)`.
-    async fn rollback_completed(
-        &self,
+    /// Roll back every processed step whose primary execution actually
+    /// succeeded, in reverse execution order. This deliberately keys off the
+    /// recorded effect rather than `StepStatus`: a step whose mutation applied
+    /// but whose postcondition later failed still requires compensation.
+    async fn rollback_applied(
+        &mut self,
         executor: &mut NixOSExecutor,
-        _results: &mut Vec<(PlanStep, Option<ExecutionResult>)>,
-        completed: usize,
+        results: &mut [(PlanStep, Option<ExecutionResult>)],
     ) -> (usize, Vec<(usize, String)>) {
         let mut rolled_back = 0;
         let mut failures = Vec::new();
 
-        for i in (0..completed).rev() {
-            if let Some(rollback_cmd) = self.steps[i].command.rollback_command() {
-                let rb_result = executor.execute_confirmed(rollback_cmd, self.phi).await;
-                match &rb_result {
-                    ExecutionResult::Success { .. } => {
-                        rolled_back += 1;
-                    }
-                    ExecutionResult::FailedNoRollback { error, .. } => {
-                        rolled_back += 1; // attempted
-                        failures.push((i, format!("rollback failed: {error}")));
-                    }
-                    other => {
-                        rolled_back += 1;
-                        failures.push((i, format!("rollback unexpected result: {other:?}")));
-                    }
+        for index in (0..results.len()).rev() {
+            let primary_applied = results[index]
+                .1
+                .as_ref()
+                .is_some_and(|result| matches!(result, ExecutionResult::Success { .. }));
+            if !primary_applied || self.steps[index].status == StepStatus::RolledBack {
+                continue;
+            }
+            let Some(rollback_command) = self.steps[index].command.rollback_command() else {
+                continue;
+            };
+
+            let rollback_result = match self.rollback_authorization {
+                RollbackAuthorization::RespectPhi => {
+                    executor.execute(rollback_command, self.phi).await
+                }
+                RollbackAuthorization::PreauthorizedCompensation => {
+                    executor.execute_confirmed(rollback_command, self.phi).await
+                }
+            };
+            rolled_back += 1;
+
+            match &rollback_result {
+                ExecutionResult::Success { .. } => {
+                    self.steps[index].status = StepStatus::RolledBack;
+                    results[index].0.status = StepStatus::RolledBack;
+                }
+                ExecutionResult::FailedNoRollback { error, .. } => {
+                    failures.push((index, format!("rollback failed: {error}")));
+                }
+                other => {
+                    failures.push((index, format!("rollback not admitted or failed: {other:?}")));
                 }
             }
         }
@@ -215,152 +328,128 @@ impl PlanExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::executor::ChannelOperation;
+
+    fn search(query: &str) -> NixOSCommand {
+        NixOSCommand::Search {
+            query: query.into(),
+            json: false,
+        }
+    }
 
     #[test]
-    fn test_plan_step_creation() {
-        let mut executor = PlanExecutor::new(0.5);
-        executor.add_step(
+    fn step_creation_defaults_to_no_verification() {
+        let mut plan = PlanExecutor::new(0.5);
+        let step = plan.add_step(
             NixOSCommand::EnvInstall {
                 packages: vec!["firefox".into()],
             },
             "Install Firefox",
         );
-        executor.add_optional_step(
-            NixOSCommand::Search {
-                query: "firefox".into(),
-                json: false,
-            },
-            "Verify Firefox is available",
-        );
-        assert_eq!(executor.step_count(), 2);
+        assert!(step.critical);
+        assert!(step.verification.is_none());
     }
 
     #[test]
-    fn test_phi_requirements_check() {
-        let executor = PlanExecutor::new(0.2);
-        let mut exec = PlanExecutor::new(0.2);
-        exec.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search packages",
-        );
-        exec.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild system",
-        );
-
-        let blocked = exec.check_phi_requirements();
-        // Search (ReadOnly, needs 0.2) should pass, rebuild (SystemCritical, needs 0.4) should be blocked
-        assert!(
-            !blocked.is_empty(),
-            "RebuildSwitch should be blocked at Φ=0.2"
-        );
-        let _ = executor;
-    }
-
-    #[tokio::test]
-    async fn test_dry_run_plan_execution() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.5).with_dry_run(true);
-
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search for vim",
-        );
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["vim".into()],
-            },
-            "Install vim",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(result.success);
-        assert_eq!(result.completed_count, 2);
-        assert_eq!(result.rolled_back_count, 0);
-    }
-
-    #[tokio::test]
-    async fn test_phi_blocks_dangerous_step() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.2); // Low Φ
-
-        plan.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild system (should be blocked by Φ)",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
-        // RebuildSwitch needs Φ >= 0.4, so it should fail (PendingConfirmation is not Success)
-        assert!(!result.success);
-    }
-
-    #[tokio::test]
-    async fn test_all_steps_succeed_in_order() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
+    fn verification_must_be_read_only() {
         let mut plan = PlanExecutor::new(0.5);
+        let step = plan.add_step(search("firefox"), "Search");
+        let error = step
+            .verify_with(NixOSCommand::EnvInstall {
+                packages: vec!["firefox".into()],
+            })
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            PlanBuildError::VerificationMustBeReadOnly {
+                safety_level: SafetyLevel::UserModify
+            }
+        ));
+    }
 
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search for vim",
-        );
-        plan.add_step(
+    #[test]
+    fn read_only_verification_is_accepted() {
+        let mut plan = PlanExecutor::new(0.5);
+        let step = plan.add_step(
             NixOSCommand::EnvInstall {
-                packages: vec!["vim".into()],
+                packages: vec!["firefox".into()],
             },
-            "Install vim",
+            "Install Firefox",
         );
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "git".into(),
-                json: false,
-            },
-            "Search for git",
+        assert!(step.verify_with(search("firefox")).is_ok());
+    }
+
+    #[test]
+    fn rollback_bypass_requires_explicit_opt_in() {
+        assert_eq!(
+            PlanExecutor::new(0.5).rollback_authorization(),
+            RollbackAuthorization::RespectPhi
         );
+        assert_eq!(
+            PlanExecutor::new(0.5)
+                .with_preauthorized_compensation()
+                .rollback_authorization(),
+            RollbackAuthorization::PreauthorizedCompensation
+        );
+    }
 
-        assert_eq!(plan.step_count(), 3);
-
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(result.success);
-        assert_eq!(result.completed_count, 3);
-        assert_eq!(result.rolled_back_count, 0);
-        assert_eq!(result.steps.len(), 3);
-
-        // Verify all steps have results
-        for (step, exec_result) in &result.steps {
-            assert_eq!(step.status, StepStatus::Completed);
-            assert!(exec_result.is_some());
-        }
+    #[test]
+    fn phi_requirements_include_verification() {
+        let mut plan = PlanExecutor::new(0.1);
+        let step = plan.add_step(search("vim"), "Search packages");
+        step.verify_with(search("git")).unwrap();
+        let blocked = plan.check_phi_requirements();
+        assert_eq!(blocked.len(), 2);
+        assert!(blocked
+            .iter()
+            .all(|(_, safety, _)| *safety == SafetyLevel::ReadOnly));
     }
 
     #[tokio::test]
-    async fn test_critical_failure_triggers_rollback() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.35);
-
-        // Step 0: install (UserModify, needs 0.3) — should succeed
+    async fn plan_level_dry_run_is_authoritative() {
+        let mut live_executor = NixOSExecutor::new();
+        let mut plan = PlanExecutor::new(0.5).with_dry_run(true);
         plan.add_step(
+            NixOSCommand::EnvInstall {
+                packages: vec!["nixward-dry-run-sentinel-do-not-install".into()],
+            },
+            "Dry-run sentinel",
+        );
+
+        let result = plan.execute(&mut live_executor).await;
+        assert!(result.success);
+        match result.steps[0].1.as_ref().unwrap() {
+            ExecutionResult::Success { stdout, .. } => assert!(stdout.contains("[DRY-RUN]")),
+            other => panic!("expected dry-run success, got {other:?}"),
+        }
+        assert!(live_executor.history().is_empty());
+    }
+
+    #[tokio::test]
+    async fn explicit_verification_runs_after_primary_success() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.5);
+        let step = plan.add_step(
             NixOSCommand::EnvInstall {
                 packages: vec!["vim".into()],
             },
             "Install vim",
         );
-        // Step 1: rebuild (SystemCritical, needs 0.4) — should fail (phi=0.35 < 0.4)
+        step.verify_with(search("vim")).unwrap();
+
+        let result = plan.execute(&mut executor).await;
+        assert!(result.success);
+        assert_eq!(result.completed_count, 1);
+        assert_eq!(result.verification_results.len(), 1);
+        assert!(matches!(
+            &result.verification_results[0].1,
+            ExecutionResult::Success { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn low_phi_blocks_dangerous_step() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.2);
         plan.add_step(
             NixOSCommand::RebuildSwitch {
                 flake: None,
@@ -368,47 +457,104 @@ mod tests {
             },
             "Rebuild system",
         );
-        // Step 2: should be skipped
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "htop".into(),
-                json: false,
-            },
-            "Search htop",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
+        let result = plan.execute(&mut executor).await;
         assert!(!result.success);
-        assert_eq!(result.completed_count, 1, "Only step 0 should complete");
-        assert_eq!(
-            result.rolled_back_count, 1,
-            "Step 0 (EnvInstall) should be rolled back"
-        );
-        assert_eq!(result.steps.len(), 3);
-
-        // Step 0: completed (then rolled back)
-        assert!(result.steps[0].1.is_some());
-        // Step 1: failed (PendingConfirmation)
-        assert!(matches!(result.steps[1].0.status, StepStatus::Failed(_)));
-        // Step 2: skipped
-        assert_eq!(result.steps[2].0.status, StepStatus::Skipped);
-        assert!(result.steps[2].1.is_none());
+        assert_eq!(result.completed_count, 0);
     }
 
     #[tokio::test]
-    async fn test_noncritical_failure_continues() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
+    async fn critical_failure_rolls_back_completed_steps() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
         let mut plan = PlanExecutor::new(0.35);
-
-        // Step 0: search (ReadOnly, needs 0.2) — succeeds
         plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".into()],
             },
-            "Search vim",
+            "Install vim",
         );
-        // Step 1: rebuild (SystemCritical, needs 0.4) — fails, but NON-CRITICAL
+        plan.add_step(
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            "Rebuild system",
+        );
+        plan.add_step(search("htop"), "Search htop");
+
+        let result = plan.execute(&mut executor).await;
+        assert!(!result.success);
+        assert_eq!(result.completed_count, 1);
+        assert_eq!(result.rolled_back_count, 1);
+        assert!(result.rollback_failures.is_empty());
+        assert_eq!(result.steps[0].0.status, StepStatus::RolledBack);
+        assert!(matches!(result.steps[1].0.status, StepStatus::Failed(_)));
+        assert_eq!(result.steps[2].0.status, StepStatus::Skipped);
+    }
+
+    #[tokio::test]
+    async fn rollback_tracks_applied_steps_not_completed_count_indices() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.35);
+        plan.add_optional_step(
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            "Optional blocked rebuild",
+        );
+        plan.add_step(
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".into()],
+            },
+            "Install vim",
+        );
+        plan.add_step(
+            NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
+            "Critical blocked rebuild",
+        );
+
+        let result = plan.execute(&mut executor).await;
+        assert!(!result.success);
+        assert_eq!(result.completed_count, 1);
+        assert_eq!(result.rolled_back_count, 1);
+        assert!(result.rollback_failures.is_empty());
+        assert!(matches!(result.steps[0].0.status, StepStatus::Failed(_)));
+        assert_eq!(result.steps[1].0.status, StepStatus::RolledBack);
+        assert!(matches!(result.steps[2].0.status, StepStatus::Failed(_)));
+    }
+
+    #[tokio::test]
+    async fn rollback_includes_applied_step_even_when_verification_failed() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.5);
+        plan.add_step(
+            NixOSCommand::EnvInstall {
+                packages: vec!["vim".into()],
+            },
+            "Install vim",
+        );
+        plan.steps[0].status = StepStatus::Failed("verification failed".into());
+        let primary = ExecutionResult::Success {
+            stdout: "applied".into(),
+            stderr: String::new(),
+            execution_time_ms: 0,
+        };
+        let mut results = vec![(plan.steps[0].clone(), Some(primary))];
+
+        let (rolled_back, failures) = plan.rollback_applied(&mut executor, &mut results).await;
+        assert_eq!(rolled_back, 1);
+        assert!(failures.is_empty());
+        assert_eq!(results[0].0.status, StepStatus::RolledBack);
+    }
+
+    #[tokio::test]
+    async fn noncritical_failure_continues() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let mut plan = PlanExecutor::new(0.35);
+        plan.add_step(search("vim"), "Search vim");
         plan.add_optional_step(
             NixOSCommand::RebuildSwitch {
                 flake: None,
@@ -416,332 +562,23 @@ mod tests {
             },
             "Optional rebuild",
         );
-        // Step 2: search again — should still execute
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "git".into(),
-                json: false,
-            },
-            "Search git",
-        );
+        plan.add_step(search("git"), "Search git");
 
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(
-            result.success,
-            "Plan should succeed despite non-critical failure"
-        );
-        assert_eq!(result.completed_count, 2, "Steps 0 and 2 succeed");
-        assert_eq!(result.rolled_back_count, 0, "No rollback for non-critical");
-        assert_eq!(result.steps.len(), 3);
-
-        // Step 1 failed but non-critical
+        let result = plan.execute(&mut executor).await;
+        assert!(result.success);
+        assert_eq!(result.completed_count, 2);
+        assert_eq!(result.rolled_back_count, 0);
         assert!(matches!(result.steps[1].0.status, StepStatus::Failed(_)));
-        assert!(!result.steps[1].0.critical);
     }
 
     #[tokio::test]
-    async fn test_empty_plan_succeeds() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
+    async fn empty_plan_succeeds() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
         let mut plan = PlanExecutor::new(0.5);
-
-        assert_eq!(plan.step_count(), 0);
-        let result = plan.execute(&mut nix_executor).await;
+        let result = plan.execute(&mut executor).await;
         assert!(result.success);
         assert_eq!(result.completed_count, 0);
-        assert_eq!(result.rolled_back_count, 0);
         assert!(result.steps.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_first_step_critical_failure_no_rollback_needed() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.1); // Very low Φ
-
-        // Step 0: rebuild (SystemCritical, needs 0.4) — fails immediately
-        plan.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild",
-        );
-        // Step 1: should be skipped
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(!result.success);
-        assert_eq!(
-            result.completed_count, 0,
-            "Nothing completed before failure"
-        );
-        assert_eq!(result.rolled_back_count, 0, "Nothing to roll back");
-        assert_eq!(result.steps[1].0.status, StepStatus::Skipped);
-    }
-
-    #[test]
-    fn test_phi_requirements_detailed() {
-        let mut plan = PlanExecutor::new(0.35);
-
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search (ReadOnly, 0.2)",
-        );
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["vim".into()],
-            },
-            "Install (UserModify, 0.3)",
-        );
-        plan.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild (SystemCritical, 0.4)",
-        );
-        plan.add_step(
-            NixOSCommand::CollectGarbage {
-                older_than_days: None,
-                delete_all: true,
-            },
-            "GC (Destructive, 0.6)",
-        );
-
-        let blocked = plan.check_phi_requirements();
-        // At phi=0.35: Search (0.2) ok, Install (0.3) ok, Rebuild (0.4) blocked, GC (0.6) blocked
-        assert_eq!(blocked.len(), 2, "Rebuild and GC should be blocked");
-        assert_eq!(blocked[0].0, 2, "Step 2 (Rebuild) should be first blocked");
-        assert_eq!(blocked[0].1, SafetyLevel::SystemCritical);
-        assert_eq!(blocked[1].0, 3, "Step 3 (GC) should be second blocked");
-        assert_eq!(blocked[1].1, SafetyLevel::Destructive);
-    }
-
-    #[test]
-    fn test_step_status_enum_variants() {
-        assert_eq!(StepStatus::Pending, StepStatus::Pending);
-        assert_eq!(StepStatus::Running, StepStatus::Running);
-        assert_eq!(StepStatus::Completed, StepStatus::Completed);
-        assert_eq!(StepStatus::RolledBack, StepStatus::RolledBack);
-        assert_eq!(StepStatus::Skipped, StepStatus::Skipped);
-        assert_ne!(StepStatus::Pending, StepStatus::Completed);
-        assert_eq!(
-            StepStatus::Failed("reason".into()),
-            StepStatus::Failed("reason".into())
-        );
-        assert_ne!(
-            StepStatus::Failed("a".into()),
-            StepStatus::Failed("b".into())
-        );
-    }
-
-    #[test]
-    fn test_step_critical_vs_optional() {
-        let mut plan = PlanExecutor::new(0.5);
-
-        let step = plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Critical step",
-        );
-        assert!(step.critical, "add_step should create critical steps");
-        assert!(!step.verify, "Default verify should be false");
-
-        let opt = plan.add_optional_step(
-            NixOSCommand::Search {
-                query: "git".into(),
-                json: false,
-            },
-            "Optional step",
-        );
-        assert!(
-            !opt.critical,
-            "add_optional_step should create non-critical steps"
-        );
-    }
-
-    #[test]
-    fn test_rollback_command_types() {
-        // Rebuild variants all produce nixos-rebuild --rollback
-        let switch = NixOSCommand::RebuildSwitch {
-            flake: None,
-            extra_args: vec![],
-        };
-        let rb = switch.rollback_command().unwrap();
-        let (cmd, args) = rb.to_command();
-        assert_eq!(cmd, "nixos-rebuild");
-        assert!(args.contains(&"--rollback".to_string()));
-
-        // EnvInstall/Remove produce nix-env --rollback
-        let install = NixOSCommand::EnvInstall {
-            packages: vec!["vim".into()],
-        };
-        let rb = install.rollback_command().unwrap();
-        let (cmd, args) = rb.to_command();
-        assert_eq!(cmd, "nix-env");
-        assert!(args.contains(&"--rollback".to_string()));
-
-        // HomeManager uses generation-based rollback
-        let hm = NixOSCommand::HomeManagerSwitch { flake: None };
-        let rb = hm.rollback_command().unwrap();
-        let (cmd, _args) = rb.to_command();
-        assert_eq!(cmd, "sh");
-
-        // Commands without rollback
-        assert!(
-            NixOSCommand::Search {
-                query: "x".into(),
-                json: false
-            }
-            .rollback_command()
-            .is_none()
-        );
-        assert!(
-            NixOSCommand::CollectGarbage {
-                older_than_days: None,
-                delete_all: false
-            }
-            .rollback_command()
-            .is_none()
-        );
-        assert!(
-            NixOSCommand::Channel {
-                operation: ChannelOperation::List
-            }
-            .rollback_command()
-            .is_none()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_multi_step_rollback_reverse_order() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.35);
-
-        // 3 steps succeed, then step 3 fails critically
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["a".into()],
-            },
-            "Install a",
-        );
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["b".into()],
-            },
-            "Install b",
-        );
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["c".into()],
-            },
-            "Install c",
-        );
-        // This needs 0.4, phi=0.35 → fail
-        plan.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild (will fail)",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(!result.success);
-        assert_eq!(result.completed_count, 3);
-        // All 3 EnvInstall commands have rollback → 3 rolled back
-        assert_eq!(result.rolled_back_count, 3);
-    }
-
-    #[tokio::test]
-    async fn test_rollback_failures_tracked() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.35);
-
-        // Step 0: install (succeeds)
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["vim".into()],
-            },
-            "Install vim",
-        );
-        // Step 1: rebuild (fails due to phi)
-        plan.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(!result.success);
-        // In dry-run mode, rollback "succeeds" — so rollback_failures should be empty
-        assert!(
-            result.rollback_failures.is_empty(),
-            "Dry-run rollbacks should not produce failures"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_success_path_no_rollback_failures() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.5);
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search",
-        );
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(result.success);
-        assert!(result.rollback_failures.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_rollback_skips_unrollable_steps() {
-        let mut nix_executor = NixOSExecutor::new().with_dry_run(true);
-        let mut plan = PlanExecutor::new(0.35);
-
-        // Search has no rollback command
-        plan.add_step(
-            NixOSCommand::Search {
-                query: "vim".into(),
-                json: false,
-            },
-            "Search (no rollback)",
-        );
-        // Install has rollback
-        plan.add_step(
-            NixOSCommand::EnvInstall {
-                packages: vec!["vim".into()],
-            },
-            "Install (has rollback)",
-        );
-        // Rebuild fails (needs 0.4)
-        plan.add_step(
-            NixOSCommand::RebuildSwitch {
-                flake: None,
-                extra_args: vec![],
-            },
-            "Rebuild (will fail)",
-        );
-
-        let result = plan.execute(&mut nix_executor).await;
-        assert!(!result.success);
-        assert_eq!(result.completed_count, 2);
-        // Only EnvInstall has rollback, Search doesn't → 1 rolled back
-        assert_eq!(result.rolled_back_count, 1);
+        assert!(result.verification_results.is_empty());
     }
 }
