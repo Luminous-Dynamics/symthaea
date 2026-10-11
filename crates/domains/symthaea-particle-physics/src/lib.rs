@@ -28,6 +28,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_qcd;
+pub mod lattice_variational;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -41,6 +42,9 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_variational::{
+    VariationalError, principal_correlators, principal_effective_energies,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
