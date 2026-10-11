@@ -264,6 +264,8 @@ fn run_scenario_classifier(
             .map(|scenario| scenario.event_count)
             .sum::<usize>()
     );
+    print_distribution("source scenarios by label", &source_labels);
+    print_distribution("OTRF scenarios by label", &held_out_labels);
 
     let fold_accuracies =
         run_grouped_kfold(&source_hvs, &source_labels, &source_groups, 5, cfg)?;
@@ -273,7 +275,10 @@ fn run_scenario_classifier(
         .map(|accuracy| (accuracy - mean).powi(2))
         .sum::<f32>()
         / fold_accuracies.len() as f32;
-    println!("  grouped scenario 5-fold CV accuracy: {mean:.3} ± {:.3}", variance.sqrt());
+    println!(
+        "  grouped scenario 5-fold CV accuracy: {mean:.3} ± {:.3}",
+        variance.sqrt()
+    );
 
     let (train_hvs, train_labels, test_hvs, test_labels) =
         symthaea_logparse::probe::grouped_stratified_split(
