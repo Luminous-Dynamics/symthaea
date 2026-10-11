@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/spore/spore-parity-receipt-v1.schema.json",
+  "title": "Spore Parity Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evidence_tier",
+    "obligation_id",
+    "source_artifact_id",
+    "source_commit",
+    "source_tree",
+    "source_blob_sha1",
+    "destination_repository",
+    "destination_commit",
+    "destination_tree",
+    "destination_artifact_sha256",
+    "runner_identity",
+    "toolchain_identity",
+    "execution_class",
+    "nix_derivation",
+    "nix_closure_sha256",
+    "result",
+    "failure_classification",
+    "destination_qualification",
+    "executed_at"
+  ],
+  "properties": {
+    "schema": { "const": "spore-parity-receipt-v1" },
+    "evidence_tier": { "const": "parity-only" },
+    "obligation_id": { "type": "string", "pattern": "^GP-[A-Z]+-[0-9]{3}$" },
+    "source_artifact_id": {
+      "enum": [
+        "fail-open-vm",
+        "helper-expendability-vm",
+        "systemd-authority-tests",
+        "ovmf-recovery-vm"
+      ]
+    },
+    "source_commit": { "const": "5d80360768ee329c50756e71fbce4692ac3a8e45" },
+    "source_tree": { "const": "51c04910b3a97586ecf88a46699b7de22e3e1b0b" },
+    "source_blob_sha1": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "destination_repository": { "const": "Luminous-Dynamics/spore" },
+    "destination_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "destination_tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "destination_artifact_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "runner_identity": { "type": "string", "minLength": 1 },
+    "toolchain_identity": { "type": "string", "minLength": 1 },
+    "execution_class": { "enum": ["vm", "unit", "firmware-vm"] },
+    "nix_derivation": { "type": ["string", "null"], "minLength": 1 },
+    "nix_closure_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "result": { "enum": ["PASS", "FAIL"] },
+    "failure_classification": { "type": ["string", "null"], "minLength": 1 },
+    "destination_qualification": { "const": "NOT_ESTABLISHED" },
+    "executed_at": { "type": "string", "format": "date-time" }
+  }
+}
