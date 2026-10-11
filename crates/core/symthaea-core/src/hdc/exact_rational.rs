@@ -100,6 +100,8 @@ pub enum ExactRationalError {
     InvalidInteger,
     /// Canonical byte encoding has a malformed header, length, component, or suffix.
     InvalidCanonicalEncoding,
+    /// A wire numerator/denominator is valid but not in canonical normalized form.
+    InvalidCanonicalWire,
     /// A rational denominator is zero.
     ZeroDenominator,
     /// A division operation used a zero rational divisor.
@@ -120,6 +122,7 @@ impl fmt::Display for ExactRationalError {
             Self::InvalidBudget => write!(f, "invalid rational bit budget"),
             Self::InvalidInteger => write!(f, "invalid decimal integer"),
             Self::InvalidCanonicalEncoding => write!(f, "invalid canonical rational encoding"),
+            Self::InvalidCanonicalWire => write!(f, "noncanonical exact-rational wire value"),
             Self::InvalidNumericTowerRational => write!(f, "numeric-tower rational is not in canonical form"),
             Self::ZeroDenominator => write!(f, "rational denominator cannot be zero"),
             Self::DivisionByZero => write!(f, "division by zero"),
@@ -185,12 +188,21 @@ impl ExactRational {
         Self::parse(value, "1", budget)
     }
 
-    /// Rehydrate a wire value with a caller-supplied budget.
+    /// Rehydrate a canonical wire value with a caller-supplied budget.
+    ///
+    /// The input strings must already be normalized decimal components;
+    /// unlike the parse constructor, this transport boundary rejects alternate spellings.
     pub fn from_wire(
         wire: &ExactRationalWire,
         budget: RationalBudget,
     ) -> Result<Self, ExactRationalError> {
-        Self::parse(&wire.numerator, &wire.denominator, budget)
+        let value = Self::parse(&wire.numerator, &wire.denominator, budget)?;
+        if value.numerator_str() != wire.numerator
+            || value.denominator_str() != wire.denominator
+        {
+            return Err(ExactRationalError::InvalidCanonicalWire);
+        }
+        Ok(value)
     }
 
     /// Decode canonical bytes while enforcing resource limits before parsing.
@@ -609,6 +621,22 @@ mod tests {
         assert!(encoded.contains("\"123456789012345678901234567890\""));
         let wire: ExactRationalWire = serde_json::from_str(&encoded).unwrap();
         assert_eq!(ExactRational::from_wire(&wire, limit).unwrap(), value);
+    }
+
+    #[test]
+    fn wire_decoder_rejects_noncanonical_decimal_strings() {
+        let limit = budget(128);
+        for wire in [
+            ExactRationalWire { numerator: "01".into(), denominator: "1".into() },
+            ExactRationalWire { numerator: "2".into(), denominator: "4".into() },
+            ExactRationalWire { numerator: "+1".into(), denominator: "2".into() },
+            ExactRationalWire { numerator: "1".into(), denominator: "-2".into() },
+        ] {
+            assert_eq!(
+                ExactRational::from_wire(&wire, limit).unwrap_err(),
+                ExactRationalError::InvalidCanonicalWire
+            );
+        }
     }
 
     #[test]
