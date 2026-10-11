@@ -45,7 +45,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load sbousseaden (per-file cap 50, but no global total cap now)
     // ----------------------------------------------------------------
     println!("[load] sbousseaden corpus from {evtx_dir}");
-    let sbou_events = load_evtx_corpus(&PathBuf::from(&evtx_dir), 50, None, &shared_labels)?;
+    let (sbou_events, sbou_groups) =
+        load_evtx_corpus(&PathBuf::from(&evtx_dir), 50, None, &shared_labels)?;
     let sbou_labels: Vec<String> = sbou_events
         .iter()
         .map(|e| e.label.clone().unwrap())
@@ -57,7 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load OTRF (walk the staged dirs, parse every .json file)
     // ----------------------------------------------------------------
     println!("\n[load] OTRF corpus from {otrf_dir}");
-    let otrf_events = load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
+    let (otrf_events, otrf_groups) =
+        load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
     let otrf_labels: Vec<String> = otrf_events
         .iter()
         .map(|e| e.label.clone().unwrap())
@@ -78,7 +80,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ----------------------------------------------------------------
     println!("\n=== Experiment 1: scale-up (sbousseaden full corpus, 80/20 split) ===");
     let (tr_hv, tr_y, te_hv, te_y) =
-        symthaea_logparse::probe::stratified_split(&sbou_hvs, &sbou_labels, 0.8, 0xFACADE);
+        symthaea_logparse::probe::grouped_stratified_split(
+            &sbou_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
+        )?;
     println!(
         "  train={}, test={}, classes={}",
         tr_hv.len(),
@@ -96,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 2: 5-fold stratified CV on sbousseaden ===");
-    let fold_accs = run_kfold(&sbou_hvs, &sbou_labels, 5, cfg);
+    let fold_accs = run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, cfg)?;
     let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
     let var = fold_accs.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / fold_accs.len() as f32;
     let std = var.sqrt();
@@ -158,7 +162,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sbou_di_hvs: Vec<Hdv> = sbou_events.iter().map(encode_domain_invariant).collect();
         let otrf_di_hvs: Vec<Hdv> = otrf_events.iter().map(encode_domain_invariant).collect();
         let (tr_hv, tr_y, te_hv, te_y) =
-            symthaea_logparse::probe::stratified_split(&sbou_di_hvs, &sbou_labels, 0.8, 0xFACADE);
+            symthaea_logparse::probe::grouped_stratified_split(
+                &sbou_di_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
+            )?;
         let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
         let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
         let di_ood = di_probe.accuracy(&otrf_di_hvs, &otrf_labels);
@@ -243,7 +249,7 @@ fn load_evtx_corpus(
     max_per_file: usize,
     max_total: Option<usize>,
     keep_labels: &[&str],
-) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
+) -> Result<(Vec<LogEvent>, Vec<String>), Box<dyn std::error::Error>> {
     let labels_path = corpus_dir.join("labels.csv");
     let labels_csv = std::fs::read_to_string(&labels_path)?;
     let mut file_labels: HashMap<String, String> = HashMap::new();
@@ -254,11 +260,13 @@ fn load_evtx_corpus(
     }
 
     let keep_set: std::collections::HashSet<&str> = keep_labels.iter().copied().collect();
-    let mut by_label: BTreeMap<String, Vec<LogEvent>> = BTreeMap::new();
+    let mut by_label: BTreeMap<String, Vec<(LogEvent, String)>> = BTreeMap::new();
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(corpus_dir)?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<Result<_, _>>()?;
+    paths.sort();
 
-    for entry in std::fs::read_dir(corpus_dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    for path in paths {
         if path.extension().and_then(|s| s.to_str()) != Some("evtx") {
             continue;
         }
@@ -273,7 +281,7 @@ fn load_evtx_corpus(
         let capped: Vec<LogEvent> = if parsed.len() <= max_per_file {
             parsed
         } else {
-            let stride = parsed.len() / max_per_file;
+            let stride = parsed.len() / max_per_file.max(1);
             parsed
                 .into_iter()
                 .step_by(stride.max(1))
@@ -283,11 +291,11 @@ fn load_evtx_corpus(
         let bucket = by_label.entry(label.clone()).or_default();
         for mut ev in capped {
             ev.label = Some(label.clone());
-            bucket.push(ev);
+            bucket.push((ev, format!("evtx:{fname}")));
         }
     }
 
-    let events = if let Some(cap) = max_total {
+    let rows: Vec<(LogEvent, String)> = if let Some(cap) = max_total {
         let n_labels = by_label.len().max(1);
         let per_label_budget = cap / n_labels;
         let mut out = Vec::new();
@@ -300,14 +308,15 @@ fn load_evtx_corpus(
     } else {
         by_label.into_values().flatten().collect()
     };
-    Ok(events)
+    let (events, groups): (Vec<LogEvent>, Vec<String>) = rows.into_iter().unzip();
+    Ok((events, groups))
 }
 
 fn load_otrf_corpus(
     corpus_dir: &PathBuf,
     keep_labels: &[&str],
     max_per_dir: usize,
-) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
+) -> Result<(Vec<LogEvent>, Vec<String>), Box<dyn std::error::Error>> {
     let labels_path = corpus_dir.join("labels.csv");
     let labels_csv = std::fs::read_to_string(&labels_path)?;
     let mut dir_labels: HashMap<String, String> = HashMap::new();
@@ -317,11 +326,13 @@ fn load_otrf_corpus(
         }
     }
     let keep_set: std::collections::HashSet<&str> = keep_labels.iter().copied().collect();
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(corpus_dir)?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<Result<_, _>>()?;
+    paths.sort();
 
-    let mut out = Vec::new();
-    for entry in std::fs::read_dir(corpus_dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    let mut rows: Vec<(LogEvent, String)> = Vec::new();
+    for path in paths {
         if !path.is_dir() {
             continue;
         }
@@ -336,19 +347,21 @@ fn load_otrf_corpus(
         let capped: Vec<LogEvent> = if parsed.len() <= max_per_dir {
             parsed
         } else {
-            let stride = parsed.len() / max_per_dir;
+            let stride = parsed.len() / max_per_dir.max(1);
             parsed
                 .into_iter()
                 .step_by(stride.max(1))
                 .take(max_per_dir)
                 .collect()
         };
+        let group_id = format!("otrf:{dname}");
         for mut ev in capped {
             ev.label = Some(label.clone());
-            out.push(ev);
+            rows.push((ev, group_id.clone()));
         }
     }
-    Ok(out)
+    let (events, groups): (Vec<LogEvent>, Vec<String>) = rows.into_iter().unzip();
+    Ok((events, groups))
 }
 
 /// Stratified 5-fold cross-validation. Splits each class's samples into k
