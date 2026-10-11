@@ -199,8 +199,11 @@ pub struct Px4ExternalModeSetpointConfigRequestV1 {
     pub source_boot_session_id: String,
     /// Adapter-local ID tying this request/reply pair to one capture attempt.
     pub capture_window_id: String,
-    /// PX4 boot-relative SetpointConfig timestamp, microseconds.
-    pub source_timestamp_us: u64,
+    /// Raw SetpointConfig.timestamp field in microseconds.
+    ///
+    /// The value is preserved as received and is not compared with the PX4 reply
+    /// timestamp unless a separate clock-correspondence proof is available.
+    pub timestamp_us_raw: u64,
     /// Raw SetpointConfig::type; unknown values are preserved.
     pub type_raw: u16,
     /// Navigation-state ID of the external mode declaring this setpoint type.
@@ -224,7 +227,7 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
         firmware_profile_id: impl Into<String>,
         source_boot_session_id: impl Into<String>,
         capture_window_id: impl Into<String>,
-        source_timestamp_us: u64,
+        timestamp_us_raw: u64,
         type_raw: u16,
         source_id: u8,
         should_apply: bool,
@@ -239,7 +242,7 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
             firmware_profile_id: firmware_profile_id.into(),
             source_boot_session_id: source_boot_session_id.into(),
             capture_window_id: capture_window_id.into(),
-            source_timestamp_us,
+            timestamp_us_raw,
             type_raw,
             source_id,
             should_apply,
@@ -304,7 +307,7 @@ impl Px4ExternalModeSetpointConfigRequestV1 {
         feed_str(&mut hasher, &self.firmware_profile_id);
         feed_str(&mut hasher, &self.source_boot_session_id);
         feed_str(&mut hasher, &self.capture_window_id);
-        hasher.update(&self.source_timestamp_us.to_le_bytes());
+        hasher.update(&self.timestamp_us_raw.to_le_bytes());
         hasher.update(&self.type_raw.to_le_bytes());
         hasher.update(&[self.source_id, u8::from(self.should_apply)]);
         hasher.update(&self.timeout_ms.to_le_bytes());
@@ -482,9 +485,9 @@ pub struct Px4ExternalModeSetpointConfigProfileV1 {
     pub capture_window_id: String,
     /// Clock used for receive-time freshness.
     pub receiver_clock_domain: ClockDomainId,
-    /// Maximum request-to-reply latency measured in PX4 boot-relative microseconds.
-    pub max_source_reply_delay_us: u64,
-    /// Time allowed for a request to await a reply in the companion clock.
+    /// Maximum request-to-reply latency measured on the companion clock.
+    pub max_reply_wait_ns: u64,
+    /// Maximum age of a received reply in the companion clock.
     pub max_reply_wait_ns: u64,
     /// Maximum age of a received reply in the companion clock.
     pub max_reply_age_ns: u64,
@@ -503,7 +506,6 @@ impl Px4ExternalModeSetpointConfigProfileV1 {
         source_boot_session_id: impl Into<String>,
         capture_window_id: impl Into<String>,
         receiver_clock_domain: ClockDomainId,
-        max_source_reply_delay_us: u64,
         max_reply_wait_ns: u64,
         max_reply_age_ns: u64,
     ) -> Result<Self, Px4ExternalModeSetpointConfigError> {
@@ -516,7 +518,6 @@ impl Px4ExternalModeSetpointConfigProfileV1 {
             source_boot_session_id: source_boot_session_id.into(),
             capture_window_id: capture_window_id.into(),
             receiver_clock_domain,
-            max_source_reply_delay_us,
             max_reply_wait_ns,
             max_reply_age_ns,
             profile_digest_hex: String::new(),
@@ -547,9 +548,7 @@ impl Px4ExternalModeSetpointConfigProfileV1 {
         self.receiver_clock_domain
             .validate()
             .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
-        if self.max_source_reply_delay_us == 0
-            || self.max_reply_wait_ns == 0
-            || self.max_reply_age_ns == 0
+        if self.max_reply_wait_ns == 0 || self.max_reply_age_ns == 0
         {
             return Err(Px4ExternalModeSetpointConfigError::ZeroTimingBound);
         }
@@ -567,7 +566,6 @@ impl Px4ExternalModeSetpointConfigProfileV1 {
         feed_str(&mut hasher, &self.source_boot_session_id);
         feed_str(&mut hasher, &self.capture_window_id);
         feed_str(&mut hasher, self.receiver_clock_domain.as_str());
-        hasher.update(&self.max_source_reply_delay_us.to_le_bytes());
         hasher.update(&self.max_reply_wait_ns.to_le_bytes());
         hasher.update(&self.max_reply_age_ns.to_le_bytes());
         digest_hex(hasher.finalize().as_bytes())
@@ -599,12 +597,12 @@ pub enum Px4ExternalModeSetpointConfigOutcomeV1 {
         /// Maximum permitted reply age.
         max_reply_age_ns: u64,
     },
-    /// PX4's boot-relative request/reply delay exceeded its profile bound.
-    SourceReplyTooLate {
-        /// Measured PX4 source-time latency.
-        source_reply_delay_us: u64,
-        /// Maximum permitted source-time latency.
-        max_source_reply_delay_us: u64,
+    /// A reply arrived after the locally measured response-wait ceiling.
+    ReplyObservedTooLate {
+        /// Elapsed time from local request submission to local reply receipt.
+        response_latency_ns: u64,
+        /// Maximum permitted local response wait.
+        max_reply_wait_ns: u64,
     },
     /// The reply reported a non-success result; raw value is preserved.
     ReplyRejected {
@@ -716,7 +714,7 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
         ))
     }
 
-    /// Assess reply presence, source-time latency, receive-time freshness, and result.
+    /// Assess reply presence, same-clock response latency, receive-time freshness, and result.
     pub fn outcome(
         &self,
     ) -> Result<Px4ExternalModeSetpointConfigOutcomeV1, Px4ExternalModeSetpointConfigError> {
@@ -749,11 +747,14 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
                 max_reply_age_ns: self.profile.max_reply_age_ns,
             });
         }
-        let source_reply_delay_us = reply.source_timestamp_us - self.request.source_timestamp_us;
-        if source_reply_delay_us > self.profile.max_source_reply_delay_us {
-            return Ok(Px4ExternalModeSetpointConfigOutcomeV1::SourceReplyTooLate {
-                source_reply_delay_us,
-                max_source_reply_delay_us: self.profile.max_source_reply_delay_us,
+        let response_latency_ns = reply
+            .received_at
+            .elapsed_since(&self.request.submitted_at)
+            .map_err(Px4ExternalModeSetpointConfigError::Timestamp)?;
+        if response_latency_ns > self.profile.max_reply_wait_ns {
+            return Ok(Px4ExternalModeSetpointConfigOutcomeV1::ReplyObservedTooLate {
+                response_latency_ns,
+                max_reply_wait_ns: self.profile.max_reply_wait_ns,
             });
         }
         if reply.result() != Px4SetpointConfigResultV1::Success {
@@ -826,9 +827,6 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
             }
             if reply.source_id != self.request.source_id {
                 return Err(Px4ExternalModeSetpointConfigError::ReplySourceMismatch);
-            }
-            if reply.source_timestamp_us < self.request.source_timestamp_us {
-                return Err(Px4ExternalModeSetpointConfigError::SourceTimeRegression);
             }
             if reply.received_at.nanoseconds < self.request.submitted_at.nanoseconds {
                 return Err(Px4ExternalModeSetpointConfigError::ReceiveOrderRegression);
@@ -991,11 +989,8 @@ pub enum Px4ExternalModeSetpointConfigError {
     /// Reply did not echo the requested source ID.
     #[error("SetpointConfigReply source_id did not match request")]
     ReplySourceMismatch,
-    /// PX4 source timestamp regressed across request and reply.
-    #[error("SetpointConfigReply source time preceded request source time")]
-    SourceTimeRegression,
-    /// Reply was received before request within the declared single capture window.
-    #[error("SetpointConfigReply receive time preceded request receive time")]
+    /// Reply was received before the request was submitted in the common receiver clock.
+    #[error("SetpointConfigReply receive time preceded request submission time")]
     ReceiveOrderRegression,
     /// Assessment preceded the request receive time.
     #[error("assessment preceded SetpointConfig request")]
@@ -1107,7 +1102,6 @@ mod tests {
             "px4.boot.fixture.session-a",
             "setpoint-config.capture.fixture.attempt-1",
             clock(),
-            100_000,
             200_000_000,
             500_000_000,
         )
@@ -1334,24 +1328,24 @@ mod tests {
     }
 
     #[test]
-    fn source_time_latency_and_receiver_freshness_have_separate_bounds() {
-        let source_late = assessment(
+    fn response_latency_uses_companion_clock_and_reply_freshness_is_separate() {
+        let late = assessment(
             request(),
             Some(reply_at(
                 "setpoint-config.capture.fixture.attempt-1",
                 4,
                 42,
                 0,
-                1_200_001,
-                1_100_000_000,
+                1_050_000,
+                1_250_000_001,
             )),
-            1_200_000_000,
+            1_300_000_000,
         );
         assert_eq!(
-            source_late.outcome().unwrap(),
-            Px4ExternalModeSetpointConfigOutcomeV1::SourceReplyTooLate {
-                source_reply_delay_us: 200_001,
-                max_source_reply_delay_us: 100_000,
+            late.outcome().unwrap(),
+            Px4ExternalModeSetpointConfigOutcomeV1::ReplyObservedTooLate {
+                response_latency_ns: 250_000_001,
+                max_reply_wait_ns: 200_000_000,
             }
         );
 
@@ -1421,25 +1415,35 @@ mod tests {
     }
 
     #[test]
-    fn source_and_receive_clock_ordering_fail_closed() {
-        let source_regression = Px4ExternalModeSetpointConfigAssessmentV1::new(
-            profile(),
-            request(),
-            Some(reply_at(
-                "setpoint-config.capture.fixture.attempt-1",
-                4,
-                42,
-                0,
-                999_999,
-                1_100_000_000,
-            )),
-            ts(1_200_000_000),
+    fn request_and_px4_source_timestamps_are_not_compared_without_clock_proof() {
+        let req = request_at(
+            "setpoint-config.capture.fixture.attempt-1",
+            4,
+            42,
+            true,
+            250,
+            90_000_000,
+            1_000_000_000,
         );
-        assert_eq!(
-            source_regression.unwrap_err(),
-            Px4ExternalModeSetpointConfigError::SourceTimeRegression
+        let rep = reply_at(
+            "setpoint-config.capture.fixture.attempt-1",
+            4,
+            42,
+            0,
+            1_050_000,
+            1_100_000_000,
         );
+        assert!(matches!(
+            assessment(req, Some(rep), 1_200_000_000).outcome().unwrap(),
+            Px4ExternalModeSetpointConfigOutcomeV1::ApplyRequestAccepted {
+                requested_timeout_ms: 250,
+                ..
+            }
+        ));
+    }
 
+    #[test]
+    fn receive_clock_ordering_fails_closed() {
         let receive_regression = Px4ExternalModeSetpointConfigAssessmentV1::new(
             profile(),
             request(),
@@ -1479,7 +1483,6 @@ mod tests {
                 "setpoint-config.capture.fixture.attempt-1",
                 clock(),
                 0,
-                200_000_000,
                 500_000_000,
             )
             .unwrap_err(),
