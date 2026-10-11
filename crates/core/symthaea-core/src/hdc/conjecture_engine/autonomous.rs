@@ -1555,3 +1555,51 @@ fn find_lyapunov_candidate(
 
     None
 }
+
+
+#[cfg(test)]
+mod cold_discovery_provenance_tests {
+    use super::*;
+
+    #[test]
+    fn cold_search_strips_prior_dependent_configuration_without_mutating_input() {
+        let mut config = RegressorConfig::default();
+        config.known_invariants.push(Expr::Var("x".into()));
+        config.orthogonality_penalty = 4.0;
+        config.prior_composition_rate = 0.7;
+        config.prior_fragment_bonus = 0.25;
+        config.disable_macro_seeds = false;
+
+        let cold = effective_discovery_config(&config, AutonomousDiscoveryMode::Cold);
+        assert!(cold.known_invariants.is_empty());
+        assert_eq!(cold.orthogonality_penalty, 1.0);
+        assert_eq!(cold.prior_composition_rate, 0.0);
+        assert_eq!(cold.prior_fragment_bonus, 1.0);
+        assert!(cold.disable_macro_seeds);
+        assert_eq!(config.known_invariants.len(), 1);
+        assert_eq!(config.orthogonality_penalty, 4.0);
+    }
+
+    #[test]
+    fn cold_entry_point_fails_closed_on_dimension_mismatch() {
+        fn harmonic_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![state[1], -state[0]]
+        }
+
+        let config = RegressorConfig {
+            population_size: 20,
+            generations: 2,
+            ..RegressorConfig::default()
+        };
+        let result = discover_invariants_autonomous_cold(
+            harmonic_rhs,
+            &[1.0],
+            &["x", "v"],
+            None,
+            &config,
+            1.0,
+            0.01,
+        );
+        assert!(result.is_empty());
+    }
+}
