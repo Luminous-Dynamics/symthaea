@@ -683,4 +683,56 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_becke_partition_weights_are_finite_and_sum_to_one() {
+        // Partition of unity is independent of radial/angular quadrature.
+        // Exercise points near nuclei, between atoms, off-axis, and outside
+        // the molecular region for diatomic, bent triatomic, and tetrahedral
+        // geometries. The partition weights are normalized shares, not density.
+        let geometries = [
+            vec![
+                Atom::new(1, 0.0, 0.0, -0.7),
+                Atom::new(1, 0.0, 0.0, 0.7),
+            ],
+            vec![
+                Atom::new(8, 0.0, 0.0, 0.0),
+                Atom::new(1, 1.43, 0.0, 1.10),
+                Atom::new(1, -1.43, 0.0, 1.10),
+            ],
+            vec![
+                Atom::new(6, 0.0, 0.0, 0.0),
+                Atom::new(1, 1.0, 1.0, 1.0),
+                Atom::new(1, -1.0, -1.0, 1.0),
+                Atom::new(1, -1.0, 1.0, -1.0),
+            ],
+        ];
+        let probes = [
+            [0.0, 0.0, 0.0],
+            [0.1, -0.2, 0.3],
+            [1.0, 0.0, 0.0],
+            [-2.5, 0.4, 0.7],
+            [4.0, -3.0, 2.0],
+        ];
+
+        for (geometry_index, atoms) in geometries.iter().enumerate() {
+            for point in probes {
+                let weights: Vec<f64> = (0..atoms.len())
+                    .map(|atom_idx| {
+                        becke_partition_weight(atom_idx, point[0], point[1], point[2], atoms)
+                    })
+                    .collect();
+                let total: f64 = weights.iter().sum();
+
+                assert!(
+                    weights.iter().all(|w| w.is_finite() && *w >= 0.0 && *w <= 1.0),
+                    "geometry={geometry_index}, point={point:?}: invalid partition weights {weights:?}"
+                );
+                assert!(
+                    (total - 1.0).abs() < 1e-12,
+                    "geometry={geometry_index}, point={point:?}: partition sum={total}, weights={weights:?}"
+                );
+            }
+        }
+    }
 }
