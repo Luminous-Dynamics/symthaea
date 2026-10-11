@@ -142,6 +142,36 @@ fn blind_id(salt: &str, backend: &str, case_id: usize) -> String {
     format!("vocal-{}", &digest.to_hex()[..12])
 }
 
+fn validate_human_rating(rating: &HumanRating, clips: &[BlindClip]) -> Result<()> {
+    if rating.listener_id.trim().is_empty() {
+        anyhow::bail!("listener_id must be non-empty");
+    }
+    if !(1.0..=5.0).contains(&rating.naturalness)
+        || !(1.0..=5.0).contains(&rating.emotional_fit)
+        || !(1.0..=5.0).contains(&rating.identity_consistency)
+        || !(1.0..=5.0).contains(&rating.artifact_free)
+    {
+        anyhow::bail!("rating scores must be within 1..=5");
+    }
+    if rating.lyric_words_understood > rating.lyric_words_total {
+        anyhow::bail!("understood word count exceeds total for {}", rating.clip_id);
+    }
+    let clip = clips
+        .iter()
+        .find(|clip| clip.clip_id == rating.clip_id)
+        .with_context(|| format!("rating references unknown clip_id {}", rating.clip_id))?;
+    let expected_words = clip.lyrics.split_whitespace().count();
+    if expected_words == 0 || rating.lyric_words_total != expected_words {
+        anyhow::bail!(
+            "lyric_words_total mismatch for {}: expected {}, got {}",
+            rating.clip_id,
+            expected_words,
+            rating.lyric_words_total
+        );
+    }
+    Ok(())
+}
+
 fn blind_salt(args: &[String], output: &Path) -> Result<String> {
     if let Some(seed) = arg(args, "--blind-seed") {
         return Ok(blake3::hash(seed.as_bytes()).to_hex().to_string());
@@ -170,6 +200,9 @@ fn render_one(
     objective: &mut Vec<ObjectiveEntry>,
 ) -> Result<()> {
     let stem = engine.render(performance)?;
+    // Enforce the shared integrity contract at the evaluator boundary too;
+    // a custom/backend implementation must not save malformed audio for ratings.
+    stem.validate()?;
     let id = blind_id(salt, &stem.backend, case_id);
     let filename = format!("{id}.wav");
     save(&output.join(&filename), &stem)?;
@@ -245,6 +278,7 @@ fn main() -> Result<()> {
         .unwrap_or("5")
         .parse()
         .context("invalid --minimum-listeners")?;
+    anyhow::ensure!(minimum_listeners > 0, "--minimum-listeners must be positive");
     std::fs::create_dir_all(&output)?;
     let salt = blind_salt(&args, &output)?;
 
@@ -370,14 +404,7 @@ fn main() -> Result<()> {
             values.iter().map(|r| r.listener_id.clone()).collect();
         let mut by_clip_listener = BTreeMap::new();
         for rating in &values {
-            if !(1.0..=5.0).contains(&rating.naturalness)
-                || !(1.0..=5.0).contains(&rating.emotional_fit)
-                || !(1.0..=5.0).contains(&rating.identity_consistency)
-                || !(1.0..=5.0).contains(&rating.artifact_free)
-                || rating.lyric_words_understood > rating.lyric_words_total
-            {
-                anyhow::bail!("invalid human rating for {}", rating.clip_id);
-            }
+            validate_human_rating(rating, &clips)?;
             if by_clip_listener
                 .insert((rating.clip_id.clone(), rating.listener_id.clone()), ())
                 .is_some()
@@ -430,4 +457,51 @@ fn main() -> Result<()> {
     )?;
     println!("{}", serde_json::to_string_pretty(&status)?);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn clip() -> BlindClip {
+        BlindClip {
+            clip_id: "clip-1".into(),
+            case_id: 7,
+            lyrics: "softly now stars".into(),
+            audio: "clip-1.wav".into(),
+            category: "center".into(),
+            challenge: "legato".into(),
+        }
+    }
+
+    fn rating(listener_id: &str, clip_id: &str, total: usize) -> HumanRating {
+        HumanRating {
+            listener_id: listener_id.into(),
+            clip_id: clip_id.into(),
+            naturalness: 4.0,
+            emotional_fit: 4.0,
+            identity_consistency: 4.0,
+            artifact_free: 4.0,
+            lyric_words_understood: total,
+            lyric_words_total: total,
+        }
+    }
+
+    #[test]
+    fn human_rating_rejects_unknown_clip_id() {
+        let error = validate_human_rating(&rating("listener-1", "invented-clip", 3), &[clip()]);
+        assert!(error.is_err());
+    }
+
+    #[test]
+    fn human_rating_rejects_blank_listener_and_word_count_mismatch() {
+        let clips = [clip()];
+        assert!(validate_human_rating(&rating("  ", "clip-1", 3), &clips).is_err());
+        assert!(validate_human_rating(&rating("listener-1", "clip-1", 2), &clips).is_err());
+    }
+
+    #[test]
+    fn human_rating_accepts_manifest_aligned_rating() {
+        assert!(validate_human_rating(&rating("listener-1", "clip-1", 3), &[clip()]).is_ok());
+    }
 }
