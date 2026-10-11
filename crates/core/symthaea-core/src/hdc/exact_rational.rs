@@ -13,7 +13,7 @@ use super::numeric_tower::Number;
 use crate::hdc::binary_hv::BinaryHV;
 use num_bigint::BigInt;
 use num_rational::BigRational;
-use num_traits::{ToPrimitive, Zero};
+use num_traits::{Signed, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -470,6 +470,55 @@ impl ExactRational {
         Ok(self.to_f64_approx())
     }
 
+    /// True when the exact numerator is zero.
+    pub fn is_zero(&self) -> bool {
+        self.value.numer().is_zero()
+    }
+
+    /// True when the exact rational is strictly positive.
+    pub fn is_positive(&self) -> bool {
+        self.value.numer().is_positive()
+    }
+
+    /// True when the exact rational is strictly negative.
+    pub fn is_negative(&self) -> bool {
+        self.value.numer().is_negative()
+    }
+
+    /// Compare exact values without narrowing to floating point.
+    /// Both operands must fit the caller-selected resource budget.
+    pub fn checked_compare(
+        &self,
+        other: &Self,
+        budget: RationalBudget,
+    ) -> Result<std::cmp::Ordering, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        budget.validate_value(&other.value)?;
+        Ok(self.value.cmp(&other.value))
+    }
+
+    /// Negate exactly, enforcing the caller-selected resource budget.
+    pub fn checked_negate(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        let value = -self.value.clone();
+        budget.validate_value(&value)?;
+        Ok(Self { value })
+    }
+
+    /// Return the exact absolute value under the caller-selected resource budget.
+    pub fn checked_abs(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        let value = self.value.clone().abs();
+        budget.validate_value(&value)?;
+        Ok(Self { value })
+    }
+
     /// Add exactly, failing closed if operands or normalized result exceed budget.
     pub fn checked_add(
         &self,
@@ -919,6 +968,66 @@ mod tests {
         );
         assert_eq!(
             value.checked_to_f64_approx(narrow_budget).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+    }
+
+    #[test]
+    fn exact_comparison_distinguishes_values_that_round_to_the_same_f64() {
+        use std::cmp::Ordering;
+
+        let limit = budget(512);
+        let one = ExactRational::from_integer("1", limit).unwrap();
+        let denominator = format!("1{}", "0".repeat(100));
+        let epsilon = ExactRational::parse("1", &denominator, limit).unwrap();
+        let one_plus_epsilon = one.checked_add(&epsilon, limit).unwrap();
+
+        // Both values collapse to 1.0 in binary64, but exact ordering must not.
+        assert_eq!(one.to_f64_approx(), Some(1.0));
+        assert_eq!(one_plus_epsilon.to_f64_approx(), Some(1.0));
+        assert_eq!(one.checked_compare(&one_plus_epsilon, limit).unwrap(), Ordering::Less);
+        assert_eq!(one_plus_epsilon.checked_compare(&one, limit).unwrap(), Ordering::Greater);
+        assert_eq!(one.checked_compare(&one.clone(), limit).unwrap(), Ordering::Equal);
+    }
+
+    #[test]
+    fn exact_sign_negation_and_absolute_value_preserve_canonical_form() {
+        let limit = budget(128);
+        let negative = ExactRational::parse("-18", "24", limit).unwrap();
+        assert!(negative.is_negative());
+        assert!(!negative.is_positive());
+        assert!(!negative.is_zero());
+
+        let positive = negative.checked_abs(limit).unwrap();
+        assert_eq!(positive.to_string(), "3/4");
+        assert!(positive.is_positive());
+        assert_eq!(negative.checked_negate(limit).unwrap(), positive);
+
+        let zero = ExactRational::from_integer("0", limit).unwrap();
+        assert!(zero.is_zero());
+        assert!(!zero.is_positive());
+        assert!(!zero.is_negative());
+        assert_eq!(zero.checked_negate(limit).unwrap(), zero);
+        assert_eq!(zero.checked_abs(limit).unwrap(), zero);
+    }
+
+    #[test]
+    fn exact_comparison_and_unary_operations_enforce_caller_budget() {
+        let wide = budget(32);
+        let narrow = budget(8);
+        let value = ExactRational::from_integer("65535", wide).unwrap();
+        let one = ExactRational::from_integer("1", wide).unwrap();
+
+        assert_eq!(
+            value.checked_compare(&one, narrow).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+        assert_eq!(
+            value.checked_negate(narrow).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+        assert_eq!(
+            value.checked_abs(narrow).unwrap_err(),
             ExactRationalError::ResourceLimitExceeded
         );
     }
