@@ -1000,6 +1000,7 @@ mod tests {
         ledger
             .resolve_verified_forecast(test_verified_receipt(&ledger, CapabilityOutcomeReceipt {
                 forecast_id: id.to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
                 subject: subject(),
                 sequence: forecast_seq + 1,
                 observed_success: actual,
@@ -1103,6 +1104,7 @@ mod tests {
 
         let mut receipt = CapabilityOutcomeReceipt {
             forecast_id: "chronology".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
             subject: subject(),
             sequence: 10,
             observed_success: true,
@@ -1162,6 +1164,48 @@ mod tests {
             ledger.claim("forged").unwrap().lifecycle,
             CapabilityLifecycle::Proposed
         );
+    }
+
+    #[test]
+    fn outcome_for_different_forecast_payload_is_rejected() {
+        let mut ledger = setup_claim();
+        ledger.record_forecast(CapabilityForecast {
+            forecast_id: "forecast-binding".to_string(),
+            claim_id: "rust-debugging".to_string(),
+            claim_sha256: "f".repeat(64),
+            subject: subject(),
+            sequence: 1,
+            context_id: "original-context".to_string(),
+            split: CapabilitySplit::HeldOut,
+            predicted_success_probability: 0.9,
+            expected_compute_units: 5.0,
+            predicted_failure_mode: Some("missing source context".to_string()),
+        }).unwrap();
+
+        let receipt = CapabilityOutcomeReceipt {
+            forecast_id: "forecast-binding".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
+            subject: subject(),
+            sequence: 2,
+            observed_success: true,
+            split: CapabilitySplit::HeldOut,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            receipt_sha256: "b".repeat(64),
+            actual_compute_units: Some(5.0),
+        };
+        let verified = VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
+            receipt,
+            "a".repeat(64),
+            CAPABILITY_RECEIPT_VERIFIER_IDENTITY,
+            CAPABILITY_RECEIPT_VERIFIER_REVISION,
+            "c".repeat(64),
+        ).unwrap();
+        assert_eq!(
+            ledger.resolve_verified_forecast(verified),
+            Err(CapabilityLedgerError::ForecastCommitmentMismatch)
+        );
+        assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
     }
 
     #[test]
@@ -1231,6 +1275,7 @@ mod tests {
             .clone();
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "signed-forecast".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
             forecast_commitment_blake3,
             subject: subject(),
             sequence: 2,
@@ -1312,6 +1357,7 @@ mod tests {
             ledger
                 .resolve_verified_forecast(test_verified_receipt(&ledger, CapabilityOutcomeReceipt {
                     forecast_id: id,
+            forecast_commitment_blake3: "0".repeat(64),
                     subject: subject(),
                     sequence: seq + 1,
                     observed_success: true,
@@ -1333,6 +1379,7 @@ mod tests {
     fn verified_token_rejects_malformed_verifier_provenance() {
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "token-shape".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
             subject: subject(),
             sequence: 2,
             observed_success: true,
@@ -1376,6 +1423,7 @@ mod tests {
                 &ledger,
                 CapabilityOutcomeReceipt {
                     forecast_id: id,
+            forecast_commitment_blake3: "0".repeat(64),
                     subject: subject(),
                     sequence: forecast_sequence + 1,
                     observed_success: true,
@@ -1497,6 +1545,7 @@ mod tests {
 
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "first".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
             subject: subject(),
             sequence: 5,
             observed_success: true,
@@ -1551,6 +1600,7 @@ mod tests {
             .unwrap();
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "first".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
             subject: subject(),
             sequence: 2,
             observed_success: true,
@@ -1578,6 +1628,7 @@ mod tests {
             .unwrap();
         let replay = CapabilityOutcomeReceipt {
             forecast_id: "second".to_string(),
+            forecast_commitment_blake3: "0".repeat(64),
             sequence: 4,
             ..receipt
         };
