@@ -32,7 +32,7 @@ jobs:
           BASE=b9af191f380d635f0459b24284c1d1fd6a5516aa
           git merge-base --is-ancestor "$BASE" HEAD
           actual="$(git diff --name-only "$BASE" HEAD | sort)"
-          expected="$(printf '%s\\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/validate_jungian_symbolic_probe.py' | sort)"
+          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/validate_jungian_symbolic_probe.py' | sort)"
           test "$actual" = "$expected"
 
       - name: Capture pinned artifact identity
