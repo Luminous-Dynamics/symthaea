@@ -33,11 +33,15 @@ pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
 pub mod encoder;
+pub mod epistemic;
 pub mod manifold;
 pub mod predictive;
 pub mod spectrum;
 pub mod training;
 pub mod types;
+
+#[cfg(test)]
+mod epistemic_tests;
 
 pub use attention::SurpriseMap;
 pub use bridge::{
@@ -87,6 +91,7 @@ pub use checkpoint::{
     with_checkpoint_writer_lock, write_checkpoint_atomic, write_checkpoint_atomic_report,
 };
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder, StereoDepthEstimate};
+pub use epistemic::{VisualEvidence, VisualEvidenceError, VisualObservationRef, VisualOrigin};
 pub use manifold::{
     DelayedHorizonEvaluator, HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory,
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
