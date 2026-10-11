@@ -46,7 +46,7 @@ python3 -m unittest discover -s scripts/research -p 'test_validate_protein_dynam
 
 When run in the repository, the tests use the production schema at docs/research/PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json. When the test module is copied outside the repository for isolated semantic testing, it falls back to a minimal JSON Schema and therefore does **not** test production-schema compatibility.
 
-The unit suite includes adversarial cases for target omissions, target-manifest hash mismatch, output hash mismatch, NaN metrics, missing failure codes, mislabeled held-out metrics, duplicate target rows, path traversal, and NOT_RUN rows in a claimed complete run.
+The 16-test suite includes adversarial cases for target omissions and identity types, target-manifest hash mismatch, output hash mismatch, non-finite metrics, missing failure codes, mislabeled held-out metrics, duplicate target rows, path traversal and remote artifacts, conformer/resource mismatches, malformed preregistration, preregistration ordering, and NOT_RUN rows in a claimed complete run.
 
 ## Limitations and next gate
 
