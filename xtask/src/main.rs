@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod repository_snapshot;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -35,6 +36,15 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Snapshot exact worktree source bytes for a declared repository scope.
+    RepositorySnapshot {
+        /// Explicit ignored file/symlink inputs to bind in addition to tracked and non-ignored untracked files.
+        #[arg(long = "include-ignored")]
+        include_ignored: Vec<PathBuf>,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -147,6 +157,16 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::RepositorySnapshot {
+            include_ignored,
+            output,
+        } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            repository_snapshot::run(&root, include_ignored, output)?;
         }
     }
     Ok(())
