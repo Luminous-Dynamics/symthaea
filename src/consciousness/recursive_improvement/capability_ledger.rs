@@ -149,7 +149,7 @@ impl CapabilityForecast {
         let encoded =
             serde_json::to_vec(self).map_err(|_| CapabilityLedgerError::InvalidForecast)?;
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"MAGI_CAPABILITY_FORECAST_COMMITMENT_V1\\0");
+        hasher.update(b"MAGI_CAPABILITY_FORECAST_COMMITMENT_V1\0");
         hasher.update(&(encoded.len() as u64).to_be_bytes());
         hasher.update(&encoded);
         Ok(hasher.finalize().to_hex().to_string())
@@ -983,34 +983,34 @@ mod tests {
         probability: f64,
         actual: bool,
     ) {
-        ledger
-            .record_forecast(CapabilityForecast {
-                forecast_id: id.to_string(),
-                claim_id: "rust-debugging".to_string(),
-                claim_sha256: "f".repeat(64),
-                subject: subject(),
-                sequence: forecast_seq,
-                context_id: format!("frozen-context-{id}"),
-                split,
-                predicted_success_probability: probability,
-                expected_compute_units: 10.0,
-                predicted_failure_mode: Some("Missing compiler feature context".to_string()),
-            })
-            .unwrap();
-        ledger
-            .resolve_verified_forecast(test_verified_receipt(&ledger, CapabilityOutcomeReceipt {
-                forecast_id: id.to_string(),
+        let forecast = CapabilityForecast {
+            forecast_id: id.to_string(),
+            claim_id: "rust-debugging".to_string(),
+            claim_sha256: "f".repeat(64),
+            subject: subject(),
+            sequence: forecast_seq,
+            context_id: format!("frozen-context-{id}"),
+            split,
+            predicted_success_probability: probability,
+            expected_compute_units: 10.0,
+            predicted_failure_mode: Some("Missing compiler feature context".to_string()),
+        };
+        ledger.record_forecast(forecast).unwrap();
+
+        let receipt = CapabilityOutcomeReceipt {
+            forecast_id: id.to_string(),
             forecast_commitment_blake3: "0".repeat(64),
-                subject: subject(),
-                sequence: forecast_seq + 1,
-                observed_success: actual,
-                split,
-                evaluator_identity: "independent-qualification-runner".to_string(),
-                evaluator_revision: "v1".to_string(),
-                receipt_sha256: format!("{:064x}", forecast_seq + 1),
-                actual_compute_units: Some(12.0),
-            }))
-            .unwrap();
+            subject: subject(),
+            sequence: forecast_seq + 1,
+            observed_success: actual,
+            split,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            receipt_sha256: format!("{:064x}", forecast_seq + 1),
+            actual_compute_units: Some(12.0),
+        };
+        let verified = test_verified_receipt(ledger, receipt);
+        ledger.resolve_verified_forecast(verified).unwrap();
     }
 
     #[test]
