@@ -614,6 +614,20 @@ impl MeasurementEnvelope {
         if resolved.standard_uncertainty > policy.max_calibration_standard_uncertainty {
             return Err(AssessmentFailure::CalibrationUncertaintyExceeded);
         }
+        let certificate_claims = verified_calibration.certificate_claims();
+        let reviewer_authorization = verified_calibration
+            .review_receipt()
+            .reviewer_authorization()
+            .cloned()
+            .ok_or(AssessmentFailure::CalibrationReviewAuthorizationMissing)?;
+        let calibration_provider_id =
+            certificate_claims.calibration_provider_id().to_owned();
+        let calibration_procedure_id =
+            certificate_claims.calibration_procedure_id().to_owned();
+        let calibration_reference_standard = verified_calibration
+            .reference_standard()
+            .reference()
+            .clone();
 
         Ok(MeasurementAssessment {
             instrument: self.identity.clone(),
@@ -629,6 +643,10 @@ impl MeasurementEnvelope {
             calibration_record_id: resolved.record_id.clone(),
             calibration_evidence: resolved.evidence.clone(),
             calibration_review_receipt: resolved.review_receipt.clone(),
+            calibration_provider_id,
+            calibration_procedure_id,
+            calibration_reference_standard,
+            calibration_review_authorization: reviewer_authorization,
             calibration_range_min_value: resolved.range_min_value,
             calibration_range_max_value: resolved.range_max_value,
             raw_data: resolved_raw,
@@ -1005,6 +1023,10 @@ pub struct MeasurementAssessment {
     calibration_record_id: String,
     calibration_evidence: ArtifactReference,
     calibration_review_receipt: ArtifactReference,
+    calibration_provider_id: String,
+    calibration_procedure_id: String,
+    calibration_reference_standard: ArtifactReference,
+    calibration_review_authorization: VerifiedReviewerAuthorization,
     calibration_range_min_value: f64,
     calibration_range_max_value: f64,
     raw_data: ResolvedRawData,
@@ -1031,6 +1053,18 @@ impl MeasurementAssessment {
     pub fn calibration_review_receipt(&self) -> &ArtifactReference {
         &self.calibration_review_receipt
     }
+    pub fn calibration_provider_id(&self) -> &str {
+        &self.calibration_provider_id
+    }
+    pub fn calibration_procedure_id(&self) -> &str {
+        &self.calibration_procedure_id
+    }
+    pub fn calibration_reference_standard(&self) -> &ArtifactReference {
+        &self.calibration_reference_standard
+    }
+    pub fn calibration_review_authorization(&self) -> &VerifiedReviewerAuthorization {
+        &self.calibration_review_authorization
+    }
     pub fn calibration_range(&self) -> (f64, f64) {
         (self.calibration_range_min_value, self.calibration_range_max_value)
     }
@@ -1050,6 +1084,7 @@ pub enum AssessmentFailure {
     RawDataEvidenceUnresolved(String),
     RawDataReferenceMismatch,
     CalibrationEvidenceUnresolved(String),
+    CalibrationReviewAuthorizationMissing,
     CalibrationReferenceMismatch,
     CalibrationInstrumentMismatch,
     CalibrationUnitMismatch,

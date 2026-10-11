@@ -926,9 +926,33 @@ fn assessment_passes_only_with_resolved_applicable_calibration_and_complete_prov
         (4_000_000.0, 6_000_000.0)
     );
     assert_eq!(assessment.calibration_review_receipt().artifact_id(), "independent-review-receipt");
+    assert_eq!(assessment.calibration_provider_id(), "calibration-lab-01");
+    assert_eq!(
+        assessment.calibration_procedure_id(),
+        "ultrasound-frequency-procedure-v1"
+    );
+    assert_eq!(
+        assessment.calibration_reference_standard().artifact_id(),
+        "reference-standard-01"
+    );
+    let review_authorization = assessment.calibration_review_authorization();
+    assert_eq!(review_authorization.reviewer_id(), "fixture-reviewer-person-01");
+    assert_eq!(
+        review_authorization.reviewer_organization_id(),
+        "independent-calibration-lab-01"
+    );
+    assert_eq!(
+        review_authorization.provider_organization_id(),
+        assessment.calibration_provider_id()
+    );
+    assert_eq!(review_authorization.policy_sha256().len(), 64);
     assert_eq!(assessment.raw_data().artifact().artifact_id(), "raw-acquisition-1");
     assert_eq!(assessment.raw_data().byte_length(), 4_096);
     assert_eq!(assessment.raw_data().media_type(), "application/octet-stream");
+    assert_eq!(
+        assessment.raw_data().source_version_id(),
+        "fixture-object-version:raw-acquisition-1:v1"
+    );
 }
 
 #[test]
