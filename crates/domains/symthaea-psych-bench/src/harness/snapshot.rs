@@ -285,6 +285,7 @@ pub enum SnapshotComparisonError {
         benchmark: String,
         metric: String,
     },
+    InvalidThresholdPolicy,
 }
 
 impl std::fmt::Display for SnapshotComparisonError {
@@ -314,6 +315,10 @@ impl std::fmt::Display for SnapshotComparisonError {
             Self::NearZeroBaseline { benchmark, metric } => write!(
                 f,
                 "baseline metric {benchmark:?}/{metric:?} is near zero; percentage regression comparison is not qualified"
+            ),
+            Self::InvalidThresholdPolicy => write!(
+                f,
+                "regression thresholds must be finite and non-negative, with critical_pct greater than warning_pct"
             ),
         }
     }
@@ -441,6 +446,14 @@ impl RegressionReport {
         warning_pct: f64,
         critical_pct: f64,
     ) -> Result<Self, SnapshotComparisonError> {
+        if !warning_pct.is_finite()
+            || warning_pct < 0.0
+            || !critical_pct.is_finite()
+            || critical_pct <= warning_pct
+        {
+            return Err(SnapshotComparisonError::InvalidThresholdPolicy);
+        }
+
         for (side, snapshot) in [("baseline", baseline), ("current", current)] {
             if snapshot.schema_version != SNAPSHOT_SCHEMA_VERSION {
                 return Err(SnapshotComparisonError::UnsupportedSchemaVersion {
@@ -765,6 +778,26 @@ mod strict_population_tests {
                 metric: "accuracy".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn strict_comparison_rejects_invalid_threshold_policy() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)])]);
+        for (warning, critical) in [
+            (f64::NAN, 0.10),
+            (-0.01, 0.10),
+            (0.05, f64::INFINITY),
+            (0.10, 0.05),
+            (0.05, 0.05),
+        ] {
+            assert_eq!(
+                RegressionReport::compare_strict_metric_population(
+                    &baseline, &current, warning, critical
+                ).unwrap_err(),
+                SnapshotComparisonError::InvalidThresholdPolicy
+            );
+        }
     }
 
     #[test]
