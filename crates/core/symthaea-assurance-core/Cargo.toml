@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-assurance-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Generic claim-evidence qualification kernel for Symthaea assurance"
+
+[dependencies]
+sha2 = { workspace = true }
+thiserror = { workspace = true }
