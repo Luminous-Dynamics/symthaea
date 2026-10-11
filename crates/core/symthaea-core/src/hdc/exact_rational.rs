@@ -736,6 +736,36 @@ mod tests {
     }
 
     #[test]
+    fn numeric_tower_import_round_trips_fixed_width_integer_edges() {
+        let limit = budget(128);
+        let values = [
+            Number::Natural(0),
+            Number::Natural(u64::MAX),
+            Number::Integer(i64::MIN),
+            Number::Integer(-1),
+            Number::Rational { numerator: i64::MIN, denominator: i64::MAX },
+            Number::Rational { numerator: 7, denominator: 9 },
+        ];
+
+        for original in values {
+            let exact = ExactRational::try_from_number_exact(&original, limit).unwrap();
+            let narrowed = exact.try_to_number().unwrap();
+            // Natural / Integer values preserve their exact variant where the
+            // tower representation is canonical. Rational integer-like values
+            // intentionally narrow to the narrower integer domain.
+            match original {
+                Number::Rational { numerator: 7, denominator: 9 } => {
+                    assert_eq!(narrowed, Number::Rational { numerator: 7, denominator: 9 });
+                }
+                Number::Rational { numerator: i64::MIN, denominator: i64::MAX } => {
+                    assert_eq!(narrowed, Number::Rational { numerator: i64::MIN, denominator: i64::MAX });
+                }
+                other => assert_eq!(narrowed, other),
+            }
+        }
+    }
+
+    #[test]
     fn exact_numeric_tower_adapter_rejects_approximation_and_narrowing() {
         let limit = budget(256);
         assert_eq!(
@@ -776,6 +806,22 @@ mod tests {
 
         let zero = ExactRational::from_integer("0", limit).unwrap();
         assert_eq!(zero.to_f64_approx(), Some(0.0));
+    }
+
+    #[test]
+    fn exact_numeric_import_rejects_malformed_rational_and_real_nan() {
+        let limit = budget(64);
+        assert_eq!(
+            ExactRational::try_from_number_exact(
+                &Number::Rational { numerator: 1, denominator: 0 },
+                limit,
+            ).unwrap_err(),
+            ExactRationalError::ZeroDenominator
+        );
+        assert_eq!(
+            ExactRational::try_from_number_exact(&Number::Real(f64::NAN), limit).unwrap_err(),
+            ExactRationalError::ApproximateInput
+        );
     }
 
     #[test]
