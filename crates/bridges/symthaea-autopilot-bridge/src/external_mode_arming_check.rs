@@ -1554,16 +1554,32 @@ mod tests {
     }
 
     fn arming_request(valid_mask: u32) -> Px4ExternalModeArmingCheckRequestV1 {
+        arming_request_in_window(
+            8,
+            1_200_000,
+            "arming-check.fixture.cycle-1",
+            valid_mask,
+            1_300_000_000,
+        )
+    }
+
+    fn arming_request_in_window(
+        request_id: u8,
+        source_timestamp_us_raw: u64,
+        capture_window_id: &str,
+        valid_mask: u32,
+        received_ns: u64,
+    ) -> Px4ExternalModeArmingCheckRequestV1 {
         Px4ExternalModeArmingCheckRequestV1::new(
             "px4.arming-check.decoder.fixture.v1",
             "vehicle.slot-a",
             "px4.v1.18.external-mode.fixture.v1",
             "px4.boot.fixture.session-a",
-            "arming-check.fixture.cycle-1",
-            1_200_000,
-            8,
+            capture_window_id,
+            source_timestamp_us_raw,
+            request_id,
             valid_mask,
-            ts(1_300_000_000),
+            ts(received_ns),
         )
         .unwrap()
     }
@@ -1593,7 +1609,39 @@ mod tests {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     fn arming_reply_with_diagnostics(
+        req_id: u8,
+        registration_id: u8,
+        local_alt: bool,
+        received_ns: u64,
+        source_timestamp_us_raw: u64,
+        health_component_index: u8,
+        health_component_is_present: bool,
+        health_component_warning: bool,
+        health_component_error: bool,
+        num_events: u8,
+        events: [Px4ExternalModeArmingCheckEventV1; PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+    ) -> Result<Px4ExternalModeArmingCheckReplyV1, Px4ExternalModeArmingCheckError> {
+        arming_reply_in_window_with_diagnostics(
+            "arming-check.fixture.cycle-1",
+            req_id,
+            registration_id,
+            local_alt,
+            received_ns,
+            source_timestamp_us_raw,
+            health_component_index,
+            health_component_is_present,
+            health_component_warning,
+            health_component_error,
+            num_events,
+            events,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn arming_reply_in_window_with_diagnostics(
+        capture_window_id: &str,
         req_id: u8,
         registration_id: u8,
         local_alt: bool,
@@ -1611,7 +1659,7 @@ mod tests {
             "vehicle.slot-a",
             "px4.v1.18.external-mode.fixture.v1",
             "px4.boot.fixture.session-a",
-            "arming-check.fixture.cycle-1",
+            capture_window_id,
             source_timestamp_us_raw,
             req_id,
             registration_id,
@@ -1637,6 +1685,12 @@ mod tests {
     }
 
     fn profile() -> Px4ExternalModeArmingCheckProfileV1 {
+        profile_with_window("arming-check.fixture.cycle-1")
+    }
+
+    fn profile_with_window(
+        capture_window_id: &str,
+    ) -> Px4ExternalModeArmingCheckProfileV1 {
         Px4ExternalModeArmingCheckProfileV1::new(
             "px4.external-mode.arming-check.fixture.v1",
             "vehicle.slot-a",
@@ -1644,7 +1698,7 @@ mod tests {
             "px4.registration.decoder.fixture.v1",
             "px4.arming-check.decoder.fixture.v1",
             "px4.boot.fixture.session-a",
-            "arming-check.fixture.cycle-1",
+            capture_window_id,
             clock(),
             2_000_000_000,
             300_000_000,
@@ -2077,14 +2131,118 @@ mod tests {
         mutated_health.health_component_warning = false;
         assert_eq!(
             mutated_health.validate().unwrap_err(),
-            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply")
+            Px4ExternalModeArmingCheckError::DigestMismatch(
+                "arming-check source payload",
+            )
         );
 
         let mut mutated_event = reply;
         mutated_event.events[0].arguments[24] ^= 1;
         assert_eq!(
             mutated_event.validate().unwrap_err(),
-            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply")
+            Px4ExternalModeArmingCheckError::DigestMismatch(
+                "arming-check source payload",
+            )
+        );
+    }
+
+    #[test]
+    fn duplicate_captures_share_source_fingerprint_but_keep_distinct_observation_ids() {
+        let events = [
+            Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+        ];
+        let first = arming_reply_with_diagnostics(
+            8, 3, false, 1_350_000_000, 1_250_000, 0, false, false, false, 0, events,
+        )
+        .unwrap();
+        let duplicate = arming_reply_with_diagnostics(
+            8, 3, false, 1_360_000_000, 1_250_000, 0, false, false, false, 0, events,
+        )
+        .unwrap();
+
+        assert_eq!(
+            first.source_payload_fingerprint_hex().unwrap(),
+            duplicate.source_payload_fingerprint_hex().unwrap()
+        );
+        assert_ne!(first.reply_digest_hex, duplicate.reply_digest_hex);
+        assert_ne!(first.received_at.nanoseconds, duplicate.received_at.nanoseconds);
+        first.validate().unwrap();
+        duplicate.validate().unwrap();
+    }
+
+    #[test]
+    fn request_id_wraparound_does_not_override_source_timestamp() {
+        // A u8 request ID is reusable after wraparound. Here both observations carry
+        // request_id=0, and the old payload is mislabeled into the new capture window.
+        // The PX4 source timestamp still proves that it predates the new request.
+        let window = "arming-check.fixture.cycle-after-wrap";
+        let request = arming_request_in_window(0, 1_500_000, window, 1 << 3, 1_300_000_000);
+        let previous_cycle_reply = arming_reply_in_window_with_diagnostics(
+            window,
+            0,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            0,
+            [
+                Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            Px4ExternalModeArmingCheckAssessmentV1::new(
+                profile_with_window(window),
+                registration(true, 3, 42),
+                config_assessment(42, true, 0, 1_200_000_000),
+                request,
+                Some(previous_cycle_reply),
+                ts(1_400_000_000),
+            )
+            .unwrap_err(),
+            Px4ExternalModeArmingCheckError::ReplySourceTimestampRegression
+        );
+    }
+
+    #[test]
+    fn reply_from_another_capture_window_is_rejected() {
+        let previous_window_reply = arming_reply_in_window_with_diagnostics(
+            "arming-check.fixture.previous-cycle",
+            8,
+            3,
+            false,
+            1_350_000_000,
+            1_250_000,
+            0,
+            false,
+            false,
+            false,
+            0,
+            [
+                Px4ExternalModeArmingCheckEventV1::default();
+                PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            Px4ExternalModeArmingCheckAssessmentV1::new(
+                profile(),
+                registration(true, 3, 42),
+                config_assessment(42, true, 0, 1_200_000_000),
+                arming_request(1 << 3),
+                Some(previous_window_reply),
+                ts(1_400_000_000),
+            )
+            .unwrap_err(),
+            Px4ExternalModeArmingCheckError::CaptureWindowMismatch
         );
     }
 
