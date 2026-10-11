@@ -90,6 +90,8 @@ pub enum NeuronStepError {
     NonFiniteInput { index: usize },
     /// A non-finite state component would poison future temporal state.
     NonFiniteState { index: usize },
+    /// Evolution produced a non-finite state; the checked path restores the prior state.
+    NonFiniteOutput { index: usize },
     /// A deserialized or corrupted internal parameter vector has the wrong dimension.
     ParameterDimensionMismatch {
         field: &'static str,
@@ -119,6 +121,9 @@ impl std::fmt::Display for NeuronStepError {
             }
             Self::NonFiniteState { index } => {
                 write!(f, "state component {index} is not finite")
+            }
+            Self::NonFiniteOutput { index } => {
+                write!(f, "evolution produced a non-finite state component at index {index}; state was rolled back")
             }
             Self::ParameterDimensionMismatch { field, expected, actual } => {
                 write!(
@@ -222,11 +227,13 @@ impl HdcLtcUnifiedNeuron {
 
     /// Validated CfC step for inputs crossing a trust or data-quality boundary.
     ///
-    /// The preflight rejects invalid time increments/configuration, dimension mismatches,
-    /// corrupt parameter vectors, and non-finite input/state before mutating the neuron.
-    /// A zero time increment is a no-op. The preflight performs
-    /// an additional O(D) scan; callers that have already validated inputs can use the
-    /// allocation-free `evolve_closed_form_fused` hot path directly.
+    /// The checked boundary path rejects invalid time increments/configuration, dimension
+    /// mismatches, corrupt parameter vectors, and non-finite input/state before evolution.
+    /// It snapshots the prior state and counters, then verifies the result remains finite;
+    /// arithmetic overflow returns `NonFiniteOutput` and rolls back the checked call.
+    /// A zero time increment is a no-op. Snapshotting and validation add O(D) work and one
+    /// state clone, so callers with validated, well-scaled data can use the allocation-free
+    /// `evolve_closed_form_fused` hot path directly.
     pub fn try_evolve_closed_form_fused(
         &mut self,
         dt: f32,
@@ -300,7 +307,17 @@ impl HdcLtcUnifiedNeuron {
             return Ok(());
         }
 
+        let state_before = self.state.clone();
+        let total_time_before = self.total_time;
+        let update_count_before = self.update_count;
+
         self.evolve_closed_form_fused(dt, input);
+        if let Some(index) = self.state.values.iter().position(|value| !value.is_finite()) {
+            self.state = state_before;
+            self.total_time = total_time_before;
+            self.update_count = update_count_before;
+            return Err(NeuronStepError::NonFiniteOutput { index });
+        }
         Ok(())
     }
 
@@ -325,9 +342,10 @@ impl HdcLtcUnifiedNeuron {
         let gating_steepness = self.config.gating_steepness;
         let dt_clamped = dt;
 
-        // Fuse the post-update L2-bound reduction into the main O(D) update pass.
-        // If the bound is not crossed, this avoids a separate read of the whole state.
-        let mut state_norm_sq = 0.0_f32;
+        // Stable scaled sum-of-squares avoids overflow for large finite components.
+        // Accumulation is fused into the update pass; the state is revisited only if clipping is needed.
+        let mut state_norm_scale = 0.0_f32;
+        let mut state_norm_ssq = 0.0_f32;
         match self.config.activation {
             Activation::Tanh => {
                 for i in 0..dim {
@@ -375,7 +393,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite(), "Evolved state value must be finite");
                     self.state.values[i] = new_h_i;
-                    state_norm_sq += new_h_i * new_h_i;
+                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
                 }
             }
             Activation::Sigmoid => {
@@ -400,7 +418,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    state_norm_sq += new_h_i * new_h_i;
+                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
                 }
             }
             Activation::SiLU => {
@@ -425,7 +443,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    state_norm_sq += new_h_i * new_h_i;
+                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
                 }
             }
             Activation::Identity => {
@@ -450,7 +468,7 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    state_norm_sq += new_h_i * new_h_i;
+                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
                 }
             }
             Activation::BoundedTanh { bound } => {
@@ -476,14 +494,16 @@ impl HdcLtcUnifiedNeuron {
                     let new_h_i = (1.0 - sigma_i) * h_i + sigma_i * x_inf_i;
                     debug_assert!(new_h_i.is_finite());
                     self.state.values[i] = new_h_i;
-                    state_norm_sq += new_h_i * new_h_i;
+                    update_scaled_sum_squares(new_h_i, &mut state_norm_scale, &mut state_norm_ssq);
                 }
             }
         }
 
-        let state_norm = state_norm_sq.sqrt();
-        if state_norm > 5.0 {
-            self.state.scale_in_place(5.0 / state_norm);
+        let normalized_sum_squares = state_norm_ssq.sqrt();
+        if state_norm_scale > 0.0 && state_norm_scale > 5.0 / normalized_sum_squares {
+            // Divide in this order to avoid overflowing state_norm_scale * normalized_sum_squares.
+            let scale_factor = (5.0 / state_norm_scale) / normalized_sum_squares;
+            self.state.scale_in_place(scale_factor);
         }
         self.update_stats(dt);
     }
@@ -575,6 +595,26 @@ fn sigmoid(x: f32) -> f32 {
 #[inline(always)]
 fn silu(x: f32) -> f32 {
     x * sigmoid(x)
+}
+
+/// Accumulate a component into a scaled sum-of-squares (LASSQ-style) norm.
+///
+/// Keeps intermediate squares bounded even when finite state components are too large
+/// for direct `value * value` accumulation in f32.
+#[inline(always)]
+fn update_scaled_sum_squares(value: f32, scale: &mut f32, sum_squares: &mut f32) {
+    let absolute = value.abs();
+    if absolute == 0.0 {
+        return;
+    }
+    if *scale < absolute {
+        let ratio = *scale / absolute;
+        *sum_squares = 1.0 + *sum_squares * ratio * ratio;
+        *scale = absolute;
+    } else {
+        let ratio = absolute / *scale;
+        *sum_squares += ratio * ratio;
+    }
 }
 
 /// Stable CfC interpolation coefficient: 1 - exp(-dt / tau).
@@ -738,6 +778,44 @@ mod tests {
             assert!(stable.is_finite() && (0.0..=1.0).contains(&stable));
             assert!((stable - direct).abs() < 2.0e-6);
         }
+    }
+
+    #[test]
+    fn checked_step_rolls_back_when_finite_values_overflow_during_evolution() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(small_config(), 42);
+        neuron.state.values.fill(2.0);
+        neuron.weight_hv.values.fill(f32::MAX);
+        neuron.input_mask.values.fill(-f32::MAX);
+        let input = ContinuousHV::from_values(vec![2.0; 256]);
+        let state_before = neuron.state().clone();
+        let time_before = neuron.total_time();
+        let updates_before = neuron.update_count();
+
+        assert_eq!(
+            neuron.try_evolve_closed_form_fused(0.1, &input),
+            Err(NeuronStepError::NonFiniteOutput { index: 0 })
+        );
+        assert_eq!(neuron.state(), &state_before);
+        assert_eq!(neuron.total_time(), time_before);
+        assert_eq!(neuron.update_count(), updates_before);
+    }
+
+    #[test]
+    fn fused_state_bound_does_not_overflow_on_large_finite_components() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(small_config(), 42);
+        neuron.set_state(ContinuousHV::from_values(vec![1.0e20_f32; 256]));
+        let input = ContinuousHV::new(256);
+
+        assert_eq!(
+            neuron.try_evolve_closed_form_fused(1.0e-6, &input),
+            Ok(())
+        );
+        let norm = neuron.state().norm();
+        assert!(norm.is_finite(), "clipped state norm must be finite, got {norm}");
+        assert!(
+            (norm - 5.0).abs() < 1.0e-3,
+            "finite extreme state should be clipped to norm 5, got {norm}"
+        );
     }
 
     // ── Forward evolution ──────────────────────────────────────────────────
