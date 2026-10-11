@@ -330,14 +330,11 @@ fn lebedev_50() -> Vec<(f64, f64, f64, f64)> {
     pts
 }
 
-
-/**
- * Expand a symmetry orbit from the Lebedev–Laikov tables.
- * The orbit code follows PySCF's SphGenOh convention: 0 (axes), 2 (cube
- * corners), 3 (two equal coordinates), 4 (one zero coordinate), and 5
- * (three distinct coordinates). We emit normalized weights summing to 1;
- * the radial quadrature supplies the missing 4π solid-angle factor.
- */
+/// Expand a symmetry orbit from the Lebedev–Laikov tables.
+/// The orbit code follows PySCF's SphGenOh convention: 0 (axes), 2 (cube
+/// corners), 3 (two equal coordinates), 4 (one zero coordinate), and 5
+/// (three distinct coordinates). We emit normalized weights summing to 1;
+/// the radial quadrature supplies the missing 4π solid-angle factor.
 fn lebedev_orbit(code: u8, a: f64, b: f64, weight: f64) -> Vec<(f64, f64, f64, f64)> {
     let mut points = Vec::new();
     let signs = [1.0_f64, -1.0_f64];
