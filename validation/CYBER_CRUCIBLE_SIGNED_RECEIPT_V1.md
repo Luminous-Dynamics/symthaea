@@ -64,7 +64,7 @@ CLI example (paths are operator-controlled where noted):
       --expected-context /protected/run/expected-context.json \
       --replay-db /protected/state/receipt-replay.sqlite3
 
-The JSON response includes \`signature_verified: true\`, policy identity, receipt bindings, and \`non_authorizing: true\`. It is a local verifier result, not itself a signed verifier receipt, and must not be consumed as operational authorization. An upstream verifier service should sign and audit its own redacted verification decision.
+The JSON response includes \`signature_verified: true\`, policy identity and digest, receipt bindings, \`replay_checked: true\`, and \`non_authorizing: true\`. The library API rejects receipt acceptance when no persistent replay ledger is supplied. The CLI always requires an explicit ledger path. The output is a local verifier result, not itself a signed verifier receipt, and must not be consumed as operational authorization. An upstream verifier service should sign and audit its own redacted verification decision.
 
 ## Security and evidence limits
 
