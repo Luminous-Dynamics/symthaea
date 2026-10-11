@@ -58,12 +58,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tmp="$(mktemp -d)"
-          trap 'rm -rf "$tmp"' EXIT
-          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$tmp/self-test-a.json"
-          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$tmp/self-test-b.json"
-          cmp "$tmp/self-test-a.json" "$tmp/self-test-b.json"
-          python3 - "$tmp/self-test-a.json" <<'PY'
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          mkdir -p "$reports"
+          git rev-parse HEAD > "$reports/commit_sha.txt"
+          git hash-object scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_git_blob_sha.txt"
+          sha256sum scripts/engineering/validate_orbital_ring_failure_manifest.py > "$reports/validator_sha256.txt"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$reports/self-test-a.json"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$reports/self-test-b.json"
+          cmp "$reports/self-test-a.json" "$reports/self-test-b.json"
+          cp "$reports/self-test-a.json" "$reports/self-test.json"
+          python3 - "$reports/self-test.json" <<'PY'
           import json
           import sys
 
@@ -84,11 +88,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tmp="$(mktemp)"
-          trap 'rm -f "$tmp"' EXIT
-          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json > "$tmp"
-          cmp "$tmp" docs/engineering/evidence/f_skyhook_load_step_manifest_validation.json
-          python3 - "$tmp" <<'PY'
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json > "$reports/manifest-validation.json"
+          cmp "$reports/manifest-validation.json" docs/engineering/evidence/f_skyhook_load_step_manifest_validation.json
+          python3 - "$reports/manifest-validation.json" <<'PY'
           import json
           import sys
 
@@ -102,6 +105,15 @@ jobs:
           assert report["physics_claim"].startswith("none;"), report
           print("scenario manifest structurally valid and correctly remains Blocked/NotRun")
           PY
+
+      - name: Preserve exact validator evidence and source fingerprints
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbital-ring-contract-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/orbital-ring-contract-evidence
+          if-no-files-found: error
+          retention-days: 90
 
   governance:
     name: Governance Check (Class A/B Changes)
