@@ -135,11 +135,7 @@ pub struct CapabilityForecast {
     pub predicted_failure_mode: Option<String>,
 }
 
-/// Outcome evidence linked to one previously recorded forecast.
-///
-/// The receipt's evaluator identity/revision must match an externally configured
-/// QualificationPolicy. receipt_sha256 is an evidence root/reference, not a signature; the
-/// evidence pipeline must independently authenticate and verify it before admission.
+/// Untrusted outcome receipt payload. Digest shape and evaluator labels are data, not proof.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CapabilityOutcomeReceipt {
     pub forecast_id: String,
@@ -151,6 +147,42 @@ pub struct CapabilityOutcomeReceipt {
     pub evaluator_revision: String,
     pub receipt_sha256: String,
     pub actual_compute_units: Option<f64>,
+}
+
+/// Opaque qualification-admission token. It intentionally has private fields and no serde
+/// implementation, so callers cannot create one by supplying a digest or deserializing a claim.
+/// Only this module and its descendants (the future independent verifier and unit tests) can
+/// issue the token. The verifier must authenticate artifacts/signatures before issuance; this
+/// wrapper is an API boundary, not a cryptographic primitive.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedCapabilityOutcomeReceipt {
+    receipt: CapabilityOutcomeReceipt,
+    verifier_identity: String,
+    verifier_revision: String,
+    verification_root_sha256: String,
+}
+
+impl VerifiedCapabilityOutcomeReceipt {
+    fn from_verified_pipeline(
+        receipt: CapabilityOutcomeReceipt,
+        verifier_identity: impl Into<String>,
+        verifier_revision: impl Into<String>,
+        verification_root_sha256: impl Into<String>,
+    ) -> Result<Self, CapabilityLedgerError> {
+        let verified = Self {
+            receipt,
+            verifier_identity: verifier_identity.into(),
+            verifier_revision: verifier_revision.into(),
+            verification_root_sha256: verification_root_sha256.into(),
+        };
+        if !non_empty(&verified.verifier_identity)
+            || !non_empty(&verified.verifier_revision)
+            || !is_hex_digest(&verified.verification_root_sha256, &[64])
+        {
+            return Err(CapabilityLedgerError::InvalidVerificationProvenance);
+        }
+        Ok(verified)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -180,6 +212,9 @@ pub struct QualificationPolicy {
     pub maximum_expected_calibration_error: f64,
     pub trusted_evaluator_identity: String,
     pub trusted_evaluator_revisions: Vec<String>,
+    /// Exact independent receipt-verifier identity/revision accepted for qualification.
+    pub trusted_verifier_identity: String,
+    pub trusted_verifier_revisions: Vec<String>,
 }
 
 impl QualificationPolicy {
@@ -193,18 +228,27 @@ impl QualificationPolicy {
             || !non_empty(&self.trusted_evaluator_identity)
             || self.trusted_evaluator_revisions.is_empty()
             || self.trusted_evaluator_revisions.iter().any(|r| !non_empty(r))
+            || !non_empty(&self.trusted_verifier_identity)
+            || self.trusted_verifier_revisions.is_empty()
+            || self.trusted_verifier_revisions.iter().any(|r| !non_empty(r))
         {
             return Err(CapabilityLedgerError::InvalidQualificationPolicy);
         }
         Ok(())
     }
 
-    fn accepts(&self, receipt: &CapabilityOutcomeReceipt) -> bool {
+    fn accepts(&self, verified: &VerifiedCapabilityOutcomeReceipt) -> bool {
+        let receipt = &verified.receipt;
         receipt.evaluator_identity == self.trusted_evaluator_identity
             && self
                 .trusted_evaluator_revisions
                 .iter()
                 .any(|revision| revision == &receipt.evaluator_revision)
+            && verified.verifier_identity == self.trusted_verifier_identity
+            && self
+                .trusted_verifier_revisions
+                .iter()
+                .any(|revision| revision == &verified.verifier_revision)
             && receipt.split.may_qualify()
     }
 }
@@ -225,6 +269,7 @@ pub enum CapabilityLedgerError {
     SequenceNotMonotonic,
     SplitMismatch,
     InvalidOutcomeReceipt,
+    InvalidVerificationProvenance,
     ReceiptReplay,
     InvalidQualificationPolicy,
     InsufficientEvidence,
@@ -242,7 +287,7 @@ impl std::error::Error for CapabilityLedgerError {}
 #[derive(Debug, Clone)]
 struct ForecastRecord {
     forecast: CapabilityForecast,
-    receipt: Option<CapabilityOutcomeReceipt>,
+    receipt: Option<VerifiedCapabilityOutcomeReceipt>,
 }
 
 /// In-memory ledger pinned to one exact subject identity.
@@ -399,14 +444,17 @@ impl CapabilityLedger {
         Ok(())
     }
 
-    /// Resolve a forecast only with later, subject-matched, split-matched evidence.
+    /// Resolve a forecast only through the opaque token issued by the independent verifier.
     ///
-    /// This checks chronology and bindings, not receipt authenticity. Only admit receipts after
-    /// independent verification by the external evidence pipeline.
-    pub fn resolve_forecast(
+    /// Raw CapabilityOutcomeReceipt values cannot qualify a claim: matching evaluator labels and
+    /// a caller-supplied digest do not authenticate an execution artifact. Until the reviewed
+    /// verifier path can issue VerifiedCapabilityOutcomeReceipt, production qualification fails
+    /// closed.
+    pub fn resolve_verified_forecast(
         &mut self,
-        receipt: CapabilityOutcomeReceipt,
+        verified: VerifiedCapabilityOutcomeReceipt,
     ) -> Result<(), CapabilityLedgerError> {
+        let receipt = &verified.receipt;
         receipt.subject.validate()?;
         if receipt.subject != self.subject {
             return Err(CapabilityLedgerError::SubjectMismatch);
@@ -414,19 +462,21 @@ impl CapabilityLedger {
         if !non_empty(&receipt.evaluator_identity)
             || !non_empty(&receipt.evaluator_revision)
             || !is_hex_digest(&receipt.receipt_sha256, &[64])
-            || receipt
-                .actual_compute_units
-                .is_some_and(|cost| !cost.is_finite() || cost < 0.0)
+            || receipt.actual_compute_units.is_some_and(|cost| !cost.is_finite() || cost < 0.0)
         {
             return Err(CapabilityLedgerError::InvalidOutcomeReceipt);
+        }
+        if !non_empty(&verified.verifier_identity)
+            || !non_empty(&verified.verifier_revision)
+            || !is_hex_digest(&verified.verification_root_sha256, &[64])
+        {
+            return Err(CapabilityLedgerError::InvalidVerificationProvenance);
         }
         if receipt.sequence <= self.last_sequence {
             return Err(CapabilityLedgerError::SequenceNotMonotonic);
         }
         {
-            let record = self
-                .forecasts
-                .get(&receipt.forecast_id)
+            let record = self.forecasts.get(&receipt.forecast_id)
                 .ok_or(CapabilityLedgerError::UnknownForecast)?;
             if record.receipt.is_some() {
                 return Err(CapabilityLedgerError::AlreadyResolved);
@@ -443,16 +493,16 @@ impl CapabilityLedger {
         }
         if self.forecasts.values().any(|existing| {
             existing.receipt.as_ref().is_some_and(|prior| {
-                prior.receipt_sha256 == receipt.receipt_sha256
+                prior.receipt.receipt_sha256 == receipt.receipt_sha256
+                    || prior.verification_root_sha256 == verified.verification_root_sha256
             })
         }) {
             return Err(CapabilityLedgerError::ReceiptReplay);
         }
         let sequence = receipt.sequence;
-        self.forecasts
-            .get_mut(&receipt.forecast_id)
+        self.forecasts.get_mut(&receipt.forecast_id)
             .ok_or(CapabilityLedgerError::UnknownForecast)?
-            .receipt = Some(receipt);
+            .receipt = Some(verified);
         self.last_sequence = sequence;
         Ok(())
     }
@@ -544,7 +594,7 @@ fn calculate_metrics(
     records: &[&ForecastRecord],
     total_forecast_count: usize,
 ) -> CapabilityMetrics {
-    let resolved: Vec<(&CapabilityForecast, &CapabilityOutcomeReceipt)> = records
+    let resolved: Vec<(&CapabilityForecast, &VerifiedCapabilityOutcomeReceipt)> = records
         .iter()
         .filter_map(|record| {
             record
@@ -557,11 +607,11 @@ fn calculate_metrics(
     let resolved_count = resolved.len();
     let held_out_samples = resolved
         .iter()
-        .filter(|(_, receipt)| receipt.split == CapabilitySplit::HeldOut)
+        .filter(|(_, verified)| verified.receipt.split == CapabilitySplit::HeldOut)
         .count();
     let transfer_samples = resolved
         .iter()
-        .filter(|(_, receipt)| receipt.split == CapabilitySplit::Transfer)
+        .filter(|(_, verified)| verified.receipt.split == CapabilitySplit::Transfer)
         .count();
     let qualification_samples = held_out_samples + transfer_samples;
 
@@ -584,7 +634,7 @@ fn calculate_metrics(
     let brier_score = resolved
         .iter()
         .map(|(forecast, receipt)| {
-            let observed = if receipt.observed_success { 1.0 } else { 0.0 };
+            let observed = if receipt.receipt.observed_success { 1.0 } else { 0.0 };
             (forecast.predicted_success_probability - observed).powi(2)
         })
         .sum::<f64>()
@@ -612,8 +662,7 @@ fn calculate_metrics(
     let compute_errors: Vec<f64> = resolved
         .iter()
         .filter_map(|(forecast, receipt)| {
-            receipt
-                .actual_compute_units
+            receipt.receipt.actual_compute_units
                 .map(|actual| (forecast.expected_compute_units - actual).abs())
         })
         .collect();
@@ -636,7 +685,7 @@ fn calculate_metrics(
         empirical_success_rate: Some(
             resolved
                 .iter()
-                .filter(|(_, receipt)| receipt.observed_success)
+                .filter(|(_, receipt)| receipt.receipt.observed_success)
                 .count() as f64
                 / n,
         ),
@@ -704,7 +753,23 @@ mod tests {
             maximum_expected_calibration_error: 0.15,
             trusted_evaluator_identity: "independent-qualification-runner".to_string(),
             trusted_evaluator_revisions: vec!["v1".to_string()],
+            trusted_verifier_identity: "symthaea-evidence-verifier".to_string(),
+            trusted_verifier_revisions: vec!["v1".to_string()],
         }
+    }
+
+    fn test_verified_receipt(
+        receipt: CapabilityOutcomeReceipt,
+    ) -> VerifiedCapabilityOutcomeReceipt {
+        // Synthetic unit-test admission only. Production code has no public token constructor;
+        // real issuance must be added inside the reviewed independent-verifier path.
+        VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
+            receipt,
+            "symthaea-evidence-verifier",
+            "v1",
+            "9".repeat(64),
+        )
+        .expect("fixed synthetic verifier provenance is structurally valid")
     }
 
     fn add_case(
@@ -730,7 +795,7 @@ mod tests {
             })
             .unwrap();
         ledger
-            .resolve_forecast(CapabilityOutcomeReceipt {
+            .resolve_verified_forecast(test_verified_receipt(CapabilityOutcomeReceipt {
                 forecast_id: id.to_string(),
                 subject: subject(),
                 sequence: forecast_seq + 1,
@@ -740,7 +805,7 @@ mod tests {
                 evaluator_revision: "v1".to_string(),
                 receipt_sha256: format!("{:064x}", forecast_seq + 1),
                 actual_compute_units: Some(12.0),
-            })
+            }))
             .unwrap();
     }
 
@@ -845,13 +910,13 @@ mod tests {
             actual_compute_units: None,
         };
         assert_eq!(
-            ledger.resolve_forecast(receipt.clone()),
+            ledger.resolve_verified_forecast(test_verified_receipt(receipt.clone())),
             Err(CapabilityLedgerError::SequenceNotMonotonic)
         );
         receipt.sequence = 11;
         receipt.split = CapabilitySplit::Training;
         assert_eq!(
-            ledger.resolve_forecast(receipt),
+            ledger.resolve_verified_forecast(test_verified_receipt(receipt)),
             Err(CapabilityLedgerError::SplitMismatch)
         );
     }
@@ -938,7 +1003,7 @@ mod tests {
                 })
                 .unwrap();
             ledger
-                .resolve_forecast(CapabilityOutcomeReceipt {
+                .resolve_verified_forecast(test_verified_receipt(CapabilityOutcomeReceipt {
                     forecast_id: id,
                     subject: subject(),
                     sequence: seq + 1,
@@ -948,7 +1013,7 @@ mod tests {
                     evaluator_revision: "unreviewed-revision".to_string(),
                     receipt_sha256: format!("{:064x}", seq + 1),
                     actual_compute_units: Some(10.0),
-                })
+                }))
                 .unwrap();
         }
         assert_eq!(
@@ -1064,13 +1129,13 @@ mod tests {
             actual_compute_units: None,
         };
         assert_eq!(
-            ledger.resolve_forecast(receipt.clone()),
+            ledger.resolve_verified_forecast(test_verified_receipt(receipt.clone())),
             Err(CapabilityLedgerError::SequenceNotMonotonic)
         );
 
         let mut later_receipt = receipt;
         later_receipt.sequence = 6;
-        ledger.resolve_forecast(later_receipt).unwrap();
+        ledger.resolve_verified_forecast(test_verified_receipt(later_receipt)).unwrap();
 
         assert_eq!(
             ledger.record_forecast(CapabilityForecast {
@@ -1117,7 +1182,7 @@ mod tests {
             receipt_sha256: "2".repeat(64),
             actual_compute_units: None,
         };
-        ledger.resolve_forecast(receipt.clone()).unwrap();
+        ledger.resolve_verified_forecast(test_verified_receipt(receipt.clone())).unwrap();
 
         ledger
             .record_forecast(CapabilityForecast {
@@ -1139,7 +1204,7 @@ mod tests {
             ..receipt
         };
         assert_eq!(
-            ledger.resolve_forecast(replay),
+            ledger.resolve_verified_forecast(test_verified_receipt(replay)),
             Err(CapabilityLedgerError::ReceiptReplay)
         );
     }
