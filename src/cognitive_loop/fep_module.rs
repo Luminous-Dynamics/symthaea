@@ -51,6 +51,74 @@ const TRAJECTORY_PLANNING_INTERVAL: u64 = 10;
 /// Ring buffer capacity for trajectory history.
 const TRAJECTORY_HISTORY_CAP: usize = 16;
 
+// ─── Live Cognitive-Loop Regulation Actions ────────────────────────────────
+
+/// Stable semantic identity for the four internal regulation policies owned by
+/// the live cognitive-loop FEP agent.
+///
+/// The discriminants intentionally preserve the existing raw action-index
+/// contract.  This type does not grant execution authority and is deliberately
+/// kept out of the generic `symthaea-fep` crate: these meanings belong to the
+/// cognitive-loop adapter, not to active inference in general.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum InternalRegulationAction {
+    /// Adapt learning rate from current free energy.
+    AdaptLearning = 0,
+    /// Move sensory precision back toward direct observation.
+    RefreshSensoryPrecision = 1,
+    /// Increase exploratory behavior.
+    Explore = 2,
+    /// Tighten the self-reflection trust threshold from prediction precision.
+    TightenTrust = 3,
+}
+
+impl InternalRegulationAction {
+    /// Complete ordered action domain.  Ordering is part of the compatibility
+    /// contract because the underlying FEP model and JEPA path use raw indices.
+    pub const ALL: [Self; 4] = [
+        Self::AdaptLearning,
+        Self::RefreshSensoryPrecision,
+        Self::Explore,
+        Self::TightenTrust,
+    ];
+
+    /// Raw compatibility index used by the generic FEP model.
+    pub const fn raw_index(self) -> usize {
+        self as u8 as usize
+    }
+
+    /// Stable human-readable semantic identity for telemetry/evidence.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AdaptLearning => "adapt_learning",
+            Self::RefreshSensoryPrecision => "refresh_sensory_precision",
+            Self::Explore => "explore",
+            Self::TightenTrust => "tighten_trust",
+        }
+    }
+}
+
+/// Raw FEP action index that has no declared cognitive-loop regulation meaning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidInternalRegulationActionIndex {
+    pub index: usize,
+}
+
+impl TryFrom<usize> for InternalRegulationAction {
+    type Error = InvalidInternalRegulationActionIndex;
+
+    fn try_from(index: usize) -> Result<Self, Self::Error> {
+        match index {
+            0 => Ok(Self::AdaptLearning),
+            1 => Ok(Self::RefreshSensoryPrecision),
+            2 => Ok(Self::Explore),
+            3 => Ok(Self::TightenTrust),
+            _ => Err(InvalidInternalRegulationActionIndex { index }),
+        }
+    }
+}
+
 // ─── ODE System Adapter ─────────────────────────────────────────────────────
 
 /// Wraps a generative model's transition matrix for a specific action
@@ -568,5 +636,48 @@ impl FepModule {
     /// Get the current effective blanket permeability.
     pub fn blanket_effective_permeability(&self) -> f64 {
         self.enhanced_bridge.blanket.permeability().effective
+    }
+}
+
+#[cfg(test)]
+mod internal_regulation_action_tests {
+    use super::*;
+
+    #[test]
+    fn internal_regulation_action_indices_are_stable_and_lossless() {
+        for action in InternalRegulationAction::ALL {
+            let index = action.raw_index();
+            assert_eq!(InternalRegulationAction::try_from(index), Ok(action));
+        }
+
+        assert_eq!(InternalRegulationAction::AdaptLearning.raw_index(), 0);
+        assert_eq!(
+            InternalRegulationAction::RefreshSensoryPrecision.raw_index(),
+            1
+        );
+        assert_eq!(InternalRegulationAction::Explore.raw_index(), 2);
+        assert_eq!(InternalRegulationAction::TightenTrust.raw_index(), 3);
+    }
+
+    #[test]
+    fn internal_regulation_action_rejects_out_of_domain_indices() {
+        assert_eq!(
+            InternalRegulationAction::try_from(4),
+            Err(InvalidInternalRegulationActionIndex { index: 4 })
+        );
+        assert_eq!(
+            InternalRegulationAction::try_from(usize::MAX),
+            Err(InvalidInternalRegulationActionIndex { index: usize::MAX })
+        );
+    }
+
+    #[test]
+    fn internal_regulation_action_names_are_unique() {
+        let names = InternalRegulationAction::ALL.map(InternalRegulationAction::as_str);
+        for (i, name) in names.iter().enumerate() {
+            for other in names.iter().skip(i + 1) {
+                assert_ne!(name, other);
+            }
+        }
     }
 }
