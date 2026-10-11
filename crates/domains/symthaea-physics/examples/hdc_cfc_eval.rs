@@ -1060,7 +1060,7 @@ fn main() {
             }
             None => {
                 eprintln!(
-                    "[Spacecraft] Skipped: valid labelled train/test calibration data is insufficient."
+                    "[Spacecraft] Skipped: insufficient valid train/test calibration data."
                 );
             }
         }
