@@ -259,6 +259,10 @@ impl ReviewTrustStore {
         &self,
         key_id: &str,
         policy: &ReviewAuthorizationPolicy,
+        trust_store_sequence: u64,
+        trust_store_sha256: String,
+        trust_authority_key_sha256: String,
+        verified_at_unix_s: u64,
     ) -> Result<VerifiedReviewerAuthorization, ReviewVerificationError> {
         let key = self
             .keys
@@ -292,10 +296,10 @@ impl ReviewTrustStore {
             provider_organization_id: policy.provider_organization_id.clone(),
             excluded_organization_ids: policy.excluded_organization_ids.iter().cloned().collect(),
             policy_sha256: policy.canonical_digest(),
-            trust_store_sequence: 0,
-            trust_store_sha256: String::new(),
-            trust_authority_key_sha256: String::new(),
-            verified_at_unix_s: 0,
+            trust_store_sequence,
+            trust_store_sha256,
+            trust_authority_key_sha256,
+            verified_at_unix_s,
         })
     }
 
@@ -974,17 +978,14 @@ impl VerifiedCalibrationReviewReceipt {
         )?;
         let reviewer_authorization = authorization_policy
             .map(|policy| {
-                trust_store
-                    .trust_store()
-                    .authorize_reviewer(receipt.payload().key_id(), policy)
-                    .map(|mut authorization| {
-                        authorization.trust_store_sequence = trust_store.sequence();
-                        authorization.trust_store_sha256 = trust_store.canonical_digest();
-                        authorization.trust_authority_key_sha256 =
-                            trust_store.authority_key_sha256().to_owned();
-                        authorization.verified_at_unix_s = now_unix_s;
-                        authorization
-                    })
+                trust_store.trust_store().authorize_reviewer(
+                    receipt.payload().key_id(),
+                    policy,
+                    trust_store.sequence(),
+                    trust_store.canonical_digest(),
+                    trust_store.authority_key_sha256().to_owned(),
+                    now_unix_s,
+                )
             })
             .transpose()?;
         // Rejected signatures or authorization decisions must not advance rollback state.
