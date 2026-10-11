@@ -1363,6 +1363,7 @@ jobs:
       matrix:
         crate:
           - symthaea-core
+          - symthaea-instrumentation
           - symthaea-psych-bench
           - symthaea-fep
           - symthaea-dream
