@@ -16,17 +16,19 @@
 //!
 //! Usage:
 //!   cargo run -p symthaea-logparse --example phase2_experiments --release -- \
-//!     /tmp/evtx-staged /tmp/otrf-staged
+//!     /tmp/evtx-staged /tmp/otrf-staged [--domain-invariant-ablation]
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-use symthaea_logparse::encoder::{Hdv, encode};
+use symthaea_logparse::encoder::{Hdv, encode, encode_domain_invariant};
 use symthaea_logparse::probe::{LogisticProbe, TrainConfig};
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let evtx_dir = std::env::args().nth(1).ok_or("need evtx corpus dir")?;
     let otrf_dir = std::env::args().nth(2).ok_or("need otrf corpus dir")?;
+    let run_domain_invariant_ablation =
+        std::env::args().nth(3).as_deref() == Some("--domain-invariant-ablation");
 
     let shared_labels: Vec<&str> = vec![
         "credential_access",
@@ -148,7 +150,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  chance (7 classes):          {:.3}", 1.0 / 7.0);
     println!("  Phase 1 cutoff:              0.500");
 
+    if run_domain_invariant_ablation {
+        println!("\n=== Optional ablation: domain-invariant encoder ===");
+        println!("  This is a paired experiment using the same source split seed.");
+        println!("  It is not a new headline result until run on the staged corpora.");
+
+        let sbou_di_hvs: Vec<Hdv> = sbou_events.iter().map(encode_domain_invariant).collect();
+        let otrf_di_hvs: Vec<Hdv> = otrf_events.iter().map(encode_domain_invariant).collect();
+        let (tr_hv, tr_y, te_hv, te_y) =
+            symthaea_logparse::probe::stratified_split(
+                &sbou_di_hvs, &sbou_labels, 0.8, 0xFACADE,
+            );
+        let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
+        let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
+        let di_ood = di_probe.accuracy(&otrf_di_hvs, &otrf_labels);
+        let di_macro_ood = macro_accuracy(&di_probe, &otrf_di_hvs, &otrf_labels);
+        let raw_macro_ood = macro_accuracy(&scale_up_probe, &otrf_hvs, &otrf_labels);
+
+        println!("  baseline raw in-distribution accuracy: {test_acc:.3}");
+        println!("  ablation in-distribution accuracy:      {di_in_distribution:.3}");
+        println!("  baseline raw OOD accuracy:              {ood_test_acc:.3}");
+        println!("  ablation OOD accuracy:                  {di_ood:.3}");
+        println!("  baseline raw OOD macro recall:          {raw_macro_ood:.3}");
+        println!("  ablation OOD macro recall:              {di_macro_ood:.3}");
+        println!("  Compare both accuracy and macro recall; neither alone proves detection quality.");
+    }
+
     Ok(())
+}
+
+fn macro_accuracy(probe: &LogisticProbe, hvs: &[Hdv], labels: &[String]) -> f32 {
+    if hvs.is_empty() || hvs.len() != labels.len() {
+        return f32::NAN;
+    }
+    let predictions = probe.predict_batch(hvs);
+    let mut per_class: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
+    for (label, prediction) in labels.iter().zip(predictions.iter()) {
+        let entry = per_class.entry(label.as_str()).or_insert((0, 0));
+        entry.1 += 1;
+        if probe.class_names.get(*prediction).map(String::as_str) == Some(label.as_str()) {
+            entry.0 += 1;
+        }
+    }
+    if per_class.is_empty() {
+        return f32::NAN;
+    }
+    per_class
+        .values()
+        .map(|(correct, total)| *correct as f32 / *total as f32)
+        .sum::<f32>()
+        / per_class.len() as f32
 }
 
 fn print_distribution(name: &str, labels: &[String]) {
