@@ -66,7 +66,9 @@ jobs:
       # resolver delta in this disposable runner. Restore Cargo.lock before
       # leaving the step, and keep the preceding measurement failure intact.
       - name: Diagnose Cargo.lock drift after measurement failure
-        if: steps.generate.outcome == 'failure'
+        # Explicitly override Actions' default success() so this diagnostic
+        # executes after the measurement step fails.
+        if: ${{ failure() && steps.generate.outcome == 'failure' }}
         shell: bash
         run: |
           set -euo pipefail
