@@ -35,17 +35,30 @@ class RegressionResult:
 
 
 def _read_estimate(estimate_file: Path) -> dict:
-    """Read and validate Criterion's point-estimate JSON."""
-    with open(estimate_file, encoding="utf-8") as f:
-        data = json.load(f)
+    """Read Criterion point estimates and reject malformed or non-finite data."""
+    try:
+        with open(estimate_file, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read Criterion estimates from {estimate_file}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Criterion estimates must be a JSON object: {estimate_file}")
+
+    def point_estimate(metric: str) -> float:
+        section = data.get(metric)
+        if not isinstance(section, dict):
+            raise ValueError(f"Missing or invalid '{metric}' section in {estimate_file}")
+        value = section.get("point_estimate")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
+            raise ValueError(f"Missing, non-numeric, or non-finite '{metric}' estimate in {estimate_file}")
+        return float(value)
 
     values = {
-        "mean": data.get("mean", {}).get("point_estimate"),
-        "std_dev": data.get("std_dev", {}).get("point_estimate"),
-        "median": data.get("median", {}).get("point_estimate"),
+        "mean": point_estimate("mean"),
+        "std_dev": point_estimate("std_dev"),
+        "median": point_estimate("median"),
     }
-    if any(value is None or not isfinite(value) for value in values.values()):
-        raise ValueError(f"Missing or non-finite Criterion estimate in {estimate_file}")
     if values["mean"] <= 0 or values["median"] <= 0 or values["std_dev"] < 0:
         raise ValueError(f"Non-positive/invalid Criterion estimate in {estimate_file}")
     return values
@@ -277,10 +290,13 @@ def main():
     parser.add_argument(
         "--require-baseline",
         action="store_true",
-        help="Fail instead of silently skipping when no comparable baseline exists",
+        help="Require a complete, exactly matched set of current and baseline benchmarks",
     )
 
     args = parser.parse_args()
+
+    if args.threshold < 0 or args.critical_threshold < args.threshold:
+        parser.error("Thresholds must be non-negative and critical-threshold must be >= threshold")
 
     if args.require_baseline:
         current_results = load_criterion_results(args.results)
@@ -289,10 +305,21 @@ def main():
             parser.error(f"No current Criterion estimates found under {args.results}")
         if not baseline_results:
             parser.error(f"Required Criterion baseline '{args.baseline}' was not found under {args.results}")
-        if not (set(current_results) & set(baseline_results)):
+
+        current_names = set(current_results)
+        baseline_names = set(baseline_results)
+        current_only = sorted(current_names - baseline_names)
+        baseline_only = sorted(baseline_names - current_names)
+        if current_only or baseline_only:
+            details = []
+            if current_only:
+                details.append("current benchmarks missing a baseline: " + ", ".join(current_only))
+            if baseline_only:
+                details.append("baseline benchmarks missing current results: " + ", ".join(baseline_only))
             parser.error(
-                f"No current benchmarks match Criterion baseline '{args.baseline}'; "
-                "refusing to report a clean comparison"
+                f"Incomplete Criterion comparison against '{args.baseline}'; "
+                + "; ".join(details)
+                + ". Refusing to report a clean comparison"
             )
 
     regressions, has_critical = analyze_regressions(
