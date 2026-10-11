@@ -14,7 +14,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const BINDING_DIGEST_DOMAIN: &[u8] = b"luminous-dynamics.energy-study-binding.v1\\0";
+const BINDING_DIGEST_DOMAIN: &[u8] = b"luminous-dynamics.energy-study-binding.v1\0";
 
 use crate::qualification::{
     FrozenEnergyScenario, PolicyComparisonReceipt, PolicyRunReceipt, QualificationError,
