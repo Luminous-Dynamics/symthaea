@@ -1269,6 +1269,30 @@ mod tests {
     }
 
     #[test]
+    fn midi_system_exclusive_events_are_rejected_instead_of_dropped() {
+        let track = [
+            0, 0xF0, 2, 0x7D, 0xF7, // vendor-specific SysEx payload
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("MIDI System Exclusive events are not supported"), "{error}");
+    }
+
+    #[test]
+    fn midi_escape_events_are_rejected_instead_of_dropped() {
+        let track = [
+            0, 0xF7, 1, 0x01, // arbitrary synthesizer escape payload
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("MIDI escape events are not supported"), "{error}");
+    }
+
+    #[test]
     fn midi_note_on_and_note_off_pair_across_format_one_tracks() {
         let note_on_track = [
             0, 0x90, 60, 100,
