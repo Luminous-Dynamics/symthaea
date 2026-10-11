@@ -331,8 +331,9 @@ impl HdcLtcUnifiedNeuron {
 
     /// **Primary evolution method** — fully-fused CfC step.
     ///
-    /// Implements the Hasani LTC closed-form update in a single O(D) pass
-    /// with zero intermediate heap allocations.
+    /// Implements the Hasani LTC closed-form update in O(D) work with zero intermediate
+    /// heap allocations. A pre-step norm pass computes the shared backbone timescale; the
+    /// post-update norm reduction is fused into the coordinate update pass.
     ///
     /// This allocation-free hot path assumes finite, non-negative dt, matching dimensions, and
     /// well-scaled finite inputs/configuration. It preserves positive dt values without a floor;
