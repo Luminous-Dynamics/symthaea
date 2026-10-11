@@ -46,7 +46,7 @@ jobs:
           sha256 = Path(sys.argv[3]).read_text(encoding="utf-8").split()[0]
           assert current["git_blob_sha"] == blob, (current["git_blob_sha"], blob)
           assert current["sha256"] == sha256, (current["sha256"], sha256)
-          assert current["expected_self_test_check_count"] == 84, current
+          assert current["expected_self_test_check_count"] == 85, current
           reference = status["current_reference_checker"]
           reference_blob = Path(sys.argv[4]).read_text(encoding="utf-8").strip()
           reference_sha256 = Path(sys.argv[5]).read_text(encoding="utf-8").split()[0]
@@ -74,7 +74,7 @@ jobs:
           import sys
 
           report = json.load(open(sys.argv[1], encoding="utf-8"))
-          expected = 84
+          expected = 85
           assert report.get("checks_passed") == expected, report
           assert report.get("checks_failed") == 0, report
           checks = report.get("checks")
