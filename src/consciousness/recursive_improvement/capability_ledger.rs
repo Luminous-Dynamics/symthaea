@@ -500,7 +500,9 @@ impl CapabilityLedger {
             return Err(CapabilityLedgerError::ReceiptReplay);
         }
         let sequence = receipt.sequence;
-        self.forecasts.get_mut(&receipt.forecast_id)
+        let forecast_id = receipt.forecast_id.clone();
+        self.forecasts
+            .get_mut(&forecast_id)
             .ok_or(CapabilityLedgerError::UnknownForecast)?
             .receipt = Some(verified);
         self.last_sequence = sequence;
@@ -1034,6 +1036,30 @@ mod tests {
         assert_eq!(
             ledger.qualify_claim("rust-debugging", &policy()),
             Err(CapabilityLedgerError::InsufficientEvidence)
+        );
+    }
+
+    #[test]
+    fn verified_token_rejects_malformed_verifier_provenance() {
+        let receipt = CapabilityOutcomeReceipt {
+            forecast_id: "token-shape".to_string(),
+            subject: subject(),
+            sequence: 2,
+            observed_success: true,
+            split: CapabilitySplit::HeldOut,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            receipt_sha256: "1".repeat(64),
+            actual_compute_units: None,
+        };
+        assert_eq!(
+            VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
+                receipt,
+                "symthaea-evidence-verifier",
+                "v1",
+                "not-a-digest",
+            ),
+            Err(CapabilityLedgerError::InvalidVerificationProvenance)
         );
     }
 
