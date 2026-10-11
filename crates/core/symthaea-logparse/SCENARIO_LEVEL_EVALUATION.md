@@ -4,9 +4,9 @@
 
 A grouped event split prevents events from the same EVTX file leaking into both train and test, but its accuracy is still event-weighted: a capture with many retained events can contribute many predictions. This experiment adds a second unit of analysis where one EVTX source file or one OTRF scenario directory produces one example.
 
-The library helper \`scenario::aggregate_scenarios\` validates each group, bundles its event vectors without encoding the label or group ID, records its event count, and returns scenarios sorted by stable group ID. This is the orderless baseline.
+The library helper `scenario::aggregate_scenarios` validates each group, bundles its event vectors without encoding the label or group ID, records its event count, and returns scenarios sorted by stable group ID. This is the orderless baseline.
 
-The companion \`scenario::aggregate_ordered_scenarios\` binds each event vector to one of eight coarse relative record-position roles before bundling. This is an experimental ordered variant; both produce exactly one sample per capture/scenario, so the statistical unit stays the same while representation changes.
+The companion `scenario::aggregate_ordered_scenarios` binds each event vector to one of eight coarse relative record-position roles before bundling. This is an experimental ordered variant; both produce exactly one sample per capture/scenario, so the statistical unit stays the same while representation changes. Each `ScenarioEmbedding` also carries an explicit `ScenarioEncodingMode`; the runner rejects a source/held-out mix of modes rather than training on one representation and evaluating on another.
 
 ## What these representations do—and do not—encode
 
@@ -14,7 +14,7 @@ The orderless HDC bundle tests whether the collection of signals in a capture ca
 
 The relative-record-position variant retains coarse position within the parser-provided record order. It does **not** preserve absolute timestamps, elapsed time, time gaps, causal relationships, or reliable attack-chain transitions. It must not be described as a temporal graph or causal model. The caller is responsible for passing deterministic source order within each scenario.
 
-This distinction matters because the current EVTX and OTRF parsers fill missing or invalid timestamps with \`Utc::now()\`. Sorting such events by parsed timestamp could inject nondeterministic order. This PR therefore does not sort on timestamp; it uses source-record order and labels it accordingly. Source record order is not proof of chronology, especially if upstream records were reordered or missing.
+This distinction matters because the current EVTX and OTRF parsers fill missing or invalid timestamps with `Utc::now()`. Sorting such events by parsed timestamp could inject nondeterministic order. This PR therefore does not sort on timestamp; it uses source-record order and labels it accordingly. Source record order is not proof of chronology, especially if upstream records were reordered or missing.
 
 Both representations can be dominated by unrelated or repeated events. The 50-event cap bounds contributions but does not solve mixed-technique labels. A source-file or OTRF-directory label is assumed to apply to all retained events in that group; more precise scenario annotations remain an important limitation.
 
@@ -22,20 +22,20 @@ Both representations can be dominated by unrelated or repeated events. The 50-ev
 
 Stage the same EVTX-ATTACK-SAMPLES and OTRF directories described by the Phase 2 example. Then run:
 
-\`\`\`bash
+```bash
 cargo run -p symthaea-logparse --example phase2_experiments --release -- \
   /tmp/evtx-staged /tmp/otrf-staged \
   --scenario-level-evaluation --domain-invariant-ablation
-\`\`\`
+```
 
-The scenario flag reports four scenario-level models when combined with the domain-invariant flag:
+The scenario flag reports two raw-encoder scenario models by default, and four when combined with the domain-invariant flag:
 
 - raw encoder with orderless bundling;
 - raw encoder with relative-record-position encoding;
 - domain-invariant encoder with orderless bundling;
 - domain-invariant encoder with relative-record-position encoding.
 
-Each model reports source-scenario grouped five-fold CV, a separate 80/20 source-scenario holdout report, and OTRF scenario-level OOD precision/recall/F1 and confusion matrix. Class distributions are printed before training. The ordered mode version is printed as \`ORDERED_SCENARIO_ENCODER_VERSION\`; the domain-invariant representation separately prints \`DOMAIN_INVARIANT_ENCODER_VERSION\`.
+Each model reports source-scenario grouped five-fold CV, a separate 80/20 source-scenario holdout report, and OTRF scenario-level OOD precision/recall/F1 and confusion matrix. Class distributions are printed before training. The ordered mode version is printed as `ORDERED_SCENARIO_ENCODER_VERSION`; the domain-invariant representation separately prints `DOMAIN_INVARIANT_ENCODER_VERSION`. The encoding mode is retained in typed scenario metadata and source/held-out mode mismatches are rejected.
 
 If any class has fewer than five independent source groups, grouped five-fold CV fails closed instead of falling back to event-level splitting. Compare all variants on the same exact commit and staged data; none should be considered an improvement until the run actually completes.
 
