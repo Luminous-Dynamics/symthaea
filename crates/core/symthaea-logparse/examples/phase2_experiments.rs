@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load OTRF (walk the staged dirs, parse every .json file)
     // ----------------------------------------------------------------
     println!("\n[load] OTRF corpus from {otrf_dir}");
-    let (otrf_events, otrf_groups) =
+    let (otrf_events, _otrf_groups) =
         load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
     let otrf_labels: Vec<String> = otrf_events
         .iter()
@@ -395,6 +395,15 @@ fn run_grouped_kfold(
             .entry(group.clone())
             .or_default()
             .push(i);
+    }
+
+    fn xorshift(state: &mut u64) -> u64 {
+        let mut x = *state;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        *state = x;
+        x.wrapping_mul(0x2545F4914F6CDD1D)
     }
 
     let mut state = 0xDEADBEEFu64;
