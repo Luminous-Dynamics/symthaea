@@ -218,6 +218,8 @@ pub struct ImportedMotifSummary {
     pub independent_occurrence_count: Option<usize>,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
+    /// Legacy heuristic score retained for wire compatibility; not a calibrated
+    /// probability of motif identity, listener recognition, or musical quality.
     pub confidence: f32,
     /// Persistent source-part identity, when extraction was scoped to one known part.
     /// Missing on legacy records; it is never inferred from register or role.
