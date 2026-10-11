@@ -156,6 +156,7 @@ mod cycle_strategy;
 mod cycle_subsystems;
 pub(crate) mod episodic_persistence_manager;
 pub(crate) mod ethics_engine;
+pub mod ethical_pluralism;
 pub(crate) mod ethics_values_manager;
 pub(crate) mod feature_integration_manager;
 pub mod feedback_state;
