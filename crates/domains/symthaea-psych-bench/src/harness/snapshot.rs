@@ -242,6 +242,10 @@ pub enum SnapshotComparisonError {
         benchmark: String,
         metric: String,
     },
+    NearZeroBaseline {
+        benchmark: String,
+        metric: String,
+    },
 }
 
 impl std::fmt::Display for SnapshotComparisonError {
@@ -272,11 +276,17 @@ impl std::fmt::Display for SnapshotComparisonError {
                 f,
                 "current snapshot contains unexpected metric {benchmark:?}/{metric:?}"
             ),
+            Self::NearZeroBaseline { benchmark, metric } => write!(
+                f,
+                "baseline metric {benchmark:?}/{metric:?} is near zero; percentage regression comparison is not qualified"
+            ),
         }
     }
 }
 
 impl std::error::Error for SnapshotComparisonError {}
+
+const MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON: f64 = 1e-10;
 
 impl RegressionReport {
     /// Compare current results against a baseline snapshot.
@@ -297,8 +307,11 @@ impl RegressionReport {
             if let Some(current_metrics) = current.metrics.get(bench_name) {
                 for (metric_name, baseline_val) in baseline_metrics {
                     if let Some(current_val) = current_metrics.get(metric_name) {
-                        // Skip metrics where baseline is near zero (avoid div-by-zero)
-                        if baseline_val.mean.abs() < 1e-10 {
+                        // Percentage changes are undefined/unreliable for near-zero baselines.
+                        // The strict comparison API rejects these before reaching
+                        // this exploratory comparator; keep this legacy path from
+                        // dividing by zero and leave its result visibly non-comparable.
+                        if baseline_val.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON {
                             results.push(RegressionResult {
                                 benchmark: bench_name.clone(),
                                 metric: metric_name.clone(),
@@ -420,6 +433,17 @@ impl RegressionReport {
             for metric in current_metrics.keys() {
                 if !baseline_metrics.contains_key(metric) {
                     return Err(SnapshotComparisonError::UnexpectedMetric {
+                        benchmark: benchmark.clone(),
+                        metric: metric.clone(),
+                    });
+                }
+            }
+        }
+
+        for (benchmark, metrics) in &baseline.metrics {
+            for (metric, value) in metrics {
+                if value.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON {
+                    return Err(SnapshotComparisonError::NearZeroBaseline {
                         benchmark: benchmark.clone(),
                         metric: metric.clone(),
                     });
@@ -916,6 +940,20 @@ mod strict_population_tests {
         .unwrap();
         assert_eq!(report.summary.total_metrics, 2);
         assert_eq!(report.results.len(), 2);
+    }
+
+    #[test]
+    fn strict_comparison_rejects_near_zero_baseline_instead_of_marking_pass() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
+        assert_eq!(
+            RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
+                .unwrap_err(),
+            SnapshotComparisonError::NearZeroBaseline {
+                benchmark: "NBack".to_string(),
+                metric: "accuracy".to_string(),
+            }
+        );
     }
 
     #[test]
