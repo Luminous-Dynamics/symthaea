@@ -563,7 +563,10 @@ pub fn grouped_stratified_split(
         let mut group_ids: Vec<String> = group_map.keys().cloned().collect();
         if group_ids.len() < 2 {
             return Err(format!(
-                "label {label:?} has {} distinct groups; need at least two for a grouped train/test split",
+                concat!(
+                    "label {label:?} has {} distinct groups; ",
+                    "need at least two for a grouped train/test split"
+                ),
                 group_ids.len()
             ));
         }
