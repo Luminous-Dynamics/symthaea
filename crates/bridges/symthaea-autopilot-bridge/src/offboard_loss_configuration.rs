@@ -155,7 +155,7 @@ impl Px4MavlinkParameterValueV1 {
             return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
         }
         let id_len = self.param_id.len();
-        if self.param_id_bytes[..id_len] != *self.param_id.as_bytes()
+        if &self.param_id_bytes[..id_len] != self.param_id.as_bytes()
             || self.param_id_bytes.get(id_len) != Some(&0)
         {
             return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
@@ -1122,6 +1122,38 @@ mod tests {
             wire.validate_for(value),
             Err(Px4OffboardLossConfigurationError::InvalidWireParameterId)
         );
+    }
+
+    #[test]
+    fn packet_sender_ids_are_bound_to_the_configuration_profile() {
+        for (system_id, component_id, expected_error) in [
+            (2, 1, Px4OffboardLossConfigurationError::SourceSystemMismatch),
+            (1, 2, Px4OffboardLossConfigurationError::SourceComponentMismatch),
+        ] {
+            let value = Px4OffboardLossParameterValueV1::RcActionI32(6);
+            let mut wire = wire_for(value);
+            wire.source_system_id = system_id;
+            wire.source_component_id = component_id;
+            let observation = Px4OffboardLossParameterObservationV1::new(
+                "px4.param.decoder.fixture.v1",
+                "vehicle.slot-a",
+                "px4.firmware-profile.fixture.v1",
+                "px4.boot.fixture.session-a",
+                "parameter-capture.fixture.attempt-1",
+                12,
+                wire,
+                value,
+                ts(1_100_000_000),
+            )
+            .unwrap();
+            let assessment = Px4OffboardLossConfigurationAssessmentV1::new(
+                profile(200_000_000),
+                "parameter-capture.fixture.attempt-1",
+                ts(1_200_000_000),
+                vec![timeout(11, 1_000_000_000), observation],
+            );
+            assert_eq!(assessment.unwrap_err(), expected_error);
+        }
     }
 
     #[test]
