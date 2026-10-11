@@ -36,3 +36,7 @@ path = "examples/language.rs"
 [[example]]
 name = "irregular_timestep_replay"
 path = "examples/irregular_timestep_replay.rs"
+
+[[example]]
+name = "scaling_benchmark"
+path = "examples/scaling_benchmark.rs"
