@@ -17,8 +17,9 @@
 //! - **Repeated ODE substeps** are replaced by a closed-form exponential update (O(D)
 //!   coordinate work per jump, independent of dt; not O(1) in hypervector dimension)
 //!
-//! The result: a single neuron with a 16,384-dimensional state that can jump to
-//! *any* time horizon in O(D) operations.
+//! The default state dimension is 16,384; dimensions are configurable, and the
+//! scaling benchmark samples through 65,536 (64K). A temporal jump costs O(D), so
+//! increasing D increases work even though elapsed time does not add substeps.
 //!
 //! ## Mathematical Basis
 //!
