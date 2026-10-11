@@ -1104,10 +1104,10 @@ impl HdcLtcUnifiedNeuron {
             let x_inf = self.compute_equilibrium(input);
             let tau = self.compute_tau(input);
 
-            // Apply exponential decay (clamped to prevent f32 underflow)
-            let decay = (-sub_dt / tau).max(-87.0).exp();
-            let weighted_equilibrium = x_inf.scale(1.0 - decay);
-            let weighted_current = self.state.scale(decay);
+            // Stable interpolation coefficient avoids cancellation for tiny substeps.
+            let interpolation = cfc_interpolation_alpha(sub_dt, tau);
+            let weighted_equilibrium = x_inf.scale(interpolation);
+            let weighted_current = self.state.scale(1.0 - interpolation);
             self.state = weighted_equilibrium.add(&weighted_current);
         }
 
