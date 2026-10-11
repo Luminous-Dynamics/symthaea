@@ -113,35 +113,60 @@ impl NumberTheoryEngine {
         }
     }
 
-    /// Extended Euclidean algorithm: returns (gcd, x, y) where ax + by = gcd
-    pub fn extended_gcd(&self, a: i64, b: i64) -> (i64, i64, i64) {
-        if b == 0 {
-            return (a.abs(), if a >= 0 { 1 } else { -1 }, 0);
-        }
-
-        let mut old_r = a;
-        let mut r = b;
-        let mut old_s = 1i64;
-        let mut s = 0i64;
-        let mut old_t = 0i64;
-        let mut t = 1i64;
+    /// Widened extended Euclidean algorithm over the full i64 input domain.
+    ///
+    /// Returns (g, x, y) with non-negative g and a*x + b*y = g exactly.
+    /// A u64 is required for g = abs(i64::MIN); i128 coefficients avoid
+    /// intermediate overflow in the Euclidean recurrence.
+    pub fn extended_gcd_wide(&self, a: i64, b: i64) -> (u64, i128, i128) {
+        let mut old_r = i128::from(a);
+        let mut r = i128::from(b);
+        let mut old_s = 1i128;
+        let mut s = 0i128;
+        let mut old_t = 0i128;
+        let mut t = 1i128;
 
         while r != 0 {
             let quotient = old_r / r;
-            let temp_r = r;
-            r = old_r - quotient * r;
-            old_r = temp_r;
+            let next_r = old_r - quotient * r;
+            old_r = r;
+            r = next_r;
 
-            let temp_s = s;
-            s = old_s - quotient * s;
-            old_s = temp_s;
+            let next_s = old_s - quotient * s;
+            old_s = s;
+            s = next_s;
 
-            let temp_t = t;
-            t = old_t - quotient * t;
-            old_t = temp_t;
+            let next_t = old_t - quotient * t;
+            old_t = t;
+            t = next_t;
         }
 
-        (old_r.abs(), old_s, old_t)
+        if old_r < 0 {
+            old_r = -old_r;
+            old_s = -old_s;
+            old_t = -old_t;
+        }
+
+        // The absolute GCD of two i64 values is at most 2^63, which fits u64.
+        let gcd = u64::try_from(old_r).expect("absolute GCD of i64 values fits u64");
+        (gcd, old_s, old_t)
+    }
+
+    /// Extended Euclidean algorithm: returns (gcd, x, y) where ax + by = gcd.
+    ///
+    /// This compatibility signature uses i64 for all outputs and therefore
+    /// panics explicitly when the exact result cannot be represented. Use
+    /// `extended_gcd_wide` to support the entire i64 input domain.
+    pub fn extended_gcd(&self, a: i64, b: i64) -> (i64, i64, i64) {
+        let (gcd, x, y) = self.extended_gcd_wide(a, b);
+        (
+            i64::try_from(gcd)
+                .expect("GCD exceeds i64::MAX; use extended_gcd_wide to preserve the exact result"),
+            i64::try_from(x)
+                .expect("extended GCD coefficient exceeds i64 range; use extended_gcd_wide"),
+            i64::try_from(y)
+                .expect("extended GCD coefficient exceeds i64 range; use extended_gcd_wide"),
+        )
     }
 
     /// Greatest common divisor using Euclidean algorithm
@@ -649,6 +674,44 @@ mod tests {
         let (g, x, y) = engine.extended_gcd(35, 15);
         assert_eq!(g, 5);
         assert_eq!(35 * x + 15 * y, 5);
+    }
+
+    #[test]
+    fn test_extended_gcd_wide_satisfies_bezout_identity_on_signed_grid() {
+        let engine = NumberTheoryEngine::new();
+        for a in -40i64..=40 {
+            for b in -40i64..=40 {
+                let (gcd, x, y) = engine.extended_gcd_wide(a, b);
+                assert_eq!(i128::from(a) * x + i128::from(b) * y, i128::from(gcd), "a={a}, b={b}");
+                assert_eq!(gcd, engine.gcd(a.unsigned_abs(), b.unsigned_abs()));
+            }
+        }
+    }
+
+    #[test]
+    fn test_extended_gcd_wide_handles_signed_integer_boundaries() {
+        let engine = NumberTheoryEngine::new();
+        for (a, b) in [
+            (i64::MIN, 0),
+            (0, i64::MIN),
+            (i64::MIN, i64::MAX),
+            (i64::MAX, i64::MIN),
+            (i64::MIN, i64::MIN),
+            (i64::MAX, i64::MAX),
+            (0, 0),
+        ] {
+            let (gcd, x, y) = engine.extended_gcd_wide(a, b);
+            assert_eq!(i128::from(a) * x + i128::from(b) * y, i128::from(gcd), "a={a}, b={b}");
+            assert_eq!(gcd, engine.gcd(a.unsigned_abs(), b.unsigned_abs()));
+        }
+        assert_eq!(engine.extended_gcd_wide(i64::MIN, 0), (1u64 << 63, -1, 0));
+    }
+
+    #[test]
+    #[should_panic(expected = "GCD exceeds i64::MAX; use extended_gcd_wide")]
+    fn test_legacy_extended_gcd_rejects_unrepresentable_gcd_explicitly() {
+        let engine = NumberTheoryEngine::new();
+        let _ = engine.extended_gcd(i64::MIN, 0);
     }
 
     #[test]
