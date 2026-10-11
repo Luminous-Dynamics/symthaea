@@ -41,6 +41,42 @@ fn canonical_partition(partition: &TruePartition) -> (Vec<usize>, Vec<usize>) {
 }
 
 #[test]
+fn checked_fiedler_pair_matches_analytic_p4_eigenvalue_and_residual() {
+    let matrix = path4(&[0.0; 4]);
+    let laplacian = checked_mi_graph_laplacian(&matrix, 4).expect("valid connected P4 graph");
+    let (lambda, vector) =
+        checked_fiedler_eigenpair(&laplacian).expect("P4 has a unique Fiedler mode");
+
+    let expected = 2.0 - 2.0_f64.sqrt();
+    assert!(
+        (lambda - expected).abs() < 1e-8,
+        "expected λ₂={expected}, got {lambda}"
+    );
+
+    let residual_norm = (0..4)
+        .map(|i| {
+            let lv: f64 = (0..4).map(|j| laplacian[(i, j)] * vector[j]).sum();
+            let residual = lv - lambda * vector[i];
+            residual * residual
+        })
+        .sum::<f64>()
+        .sqrt();
+    assert!(residual_norm < 1e-8, "eigenpair residual={residual_norm}");
+    assert!(vector.iter().sum::<f64>().abs() < 1e-8);
+}
+
+#[test]
+fn checked_fiedler_abstains_when_solver_budget_is_exhausted() {
+    let matrix = path4(&[0.0; 4]);
+    let laplacian = checked_mi_graph_laplacian(&matrix, 4).expect("valid connected P4 graph");
+
+    assert!(
+        checked_fiedler_eigenpair_with_budget(&laplacian, 1).is_none(),
+        "an exhausted eigen-solver must not produce a qualified spectral candidate"
+    );
+}
+
+#[test]
 fn spectral_partition_ignores_entropy_reporting_diagonal() {
     let calc = TruePhiCalculator::new();
     let uniform = path4(&[1.0, 1.0, 1.0, 1.0]);
