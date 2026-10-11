@@ -1019,7 +1019,7 @@ mod tests {
         let invalid_definitions = [
             "",
             "harmonic-oscillator-v1\nxdot=vx",
-            "system-definition-v1\\r\\nmodel",
+            "system-definition-v1\r\nmodel",
         ];
         for invalid_definition in invalid_definitions {
             let result = build_autonomous_discovery_receipt_v1(
