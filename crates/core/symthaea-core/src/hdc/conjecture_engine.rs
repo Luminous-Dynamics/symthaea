@@ -3830,6 +3830,7 @@ mod tests {
             mean_value: 1.0,
             complexity: 3,
             symbolically_proven: false,
+            discovery_mode: AutonomousDiscoveryMode::Primed,
         }];
 
         engine.ingest_autonomous_invariants("autonomous_numeric", MathDomain::Physics, &invariants);
