@@ -22,6 +22,8 @@ pub const PX4_OFFBOARD_LOSS_CONFIGURATION_SCHEMA_V1: u16 = 1;
 const OBSERVATION_DOMAIN: &[u8] = b"symthaea.autopilot.px4.offboard-loss-parameter.v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea.autopilot.px4.offboard-loss-config-profile.v1\0";
 const ASSESSMENT_DOMAIN: &[u8] = b"symthaea.autopilot.px4.offboard-loss-config-assessment.v1\0";
+const PARAM_ENCODE_BYTEWISE_CAPABILITY: u64 = 1 << 4;
+const PARAM_ENCODE_C_CAST_CAPABILITY: u64 = 1 << 17;
 
 /// Allowlisted parameters relevant to Offboard-loss policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -368,9 +370,11 @@ pub struct Px4OffboardLossConfigurationProfileV1 {
     pub expected_source_system_id: u8,
     /// Expected MAVLink packet-header component ID for PARAM_VALUE responses.
     pub expected_source_component_id: u8,
-    /// Declared wire encoding mode from AUTOPILOT_VERSION capabilities or prior profile.
+    /// Declared wire encoding mode derived from AUTOPILOT_VERSION capability flags.
     pub parameter_encoding: Px4MavlinkParameterEncodingV1,
-    /// Identity of AUTOPILOT_VERSION capability evidence or compatibility basis.
+    /// Raw AUTOPILOT_VERSION.capabilities bitmask associated with the encoding profile.
+    pub parameter_encoding_capabilities_raw: u64,
+    /// Identity of the AUTOPILOT_VERSION capability observation used for this profile.
     pub parameter_encoding_evidence_id: String,
     /// Clock used to compare parameter receive timestamps.
     pub receiver_clock_domain: ClockDomainId,
@@ -396,6 +400,7 @@ impl Px4OffboardLossConfigurationProfileV1 {
         expected_source_system_id: u8,
         expected_source_component_id: u8,
         parameter_encoding: Px4MavlinkParameterEncodingV1,
+        parameter_encoding_capabilities_raw: u64,
         parameter_encoding_evidence_id: impl Into<String>,
         receiver_clock_domain: ClockDomainId,
         mut required_parameters: Vec<Px4OffboardLossParameterNameV1>,
@@ -413,6 +418,7 @@ impl Px4OffboardLossConfigurationProfileV1 {
             expected_source_system_id,
             expected_source_component_id,
             parameter_encoding,
+            parameter_encoding_capabilities_raw,
             parameter_encoding_evidence_id: parameter_encoding_evidence_id.into(),
             receiver_clock_domain,
             required_parameters,
@@ -446,6 +452,17 @@ impl Px4OffboardLossConfigurationProfileV1 {
             &self.parameter_encoding_evidence_id,
             "parameter_encoding_evidence_id",
         )?;
+        let bytewise = self.parameter_encoding_capabilities_raw
+            & PARAM_ENCODE_BYTEWISE_CAPABILITY != 0;
+        let c_style = self.parameter_encoding_capabilities_raw
+            & PARAM_ENCODE_C_CAST_CAPABILITY != 0;
+        let mode_matches_capabilities = match self.parameter_encoding {
+            Px4MavlinkParameterEncodingV1::Bytewise => bytewise && !c_style,
+            Px4MavlinkParameterEncodingV1::CStyleCast => c_style && !bytewise,
+        };
+        if !mode_matches_capabilities {
+            return Err(Px4OffboardLossConfigurationError::ParameterEncodingCapabilitiesMismatch);
+        }
         self.receiver_clock_domain
             .validate()
             .map_err(Px4OffboardLossConfigurationError::Timestamp)?;
@@ -483,6 +500,7 @@ impl Px4OffboardLossConfigurationProfileV1 {
             self.expected_source_component_id,
             self.parameter_encoding.digest_tag(),
         ]);
+        hasher.update(&self.parameter_encoding_capabilities_raw.to_le_bytes());
         feed_str(&mut hasher, &self.parameter_encoding_evidence_id);
         feed_str(&mut hasher, self.receiver_clock_domain.as_str());
         hasher.update(&(self.required_parameters.len() as u64).to_le_bytes());
@@ -814,6 +832,9 @@ pub enum Px4OffboardLossConfigurationError {
     /// Encoding mode did not match the profile's declared mode.
     #[error("parameter wire encoding mismatch")]
     ParameterEncodingMismatch,
+    /// Declared parameter encoding did not agree with the AUTOPILOT_VERSION capability mask.
+    #[error("parameter encoding mode disagrees with AUTOPILOT_VERSION capability flags")]
+    ParameterEncodingCapabilitiesMismatch,
     /// Source producer did not match profile.
     #[error("parameter producer mismatch")]
     ProducerMismatch,
@@ -948,6 +969,7 @@ mod tests {
             1,
             1,
             Px4MavlinkParameterEncodingV1::Bytewise,
+            PARAM_ENCODE_BYTEWISE_CAPABILITY,
             "px4.autopilot-version.capabilities.fixture.bytewise.v1",
             clock(),
             vec![
@@ -975,6 +997,33 @@ mod tests {
 
 
     #[test]
+    fn profile_rejects_encoding_mode_not_supported_by_declared_capabilities() {
+        assert_eq!(
+            Px4OffboardLossConfigurationProfileV1::new(
+                "px4.offboard-loss.capability-mismatch.v1",
+                "vehicle.slot-a",
+                "px4.firmware-profile.fixture.v1",
+                "px4.param.decoder.fixture.v1",
+                "px4.boot.fixture.session-a",
+                1,
+                1,
+                Px4MavlinkParameterEncodingV1::Bytewise,
+                PARAM_ENCODE_C_CAST_CAPABILITY,
+                "px4.autopilot-version.capabilities.fixture.cstyle.v1",
+                clock(),
+                vec![
+                    Px4OffboardLossParameterNameV1::ComOfLossT,
+                    Px4OffboardLossParameterNameV1::ComOblRcAct,
+                ],
+                200,
+                2_000_000_000,
+            )
+            .unwrap_err(),
+            Px4OffboardLossConfigurationError::ParameterEncodingCapabilitiesMismatch
+        );
+    }
+
+    #[test]
     fn profile_cannot_call_timeout_only_a_complete_loss_configuration() {
         assert_eq!(
             Px4OffboardLossConfigurationProfileV1::new(
@@ -986,6 +1035,7 @@ mod tests {
                 1,
                 1,
                 Px4MavlinkParameterEncodingV1::Bytewise,
+                PARAM_ENCODE_BYTEWISE_CAPABILITY,
                 "px4.autopilot-version.capabilities.fixture.bytewise.v1",
                 clock(),
                 vec![Px4OffboardLossParameterNameV1::ComOfLossT],
