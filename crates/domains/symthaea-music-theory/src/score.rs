@@ -53,6 +53,10 @@ impl PartId {
 /// Which contrapuntal voice a note belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VoiceRole {
+    /// The source does not explicitly identify this line's musical function.
+    /// Role-dependent analysis must not reinterpret this as a melody, bass, or
+    /// harmony merely from pitch register or source-part ordering.
+    Unspecified,
     /// The tune — the developed motivic line.
     Melody,
     /// Inner harmony / accompaniment chord tones.

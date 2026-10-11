@@ -3549,6 +3549,7 @@ fn role_slug(role: VoiceRole) -> &'static str {
         VoiceRole::Harmony => "harmony",
         VoiceRole::Bass => "bass",
         VoiceRole::CounterMelody => "counter",
+        VoiceRole::Unspecified => "unspecified",
     }
 }
 
@@ -3558,6 +3559,7 @@ fn role_label(role: VoiceRole) -> &'static str {
         VoiceRole::Harmony => "Harmony",
         VoiceRole::Bass => "Bass",
         VoiceRole::CounterMelody => "Counter melody",
+        VoiceRole::Unspecified => "Unspecified",
     }
 }
 
@@ -3605,6 +3607,7 @@ fn symbolic_notes(score: &Score) -> Vec<SymbolicNoteEvent> {
         VoiceRole::Harmony,
         VoiceRole::CounterMelody,
         VoiceRole::Melody,
+        VoiceRole::Unspecified,
     ] {
         events.extend(
             score
@@ -3909,6 +3912,7 @@ fn cadence_events(score: &Score) -> Vec<CadenceEvent> {
         VoiceRole::CounterMelody,
         VoiceRole::Harmony,
         VoiceRole::Bass,
+        VoiceRole::Unspecified,
     ] {
         for (index, note) in score.voice(role).into_iter().enumerate() {
             if note.emphasis != Emphasis::Cadential {
@@ -4055,6 +4059,7 @@ fn orchestration_regions(score: &Score, sections: &[SectionRegion]) -> Vec<Orche
                 VoiceRole::CounterMelody,
                 VoiceRole::Harmony,
                 VoiceRole::Bass,
+                VoiceRole::Unspecified,
             ]
             .into_iter()
             .filter_map(|role| {

@@ -201,6 +201,7 @@ fn active_voice_count(notes: &[ScoreNote]) -> usize {
             VoiceRole::Harmony => 1,
             VoiceRole::Bass => 2,
             VoiceRole::CounterMelody => 3,
+            VoiceRole::Unspecified => continue,
         };
         active[index] = true;
     }
@@ -524,6 +525,21 @@ mod tests {
         assert_eq!(profile.note_count, 1);
         assert_eq!(profile.onset_count, 1);
         assert_eq!(profile.active_voice_count, 1);
+    }
+
+    #[test]
+    fn unspecified_import_role_does_not_claim_a_functional_voice() {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.push(note(
+            Pitch::new(PitchClass::C, 4),
+            Duration::zero(),
+            Duration::quarter(),
+            VoiceRole::Unspecified,
+        ));
+
+        let profile = profile_score(&score);
+        assert_eq!(profile.note_count, 1);
+        assert_eq!(profile.active_voice_count, 0);
     }
 
     #[test]

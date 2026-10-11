@@ -591,6 +591,7 @@ fn role_name(role: VoiceRole) -> &'static str {
         VoiceRole::Harmony => "harmony",
         VoiceRole::Bass => "bass",
         VoiceRole::CounterMelody => "countermelody",
+        VoiceRole::Unspecified => "unspecified",
     }
 }
 

@@ -337,7 +337,6 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
             note.velocity,
         )
     });
-    let roles = roles_by_track(&notes);
     let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
     let key = if minor {
         Key::minor(tonic)
@@ -359,10 +358,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 onset: Duration::new(onset, ticks_per_beat as i64),
                 duration: Duration::new(duration, ticks_per_beat as i64),
                 velocity: note.velocity as f32 / 127.0,
-                role: roles
-                    .get(&note.track)
-                    .copied()
-                    .unwrap_or(VoiceRole::Harmony),
+                role: VoiceRole::Unspecified,
                 emphasis: Emphasis::Normal,
                 section_intensity: 1.0,
             })
@@ -380,40 +376,6 @@ fn push_raw_note(notes: &mut Vec<RawNote>, note: RawNote) -> Result<(), String> 
     }
     notes.push(note);
     Ok(())
-}
-
-fn roles_by_track(notes: &[RawNote]) -> HashMap<usize, VoiceRole> {
-    let mut pitches: HashMap<usize, Vec<u8>> = HashMap::new();
-    for note in notes {
-        pitches.entry(note.track).or_default().push(note.pitch);
-    }
-    let mut ranked: Vec<(usize, f64)> = pitches
-        .into_iter()
-        .map(|(track, values)| {
-            let mean = values.iter().map(|value| f64::from(*value)).sum::<f64>()
-                / values.len().max(1) as f64;
-            (track, mean)
-        })
-        .collect();
-    ranked.sort_by(|a, b| a.1.total_cmp(&b.1));
-    let mut roles = HashMap::new();
-    if ranked.len() == 1 {
-        roles.insert(ranked[0].0, VoiceRole::Melody);
-        return roles;
-    }
-    for (index, (track, _)) in ranked.iter().enumerate() {
-        let role = if index == 0 {
-            VoiceRole::Bass
-        } else if index + 1 == ranked.len() {
-            VoiceRole::Melody
-        } else if index + 2 == ranked.len() {
-            VoiceRole::CounterMelody
-        } else {
-            VoiceRole::Harmony
-        };
-        roles.insert(*track, role);
-    }
-    roles
 }
 
 pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
@@ -846,17 +808,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         Key::major(tonic)
     };
     let mut score = Score::new(key, tempo, meter);
-    let part_count = parts.len();
     for (part, midi, onset, duration, velocity) in raw {
-        let role = if part_count == 1 || part == 0 {
-            VoiceRole::Melody
-        } else if part + 1 == part_count {
-            VoiceRole::Bass
-        } else if part == 1 {
-            VoiceRole::CounterMelody
-        } else {
-            VoiceRole::Harmony
-        };
         score
             .try_push(ScoreNote {
                 part: u16::try_from(part)
@@ -866,7 +818,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 onset,
                 duration,
                 velocity,
-                role,
+                role: VoiceRole::Unspecified,
                 emphasis: Emphasis::Normal,
                 section_intensity: 1.0,
             })
@@ -1261,18 +1213,22 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
     let mut unresolved_interpretations = vec![
         "Confirm section boundaries".into(),
         "Confirm voice and instrument roles".into(),
-        "Confirm reconstructed motif identity".into(),
     ];
+    if melody.is_empty() {
+        unresolved_interpretations.push(
+            "No source-declared melody role exists; motif reconstruction is withheld rather than guessed from register or part order".into(),
+        );
+    } else {
+        unresolved_interpretations.push("Confirm reconstructed motif identity".into());
+    }
     if start < total {
         unresolved_interpretations.push(format!(
             "Section reconstruction stopped at its {MAX_RECONSTRUCTED_SECTIONS}-region safety cap; the remaining duration is not segmented"
         ));
     }
-    let voices: BTreeSet<_> = score
-        .notes
-        .iter()
-        .map(|note| format!("{:?}", note.role))
-        .collect();
+    // PartId represents source-line identity; VoiceRole represents function.
+    // Count the former instead of counting whichever role labels happen to occur.
+    let voice_count = score.parts().len();
     ImportedWorkAnalysis {
         source_native: true,
         inferred_territory: None,
@@ -1280,7 +1236,7 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
         meter: score.meter,
         tonic: score.key.tonic.name().into(),
         note_count: score.notes.len(),
-        voice_count: voices.len(),
+        voice_count,
         duration_seconds: score.seconds(),
         motifs,
         sections,
@@ -1336,6 +1292,15 @@ mod tests {
             "expected the source velocity ratio, got {}",
             score.notes[0].velocity
         );
+    }
+
+    #[test]
+    fn midi_import_preserves_part_identity_without_guessing_functional_role() {
+        let track = [0, 0x90, 72, 100, 100, 0x80, 72, 0, 0, 0xFF, 0x2F, 0];
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        assert_eq!(score.notes.len(), 1);
+        assert_eq!(score.notes[0].part, PartId(0));
+        assert_eq!(score.notes[0].role, VoiceRole::Unspecified);
     }
 
     #[test]
@@ -1984,9 +1949,15 @@ mod tests {
     fn parses_minimal_musicxml_without_forcing_a_territory() {
         let score = parse_musicxml(minimal_musicxml()).unwrap();
         assert_eq!(score.notes.len(), 2);
+        assert!(score.notes.iter().all(|note| note.role == VoiceRole::Unspecified));
         let analysis = analyze(&score);
         assert!(analysis.source_native);
         assert!(analysis.inferred_territory.is_none());
+        assert_eq!(analysis.voice_count, 1);
+        assert!(analysis.motifs.is_empty());
+        assert!(analysis.unresolved_interpretations.iter().any(|item| {
+            item.contains("motif reconstruction is withheld")
+        }));
     }
 
     #[test]
