@@ -192,22 +192,58 @@ impl LogisticProbe {
         }
     }
 
-    /// Predict the most-likely class index for a single hypervector.
-    pub fn predict(&self, hv: &Hdv) -> usize {
-        let n_classes = self.class_names.len();
-        let mut best_c = 0;
+    /// Predict the most-likely class and the top-1 minus top-2 logit margin.
+    ///
+    /// The margin is an uncalibrated ranking signal, not a probability or a
+    /// calibrated confidence score. Callers should only use it to study
+    /// selective prediction/abstention unless a separate calibration protocol
+    /// has been validated.
+    pub fn predict_with_margin(&self, hv: &Hdv) -> (usize, f32) {
+        let dim = self.weights.first().map_or(0, Vec::len);
+        assert_eq!(
+            hv.len(), dim,
+            "hypervector dimension mismatch: expected {dim}, got {}",
+            hv.len()
+        );
+        assert_eq!(
+            self.class_names.len(),
+            self.weights.len(),
+            "model class/weight count mismatch"
+        );
+        assert_eq!(
+            self.class_names.len(),
+            self.biases.len(),
+            "model class/bias count mismatch"
+        );
+        assert!(!self.class_names.is_empty(), "model must have at least one class");
+
+        let mut best_class = 0usize;
         let mut best_score = f32::NEG_INFINITY;
-        for c in 0..n_classes {
-            let mut logit = self.biases[c];
-            for (xi, &wi) in hv.iter().zip(self.weights[c].iter()) {
-                logit += (*xi as f32) * wi;
+        let mut second_score = f32::NEG_INFINITY;
+        for class in 0..self.class_names.len() {
+            let mut score = self.biases[class];
+            for (&value, &weight) in hv.iter().zip(self.weights[class].iter()) {
+                score += value as f32 * weight;
             }
-            if logit > best_score {
-                best_score = logit;
-                best_c = c;
+            if score > best_score {
+                second_score = best_score;
+                best_score = score;
+                best_class = class;
+            } else if score > second_score {
+                second_score = score;
             }
         }
-        best_c
+        let margin = if self.class_names.len() < 2 {
+            0.0
+        } else {
+            best_score - second_score
+        };
+        (best_class, margin)
+    }
+
+    /// Predict the most-likely class index for a single hypervector.
+    pub fn predict(&self, hv: &Hdv) -> usize {
+        self.predict_with_margin(hv).0
     }
 
     /// Predict a batch, returning class indices (not names).
@@ -236,6 +272,117 @@ impl LogisticProbe {
         }
         correct as f32 / hvs.len() as f32
     }
+}
+
+/// One point on an uncalibrated margin-ranked selective-prediction curve.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectivePoint {
+    pub target_coverage: f32,
+    pub actual_coverage: f32,
+    pub accepted_samples: usize,
+    pub accepted_accuracy: f32,
+    pub accepted_macro_recall: f32,
+}
+
+/// Evaluate accuracy when the evaluator accepts only the top-margin fraction.
+///
+/// The margin ranks examples but is not a calibrated probability. For a
+/// target coverage, this helper deterministically accepts ceil(coverage * n)
+/// examples, sorting by descending margin and then original index. This is a
+/// diagnostic risk/coverage curve, not a deployment threshold policy.
+pub fn selective_accuracy_curve(
+    labels: &[String],
+    predictions: &[usize],
+    margins: &[f32],
+    class_names: &[String],
+    target_coverages: &[f32],
+) -> Result<Vec<SelectivePoint>, String> {
+    if labels.len() != predictions.len() || labels.len() != margins.len() {
+        return Err(format!(
+            "selective evaluation length mismatch: labels={}, predictions={}, margins={}",
+            labels.len(),
+            predictions.len(),
+            margins.len()
+        ));
+    }
+    if labels.is_empty() {
+        return Err("cannot evaluate selective accuracy on an empty set".to_string());
+    }
+    if class_names.is_empty() {
+        return Err("class_names must not be empty".to_string());
+    }
+    if target_coverages.is_empty()
+        || target_coverages
+            .iter()
+            .any(|coverage| !coverage.is_finite() || *coverage <= 0.0 || *coverage > 1.0)
+    {
+        return Err("target coverages must be finite and in (0, 1]".to_string());
+    }
+    if margins.iter().any(|margin| !margin.is_finite() || *margin < 0.0) {
+        return Err("margins must be finite and non-negative".to_string());
+    }
+
+    let mut seen = std::collections::BTreeSet::new();
+    for class in class_names {
+        if class.is_empty() || !seen.insert(class.as_str()) {
+            return Err("class_names must be unique and non-empty".to_string());
+        }
+    }
+    let known_classes: std::collections::BTreeSet<&str> =
+        class_names.iter().map(String::as_str).collect();
+    for (index, (label, prediction)) in labels.iter().zip(predictions).enumerate() {
+        if !known_classes.contains(label.as_str()) {
+            return Err(format!("unknown ground-truth class {label:?} at index {index}"));
+        }
+        if *prediction >= class_names.len() {
+            return Err(format!("predicted class index {prediction} is out of range"));
+        }
+    }
+
+    let mut ranked: Vec<usize> = (0..labels.len()).collect();
+    ranked.sort_by(|left, right| {
+        margins[*right]
+            .total_cmp(&margins[*left])
+            .then_with(|| left.cmp(right))
+    });
+
+    let mut points = Vec::with_capacity(target_coverages.len());
+    for &target_coverage in target_coverages {
+        let accepted_samples =
+            ((target_coverage * labels.len() as f32).ceil() as usize).clamp(1, labels.len());
+        let mut correct = 0usize;
+        let mut support_by_class: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut correct_by_class: BTreeMap<&str, usize> = BTreeMap::new();
+        for &index in ranked.iter().take(accepted_samples) {
+            let actual = labels[index].as_str();
+            *support_by_class.entry(actual).or_insert(0) += 1;
+            if class_names[predictions[index]] == labels[index] {
+                correct += 1;
+                *correct_by_class.entry(actual).or_insert(0) += 1;
+            }
+        }
+        let accepted_macro_recall = class_names
+            .iter()
+            .map(|class| {
+                let support = support_by_class.get(class.as_str()).copied().unwrap_or(0);
+                if support == 0 {
+                    0.0
+                } else {
+                    correct_by_class.get(class.as_str()).copied().unwrap_or(0) as f32
+                        / support as f32
+                }
+            })
+            .sum::<f32>()
+            / class_names.len() as f32;
+        points.push(SelectivePoint {
+            target_coverage,
+            actual_coverage: accepted_samples as f32 / labels.len() as f32,
+            accepted_samples,
+            accepted_accuracy: correct as f32 / accepted_samples as f32,
+            accepted_macro_recall,
+        });
+    }
+    Ok(points)
 }
 
 /// Per-class binary view of a multiclass evaluation.
@@ -781,6 +928,51 @@ mod tests {
         );
         assert!(grouped_fold_assignment(&labels, &mixed_groups, 1, 1).is_err());
         assert!(grouped_fold_assignment(&labels, &mixed_groups[..3], 2, 1).is_err());
+    }
+
+    #[test]
+    fn predict_with_margin_orders_top_class_and_exposes_gap() {
+        let probe = LogisticProbe {
+            weights: vec![vec![1.0, 0.0], vec![-1.0, 0.0], vec![0.0, 1.0]],
+            biases: vec![0.0, 0.0, 0.0],
+            class_names: vec!["a".into(), "b".into(), "c".into()],
+        };
+        let (class, margin) = probe.predict_with_margin(&vec![1, -1]);
+        assert_eq!(class, 0);
+        assert!(margin > 0.0);
+        assert_eq!(probe.predict(&vec![1, -1]), class);
+    }
+
+    #[test]
+    fn selective_curve_reports_accuracy_at_deterministic_coverages() {
+        let labels = vec!["a".into(), "b".into(), "b".into(), "a".into()];
+        let predictions = vec![0, 0, 1, 1];
+        let margins = vec![0.1, 0.9, 0.8, 0.2];
+        let classes = vec!["a".into(), "b".into()];
+        let curve =
+            selective_accuracy_curve(&labels, &predictions, &margins, &classes, &[0.5, 0.75, 1.0])
+                .unwrap();
+        assert_eq!(curve.len(), 3);
+        assert_eq!(curve[0].accepted_samples, 2);
+        assert!((curve[0].actual_coverage - 0.5).abs() < 1e-6);
+        assert!((curve[0].accepted_accuracy - 0.5).abs() < 1e-6);
+        assert_eq!(curve[1].accepted_samples, 3);
+        assert!((curve[1].accepted_accuracy - (2.0 / 3.0)).abs() < 1e-6);
+        assert_eq!(curve[2].accepted_samples, 4);
+        assert!((curve[2].accepted_accuracy - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn selective_curve_rejects_malformed_inputs() {
+        let labels = vec!["a".into()];
+        let predictions = vec![0usize];
+        let margins = vec![0.2f32];
+        let classes = vec!["a".into()];
+        assert!(selective_accuracy_curve(&labels, &predictions, &[], &classes, &[1.0]).is_err());
+        assert!(selective_accuracy_curve(&labels, &predictions, &margins, &classes, &[0.0]).is_err());
+        assert!(selective_accuracy_curve(&labels, &predictions, &[f32::NAN], &classes, &[1.0]).is_err());
+        assert!(selective_accuracy_curve(&["unknown".into()], &predictions, &margins, &classes, &[1.0]).is_err());
+        assert!(selective_accuracy_curve(&labels, &[1], &margins, &classes, &[1.0]).is_err());
     }
 
     #[test]
