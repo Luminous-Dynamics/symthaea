@@ -68,7 +68,7 @@ UNSUPPORTED_HIDDEN_STATE_RE = re.compile(
     r"(?:you|the speaker|the attendee|the person|the dreamer|the character|they|he|she)\s+"
     r"(?:are|is|has|have)\s+(?:secretly\s+)?(?:afraid|lying|repressed|in denial)\b"
     r"|\b(?:hidden motive|unconscious conflict)\s+(?:is|must be|clearly is)\b"
-    r"|\b[A-Z][\\w-]+\\s+(?:is|was|seems)\\s+(?:secretly\\s+)?(?:afraid|lying|repressed|in denial)\\b",
+    r"|\b[A-Z][\w-]+\s+(?:is|was|seems)\s+(?:secretly\s+)?(?:afraid|lying|repressed|in denial)\b",
     re.IGNORECASE,
 )
 
