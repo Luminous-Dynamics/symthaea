@@ -30,6 +30,9 @@ pub struct AutonomousHoldoutValidation {
 const MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES: usize = 4096;
 const MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY: f64 = 100_000.0;
 const MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS: usize = 5_000_000;
+const MAX_AUTONOMOUS_STATE_DIMENSION: usize = 4096;
+const MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY: f64 = 10_000_000.0;
+const MAX_AUTONOMOUS_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
 
 fn failed_holdout(
     discovery_seed: u64,
@@ -64,8 +67,11 @@ fn checked_rk4_trajectory(
         return None;
     }
     let estimated_steps = (t_end / dt).ceil();
+    let estimated_state_updates = estimated_steps * dimension as f64;
     if !estimated_steps.is_finite()
         || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
+        || dimension > MAX_AUTONOMOUS_STATE_DIMENSION
+        || estimated_state_updates > MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY
     {
         return None;
     }
@@ -154,11 +160,6 @@ pub fn validate_invariant_holdout(
         || var_names.iter().any(|name| name.trim().is_empty())
         || var_names.iter().collect::<std::collections::HashSet<_>>().len() != var_names.len()
         || initial_state.iter().any(|value| !value.is_finite())
-        || {
-            let initial_derivative = rhs(initial_state, 0.0);
-            initial_derivative.len() != initial_state.len()
-                || initial_derivative.iter().any(|value| !value.is_finite())
-        }
         || !t_max.is_finite()
         || t_max <= 0.0
         || !dt.is_finite()
@@ -189,10 +190,15 @@ pub fn validate_invariant_holdout(
         );
     }
     let estimated_steps = (t_max / dt).ceil();
+    let state_updates_per_trajectory = estimated_steps * initial_state.len() as f64;
+    let total_state_updates = state_updates_per_trajectory * holdout_trajectories as f64;
+    let total_steps = estimated_steps * holdout_trajectories as f64;
     if holdout_trajectories > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
+        || initial_state.len() > MAX_AUTONOMOUS_STATE_DIMENSION
         || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
-        || (estimated_steps as usize).saturating_mul(holdout_trajectories)
-            > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS
+        || state_updates_per_trajectory > MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY
+        || total_steps > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS as f64
+        || total_state_updates > MAX_AUTONOMOUS_TOTAL_STATE_UPDATES
     {
         return failed_holdout(
             discovery_seed,
@@ -202,6 +208,20 @@ pub fn validate_invariant_holdout(
             0,
             f64::MAX,
             AutonomousHoldoutFailure::TrajectoryLimitExceeded,
+        );
+    }
+    let initial_derivative = rhs(initial_state, 0.0);
+    if initial_derivative.len() != initial_state.len()
+        || initial_derivative.iter().any(|value| !value.is_finite())
+    {
+        return failed_holdout(
+            discovery_seed,
+            holdout_seed,
+            holdout_trajectories,
+            threshold,
+            0,
+            f64::MAX,
+            AutonomousHoldoutFailure::InvalidInput,
         );
     }
 
@@ -463,7 +483,7 @@ pub fn build_autonomous_discovery_receipt_v1(
         return Err(AutonomousDiscoveryReceiptError::ColdRunContainsPriors);
     }
     let effective = sanitized_config(config, candidate.discovery_mode);
-    let holdout_valid = holdout_record_is_consistent(holdout, t_max, dt);
+    let holdout_valid = holdout_record_is_consistent(holdout, t_max, dt, initial_state.len());
     if !holdout_valid {
         return Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
     }
@@ -549,7 +569,12 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         && receipt.dt.is_finite()
         && receipt.dt > 0.0
         && seed_pair_consistent
-        && holdout_record_is_consistent(&holdout, receipt.t_max, receipt.dt)
+        && holdout_record_is_consistent(
+            &holdout,
+            receipt.t_max,
+            receipt.dt,
+            receipt.initial_state.len(),
+        )
         && blake3::hash(receipt.candidate_formula.as_bytes()).to_hex().to_string()
             == receipt.candidate_blake3
         && compute_receipt_digest(receipt) == receipt.receipt_blake3
@@ -562,6 +587,7 @@ fn holdout_record_is_consistent(
     holdout: &AutonomousHoldoutValidation,
     t_max: f64,
     dt: f64,
+    state_dimension: usize,
 ) -> bool {
     if !t_max.is_finite()
         || t_max <= 0.0
@@ -579,11 +605,17 @@ fn holdout_record_is_consistent(
         return false;
     }
     let estimated_steps = (t_max / dt).ceil();
+    let state_updates_per_trajectory = estimated_steps * state_dimension as f64;
+    let total_steps = estimated_steps * holdout.requested_trajectories as f64;
+    let total_state_updates = state_updates_per_trajectory
+        * holdout.requested_trajectories as f64;
     let budget_exceeded = holdout.requested_trajectories
         > MAX_AUTONOMOUS_HOLDOUT_TRAJECTORIES
+        || state_dimension > MAX_AUTONOMOUS_STATE_DIMENSION
         || estimated_steps > MAX_AUTONOMOUS_STEPS_PER_TRAJECTORY
-        || (estimated_steps as usize).saturating_mul(holdout.requested_trajectories)
-            > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS;
+        || state_updates_per_trajectory > MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY
+        || total_steps > MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS as f64
+        || total_state_updates > MAX_AUTONOMOUS_TOTAL_STATE_UPDATES;
 
     if holdout.passed {
         return !budget_exceeded
@@ -930,6 +962,35 @@ mod tests {
         assert!(!result.passed);
         assert_eq!(result.trajectories_checked, 0);
         assert_eq!(result.failure, Some(AutonomousHoldoutFailure::IncompleteCoverage));
+    }
+
+    #[test]
+    fn oversized_state_dimension_is_rejected_before_rhs_execution() {
+        fn constant_rhs(state: &[f64], _time: f64) -> Vec<f64> {
+            vec![0.0; state.len()]
+        }
+
+        let config = RegressorConfig { seed: 23, ..RegressorConfig::default() };
+        let initial_state = vec![1.0; MAX_AUTONOMOUS_STATE_DIMENSION + 1];
+        let names: Vec<String> = (0..initial_state.len())
+            .map(|index| format!("x{index}"))
+            .collect();
+        let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let result = validate_invariant_holdout(
+            constant_rhs,
+            &Expr::Var("x0".into()),
+            &initial_state,
+            &name_refs,
+            &config,
+            1.0,
+            0.01,
+            1,
+            709,
+            1e-2,
+        );
+        assert!(!result.passed);
+        assert_eq!(result.trajectories_checked, 0);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded));
     }
 
     #[test]
