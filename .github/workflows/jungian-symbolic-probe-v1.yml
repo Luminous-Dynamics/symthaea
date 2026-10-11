@@ -8,6 +8,7 @@ on:
       - 'docs/research/data/jungian_symbolic_probe_v1.json'
       - 'scripts/validate_jungian_symbolic_probe.py'
       - 'scripts/run_jungian_symbolic_baselines.py'
+      - 'scripts/evaluate_jungian_symbolic_outputs.py'
       - 'src/bin/jungian_glyph_projection_probe.rs'
       - '.github/workflows/jungian-symbolic-probe-v1.yml'
   workflow_dispatch:
@@ -34,7 +35,7 @@ jobs:
           BASE=b9af191f380d635f0459b24284c1d1fd6a5516aa
           git merge-base --is-ancestor "$BASE" HEAD
           actual="$(git diff --name-only "$BASE" HEAD | sort)"
-          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/validate_jungian_symbolic_probe.py' 'src/bin/jungian_glyph_projection_probe.rs' 'Cargo.toml' | sort)"
+          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/evaluate_jungian_symbolic_outputs.py' 'scripts/validate_jungian_symbolic_probe.py' 'src/bin/jungian_glyph_projection_probe.rs' 'Cargo.toml' | sort)"
           test "$actual" = "$expected"
 
       - name: Capture exact runtime and source identities
@@ -95,6 +96,12 @@ jobs:
             --glyph-projection "$OUT/glyph_projection.json"
           python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/keyword_dictionary_foil_v0.normalized.json"
           python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/context_guardrails_rules_v0.normalized.json"
+          python3 scripts/evaluate_jungian_symbolic_outputs.py --self-test
+          python3 scripts/evaluate_jungian_symbolic_outputs.py \
+            --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --results "$OUT/keyword_dictionary_foil_v0.normalized.json" \
+            --results "$OUT/context_guardrails_rules_v0.normalized.json" \
+            --output-dir "$OUT"
           sha256sum "$OUT"/*.json
           echo "output_dir=$OUT" >> "$GITHUB_OUTPUT"
 
@@ -137,6 +144,31 @@ jobs:
                   f"{s['declared_forbidden_code_claims']} | "
                   f"{s['cases_declaring_all_required_codes_without_forbidden_claims']}/14 | executed |"
               )
+          # This score is derived from the result bundle text, not from the
+          # baseline's own hand-returned behavior-code declarations.
+          audit_dir = __import__("pathlib").Path(sys.argv[1]).parent
+          lines.extend([
+              "",
+              "## Independent output-side audit (static cues; not semantic accuracy)",
+              "",
+              "| Baseline | Text/evidence checks | Cases satisfying all local checks | Pair text-contrast checks |",
+              "|---|---:|---:|---:|",
+          ])
+          for item in data["methods"]:
+              if item["state"] != "executed":
+                  continue
+              audit_path = audit_dir / f"{item['method_id']}.output_evaluation.json"
+              audit = json.load(open(audit_path, encoding="utf-8"))
+              lines.append(
+                  f"| {item['method_id']} | {audit['checks_passed']}/{audit['checks_total']} | "
+                  f"{audit['case_contracts_passed']}/{audit['case_count']} | "
+                  f"{audit['pair_checks_passed']}/{audit['pair_checks_total']} |"
+              )
+          lines.extend([
+              "",
+              "> The independent audit inspects emitted statements, abstention/questions, exact evidence links, and case-specific cues. Its text patterns are incomplete and can misread negation; the raw normalized bundles and per-case findings are in the artifact. Audit failures are reported rather than blocking capture because the lexical foil is intentionally unsafe. No score here is semantic, psychological, clinical, human-rated, or holdout accuracy.",
+              "",
+          ])
           if data.get("context_pair_diagnostics"):
               lines.extend([
                   "",
