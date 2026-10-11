@@ -1,0 +1,98 @@
+# CI-QUAL-001A focused qualification lane.
+#
+# This workflow qualifies only the offline runner-state classifier and its saved
+# fixtures. It does not query or mutate GitHub Actions state.
+
+name: CI Runner State Classifier
+
+on:
+  pull_request:
+    paths:
+      - "scripts/classify_ci_runner_state.py"
+      - "scripts/test_classify_ci_runner_state.py"
+      - "tests/fixtures/ci_runner_state/**"
+      - ".github/workflows/ci-runner-state-classifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/classify_ci_runner_state.py"
+      - "scripts/test_classify_ci_runner_state.py"
+      - "tests/fixtures/ci_runner_state/**"
+      - ".github/workflows/ci-runner-state-classifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-runner-state-classifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  classifier:
+    name: CI-QUAL-001A Exact-Head Qualification
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact candidate and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain)"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Record toolchain
+        run: python --version
+
+      - name: Compile classifier sources
+        run: |
+          python -m py_compile \
+            scripts/classify_ci_runner_state.py \
+            scripts/test_classify_ci_runner_state.py
+
+      - name: Run deterministic classifier tests
+        run: python -m unittest scripts.test_classify_ci_runner_state -v
+
+      - name: Exercise stale-summary fixture through public CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/classify_ci_runner_state.py \
+            tests/fixtures/ci_runner_state/stale_summary.json \
+            --pretty > /tmp/stale-summary.json
+          grep -q '"classification": "SummaryStaleAgainstSteps"' /tmp/stale-summary.json
+
+          set +e
+          python scripts/classify_ci_runner_state.py \
+            tests/fixtures/ci_runner_state/stale_summary.json \
+            --assert-required-success > /tmp/assert-output.json
+          rc=$?
+          set -e
+          test "$rc" -eq 1
+
+      - name: Exercise timeout-inconsistent fixture through public CLI
+        run: |
+          python scripts/classify_ci_runner_state.py \
+            tests/fixtures/ci_runner_state/timeout_inconsistent.json \
+            --pretty > /tmp/timeout-inconsistent.json
+          grep -q '"classification": "TimeoutInconsistent"' /tmp/timeout-inconsistent.json
+
+      - name: Verify tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
