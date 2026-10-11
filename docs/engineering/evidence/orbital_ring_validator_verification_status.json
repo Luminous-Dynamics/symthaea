@@ -6,12 +6,12 @@
     "sha256": "c4eabd9a2e02f246d7d337926b9a8f0e422f1eced879d1ed57c2c26b1ffc98c2"
   },
   "current_validator": {
-    "expected_self_test_check_count": 84,
-    "git_blob_sha": "e6f79e02689da61686af383ebfff470b26549b0c",
+    "expected_self_test_check_count": 85,
+    "git_blob_sha": "734fae84c6d5b1fb7b895b56b021a75892546206",
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
-    "sha256": "ec7e01912c730df7bd0d9afb3eedced99be30de264cabc5d690278e2c72fbd81"
+    "sha256": "532de2bb5707db127fa9a031e233e25100673491e658d0b2173845bfeebf85f4"
   },
-  "execution_note": "Validator suite (84 expected checks) and reference-checker suite (66 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify the exact current hashes, repeat outputs byte-for-byte, and compare the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here.",
+  "execution_note": "Validator suite (85 expected checks) and reference-checker suite (66 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify exact hashes, repeat outputs byte-for-byte, and compare the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors and declared-state mismatch both force expected_gate_state=Blocked.",
   "last_executed_reference_check": {
     "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
     "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
@@ -41,7 +41,8 @@
     "duplicate_json_object_keys_rejected",
     "nonstandard_nan_token_rejected",
     "required_fields_subset_fails_closed_and_blocks_promotion",
-    "unexpected_provenance_key_keeps_expected_gate_blocked"
+    "unexpected_provenance_key_keeps_expected_gate_blocked",
+    "declared_gate_mismatch_keeps_expected_gate_blocked"
   ],
   "verification_state": "not_run_after_source_change"
 }
