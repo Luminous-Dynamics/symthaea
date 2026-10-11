@@ -7,7 +7,7 @@
 
 Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dynamics (CfC), consciousness-relevant measurement (IIT-inspired Φ, Butlin-indicator probes), and zero-knowledge proofs. **It does not claim to prove consciousness, and nothing below is a regulatory compliance certification.** What it does have: working ZK circuits over HDC's binary-field structure, measured against a prime-field baseline, and an internal research program that documents its own retractions — see the Evidence table below before trusting any specific number.
 
-[**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/binius-hdc/) | [**Benchmarks**](papers/binius-hdc/reproduce.sh) | [**Honest Status**](docs/HONEST_STATUS.md)
+[**Live Demo**](https://symthaea.luminousdynamics.io) | [**Paper**](papers/theory-foundations/binius-hdc/) | [**Benchmarks**](papers/theory-foundations/binius-hdc/reproduce.sh) | [**Honest Status**](docs/HONEST_STATUS.md)
 
 ---
 
@@ -15,9 +15,9 @@ Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dy
 
 | Claim | Status | Evidence | Limitations |
 |-------|--------|----------|--------------|
-| HDC XOR binding: 256x fewer ZKP constraints than a prime-field baseline (Binius vs. Winterfell, 16Kbit) | Reproduced internally | `papers/binius-hdc/reproduce.sh` — real proofs, not estimates | Same-scale comparison only; not audited by a third party |
+| HDC XOR binding: 256x fewer ZKP constraints than a prime-field baseline (Binius vs. Winterfell, 16Kbit) | Reproduced internally | `papers/theory-foundations/binius-hdc/reproduce.sh` — real proofs, not estimates | Same-scale comparison only; not audited by a third party |
 | Health-value range proof in ~34ms (ZK range proof, value ∈ [min, max]) | Working cryptographic primitive | `crates/mycelix-zkp-core/`, benchmark output below | **Not a HIPAA compliance certification.** A range proof is one building block; no accredited assessment of any system built on it has been performed |
-| Selective-disclosure age≥18 proof | Working cryptographic primitive | `papers/binius-hdc/` eIDAS-shaped demo | **Not an eIDAS 2.0-certified wallet or credential.** Demonstrates the primitive an eIDAS-compliant system would need, nothing more |
+| Selective-disclosure age≥18 proof | Working cryptographic primitive | `papers/theory-foundations/binius-hdc/` eIDAS-shaped demo | **Not an eIDAS 2.0-certified wallet or credential.** Demonstrates the primitive an eIDAS-compliant system would need, nothing more |
 | Butlin consciousness-indicator probes | Structural implementation, partially audited | Internal construct-validity re-check found only 4/12 probe rows survive; of those, one (`AE-2`) has real empirical support to date, and that result is explicitly scoped as "causally-supported internal wiring evidence," not functional capacity and not evidence of consciousness | **Not evidence the system is conscious.** Most of the original 12-row matrix did not hold up to its own re-audit |
 | Moral-reasoning benchmark (Hendrycks Ethics) | Internal benchmark, re-run and corrected | Canonical 2026-07-15 re-run on held-out test CSVs: 56.2% overall; only the `virtue` category (76.5%) is meaningfully above chance | An earlier 91.1%/94.5%/84.7% figure was **retracted as leakage-inflated** — if you see those numbers anywhere else in this repo's history, they are superseded |
 | Cognitive loop runs at ~31 Hz measured | Reproduced internally | Loop telemetry | Measured on one reference machine; not a real-time guarantee |
@@ -28,9 +28,9 @@ None of this is a claim of general intelligence, sentience, or legal/medical/fin
 
 - **Healthcare attestation primitive** — Prove "patient vitals are in normal range" in ~34ms without revealing the actual values, via a ZK range proof. ([health-zkp](crates/mycelix-zkp-core/))
 - **Anonymous eligibility proof** — Prove "I'm eligible to vote" without revealing identity, with post-quantum Dilithium5 signatures. ([governance](crates/mycelix-zkp-core/src/consciousness.rs))
-- **Selective credential disclosure** — Prove "age >= 18" via ZKP without revealing date of birth or nationality. ([eidas-shaped demo](papers/binius-hdc/))
+- **Selective credential disclosure** — Prove "age >= 18" via ZKP without revealing date of birth or nationality. ([eidas-shaped demo](papers/theory-foundations/binius-hdc/))
 - **Verified federated learning** — 16 participants submit encrypted gradients; aggregation proven correct in ~91ms. ([triple-stack](crates/hdc-zkp-bench/src/fl_triple_stack.rs))
-- **Verifiable search** — Prove search results were ranked per a stated formula, not manipulated. ([prism-zkp](papers/binius-hdc/))
+- **Verifiable search** — Prove search results were ranked per a stated formula, not manipulated. ([prism-zkp](papers/theory-foundations/binius-hdc/))
 - **Cognitive-loop state-transition proof** — Prove a specific internal state transition occurred as specified, without revealing the internal state itself. This is a proof about *a computation*, not a proof about *consciousness*. ([cycle_integrity](crates/symthaea-zkproof/src/cycle_integrity.rs))
 
 ## Quick Start
@@ -118,9 +118,9 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 
 | Paper | Venue | Status |
 |-------|-------|--------|
-| [**Binary-Field STARKs for HDC**](papers/binius-hdc/) | IEEE S&P 2027 | Submission-ready (v5) |
-| [CfC Temporal Proofs](papers/cfc-zkp/) | NeurIPS workshop | 3-page draft |
-| [Triple-Stack FL](papers/triple-stack-fl/) | PoPETs | 3-page draft |
+| [**Binary-Field STARKs for HDC**](papers/theory-foundations/binius-hdc/) | IEEE S&P 2027 | Submission-ready (v5) |
+| [CfC Temporal Proofs](papers/theory-foundations/cfc-zkp/) | NeurIPS workshop | 3-page draft |
+| [Triple-Stack FL](papers/evaluation/triple-stack-fl/) | PoPETs | 3-page draft |
 | HAI: Hyperdimensional Active Inference | PLoS Comp Bio | Manuscript complete |
 | Genesis: Ethical Frameworks | AI & Ethics | Manuscript complete |
 | Psych-Bench | — | 98 benchmarks, 20 domains |
@@ -129,7 +129,7 @@ XOR binding — the core HDC operation — requires **zero non-linear constraint
 
 ```bash
 # Reproduce all ZKP benchmark results
-cd papers/binius-hdc && bash reproduce.sh
+cd papers/theory-foundations/binius-hdc && bash reproduce.sh
 
 # Run consciousness psych-bench
 cargo run --features psych_bench --example run_all_benchmarks
@@ -239,6 +239,6 @@ AGPL-3.0-or-later. Commercial licensing available — contact tristan.stoltz@evo
   title={Binary-Field STARKs for Hyperdimensional Computing},
   author={Stoltz, Tristan},
   year={2026},
-  note={Available at github.com/Luminous-Dynamics/symthaea/papers/binius-hdc}
+  note={Available at github.com/Luminous-Dynamics/symthaea/papers/theory-foundations/binius-hdc}
 }
 ```
