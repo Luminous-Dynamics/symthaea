@@ -1,0 +1,66 @@
+{
+  "schema": "symthaea.research.millennium_biology.evidence_event",
+  "schema_version": "1.0.0",
+  "purpose": "Canonical append-only event envelope for prospective scientific evidence lineage. This envelope records claims and observations without assigning scientific truth.",
+  "authority_boundary": {
+    "model_output_is_not_observation": true,
+    "observation_is_not_replication": true,
+    "replication_is_not_official_criterion_evidence": true,
+    "local_status_is_not_source_authority": true,
+    "events_are_append_only": true
+  },
+  "required_identity": [
+    "event_id",
+    "event_type",
+    "challenge_id",
+    "criteria_generation",
+    "mapping_generation",
+    "created_at",
+    "actor_id",
+    "provenance"
+  ],
+  "event_types": [
+    "HypothesisProposal",
+    "InSilicoPrediction",
+    "RetrospectiveBenchmarkResult",
+    "ProspectiveCommittedPrediction",
+    "ExternalExperimentalObservation",
+    "IndependentReplication",
+    "OfficialChallengeCriterionEvidence",
+    "Failure",
+    "NullResult",
+    "Contradiction"
+  ],
+  "required_provenance": {
+    "exact_input_digest": true,
+    "artifact_digest": true,
+    "parent_event_ids": true,
+    "model_lineage_when_applicable": true,
+    "knowledge_cutoff_when_applicable": true,
+    "exposure_cutoff_for_prospective_events": true
+  },
+  "immutable_after_commit": [
+    "event_id",
+    "event_type",
+    "challenge_id",
+    "criteria_generation",
+    "mapping_generation",
+    "actor_id",
+    "created_at",
+    "provenance",
+    "payload_digest"
+  ],
+  "negative_result_policy": {
+    "failure_is_first_class": true,
+    "null_result_is_first_class": true,
+    "contradiction_is_first_class": true,
+    "failed_events_must_not_be_deleted_or_rewritten": true,
+    "supersession_requires_new_event": true
+  },
+  "promotion_policy": {
+    "allowed_transitions_are_defined_by_claim_mapping": true,
+    "status_must_be_derived_from_lineage_not_free_text": true,
+    "official_criterion_evidence_requires_exact_criteria_generation": true,
+    "official_criterion_evidence_requires_complete_source_predicate": true
+  }
+}
