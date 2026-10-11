@@ -57,6 +57,8 @@ pub mod voice_feedback;
 
 // Voice pipeline orchestrator: bridges STT, cognitive loop, Broca, and TTS
 pub mod audio_bridge;
+#[cfg(all(feature = "ssm_language", feature = "vocal-tract"))]
+pub mod broca_realization;
 pub mod orchestrator;
 // synthesis_bridge deleted 2026-07-15 (voice plan P4): its
 // cycle_result_to_thought_channels had zero callers outside its own tests —
