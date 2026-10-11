@@ -230,7 +230,9 @@ def assess(m):
     # Structural errors are fatal to readiness too. Keep the reported expected gate
     # Blocked whenever either field-level blockers or schema/contract errors exist.
     expected = "Blocked" if blocking or structural else "ReadyForIndependentReview"
-    if m.get("declared_state") != expected: structural.append("declared_state inconsistent with completeness, provenance, and consistency checks")
+    if m.get("declared_state") != expected:
+        structural.append("declared_state inconsistent with completeness, provenance, and consistency checks")
+        expected = "Blocked"
     return {
         "schema": "luminous-dynamics.orbital-ring-manifest-validation/v1",
         "validation_state": "passed_contract_checks" if not structural else "failed_contract_checks",
@@ -351,6 +353,8 @@ def self_test():
     check("missing_path_constraint_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and bool(r["structural_errors"]))
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["scenario_version"]=1; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
     check("scenario_version_mismatch_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked" and "scenario_version must be 2 for scenario schema v2" in r["structural_errors"])
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["declared_state"]="Blocked"; r=assess(c)
+    check("declared_gate_mismatch_keeps_expected_gate_blocked", r["validation_state"]=="failed_contract_checks" and r["expected_gate_state"]=="Blocked" and any("declared_state inconsistent" in e for e in r["structural_errors"]))
     r=assess([])
     check("non_object_manifest_fails_closed_without_exception", r["validation_state"]=="failed_contract_checks" and "manifest must be a JSON object" in r["structural_errors"])
     c=json.loads(json.dumps(m)); c["required_inputs"]=[]; r=assess(c)
