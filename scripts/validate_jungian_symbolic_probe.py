@@ -216,7 +216,7 @@ def validate_results(data: Any, corpus: dict[str, Any], corpus_bytes: bytes) -> 
 
 
 def git_blob_sha1(data: bytes) -> str:
-    header = b"blob " + str(len(data)).encode("ascii") + b"\\0"
+    header = b"blob " + str(len(data)).encode("ascii") + b"\0"
     return hashlib.sha1(header + data).hexdigest()
 
 
