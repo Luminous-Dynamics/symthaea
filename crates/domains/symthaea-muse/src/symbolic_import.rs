@@ -1422,14 +1422,29 @@ mod tests {
         assert_eq!(motif.occurrence_evidence_complete, Some(true));
         assert_eq!(motif.matched_occurrences.len(), 2);
         assert_eq!(motif.onset_deltas.len(), 5);
-        assert!(motif.onset_deltas.iter().all(|delta| {
-            delta.numerator == 5 && delta.denominator == 24
-        }));
+        assert!(
+            motif
+                .onset_deltas
+                .iter()
+                .all(|delta| delta.numerator == 5 && delta.denominator == 24)
+        );
 
         let first = &motif.matched_occurrences[0].notes;
         let transposed = &motif.matched_occurrences[1].notes;
-        assert_eq!(first.iter().map(|note| note.score_note_index).collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5]);
-        assert_eq!(transposed.iter().map(|note| note.score_note_index).collect::<Vec<_>>(), vec![6, 7, 8, 9, 10, 11]);
+        assert_eq!(
+            first
+                .iter()
+                .map(|note| note.score_note_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(
+            transposed
+                .iter()
+                .map(|note| note.score_note_index)
+                .collect::<Vec<_>>(),
+            vec![6, 7, 8, 9, 10, 11]
+        );
         assert_eq!(first[0].midi_pitch, 60);
         assert_eq!(transposed[0].midi_pitch, 62);
         assert_eq!(first[0].onset_numerator, 0);
