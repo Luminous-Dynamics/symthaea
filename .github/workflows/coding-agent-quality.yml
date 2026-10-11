@@ -5,7 +5,6 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "Cargo.toml"
-      - "Cargo.lock"
       - "src/language/**"
       - "examples/benchmark_coding_backends.rs"
       - "examples/forecastbench_eval.rs"
