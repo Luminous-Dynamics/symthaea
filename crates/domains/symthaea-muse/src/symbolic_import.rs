@@ -1213,6 +1213,7 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         note_len: usize,
         first_start: usize,
         occurrence_count: usize,
+        independent_occurrence_count: usize,
         next_non_overlapping_start: usize,
     }
 
@@ -1228,12 +1229,14 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
                 note_len,
                 first_start: start,
                 occurrence_count: 0,
+                independent_occurrence_count: 0,
                 next_non_overlapping_start: start,
             });
-            // Sliding windows that share notes are not independent occurrences.
-            // Keep the earliest deterministic non-overlapping cover per contour.
+            // Preserve every exact match, including overlapping windows, for
+            // transparent evidence. Count independent occurrences separately.
+            stats.occurrence_count += 1;
             if start >= stats.next_non_overlapping_start {
-                stats.occurrence_count += 1;
+                stats.independent_occurrence_count += 1;
                 stats.next_non_overlapping_start = start + note_len;
             }
         }
@@ -1243,7 +1246,7 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
     // then the earliest first instance. Signature is a final stable tiebreak.
     let mut selected: Option<(u64, PatternStats)> = None;
     for (&signature, &stats) in &patterns {
-        if stats.occurrence_count < 2 {
+        if stats.independent_occurrence_count < 2 {
             continue;
         }
         let better = match selected {
@@ -1251,8 +1254,10 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
             Some((best_signature, best)) => {
                 stats.note_len > best.note_len
                     || (stats.note_len == best.note_len
-                        && (stats.occurrence_count > best.occurrence_count
-                            || (stats.occurrence_count == best.occurrence_count
+                        && (stats.independent_occurrence_count
+                            > best.independent_occurrence_count
+                            || (stats.independent_occurrence_count
+                                == best.independent_occurrence_count
                                 && (stats.first_start < best.first_start
                                     || (stats.first_start == best.first_start
                                         && signature < best_signature)))))
@@ -1272,6 +1277,7 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
                 note_len,
                 first_start: 0,
                 occurrence_count: 1,
+                independent_occurrence_count: 1,
                 next_non_overlapping_start: note_len,
             },
         )
@@ -1309,16 +1315,18 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
     }
 
     let mut occurrence_count = 0_usize;
+    let mut independent_occurrence_count = 0_usize;
     let mut next_non_overlapping_start = 0_usize;
     let mut matched_occurrences = Vec::new();
     for window_start in 0..=notes.len().saturating_sub(motif_len) {
-        if window_start < next_non_overlapping_start
-            || signature_for(window_start, motif_len) != selected_signature
-        {
+        if signature_for(window_start, motif_len) != selected_signature {
             continue;
         }
         occurrence_count += 1;
-        next_non_overlapping_start = window_start + motif_len;
+        if window_start >= next_non_overlapping_start {
+            independent_occurrence_count += 1;
+            next_non_overlapping_start = window_start + motif_len;
+        }
         if matched_occurrences.len() >= MAX_MOTIF_OCCURRENCE_EVIDENCE {
             continue;
         }
@@ -1343,18 +1351,27 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         matched_occurrences.push(ImportedMotifOccurrence { notes: references });
     }
     debug_assert_eq!(occurrence_count, selected_stats.occurrence_count);
+    debug_assert_eq!(
+        independent_occurrence_count,
+        selected_stats.independent_occurrence_count
+    );
 
-    let identity_note = if occurrence_count > 1 {
+    let identity_note = if independent_occurrence_count > 1 {
         "Longest repeated non-overlapping part-local pitch-interval contour (3–6 notes); musical function remains unspecified; contributor confirmation required"
     } else {
-        "Opening part-local pitch-interval contour; no repeat of this contour observed; musical function remains unspecified; contributor confirmation required"
+        "Opening part-local pitch-interval contour; no non-overlapping repeat of this contour observed; musical function remains unspecified; contributor confirmation required"
     };
     Some(ImportedMotifSummary {
         source_part_id: Some(part.0),
         occurrence_count,
+        independent_occurrence_count: Some(independent_occurrence_count),
         midi_pitches,
         identity_note: identity_note.into(),
-        confidence: if occurrence_count > 1 { 0.72 } else { 0.42 },
+        confidence: if independent_occurrence_count > 1 {
+            0.72
+        } else {
+            0.42
+        },
         pitch_interval_pattern,
         onset_deltas,
         matched_occurrences,
@@ -1602,8 +1619,30 @@ mod tests {
 
         assert_eq!(summary.midi_pitches, vec![60, 61, 62, 63, 64]);
         assert_eq!(summary.occurrence_count, 1);
+        assert_eq!(summary.independent_occurrence_count, Some(1));
         assert_eq!(summary.matched_occurrences.len(), 1);
-        assert!(summary.identity_note.contains("no repeat"));
+        assert!(summary.identity_note.contains("no non-overlapping repeat"));
+    }
+
+    #[test]
+    fn overlapping_matches_remain_visible_but_are_counted_separately() {
+        let pitches = [60_u8, 61, 62, 63, 64, 65, 66, 67];
+        let mut track = Vec::new();
+        for pitch in pitches {
+            track.extend_from_slice(&[0, 0x90, pitch, 100, 100, 0x80, pitch, 0]);
+        }
+        track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let summary = &analysis.motifs[0];
+
+        // Five exact four-note contour windows overlap; only starts 0 and 4
+        // are independent occurrences. The raw evidence count is not discarded.
+        assert_eq!(summary.midi_pitches, vec![60, 61, 62, 63]);
+        assert_eq!(summary.occurrence_count, 5);
+        assert_eq!(summary.independent_occurrence_count, Some(2));
+        assert_eq!(summary.matched_occurrences.len(), 5);
     }
 
     #[test]
