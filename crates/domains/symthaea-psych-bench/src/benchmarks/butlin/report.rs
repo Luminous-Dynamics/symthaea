@@ -621,12 +621,23 @@ pub struct AblationResult {
 pub struct ButlinEvidenceBundle {
     pub schema_version: u32,
     pub commit_sha: String,
+    /// Legacy/local configuration fingerprint retained for serialized compatibility.
+    /// This field is intentionally not the stable semantic identity.
     pub config_hash: String,
+    /// Stable semantic configuration identity for current producers.
+    ///
+    /// Historical bundles may omit this field rather than receiving an invented
+    /// identity. Consumers must pair it with config_identity_schema.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity: Option<String>,
+    /// Explicit schema for the stable identity carried in config_identity.
+    /// Historical bundles may omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity_schema: Option<String>,
     pub seeds: Vec<u64>,
     pub generated_at: String,
     pub ablations: Vec<AblationResult>,
 }
-
 /// Failure modes for `annotate_with_ablation_results` — a strict, provenance-checking merge.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvidenceMergeError {
@@ -1147,6 +1158,8 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
+            config_identity_schema: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-1", true, false, false)],
@@ -1173,6 +1186,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-2", true, true, false)],
@@ -1194,6 +1208,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("RPT-2", false, false, false)],
@@ -1215,6 +1230,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("GWT-2", false, false, true)],
@@ -1246,6 +1262,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result_raw(
@@ -1309,6 +1326,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result_raw(
@@ -1347,6 +1365,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result_raw(
@@ -1390,6 +1409,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-2", true, true, false)],
@@ -1487,6 +1507,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![],
@@ -1495,6 +1516,33 @@ mod tests {
         assert_eq!(
             merged.indicators[0].outcome,
             EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly)
+        );
+    }
+
+    #[test]
+    fn test_butlin_identity_fields_round_trip_additively() {
+        let bundle = ButlinEvidenceBundle {
+            schema_version: REPORT_SCHEMA_VERSION,
+            commit_sha: "test-commit".into(),
+            config_hash: "legacy-fingerprint".into(),
+            config_identity: Some("stable-identity".into()),
+            config_identity_schema: Some(
+                "symthaea:stable-config-identity:v1".into(),
+            ),
+            seeds: vec![1],
+            generated_at: "test".into(),
+            ablations: vec![],
+        };
+
+        let json = serde_json::to_string(&bundle).expect("bundle should serialize");
+        let decoded: ButlinEvidenceBundle =
+            serde_json::from_str(&json).expect("bundle should deserialize");
+
+        assert_eq!(decoded.config_hash, "legacy-fingerprint");
+        assert_eq!(decoded.config_identity.as_deref(), Some("stable-identity"));
+        assert_eq!(
+            decoded.config_identity_schema.as_deref(),
+            Some("symthaea:stable-config-identity:v1")
         );
     }
 
@@ -1508,6 +1556,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("NOT-A-REAL-ID", true, true, false)],
@@ -1528,6 +1577,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![
@@ -1553,6 +1603,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-2", true, true, false)],
@@ -1584,6 +1635,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-2", true, true, false)],
@@ -1670,6 +1722,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-1", true, false, false)],
@@ -1704,6 +1757,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![bad_result],
@@ -1743,6 +1797,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![bad_result],
@@ -1782,6 +1837,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![bad_result],
@@ -1819,6 +1875,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![good_result],
@@ -1852,6 +1909,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![result],
@@ -1885,6 +1943,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![result],
@@ -1908,6 +1967,7 @@ mod tests {
             schema_version: 2,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![],
