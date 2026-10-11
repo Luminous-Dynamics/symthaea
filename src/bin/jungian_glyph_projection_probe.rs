@@ -167,7 +167,8 @@ fn run() -> Result<(), String> {
         let mut modality_order: Vec<usize> = (0..N_FIELD_MODALITIES).collect();
         modality_order.sort_by(|left, right| {
             coords[*right]
-                .total_cmp(&coords[*left])
+                .partial_cmp(&coords[*left])
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| left.cmp(right))
         });
         let modality_scores: Vec<Value> = FieldModality::ALL
@@ -204,7 +205,8 @@ fn run() -> Result<(), String> {
         }
         glyph_rankings.sort_by(|(left_entry, left_score), (right_entry, right_score)| {
             right_score
-                .total_cmp(left_score)
+                .partial_cmp(left_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| left_entry.id.cmp(&right_entry.id))
         });
         let glyph_scores: Vec<Value> = glyph_rankings
