@@ -1,0 +1,76 @@
+name: PARADOX-001 Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/research/symthaea-structured-inconsistency/**'
+      - 'docs/research/PARADOX_000_STRUCTURED_INCONSISTENCY_PREREGISTRATION.md'
+      - '.github/workflows/paradox-001-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-001-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Bind subject and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test -f docs/research/PARADOX_000_STRUCTURED_INCONSISTENCY_PREREGISTRATION.md
+          test -f crates/research/symthaea-structured-inconsistency/Cargo.toml
+          test -f crates/research/symthaea-structured-inconsistency/Cargo.lock
+          test -f crates/research/symthaea-structured-inconsistency/rust-toolchain.toml
+          test -f crates/research/symthaea-structured-inconsistency/src/lib.rs
+
+      - name: Format
+        run: cargo fmt --manifest-path crates/research/symthaea-structured-inconsistency/Cargo.toml -- --check
+
+      - name: Check
+        run: cargo check --locked --manifest-path crates/research/symthaea-structured-inconsistency/Cargo.toml
+
+      - name: Test controls
+        run: cargo test --locked --manifest-path crates/research/symthaea-structured-inconsistency/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path crates/research/symthaea-structured-inconsistency/Cargo.toml --all-targets -- -D warnings
+
+      - name: Claim-boundary source audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=crates/research/symthaea-structured-inconsistency/src/lib.rs
+          grep -Fq 'not measurements or classifications of consciousness' "$file"
+          grep -Fq 'No external state is read or mutated.' "$file"
+          grep -Fq 'This is not observed metacognition' "$file"
+          ! grep -Eq 'crate::cognitive_loop|crate::consciousness|CognitiveLoopService|GlobalWorkspace' "$file"
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
