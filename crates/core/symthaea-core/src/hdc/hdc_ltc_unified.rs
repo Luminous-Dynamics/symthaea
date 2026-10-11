@@ -70,6 +70,82 @@ fn cfc_interpolation_alpha(dt: f32, tau: f32) -> f32 {
     -(-dt / tau).exp_m1()
 }
 
+/// Default work budget for iterative HDC-LTC evolution (maximum coordinate sweeps).
+///
+/// At the default 100 ms base time constant, this permits a 40.96 s horizon at the
+/// conservative tau/10 substep policy. Callers predicting longer horizons should choose
+/// an explicit larger budget or use the O(D)-per-jump closed-form approximation.
+pub const DEFAULT_MAX_ITERATIVE_SUBSTEPS: usize = 4096;
+
+/// Failure from checked iterative HDC-LTC/CfC evolution.
+///
+/// Every error is returned before mutation, or after restoring the prior state, evolution
+/// clock, and running statistics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IterativeEvolutionError {
+    InvalidDeltaTime,
+    InvalidConfiguration { field: &'static str },
+    InvalidSubstepBudget,
+    InputDimensionMismatch { expected: usize, actual: usize },
+    StateDimensionMismatch { expected: usize, actual: usize },
+    ParameterDimensionMismatch {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteInput { index: usize },
+    NonFiniteState { index: usize },
+    NonFiniteParameter { field: &'static str, index: usize },
+    NonFiniteNorm { field: &'static str },
+    SubstepBudgetExceeded {
+        requested_at_least: usize,
+        max_substeps: usize,
+    },
+    NonFiniteOutput { index: usize },
+}
+
+impl std::fmt::Display for IterativeEvolutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidDeltaTime => write!(f, "dt must be finite and non-negative"),
+            Self::InvalidConfiguration { field } => {
+                write!(f, "iterative evolution configuration field {field} is invalid")
+            }
+            Self::InvalidSubstepBudget => write!(f, "max_substeps must be greater than zero"),
+            Self::InputDimensionMismatch { expected, actual } => {
+                write!(f, "input dimension mismatch: expected {expected}, got {actual}")
+            }
+            Self::StateDimensionMismatch { expected, actual } => {
+                write!(f, "state dimension mismatch: expected {expected}, got {actual}")
+            }
+            Self::ParameterDimensionMismatch { field, expected, actual } => write!(
+                f,
+                "parameter {field} dimension mismatch: expected {expected}, got {actual}"
+            ),
+            Self::NonFiniteInput { index } => write!(f, "input component {index} is not finite"),
+            Self::NonFiniteState { index } => write!(f, "state component {index} is not finite"),
+            Self::NonFiniteParameter { field, index } => {
+                write!(f, "parameter {field} component {index} is not finite")
+            }
+            Self::NonFiniteNorm { field } => {
+                write!(f, "{field} norm is non-finite or overflows f32")
+            }
+            Self::SubstepBudgetExceeded {
+                requested_at_least,
+                max_substeps,
+            } => write!(
+                f,
+                "iterative step requires at least {requested_at_least} substeps, budget is {max_substeps}"
+            ),
+            Self::NonFiniteOutput { index } => {
+                write!(f, "iterative evolution produced a non-finite state at index {index}; state rolled back")
+            }
+        }
+    }
+}
+
+impl std::error::Error for IterativeEvolutionError {}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1071,49 +1147,190 @@ impl HdcLtcUnifiedNeuron {
         self.update_stats(dt);
     }
 
-    /// **ITERATIVE CLOSED-FORM EVOLUTION** - Handles nonlinear equilibrium
+    /// Fallible iterative CfC evolution with an explicit computation budget.
     ///
-    /// For accurate closed-form evolution of the nonlinear ODE where x_∞ depends on x,
-    /// this method uses sub-stepping to recompute equilibrium periodically.
+    /// The requested time horizon is never silently truncated. If the tau/10 substep
+    /// policy requires more than `max_substeps`, this returns
+    /// `SubstepBudgetExceeded` without changing state or counters. The checked path also
+    /// rejects invalid dimensions/configuration and non-finite data, and rolls back if
+    /// arithmetic produces non-finite state.
     ///
-    /// ## Strategy
-    ///
-    /// 1. Split large dt into smaller sub-steps (at most tau/10 per step)
-    /// 2. Apply closed-form exponential decay for each sub-step
-    /// 3. Recompute equilibrium after each sub-step
-    ///
-    /// This achieves O(D × dt/tau) work instead of O(D) for one jump, but provides
-    /// improved accuracy by recomputing the equilibrium at every substep.
-    ///
-    /// ## Parameters
-    ///
-    /// - `dt`: Total time to evolve
-    /// - `input`: Input hypervector (assumed constant during evolution)
-    pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
-        // Determine sub-step size based on tau
-        // Using tau/10 gives high accuracy for the nonlinear dynamics (<1% error)
-        let base_tau = self.config.tau_base;
-        let max_substep = base_tau / 10.0;
+    /// Work is O(D × N), where N is the accepted substep count. Use
+    /// `evolve_closed_form_fused` for a single O(D) approximation over large horizons.
+    pub fn try_evolve_closed_form_iterative(
+        &mut self,
+        dt: f32,
+        input: &ContinuousHV,
+        max_substeps: usize,
+    ) -> Result<(), IterativeEvolutionError> {
+        if !dt.is_finite() || dt < 0.0 {
+            return Err(IterativeEvolutionError::InvalidDeltaTime);
+        }
+        if max_substeps == 0 {
+            return Err(IterativeEvolutionError::InvalidSubstepBudget);
+        }
 
-        // Calculate number of sub-steps needed
-        let n_steps = ((dt / max_substep).ceil() as usize).max(1);
+        let expected = self.config.dimension;
+        if expected == 0 {
+            return Err(IterativeEvolutionError::InvalidConfiguration { field: "dimension" });
+        }
+        if !self.config.tau_base.is_finite() || self.config.tau_base <= 0.0 {
+            return Err(IterativeEvolutionError::InvalidConfiguration { field: "tau_base" });
+        }
+        if !self.config.backbone_tau.is_finite() {
+            return Err(IterativeEvolutionError::InvalidConfiguration { field: "backbone_tau" });
+        }
+        if !self.config.fourier_amplitude.is_finite() {
+            return Err(IterativeEvolutionError::InvalidConfiguration {
+                field: "fourier_amplitude",
+            });
+        }
+        if self.config.fourier_frequencies.iter().any(|frequency| !frequency.is_finite()) {
+            return Err(IterativeEvolutionError::InvalidConfiguration {
+                field: "fourier_frequencies",
+            });
+        }
+        if let UnifiedActivation::BoundedTanh { scale } = self.config.activation {
+            if !scale.is_finite() {
+                return Err(IterativeEvolutionError::InvalidConfiguration {
+                    field: "activation.scale",
+                });
+            }
+        }
+        if !self.total_time.is_finite() {
+            return Err(IterativeEvolutionError::InvalidConfiguration { field: "evolution_clock" });
+        }
+        if input.dim() != expected {
+            return Err(IterativeEvolutionError::InputDimensionMismatch {
+                expected,
+                actual: input.dim(),
+            });
+        }
+        if self.state.dim() != expected {
+            return Err(IterativeEvolutionError::StateDimensionMismatch {
+                expected,
+                actual: self.state.dim(),
+            });
+        }
+
+        if let Some(index) = input.values.iter().position(|value| !value.is_finite()) {
+            return Err(IterativeEvolutionError::NonFiniteInput { index });
+        }
+        if let Some(index) = self.state.values.iter().position(|value| !value.is_finite()) {
+            return Err(IterativeEvolutionError::NonFiniteState { index });
+        }
+        for (field, vector) in [
+            ("weight_hv", &self.weight_hv),
+            ("input_mask", &self.input_mask),
+            ("tau_modulator", &self.tau_modulator),
+            ("gate_weight", &self.gate_weight),
+            ("gate_bias", &self.gate_bias),
+        ] {
+            if vector.dim() != expected {
+                return Err(IterativeEvolutionError::ParameterDimensionMismatch {
+                    field,
+                    expected,
+                    actual: vector.dim(),
+                });
+            }
+            if let Some(index) = vector.values.iter().position(|value| !value.is_finite()) {
+                return Err(IterativeEvolutionError::NonFiniteParameter { field, index });
+            }
+            if !vector.norm().is_finite() {
+                return Err(IterativeEvolutionError::NonFiniteNorm { field });
+            }
+        }
+        if !input.norm().is_finite() {
+            return Err(IterativeEvolutionError::NonFiniteNorm { field: "input" });
+        }
+        if !self.state.norm().is_finite() {
+            return Err(IterativeEvolutionError::NonFiniteNorm { field: "state" });
+        }
+        if !self.running_mean.is_finite() || !self.running_var.is_finite() {
+            return Err(IterativeEvolutionError::InvalidConfiguration {
+                field: "running_statistics",
+            });
+        }
+        if dt == 0.0 {
+            return Ok(());
+        }
+
+        // Compute N in f64 before converting to usize. A finite f32 dt divided by a
+        // tiny positive time constant can still exceed usize range.
+        let requested_steps =
+            ((dt as f64) / (self.config.tau_base as f64 / 10.0)).ceil().max(1.0);
+        if requested_steps > max_substeps as f64 {
+            let requested_at_least = requested_steps.min(usize::MAX as f64) as usize;
+            return Err(IterativeEvolutionError::SubstepBudgetExceeded {
+                requested_at_least,
+                max_substeps,
+            });
+        }
+        let n_steps = requested_steps as usize;
         let sub_dt = dt / n_steps as f32;
 
-        // Apply closed-form evolution iteratively
+        let state_before = self.state.clone();
+        let total_time_before = self.total_time;
+        let update_count_before = self.update_count;
+        let running_mean_before = self.running_mean;
+        let running_var_before = self.running_var;
+
         for _ in 0..n_steps {
-            // Recompute equilibrium at current state
             let x_inf = self.compute_equilibrium(input);
             let tau = self.compute_tau(input);
-
-            // Stable interpolation coefficient avoids cancellation for tiny substeps.
             let interpolation = cfc_interpolation_alpha(sub_dt, tau);
             let weighted_equilibrium = x_inf.scale(interpolation);
             let weighted_current = self.state.scale(1.0 - interpolation);
             self.state = weighted_equilibrium.add(&weighted_current);
+
+            if let Some(index) = self.state.values.iter().position(|value| !value.is_finite()) {
+                self.state = state_before;
+                self.total_time = total_time_before;
+                self.update_count = update_count_before;
+                self.running_mean = running_mean_before;
+                self.running_var = running_var_before;
+                return Err(IterativeEvolutionError::NonFiniteOutput { index });
+            }
+            if !self.state.norm().is_finite() {
+                self.state = state_before;
+                self.total_time = total_time_before;
+                self.update_count = update_count_before;
+                self.running_mean = running_mean_before;
+                self.running_var = running_var_before;
+                return Err(IterativeEvolutionError::NonFiniteNorm { field: "evolved state" });
+            }
         }
 
         self.apply_state_bounds();
         self.update_stats(dt);
+        if let Some(index) = self.state.values.iter().position(|value| !value.is_finite()) {
+            self.state = state_before;
+            self.total_time = total_time_before;
+            self.update_count = update_count_before;
+            self.running_mean = running_mean_before;
+            self.running_var = running_var_before;
+            return Err(IterativeEvolutionError::NonFiniteOutput { index });
+        }
+        if !self.running_mean.is_finite() || !self.running_var.is_finite() || !self.total_time.is_finite() {
+            self.state = state_before;
+            self.total_time = total_time_before;
+            self.update_count = update_count_before;
+            self.running_mean = running_mean_before;
+            self.running_var = running_var_before;
+            return Err(IterativeEvolutionError::NonFiniteNorm { field: "running statistics" });
+        }
+        Ok(())
+    }
+
+    /// Compatibility wrapper for bounded iterative CfC evolution.
+    ///
+    /// Requests beyond `DEFAULT_MAX_ITERATIVE_SUBSTEPS` panic without mutating state.
+    /// New code should use `try_evolve_closed_form_iterative` to handle this condition
+    /// explicitly. The previous implementation could loop for effectively unbounded time.
+    #[deprecated(note = "Use try_evolve_closed_form_iterative with an explicit substep budget")]
+    pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
+        self.try_evolve_closed_form_iterative(dt, input, DEFAULT_MAX_ITERATIVE_SUBSTEPS)
+            .unwrap_or_else(|error| panic!("iterative CfC evolution rejected: {error}"));
     }
 
     /// Compute derivative dx/dt for given state (used by RK4)
@@ -2879,5 +3096,143 @@ mod tests {
 
         neuron.set_fourier_frequencies(&[5.0, 10.0, 15.0]);
         assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
+    }
+}
+
+
+#[cfg(test)]
+mod checked_iterative_evolution_tests {
+    use super::*;
+
+    fn neuron() -> HdcLtcUnifiedNeuron {
+        HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                ..UnifiedConfig::default()
+            },
+            4242,
+        )
+    }
+
+    fn input() -> ContinuousHV {
+        ContinuousHV::random(256, 77)
+    }
+
+    fn assert_unchanged(
+        neuron: &HdcLtcUnifiedNeuron,
+        state: &ContinuousHV,
+        clock: (f64, u64),
+        running_mean: f32,
+        running_var: f32,
+    ) {
+        assert_eq!(neuron.state(), state);
+        assert_eq!(neuron.evolution_clock(), clock);
+        assert_eq!(neuron.running_mean, running_mean);
+        assert_eq!(neuron.running_var, running_var);
+    }
+
+    #[test]
+    fn checked_iterative_rejects_invalid_time_without_mutation() {
+        for dt in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0] {
+            let mut neuron = neuron();
+            let input = input();
+            let state = neuron.state().clone();
+            let clock = neuron.evolution_clock();
+            let mean = neuron.running_mean;
+            let var = neuron.running_var;
+            assert_eq!(
+                neuron.try_evolve_closed_form_iterative(dt, &input, 100),
+                Err(IterativeEvolutionError::InvalidDeltaTime)
+            );
+            assert_unchanged(&neuron, &state, clock, mean, var);
+        }
+    }
+
+    #[test]
+    fn checked_iterative_rejects_over_budget_before_converting_or_mutating() {
+        let mut neuron = neuron();
+        let input = input();
+        let state = neuron.state().clone();
+        let clock = neuron.evolution_clock();
+        let mean = neuron.running_mean;
+        let var = neuron.running_var;
+        let error = neuron.try_evolve_closed_form_iterative(f32::MAX, &input, 4096);
+        assert!(matches!(
+            error,
+            Err(IterativeEvolutionError::SubstepBudgetExceeded {
+                max_substeps: 4096,
+                ..
+            })
+        ));
+        assert_unchanged(&neuron, &state, clock, mean, var);
+    }
+
+    #[test]
+    fn checked_iterative_zero_dt_is_a_true_noop() {
+        let mut neuron = neuron();
+        let input = input();
+        neuron
+            .try_evolve_closed_form_iterative(0.1, &input, 100)
+            .unwrap();
+        let state = neuron.state().clone();
+        let clock = neuron.evolution_clock();
+        let mean = neuron.running_mean;
+        let var = neuron.running_var;
+        assert_eq!(neuron.try_evolve_closed_form_iterative(0.0, &input, 1), Ok(()));
+        assert_unchanged(&neuron, &state, clock, mean, var);
+    }
+
+    #[test]
+    fn checked_iterative_valid_step_respects_budget_and_advances_clock_once() {
+        let mut neuron = neuron();
+        let input = input();
+        assert_eq!(neuron.try_evolve_closed_form_iterative(0.2, &input, 20), Ok(()));
+        assert!(neuron.state().values.iter().all(|value| value.is_finite()));
+        assert_eq!(neuron.evolution_clock().1, 1);
+        assert!((neuron.total_time() - 0.2).abs() < 1.0e-6);
+        assert!(neuron.state().norm() <= 5.001);
+    }
+
+    #[test]
+    fn checked_iterative_rejects_bad_dimensions_and_nonfinite_input() {
+        let mut neuron = neuron();
+        let wrong_dim = ContinuousHV::zero(255);
+        assert_eq!(
+            neuron.try_evolve_closed_form_iterative(0.1, &wrong_dim, 100),
+            Err(IterativeEvolutionError::InputDimensionMismatch {
+                expected: 256,
+                actual: 255
+            })
+        );
+        let mut bad_input = input();
+        bad_input.values[17] = f32::NAN;
+        assert_eq!(
+            neuron.try_evolve_closed_form_iterative(0.1, &bad_input, 100),
+            Err(IterativeEvolutionError::NonFiniteInput { index: 17 })
+        );
+    }
+
+    #[test]
+    fn checked_iterative_rolls_back_nonfinite_fourier_output() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 256,
+                fourier_frequencies: vec![f32::MAX],
+                fourier_amplitude: 0.1,
+                ..UnifiedConfig::default()
+            },
+            4242,
+        );
+        neuron.set_evolution_clock(1.0e20, 7);
+        let input = input();
+        let state = neuron.state().clone();
+        let clock = neuron.evolution_clock();
+        let mean = neuron.running_mean;
+        let var = neuron.running_var;
+        assert_eq!(
+            neuron.try_evolve_closed_form_iterative(0.1, &input, 100),
+            Err(IterativeEvolutionError::NonFiniteOutput { index: 0 })
+        );
+        assert_unchanged(&neuron, &state, clock, mean, var);
     }
 }
