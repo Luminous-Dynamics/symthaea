@@ -168,7 +168,9 @@ impl NixOSCommand {
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
 
-            Self::Custom { safety_level, .. } => *safety_level,
+            // Custom is deliberately ungoverned; never trust its embedded label
+            // for planning or confirmation metadata.
+            Self::Custom { .. } => SafetyLevel::Destructive,
         }
     }
 
@@ -454,6 +456,13 @@ impl NixOSExecutor {
     /// re-checking a synthetic score. See
     /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        if matches!(&command, NixOSCommand::Custom { .. }) && !self.dry_run {
+            return ExecutionResult::Blocked {
+                reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
+                safety_level: SafetyLevel::Destructive,
+            };
+        }
+
         let safety = command.safety_level();
         let required_phi = safety.required_phi();
 
@@ -575,6 +584,13 @@ impl NixOSExecutor {
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        if matches!(&command, NixOSCommand::Custom { .. }) && !self.dry_run {
+            return ExecutionResult::Blocked {
+                reason: "unguarded Custom command requires a typed Nixward effect".to_string(),
+                safety_level: SafetyLevel::Destructive,
+            };
+        }
+
         let (cmd, args) = command.to_command();
 
         info!(
@@ -667,6 +683,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_custom_safety_label_cannot_reduce_authority_tier() {
+        let custom = NixOSCommand::Custom {
+            command: "echo".into(),
+            args: vec!["hello".into()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        assert_eq!(custom.safety_level(), SafetyLevel::Destructive);
+    }
+
+
+    #[test]
     fn test_command_safety_levels() {
         let search = NixOSCommand::Search {
             query: "vim".to_string(),
@@ -736,6 +763,44 @@ mod tests {
         assert_eq!(SafetyLevel::UserModify.required_phi(), 0.3);
         assert_eq!(SafetyLevel::SystemCritical.required_phi(), 0.4);
         assert_eq!(SafetyLevel::Destructive.required_phi(), 0.6);
+    }
+
+    #[tokio::test]
+    async fn test_custom_command_cannot_mint_authority_from_read_only_label() {
+        let custom = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "touch /tmp/nixward-custom-bypass".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        let mut executor = NixOSExecutor::new();
+        let result = executor.execute(custom.clone(), 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { reason, safety_level: SafetyLevel::Destructive }
+                if reason.contains("unguarded Custom")
+        ));
+
+        let result = executor.execute_confirmed(custom, 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked { reason, safety_level: SafetyLevel::Destructive }
+                if reason.contains("unguarded Custom")
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_custom_command_remains_previewable_in_dry_run() {
+        let custom = NixOSCommand::Custom {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "touch /tmp/nixward-custom-bypass".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let result = executor.execute(custom, 1.0).await;
+        match result {
+            ExecutionResult::Success { stdout, .. } => assert!(stdout.contains("[DRY-RUN]")),
+            other => panic!("expected dry-run preview, got {:?}", other),
+        }
     }
 
     #[tokio::test]
