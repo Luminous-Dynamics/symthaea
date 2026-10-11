@@ -24,15 +24,20 @@
       "url": "https://github.com/PeptoneLtd/peptonebench",
       "paper_doi": "10.1101/2025.10.18.680935",
       "code_license_reported_by_upstream": "Apache-2.0",
-      "revision_pinned": false,
-      "disposition": "reuse_candidate_pending_revision_pin_and_reference_reproduction",
+      "revision_pinned": true,
+      "disposition": "pinned_static_audit_complete_runtime_reference_reproduction_pending",
       "required_checks": [
-        "pin immutable source commit",
-        "audit dependencies and forward-model environment",
-        "reproduce one reference case from documented inputs",
-        "separate pre-reweighting and post-reweighting results",
+        "pin immutable source commit (complete: f161b5220a52ebd1a715c91a68beef125101608e)",
+        "audit scoring, failure reporting, dataset download integrity and ESS semantics (static audit documented; runtime still pending)",
+        "resolve and record dependency versions and immutable forward-model environment digests",
+        "hash a minimal source dataset subset and all reference inputs",
+        "reproduce one labelled reference case in a fresh environment",
+        "separate pre-reweighting, same-observable post-reweighting, and genuinely held-out-observable results",
         "check target overlap with model training and exposure"
-      ]
+      ],
+      "revision": "f161b5220a52ebd1a715c91a68beef125101608e",
+      "revision_url": "https://github.com/PeptoneLtd/peptonebench/commit/f161b5220a52ebd1a715c91a68beef125101608e",
+      "pinned_source_audit": "docs/research/PEPTONEBENCH_PINNED_SOURCE_AUDIT_2026-10-11.md"
     },
     {
       "source_id": "ped",
