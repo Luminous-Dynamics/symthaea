@@ -2272,6 +2272,29 @@ mod tests {
     }
 
     #[test]
+    fn test_dense_condition_number_estimate_is_scale_invariant() {
+        let matrix = vec![vec![3.0e-100, 0.0], vec![0.0, 1.0e-100]];
+        let condition = try_condition_number_estimate(&matrix, 100)
+            .expect("direct SVD should estimate condition for a scaled matrix");
+        assert!((condition - 3.0).abs() < 1e-8);
+        assert!((condition_number_estimate(&matrix, 100) - 3.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn test_dense_condition_number_estimate_handles_singular_and_malformed_inputs() {
+        let singular = vec![vec![1.0, 2.0], vec![2.0, 4.0]];
+        assert!(
+            try_condition_number_estimate(&singular, 100)
+                .expect("singular matrix should still have a condition classification")
+                .is_infinite()
+        );
+
+        let malformed = vec![vec![1.0, 0.0], vec![0.0]];
+        assert!(try_condition_number_estimate(&malformed, 100).is_err());
+        assert!(condition_number_estimate(&malformed, 100).is_nan());
+    }
+
+    #[test]
     fn test_svd_checked_api_rejects_non_finite_input_and_wrapper_fails_closed() {
         let mut a = HdcMatrix::identity(2);
         a.data[0] = f64::NAN;
