@@ -174,7 +174,7 @@ fn bragg_slater_radius(z: u8) -> f64 {
 /// 6-point Lebedev grid (octahedral symmetry).
 /// Returns (x, y, z, weight) for points on the unit sphere.
 fn lebedev_6() -> Vec<(f64, f64, f64, f64)> {
-    let w = 1.0 / 6.0; // 4π/6 normalized to sum=4π... actually sum of weights = 4π
+    let w = 1.0 / 6.0; // Normalized angular weights sum to 1; the radial weight carries 4π.
     // For integration: Σ w_i f(r_i) ≈ ∫ f dΩ / (4π), so w_i should sum to 1
     // We normalize so Σ w = 1 (weights are for ∫ f(Ω) dΩ/(4π))
     vec![
@@ -418,22 +418,88 @@ mod tests {
             );
         }
 
-        // 4. Quartic moment identity: x^2+y^2+z^2=1 pointwise on the unit
-        // sphere, so squaring and integrating gives
-        // E[x^4]+E[y^4]+E[z^4] + 2*(E[x^2y^2]+E[x^2z^2]+E[y^2z^2]) = E[1] = 1
-        // exactly -- a real constraint any degree->=4-exact rule must
-        // satisfy, derived here, not looked up.
-        let e_x4: f64 = pts.iter().map(|&(x, _, _, w)| w * x.powi(4)).sum();
-        let e_y4: f64 = pts.iter().map(|&(_, y, _, w)| w * y.powi(4)).sum();
-        let e_z4: f64 = pts.iter().map(|&(_, _, z, w)| w * z.powi(4)).sum();
-        let e_x2y2: f64 = pts.iter().map(|&(x, y, _, w)| w * x * x * y * y).sum();
-        let e_x2z2: f64 = pts.iter().map(|&(x, _, z, w)| w * x * x * z * z).sum();
-        let e_y2z2: f64 = pts.iter().map(|&(_, y, z, w)| w * y * y * z * z).sum();
-        let quartic_identity = e_x4 + e_y4 + e_z4 + 2.0 * (e_x2y2 + e_x2z2 + e_y2z2);
+        // Weight normalization and unit-sphere checks are structural invariants.
+        // They do not establish a rule's polynomial exactness; see the explicit
+        // analytic spherical-moment tests below for that stronger contract.
+    }
+
+    /// Integrate a monomial using normalized spherical weights.
+    fn weighted_spherical_moment(
+        pts: &[(f64, f64, f64, f64)],
+        powers: [i32; 3],
+    ) -> f64 {
+        pts.iter()
+            .map(|&(x, y, z, w)| {
+                w * x.powi(powers[0]) * y.powi(powers[1]) * z.powi(powers[2])
+            })
+            .sum()
+    }
+
+    fn assert_spherical_moment(
+        pts: &[(f64, f64, f64, f64)],
+        powers: [i32; 3],
+        exact: f64,
+        label: &str,
+    ) {
+        let numerical = weighted_spherical_moment(pts, powers);
         assert!(
-            (quartic_identity - 1.0).abs() < 1e-10,
-            "{label}: quartic identity = {quartic_identity}, expected 1"
+            (numerical - exact).abs() < 2e-10,
+            "{label}: moment x^{} y^{} z^{} = {numerical:.15e}, expected {exact:.15e}",
+            powers[0],
+            powers[1],
+            powers[2],
         );
+    }
+
+    #[test]
+    fn test_lebedev_rules_match_their_spherical_moment_exactness() {
+        // For the normalized uniform-sphere measure,
+        // E[x^(2a)y^(2b)z^(2c)] = ((2a-1)!!(2b-1)!!(2c-1)!!)
+        //                                   / (2(a+b+c)+1)!!.
+        // These are independent analytic targets; sphere membership plus a
+        // weight sum of one alone cannot catch a wrong Lebedev orbit weight.
+        let lebedev6 = lebedev_6();
+        for (powers, exact) in [
+            ([2, 0, 0], 1.0 / 3.0),
+            ([0, 2, 0], 1.0 / 3.0),
+            ([0, 0, 2], 1.0 / 3.0),
+        ] {
+            assert_spherical_moment(&lebedev6, powers, exact, "Lebedev-6 (degree 3)");
+        }
+
+        // Lebedev-26 is degree 7 exact.
+        let lebedev26 = lebedev_26();
+        for (powers, exact) in [
+            ([2, 0, 0], 1.0 / 3.0),
+            ([4, 0, 0], 1.0 / 5.0),
+            ([2, 2, 0], 1.0 / 15.0),
+            ([6, 0, 0], 1.0 / 7.0),
+            ([4, 2, 0], 1.0 / 35.0),
+            ([2, 2, 2], 1.0 / 105.0),
+        ] {
+            assert_spherical_moment(&lebedev26, powers, exact, "Lebedev-26 (degree 7)");
+        }
+
+        // Lebedev-50 is degree 11 exact; the higher moments exercise its
+        // 24-point (p,p,q) orbit as well as the shared lower-order orbits.
+        let lebedev50 = lebedev_50();
+        for (powers, exact) in [
+            ([2, 0, 0], 1.0 / 3.0),
+            ([4, 0, 0], 1.0 / 5.0),
+            ([2, 2, 0], 1.0 / 15.0),
+            ([6, 0, 0], 1.0 / 7.0),
+            ([4, 2, 0], 1.0 / 35.0),
+            ([2, 2, 2], 1.0 / 105.0),
+            ([8, 0, 0], 1.0 / 9.0),
+            ([6, 2, 0], 1.0 / 63.0),
+            ([4, 4, 0], 1.0 / 105.0),
+            ([10, 0, 0], 1.0 / 11.0),
+            ([8, 2, 0], 1.0 / 99.0),
+            ([6, 4, 0], 1.0 / 231.0),
+            ([4, 4, 2], 1.0 / 1155.0),
+        ] {
+            assert_spherical_moment(&lebedev50, powers, exact, "Lebedev-50 (degree 11)");
+        }
     }
 
     #[test]
