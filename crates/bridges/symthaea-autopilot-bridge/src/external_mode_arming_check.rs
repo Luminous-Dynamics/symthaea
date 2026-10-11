@@ -1473,6 +1473,30 @@ mod tests {
         Px4ExternalModeSetpointConfigRequestV1,
     };
 
+    #[derive(serde::Deserialize)]
+    struct Px4ArmingCheckReplayCorpusV1 {
+        schema_version: u16,
+        cases: Vec<Px4ArmingCheckReplayCaseV1>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Px4ArmingCheckReplayCaseV1 {
+        case_id: String,
+        kind: String,
+        expected: String,
+        request_id: u8,
+        registration_id: u8,
+        request_source_timestamp_us: u64,
+        reply_source_timestamp_us: u64,
+        request_window_id: String,
+        reply_window_id: String,
+        request_received_at_ns: u64,
+        reply_received_at_ns: u64,
+        assessment_at_ns: u64,
+        config_assessed_at_ns: u64,
+        duplicate_second_received_at_ns: Option<u64>,
+    }
+
     fn clock() -> ClockDomainId {
         ClockDomainId::new("companion.monotonic").unwrap()
     }
@@ -2302,6 +2326,183 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, Px4ExternalModeArmingCheckError::InvalidEventCount { found: 6 });
+    }
+
+    #[test]
+    fn deterministic_px4_arming_check_replay_corpus_v1() {
+        use std::collections::BTreeSet;
+
+        const CORPUS_JSON: &str =
+            include_str!("../tests/fixtures/px4_arming_check_replay_corpus_v1.json");
+        let corpus: Px4ArmingCheckReplayCorpusV1 =
+            serde_json::from_str(CORPUS_JSON).expect("replay corpus JSON must parse");
+        assert_eq!(corpus.schema_version, 1);
+
+        let mut case_ids = BTreeSet::new();
+        for case in corpus.cases {
+            assert!(
+                case_ids.insert(case.case_id.clone()),
+                "duplicate replay case ID: {}",
+                case.case_id
+            );
+
+            match case.kind.as_str() {
+                "duplicate_observation" => {
+                    assert_eq!(case.expected, "same_source_different_observation");
+                    let second_receive = case
+                        .duplicate_second_received_at_ns
+                        .expect("duplicate case must define its second receive time");
+                    let events = [
+                        Px4ExternalModeArmingCheckEventV1::default();
+                        PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+                    ];
+                    let first = arming_reply_in_window_with_diagnostics(
+                        &case.reply_window_id,
+                        case.request_id,
+                        case.registration_id,
+                        false,
+                        case.reply_received_at_ns,
+                        case.reply_source_timestamp_us,
+                        0,
+                        false,
+                        false,
+                        false,
+                        0,
+                        events,
+                    )
+                    .unwrap();
+                    let duplicate = arming_reply_in_window_with_diagnostics(
+                        &case.reply_window_id,
+                        case.request_id,
+                        case.registration_id,
+                        false,
+                        second_receive,
+                        case.reply_source_timestamp_us,
+                        0,
+                        false,
+                        false,
+                        false,
+                        0,
+                        events,
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        first.source_payload_fingerprint_hex().unwrap(),
+                        duplicate.source_payload_fingerprint_hex().unwrap(),
+                        "source fingerprint mismatch for {}",
+                        case.case_id
+                    );
+                    assert_ne!(
+                        first.reply_digest_hex, duplicate.reply_digest_hex,
+                        "observation commitment collapsed for {}",
+                        case.case_id
+                    );
+                    assert_ne!(
+                        first.received_at.nanoseconds, duplicate.received_at.nanoseconds,
+                        "duplicate fixture must preserve distinct receive times: {}",
+                        case.case_id
+                    );
+                }
+                "assessment" => {
+                    let request = arming_request_in_window(
+                        case.request_id,
+                        case.request_source_timestamp_us,
+                        &case.request_window_id,
+                        1_u32 << u32::from(case.registration_id),
+                        case.request_received_at_ns,
+                    );
+                    let events = [
+                        Px4ExternalModeArmingCheckEventV1::default();
+                        PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+                    ];
+                    let reply = arming_reply_in_window_with_diagnostics(
+                        &case.reply_window_id,
+                        case.request_id,
+                        case.registration_id,
+                        false,
+                        case.reply_received_at_ns,
+                        case.reply_source_timestamp_us,
+                        0,
+                        false,
+                        false,
+                        false,
+                        0,
+                        events,
+                    )
+                    .unwrap();
+                    let result = Px4ExternalModeArmingCheckAssessmentV1::new(
+                        profile_with_window(&case.request_window_id),
+                        registration(
+                            true,
+                            case.registration_id as i8,
+                            42,
+                        ),
+                        config_assessment(
+                            42,
+                            true,
+                            0,
+                            case.config_assessed_at_ns,
+                        ),
+                        request,
+                        Some(reply),
+                        ts(case.assessment_at_ns),
+                    );
+
+                    match case.expected.as_str() {
+                        "source_timestamp_regression" => assert_eq!(
+                            result.unwrap_err(),
+                            Px4ExternalModeArmingCheckError::ReplySourceTimestampRegression,
+                            "unexpected result for {}",
+                            case.case_id
+                        ),
+                        "capture_window_mismatch" => assert_eq!(
+                            result.unwrap_err(),
+                            Px4ExternalModeArmingCheckError::CaptureWindowMismatch,
+                            "unexpected result for {}",
+                            case.case_id
+                        ),
+                        "requirements_match" => assert!(
+                            matches!(
+                                result.unwrap().outcome().unwrap(),
+                                Px4ExternalModeArmingCheckOutcomeV1::RequirementsMatch {
+                                    ..
+                                }
+                            ),
+                            "expected requirement match for {}",
+                            case.case_id
+                        ),
+                        "reply_observed_too_late" => assert!(
+                            matches!(
+                                result.unwrap().outcome().unwrap(),
+                                Px4ExternalModeArmingCheckOutcomeV1::ReplyObservedTooLate {
+                                    ..
+                                }
+                            ),
+                            "expected late-reply classification for {}",
+                            case.case_id
+                        ),
+                        "stale_reply" => assert!(
+                            matches!(
+                                result.unwrap().outcome().unwrap(),
+                                Px4ExternalModeArmingCheckOutcomeV1::StaleReply { .. }
+                            ),
+                            "expected stale-reply classification for {}",
+                            case.case_id
+                        ),
+                        other => panic!(
+                            "unrecognized expected result {other:?} in case {}",
+                            case.case_id
+                        ),
+                    }
+                }
+                other => panic!(
+                    "unrecognized replay case kind {other:?} in case {}",
+                    case.case_id
+                ),
+            }
+        }
+
+        assert_eq!(case_ids.len(), 6, "corpus case count changed unexpectedly");
     }
 
     #[test]
