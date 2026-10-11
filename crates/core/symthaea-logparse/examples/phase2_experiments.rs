@@ -345,19 +345,31 @@ fn run_scenario_classifier(
         ),
     }
 
-    let (train_hvs, train_labels, test_hvs, test_labels) =
-        symthaea_logparse::probe::grouped_stratified_split(
-            &source_hvs,
-            &source_labels,
-            &source_groups,
-            0.8,
-            0x51CE_0001,
-        )?;
-    let probe = LogisticProbe::train(&train_hvs, &train_labels, cfg);
-    let held_out_predictions = probe.predict_batch(&test_hvs);
-    let held_out_report =
-        classification_report(&test_labels, &held_out_predictions, &probe.class_names)?;
-    print_classification_report("source-capture holdout", &held_out_report);
+    let probe = match symthaea_logparse::probe::grouped_stratified_split(
+        &source_hvs,
+        &source_labels,
+        &source_groups,
+        0.8,
+        0x51CE_0001,
+    ) {
+        Ok((train_hvs, train_labels, test_hvs, test_labels)) => {
+            let probe = LogisticProbe::train(&train_hvs, &train_labels, cfg);
+            let held_out_predictions = probe.predict_batch(&test_hvs);
+            let held_out_report =
+                classification_report(&test_labels, &held_out_predictions, &probe.class_names)?;
+            print_classification_report("source-capture holdout", &held_out_report);
+            probe
+        }
+        Err(error) => {
+            println!(
+                "  source-capture holdout unavailable under the strict group contract: {error}"
+            );
+            println!(
+                "  fitting all source scenarios for independent-corpus OOD only; no holdout score claimed"
+            );
+            LogisticProbe::train(&source_hvs, &source_labels, cfg)
+        }
+    };
 
     let ood_predictions = probe.predict_batch(&held_out_hvs);
     let ood_report = classification_report(
