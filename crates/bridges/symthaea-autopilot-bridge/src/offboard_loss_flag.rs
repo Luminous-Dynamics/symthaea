@@ -852,6 +852,25 @@ mod tests {
     }
 
     #[test]
+    fn input_observation_order_is_canonicalized_for_assessment_identity() {
+        let earlier = observation(10, 1_000, false, 1_000_000_000);
+        let later = observation(11, 2_000, true, 1_100_000_000);
+        let forward = Px4OffboardLossFlagAssessmentV1::new(
+            profile(),
+            ts(1_200_000_000),
+            vec![earlier.clone(), later.clone()],
+        )
+        .unwrap();
+        let reverse = Px4OffboardLossFlagAssessmentV1::new(
+            profile(),
+            ts(1_200_000_000),
+            vec![later, earlier],
+        )
+        .unwrap();
+        assert_eq!(forward.assessment_id().unwrap(), reverse.assessment_id().unwrap());
+    }
+
+    #[test]
     fn zero_samples_are_incomplete_not_zero_loss() {
         let value = assessment(vec![], 1_000);
         assert_eq!(
