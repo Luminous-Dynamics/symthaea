@@ -254,7 +254,7 @@ def valid_results_stub(corpus: dict[str, Any], corpus_bytes: bytes) -> dict[str,
     }
 
 
-def self_test(data: dict[str, Any]) -> list[str]:
+def self_test(data: dict[str, Any], corpus_bytes: bytes) -> list[str]:
     failures: list[str] = []
     if validate_corpus(data):
         failures.append("canonical corpus unexpectedly fails")
@@ -306,6 +306,9 @@ def self_test(data: dict[str, Any]) -> list[str]:
         "epistemic_status": "InterpretationHypothesis",
     })
     results_mutations.append(("reject unbound hypothesis evidence", mutation, "reference to evidence outside the frozen case"))
+    mutation = copy.deepcopy(good_results)
+    mutation["corpus_sha256"] = "f" * 64
+    results_mutations.append(("reject mismatched corpus digest", mutation, "corpus SHA-256 mismatch"))
     mutation = copy.deepcopy(good_results)
     mutation["source_revision"] = "not-a-git-object-id"
     results_mutations.append(("reject weak source identity", mutation, "full lowercase Git object ID"))
@@ -366,12 +369,12 @@ def main() -> int:
         print(f"PASS normalized result structure: {len(results_data['results'])} cases")
 
     if args.self_test:
-        failures = self_test(data)
+        failures = self_test(data, corpus_bytes)
         if failures:
             for failure in failures:
                 print(f"FAIL self-test: {failure}", file=sys.stderr)
             return 1
-        print("PASS self-test: 11 hostile mutations plus normalized-results positive control")
+        print("PASS self-test: 12 hostile mutations plus normalized-results positive control; pinned corpus Git blob")
     return 0
 
 
