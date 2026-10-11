@@ -168,6 +168,35 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     }
                     key_events.push((tick, (sf, is_minor)));
                 }
+                TrackEventKind::Meta(MetaMessage::MidiPort(_)) => {
+                    return Err(
+                        "MIDI port-routing metadata is not supported; Score cannot preserve output-port identity or safely pair cross-track notes"
+                            .into(),
+                    );
+                }
+                TrackEventKind::Meta(MetaMessage::MidiChannel(_)) => {
+                    return Err(
+                        "MIDI channel-routing metadata is not supported by the pitched-note Score importer"
+                            .into(),
+                    );
+                }
+                TrackEventKind::Meta(MetaMessage::SmpteOffset(_)) => {
+                    return Err(
+                        "MIDI SMPTE start offsets are not supported by the beat-relative Score importer"
+                            .into(),
+                    );
+                }
+                TrackEventKind::Meta(MetaMessage::SequencerSpecific(_)) => {
+                    return Err(
+                        "MIDI sequencer-specific metadata is not interpreted by the Score importer"
+                            .into(),
+                    );
+                }
+                TrackEventKind::Meta(MetaMessage::Unknown(kind, _)) => {
+                    return Err(format!(
+                        "MIDI unknown meta-event type 0x{kind:02X} is not supported by the Score importer"
+                    ));
+                }
                 TrackEventKind::Midi { channel, message } => {
                     let channel = channel.as_int();
                     let note_event = match message {
@@ -1266,6 +1295,42 @@ mod tests {
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("unsupported playback event"), "{error}");
+    }
+
+    #[test]
+    fn midi_port_routing_is_rejected_before_cross_track_note_pairing() {
+        let track = [
+            0, 0xFF, 0x21, 1, 1, // select non-default MIDI port
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("MIDI port-routing metadata is not supported"), "{error}");
+    }
+
+    #[test]
+    fn midi_smpte_start_offset_is_rejected_in_beat_relative_score() {
+        let track = [
+            0, 0xFF, 0x54, 5, 0, 0, 0, 0, 0, // zero-valued valid SMPTE offset
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("MIDI SMPTE start offsets are not supported"), "{error}");
+    }
+
+    #[test]
+    fn midi_unknown_meta_event_is_rejected_instead_of_dropped() {
+        let track = [
+            0, 0xFF, 0x70, 1, 0x7D, // unknown meta-event 0x70
+            0, 0x90, 60, 100,
+            1, 0x80, 60, 0,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let error = parse_midi(&midi_file(&track)).unwrap_err();
+        assert!(error.contains("MIDI unknown meta-event type 0x70"), "{error}");
     }
 
     #[test]
