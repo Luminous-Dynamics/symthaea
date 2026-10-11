@@ -187,18 +187,33 @@ fn provider_family(provider: &str, component: &str) -> &'static str {
     let provider = normalized_source_token(provider);
     let component = normalized_source_token(component);
 
-    if provider.contains("sysmon") || component.contains("sysmon") {
-        "sysmon"
-    } else if provider.contains("securityauditing")
-        || (provider.is_empty() && component == "security")
-    {
-        "security_audit"
+    let provider_hint = if provider.contains("sysmon") {
+        Some("sysmon")
+    } else if provider.contains("securityauditing") {
+        Some("security_audit")
     } else if provider.contains("servicecontrolmanager") {
-        "service_control_manager"
-    } else if provider.contains("powershell") || component.contains("powershell") {
-        "powershell"
+        Some("service_control_manager")
+    } else if provider.contains("powershell") {
+        Some("powershell")
     } else {
-        "unknown"
+        None
+    };
+
+    let component_hint = if component.contains("sysmon") {
+        Some("sysmon")
+    } else if component.contains("powershell") {
+        Some("powershell")
+    } else if provider.is_empty() && component == "security" {
+        Some("security_audit")
+    } else {
+        None
+    };
+
+    match (provider_hint, component_hint) {
+        (Some(provider), Some(component)) if provider != component => "unknown",
+        (Some(provider), _) => provider,
+        (None, Some(component)) => component,
+        (None, None) => "unknown",
     }
 }
 
@@ -448,6 +463,32 @@ mod tests {
             "",
         ));
         assert_eq!(sysmon_network, security_network);
+    }
+
+    #[test]
+    fn domain_invariant_encoding_rejects_conflicting_provider_and_channel_hints() {
+        let conflicting = encode_domain_invariant(&ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        ));
+        let unknown_namespace = encode_domain_invariant(&ev(
+            "Vendor-Unknown-Provider",
+            90001,
+            "",
+        ));
+        let mut conflicting_event = ev(
+            "Microsoft-Windows-Security-Auditing",
+            4688,
+            "",
+        );
+        conflicting_event.component = "Microsoft-Windows-Sysmon/Operational".into();
+        assert_eq!(
+            encode_domain_invariant(&conflicting_event),
+            unknown_namespace,
+            "contradictory provider and channel hints must fail closed"
+        );
+        assert_ne!(conflicting, unknown_namespace);
     }
 
     #[test]
