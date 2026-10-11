@@ -47,7 +47,7 @@ Tracking: [#7336 — enforce resolver-backed outcome admission and real timeouts
 
 The \`SelfModel\` stub in \`magi_integration.rs\` initializes capability values from a shared prior, updates an estimate through an observed scalar and learning rate, and uses that estimate as the confidence reported by \`predict_behavior\`. It does not, by itself, bind a particular skill claim to a forecast committed before execution and a verified later outcome for the exact source/configuration/evaluation profile.
 
-The new capability-ledger primitive in [PR #7349](https://github.com/Luminous-Dynamics/symthaea/pull/7349) is the first proposed foundation for that missing link. It is intentionally not described as a complete learning loop yet: runtime forecast emission, trusted receipt verification, and end-to-end skill evaluation remain to be integrated.
+The capability-ledger primitive in [PR #7349](https://github.com/Luminous-Dynamics/symthaea/pull/7349) now requires an opaque `VerifiedCapabilityOutcomeReceipt` at outcome admission. The token has private fields and no serde implementation; qualification policy pins both evaluator identity/revision and independent-verifier identity/revision. A regression test confirms that receipts from a verifier identity not pinned by policy contribute no qualification samples. This is an API boundary, not cryptographic verification: the production verifier that authenticates signatures/artifacts and issues the token is still absent, so a production caller currently cannot mint a token and qualification intentionally fails closed. Runtime forecast emission, verifier integration, and end-to-end skill evaluation remain open.
 
 ### Gap 4 — the full loop is not qualified by source presence
 
@@ -70,7 +70,7 @@ with \`Restricted\`, \`Suspended\`, and \`Retired\` as fail-closed or terminal s
 
 The ledger computes Brier score and ECE for prospective success probabilities, retains expected/actual compute values for later analysis, enforces a single monotonically increasing event sequence across all accepted forecasts and outcomes, prevents cross-subject resolution and rejects duplicate receipt roots within one ledger. Empty calibration metrics are represented as unavailable, not perfect.
 
-**Trust boundary:** the ledger checks metadata and bindings; it is not a cryptographic artifact verifier. Its input receipt must already have been authenticated by the external evidence pipeline. A caller-supplied digest string alone is not proof that a run occurred.
+**Trust boundary:** raw `CapabilityOutcomeReceipt` data is not accepted by the qualification admission method. Qualification stores only the opaque `VerifiedCapabilityOutcomeReceipt` token and filters on policy-pinned evaluator and verifier identities/revisions. The token constructor is private and the token cannot be serialized/deserialized; the only current constructor use is synthetic unit-test setup. This prevents external callers from promoting an arbitrary digest string into a qualification receipt through the public API, but does not itself authenticate an artifact. The future nested verifier must independently verify the exact artifact/signature and evidence root before issuing tokens. Until that implementation exists, no production qualification receipt can enter the ledger.
 
 The existing `symthaea-evidence-plane` crate is a measured-counter/integrity contract (`EvidenceCounters`, `Expectation`, `check_integrity`), not an outcome-signature verifier. Its `config_hash` documentation explicitly states that it uses `DefaultHasher` over a debug representation and is not cryptographic or security-sensitive. It may be useful for recording instrumentation counters, but it must not be repurposed as the trust anchor for resolver receipts. Outcome qualification needs authenticated provenance and exact prediction/subject binding.
 
@@ -78,8 +78,8 @@ The existing `symthaea-evidence-plane` crate is a measured-counter/integrity con
 
 1. Enforce timeouts and unresolved results in both the synchronous resolver and the async runtime subprocess path.
 2. Preserve `tests_passed: None` as unresolved/not-qualified rather than success; bind compile/test claims to the relevant independent receipts.
-3. Add a resolver result/receipt type that binds outcome to prediction ID, exact subject, evaluator revision, chronology, and evidence root.
-4. Make verified receipt admission—not an arbitrary outcome argument—the only production route into qualification-grade calibration.
+3. Implement the independent verifier that authenticates artifact/signature bytes and the content-addressed evidence root, binds the receipt to prediction ID, exact subject/configuration/evaluation profile, committed forecast sequence, and resolver/evaluator identity and revision, then issues `VerifiedCapabilityOutcomeReceipt` through the private module boundary. The ledger API now refuses raw receipt payloads, so production qualification remains unavailable until this verifier is wired in.
+4. Connect the private verified-token issuance boundary only to that reviewed verifier path; caller-created digests, metadata-only checks, serialized tokens, and synthetic test fixtures must never become production qualification evidence.
 5. Connect MAGI's per-capability forecast emission and resolved outcomes to the ledger in PR #7349.
 6. Run focused tests on the exact integrated commit, then measure held-out transfer, calibration, and the actual downstream effect on decision selection.
 
