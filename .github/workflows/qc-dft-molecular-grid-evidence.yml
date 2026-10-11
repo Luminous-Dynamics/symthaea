@@ -195,6 +195,29 @@ jobs:
               for reason in counts.get("failure_reasons", []):
                   lines.append(f"- Failure detail: {reason}")
 
+              lines += [
+                  "",
+                  "#### Within-engine grid convergence (independent of cross-engine error)",
+                  "",
+                  "| Molecule | Engine | Coarse→Medium ΔE (Ha) | Medium→Fine ΔE (Ha) | Fine→High ΔE (Ha) | Coarse electron-count error | High electron-count error |",
+                  "|---|---|---:|---:|---:|---:|---:|",
+              ]
+              for curve in comparison.get("grid_convergence", []):
+                  for engine, prefix, count_field in [
+                      ("Symthaea", "native", "native_integrated_electron_count_abs_error_by_grid"),
+                      ("PySCF", "pyscf", "pyscf_integrated_electron_count_abs_error_by_grid"),
+                  ]:
+                      deltas = curve.get(f"{prefix}_delta_to_previous_grid_hartree", {})
+                      errors = curve.get(count_field, {})
+                      def fmt(value):
+                          return "—" if value is None else f"{value:.3e}"
+                      lines.append(
+                          f"| {curve.get('molecule')} | {engine} | "
+                          f"{fmt(deltas.get('medium'))} | {fmt(deltas.get('fine'))} | "
+                          f"{fmt(deltas.get('high_accuracy'))} | "
+                          f"{fmt(errors.get('coarse'))} | {fmt(errors.get('high_accuracy'))} |"
+                      )
+
           lines += [
               "",
               "A grid-electron count is a quadrature diagnostic; it is not silently forced to the exact integer.",
