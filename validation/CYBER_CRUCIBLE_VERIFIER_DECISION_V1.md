@@ -27,7 +27,7 @@ The payload binds the exact campaign, subject, attempt, scenario ID/revision/dig
 
 `context_digest` is SHA-256 over RFC 8785 JCS of the complete externally supplied expected-context object with exactly the fields defined in the verifier. That expected context MUST be independently supplied by a trusted consumer/operator; it MUST NOT be copied from the decision receipt itself.
 
-The verifier build digest is also externally supplied. A signed self-assertion inside a receipt does not establish the executable that actually ran. Production provenance therefore belongs to a separate trusted release/attestation channel; this verifier checks only the digest binding.
+The verifier build digest is also externally supplied. A signed self-assertion inside a receipt does not establish the executable that actually ran. Production provenance therefore belongs to a separate trusted release/attestation channel; this verifier checks only the digest binding. Issued/expiry timestamps are signer claims checked against the verifier's local clock; this contract does not establish a trusted timestamping service or a rollback-resistant clock.
 
 ## Trust policy and replay
 
