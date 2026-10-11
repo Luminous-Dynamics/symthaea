@@ -166,6 +166,57 @@ impl HdcVector {
     }
 }
 
+/// Complete a row-major square matrix whose first `initial_columns` columns are already orthonormal.
+fn complete_orthonormal_columns(
+    data: &mut [f64],
+    dimension: usize,
+    initial_columns: usize,
+) -> Result<(), String> {
+    if dimension == 0
+        || dimension.checked_mul(dimension) != Some(data.len())
+        || initial_columns > dimension
+    {
+        return Err("orthonormal completion received invalid dimensions".to_string());
+    }
+
+    let threshold = f64::EPSILON * dimension as f64 * 100.0;
+    let mut filled = initial_columns;
+    for candidate_index in 0..dimension {
+        if filled == dimension {
+            break;
+        }
+
+        let mut column = vec![0.0; dimension];
+        column[candidate_index] = 1.0;
+        // Modified Gram-Schmidt with a second pass to control loss of
+        // orthogonality when the supplied columns are nearly aligned with e_i.
+        for _ in 0..2 {
+            for prior in 0..filled {
+                let projection: f64 = (0..dimension)
+                    .map(|row| column[row] * data[row * dimension + prior])
+                    .sum();
+                for row in 0..dimension {
+                    column[row] -= projection * data[row * dimension + prior];
+                }
+            }
+        }
+
+        let norm = column.iter().map(|value| value * value).sum::<f64>().sqrt();
+        if norm.is_finite() && norm > threshold {
+            for row in 0..dimension {
+                data[row * dimension + filled] = column[row] / norm;
+            }
+            filled += 1;
+        }
+    }
+
+    if filled == dimension {
+        Ok(())
+    } else {
+        Err("failed to complete an orthonormal basis".to_string())
+    }
+}
+
 impl HdcMatrix {
     /// Create a new matrix from row-major data
     pub fn new(data: Vec<f64>, rows: usize, cols: usize) -> Self {
@@ -742,109 +793,207 @@ impl HdcMatrix {
                     &format!("QR converged after {} iterations", iter + 1),
                     "qr_eigen",
                     0.2,
-                );
-                break;
-            }
-        }
-
-        let mut eigenvalues: Vec<f64> = (0..n).map(|i| a.get(i, i)).collect();
-        eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-
-        result.verified = true;
-        (eigenvalues, result)
-    }
-
-    /// Full eigendecomposition for symmetric matrices.
-    /// Returns (eigenvalues, eigenvectors_as_columns).
-    pub fn eigen_symmetric(&self) -> (Vec<f64>, HdcMatrix, LinAlgResult) {
-        assert!(self.is_square());
-        let n = self.rows;
-        let mut result = LinAlgResult::new(format!("{}x{} symmetric eigendecomposition", n, n));
-
-        let mut a = self.clone();
-        let mut v = HdcMatrix::identity(n);
-
-        for iter in 0..MAX_QR_ITERATIONS {
-            let (q, r, _) = a.qr_decompose();
-            let (new_a, _) = r.mul(&q);
-            let (new_v, _) = v.mul(&q);
-            a = new_a;
-            v = new_v;
-
-            let mut off_diag = 0.0;
-            for i in 0..n {
-                for j in 0..n {
-                    if i != j {
-                        off_diag += a.get(i, j).abs();
-                    }
-                }
-            }
-
-            if off_diag < DEFAULT_TOLERANCE * (n * n) as f64 {
-                result.add_step(
-                    &format!("Eigen converged after {} iterations", iter + 1),
-                    "qr_eigen",
-                    0.3,
-                );
-                break;
-            }
-        }
-
-        let eigenvalues: Vec<f64> = (0..n).map(|i| a.get(i, i)).collect();
-        result.verified = true;
-        (eigenvalues, v, result)
-    }
-
-    // ─── SVD ─────────────────────────────────────────────────────────────
-
-    /// Singular Value Decomposition: A = U Σ V^T
+        /// Singular Value Decomposition: A = U Σ V^T.
     ///
-    /// Returns (singular_values, U, V) where:
-    /// - singular_values: min(m,n) values sorted by descending magnitude
-    /// - U: m×m orthogonal matrix (left singular vectors)
-    /// - V: n×n orthogonal matrix (right singular vectors)
+    /// Returns (singular_values, U, V) where singular values are in descending
+    /// order, U is m×m orthogonal, and V is n×n orthogonal. This preserves the
+    /// historical full-basis shape contract while computing the singular values
+    /// directly from A rather than from AᵀA.
     ///
-    /// Uses eigendecomposition of A^T A. Handles rectangular matrices correctly.
-    /// The SVD tolerance for rank determination is `SVD_TOLERANCE = 1e-9`.
+    /// The compatibility wrapper fails closed on malformed input or solver
+    /// exhaustion: singular values are NaN, the result is unverified, and the
+    /// failure is recorded in its trace. Call try_svd() to receive the error.
     pub fn svd(&self) -> (Vec<f64>, HdcMatrix, HdcMatrix, LinAlgResult) {
-        let mut result = LinAlgResult::new(format!("{}x{} SVD", self.rows, self.cols));
+        match self.try_svd() {
+            Ok(result) => result,
+            Err(error) => {
+                let mut result =
+                    LinAlgResult::new(format!("{}x{} SVD (failed closed)", self.rows, self.cols));
+                result.add_step(&format!("SVD failed closed: {}", error), "svd_failure", 0.0);
+                result.verified = false;
+                (
+                    vec![f64::NAN; self.rows.min(self.cols)],
+                    HdcMatrix::identity(self.rows),
+                    HdcMatrix::identity(self.cols),
+                    result,
+                )
+            }
+        }
+    }
+
+    /// Checked direct SVD with explicit convergence, residual and orthogonality checks.
+    ///
+    /// Uses nalgebra's fallible direct SVD, avoiding the condition-number squaring
+    /// caused by an AᵀA eigendecomposition. The normalized input keeps the iterative
+    /// solver away from avoidable overflow for very large but finite matrix scales.
+    pub fn try_svd(
+        &self,
+    ) -> Result<(Vec<f64>, HdcMatrix, HdcMatrix, LinAlgResult), String> {
         let m = self.rows;
         let n = self.cols;
-        let min_mn = m.min(n);
-
-        // A^T A (n×n) gives V and σ²
-        let at = self.transpose();
-        let (ata, _) = at.mul(self);
-        let (eigenvalues, v, _) = ata.eigen_symmetric();
-
-        let singular_values: Vec<f64> = eigenvalues
-            .iter()
-            .take(min_mn) // only min(m,n) singular values are meaningful
-            .map(|&e| if e > 0.0 { e.sqrt() } else { 0.0 })
-            .collect();
-
-        // Consistent rank threshold: use SVD_TOLERANCE for ALL rank decisions
-        let rank = singular_values
-            .iter()
-            .filter(|&&s| s > SVD_TOLERANCE)
-            .count();
-
-        // U = A V Σ^{-1} for the first `rank` columns
-        // AV has shape m × n; we only use the first `rank` columns
-        let (av, _) = self.mul(&v);
-        let mut u_data = vec![0.0; m * m];
-
-        for j in 0..rank.min(min_mn) {
-            let inv_sigma = 1.0 / singular_values[j];
-            for i in 0..m {
-                // av is m×n, so j must be < n (guaranteed since rank ≤ min(m,n))
-                u_data[i * m + j] = av.get(i, j) * inv_sigma;
-            }
+        let k = m.min(n);
+        if m == 0 || n == 0 || m.checked_mul(n) != Some(self.data.len()) {
+            return Err("SVD matrix shape is empty or inconsistent with its data".to_string());
+        }
+        if self.data.iter().any(|value| !value.is_finite()) {
+            return Err("SVD input contains a non-finite value".to_string());
         }
 
-        // Fill remaining columns (rank..m) with orthogonal complement via
-        // modified Gram-Schmidt against existing U columns.
-        // Try each standard basis vector e_k as candidate; if linearly
+        let scale = self.data.iter().fold(0.0_f64, |max_value, value| {
+            max_value.max(value.abs())
+        });
+        let mut result = LinAlgResult::new(format!("{}x{} direct SVD", m, n));
+
+        if scale == 0.0 {
+            result.add_step("Zero matrix has zero singular values", "svd_zero", 0.3);
+            result.verified = true;
+            return Ok((
+                vec![0.0; k],
+                HdcMatrix::identity(m),
+                HdcMatrix::identity(n),
+                result,
+            ));
+        }
+
+        let normalized_data: Vec<f64> = self.data.iter().map(|value| value / scale).collect();
+        let normalized = nalgebra::DMatrix::from_row_slice(m, n, &normalized_data);
+        let max_dim = m.max(n);
+        let max_iterations = max_dim.saturating_mul(max_dim).saturating_mul(20).max(1);
+        let decomposition = nalgebra::linalg::SVD::try_new(
+            normalized,
+            true,
+            true,
+            f64::EPSILON,
+            max_iterations,
+        )
+        .ok_or_else(|| "direct SVD did not converge within its iteration budget".to_string())?;
+
+        let u_thin = decomposition
+            .u
+            .ok_or_else(|| "direct SVD did not return left singular vectors".to_string())?;
+        let v_t_thin = decomposition
+            .v_t
+            .ok_or_else(|| "direct SVD did not return right singular vectors".to_string())?;
+        let singular_values_normalized: Vec<f64> =
+            decomposition.singular_values.iter().copied().collect();
+
+        if singular_values_normalized.len() != k
+            || singular_values_normalized
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+            || singular_values_normalized.windows(2).any(|pair| pair[0] < pair[1])
+        {
+            return Err("direct SVD returned invalid or unordered singular values".to_string());
+        }
+
+        // Expand nalgebra's thin factors to the full square U/V matrices required
+        // by the existing public API. The thin columns remain paired with σ.
+        let mut u_data = vec![0.0; m * m];
+        for i in 0..m {
+            for j in 0..k {
+                u_data[i * m + j] = u_thin[(i, j)];
+            }
+        }
+        complete_orthonormal_columns(&mut u_data, m, k)?;
+
+        let mut v_data = vec![0.0; n * n];
+        for i in 0..n {
+            for j in 0..k {
+                v_data[i * n + j] = v_t_thin[(j, i)];
+            }
+        }
+        complete_orthonormal_columns(&mut v_data, n, k)?;
+
+        let orthogonality_residual = |data: &[f64], dim: usize| -> f64 {
+            let mut maximum = 0.0_f64;
+            for i in 0..dim {
+                for j in 0..dim {
+                    let mut dot = 0.0;
+                    for row in 0..dim {
+                        dot += data[row * dim + i] * data[row * dim + j];
+                    }
+                    let expected = if i == j { 1.0 } else { 0.0 };
+                    maximum = maximum.max((dot - expected).abs());
+                }
+            }
+            maximum
+        };
+        let u_orthogonality_residual = orthogonality_residual(&u_data, m);
+        let v_orthogonality_residual = orthogonality_residual(&v_data, n);
+
+        // Independently reconstruct the normalized input in Frobenius norm.
+        let mut residual_squared = 0.0;
+        let mut input_norm_squared = 0.0;
+        for i in 0..m {
+            for j in 0..n {
+                let expected = normalized_data[i * n + j];
+                let mut reconstructed = 0.0;
+                for singular_index in 0..k {
+                    reconstructed += u_data[i * m + singular_index]
+                        * singular_values_normalized[singular_index]
+                        * v_data[j * n + singular_index];
+                }
+                let residual = reconstructed - expected;
+                residual_squared += residual * residual;
+                input_norm_squared += expected * expected;
+            }
+        }
+        let relative_reconstruction_residual =
+            residual_squared.sqrt() / input_norm_squared.sqrt().max(f64::MIN_POSITIVE);
+
+        if !relative_reconstruction_residual.is_finite()
+            || relative_reconstruction_residual > 1e-8
+            || !u_orthogonality_residual.is_finite()
+            || u_orthogonality_residual > 1e-8
+            || !v_orthogonality_residual.is_finite()
+            || v_orthogonality_residual > 1e-8
+        {
+            return Err(format!(
+                "direct SVD quality gates failed (reconstruction={:.3e}, U-orthogonality={:.3e}, V-orthogonality={:.3e})",
+                relative_reconstruction_residual,
+                u_orthogonality_residual,
+                v_orthogonality_residual
+            ));
+        }
+
+        let singular_values: Vec<f64> = singular_values_normalized
+            .iter()
+            .map(|value| value * scale)
+            .collect();
+        if singular_values.iter().any(|value| !value.is_finite()) {
+            return Err("rescaling singular values overflowed f64".to_string());
+        }
+
+        let sigma_max = singular_values.iter().copied().fold(0.0_f64, f64::max);
+        let rank_tolerance = max_dim as f64 * SVD_TOLERANCE * sigma_max;
+        let rank = singular_values
+            .iter()
+            .filter(|&&value| value > rank_tolerance)
+            .count();
+
+        result.add_step(
+            &format!(
+                "Direct SVD qualified: {} singular values, rank={}, reconstruction residual={:.3e}, U/V orthogonality residuals={:.3e}/{:.3e}",
+                singular_values.len(),
+                rank,
+                relative_reconstruction_residual,
+                u_orthogonality_residual,
+                v_orthogonality_residual
+            ),
+            "svd",
+            0.3,
+        );
+        result.verified = true;
+
+        Ok((
+            singular_values,
+            HdcMatrix::new(u_data, m, m),
+            HdcMatrix::new(v_data, n, n),
+            result,
+        ))
+    }
+
+basis vector e_k as candidate; if linearly
         // independent from existing columns, orthogonalize and add.
         let mut filled = rank;
         for candidate_idx in 0..m {
