@@ -6,12 +6,12 @@
     "sha256": "c4eabd9a2e02f246d7d337926b9a8f0e422f1eced879d1ed57c2c26b1ffc98c2"
   },
   "current_validator": {
-    "expected_self_test_check_count": 85,
-    "git_blob_sha": "734fae84c6d5b1fb7b895b56b021a75892546206",
+    "expected_self_test_check_count": 88,
+    "git_blob_sha": "692f88489756e6b045cf2f1b9200a0974ea0860c",
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
-    "sha256": "532de2bb5707db127fa9a031e233e25100673491e658d0b2173845bfeebf85f4"
+    "sha256": "44b3e8500221879be9efeb0faedc95d5873df4c3a063c080bc19338afbaaeb25"
   },
-  "execution_note": "Validator suite (85 expected checks) and reference-checker suite (66 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify exact hashes, repeat outputs byte-for-byte, and compare the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors and declared-state mismatch both force expected_gate_state=Blocked.",
+  "execution_note": "Validator suite (88 expected checks) and reference-checker suite (66 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify exact hashes, repeat outputs byte-for-byte, and compare the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors, malformed populated fields/provenance, and declared-state mismatch force expected_gate_state=Blocked; contract validation fails for malformed populated fields.",
   "last_executed_reference_check": {
     "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
     "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
@@ -31,6 +31,9 @@
   "physics_claim": "none; these checks cover manifest contract handling only, not orbital-ring equilibrium, stability, or survivability",
   "schema": "luminous-dynamics.orbital-ring-validator-verification-status/v1",
   "unexecuted_regressions": [
+    "wrong_numeric_type_fails_contract_validation",
+    "invalid_populated_provenance_fails_contract_validation",
+    "unknown_top_level_key_fails_structural_gate",
     "non_object_manifest_fails_closed_without_exception",
     "non_object_required_inputs_fails_structural_gate",
     "unexpected_input_key_fails_structural_gate",
