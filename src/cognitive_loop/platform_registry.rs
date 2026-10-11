@@ -124,4 +124,20 @@ mod tests {
                 .contains(&EmbodimentPlatform::Quadrotor)
         );
     }
+
+    #[cfg(feature = "orbital")]
+    #[test]
+    fn capability_query_finds_orbital_servicer_without_constructing_it() {
+        use symthaea_core::embodiment::EmbodimentPlatform;
+        use symthaea_core::platform_descriptor::{
+            MissionRole, OperatingEnvironment, PlatformRegistryDescriptorExt,
+        };
+
+        let registry = build_platform_registry();
+        let matches = registry.platforms_supporting(
+            MissionRole::Servicing,
+            OperatingEnvironment::OrbitalMicrogravity,
+        );
+        assert!(matches.contains(&EmbodimentPlatform::Orbital));
+    }
 }

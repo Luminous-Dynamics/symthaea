@@ -70,6 +70,9 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Typed, capability-composed descriptors for embodiment discovery and routing.
+#[allow(missing_docs)]
+pub mod platform_descriptor;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;

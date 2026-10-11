@@ -109,6 +109,11 @@ impl DomainProfile {
     }
 }
 
+/// Legacy four-axis projection of the canonical typed platform descriptor.
+///
+/// New code should prefer `symthaea_core::platform_descriptor::PlatformDescriptor`.
+/// This compatibility surface remains so older domain-routing callers do not
+/// need to migrate atomically.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PlatformCapabilityProfile {
     pub manipulation: f64,
@@ -119,75 +124,52 @@ pub struct PlatformCapabilityProfile {
 
 impl PlatformCapabilityProfile {
     pub fn for_platform(platform: symthaea_core::embodiment::EmbodimentPlatform) -> Self {
-        use symthaea_core::embodiment::EmbodimentPlatform;
-        match platform {
-            EmbodimentPlatform::Humanoid => Self {
-                manipulation: 0.8,
-                locomotion: 0.9,
-                perception: 0.7,
-                communication: 0.5,
-            },
-            EmbodimentPlatform::Quadrotor => Self {
-                manipulation: 0.0,
-                locomotion: 0.9,
-                perception: 0.8,
-                communication: 0.7,
-            },
-            EmbodimentPlatform::Vehicle => Self {
-                manipulation: 0.0,
-                locomotion: 1.0,
-                perception: 0.6,
-                communication: 0.8,
-            },
-            EmbodimentPlatform::Helicopter => Self {
-                manipulation: 0.0,
-                locomotion: 0.95,
-                perception: 0.7,
-                communication: 0.6,
-            },
-            EmbodimentPlatform::Auv => Self {
-                manipulation: 0.3,
-                locomotion: 0.7,
-                perception: 0.5,
-                communication: 0.2,
-            },
-            EmbodimentPlatform::Manipulator => Self {
-                manipulation: 1.0,
-                locomotion: 0.0,
-                perception: 0.6,
-                communication: 0.4,
-            },
-            EmbodimentPlatform::Exoskeleton => Self {
-                manipulation: 0.5,
-                locomotion: 0.8,
-                perception: 0.3,
-                communication: 0.3,
-            },
-            EmbodimentPlatform::Surgical => Self {
-                manipulation: 1.0,
-                locomotion: 0.0,
-                perception: 0.9,
-                communication: 0.5,
-            },
-            EmbodimentPlatform::Orbital => Self {
-                manipulation: 0.9,
-                locomotion: 0.0,
-                perception: 0.4,
-                communication: 0.3,
-            },
-            EmbodimentPlatform::Quadruped => Self {
-                manipulation: 0.0,
-                locomotion: 0.85,
-                perception: 0.7,
-                communication: 0.5,
-            },
-            _ => Self::default(),
+        let strengths = platform.descriptor().strengths;
+        Self {
+            manipulation: strengths.manipulation,
+            locomotion: strengths.locomotion,
+            perception: strengths.perception,
+            communication: strengths.communication,
         }
     }
+
     pub fn supports_domain(&self, _domain: &str) -> bool {
         true
     }
+
     pub fn preferred_domain_profile(&self) -> DomainProfile {
         DomainProfile::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_core::embodiment::EmbodimentPlatform;
+    use symthaea_core::platform_descriptor::{MissionRole, OperatingEnvironment};
+
+    #[test]
+    fn legacy_profile_is_projection_of_canonical_descriptor() {
+        let platform = EmbodimentPlatform::Humanoid;
+        let legacy = PlatformCapabilityProfile::for_platform(platform);
+        let strengths = platform.descriptor().strengths;
+        assert_eq!(legacy.manipulation, strengths.manipulation);
+        assert_eq!(legacy.locomotion, strengths.locomotion);
+        assert_eq!(legacy.perception, strengths.perception);
+        assert_eq!(legacy.communication, strengths.communication);
+    }
+
+    #[test]
+    fn newer_platforms_no_longer_collapse_to_zero_capability() {
+        let profile = PlatformCapabilityProfile::for_platform(EmbodimentPlatform::Infrastructure);
+        assert!(profile.perception > 0.0);
+        assert!(profile.communication > 0.0);
+    }
+
+    #[test]
+    fn typed_descriptor_carries_role_and_environment_separately() {
+        let descriptor = EmbodimentPlatform::Orbital.descriptor();
+        assert!(descriptor.supports_role(MissionRole::Servicing));
+        assert!(descriptor.supports_environment(OperatingEnvironment::OrbitalMicrogravity));
     }
 }
