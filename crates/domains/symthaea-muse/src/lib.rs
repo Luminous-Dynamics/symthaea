@@ -202,9 +202,9 @@ pub mod study_release;
 pub mod study_runner;
 #[cfg(feature = "theory")]
 pub mod symbolic_import;
+pub mod synth;
 #[cfg(feature = "theory")]
 pub mod teaching_corpus;
-pub mod synth;
 #[cfg(feature = "theory")]
 pub mod temporal_confirmatory;
 #[cfg(feature = "theory")]
