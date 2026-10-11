@@ -94,22 +94,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Experiment 1: Scale-up single 80/20 split on full sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 1: scale-up (sbousseaden full corpus, grouped 80/20 split) ===");
-    let (tr_hv, tr_y, te_hv, te_y) =
-        symthaea_logparse::probe::grouped_stratified_split(
+    let (scale_up_probe, test_acc) =
+        match symthaea_logparse::probe::grouped_stratified_split(
             &sbou_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
-        )?;
-    println!(
-        "  train={}, test={}, classes={}",
-        tr_hv.len(),
-        te_hv.len(),
-        shared_labels.len()
-    );
-    let probe1 = LogisticProbe::train(&tr_hv, &tr_y, cfg);
-    let train_acc = probe1.accuracy(&tr_hv, &tr_y);
-    let test_acc = probe1.accuracy(&te_hv, &te_y);
-    println!("  train accuracy: {train_acc:.3}");
-    println!("  test accuracy:  {test_acc:.3}");
-    let scale_up_probe = probe1;
+        ) {
+            Ok((tr_hv, tr_y, te_hv, te_y)) => {
+                println!(
+                    "  train={}, test={}, classes={}",
+                    tr_hv.len(),
+                    te_hv.len(),
+                    shared_labels.len()
+                );
+                let probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
+                let train_acc = probe.accuracy(&tr_hv, &tr_y);
+                let held_out_acc = probe.accuracy(&te_hv, &te_y);
+                println!("  train accuracy: {train_acc:.3}");
+                println!("  grouped holdout accuracy: {held_out_acc:.3}");
+                (probe, Some(held_out_acc))
+            }
+            Err(error) => {
+                println!(
+                    "  grouped source holdout unavailable under the strict capture-group contract: {error}"
+                );
+                println!(
+                    "  fitting all source events for independent-corpus OOD only; no in-corpus holdout score claimed"
+                );
+                (
+                    LogisticProbe::train(&sbou_hvs, &sbou_labels, cfg),
+                    None,
+                )
+            }
+        };
 
     // ----------------------------------------------------------------
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
@@ -146,7 +161,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  test  corpus: OTRF        ({} events)", otrf_hvs.len());
     let ood_test_acc = scale_up_probe.accuracy(&otrf_hvs, &otrf_labels);
     println!("  OOD test accuracy: {ood_test_acc:.3}");
-    println!("  (reference: same-distribution test was {test_acc:.3})");
+    if let Some(held_out_acc) = test_acc {
+        println!("  (reference: grouped same-distribution holdout was {held_out_acc:.3})");
+    } else {
+        println!("  (no same-distribution holdout estimate; group support was insufficient)");
+    }
 
     // Cross-corpus evaluation includes class-level precision/recall/F1 and
     // a confusion matrix. OTRF is not a benign baseline, so this is not an
@@ -161,7 +180,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Summary
     // ----------------------------------------------------------------
     println!("\n=== Phase 2 summary ===");
-    println!("  sbousseaden single split:    {test_acc:.3}");
+    if let Some(held_out_acc) = test_acc {
+        println!("  sbousseaden grouped holdout: {held_out_acc:.3}");
+    } else {
+        println!("  sbousseaden grouped holdout: unavailable (insufficient independent source groups)");
+    }
     println!("  sbousseaden 5-fold CV:       {mean:.3} ± {std:.3}");
     println!("  OOD (train sbou, test otrf): {ood_test_acc:.3}");
     println!("  chance (7 classes):          {:.3}", 1.0 / 7.0);
@@ -175,18 +198,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let sbou_di_hvs: Vec<Hdv> = sbou_events.iter().map(encode_domain_invariant).collect();
         let otrf_di_hvs: Vec<Hdv> = otrf_events.iter().map(encode_domain_invariant).collect();
-        let (tr_hv, tr_y, te_hv, te_y) =
-            symthaea_logparse::probe::grouped_stratified_split(
+        let (di_probe, di_in_distribution) =
+            match symthaea_logparse::probe::grouped_stratified_split(
                 &sbou_di_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
-            )?;
-        let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
-        let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
+            ) {
+                Ok((tr_hv, tr_y, te_hv, te_y)) => {
+                    let probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
+                    let held_out_acc = probe.accuracy(&te_hv, &te_y);
+                    (probe, Some(held_out_acc))
+                }
+                Err(error) => {
+                    println!(
+                        "  domain-invariant source holdout unavailable under strict group contract: {error}"
+                    );
+                    println!("  using all source events for independent-corpus OOD only");
+                    (
+                        LogisticProbe::train(&sbou_di_hvs, &sbou_labels, cfg),
+                        None,
+                    )
+                }
+            };
         let di_ood_predictions = di_probe.predict_batch(&otrf_di_hvs);
         let di_ood_report =
             classification_report(&otrf_labels, &di_ood_predictions, &di_probe.class_names)?;
 
-        println!("  baseline raw in-distribution accuracy: {test_acc:.3}");
-        println!("  ablation in-distribution accuracy:      {di_in_distribution:.3}");
+        if let Some(held_out_acc) = test_acc {
+            println!("  baseline raw grouped holdout accuracy: {held_out_acc:.3}");
+        } else {
+            println!("  baseline raw grouped holdout accuracy: unavailable");
+        }
+        if let Some(held_out_acc) = di_in_distribution {
+            println!("  ablation grouped holdout accuracy:      {held_out_acc:.3}");
+        } else {
+            println!("  ablation grouped holdout accuracy:      unavailable");
+        }
         println!("  baseline raw OOD accuracy:              {ood_test_acc:.3}");
         println!("  ablation OOD accuracy:                  {:.3}", di_ood_report.accuracy);
         println!("  baseline raw OOD macro recall:          {:.3}", raw_ood_report.macro_recall);
