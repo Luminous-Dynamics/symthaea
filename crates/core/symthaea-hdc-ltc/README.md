@@ -2,7 +2,7 @@
 
 **O(D) work per temporal update, independent of elapsed time at fixed D.**
 
-A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a hypervector (16,384 dimensions by default) evolved with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump each perform one O(D) coordinate pass. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
+A standalone Rust crate implementing the Hyperdimensional Liquid Time-Constant (HDC-LTC) unified neuron architecture. The neuron's *state* is a hypervector (16,384 dimensions by default) evolved with a solver-free Closed-form Continuous (CfC) update. At fixed dimension, the update cost does not grow with the elapsed time horizon: a 1 ms jump and a 100 s jump perform the same fixed number of O(D) passes. The shared state-complexity factor `backbone_tau` modulates the base time constant, while per-coordinate state/input terms preserve heterogeneous time scales. CfC is an efficient closed-form approximation for liquid time-constant dynamics, not an exact integrator for every arbitrary nonlinear LTC ODE.
 
 ## The Key Insight
 
@@ -13,6 +13,7 @@ Traditional recurrent neural networks have two scaling problems:
 HDC-LTC solves both:
 - **Weight hypervectors** replace a dense recurrent matrix with per-dimension HDC binding (element-wise multiply): O(D) parameters per neuron. This is a more compact, structured parameterization—not an equivalent replacement for every possible dense recurrent map.
 - **Closed-form exponential update** avoids repeated ODE solver substeps: O(D) per jump, independent of dt
+- **Multi-timescale dynamics** combine `backbone_tau` state-complexity modulation with per-coordinate state/input modulation; the checked API rejects non-finite or negative `backbone_tau`
 
 The closed-form solution:
 ```
@@ -46,7 +47,7 @@ neuron.try_evolve_closed_form_fused(100.0, &input).expect("valid 100 s step");
 ## Performance
 
 - **Neuron evolution**: O(D) per step, independent of dt; it is not O(1) in the hypervector dimension
-- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses a scaled sum-of-squares norm reduction into the update pass; it assumes the caller supplies valid dimensions and well-scaled finite values. State components are revisited only when the norm bound is exceeded
+- **Fused hot path**: `evolve_closed_form_fused()` avoids intermediate heap allocations and fuses a scaled sum-of-squares *post-update bound check* into the update pass. The shared state norm used by `backbone_tau` is computed before that pass. The hot path assumes matching dimensions and well-scaled finite values
 - **Checked path**: `try_evolve_closed_form_fused()` validates dt, dimensions, configuration and finite inputs/parameters, then verifies the evolved state; if arithmetic overflow produces a non-finite result, it restores the prior state and counters. Validation and rollback safety add O(D) scans and a state clone
 - **Small-step stability**: CfC interpolation uses `-expm1(-dt / tau)` to avoid cancellation for tiny positive dt
 - **fast_tanh**: Rational approximation (max 0.4% error) that auto-vectorizes on modern CPUs
