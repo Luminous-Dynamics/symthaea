@@ -84,7 +84,27 @@ Report per system and aggregated, with confidence intervals:
 
 Do not report only the best seed, best formula, or mean training score. Publish every attempted run, including failed searches and incomplete validation.
 
-## 7. Immutable run artifact
+## 7. Preregistered statistical analysis
+
+The following analysis is part of the protocol, not a choice to make after viewing results.
+
+### Primary outcome and comparison
+
+- The unit of analysis is one attempted search run, not each candidate formula. A run is a **recovery success** only when at least one candidate meets the frozen symbolic-equivalence/domain-oracle criterion and passes the independent holdout protocol, including the second-step-size stability check. Empty searches, invalid outputs, and incomplete holdout coverage are failures for the primary recovery outcome and remain in the denominator.
+- The primary confirmatory contrast is cold discovery versus the random-expression control. The secondary contrast is cold versus primed discovery.
+- Pair runs by system and discovery-seed label. Use the same sealed holdout initial-condition set for the modes within each pair, generated from a dedicated holdout seed namespace that is disjoint from discovery seeds and all tuning runs. This common holdout reduces condition-to-condition variance without allowing holdout results to influence search.
+- Report the per-system paired recovery difference and the macro-average across the frozen systems, so a system with many candidates or unusually easy equations cannot dominate the result. Use a 95% stratified bootstrap interval by resampling paired seeds within each system for the fixed-suite estimand. Because a small number of systems limits inference to new system families, any broader generalization claim must be explicitly separated and qualified.
+- State the numerator and denominator for every rate. For false-discovery rate, count oracle-invalid candidates that pass the numerical holdout rule divided by all candidates that pass the numerical rule. If no candidate passes, report the rate as undefined with a zero accepted-candidate count, not as a measured 0% false-discovery rate. Also report the per-run probability of at least one false discovery.
+
+### Multiplicity and decision rule
+
+- Use the frozen 30 paired search-seed labels per system for confirmatory estimates. Exploratory pilot runs and any runs used to change the harness, grammar, or thresholds are excluded from confirmatory estimates.
+- The primary comparison uses a two-sided 95% interval for the paired macro-average difference. Support superiority of cold over random only if the interval's lower bound is greater than zero and the frozen false-discovery guardrail is not violated. Report effect size in absolute percentage points as well as recovery ratios.
+- Treat per-system tests, alternative integration settings, and additional metrics as secondary. Apply Holm correction across families of per-system confirmatory claims; label uncorrected exploratory findings as exploratory.
+- Report compute and recovery jointly. Publish the recovery difference beside candidate fitness evaluations, RHS calls, integration steps, expression-evaluation work where instrumented, wall time, and peak memory. A recovery-rate gain with substantially greater work is not an efficiency win; do not extrapolate beyond the budgets actually tested.
+- Keep all attempted runs in the data, including crashes, timeouts, invalid receipts, and missing outputs. Distinguish protocol failure, infrastructure failure, scientific non-recovery, and unknown/incomplete outcomes; never drop these rows silently.
+
+## 8. Immutable run artifact
 
 Store one machine-readable record per attempted run with:
 - schema version, repository commit, toolchain/platform identity, benchmark suite version;
@@ -96,13 +116,13 @@ Store one machine-readable record per attempted run with:
 
 Keep raw run records append-only. Derive aggregate tables from those records with a separate script and publish its revision. A queued workflow, a skipped benchmark job, or a passing receipt-integrity check is not a scientific benchmark pass.
 
-## 8. Decision rule
+## 9. Decision rule
 
 The initial pilot is successful as infrastructure when all conditions are explicit, the counters are internally consistent, failed outcomes remain in the dataset, and a verifier can independently recompute the records. It is **not** successful merely because a candidate passes a numerical threshold.
 
 The confirmatory result supports H1/H2 only if the predeclared comparisons improve on the stated metrics under matched budgets, with uncertainty reported across systems and seeds. Otherwise publish the null or negative result and identify which bottleneck failed: search, representation, experiment/condition selection, fitness, numerical integration, or symbolic verification.
 
-## 9. External benchmark grounding
+## 10. External benchmark grounding
 
 - **SRBench 2025** reports a living, unified comparison of 25 symbolic-regression methods, using standardized containers, hyperparameter tuning, and 30 independent runs per dataset: [SRBench repository](https://github.com/cavalab/srbench).
 - **Science-Gym** evaluates autonomous discovery end-to-end, combining data collection, experimental design, and equation discovery across seven simulated physics/epidemiology environments. This is important because a fixed-data symbolic-regression test does not evaluate experiment selection: [Cerrato et al., *Machine Learning* (published 7 January 2026)](https://doi.org/10.1007/s10994-025-06914-x).
