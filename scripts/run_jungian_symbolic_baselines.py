@@ -389,13 +389,13 @@ def validate_normalized_bundle(bundle: Any, corpus: dict[str, Any]) -> None:
         require(isinstance(result["abstention"]["abstain"], bool) and bool(result["abstention"]["reason"]), "bad abstention status/reason")
 
 
-def write_result_bundle(corpus: dict[str, Any], corpus_digest: str, method_id: str,
+def write_result_bundle(corpus: dict[str, Any], corpus_digest: str, source_revision: str, method_id: str,
                         outputs: list[dict[str, Any]], output_path: Path, config: dict[str, Any]) -> str:
     bundle = {
         "schema": OUTPUT_SCHEMA,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
-        "source_revision": "0000000000000000000000000000000000000000",
+        "source_revision": source_revision,
         "implementation_id": method_id,
         "config_sha256": hashlib.sha256(canonical_json(config)).hexdigest(),
         "results": outputs,
@@ -744,12 +744,9 @@ def main() -> int:
             require(canonical_json(signals) == canonical_json(signals_again), f"{method_id} behavior signals are nondeterministic")
             normalized_path = args.output_dir / f"{method_id}.normalized.json"
             config = {"method_id": method_id, **metadata, "corpus_sha256": corpus_digest}
-            result_digest = write_result_bundle(corpus, corpus_digest, method_id, outputs, normalized_path, config)
-            # Bind the exact tested source revision rather than a placeholder.
-            bundle = load_json(normalized_path)
-            bundle["source_revision"] = args.source_revision
-            normalized_path.write_bytes(canonical_json(bundle))
-            result_digest = hashlib.sha256(normalized_path.read_bytes()).hexdigest()
+            result_digest = write_result_bundle(
+                corpus, corpus_digest, args.source_revision, method_id, outputs, normalized_path, config
+            )
             outputs_by_method[method_id] = outputs
             signals_by_method[method_id] = signals
             config_hashes[method_id] = hashlib.sha256(canonical_json(config)).hexdigest()
