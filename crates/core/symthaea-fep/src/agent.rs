@@ -357,6 +357,10 @@ impl ActiveInferenceAgent {
 
     /// Execute action and observe outcome
     pub fn act(&mut self, action: usize) -> ActionOutcome {
+        // `act()` is currently the compatibility commitment boundary for generic
+        // FEP bookkeeping. #606 will split commitment from pure prediction.
+        self.efe_computer.record_committed_action(action);
+
         // Track the action for temporal difference learning
         self.last_action = Some(action);
 
