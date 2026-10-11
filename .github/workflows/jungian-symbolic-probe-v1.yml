@@ -7,6 +7,7 @@ on:
       - 'docs/research/data/jungian_symbolic_probe_v1.json'
       - 'scripts/validate_jungian_symbolic_probe.py'
       - 'scripts/run_jungian_symbolic_baselines.py'
+      - 'src/bin/jungian_glyph_projection_probe.rs'
       - '.github/workflows/jungian-symbolic-probe-v1.yml'
   workflow_dispatch:
 
@@ -16,7 +17,7 @@ permissions:
 jobs:
   capture:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Checkout exact event head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -32,7 +33,7 @@ jobs:
           BASE=b9af191f380d635f0459b24284c1d1fd6a5516aa
           git merge-base --is-ancestor "$BASE" HEAD
           actual="$(git diff --name-only "$BASE" HEAD | sort)"
-          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/validate_jungian_symbolic_probe.py' | sort)"
+          expected="$(printf '%s\n' '.github/workflows/jungian-symbolic-probe-v1.yml' 'docs/research/JUNGIAN_SYMBOLIC_PROBE_V1.md' 'docs/research/data/jungian_symbolic_probe_v1.json' 'scripts/run_jungian_symbolic_baselines.py' 'scripts/validate_jungian_symbolic_probe.py' 'src/bin/jungian_glyph_projection_probe.rs' | sort)"
           test "$actual" = "$expected"
 
       - name: Capture exact runtime and source identities
@@ -66,9 +67,16 @@ jobs:
           OUT="$RUNNER_TEMP/jungian-baseline-capture"
           mkdir -p "$OUT"
           SOURCE_REVISION="$(git rev-parse HEAD)"
+          cargo run --quiet --bin jungian_glyph_projection_probe --features glyph_codex -- \
+            --corpus docs/research/data/jungian_symbolic_probe_v1.json \
+            --output "$OUT/glyph_projection.json" \
+            --source-revision "$SOURCE_REVISION" \
+            --glyph-source-blob "$(git rev-parse HEAD:src/hdc/glyph_basis.rs)" \
+            --registry-source-blob "$(git rev-parse HEAD:src/hdc/glyph_registry_data.rs)"
           python3 scripts/run_jungian_symbolic_baselines.py \
             --output-dir "$OUT" \
-            --source-revision "$SOURCE_REVISION"
+            --source-revision "$SOURCE_REVISION" \
+            --glyph-projection "$OUT/glyph_projection.json"
           python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/keyword_dictionary_foil_v0.normalized.json"
           python3 scripts/validate_jungian_symbolic_probe.py --results "$OUT/context_guardrails_rules_v0.normalized.json"
           sha256sum "$OUT"/*.json
@@ -94,8 +102,11 @@ jobs:
               "|---|---:|---:|---:|---:|---|",
           ]
           for item in data["methods"]:
+              if item["state"] == "projection_only_not_rubric_scored":
+                  lines.append(f"| {item['method_id']} | — | — | — | — | projection-only; not rubric-scored |")
+                  continue
               if item["state"] != "executed":
-                  lines.append(f"| {item['method_id']} | — | — | — | — | NOT RUN: adapter absent |")
+                  lines.append(f"| {item['method_id']} | — | — | — | — | NOT RUN |")
                   continue
               s = item["summary"]
               lines.append(
