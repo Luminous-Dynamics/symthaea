@@ -925,6 +925,10 @@ fn holdout_record_is_consistent(
         || !dt.is_finite()
         || dt <= 0.0
         || !(t_max / dt).is_finite()
+        || (holdout.discovery_seed == holdout.holdout_seed
+            && holdout.failure != Some(AutonomousHoldoutFailure::IdenticalSeeds))
+        || (holdout.discovery_seed != holdout.holdout_seed
+            && holdout.failure == Some(AutonomousHoldoutFailure::IdenticalSeeds))
         || !holdout.threshold.is_finite()
         || holdout.threshold < 0.0
         || !holdout.max_lie_derivative_variance.is_finite()
@@ -1497,6 +1501,66 @@ mod tests {
         receipt.min_gradient_informativeness_fraction = 1.0;
         receipt.receipt_blake3 = compute_receipt_digest(&receipt);
         assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn builder_rejects_rehashed_zero_trajectory_record_with_identical_seeds() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let initial = [1.0, 0.0, 0.0, 1.0];
+        let names = ["x", "y", "vx", "vy"];
+        let mut holdout = validate_invariant_holdout(
+            &harmonic_system(),
+            &formula,
+            &initial,
+            &names,
+            &config,
+            4.0,
+            0.01,
+            0,
+            701,
+            1e-2,
+        );
+        assert_eq!(
+            holdout.failure,
+            Some(AutonomousHoldoutFailure::ZeroTrajectories)
+        );
+
+        holdout.holdout_seed = config.seed;
+        let variable_names: Vec<String> =
+            names.iter().map(|name| (*name).to_string()).collect();
+        holdout.assessment_context_blake3 = assessment_context_digest(
+            &format!("{}", formula),
+            &variable_names,
+            &initial,
+            config.seed,
+            holdout.holdout_seed,
+            4.0,
+            0.01,
+            holdout.requested_trajectories,
+            holdout.threshold,
+            &holdout.system_id,
+            &holdout.system_definition_blake3,
+        );
+
+        let result = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &names,
+            &initial,
+            4.0,
+            0.01,
+            &holdout,
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            AutonomousDiscoveryReceiptError::InvalidHoldoutRecord
+        );
     }
 
     #[test]
