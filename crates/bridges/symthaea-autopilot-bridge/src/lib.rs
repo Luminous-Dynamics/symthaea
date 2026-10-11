@@ -20,6 +20,8 @@ pub mod offboard_submission;
 pub mod offboard_observation;
 /// PX4 FailsafeFlags Offboard control-signal-loss input evidence.
 pub mod offboard_loss_flag;
+/// Firmware-profile-bound Offboard-loss parameter configuration evidence.
+pub mod offboard_loss_configuration;
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.
