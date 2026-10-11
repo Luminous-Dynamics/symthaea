@@ -650,7 +650,7 @@ fn calculate_metrics(
         let idx = ((p * 10.0).floor() as usize).min(9);
         bins[idx].0 += 1;
         bins[idx].1 += p;
-        bins[idx].2 += if receipt.observed_success { 1.0 } else { 0.0 };
+        bins[idx].2 += if receipt.receipt.observed_success { 1.0 } else { 0.0 };
     }
     let ece = bins
         .iter()
@@ -664,7 +664,9 @@ fn calculate_metrics(
     let compute_errors: Vec<f64> = resolved
         .iter()
         .filter_map(|(forecast, receipt)| {
-            receipt.receipt.actual_compute_units
+            receipt
+                .receipt
+                .actual_compute_units
                 .map(|actual| (forecast.expected_compute_units - actual).abs())
         })
         .collect();
