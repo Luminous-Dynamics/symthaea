@@ -102,7 +102,10 @@ def validate_record(
     rows = record.get("targets", [])
     if not isinstance(rows, list):
         rows = []
-    ids = [row.get("target_id") for row in rows if isinstance(row, dict) and isinstance(row.get("target_id"), str)]
+    invalid_id_rows = [index for index, row in enumerate(rows) if not isinstance(row, dict) or not isinstance(row.get("target_id"), str) or not row.get("target_id")]
+    if invalid_id_rows:
+        errors.append("target rows have missing or non-string target_id at indices: " + ", ".join(map(str, invalid_id_rows)))
+    ids = [row.get("target_id") for row in rows if isinstance(row, dict) and isinstance(row.get("target_id"), str) and row.get("target_id")]
     if len(ids) != len(set(ids)):
         errors.append("run record contains duplicate target_id rows")
     expected_set = set(expected_ids)
