@@ -575,19 +575,29 @@ pub struct ModularRing {
 }
 
 impl ModularRing {
-    pub fn new(modulus: u64) -> Self {
+    /// Construct a modular ring only when its modulus is positive.
+    pub fn try_new(modulus: u64) -> Option<Self> {
+        if modulus == 0 {
+            return None;
+        }
         let modulus_encoding = BinaryHV::random(seed_from_name(&format!("mod_{modulus}")));
-        Self {
+        Some(Self {
             modulus,
             modulus_encoding,
-        }
+        })
     }
 
-    /// Modular addition
+    /// Construct a modular ring, failing explicitly for the invalid zero modulus.
+    pub fn new(modulus: u64) -> Self {
+        Self::try_new(modulus).expect("modular arithmetic requires a non-zero modulus")
+    }
+
+    /// Modular addition without u64 intermediate overflow.
     pub fn add(&self, a: u64, b: u64) -> u64 {
-        let a = a % self.modulus;
-        let b = b % self.modulus;
-        (a + b) % self.modulus
+        let modulus = u128::from(self.modulus);
+        let a = u128::from(a % self.modulus);
+        let b = u128::from(b % self.modulus);
+        ((a + b) % modulus) as u64
     }
 
     /// Modular multiplication
@@ -600,7 +610,7 @@ impl ModularRing {
     /// Modular exponentiation by squaring
     pub fn power(&self, base: u64, exp: u64) -> u64 {
         if exp == 0 {
-            return 1;
+            return 1 % self.modulus;
         }
 
         let mut result = 1u64;
@@ -618,17 +628,33 @@ impl ModularRing {
         result
     }
 
-    /// Modular multiplicative inverse via extended Euclidean algorithm
+    /// Modular multiplicative inverse for the full u64 modulus domain.
+    ///
+    /// Inputs are reduced modulo the ring modulus before the Euclidean algorithm;
+    /// no u64-to-i64 casts or signed remainder corrections are used.
     pub fn inverse(&self, a: u64) -> Option<u64> {
-        let engine = NumberTheoryEngine::new();
-        let (gcd, x, _) = engine.extended_gcd(a as i64, self.modulus as i64);
+        let modulus = i128::from(self.modulus);
+        let mut old_r = i128::from(a % self.modulus);
+        let mut r = modulus;
+        let mut old_s = 1i128;
+        let mut s = 0i128;
 
-        if gcd != 1 {
+        while r != 0 {
+            let quotient = old_r / r;
+            let next_r = old_r - quotient * r;
+            old_r = r;
+            r = next_r;
+
+            let next_s = old_s - quotient * s;
+            old_s = s;
+            s = next_s;
+        }
+
+        if old_r != 1 {
             return None;
         }
 
-        let inv = ((x % self.modulus as i64 + self.modulus as i64) % self.modulus as i64) as u64;
-        Some(inv)
+        Some(old_s.rem_euclid(modulus) as u64)
     }
 
     /// Check if element is a unit (has multiplicative inverse)
@@ -726,6 +752,43 @@ mod tests {
     fn test_no_inverse() {
         let ring = ModularRing::new(6);
         assert!(ring.inverse(2).is_none()); // gcd(2, 6) = 2 != 1
+    }
+
+    #[test]
+    fn test_modular_ring_rejects_zero_modulus_explicitly() {
+        assert!(ModularRing::try_new(0).is_none());
+        let ring = ModularRing::try_new(1).unwrap();
+        assert_eq!(ring.add(u64::MAX, u64::MAX), 0);
+        assert_eq!(ring.multiply(u64::MAX, u64::MAX), 0);
+        assert_eq!(ring.power(u64::MAX, 0), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "modular arithmetic requires a non-zero modulus")]
+    fn test_modular_ring_legacy_constructor_fails_on_zero_modulus() {
+        let _ = ModularRing::new(0);
+    }
+
+    #[test]
+    fn test_modular_addition_does_not_overflow_near_u64_max() {
+        let ring = ModularRing::new(u64::MAX);
+        assert_eq!(ring.add(u64::MAX - 1, u64::MAX - 1), u64::MAX - 2);
+        assert_eq!(ring.add(u64::MAX, 1), 1);
+        assert_eq!(ring.add(u64::MAX - 1, 2), 1);
+    }
+
+    #[test]
+    fn test_modular_inverse_supports_moduli_above_i64_max() {
+        let modulus = u64::MAX - 1;
+        let ring = ModularRing::new(modulus);
+        let inverse = ring.inverse(3).expect("gcd(3, modulus) = 1");
+        assert_eq!(ring.multiply(3, inverse), 1);
+
+        let prime_large = (1u64 << 63) + 29;
+        let prime_ring = ModularRing::new(prime_large);
+        let inv = prime_ring.inverse(prime_ring.modulus - 1).unwrap();
+        assert_eq!(inv, prime_ring.modulus - 1);
+        assert_eq!(prime_ring.multiply(prime_ring.modulus - 1, inv), 1);
     }
 
     #[test]
