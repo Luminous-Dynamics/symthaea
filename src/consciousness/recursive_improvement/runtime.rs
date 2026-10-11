@@ -380,13 +380,13 @@ fn auto_resolve_contract_error(
             AutoResolveType::CommandSucceeds(command),
             ResolutionAuthority::ExitCode { success_codes },
         ) => {
-            success_codes.as_slice() == [0] && command_is_pinned("sh", "-c", command)
+            success_codes.len() == 1 && success_codes[0] == 0 && command_is_pinned("sh", "-c", command)
         }
         (
             AutoResolveType::ServiceRunning(service),
             ResolutionAuthority::ExitCode { success_codes },
         ) => {
-            success_codes.as_slice() == [0]
+            success_codes.len() == 1 && success_codes[0] == 0
                 && command_is_pinned("systemctl", "is-active", service)
         }
         // A timer does not observe a process/resource result. Its expiry is handled separately
