@@ -293,7 +293,7 @@ pub fn validate_invariant_holdout(
 pub enum AutonomousDiscoveryReceiptError {
     InvalidSourceRevision,
     EmptySystemId,
-    InvalidSystemDefinitionDigest,
+    EmptySystemDefinition,
     EmptyCandidate,
     InvalidVariables,
     InvalidInitialState,
@@ -406,7 +406,7 @@ pub struct AutonomousDiscoveryReceiptV1 {
 pub fn build_autonomous_discovery_receipt_v1(
     source_revision: &str,
     system_id: &str,
-    system_definition_blake3: &str,
+    system_definition_canonical: &str,
     config: &RegressorConfig,
     extra_seed_templates: &[Expr],
     candidate: &AutonomousInvariant,
@@ -425,12 +425,13 @@ pub fn build_autonomous_discovery_receipt_v1(
     if system_id.trim().is_empty() {
         return Err(AutonomousDiscoveryReceiptError::EmptySystemId);
     }
-    let system_definition_blake3 = system_definition_blake3.to_ascii_lowercase();
-    if system_definition_blake3.len() != 64
-        || !system_definition_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinitionDigest);
+    if system_definition_canonical.trim().is_empty() {
+        return Err(AutonomousDiscoveryReceiptError::EmptySystemDefinition);
     }
+    // Hash the exact canonical UTF-8 bytes here instead of trusting a supplied
+    // digest string. The caller must retain this definition as a separate artifact.
+    let system_definition_blake3 =
+        blake3::hash(system_definition_canonical.as_bytes()).to_hex().to_string();
     if candidate.formula_str.trim().is_empty()
         || candidate.formula_str != format!("{}", candidate.formula)
     {
@@ -661,12 +662,8 @@ mod tests {
         }
     }
 
-    fn system_definition_digest() -> String {
-        blake3::hash(
-            b"harmonic-oscillator-v1;xdot=vx;ydot=vy;vxdot=-x;vydot=-y",
-        )
-        .to_hex()
-        .to_string()
+    fn system_definition_canonical() -> &'static str {
+        "system-definition-v1\nharmonic-oscillator-v1\nxdot=vx\nydot=vy\nvxdot=-x\nvydot=-y"
     }
 
     fn harmonic_energy() -> Expr {
@@ -751,7 +748,7 @@ mod tests {
         );
         let receipt = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         ).expect("well-formed receipt should be constructed");
@@ -759,6 +756,10 @@ mod tests {
         assert_eq!(receipt.discovery_seed, 13);
         assert_eq!(receipt.holdout_seed, 701);
         assert_eq!(receipt.discovery_mode, AutonomousDiscoveryMode::Cold);
+        assert_eq!(
+            receipt.system_definition_blake3,
+            blake3::hash(system_definition_canonical().as_bytes()).to_hex().to_string()
+        );
         let mut tampered = receipt.clone();
         tampered.holdout_seed += 1;
         assert!(!verify_autonomous_discovery_receipt_v1(&tampered));
@@ -776,7 +777,7 @@ mod tests {
         let result = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "harmonic-oscillator-v1",
-            &system_definition_digest(),
+            system_definition_canonical(),
             &config,
             &[Expr::Var("x".into())],
             &candidate, &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
@@ -796,7 +797,7 @@ mod tests {
         );
         let result = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
@@ -819,7 +820,7 @@ mod tests {
         holdout.failure = None;
         let result = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         );
@@ -842,7 +843,7 @@ mod tests {
         holdout.threshold = 0.01;
         let receipt = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         ).expect("a fully scored negative result should remain recordable");
@@ -862,7 +863,7 @@ mod tests {
         );
         let receipt = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         ).expect("an identical-seed failure should be archivally recordable");
@@ -882,7 +883,7 @@ mod tests {
         );
         let mut receipt = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         ).expect("well-formed receipt should be constructed");
@@ -903,7 +904,7 @@ mod tests {
         );
         let receipt = build_autonomous_discovery_receipt_v1(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "harmonic-oscillator-v1", &system_definition_digest(), &config, &[], &candidate,
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
             &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
             4.0, 0.01, &holdout,
         ).expect("well-formed receipt should be constructed");
@@ -935,6 +936,24 @@ mod tests {
         assert!(!result.passed);
         assert_eq!(result.trajectories_checked, 0);
         assert_eq!(result.failure, Some(AutonomousHoldoutFailure::TrajectoryLimitExceeded));
+    }
+
+    #[test]
+    fn empty_system_definition_is_rejected() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
+        );
+        let result = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", "", &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        );
+        assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::EmptySystemDefinition);
     }
 
 }
