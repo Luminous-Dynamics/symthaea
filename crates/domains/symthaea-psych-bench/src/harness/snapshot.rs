@@ -326,6 +326,10 @@ impl std::error::Error for SnapshotComparisonError {}
 
 const MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON: f64 = 1e-10;
 
+fn baseline_mean_is_near_zero(mean: f64) -> bool {
+    mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON
+}
+
 impl RegressionReport {
     /// Compare current results against a baseline snapshot using the intersection
     /// of benchmark/metric keys.
@@ -357,9 +361,7 @@ impl RegressionReport {
                         // this exploratory comparator. This legacy path avoids
                         // division by zero; format_summary() explicitly marks such
                         // reports as not qualified.
-                        let baseline_mean_is_near_zero =
-                            baseline_val.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON;
-                        if baseline_mean_is_near_zero {
+                        if baseline_mean_is_near_zero(baseline_val.mean) {
                             results.push(RegressionResult {
                                 benchmark: bench_name.clone(),
                                 metric: metric_name.clone(),
@@ -503,7 +505,7 @@ impl RegressionReport {
 
         for (benchmark, metrics) in &baseline.metrics {
             for (metric, value) in metrics {
-                if value.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON {
+                if baseline_mean_is_near_zero(value.mean) {
                     return Err(SnapshotComparisonError::NearZeroBaseline {
                         benchmark: benchmark.clone(),
                         metric: metric.clone(),
