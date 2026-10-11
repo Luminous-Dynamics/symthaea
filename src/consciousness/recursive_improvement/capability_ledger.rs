@@ -139,11 +139,30 @@ pub struct CapabilityForecast {
     pub predicted_failure_mode: Option<String>,
 }
 
+impl CapabilityForecast {
+    /// Versioned, domain-separated BLAKE3 commitment to the complete forecast struct.
+    ///
+    /// The field-ordered serde encoding contains no maps; incompatible schema changes must bump
+    /// the domain version. This is an integrity commitment, not proof that a forecast was
+    /// prospectively registered. That chronology is enforced by the ledger's sequence checks.
+    pub fn commitment_blake3(&self) -> Result<String, CapabilityLedgerError> {
+        let encoded =
+            serde_json::to_vec(self).map_err(|_| CapabilityLedgerError::InvalidForecast)?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"MAGI_CAPABILITY_FORECAST_COMMITMENT_V1\\0");
+        hasher.update(&(encoded.len() as u64).to_be_bytes());
+        hasher.update(&encoded);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+}
+
 /// Untrusted outcome receipt payload. Digest shape and evaluator labels are data, not proof.
 /// receipt_sha256 is the SHA-256 of the exact evidence payload bytes supplied for verification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CapabilityOutcomeReceipt {
     pub forecast_id: String,
+    /// BLAKE3 commitment to the complete prospectively registered CapabilityForecast.
+    pub forecast_commitment_blake3: String,
     pub subject: SubjectIdentity,
     pub sequence: u64,
     pub observed_success: bool,
@@ -306,6 +325,7 @@ pub enum CapabilityLedgerError {
     SequenceNotMonotonic,
     SplitMismatch,
     InvalidOutcomeReceipt,
+    ForecastCommitmentMismatch,
     InvalidReceiptSignature,
     EvidenceRootMismatch,
     InvalidVerificationProvenance,
@@ -326,6 +346,7 @@ impl std::error::Error for CapabilityLedgerError {}
 #[derive(Debug, Clone)]
 struct ForecastRecord {
     forecast: CapabilityForecast,
+    forecast_commitment_blake3: String,
     receipt: Option<VerifiedCapabilityOutcomeReceipt>,
 }
 
@@ -480,10 +501,12 @@ impl CapabilityLedger {
             return Err(CapabilityLedgerError::DuplicateForecast);
         }
         let sequence = forecast.sequence;
+        let forecast_commitment_blake3 = forecast.commitment_blake3()?;
         self.forecasts.insert(
             forecast.forecast_id.clone(),
             ForecastRecord {
                 forecast,
+                forecast_commitment_blake3,
                 receipt: None,
             },
         );
@@ -508,6 +531,7 @@ impl CapabilityLedger {
         }
         if !non_empty(&receipt.evaluator_identity)
             || !non_empty(&receipt.evaluator_revision)
+            || !is_hex_digest(&receipt.forecast_commitment_blake3, &[64])
             || !is_hex_digest(&receipt.receipt_sha256, &[64])
             || receipt.actual_compute_units.is_some_and(|cost| !cost.is_finite() || cost < 0.0)
         {
@@ -536,6 +560,9 @@ impl CapabilityLedger {
             }
             if receipt.subject != record.forecast.subject {
                 return Err(CapabilityLedgerError::SubjectMismatch);
+            }
+            if receipt.forecast_commitment_blake3 != record.forecast_commitment_blake3 {
+                return Err(CapabilityLedgerError::ForecastCommitmentMismatch);
             }
         }
         if self.forecasts.values().any(|existing| {
@@ -910,20 +937,29 @@ mod tests {
     }
 
     fn test_verified_receipt(
+        ledger: &CapabilityLedger,
         receipt: CapabilityOutcomeReceipt,
     ) -> VerifiedCapabilityOutcomeReceipt {
         test_verified_receipt_from(
+            ledger,
             receipt,
-            "symthaea-evidence-verifier",
-            "v1",
+            CAPABILITY_RECEIPT_VERIFIER_IDENTITY,
+            CAPABILITY_RECEIPT_VERIFIER_REVISION,
         )
     }
 
     fn test_verified_receipt_from(
-        receipt: CapabilityOutcomeReceipt,
+        ledger: &CapabilityLedger,
+        mut receipt: CapabilityOutcomeReceipt,
         verifier_identity: &str,
         verifier_revision: &str,
     ) -> VerifiedCapabilityOutcomeReceipt {
+        receipt.forecast_commitment_blake3 = ledger
+            .forecasts
+            .get(&receipt.forecast_id)
+            .expect("test receipt must name a previously recorded forecast")
+            .forecast_commitment_blake3
+            .clone();
         // Synthetic unit-test admission only. Production code has no public token constructor;
         // real issuance must be added inside the reviewed independent-verifier path.
         // The sequence makes fixture roots unique within a ledger unless a test intentionally
@@ -962,7 +998,7 @@ mod tests {
             })
             .unwrap();
         ledger
-            .resolve_verified_forecast(test_verified_receipt(CapabilityOutcomeReceipt {
+            .resolve_verified_forecast(test_verified_receipt(&ledger, CapabilityOutcomeReceipt {
                 forecast_id: id.to_string(),
                 subject: subject(),
                 sequence: forecast_seq + 1,
@@ -1077,13 +1113,13 @@ mod tests {
             actual_compute_units: None,
         };
         assert_eq!(
-            ledger.resolve_verified_forecast(test_verified_receipt(receipt.clone())),
+            ledger.resolve_verified_forecast(test_verified_receipt(&ledger, receipt.clone())),
             Err(CapabilityLedgerError::SequenceNotMonotonic)
         );
         receipt.sequence = 11;
         receipt.split = CapabilitySplit::Training;
         assert_eq!(
-            ledger.resolve_verified_forecast(test_verified_receipt(receipt)),
+            ledger.resolve_verified_forecast(test_verified_receipt(&ledger, receipt)),
             Err(CapabilityLedgerError::SplitMismatch)
         );
     }
@@ -1128,6 +1164,39 @@ mod tests {
         );
     }
 
+    #[test]
+    fn forecast_commitment_changes_when_claim_probability_or_context_changes() {
+        let baseline = CapabilityForecast {
+            forecast_id: "forecast-1".to_string(),
+            claim_id: "claim-1".to_string(),
+            claim_sha256: "a".repeat(64),
+            subject: subject(),
+            sequence: 1,
+            context_id: "context-a".to_string(),
+            split: CapabilitySplit::HeldOut,
+            predicted_success_probability: 0.75,
+            expected_compute_units: 10.0,
+            predicted_failure_mode: Some("missing compiler metadata".to_string()),
+        };
+        let baseline_commitment = baseline.commitment_blake3().unwrap();
+
+        let mut changed = baseline.clone();
+        changed.claim_sha256 = "b".repeat(64);
+        assert_ne!(baseline_commitment, changed.commitment_blake3().unwrap());
+
+        let mut changed = baseline.clone();
+        changed.predicted_success_probability = 0.74;
+        assert_ne!(baseline_commitment, changed.commitment_blake3().unwrap());
+
+        let mut changed = baseline.clone();
+        changed.context_id = "context-b".to_string();
+        assert_ne!(baseline_commitment, changed.commitment_blake3().unwrap());
+
+        let mut changed = baseline.clone();
+        changed.expected_compute_units = 11.0;
+        assert_ne!(baseline_commitment, changed.commitment_blake3().unwrap());
+    }
+
     #[cfg(feature = "identity")]
     #[test]
     fn signed_receipt_requires_pinned_signature_and_exact_evidence_bytes() {
@@ -1154,8 +1223,15 @@ mod tests {
         }).unwrap();
 
         let evidence = b"exact evaluator evidence bytes";
+        let forecast_commitment_blake3 = ledger
+            .forecasts
+            .get("signed-forecast")
+            .unwrap()
+            .forecast_commitment_blake3
+            .clone();
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "signed-forecast".to_string(),
+            forecast_commitment_blake3,
             subject: subject(),
             sequence: 2,
             observed_success: true,
@@ -1234,7 +1310,7 @@ mod tests {
                 })
                 .unwrap();
             ledger
-                .resolve_verified_forecast(test_verified_receipt(CapabilityOutcomeReceipt {
+                .resolve_verified_forecast(test_verified_receipt(&ledger, CapabilityOutcomeReceipt {
                     forecast_id: id,
                     subject: subject(),
                     sequence: seq + 1,
@@ -1297,6 +1373,7 @@ mod tests {
             }).unwrap();
 
             ledger.resolve_verified_forecast(test_verified_receipt_from(
+                &ledger,
                 CapabilityOutcomeReceipt {
                     forecast_id: id,
                     subject: subject(),
@@ -1430,13 +1507,13 @@ mod tests {
             actual_compute_units: None,
         };
         assert_eq!(
-            ledger.resolve_verified_forecast(test_verified_receipt(receipt.clone())),
+            ledger.resolve_verified_forecast(test_verified_receipt(&ledger, receipt.clone())),
             Err(CapabilityLedgerError::SequenceNotMonotonic)
         );
 
         let mut later_receipt = receipt;
         later_receipt.sequence = 6;
-        ledger.resolve_verified_forecast(test_verified_receipt(later_receipt)).unwrap();
+        ledger.resolve_verified_forecast(test_verified_receipt(&ledger, later_receipt)).unwrap();
 
         assert_eq!(
             ledger.record_forecast(CapabilityForecast {
@@ -1483,7 +1560,7 @@ mod tests {
             receipt_sha256: "2".repeat(64),
             actual_compute_units: None,
         };
-        ledger.resolve_verified_forecast(test_verified_receipt(receipt.clone())).unwrap();
+        ledger.resolve_verified_forecast(test_verified_receipt(&ledger, receipt.clone())).unwrap();
 
         ledger
             .record_forecast(CapabilityForecast {
@@ -1505,7 +1582,7 @@ mod tests {
             ..receipt
         };
         assert_eq!(
-            ledger.resolve_verified_forecast(test_verified_receipt(replay)),
+            ledger.resolve_verified_forecast(test_verified_receipt(&ledger, replay)),
             Err(CapabilityLedgerError::ReceiptReplay)
         );
     }
