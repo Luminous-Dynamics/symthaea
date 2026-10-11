@@ -193,7 +193,7 @@ pub struct ImportedNoteReference {
     pub duration_denominator: i64,
 }
 
-/// One pitch-interval-contour match, with the source note snapshots that form it.
+/// One non-overlapping pitch-interval-contour match, with source note snapshots.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImportedMotifOccurrence {
     pub notes: Vec<ImportedNoteReference>,
@@ -208,7 +208,7 @@ pub struct ImportedBeatRational {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
-    /// Total pitch-interval-contour matches, including any beyond the evidence cap.
+    /// Total non-overlapping pitch-interval-contour matches, including those beyond the evidence cap.
     pub occurrence_count: usize,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
