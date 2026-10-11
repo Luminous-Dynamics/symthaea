@@ -364,6 +364,27 @@ pub enum Px4ModeRequirementFieldV1 {
     LocalPosition,
 }
 
+/// One raw PX4 Event entry carried by ArmingCheckReply.
+///
+/// The arguments are retained as bytes because their interpretation depends on the
+/// firmware's event metadata; this adapter does not invent a decoded meaning.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Px4ExternalModeArmingCheckEventV1 {
+    /// Raw PX4 event timestamp, microseconds since PX4 system start.
+    pub timestamp_us_raw: u64,
+    /// Raw PX4 event identifier.
+    pub id: u32,
+    /// Raw event sequence number.
+    pub event_sequence: u16,
+    /// Fixed-width, uninterpreted event arguments exactly as captured.
+    pub arguments: [u8; 25],
+    /// Raw PX4 log-level bit field.
+    pub log_levels: u8,
+}
+
+/// Fixed number of Event slots in PX4 ArmingCheckReply v1.
+pub const PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1: usize = 5;
+
 /// One ArmingCheckReply with its component registration and complete reported requirements.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Px4ExternalModeArmingCheckReplyV1 {
@@ -387,8 +408,20 @@ pub struct Px4ExternalModeArmingCheckReplyV1 {
     pub request_id: u8,
     /// Registered external-component ID, distinct from navigation-state/mode ID.
     pub registration_id: u8,
+    /// Raw health-component index; zero is PX4's HEALTH_COMPONENT_INDEX_NONE sentinel.
+    pub health_component_index: u8,
+    /// Raw health-component presence flag (currently unused by PX4's events interface).
+    pub health_component_is_present: bool,
+    /// Raw health-component warning flag (currently unused by PX4's events interface).
+    pub health_component_warning: bool,
+    /// Raw health-component error flag (currently unused by PX4's events interface).
+    pub health_component_error: bool,
     /// Whether this component reports that it can arm/run in its mode.
     pub can_arm_and_run: bool,
+    /// Number of valid entries in the fixed-size PX4 Event queue.
+    pub num_events: u8,
+    /// All five raw Event slots, including unused tail slots, as observed.
+    pub events: [Px4ExternalModeArmingCheckEventV1; PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
     /// Full requirement vector reported in ArmingCheckReply.
     pub mode_req_angular_velocity: bool,
     /// Attitude requirement reported by the component.
@@ -429,7 +462,13 @@ impl Px4ExternalModeArmingCheckReplyV1 {
         source_timestamp_us_raw: u64,
         request_id: u8,
         registration_id: u8,
+        health_component_index: u8,
+        health_component_is_present: bool,
+        health_component_warning: bool,
+        health_component_error: bool,
         can_arm_and_run: bool,
+        num_events: u8,
+        events: [Px4ExternalModeArmingCheckEventV1; PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
         mode_req_angular_velocity: bool,
         mode_req_attitude: bool,
         mode_req_local_alt: bool,
@@ -454,7 +493,13 @@ impl Px4ExternalModeArmingCheckReplyV1 {
             source_timestamp_us_raw,
             request_id,
             registration_id,
+            health_component_index,
+            health_component_is_present,
+            health_component_warning,
+            health_component_error,
             can_arm_and_run,
+            num_events,
+            events,
             mode_req_angular_velocity,
             mode_req_attitude,
             mode_req_local_alt,
@@ -508,6 +553,11 @@ impl Px4ExternalModeArmingCheckReplyV1 {
         self.received_at
             .validate()
             .map_err(Px4ExternalModeArmingCheckError::Timestamp)?;
+        if usize::from(self.num_events) > PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1 {
+            return Err(Px4ExternalModeArmingCheckError::InvalidEventCount {
+                found: self.num_events,
+            });
+        }
         Ok(())
     }
 
@@ -522,7 +572,23 @@ impl Px4ExternalModeArmingCheckReplyV1 {
         feed_str(&mut hasher, &self.source_boot_session_id);
         feed_str(&mut hasher, &self.capture_window_id);
         hasher.update(&self.source_timestamp_us_raw.to_le_bytes());
-        hasher.update(&[self.request_id, self.registration_id, u8::from(self.can_arm_and_run)]);
+        hasher.update(&[
+            self.request_id,
+            self.registration_id,
+            self.health_component_index,
+            u8::from(self.health_component_is_present),
+            u8::from(self.health_component_warning),
+            u8::from(self.health_component_error),
+            u8::from(self.can_arm_and_run),
+            self.num_events,
+        ]);
+        for event in &self.events {
+            hasher.update(&event.timestamp_us_raw.to_le_bytes());
+            hasher.update(&event.id.to_le_bytes());
+            hasher.update(&event.event_sequence.to_le_bytes());
+            hasher.update(&event.arguments);
+            hasher.update(&[event.log_levels]);
+        }
         hasher.update(&[
             u8::from(self.mode_req_angular_velocity),
             u8::from(self.mode_req_attitude),
@@ -1240,6 +1306,9 @@ pub enum Px4ExternalModeArmingCheckError {
     /// The outcome classifier contradicted the computed SetpointConfig outcome.
     #[error("SetpointConfig outcome classification contradicted its source value")]
     OutcomeClassificationContradiction,
+    /// ArmingCheckReply's event count exceeded the fixed Event array capacity.
+    #[error("ArmingCheckReply num_events {found} exceeds the fixed event capacity of 5")]
+    InvalidEventCount { found: u8 },
     /// Reply request_id did not match the captured ArmingCheckRequest.
     #[error("ArmingCheckReply request ID mismatch")]
     ReplyRequestIdMismatch,
@@ -1433,6 +1502,33 @@ mod tests {
         local_alt: bool,
         received_ns: u64,
     ) -> Px4ExternalModeArmingCheckReplyV1 {
+        arming_reply_with_diagnostics(
+            req_id,
+            registration_id,
+            local_alt,
+            received_ns,
+            0,
+            false,
+            false,
+            false,
+            0,
+            [Px4ExternalModeArmingCheckEventV1::default(); PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn arming_reply_with_diagnostics(
+        req_id: u8,
+        registration_id: u8,
+        local_alt: bool,
+        received_ns: u64,
+        health_component_index: u8,
+        health_component_is_present: bool,
+        health_component_warning: bool,
+        health_component_error: bool,
+        num_events: u8,
+        events: [Px4ExternalModeArmingCheckEventV1; PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+    ) -> Result<Px4ExternalModeArmingCheckReplyV1, Px4ExternalModeArmingCheckError> {
         Px4ExternalModeArmingCheckReplyV1::new(
             "px4.arming-check.decoder.fixture.v1",
             "vehicle.slot-a",
@@ -1442,7 +1538,13 @@ mod tests {
             1_250_000,
             req_id,
             registration_id,
+            health_component_index,
+            health_component_is_present,
+            health_component_warning,
+            health_component_error,
             true,
+            num_events,
+            events,
             true,
             true,
             local_alt,
@@ -1453,10 +1555,8 @@ mod tests {
             false,
             false,
             false,
-            false,
             ts(received_ns),
         )
-        .unwrap()
     }
 
     fn profile() -> Px4ExternalModeArmingCheckProfileV1 {
@@ -1583,7 +1683,13 @@ mod tests {
             1_250_000,
             8,
             3,
+            0,
             false,
+            false,
+            false,
+            false,
+            0,
+            [Px4ExternalModeArmingCheckEventV1::default(); PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
             true,
             true,
             false,
@@ -1822,6 +1928,61 @@ mod tests {
         restored.validate().unwrap();
         restored.registration.mode_id_raw = 43;
         assert!(restored.validate().is_err());
+    }
+
+    #[test]
+    fn reply_preserves_health_diagnostics_and_raw_event_payload_in_digest() {
+        let mut events = [
+            Px4ExternalModeArmingCheckEventV1::default();
+            PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
+        ];
+        events[0] = Px4ExternalModeArmingCheckEventV1 {
+            timestamp_us_raw: 1_249_000,
+            id: 0x1234,
+            event_sequence: 7,
+            arguments: core::array::from_fn(|index| index as u8),
+            log_levels: 0xA5,
+        };
+        let reply = arming_reply_with_diagnostics(
+            8, 3, false, 1_350_000_000, 2, true, true, false, 1, events,
+        )
+        .unwrap();
+        assert_eq!(reply.health_component_index, 2);
+        assert!(reply.health_component_is_present);
+        assert!(reply.health_component_warning);
+        assert!(!reply.health_component_error);
+        assert_eq!(reply.num_events, 1);
+        assert_eq!(reply.events[0].timestamp_us_raw, 1_249_000);
+        assert_eq!(reply.events[0].id, 0x1234);
+        assert_eq!(reply.events[0].event_sequence, 7);
+        assert_eq!(reply.events[0].arguments[24], 24);
+        assert_eq!(reply.events[0].log_levels, 0xA5);
+        reply.validate().unwrap();
+
+        let mut mutated = reply;
+        mutated.events[0].arguments[24] ^= 1;
+        assert_eq!(
+            mutated.validate().unwrap_err(),
+            Px4ExternalModeArmingCheckError::DigestMismatch("arming-check reply")
+        );
+    }
+
+    #[test]
+    fn event_count_above_px4_fixed_queue_capacity_fails_closed() {
+        let error = arming_reply_with_diagnostics(
+            8,
+            3,
+            false,
+            1_350_000_000,
+            0,
+            false,
+            false,
+            false,
+            (PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1 + 1) as u8,
+            [Px4ExternalModeArmingCheckEventV1::default(); PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1],
+        )
+        .unwrap_err();
+        assert_eq!(error, Px4ExternalModeArmingCheckError::InvalidEventCount { found: 6 });
     }
 
     #[test]
