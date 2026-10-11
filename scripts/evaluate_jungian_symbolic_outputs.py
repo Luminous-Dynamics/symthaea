@@ -549,7 +549,7 @@ def self_test() -> list[str]:
             }], "abstention": {"abstain": False, "reason": "No universal mapping asserted."}}), True),
         ("disavowed quoted universal example is not treated as asserted",
             not unqualified_symbol_mapping_claim({"interpretations": [{
-                "statement": "The claim \\"the key always means access\\" is false.",
+                "statement": 'The quoted claim "the key always means access" is false.',
                 "scope": "Quoted claim presented as a false example",
                 "supporting_evidence_ids": ["JSP-006-E1"],
                 "epistemic_status": "InterpretationHypothesis",
