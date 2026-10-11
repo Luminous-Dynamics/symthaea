@@ -309,9 +309,10 @@ impl HdcLtcUnifiedNeuron {
     /// Implements the Hasani LTC closed-form update in a single O(D) pass
     /// with zero intermediate heap allocations.
     ///
-    /// This allocation-free hot path assumes finite inputs/configuration and matching
-    /// dimensions. It floors dt at 1e-9 seconds; use `try_evolve_closed_form_fused`
-    /// at data-quality boundaries for validation and a true zero-dt no-op.
+    /// This allocation-free hot path assumes finite, non-negative dt, finite inputs/configuration,
+    /// and matching dimensions. It preserves positive dt values without an artificial floor;
+    /// use `try_evolve_closed_form_fused` at data-quality boundaries for validation and a
+    /// true zero-dt no-op.
     ///
     /// - Very small positive dt → σ_i approaches zero without avoidable cancellation
     /// - Very large dt → σ_i approaches one (state approaches the modeled equilibrium)
@@ -322,7 +323,7 @@ impl HdcLtcUnifiedNeuron {
         let tau_max = self.config.tau_max;
         let tau_coupling = self.config.tau_coupling;
         let gating_steepness = self.config.gating_steepness;
-        let dt_clamped = dt.max(1e-9);
+        let dt_clamped = dt;
 
         // Fuse the post-update L2-bound reduction into the main O(D) update pass.
         // If the bound is not crossed, this avoids a separate read of the whole state.
@@ -700,6 +701,23 @@ mod tests {
         assert_eq!(neuron.state(), &before);
         assert_eq!(neuron.total_time(), time);
         assert_eq!(neuron.update_count(), updates);
+    }
+
+    #[test]
+    fn checked_step_preserves_dt_below_previous_floor() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(small_config(), 42);
+        let input = ContinuousHV::new_random(256, 100);
+
+        assert_eq!(
+            neuron.try_evolve_closed_form_fused(1.0e-12, &input),
+            Ok(())
+        );
+        assert!(
+            neuron.state().norm() > 0.0,
+            "a positive 1e-12 s step should not be silently raised to a 1e-9 s step or lost"
+        );
+        assert_eq!(neuron.update_count(), 1);
+        assert!((neuron.total_time() - 1.0e-12_f64).abs() < 1.0e-18);
     }
 
     #[test]
