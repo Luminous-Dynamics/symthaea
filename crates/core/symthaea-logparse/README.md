@@ -65,7 +65,7 @@ The experimental `encode_domain_invariant` variant can be compared against the b
 
 ## Scenario-level evaluation
 
-Grouped event splits reduce capture leakage, but event-level metrics can still over-weight captures with many events. The optional `--scenario-level-evaluation` run bundles each EVTX file or OTRF scenario directory into one vector and reports capture-level CV/holdout and OOD metrics. It is an orderless bag-of-events baseline—not an attack-chain model. See [`SCENARIO_LEVEL_EVALUATION.md`](SCENARIO_LEVEL_EVALUATION.md).
+Grouped event splits reduce capture leakage, but event-level metrics can still over-weight captures with many events. The optional `--scenario-level-evaluation` run compares an orderless HDC bundle with a relative-record-position encoding, using one vector per EVTX file or OTRF scenario directory. The second variant preserves coarse parser-record order—not verified chronology, time gaps, or causality—and neither is an attack-chain model. See [`SCENARIO_LEVEL_EVALUATION.md`](SCENARIO_LEVEL_EVALUATION.md).
 
 ## Kill criterion
 
