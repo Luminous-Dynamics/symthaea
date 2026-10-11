@@ -10,14 +10,17 @@ molecular DFT energies, SCF convergence, or chemical accuracy.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import sys
+from pathlib import Path
 from typing import Any
 
 try:
     import numpy as np
     import pyscf
+    import scipy
     from pyscf.dft import libxc
 except ImportError as exc:
     print(
@@ -48,6 +51,34 @@ def first_derivative(vxc: Any) -> np.ndarray:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="also write the complete machine-readable report to this path",
+    )
+    args = parser.parse_args()
+
+    # Record and assert the actual functional identifiers resolved by this
+    # PySCF/Libxc build. This prevents a renamed alias from silently changing
+    # the comparison while retaining the same display string.
+    xc_codes = getattr(libxc, "XC_CODES", {})
+    expected_x_id = xc_codes.get("LDA_X")
+    expected_c_id = xc_codes.get("LDA_C_VWN")
+    if expected_x_id is None or expected_c_id is None:
+        raise RuntimeError("PySCF/Libxc does not expose expected LDA_X / LDA_C_VWN codes")
+
+    _, (pure_x_terms, pure_c_terms) = libxc.parse_xc(",vwn")
+    _, (full_x_terms, full_c_terms) = libxc.parse_xc("lda,vwn")
+    if pure_x_terms:
+        raise RuntimeError(f"pure VWN expression unexpectedly has exchange terms: {pure_x_terms}")
+    if len(pure_c_terms) != 1 or pure_c_terms[0][0] != expected_c_id:
+        raise RuntimeError(f",vwn did not resolve to LDA_C_VWN: {pure_c_terms}")
+    if len(full_x_terms) != 1 or full_x_terms[0][0] != expected_x_id:
+        raise RuntimeError(f"lda,vwn did not resolve to LDA_X: {full_x_terms}")
+    if len(full_c_terms) != 1 or full_c_terms[0][0] != expected_c_id:
+        raise RuntimeError(f"lda,vwn did not resolve to LDA_C_VWN: {full_c_terms}")
+
     densities = np.asarray([entry[0] for entry in REFERENCES], dtype=float)
 
     # A blank exchange part requests pure VWN correlation in PySCF's parser.
@@ -94,7 +125,16 @@ def main() -> int:
     result = {
         "schema": "symthaea.vwn5-pyscf-reference.v1",
         "pyscf_version": getattr(pyscf, "__version__", "unknown"),
+        "numpy_version": np.__version__,
+        "scipy_version": scipy.__version__,
         "backend": "PySCF Libxc",
+        "functional_ids": {
+            "LDA_X": int(expected_x_id),
+            "LDA_C_VWN": int(expected_c_id),
+            "pure_c_terms": [[int(code), float(factor)] for code, factor in pure_c_terms],
+            "compound_x_terms": [[int(code), float(factor)] for code, factor in full_x_terms],
+            "compound_c_terms": [[int(code), float(factor)] for code, factor in full_c_terms],
+        },
         "correlation_functional": ",vwn",
         "compound_functional": "lda,vwn",
         "absolute_tolerance_hartree": ABS_TOL,
@@ -102,7 +142,11 @@ def main() -> int:
         "pass": not failed,
         "records": records,
     }
-    print(json.dumps(result, indent=2, sort_keys=True))
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
     return 1 if failed else 0
 
 
