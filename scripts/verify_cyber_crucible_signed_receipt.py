@@ -34,7 +34,7 @@ B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
 
 PAYLOAD_FIELDS = {
     "schema_version", "algorithm", "receipt_id", "key_id", "evaluator_id",
-    "role", "campaign_id", "subject_id", "attempt_id", "run_nonce", "issued_at", "expires_at",
+    "role", "campaign_id", "subject_id", "attempt_id", "receipt_nonce", "issued_at", "expires_at",
     "scenario_id", "scenario_revision", "scenario_digest", "evidence_digest",
     "status", "proposal_id", "proposal_digest",
 }
@@ -112,7 +112,7 @@ def _context(context: Any) -> dict[str, Any]:
     if not isinstance(context, dict):
         raise VerificationError("expected context must be an object")
     required = {
-        "campaign_id", "subject_id", "attempt_id", "run_nonce", "scenario_id", "scenario_revision",
+        "campaign_id", "subject_id", "attempt_id", "receipt_nonce", "scenario_id", "scenario_revision",
         "scenario_digest", "evidence_digest", "role",
     }
     allowed = required | {"proposal_id", "proposal_digest"}
@@ -128,7 +128,7 @@ def _context(context: Any) -> dict[str, Any]:
     _digest(context["evidence_digest"], "expected evidence_digest")
     if not isinstance(context["role"], str) or context["role"] not in ROLES:
         raise VerificationError("expected role is unsupported")
-    _b64url_decode(context["run_nonce"], "expected run_nonce", 32)
+    _b64url_decode(context["receipt_nonce"], "expected receipt_nonce", 32)
     if context["role"] == "authorization_decision":
         _text(context.get("proposal_id"), "expected proposal_id")
         _digest(context.get("proposal_digest"), "expected proposal_digest")
@@ -215,7 +215,7 @@ def _validate_payload(payload: Any) -> dict[str, Any]:
         raise VerificationError("scenario_revision must be a safe positive integer")
     _digest(payload["scenario_digest"], "payload.scenario_digest")
     _digest(payload["evidence_digest"], "payload.evidence_digest")
-    _b64url_decode(payload["run_nonce"], "payload.run_nonce", 32)
+    _b64url_decode(payload["receipt_nonce"], "payload.receipt_nonce", 32)
     issued_at = _utc(payload["issued_at"], "payload.issued_at")
     expires_at = _utc(payload["expires_at"], "payload.expires_at")
     if issued_at >= expires_at:
@@ -267,16 +267,16 @@ class ReplayLedger:
                 db.execute(
                     """CREATE TABLE IF NOT EXISTS consumed_receipts (
                         receipt_id TEXT PRIMARY KEY,
-                        run_nonce TEXT NOT NULL UNIQUE,
+                        receipt_nonce TEXT NOT NULL UNIQUE,
                         campaign_id TEXT NOT NULL,
                         consumed_at TEXT NOT NULL
                     )"""
                 )
                 db.execute("BEGIN IMMEDIATE")
                 db.execute(
-                    "INSERT INTO consumed_receipts(receipt_id, run_nonce, campaign_id, consumed_at) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO consumed_receipts(receipt_id, receipt_nonce, campaign_id, consumed_at) VALUES (?, ?, ?, ?)",
                     (
-                        payload["receipt_id"], payload["run_nonce"],
+                        payload["receipt_id"], payload["receipt_nonce"],
                         payload["campaign_id"], now.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     ),
                 )
@@ -287,7 +287,7 @@ class ReplayLedger:
                     db.rollback()
             except sqlite3.Error:
                 pass
-            raise VerificationError("replay rejected: receipt_id or run_nonce was already consumed") from exc
+            raise VerificationError("replay rejected: receipt_id or receipt_nonce was already consumed") from exc
         except Exception:
             if created:
                 # Keep a created DB if SQLite initialized it; do not delete a path that
@@ -382,7 +382,7 @@ def verify_receipt(
         "campaign_id": payload["campaign_id"],
         "subject_id": payload["subject_id"],
         "attempt_id": payload["attempt_id"],
-        "run_nonce": payload["run_nonce"],
+        "receipt_nonce": payload["receipt_nonce"],
         "issued_at": payload["issued_at"],
         "expires_at": payload["expires_at"],
         "scenario_id": payload["scenario_id"],
