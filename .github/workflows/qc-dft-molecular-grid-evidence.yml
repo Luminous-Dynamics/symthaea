@@ -7,6 +7,7 @@ on:
       - "crates/domains/symthaea-quantum-chemistry/src/dft/**"
       - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
       - "crates/domains/symthaea-quantum-chemistry/examples/qc_dft_molecular_grid_evidence.rs"
+      - "scripts/qc/compare_dft_molecular_grid_pyscf.py"
       - "crates/core/symthaea-observation-attestation/Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/qc-dft-molecular-grid-evidence.yml"
@@ -59,6 +60,19 @@ jobs:
         with:
           toolchain: 1.96.0
 
+      - name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned PySCF reference dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "numpy==2.2.6" \
+            "scipy==1.15.3" \
+            "h5py==3.14.0" \
+            "pyscf==2.14.0"
+
       - name: Check formatting of DFT and benchmark sources
         run: |
           set -euo pipefail
@@ -75,6 +89,8 @@ jobs:
         run: cargo test --locked -p symthaea-quantum-chemistry --lib 'dft::'
 
       - name: Run closed-shell molecular grid sweep
+        id: native_sweep
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -84,7 +100,22 @@ jobs:
             --example qc_dft_molecular_grid_evidence \
             > /tmp/symthaea-qc-dft-grid-evidence.json
 
-      - name: Summarize grid, SCF, and electron-count evidence
+      - name: Compare the native sweep against matched-grid PySCF references
+        id: pyscf_comparison
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          native_report="/tmp/symthaea-qc-dft-grid-evidence.json"
+          if [[ ! -s "$native_report" ]]; then
+            echo "Native JSON is missing; no molecular comparison can be made." >&2
+            exit 1
+          fi
+          python scripts/qc/compare_dft_molecular_grid_pyscf.py \
+            --native-report "$native_report" \
+            --output /tmp/symthaea-qc-dft-pyscf-comparison.json
+
+      - name: Summarize native and independent molecular evidence
         if: always()
         run: |
           python3 - <<'PY'
@@ -92,13 +123,15 @@ jobs:
           import os
           from pathlib import Path
 
-          report_path = Path("/tmp/symthaea-qc-dft-grid-evidence.json")
           summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
           lines = ["", "### Native molecular grid evidence", ""]
-          if not report_path.is_file():
-              lines.append("No JSON report was emitted; the Rust example did not complete.")
+          native_path = Path("/tmp/symthaea-qc-dft-grid-evidence.json")
+          comparison_path = Path("/tmp/symthaea-qc-dft-pyscf-comparison.json")
+
+          if not native_path.is_file():
+              lines.append("No native JSON report was emitted; the Rust example did not complete.")
           else:
-              report = json.loads(report_path.read_text(encoding="utf-8"))
+              report = json.loads(native_path.read_text(encoding="utf-8"))
               counts = report.get("summary", {})
               lines += [
                   f"- Source commit: `{report.get('source_commit')}`",
@@ -107,7 +140,7 @@ jobs:
                   f"- Solver receipts present for all cases: {counts.get('solver_receipts_present_all_cases')}",
                   f"- SCF converged for all cases: {counts.get('scf_converged_all_cases')}",
                   f"- Electron-count integrals finite for all cases: {counts.get('electron_count_integrals_finite_all_cases')}",
-                  f"- Execution gate: **{'PASS' if counts.get('all_cases_passed_execution_gate') else 'FAIL'}**",
+                  f"- Native execution gate: **{'PASS' if counts.get('all_cases_passed_execution_gate') else 'FAIL'}**",
                   "",
                   "| Molecule | Grid | SCF | Energy (Ha) | Grid electrons | Absolute count error | Points |",
                   "|---|---|---|---:|---:|---:|---:|",
@@ -124,20 +157,71 @@ jobs:
                       f"{item.get('status')} | {energy_s} | {count_s} | "
                       f"{error_s} | {item.get('n_grid_points', '—')} |"
                   )
+
+          lines += ["", "### Matched-grid PySCF energy comparison", ""]
+          if not comparison_path.is_file():
+              lines.append("No comparison JSON was emitted; the independent PySCF comparison did not complete.")
+          else:
+              comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+              counts = comparison.get("summary", {})
               lines += [
+                  f"- PySCF / NumPy / SciPy: `{comparison.get('pyscf_version')}` / `{comparison.get('numpy_version')}` / `{comparison.get('scipy_version')}`",
+                  f"- Matched-grid cases: {counts.get('cases')}; passed: {counts.get('passed')}; failed: {counts.get('failed')}",
+                  f"- Energy agreement tolerance: {comparison.get('energy_tolerance_hartree')} Ha",
+                  f"- Molecular comparison gate: **{'PASS' if counts.get('pass') else 'FAIL'}**",
                   "",
-                  "Grid electron-count error is a quadrature diagnostic, not a chemical-accuracy certificate.",
-                  "This is native Symthaea evidence. Molecular energy agreement against PySCF remains a separate comparison.",
+                  "| Molecule | Grid | Energy error (Ha) | Energy error (kcal/mol) | Electron-count error (Symthaea / PySCF) |",
+                  "|---|---|---:|---:|---:|",
               ]
+              for item in comparison.get("comparisons", []):
+                  error = item.get("energy_abs_error_hartree")
+                  kcal = item.get("energy_abs_error_kcal_mol")
+                  native_count = item.get("native_electron_count_abs_error")
+                  pyscf_count = item.get("pyscf_electron_count_abs_error")
+                  error_s = "—" if error is None else f"{error:.3e}"
+                  kcal_s = "—" if kcal is None else f"{kcal:.4f}"
+                  native_count_s = "—" if native_count is None else f"{native_count:.3e}"
+                  pyscf_count_s = "—" if pyscf_count is None else f"{pyscf_count:.3e}"
+                  lines.append(
+                      f"| {item.get('molecule')} | {item.get('grid_quality')} | {error_s} | "
+                      f"{kcal_s} | {native_count_s} / {pyscf_count_s} |"
+                  )
+              for reason in counts.get("failure_reasons", []):
+                  lines.append(f"- Failure detail: {reason}")
+
+          lines += [
+              "",
+              "A grid-electron count is a quadrature diagnostic; it is not silently forced to the exact integer.",
+              "Matched-grid energy agreement is an implementation test, not proof of chemical accuracy.",
+          ]
           with summary_path.open("a", encoding="utf-8") as output:
               output.write("\n".join(lines) + "\n")
           PY
 
-      - name: Upload native numerical evidence
+      - name: Enforce native and matched-grid comparison gates
+        if: always()
+        shell: bash
+        env:
+          NATIVE_OUTCOME: ${{ steps.native_sweep.outcome }}
+          PYSF_COMPARISON_OUTCOME: ${{ steps.pyscf_comparison.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$NATIVE_OUTCOME" != "success" ]]; then
+            printf 'Native DFT grid sweep outcome was %s\n' "$NATIVE_OUTCOME" >&2
+            exit 1
+          fi
+          if [[ "$PYSF_COMPARISON_OUTCOME" != "success" ]]; then
+            printf 'Matched-grid PySCF comparison outcome was %s\n' "$PYSF_COMPARISON_OUTCOME" >&2
+            exit 1
+          fi
+
+      - name: Upload native and independent numerical evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: qc-dft-molecular-grid-evidence-${{ github.event.pull_request.head.sha || github.sha }}
-          path: /tmp/symthaea-qc-dft-grid-evidence.json
+          path: |
+            /tmp/symthaea-qc-dft-grid-evidence.json
+            /tmp/symthaea-qc-dft-pyscf-comparison.json
           if-no-files-found: warn
           retention-days: 30
