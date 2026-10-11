@@ -19,11 +19,11 @@ The envelope contains exactly \`payload\` and \`signature\`. The signature is un
 
 ## Bindings
 
-The payload binds the exact campaign, subject, attempt, scenario ID/revision/digest, input-receipt digest, evaluator-policy digest, expected context digest, verifier-build digest, decision-signing-policy digest, signer identity, decision, reason classification, and validity interval.
+The payload binds the exact campaign, subject, attempt, scenario ID/revision/digest, input-receipt digest, complete diagnostic-report digest, evaluator-policy digest, expected context digest, verifier-build digest, decision-signing-policy digest, signer identity, decision, reason classification, and validity interval.
 
 \`context_digest\` is SHA-256 over RFC 8785 JCS of the complete externally supplied expected-context object, with exactly the fields defined in the verifier. That expected context MUST be independently supplied by a trusted consumer/operator; it MUST NOT be copied from the decision receipt itself. \`input_receipt_digest\` is the SHA-256 digest of the RFC 8785 JCS representation of the complete upstream receipt envelope, including its signature. The caller computing the expected context must compute these values independently.
 
-The verifier build digest is also externally supplied. A signed self-assertion inside a receipt does not establish the executable that actually ran. Production provenance therefore belongs to a separate trusted release/attestation channel; this verifier checks only the digest binding.
+The report digest is SHA-256 over RFC 8785 JCS of the complete report object. The integrated consumer recomputes it and checks report subject, scenario identity, and run ID against the trusted expected context; for this contract, `attempt_id` must equal `report.run.run_id`. The verifier build digest is also externally supplied. A signed self-assertion inside a receipt does not establish the executable that actually ran. Production provenance therefore belongs to a separate trusted release/attestation channel; this verifier checks only the digest binding.
 
 ## Trust policy and replay
 
