@@ -371,7 +371,8 @@ fn regression_against_baseline() {
         baseline_path.display()
     );
 
-    let baseline = RegressionSnapshot::load(baseline_path).expect("failed to load baseline snapshot");
+    let baseline =
+        RegressionSnapshot::load(baseline_path).expect("failed to load baseline snapshot");
     assert_eq!(
         baseline.schema_version, SNAPSHOT_SCHEMA_VERSION,
         "Committed regression baseline uses an unsupported schema version"
