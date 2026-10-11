@@ -1,9 +1,9 @@
 {
   "current_reference_checker": {
-    "expected_check_count": 66,
-    "git_blob_sha": "a7c39906e9f5cf34711630e1813e4b4f67527eef",
+    "expected_check_count": 68,
+    "git_blob_sha": "422a77f90dbf21a6b8dba6175193116c2a89cb15",
     "path": "scripts/engineering/orbital_ring_reference_check.py",
-    "sha256": "c4eabd9a2e02f246d7d337926b9a8f0e422f1eced879d1ed57c2c26b1ffc98c2"
+    "sha256": "934ae71d6b1db63dba1ee276c9144593efd0945b20e3f6d929340a0c93215332"
   },
   "current_validator": {
     "expected_self_test_check_count": 88,
@@ -11,7 +11,7 @@
     "path": "scripts/engineering/validate_orbital_ring_failure_manifest.py",
     "sha256": "44b3e8500221879be9efeb0faedc95d5873df4c3a063c080bc19338afbaaeb25"
   },
-  "execution_note": "Validator suite (88 expected checks) and reference-checker suite (66 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow must verify exact hashes, repeat outputs byte-for-byte, and compare the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors, malformed populated fields/provenance, and declared-state mismatch force expected_gate_state=Blocked; contract validation fails for malformed populated fields.",
+  "execution_note": "Validator suite (88 expected checks) and reference-checker suite (68 expected checks) are unexecuted for their current source fingerprints. The draft-safe workflow verifies exact Git blob and SHA-256 identities, repeats outputs byte-for-byte, and compares the blocked template report. Historical pass counts apply only to the exact prior source blobs listed here. Structural errors, malformed populated fields/provenance, declared-state mismatch and non-finite stream-force results must fail closed; all reference checks remain T0 arithmetic/contract evidence, not a physical feasibility result.",
   "last_executed_reference_check": {
     "checker_git_blob_sha": "7adbaab223517494332711b480bdf37e0b216811",
     "checker_sha256": "3ab051fc31ba1b4673c07578cfd047a0ce43339a4f8bf37de86992e8588953dc",
@@ -31,6 +31,8 @@
   "physics_claim": "none; these checks cover manifest contract handling only, not orbital-ring equilibrium, stability, or survivability",
   "schema": "luminous-dynamics.orbital-ring-validator-verification-status/v1",
   "unexecuted_regressions": [
+    "circular_stream.zero_density_large_finite_speed_is_zero",
+    "circular_stream.nonfinite_result_rejected",
     "wrong_numeric_type_fails_contract_validation",
     "invalid_populated_provenance_fails_contract_validation",
     "unknown_top_level_key_fails_structural_gate",
