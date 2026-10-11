@@ -16,22 +16,22 @@ Symthaea combines hyperdimensional computing (HDC), closed-form liquid neural dy
 | Claim | Status | Evidence | Limitations |
 |-------|--------|----------|--------------|
 | HDC XOR binding (16Kbit) | Binius proof is generated and verified by the public harness | `crates/hdc-zkp-bench/src/main.rs` measures Binius and explicitly labels Winterfell values as analytic estimates | The public artifact does not establish a measured cross-backend ratio; XOR itself is linear, while reported equality constraints include structural overhead |
-| Health-value range proof in ~34ms (ZK range proof, value ∈ [min, max]) | Working cryptographic primitive | `crates/mycelix-zkp-core/`, benchmark output below | **Not a HIPAA compliance certification.** A range proof is one building block; no accredited assessment of any system built on it has been performed |
-| Selective-disclosure age≥18 proof | Working cryptographic primitive | `papers/theory-foundations/binius-hdc/` eIDAS-shaped demo | **Not an eIDAS 2.0-certified wallet or credential.** Demonstrates the primitive an eIDAS-compliant system would need, nothing more |
+| Health-value range proof (~34ms historical claim) | Not reproduced by the current public standalone benchmark | Historical paper/readme claim only; `crates/mycelix-zkp-core/` is not a path in this standalone repository | No fresh proof execution or independent review in this branch; not a HIPAA compliance certification |
+| Selective-disclosure age≥18 proof | Described as an eIDAS-shaped research demo; not independently reproduced in this audit | Research paper/demo description only | Not an eIDAS-certified wallet, credential, issuer, or trust service |
 | Butlin consciousness-indicator probes | Structural implementation, partially audited | Internal construct-validity re-check found only 4/12 probe rows survive; of those, one (`AE-2`) has real empirical support to date, and that result is explicitly scoped as "causally-supported internal wiring evidence," not functional capacity and not evidence of consciousness | **Not evidence the system is conscious.** Most of the original 12-row matrix did not hold up to its own re-audit |
 | Moral-reasoning benchmark (Hendrycks Ethics) | Internal benchmark, re-run and corrected | Canonical 2026-07-15 re-run on held-out test CSVs: 56.2% overall; only the `virtue` category (76.5%) is meaningfully above chance | An earlier 91.1%/94.5%/84.7% figure was **retracted as leakage-inflated** — if you see those numbers anywhere else in this repo's history, they are superseded |
 | Cognitive loop runs at ~31 Hz measured | Reproduced internally | Loop telemetry | Measured on one reference machine; not a real-time guarantee |
 
 None of this is a claim of general intelligence, sentience, or legal/medical/financial compliance. Where a component is a real, working, reproducible cryptographic or engineering result, we say so and show the command. Where a result was wrong, we say that too, in place, rather than deleting the history.
 
-## What The ZKP Stack Demonstrates
+## What the public proof harness demonstrates
 
-- **Healthcare attestation primitive** — Prove "patient vitals are in normal range" in ~34ms without revealing the actual values, via a ZK range proof. ([health-zkp](crates/mycelix-zkp-core/))
-- **Anonymous eligibility proof** — Prove "I'm eligible to vote" without revealing identity, with post-quantum Dilithium5 signatures. ([governance](crates/mycelix-zkp-core/src/consciousness.rs))
-- **Selective credential disclosure** — Prove "age >= 18" via ZKP without revealing date of birth or nationality. ([eidas-shaped demo](papers/theory-foundations/binius-hdc/))
-- **Bitwise-majority proof demo** — proves strict per-bit majority over private opaque 64-bit words. It does **not** prove one-time-pad encryption, numeric-gradient aggregation, or an end-to-end federated-learning protocol. The source file path is retained for compatibility. ([legacy benchmark file](crates/hdc-zkp-bench/src/fl_triple_stack.rs))
-- **Verifiable search** — Prove search results were ranked per a stated formula, not manipulated. ([prism-zkp](papers/theory-foundations/binius-hdc/))
-- **Cognitive-loop state-transition proof** — Prove a specific internal state transition occurred as specified, without revealing the internal state itself. This is a proof about *a computation*, not a proof about *consciousness*. ([cycle_integrity](crates/symthaea-zkproof/src/cycle_integrity.rs))
+- **Packed-word XOR relation:** a Binius circuit generates and verifies a proof that public packed output words equal the bitwise XOR of private input words. This is a relation proof, not a complete encryption protocol.
+- **Hamming distance:** the correction branch now constrains a proper population count of XOR words and sums them into a public distance. Rust tests are authored but pending branch build/CI.
+- **Strict bitwise majority:** the correction branch uses bit-sliced counters and a per-lane threshold comparison; ties resolve to zero. Tests are authored but not yet executed on this branch.
+- **Temporal recurrence:** current demos prove a packed-bit recurrence with witness-supplied gating words, not numerical fixed-point CfC dynamics.
+
+The public standalone benchmark does **not** currently reproduce the cited ~34ms health-attestation pipeline, an end-to-end age credential, a correct encrypted numeric-gradient aggregate, or a measured same-scale Winterfell XOR proof. Those application-level claims must remain unverified until their source paths, semantics, and measurements are independently reproducible.
 
 ## Quick Start
 
@@ -116,7 +116,7 @@ The previous Hamming result is superseded: its circuit summed/truncated XOR-word
 
 ```bash
 # Reproduce all ZKP benchmark results
-cd papers/binius-hdc && bash reproduce.sh
+bash papers/theory-foundations/binius-hdc/reproduce.sh
 
 # Run consciousness psych-bench
 cargo run --features psych_bench --example run_all_benchmarks
@@ -167,9 +167,9 @@ soft warning report.
 
 ### Key Research Claims
 
-- **256x constraint reduction** for HDC XOR binding in binary-field STARKs (measured, same scale)
-- **Zero encryption overhead** for federated learning (OTP + Binius share GF(2))
-- **694 KB Binius verifier** compiles to WASM (in-zome verification possible)
+- **Binary-field alignment:** XOR is linear in the Binius representation; a measured same-scale Winterfell speedup or constraint-reduction ratio is not established by the current public harness.
+- **Opaque-word majority:** corrected circuits encode strict bitwise majority, but do not implement or prove one-time-pad encryption or numeric federated-gradient aggregation.
+- **WASM verifier size and in-zome deployment:** historically reported, not independently verified by this audit branch.
 - **4/12 Butlin indicator probes** survive an internal construct-validity re-check; only 1 has empirical support to date, explicitly scoped as internal causal-wiring evidence, not consciousness evidence
 - **56.2% moral accuracy** on Hendrycks Ethics (canonical re-run; an earlier 91.1% figure was retracted as leakage-inflated)
 
@@ -201,7 +201,7 @@ soft warning report.
                     └─────────────────┘  └─────────────────┘
 ```
 
-See full architecture diagrams in [`docs/architecture/`](docs/architecture/).
+Architecture diagrams are conceptual; they are not evidence that every pictured integration is currently deployed. See [`docs/architecture/`](docs/architecture/) for design material.
 
 ## Cryptographic Primitives Relevant to Regulated Domains
 
@@ -209,9 +209,9 @@ See full architecture diagrams in [`docs/architecture/`](docs/architecture/).
 
 | Regulation | What the primitive demonstrates | What it is NOT |
 |------------|----------------------------------|-----------------|
-| **HIPAA** (US) | ZK range proof: vitals/labs in range without revealing values (~34ms) | Not a HIPAA-compliant system or a covered-entity certification |
-| **eIDAS 2.0** (EU) | Selective-disclosure credential proof with `dastark-2026` cryptosuite + Dilithium5 | Not an eIDAS-certified wallet, issuer, or trust-service provider |
-| **EU DPP** (EU) | Proof of a compliance predicate without revealing full supply-chain data | Not a Digital Product Passport implementation or conformity assessment |
+| **HIPAA** (US) | Intended application: prove a range predicate without revealing the value; not reproduced by the current public standalone benchmark | No HIPAA-compliant system or covered-entity certification is established |
+| **eIDAS 2.0** (EU) | Intended application: selective-disclosure credential; not independently reproduced by the current public standalone source | No certified wallet, issuer, or trust-service provider is established |
+| **EU DPP** (EU) | Proposed application: prove a compliance predicate without exposing full supply-chain data | No Digital Product Passport implementation or conformity assessment is established |
 
 If you are evaluating this for an actual regulated deployment, treat everything here as a research prototype and get your own legal/compliance review.
 
@@ -226,6 +226,6 @@ AGPL-3.0-or-later. Commercial licensing available — contact tristan.stoltz@evo
   title={Binary-Field STARKs for Hyperdimensional Computing},
   author={Stoltz, Tristan},
   year={2026},
-  note={Available at github.com/Luminous-Dynamics/symthaea/papers/binius-hdc}
+  note={Available at github.com/Luminous-Dynamics/symthaea/papers/theory-foundations/binius-hdc}
 }
 ```
