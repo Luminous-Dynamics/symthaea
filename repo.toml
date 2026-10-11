@@ -1,0 +1,27 @@
+schema_version = 1
+repository = "Luminous-Dynamics/symthaea"
+canonical = true
+maturity = "research"
+production_ready = false
+external_security_audit = false
+
+claims_coverage = "partial"
+claims_manifest = "claims.toml"
+claims_render = "docs/CLAIMS.md"
+status_document = "docs/HONEST_STATUS.md"
+conformance_level = "RC-1"
+
+[policy]
+require_claim_scope = true
+require_claim_evidence_paths = true
+require_claim_limitations = true
+require_status_claims_pointer = true
+require_repo_path_containment = true
+require_checker_adversarial_tests = true
+require_exact_source_qualification = false
+require_protected_promotion = false
+
+[promotion]
+canonical_branch = "main"
+protected = false
+required_checks = []
