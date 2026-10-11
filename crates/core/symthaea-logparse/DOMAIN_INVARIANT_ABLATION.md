@@ -16,7 +16,9 @@ The baseline encoder directly binds raw `provider`, `event_id`, and `component`.
 - Preserves source, severity, and raw field values. High-cardinality value normalization and free-text message encoding are intentionally not included in v1 so this remains a narrow, interpretable ablation.
 - Uses an `unknown` family for unmapped IDs and unknown namespaces. Known semantic families can be shared across recognized providers (for example, Sysmon process-create and Security process-create events); a colliding numeric ID from an unknown provider does not inherit that meaning. This mapping remains a bounded heuristic, not a universal taxonomy.
 
-The implementation is **not OCSF-compliant**. The long-term direction should be to normalize inputs through a versioned, vendor-neutral schema such as [OCSF](https://github.com/ocsf/ocsf-schema), rather than growing a large ad-hoc alias table indefinitely.
+The implementation is **not OCSF-compliant**. The versioned `DOMAIN_INVARIANT_ENCODER_VERSION` constant is included in the hash namespaces and printed with ablation output; bump it whenever provider recognition, family mapping, or field canonicalization semantics change, and keep each result tied to the exact commit.
+
+The long-term direction should be a version-pinned, schema-driven normalization layer rather than growing this alias table indefinitely. OCSF models events as semantic event classes with class-specific attributes and activity IDs; for example, its [Process Activity](https://github.com/ocsf/ocsf-schema/blob/main/events/system/process_activity.json) and [Authentication](https://github.com/ocsf/ocsf-schema/blob/main/events/iam/authentication.json) classes carry distinct semantics. This ablation only maps to coarse families, does not populate OCSF class/category/activity identifiers, and does not validate required attributes. It must not be presented as an OCSF implementation. See the [OCSF event-class model](https://github.com/ocsf/ocsf-docs/blob/main/overview/understanding-ocsf.md) for the fuller mapping contract.
 
 ## Run the paired experiment
 
@@ -32,7 +34,7 @@ The ordinary baseline experiments now use source-file-grouped train/test and 5-f
 - in-distribution test accuracy;
 - OOD accuracy;
 - macro precision, macro recall, and macro F1;
-- per-class TP/FP/FN, precision, recall, F1, and the full confusion matrix;
+- per-class support, predicted count, TP/FP/FN, precision, recall, F1, and the full confusion matrix;
 - the corresponding raw-encoder metrics for direct comparison.
 
 Accuracy alone can be dominated by common classes; read it alongside macro metrics and the confusion matrix. Class-level false positives here mean confusion among the labeled attack classes—not false alarms on benign enterprise activity. The staged OTRF corpus does not provide the benign control needed to measure operational false-positive rates. The script prints measurements from the currently staged corpora; do not copy historical values into a new result as if it had been reproduced.
