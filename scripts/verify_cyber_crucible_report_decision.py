@@ -24,7 +24,7 @@ try:
         ProvenanceVerificationError,
         verify_verifier_provenance,
     )
-    from package_cyber_crucible_verifier import BundleError, verify_bundle
+
 except ModuleNotFoundError:
     from scripts.verify_cyber_crucible_decision_receipt import (
         DecisionVerificationError,
@@ -37,7 +37,7 @@ except ModuleNotFoundError:
         ProvenanceVerificationError,
         verify_verifier_provenance,
     )
-    from scripts.package_cyber_crucible_verifier import BundleError, verify_bundle
+
 
 
 class ReportDecisionBindingError(ValueError):
@@ -145,16 +145,12 @@ def verify_report_decision(
         raise ReportDecisionBindingError(
             "verified provenance policy digest does not match the signed decision context"
         )
-    # An attestation proves a claim about an artifact; the bundle contract also checks
-    # the exact embedded verifier/validator/schema/test inventory before consumption.
-    bundle = verify_bundle(
-        verifier_artifact_path,
-        expected_source_commit=provenance["source_commit"],
-    )
-    if bundle.get("bundle_verified") is not True:
+    # Provenance verification snapshots the file once and runs both attestation and
+    # deterministic bundle-manifest validation against those same bytes.
+    if provenance.get("bundle_verified") is not True:
         raise ReportDecisionBindingError("verifier bundle inventory was not verified")
-    if bundle.get("bundle_sha256") != provenance.get("artifact_sha256"):
-        raise ReportDecisionBindingError("verified bundle digest differs from attested artifact digest")
+    if provenance.get("bundle_schema_version") != "cyber-crucible-verifier-bundle.v1":
+        raise ReportDecisionBindingError("unsupported verifier bundle manifest version")
 
     result = verify_decision_receipt(
         decision_receipt,
@@ -168,8 +164,8 @@ def verify_report_decision(
     result["verifier_artifact_sha256"] = provenance["artifact_sha256"]
     result["verifier_provenance_policy_digest_checked"] = True
     result["verifier_bundle_verified"] = True
-    result["verifier_bundle_manifest_version"] = bundle["schema_version"]
-    result["verifier_bundle_file_count"] = bundle["file_count"]
+    result["verifier_bundle_manifest_version"] = provenance["bundle_schema_version"]
+    result["verifier_bundle_file_count"] = provenance["bundle_file_count"]
     result["input_receipt_digest"] = input_receipt_digest
     result["report_digest"] = report_digest
     return result
@@ -201,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         # signed "reject" remains a rejection; consumers MUST inspect decision.
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
-    except (BundleError, DecisionVerificationError, ProvenanceVerificationError, ReportDecisionBindingError, OSError) as exc:
+    except (DecisionVerificationError, ProvenanceVerificationError, ReportDecisionBindingError, OSError) as exc:
         print(f"REJECTED: {exc}", file=sys.stderr)
         return 2
     except Exception as exc:
