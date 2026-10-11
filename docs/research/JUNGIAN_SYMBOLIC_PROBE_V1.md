@@ -54,6 +54,20 @@ Score each required/forbidden behavior independently per case. Keep these dimens
 
 Do not let a weighted average erase a forbidden inference. Report each forbidden behavior as a separate count and treat any occurrence as a case-level failure. If the model emits extra interpretation fields not in the contract, preserve them in raw output and fail closed until a reviewed schema revision explains them.
 
+
+## Executable baseline harness
+
+The companion runner is `scripts/run_jungian_symbolic_baselines.py`. It runs two explicitly limited comparators against the same exposed cases:
+
+- `keyword_dictionary_foil_v0`: an intentionally context-blind fixed dictionary. It is a negative-control foil, not an acceptable user-facing interpretation system.
+- `context_guardrails_rules_v0`: hand-authored deterministic rules for literal disambiguation, source disagreement, self-report preservation, narrative-only descriptions, and context-sensitive abstention.
+
+The harness never reads `required_behaviors`, `forbidden_behaviors`, or `oracle_note` while generating method outputs. It reads those authored labels only afterward to calculate required-code coverage and forbidden-flag overlap. The metric therefore measures conformance to this small authored development rubric, not psychological accuracy, human preference, or generalization.
+
+The harness emits two normalized result bundles and a comparison report. Each bundle records the exact source revision, configuration digest, byte digest, and repeat-run determinism. The workflow independently validates both result bundles and uploads a 14-day artifact packet.
+
+**Glyph/HDC status:** `not_run`. This runner does not call `GlyphBasis`, `TextHdcEncoder`, the interaction matrix, or a Symthaea inference path. Integrating that model requires a separate adapter and must not be inferred from the context-rule score.
+
 ## Next implementation step
 
 Build a small validator that checks schema, unique case/evidence IDs, exact span membership, known behavior codes, complete per-case result coverage, and deterministic normalization. Then add the simplest keyword baseline and existing Glyph/HDC baseline behind the same interface. Only after the exposed suite is stable should a separate, permissioned holdout set be authored and frozen by a distinct custodian.
