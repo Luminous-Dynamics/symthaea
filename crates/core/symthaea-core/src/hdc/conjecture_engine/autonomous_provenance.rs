@@ -12,12 +12,34 @@ pub enum AutonomousHoldoutFailure {
     ThresholdExceeded,
 }
 
+/// A single evaluator paired with its declared, versioned system identity.
+/// Holdout evaluation always invokes this stored evaluator. This improves
+/// identity consistency, but does not prove the declaration equals the code.
+#[derive(Clone)]
+pub struct AutonomousHoldoutSystemV1 {
+    system_id: String,
+    canonical_definition: String,
+    definition_blake3: String,
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+}
+impl AutonomousHoldoutSystemV1 {
+    pub fn new(system_id: &str, canonical_definition: &str, rhs: fn(&[f64], f64) -> Vec<f64>)
+        -> Result<Self, AutonomousDiscoveryReceiptError> {
+        let (system_id, definition_blake3) = validate_system_identity(system_id, canonical_definition)?;
+        Ok(Self { system_id, canonical_definition: canonical_definition.to_string(), definition_blake3, rhs })
+    }
+    pub fn system_id(&self) -> &str { &self.system_id }
+    pub fn canonical_definition(&self) -> &str { &self.canonical_definition }
+    pub fn definition_blake3(&self) -> &str { &self.definition_blake3 }
+}
 /// Generalization evidence from fresh initial conditions. Passing this validator
 /// is not symbolic equivalence, formal proof, or validation against reality.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AutonomousHoldoutValidation {
     pub discovery_seed: u64,
     pub holdout_seed: u64,
+    pub system_id: String,
+    pub system_definition_blake3: String,
     pub requested_trajectories: usize,
     pub trajectories_checked: usize,
     pub max_lie_derivative_variance: f64,
@@ -49,6 +71,8 @@ fn failed_holdout(
     AutonomousHoldoutValidation {
         discovery_seed,
         holdout_seed,
+        system_id: String::new(),
+        system_definition_blake3: String::new(),
         requested_trajectories,
         trajectories_checked,
         max_lie_derivative_variance: max_variance,
@@ -297,6 +321,8 @@ fn validate_invariant_holdout_inner(
     AutonomousHoldoutValidation {
         discovery_seed,
         holdout_seed,
+        system_id: String::new(),
+        system_definition_blake3: String::new(),
         requested_trajectories: holdout_trajectories,
         trajectories_checked: checked,
         max_lie_derivative_variance: max_variance,
@@ -317,7 +343,7 @@ fn validate_invariant_holdout_inner(
 /// reusing the metrics with a different formula, variable list, initial state,
 /// integration horizon, step size, seed, trajectory count, or threshold.
 pub fn validate_invariant_holdout(
-    rhs: fn(&[f64], f64) -> Vec<f64>,
+    system: &AutonomousHoldoutSystemV1,
     candidate: &Expr,
     initial_state: &[f64],
     var_names: &[&str],
@@ -329,13 +355,16 @@ pub fn validate_invariant_holdout(
     threshold: f64,
 ) -> AutonomousHoldoutValidation {
     let mut result = validate_invariant_holdout_inner(
-        rhs, candidate, initial_state, var_names, search_config, t_max, dt,
+        system.rhs, candidate, initial_state, var_names, search_config, t_max, dt,
         holdout_trajectories, holdout_seed, threshold,
     );
     let variable_names: Vec<String> = var_names.iter().map(|name| (*name).to_string()).collect();
+    result.system_id = system.system_id.clone();
+    result.system_definition_blake3 = system.definition_blake3.clone();
     result.assessment_context_blake3 = assessment_context_digest(
         &format!("{}", candidate), &variable_names, initial_state, search_config.seed,
         holdout_seed, t_max, dt, holdout_trajectories, threshold,
+        &system.system_id, &system.definition_blake3,
     );
     result
 }
@@ -358,7 +387,23 @@ pub enum AutonomousDiscoveryReceiptError {
     ColdRunContainsPriors,
     ComposedCandidateNeedsParentReceipts,
 }
-
+fn validate_system_identity(system_id: &str, canonical_definition: &str)
+    -> Result<(String, String), AutonomousDiscoveryReceiptError> {
+    let normalized_id = system_id.trim();
+    if normalized_id.is_empty() { return Err(AutonomousDiscoveryReceiptError::EmptySystemId); }
+    if !canonical_definition.starts_with("system-definition-v1\n")
+        || canonical_definition.contains('\r') {
+        return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition);
+    }
+    let mut lines = canonical_definition.split('\n');
+    let header = lines.next();
+    let declared_id = lines.next();
+    let has_body = lines.any(|line| !line.trim().is_empty());
+    if header != Some("system-definition-v1") || declared_id != Some(normalized_id) || !has_body {
+        return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition);
+    }
+    Ok((normalized_id.to_string(), blake3::hash(canonical_definition.as_bytes()).to_hex().to_string()))
+}
 fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(&(bytes.len() as u64).to_le_bytes());
     hasher.update(bytes);
@@ -390,10 +435,14 @@ fn assessment_context_digest(
     dt: f64,
     requested_trajectories: usize,
     threshold: f64,
+    system_id: &str,
+    system_definition_blake3: &str,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hash_string(&mut hasher, "symthaea-autonomous-holdout-context-v1");
+    hash_string(&mut hasher, "symthaea-autonomous-holdout-context-v2");
     hash_string(&mut hasher, candidate_formula);
+    hash_string(&mut hasher, system_id);
+    hash_string(&mut hasher, system_definition_blake3);
     hash_usize(&mut hasher, variable_names.len());
     for name in variable_names { hash_string(&mut hasher, name); }
     hash_usize(&mut hasher, initial_state.len());
@@ -610,18 +659,8 @@ pub fn build_autonomous_discovery_receipt_v1(
     {
         return Err(AutonomousDiscoveryReceiptError::InvalidSourceRevision);
     }
-    if system_id.trim().is_empty() {
-        return Err(AutonomousDiscoveryReceiptError::EmptySystemId);
-    }
-    if !system_definition_canonical.starts_with("system-definition-v1\n")
-        || system_definition_canonical.contains('\r')
-    {
-        return Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition);
-    }
-    // Hash the exact versioned UTF-8 bytes here instead of trusting a supplied
-    // digest string. The caller must retain this definition as a separate artifact.
-    let system_definition_blake3 =
-        blake3::hash(system_definition_canonical.as_bytes()).to_hex().to_string();
+    let (normalized_system_id, system_definition_blake3) =
+        validate_system_identity(system_id, system_definition_canonical)?;
     if candidate.formula_str.trim().is_empty()
         || candidate.formula_str != format!("{}", candidate.formula)
     {
@@ -674,9 +713,14 @@ pub fn build_autonomous_discovery_receipt_v1(
     let formula = candidate.formula_str.clone();
     let receipt_variable_names: Vec<String> =
         var_names.iter().map(|name| (*name).to_string()).collect();
+    if holdout.system_id != normalized_system_id
+        || holdout.system_definition_blake3 != system_definition_blake3 {
+        return Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
+    }
     let expected_assessment_context = assessment_context_digest(
         &formula, &receipt_variable_names, initial_state, config.seed, holdout.holdout_seed,
         t_max, dt, holdout.requested_trajectories, holdout.threshold,
+        &normalized_system_id, &system_definition_blake3,
     );
     if holdout.assessment_context_blake3 != expected_assessment_context {
         return Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord);
@@ -685,7 +729,7 @@ pub fn build_autonomous_discovery_receipt_v1(
     let mut receipt = AutonomousDiscoveryReceiptV1 {
         schema_version: 1,
         source_revision,
-        system_id: system_id.trim().to_string(),
+        system_id: normalized_system_id,
         system_definition_blake3,
         discovery_mode: candidate.discovery_mode,
         discovery_seed: config.seed,
@@ -731,6 +775,8 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         threshold: receipt.threshold,
         passed: receipt.holdout_passed,
         failure: receipt.holdout_failure,
+        system_id: receipt.system_id.clone(),
+        system_definition_blake3: receipt.system_definition_blake3.clone(),
         assessment_context_blake3: receipt.assessment_context_blake3.clone(),
     };
     receipt.schema_version == 1
@@ -776,6 +822,7 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
             &receipt.candidate_formula, &receipt.variable_names, &receipt.initial_state,
             receipt.discovery_seed, receipt.holdout_seed, receipt.t_max, receipt.dt,
             receipt.requested_trajectories, receipt.threshold,
+            &receipt.system_id, &receipt.system_definition_blake3,
         )
         && compute_receipt_digest(receipt) == receipt.receipt_blake3
 }
@@ -915,6 +962,23 @@ mod tests {
         "system-definition-v1\nharmonic-oscillator-v1\nxdot=vx\nydot=vy\nvxdot=-x\nvydot=-y"
     }
 
+    fn harmonic_system() -> AutonomousHoldoutSystemV1 {
+        AutonomousHoldoutSystemV1::new("harmonic-oscillator-v1", system_definition_canonical(), harmonic_rhs)
+            .expect("valid harmonic test system")
+    }
+    fn invalid_rhs_system() -> AutonomousHoldoutSystemV1 {
+        AutonomousHoldoutSystemV1::new("invalid-rhs-shape-v1", "system-definition-v1\ninvalid-rhs-shape-v1\nrhs(state,t)->[]", wrong_dimension_at_start)
+            .expect("valid invalid-shape identity")
+    }
+    fn wrong_dimension_after_start_system() -> AutonomousHoldoutSystemV1 {
+        AutonomousHoldoutSystemV1::new("wrong-dimension-after-start-v1", "system-definition-v1\nwrong-dimension-after-start-v1\nrhs changes shape after t=0", wrong_dimension_after_start)
+            .expect("valid test identity")
+    }
+    fn constant_system() -> AutonomousHoldoutSystemV1 {
+        AutonomousHoldoutSystemV1::new("constant-flow-v1", "system-definition-v1\nconstant-flow-v1\nxdot=0", constant_rhs)
+            .expect("valid constant identity")
+    }
+
     fn harmonic_energy() -> Expr {
         let square = |name: &str| Expr::BinOp(
             BinOp::Pow,
@@ -948,7 +1012,7 @@ mod tests {
     fn identical_seeds_fail_closed() {
         let config = RegressorConfig { seed: 404, ..RegressorConfig::default() };
         let result = validate_invariant_holdout(
-            harmonic_rhs, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 404, 1e-2,
         );
         assert!(!result.passed);
@@ -960,7 +1024,7 @@ mod tests {
     fn harmonic_energy_generalizes_to_fresh_initial_conditions() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let result = validate_invariant_holdout(
-            harmonic_rhs, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 4, 701, 1e-2,
         );
         assert!(result.passed, "unexpected holdout record: {:?}", result);
@@ -972,14 +1036,14 @@ mod tests {
     fn malformed_inputs_and_zero_coverage_fail_closed() {
         let config = RegressorConfig { seed: 9, ..RegressorConfig::default() };
         let malformed = validate_invariant_holdout(
-            harmonic_rhs, &harmonic_energy(), &[f64::NAN, 0.0, 0.0, 1.0],
+            &harmonic_system(), &harmonic_energy(), &[f64::NAN, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 4, 709, 1e-2,
         );
         assert!(!malformed.passed);
         assert_eq!(malformed.failure, Some(AutonomousHoldoutFailure::InvalidInput));
 
         let zero = validate_invariant_holdout(
-            harmonic_rhs, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 0, 709, 1e-2,
         );
         assert!(!zero.passed);
@@ -992,7 +1056,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         let receipt = build_autonomous_discovery_receipt_v1(
@@ -1024,7 +1088,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs,
+            &harmonic_system(),
             &formula,
             &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"],
@@ -1064,7 +1128,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
         );
         let result = build_autonomous_discovery_receipt_v1(
@@ -1085,7 +1149,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Composed);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
         );
         let result = build_autonomous_discovery_receipt_v1(
@@ -1106,7 +1170,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let mut holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         holdout.passed = false;
@@ -1126,7 +1190,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let mut holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         holdout.passed = false;
@@ -1151,7 +1215,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 404, 1e-2,
         );
         let receipt = build_autonomous_discovery_receipt_v1(
@@ -1171,7 +1235,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         let mut receipt = build_autonomous_discovery_receipt_v1(
@@ -1192,7 +1256,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         let result = build_autonomous_discovery_receipt_v1(
@@ -1205,12 +1269,31 @@ mod tests {
     }
 
     #[test]
+    fn system_identity_requires_matching_versioned_definition() {
+        let result = AutonomousHoldoutSystemV1::new("another-system-v1", system_definition_canonical(), harmonic_rhs);
+        assert!(matches!(result, Err(AutonomousDiscoveryReceiptError::InvalidSystemDefinition)));
+    }
+
+    #[test]
+    fn holdout_context_rejects_receipt_for_another_system() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let holdout = validate_invariant_holdout(&harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2);
+        let result = build_autonomous_discovery_receipt_v1("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "unrelated-system-v1", "system-definition-v1\nunrelated-system-v1\nxdot=0",
+            &config, &[], &candidate(formula, AutonomousDiscoveryMode::Cold),
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0], 4.0, 0.01, &holdout);
+        assert!(matches!(result, Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord)));
+    }
+
+    #[test]
     fn verifier_rejects_resealed_receipt_with_changed_initial_state() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         let mut receipt = build_autonomous_discovery_receipt_v1(
@@ -1231,7 +1314,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2,
         );
         let receipt = build_autonomous_discovery_receipt_v1(
@@ -1254,7 +1337,7 @@ mod tests {
         let initial = [1.0, 0.0, 0.0, 1.0];
         let names = ["x", "y", "vx", "vy"];
         let holdout = validate_invariant_holdout(
-            wrong_dimension_at_start,
+            &invalid_rhs_system(),
             &formula,
             &initial,
             &names,
@@ -1292,7 +1375,7 @@ mod tests {
     fn wrong_rhs_dimension_on_intermediate_step_fails_closed_without_panicking() {
         let config = RegressorConfig { seed: 23, ..RegressorConfig::default() };
         let result = validate_invariant_holdout(
-            wrong_dimension_after_start, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &wrong_dimension_after_start_system(), &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 709, 1e-2,
         );
         assert!(!result.passed);
@@ -1313,7 +1396,7 @@ mod tests {
             .collect();
         let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
         let result = validate_invariant_holdout(
-            constant_rhs,
+            &constant_system(),
             &Expr::Var("x0".into()),
             &initial_state,
             &name_refs,
@@ -1333,7 +1416,7 @@ mod tests {
     fn oversized_holdout_budget_is_rejected_before_integration() {
         let config = RegressorConfig { seed: 23, ..RegressorConfig::default() };
         let result = validate_invariant_holdout(
-            harmonic_rhs, &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &harmonic_energy(), &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 600.0, 0.01, 100, 709, 1e-2,
         );
         assert!(!result.passed);
@@ -1347,7 +1430,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
         );
         let invalid_definitions = [
@@ -1382,7 +1465,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
         );
         let mut receipt = build_autonomous_discovery_receipt_v1(
@@ -1402,7 +1485,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs,
+            &harmonic_system(),
             &formula,
             &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"],
@@ -1439,7 +1522,7 @@ mod tests {
         let formula = harmonic_energy();
         let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Primed);
         let holdout = validate_invariant_holdout(
-            harmonic_rhs,
+            &harmonic_system(),
             &formula,
             &[1.0, 0.0, 0.0, 1.0],
             &["x", "y", "vx", "vy"],
@@ -1476,7 +1559,7 @@ mod tests {
         let initial = [1.0, 0.0, 0.0, 1.0];
         let names = ["x", "y", "vx", "vy"];
         let first = validate_invariant_holdout(
-            harmonic_rhs,
+            &harmonic_system(),
             &formula,
             &initial,
             &names,
@@ -1488,7 +1571,7 @@ mod tests {
             1e-2,
         );
         let replay = validate_invariant_holdout(
-            harmonic_rhs,
+            &harmonic_system(),
             &formula,
             &initial,
             &names,
