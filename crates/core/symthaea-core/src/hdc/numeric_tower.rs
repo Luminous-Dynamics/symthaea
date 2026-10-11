@@ -331,6 +331,12 @@ pub enum NumericArithmeticError {
     UnderflowToZero,
     /// A negative real value cannot be square-rooted in the real numeric tower.
     NegativeSquareRoot,
+    /// Natural logarithm requires a strictly positive real input.
+    NonPositiveLogarithmInput,
+    /// Exponentiation exceeded the finite f64 result range.
+    ExponentialOverflow,
+    /// A nonzero exponential underflowed completely to floating-point zero.
+    ExponentialUnderflow,
     /// An input Real was NaN or infinite.
     NonFiniteOperand,
     /// A finite input operation produced a non-finite floating-point result.
@@ -349,6 +355,9 @@ impl std::fmt::Display for NumericArithmeticError {
             Self::ZeroToNegativePower => write!(f, "zero cannot be raised to a negative exponent"),
             Self::UnderflowToZero => write!(f, "nonzero power underflowed to floating-point zero"),
             Self::NegativeSquareRoot => write!(f, "negative input has no real square root"),
+            Self::NonPositiveLogarithmInput => write!(f, "natural logarithm requires a positive input"),
+            Self::ExponentialOverflow => write!(f, "exponential result overflowed finite f64 range"),
+            Self::ExponentialUnderflow => write!(f, "nonzero exponential underflowed to zero"),
             Self::NonFiniteOperand => write!(f, "operand is NaN or infinite"),
             Self::NonFiniteResult => write!(f, "operation produced a non-finite result"),
             Self::ExactResultOutOfRange => {
@@ -1372,6 +1381,90 @@ impl NumericTower {
         Some(self.build_result(result, "sqrt".to_string(), proof_trace, &input_domains))
     }
 
+    /// Checked natural logarithm. ln(1) is exact for exact numeric inputs;
+    /// all other representable results use an explicitly approximate Real.
+    pub fn checked_ln(
+        &self,
+        value: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        Self::validate_checked_operand(value)?;
+        let positive = match value {
+            Number::Natural(number) => *number > 0,
+            Number::Integer(number) => *number > 0,
+            Number::Rational { numerator, .. } => *numerator > 0,
+            Number::Real(number) => *number > 0.0,
+        };
+        if !positive {
+            return Err(NumericArithmeticError::NonPositiveLogarithmInput);
+        }
+
+        let exact_one = matches!(
+            value,
+            Number::Natural(1)
+                | Number::Integer(1)
+                | Number::Rational { numerator: 1, denominator: 1 }
+        );
+        if exact_one {
+            let mut trace = vec![format!("Natural logarithm: ln({value}) = 0 exactly")];
+            trace.push("ln(1) = 0".to_string());
+            let result = self.build_result(Number::Natural(0), "ln".to_string(), trace, &[value.domain()]);
+            return Ok(NumericArithmeticResult { result, precision: ArithmeticPrecision::Exact });
+        }
+
+        let output = value.to_f64().ln();
+        if !output.is_finite() {
+            return Err(NumericArithmeticError::NonFiniteResult);
+        }
+        let trace = vec![
+            format!("Natural logarithm: ln({value}) = {output}"),
+            "Platform floating-point logarithm; exactness is not claimed.".to_string(),
+        ];
+        let result = self.build_result(Number::Real(output), "ln".to_string(), trace, &[value.domain()]);
+        Ok(NumericArithmeticResult { result, precision: ArithmeticPrecision::Approximate })
+    }
+
+    /// Checked real exponential. Exact zero maps to exact one. Nonzero inputs
+    /// use f64 and return typed overflow/total-underflow errors; subnormals survive.
+    pub fn checked_exp(
+        &self,
+        value: &Number,
+    ) -> Result<NumericArithmeticResult, NumericArithmeticError> {
+        Self::validate_checked_operand(value)?;
+
+        let exact_zero = matches!(
+            value,
+            Number::Natural(0)
+                | Number::Integer(0)
+                | Number::Rational { numerator: 0, denominator: 1 }
+        );
+        if exact_zero {
+            let trace = vec![
+                format!("Exponential: exp({value}) = 1 exactly"),
+                "exp(0) = 1".to_string(),
+            ];
+            let result = self.build_result(Number::Natural(1), "exp".to_string(), trace, &[value.domain()]);
+            return Ok(NumericArithmeticResult { result, precision: ArithmeticPrecision::Exact });
+        }
+
+        let output = value.to_f64().exp();
+        if output.is_infinite() {
+            return Err(NumericArithmeticError::ExponentialOverflow);
+        }
+        if output == 0.0 {
+            return Err(NumericArithmeticError::ExponentialUnderflow);
+        }
+        if !output.is_finite() {
+            return Err(NumericArithmeticError::NonFiniteResult);
+        }
+
+        let trace = vec![
+            format!("Exponential: exp({value}) = {output}"),
+            "Platform floating-point exponential; exactness is not claimed.".to_string(),
+        ];
+        let result = self.build_result(Number::Real(output), "exp".to_string(), trace, &[value.domain()]);
+        Ok(NumericArithmeticResult { result, precision: ArithmeticPrecision::Approximate })
+    }
+
     /// Checked real-domain square root: rejects malformed, negative, and
     /// non-finite inputs/results; exact perfect squares remain exact.
     pub fn checked_sqrt(
@@ -2388,6 +2481,68 @@ mod tests {
         assert_eq!(
             tower.checked_divide(&Number::Natural(1), &Number::Real(-0.0)).unwrap_err(),
             NumericArithmeticError::DivisionByZero
+        );
+    }
+
+    #[test]
+    fn checked_ln_accepts_positive_inputs_and_keeps_ln_one_exact() {
+        let tower = NumericTower::new();
+        for one in [
+            Number::Natural(1),
+            Number::Integer(1),
+            Number::Rational { numerator: 1, denominator: 1 },
+        ] {
+            let result = tower.checked_ln(&one).unwrap();
+            assert_eq!(result.precision, ArithmeticPrecision::Exact);
+            assert!(matches!(result.result.number, Number::Natural(0)));
+        }
+        let approximate = tower.checked_ln(&Number::Natural(2)).unwrap();
+        assert_eq!(approximate.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(approximate.result.number, Number::Real(value) if value.is_finite() && (value - std::f64::consts::LN_2).abs() < 1e-14));
+    }
+
+    #[test]
+    fn checked_ln_rejects_nonpositive_and_malformed_inputs() {
+        let tower = NumericTower::new();
+        for value in [Number::Natural(0), Number::Integer(-1), Number::Real(-0.5), Number::Real(0.0)] {
+            assert_eq!(tower.checked_ln(&value).unwrap_err(), NumericArithmeticError::NonPositiveLogarithmInput);
+        }
+        assert_eq!(
+            tower.checked_ln(&Number::Rational { numerator: 2, denominator: 4 }).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            tower.checked_ln(&Number::Real(f64::NAN)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn checked_exp_preserves_zero_exactness_and_subnormal_results() {
+        let tower = NumericTower::new();
+        for zero in [
+            Number::Natural(0),
+            Number::Integer(0),
+            Number::Rational { numerator: 0, denominator: 1 },
+        ] {
+            let result = tower.checked_exp(&zero).unwrap();
+            assert_eq!(result.precision, ArithmeticPrecision::Exact);
+            assert!(matches!(result.result.number, Number::Natural(1)));
+        }
+        let tiny = tower.checked_exp(&Number::Real(-744.0)).unwrap();
+        assert_eq!(tiny.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(tiny.result.number, Number::Real(value) if value > 0.0 && value.is_finite()));
+    }
+
+    #[test]
+    fn checked_exp_rejects_overflow_total_underflow_and_bad_inputs() {
+        let tower = NumericTower::new();
+        assert_eq!(tower.checked_exp(&Number::Natural(1000)).unwrap_err(), NumericArithmeticError::ExponentialOverflow);
+        assert_eq!(tower.checked_exp(&Number::Real(-1000.0)).unwrap_err(), NumericArithmeticError::ExponentialUnderflow);
+        assert_eq!(tower.checked_exp(&Number::Real(f64::INFINITY)).unwrap_err(), NumericArithmeticError::NonFiniteOperand);
+        assert_eq!(
+            tower.checked_exp(&Number::Rational { numerator: 2, denominator: 4 }).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
         );
     }
 
