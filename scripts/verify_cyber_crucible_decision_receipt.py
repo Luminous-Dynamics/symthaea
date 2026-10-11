@@ -209,9 +209,9 @@ def _validate_payload(payload: Any) -> dict[str, Any]:
         "signer_key_id", "verifier_id", "campaign_id", "subject_id", "attempt_id", "scenario_id"
     ):
         _text(payload[field], f"payload.{field}")
-    if payload["decision"] not in DECISIONS:
+    if not isinstance(payload["decision"], str) or payload["decision"] not in DECISIONS:
         raise DecisionVerificationError("decision must be accept or reject")
-    if payload["reason_code"] not in REASONS:
+    if not isinstance(payload["reason_code"], str) or payload["reason_code"] not in REASONS:
         raise DecisionVerificationError("decision reason_code is unsupported")
     if payload["decision"] == "accept" and payload["reason_code"] != "authenticated_under_policy":
         raise DecisionVerificationError("accept decisions require reason_code authenticated_under_policy")
