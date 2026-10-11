@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-alternatives"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+description = "Evidence-first functional alternatives assessment for materials and manufacturing pathways"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+readme = "README.md"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]

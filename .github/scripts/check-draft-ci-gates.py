@@ -65,6 +65,7 @@ DIRECT_GENERIC = {
     "compliance-safety-ethics",
     "compliance-robustness",
     "secrets-scan",
+    "alternatives",
 }
 
 DIRECT_SPECIAL = {"governance"}
