@@ -903,7 +903,9 @@ impl Px4ExternalModeSetpointConfigAssessmentV1 {
                 hasher.update(&[1]);
                 feed_str(&mut hasher, &reply.reply_digest_hex);
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         };
         feed_str(&mut hasher, self.assessed_at.clock_domain.as_str());
         hasher.update(&self.assessed_at.nanoseconds.to_le_bytes());
