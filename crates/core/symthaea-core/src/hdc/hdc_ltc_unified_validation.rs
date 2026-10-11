@@ -259,7 +259,9 @@ pub fn validate_iterative_closed_form_vs_rk4(config: &ValidationConfig) -> Valid
 
     // Iterative closed-form (handles nonlinear equilibrium)
     let mut neuron_iter = create_test_neuron(config.tau_base, config.dimension, 42);
-    neuron_iter.evolve_closed_form_iterative(config.total_time, &input);
+    neuron_iter
+        .try_evolve_closed_form_iterative(config.total_time, &input, 1_000_000)
+        .expect("validation scenario stays within the explicit iterative work budget");
 
     let l2 = l2_error(neuron_rk4.state(), neuron_iter.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_iter.state());
@@ -1222,7 +1224,9 @@ mod tests {
 
         // Iterative
         let mut neuron_iter = create_test_neuron(tau, dim, 42);
-        neuron_iter.evolve_closed_form_iterative(dt, &input);
+        neuron_iter
+            .try_evolve_closed_form_iterative(dt, &input, 1_000_000)
+            .expect("validation scenario stays within the explicit iterative work budget");
 
         // Report similarities to RK4
         let cfc_sim = neuron_cfc.state().similarity(neuron_rk4.state());
