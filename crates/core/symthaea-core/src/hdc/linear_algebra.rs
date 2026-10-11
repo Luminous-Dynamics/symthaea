@@ -1052,9 +1052,14 @@ impl HdcMatrix {
     /// For an m×n matrix of rank r, the null space has dimension n - r.
     /// Returns None if the matrix has full column rank (null space is trivial).
     pub fn null_space(&self) -> Option<HdcMatrix> {
-        let (sv, _, v, _) = self.svd();
+        let (singular_values, _, v, _) = self.try_svd().ok()?;
         let n = self.cols;
-        let rank = self.rank(); // uses relative tolerance
+        let sigma_max = singular_values.iter().copied().fold(0.0_f64, f64::max);
+        let tolerance = self.rows.max(self.cols) as f64 * SVD_TOLERANCE * sigma_max;
+        let rank = singular_values
+            .iter()
+            .filter(|&&value| value > tolerance)
+            .count();
         let null_dim = n.saturating_sub(rank);
 
         if null_dim == 0 {
@@ -1074,17 +1079,20 @@ impl HdcMatrix {
 
     // ─── Properties ──────────────────────────────────────────────────────
 
-    /// Matrix rank (number of non-zero singular values).
-    ///
-    /// Uses a **relative** tolerance: σ_i is considered zero if
-    /// σ_i < max(m,n) × ε × σ_max, where ε = SVD_TOLERANCE.
-    /// This is the standard approach (MATLAB, NumPy, LAPACK) and handles
-    /// ill-conditioned matrices correctly even when SVD is computed via A^T A.
+    /// Checked matrix rank using the relative tolerance σ_i > max(m,n)·ε·σ_max.
+    pub fn try_rank(&self) -> Result<usize, String> {
+        let (singular_values, _, _, _) = self.try_svd()?;
+        let sigma_max = singular_values.iter().copied().fold(0.0_f64, f64::max);
+        let tolerance = self.rows.max(self.cols) as f64 * SVD_TOLERANCE * sigma_max;
+        Ok(singular_values
+            .iter()
+            .filter(|&&value| value > tolerance)
+            .count())
+    }
+
+    /// Compatibility rank wrapper. Use try_rank() to distinguish solver failure.
     pub fn rank(&self) -> usize {
-        let (sv, _, _, _) = self.svd();
-        let sigma_max = sv.iter().cloned().fold(0.0f64, f64::max);
-        let tol = (self.rows.max(self.cols) as f64) * SVD_TOLERANCE * sigma_max;
-        sv.iter().filter(|&&s| s > tol).count()
+        self.try_rank().unwrap_or(0)
     }
 
     /// Inverse via LU decomposition
@@ -1114,22 +1122,30 @@ impl HdcMatrix {
         Some((HdcMatrix::new(inv_data, n, n), result))
     }
 
-    /// Condition number estimate (ratio of largest to smallest singular value)
-    /// Condition number κ(A) = σ_max / σ_min.
-    /// Uses SVD_TOLERANCE for consistent rank determination.
-    pub fn condition_number(&self) -> f64 {
-        let (sv, _, _, _) = self.svd();
-        let max = sv.iter().cloned().fold(0.0_f64, f64::max);
-        let min = sv
+    /// Checked condition number κ(A) = σ_max / σ_min under the rank tolerance.
+    ///
+    /// Numerically rank-deficient matrices return infinity. Solver/input failures
+    /// remain distinguishable through the Result instead of becoming plausible values.
+    pub fn try_condition_number(&self) -> Result<f64, String> {
+        let (singular_values, _, _, _) = self.try_svd()?;
+        let maximum = singular_values.iter().copied().fold(0.0_f64, f64::max);
+        let tolerance = self.rows.max(self.cols) as f64 * SVD_TOLERANCE * maximum;
+        let minimum = singular_values
             .iter()
-            .cloned()
-            .filter(|&s| s > SVD_TOLERANCE)
+            .copied()
+            .filter(|&value| value > tolerance)
             .fold(f64::INFINITY, f64::min);
-        if min <= SVD_TOLERANCE {
-            f64::INFINITY
+
+        if !minimum.is_finite() || minimum <= tolerance {
+            Ok(f64::INFINITY)
         } else {
-            max / min
+            Ok(maximum / minimum)
         }
+    }
+
+    /// Compatibility condition-number wrapper. Returns NaN on solver/input failure.
+    pub fn condition_number(&self) -> f64 {
+        self.try_condition_number().unwrap_or(f64::NAN)
     }
 
     /// Frobenius norm
