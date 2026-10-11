@@ -259,7 +259,7 @@ This is an arithmetic cross-check of transcribed source figures, not evidence th
 - Template assessment: contract validation `passed_contract_checks`; expected/declared scenario state remains **Blocked**, with 23 missing fields, zero type errors in the null-only template, and no physics claim.
 - Both emitted JSON reports were byte-identical on repeat and are preserved under `docs/engineering/evidence/`.
 - Validator Git blob SHA: `2d07b86480dea71f3272fbee2a9fde4152727abb`; source SHA-256: `86dece2753b53f44a5f3dffc109a33121ec2b4ff5cef28bca01a41029af74217`.
-- Template Git blob SHA: `4f4e5403ea1b90d81877158aced84e48b19b5659`; validation report blob: `8d0f200eb2db33c4c4ef6b8dc07ef98d21e184d6` (SHA-256 `0aa07355674fb104d0e9bb38ad3bafad3cd768b3557e4bfe012126b25f8c253c`); self-test report blob: `87612c32dfe45c3c0fb8b8588716b35c0457aa67` (SHA-256 `dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5`).
+- Template Git blob SHA: `a65250ba7284b503e1effb804a3a30668445017e`; SHA-256: `60c747bf226f436c28f08ca047e77faae2368e200bf72f600e3b84f7dd5234b1`; validation report blob: `8d0f200eb2db33c4c4ef6b8dc07ef98d21e184d6` (SHA-256 `0aa07355674fb104d0e9bb38ad3bafad3cd768b3557e4bfe012126b25f8c253c`); self-test report blob: `87612c32dfe45c3c0fb8b8588716b35c0457aa67` (SHA-256 `dc7718642fc57f35ca813fb3be857194c9ec74d9bc9413db9810d8a1432367c5`).
 
 A green manifest-contract result does **not** mean model inputs are physically valid, that a transient ran, or that the ORS is safe. The next gate is independent source-backed specification of those inputs, not automatic transition to ready.
 
