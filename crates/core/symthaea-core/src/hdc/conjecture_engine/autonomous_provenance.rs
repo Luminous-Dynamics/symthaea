@@ -9,6 +9,7 @@ pub enum AutonomousHoldoutFailure {
     ZeroTrajectories,
     TrajectoryLimitExceeded,
     IncompleteCoverage,
+    InsufficientGradientInformativeness,
     ThresholdExceeded,
 }
 
@@ -62,6 +63,8 @@ pub struct AutonomousHoldoutValidation {
     pub trajectories_checked: usize,
     pub max_lie_derivative_variance: f64,
     pub median_lie_derivative_variance: f64,
+    /// Minimum gradient-informativeness fraction across successfully scored orbits.
+    pub min_gradient_informativeness_fraction: f64,
     pub threshold: f64,
     pub passed: bool,
     pub failure: Option<AutonomousHoldoutFailure>,
@@ -76,6 +79,9 @@ const MAX_AUTONOMOUS_TOTAL_HOLDOUT_STEPS: usize = 5_000_000;
 const MAX_AUTONOMOUS_STATE_DIMENSION: usize = 4096;
 const MAX_AUTONOMOUS_STATE_UPDATES_PER_TRAJECTORY: f64 = 10_000_000.0;
 const MAX_AUTONOMOUS_TOTAL_STATE_UPDATES: f64 = 50_000_000.0;
+/// Match the informative-conservation gate: at least half of samples must have
+/// a gradient at least 1% of that trajectory's maximum gradient magnitude.
+const MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION: f64 = 0.5;
 
 fn failed_holdout(
     discovery_seed: u64,
@@ -84,6 +90,7 @@ fn failed_holdout(
     threshold: f64,
     trajectories_checked: usize,
     max_variance: f64,
+    min_gradient_informativeness_fraction: f64,
     failure: AutonomousHoldoutFailure,
 ) -> AutonomousHoldoutValidation {
     AutonomousHoldoutValidation {
@@ -95,6 +102,7 @@ fn failed_holdout(
         trajectories_checked,
         max_lie_derivative_variance: max_variance,
         median_lie_derivative_variance: f64::MAX,
+        min_gradient_informativeness_fraction,
         threshold,
         passed: false,
         failure: Some(failure),
@@ -197,6 +205,7 @@ fn validate_invariant_holdout_inner(
             threshold,
             0,
             f64::MAX,
+            0.0,
             AutonomousHoldoutFailure::IdenticalSeeds,
         );
     }
@@ -221,6 +230,7 @@ fn validate_invariant_holdout_inner(
             threshold,
             0,
             f64::MAX,
+            0.0,
             AutonomousHoldoutFailure::InvalidInput,
         );
     }
@@ -232,6 +242,7 @@ fn validate_invariant_holdout_inner(
             threshold,
             0,
             f64::MAX,
+            0.0,
             AutonomousHoldoutFailure::ZeroTrajectories,
         );
     }
@@ -253,6 +264,7 @@ fn validate_invariant_holdout_inner(
             threshold,
             0,
             f64::MAX,
+            0.0,
             AutonomousHoldoutFailure::TrajectoryLimitExceeded,
         );
     }
@@ -267,6 +279,7 @@ fn validate_invariant_holdout_inner(
             threshold,
             0,
             f64::MAX,
+            0.0,
             AutonomousHoldoutFailure::InvalidInput,
         );
     }
@@ -296,6 +309,7 @@ fn validate_invariant_holdout_inner(
 
     let mut prng = holdout_seed;
     let mut variances = Vec::with_capacity(holdout_trajectories);
+    let mut gradient_fractions = Vec::with_capacity(holdout_trajectories);
     for _ in 0..holdout_trajectories {
         let mut initial = initial_state.to_vec();
         for value in &mut initial {
@@ -307,15 +321,29 @@ fn validate_invariant_holdout_inner(
         let Some(orbit) = sample_orbit(&initial) else {
             continue;
         };
+        let informativeness = gradient_informativeness_fraction(candidate, &orbit, var_names);
         let variance = lie_derivative_variance(candidate, rhs, &orbit, var_names);
-        // The fitness helper uses f64::MAX as an invalid-score sentinel.
-        if variance.is_finite() && variance < f64::MAX {
+        // Invalid scores or invalid informativeness results do not count as a
+        // successfully scored holdout trajectory.
+        if variance.is_finite()
+            && variance < f64::MAX
+            && informativeness.is_finite()
+            && (0.0..=1.0).contains(&informativeness)
+        {
             variances.push(variance);
+            gradient_fractions.push(informativeness);
         }
     }
 
     let checked = variances.len();
     let max_variance = variances.iter().copied().fold(0.0_f64, f64::max);
+    let min_gradient_informativeness_fraction =
+        gradient_fractions.iter().copied().fold(1.0_f64, f64::min);
+    let min_gradient_informativeness_fraction = if gradient_fractions.is_empty() {
+        0.0
+    } else {
+        min_gradient_informativeness_fraction
+    };
     if checked != holdout_trajectories {
         return failed_holdout(
             discovery_seed,
@@ -324,6 +352,7 @@ fn validate_invariant_holdout_inner(
             threshold,
             checked,
             if checked == 0 { f64::MAX } else { max_variance },
+            min_gradient_informativeness_fraction,
             AutonomousHoldoutFailure::IncompleteCoverage,
         );
     }
@@ -335,7 +364,16 @@ fn validate_invariant_holdout_inner(
     } else {
         variances[mid]
     };
-    let passed = max_variance <= threshold;
+    let gradient_informativeness_passed =
+        min_gradient_informativeness_fraction >= MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION;
+    let passed = max_variance <= threshold && gradient_informativeness_passed;
+    let failure = if !gradient_informativeness_passed {
+        Some(AutonomousHoldoutFailure::InsufficientGradientInformativeness)
+    } else if !passed {
+        Some(AutonomousHoldoutFailure::ThresholdExceeded)
+    } else {
+        None
+    };
     AutonomousHoldoutValidation {
         discovery_seed,
         holdout_seed,
@@ -345,13 +383,10 @@ fn validate_invariant_holdout_inner(
         trajectories_checked: checked,
         max_lie_derivative_variance: max_variance,
         median_lie_derivative_variance: median,
+        min_gradient_informativeness_fraction,
         threshold,
         passed,
-        failure: if passed {
-            None
-        } else {
-            Some(AutonomousHoldoutFailure::ThresholdExceeded)
-        },
+        failure,
         assessment_context_blake3: String::new(),
     }
 }
@@ -663,6 +698,8 @@ pub struct AutonomousDiscoveryReceiptV1 {
     pub trajectories_checked: usize,
     pub max_lie_derivative_variance: f64,
     pub median_lie_derivative_variance: f64,
+    /// Minimum gradient-informativeness fraction across successfully scored orbits.
+    pub min_gradient_informativeness_fraction: f64,
     pub threshold: f64,
     pub holdout_passed: bool,
     pub holdout_failure: Option<AutonomousHoldoutFailure>,
@@ -782,6 +819,7 @@ pub fn build_autonomous_discovery_receipt_v1(
         trajectories_checked: holdout.trajectories_checked,
         max_lie_derivative_variance: holdout.max_lie_derivative_variance,
         median_lie_derivative_variance: holdout.median_lie_derivative_variance,
+        min_gradient_informativeness_fraction: holdout.min_gradient_informativeness_fraction,
         threshold: holdout.threshold,
         holdout_passed: holdout.passed,
         holdout_failure: holdout.failure,
@@ -815,6 +853,7 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         trajectories_checked: receipt.trajectories_checked,
         max_lie_derivative_variance: receipt.max_lie_derivative_variance,
         median_lie_derivative_variance: receipt.median_lie_derivative_variance,
+        min_gradient_informativeness_fraction: receipt.min_gradient_informativeness_fraction,
         threshold: receipt.threshold,
         passed: receipt.holdout_passed,
         failure: receipt.holdout_failure,
@@ -891,6 +930,8 @@ fn holdout_record_is_consistent(
         || holdout.max_lie_derivative_variance < 0.0
         || !holdout.median_lie_derivative_variance.is_finite()
         || holdout.median_lie_derivative_variance < 0.0
+        || !holdout.min_gradient_informativeness_fraction.is_finite()
+        || !(0.0..=1.0).contains(&holdout.min_gradient_informativeness_fraction)
         || holdout.trajectories_checked > holdout.requested_trajectories
     {
         return false;
@@ -913,7 +954,9 @@ fn holdout_record_is_consistent(
             && holdout.failure.is_none()
             && holdout.requested_trajectories > 0
             && holdout.trajectories_checked == holdout.requested_trajectories
-            && holdout.max_lie_derivative_variance <= holdout.threshold;
+            && holdout.max_lie_derivative_variance <= holdout.threshold
+            && holdout.min_gradient_informativeness_fraction
+                >= MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION;
     }
     match holdout.failure {
         Some(AutonomousHoldoutFailure::IdenticalSeeds) => {
@@ -929,11 +972,20 @@ fn holdout_record_is_consistent(
                 && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked < holdout.requested_trajectories
         }
+        Some(AutonomousHoldoutFailure::InsufficientGradientInformativeness) => {
+            !budget_exceeded
+                && holdout.requested_trajectories > 0
+                && holdout.trajectories_checked == holdout.requested_trajectories
+                && holdout.min_gradient_informativeness_fraction
+                    < MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
+        }
         Some(AutonomousHoldoutFailure::ThresholdExceeded) => {
             !budget_exceeded
                 && holdout.requested_trajectories > 0
                 && holdout.trajectories_checked == holdout.requested_trajectories
                 && holdout.max_lie_derivative_variance > holdout.threshold
+                && holdout.min_gradient_informativeness_fraction
+                    >= MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
         }
         Some(AutonomousHoldoutFailure::InvalidInput) => {
             holdout.requested_trajectories > 0
@@ -974,6 +1026,7 @@ fn compute_receipt_digest(receipt: &AutonomousDiscoveryReceiptV1) -> String {
     hash_usize(&mut hasher, receipt.trajectories_checked);
     hash_f64(&mut hasher, receipt.max_lie_derivative_variance);
     hash_f64(&mut hasher, receipt.median_lie_derivative_variance);
+    hash_f64(&mut hasher, receipt.min_gradient_informativeness_fraction);
     hash_f64(&mut hasher, receipt.threshold);
     hasher.update(&[u8::from(receipt.holdout_passed)]);
     let failure = receipt.holdout_failure
@@ -1067,6 +1120,73 @@ mod tests {
             symbolically_proven: false,
             discovery_mode: mode,
         }
+    }
+
+    #[test]
+    fn receipt_verifier_rejects_resealed_pass_with_low_gradient_informativeness() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(),
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            3,
+            701,
+            1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1",
+            system_definition_canonical(),
+            &config,
+            &[],
+            &candidate,
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        ).expect("well-formed receipt should be constructed");
+        receipt.min_gradient_informativeness_fraction = 0.25;
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
+    }
+
+    #[test]
+    fn holdout_rejects_high_power_candidate_with_low_gradient_informativeness() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let high_power = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(10.0)),
+        );
+        let result = validate_invariant_holdout(
+            &harmonic_system(),
+            &high_power,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            std::f64::consts::TAU,
+            0.01,
+            4,
+            701,
+            1e6,
+        );
+        assert!(!result.passed);
+        assert_eq!(
+            result.failure,
+            Some(AutonomousHoldoutFailure::InsufficientGradientInformativeness)
+        );
+        assert_eq!(result.trajectories_checked, 4);
+        assert!(
+            result.min_gradient_informativeness_fraction
+                < MIN_AUTONOMOUS_HOLDOUT_INFORMATIVE_FRACTION
+        );
     }
 
     #[test]
