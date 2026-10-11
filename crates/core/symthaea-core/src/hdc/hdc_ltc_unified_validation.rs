@@ -18,10 +18,10 @@
 //!    - ~10% error due to nonlinear equilibrium (x_inf depends on x)
 //!    - Fast O(1) computation
 //!
-//! 3. **`evolve_closed_form_iterative`**: Sub-stepped exponential decay (RECOMMENDED)
-//!    - Handles nonlinear equilibrium by sub-stepping (tau/10 per step)
-//!    - **<1% error vs RK4** - validated across all scenarios
-//!    - O(dt/tau) complexity but still faster than Euler/RK4
+//! 3. **`try_evolve_closed_form_iterative`**: Sub-stepped exponential decay
+//!    - Recomputes nonlinear equilibrium using a conservative effective-tau/10 step
+//!    - Error is scenario-dependent; this module measures it against fine-step RK4
+//!    - O(dt/tau) complexity, with an explicit budget and fail-closed overflow handling
 //!
 //! ## Key Finding: Nonlinear Equilibrium
 //!
@@ -29,13 +29,13 @@
 //! This means a single closed-form step (which assumes constant x_inf) accumulates
 //! error for large dt. The iterative method handles this by recomputing equilibrium.
 //!
-//! ## Validation Results Summary
+//! ## Validation contract
 //!
-//! | Method     | Fast tau | Medium tau | Slow tau | Long-term |
-//! |------------|----------|------------|----------|-----------|
-//! | CfC-style  | 27%      | 30%        | 30%      | 27%       |
-//! | Single-step| 27%      | 11%        | 11%      | 27%       |
-//! | Iterative  | **0.02%**| **0.85%**  | **0.85%**| **0.001%**|
+//! Numerical error depends on the effective `dt/tau` ratio, activation, and input/state
+//! scale. Historical point estimates are intentionally not presented as a universal error
+//! guarantee. `validate_iterative_closed_form_vs_rk4` compares the iterative path with a
+//! fine-step RK4 reference; `test_iterative_dt_tau_sweep_reports_finite_reference_errors`
+//! reports relative error and state similarity across a wider horizon/time-constant sweep.
 //!
 //! ## Test Scenarios
 //!
@@ -1050,6 +1050,47 @@ mod tests {
             "ITERATIVE closed-form should have very high similarity: got {}",
             result.similarity
         );
+    }
+
+    /// Exercise the iterative/RK4 comparison over a wider range of dt/tau ratios.
+    ///
+    /// This is a measurement harness, not a claim that every ratio satisfies a fixed
+    /// universal error bound. The printed reports provide the evidence needed to set
+    /// ratio-specific acceptance thresholds after execution on a Rust-capable host.
+    #[test]
+    fn test_iterative_dt_tau_sweep_reports_finite_reference_errors() {
+        const RATIOS: &[(&str, f32)] = &[
+            ("0.01", 0.01),
+            ("0.1", 0.1),
+            ("0.5", 0.5),
+            ("1", 1.0),
+            ("5", 5.0),
+            ("10", 10.0),
+            ("50", 50.0),
+        ];
+
+        for &(ratio_label, ratio) in RATIOS {
+            let config = ValidationConfig {
+                tau_base: 1.0,
+                scenario_name: ratio_label,
+                input_scale: 1.0,
+                total_time: ratio,
+                dimension: 256,
+            };
+            let result = validate_iterative_closed_form_vs_rk4(&config);
+            println!("dt/tau={ratio_label}: {}", result.report());
+
+            assert!(
+                result.relative_error_percent.is_finite(),
+                "relative error must be finite at dt/tau={ratio_label}: {}",
+                result.relative_error_percent
+            );
+            assert!(
+                result.similarity.is_finite(),
+                "state similarity must be finite at dt/tau={ratio_label}: {}",
+                result.similarity
+            );
+        }
     }
 
     /// Test ITERATIVE closed-form for long-term evolution
