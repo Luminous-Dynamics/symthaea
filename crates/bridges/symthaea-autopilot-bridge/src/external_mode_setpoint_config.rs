@@ -485,9 +485,7 @@ pub struct Px4ExternalModeSetpointConfigProfileV1 {
     pub capture_window_id: String,
     /// Clock used for receive-time freshness.
     pub receiver_clock_domain: ClockDomainId,
-    /// Maximum request-to-reply latency measured on the companion clock.
-    pub max_reply_wait_ns: u64,
-    /// Maximum age of a received reply in the companion clock.
+    /// Maximum wait for a reply, measured on the companion clock.
     pub max_reply_wait_ns: u64,
     /// Maximum age of a received reply in the companion clock.
     pub max_reply_age_ns: u64,
