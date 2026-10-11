@@ -71,7 +71,7 @@ jobs:
           OUT="$RUNNER_TEMP/jungian-baseline-capture"
           mkdir -p "$OUT"
           SOURCE_REVISION="$(git rev-parse HEAD)"
-          export SYMTHAEA_RUSTC_VERSION="$(rustc --version --verbose | tr '\\n' ';')"
+          export SYMTHAEA_RUSTC_VERSION="$(rustc --version --verbose | tr '\n' ';')"
           export SYMTHAEA_CARGO_VERSION="$(cargo --version)"
           cargo run --quiet --no-default-features --bin jungian_glyph_projection_probe --features glyph_codex -- \
             --corpus docs/research/data/jungian_symbolic_probe_v1.json \
