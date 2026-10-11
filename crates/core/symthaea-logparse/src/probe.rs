@@ -597,10 +597,25 @@ mod tests {
             "b2".into(),
             "b3".into(),
         ];
-        assert_eq!(
-            grouped_fold_assignment(&labels, &groups, 3, 99).unwrap(),
-            grouped_fold_assignment(&labels, &groups, 3, 99).unwrap()
-        );
+        let first = grouped_fold_assignment(&labels, &groups, 3, 99).unwrap();
+        let repeated = grouped_fold_assignment(&labels, &groups, 3, 99).unwrap();
+        assert_eq!(first, repeated);
+
+        let labels_reversed: Vec<String> = labels.iter().rev().cloned().collect();
+        let groups_reversed: Vec<String> = groups.iter().rev().cloned().collect();
+        let folds_reversed =
+            grouped_fold_assignment(&labels_reversed, &groups_reversed, 3, 99).unwrap();
+        let original_by_group: std::collections::BTreeMap<String, usize> = groups
+            .iter()
+            .cloned()
+            .zip(first.iter().copied())
+            .collect();
+        let reversed_by_group: std::collections::BTreeMap<String, usize> = groups_reversed
+            .iter()
+            .cloned()
+            .zip(folds_reversed.iter().copied())
+            .collect();
+        assert_eq!(original_by_group, reversed_by_group);
     }
 
     #[test]
