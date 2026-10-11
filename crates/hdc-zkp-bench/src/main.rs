@@ -308,35 +308,10 @@ fn main() {
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    if winterfell_result.constraint_count > 0 {
-        let constraint_ratio = winterfell_result.constraint_count as f64
-            / binius_result.constraint_count.max(1) as f64;
-        let prove_ratio = winterfell_result.prove_time_ms / binius_result.prove_time_ms.max(0.001);
-
-        println!();
-        println!(
-            "Key finding: Binius uses {}x fewer constraints for HDC XOR",
-            if binius_result.constraint_count == 0 {
-                "∞".to_string()
-            } else {
-                format!("{:.0}", constraint_ratio)
-            }
-        );
-        println!(
-            "Key finding: Binius proves an estimated {:.1}x faster for HDC XOR",
-            prove_ratio
-        );
-        println!("(measured Binius time vs ANALYTIC ESTIMATE of Winterfell time —");
-        println!("the Winterfell side was never actually run)");
-        println!();
-        println!("Conclusion: XOR binding (the core HDC operation) is algebraically");
-        println!("FREE in binary-field STARKs — native GF(2) addition requires zero");
-        println!(
-            "non-linear constraints, while prime-field STARKs need an estimated {} constraints",
-            winterfell_result.constraint_count
-        );
-        println!("for the same operation on 16,384-bit vectors.");
-    }
+    println!();
+    println!("Comparison status: Winterfell values are analytical estimates, not measurements.");
+    println!("Do not interpret the displayed comparison table as a measured speedup or constraint reduction.");
+    println!("The supported implementation result is a generated and verified Binius XOR proof.");
 
     // HDC Bundling
     println!("\n\n{}", "=".repeat(60));
