@@ -601,7 +601,7 @@ fn main() {
         let total_correct: usize = cat_results.values().map(|(c, _)| c).sum();
         let total_total: usize = cat_results.values().map(|(_, t)| t).sum();
         println!(
-            "  Legacy in-sample label agreement: {}/{} ({:.1}%)  [{:.1}s]\n",
+            "  Legacy label agreement (not official metric): {}/{} ({:.1}%)  [{:.1}s]\n",
             total_correct,
             total_total,
             total_correct as f64 / total_total as f64 * 100.0,
