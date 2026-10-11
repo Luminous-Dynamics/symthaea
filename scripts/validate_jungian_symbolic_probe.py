@@ -287,7 +287,7 @@ def self_test(data: dict[str, Any], corpus_bytes: bytes) -> list[str]:
         pass
 
     good_results = valid_results_stub(data, corpus_bytes)
-    if validate_results(good_results, data):
+    if validate_results(good_results, data, corpus_bytes):
         failures.append("neutral normalized-results positive control was rejected")
     results_mutations: list[tuple[str, Any, str]] = []
     mutation = copy.deepcopy(good_results)
