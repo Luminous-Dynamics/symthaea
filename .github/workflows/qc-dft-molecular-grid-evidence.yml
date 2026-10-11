@@ -73,17 +73,6 @@ jobs:
             scripts/qc/compare_dft_molecular_grid_pyscf.py \
             scripts/qc/test_compare_dft_molecular_grid_pyscf.py
 
-      - name: Install pinned PySCF reference dependencies
-        run: |
-          python -m pip install --disable-pip-version-check \
-            "numpy==2.2.6" \
-            "scipy==1.15.3" \
-            "h5py==3.14.0" \
-            "pyscf==2.14.0"
-
-      - name: Test the PySCF radial rule against analytic Gaussian integrals
-        run: python -m unittest discover -s scripts/qc -p test_compare_dft_molecular_grid_pyscf.py
-
       - name: Check formatting of DFT and benchmark sources
         run: |
           set -euo pipefail
@@ -110,6 +99,19 @@ jobs:
           cargo run --locked -p symthaea-quantum-chemistry \
             --example qc_dft_molecular_grid_evidence \
             > /tmp/symthaea-qc-dft-grid-evidence.json
+
+      - name: Install pinned PySCF reference dependencies
+        if: always()
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "numpy==2.2.6" \
+            "scipy==1.15.3" \
+            "h5py==3.14.0" \
+            "pyscf==2.14.0"
+
+      - name: Test the PySCF radial rule against analytic Gaussian integrals
+        if: always()
+        run: python -m unittest discover -s scripts/qc -p test_compare_dft_molecular_grid_pyscf.py
 
       - name: Compare the native sweep against matched-grid PySCF references
         id: pyscf_comparison
