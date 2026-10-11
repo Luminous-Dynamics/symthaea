@@ -37,14 +37,14 @@ PAYLOAD_FIELDS = {
     "schema_version", "algorithm", "decision_id", "decision_nonce",
     "signer_key_id", "verifier_id", "decision", "reason_code",
     "campaign_id", "subject_id", "attempt_id", "scenario_id",
-    "scenario_revision", "scenario_digest", "input_receipt_digest",
+    "scenario_revision", "scenario_digest", "input_receipt_digest", "report_digest",
     "evaluator_policy_digest", "context_digest", "verifier_build_digest",
     "decision_trust_policy_digest", "issued_at", "expires_at",
     "non_authorizing",
 }
 CONTEXT_FIELDS = {
     "campaign_id", "subject_id", "attempt_id", "scenario_id",
-    "scenario_revision", "scenario_digest", "input_receipt_digest",
+    "scenario_revision", "scenario_digest", "input_receipt_digest", "report_digest",
     "evaluator_policy_digest", "verifier_build_digest", "decision_nonce",
 }
 DECISIONS = {"accept", "reject"}
@@ -151,7 +151,7 @@ def _validate_context(context: Any) -> dict[str, Any]:
     if not isinstance(revision, int) or isinstance(revision, bool) or not 1 <= revision <= 2**53 - 1:
         raise DecisionVerificationError("expected context.scenario_revision must be a safe positive integer")
     for field in (
-        "scenario_digest", "input_receipt_digest", "evaluator_policy_digest",
+        "scenario_digest", "input_receipt_digest", "report_digest", "evaluator_policy_digest",
         "verifier_build_digest",
     ):
         _digest(context[field], f"expected context.{field}")
@@ -221,7 +221,7 @@ def _validate_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(revision, int) or isinstance(revision, bool) or not 1 <= revision <= 2**53 - 1:
         raise DecisionVerificationError("scenario_revision must be a safe positive integer")
     for field in (
-        "scenario_digest", "input_receipt_digest", "evaluator_policy_digest",
+        "scenario_digest", "input_receipt_digest", "report_digest", "evaluator_policy_digest",
         "context_digest", "verifier_build_digest", "decision_trust_policy_digest",
     ):
         _digest(payload[field], f"payload.{field}")
