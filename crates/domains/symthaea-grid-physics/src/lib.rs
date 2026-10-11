@@ -9,13 +9,16 @@
 //! Phase 1 (physics + backend wiring) and Phase 2 (generation + scheduling).
 //!
 //! Modules:
-//! - [`battery`] — battery SoC, degradation and storage accounting
+//! - [`battery`] — battery SoC, round-trip efficiency, cycle-based degradation
 //! - [`feeder`] — radial distribution power flow (linearized DistFlow)
-//! - [`droop`] — P-f / Q-V droop control (simulation only)
-//! - [`trip_envelope`] — voltage ride-through / must-trip envelope
-//! - [`islanding`] — passive islanding detection
-//! - [`generation`] — PV/wind generation models
-//! - [`scheduling`] — scenario runner and per-step dispatch receipts
+//! - [`droop`] — P-f / Q-V droop control (grid-forming inverter behavior)
+//! - [`trip_envelope`] — voltage ride-through / must-trip envelope (simulation only)
+//! - [`islanding`] — passive islanding detection (ROCOF, threshold), incl. the
+//!   real non-detection-zone limitation
+//! - [`generation`] — PVWatts-style solar + IEC 61400-12-style wind generation
+//! - [`scheduling`] — storage-scheduling scenario harness, scored on cost /
+//!   unserved energy / battery cycles, with a naive baseline and a first
+//!   reserve-aware advisor policy
 //! - [`qualification`] — frozen scenario corpus and independent receipt checker
 //! - [`study_binding`] — cross-project study identity on each step receipt
 
