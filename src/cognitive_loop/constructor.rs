@@ -822,6 +822,7 @@ impl CognitiveLoopService {
                 episodic_memory: EpisodicMemoryBridge::default(),
                 goal_system: GoalSystemBridge::new(),
                 world_model: WorldModelBridge::default(),
+                viability_fabric: super::viability_fabric::ViabilityFabric::new(1024),
                 agent: ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
                     state_dim: 8,
                     obs_dim: 4,
@@ -852,6 +853,7 @@ impl CognitiveLoopService {
                     ..Default::default()
                 },
                 trajectory_telemetry: super::fep_module::TrajectoryTelemetry::default(),
+                viability_horizon_modulation_enabled: false,
                 trajectory_history: VecDeque::new(),
                 // CORRECT INITIALIZATION:
                 ledger: symthaea_core::physics::thermodynamics::ThermodynamicLedger::new(1000.0),

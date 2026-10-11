@@ -48,6 +48,17 @@ mod tests {
     // ── Stats accessor ────────────────────────────────────────────────
 
     #[test]
+    fn viability_horizon_modulation_defaults_to_neutral() {
+        let mut s = make_service();
+        assert!(!s.viability_horizon_modulation_enabled());
+        assert!((s.viability_planning_horizon_scale() - 1.0).abs() < f64::EPSILON);
+
+        s.enable_viability_horizon_modulation();
+        assert!(s.viability_horizon_modulation_enabled());
+        assert!((0.25..=1.0).contains(&s.viability_planning_horizon_scale()));
+    }
+
+    #[test]
     fn stats_initial_total_cycles() {
         let s = make_service();
         assert_eq!(s.stats().total_cycles, 0);

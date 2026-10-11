@@ -133,6 +133,14 @@ pub struct WorldModelBridge {
     level_dims: Vec<usize>,
     /// Prediction error at each level
     level_errors: Vec<f32>,
+    /// Action-conditioned delta model at level 0.
+    action_deltas: Vec<Vec<f32>>,
+    /// Number of observed transitions for each action.
+    action_samples: Vec<u64>,
+    /// EMA of pre-update transition prediction error for each action.
+    action_errors: Vec<f32>,
+    /// Online learning rate for action-conditioned deltas.
+    action_learning_rate: f32,
     /// Total predictions made
     pub total_predictions: u64,
     /// Average prediction error across levels
@@ -141,9 +149,25 @@ pub struct WorldModelBridge {
 
 impl Default for WorldModelBridge {
     fn default() -> Self {
-        // Default 4-level hierarchy
+        // Default 4-level hierarchy and eight generic action slots.
+        Self::with_actions(8)
+    }
+}
+
+impl WorldModelBridge {
+    /// Create a world-model bridge with an explicit action vocabulary.
+    ///
+    /// The action model is intentionally lightweight: it learns an EMA of
+    /// observed level-0 state deltas for each action. This provides a grounded
+    /// action-conditioned baseline that can later be replaced or augmented by
+    /// the full FEP generative model.
+    pub fn with_actions(num_actions: usize) -> Self {
         let level_dims = vec![64, 128, 256, 128];
         Self {
+            action_deltas: (0..num_actions).map(|_| vec![0.0; level_dims[0]]).collect(),
+            action_samples: vec![0; num_actions],
+            action_errors: vec![0.0; num_actions],
+            action_learning_rate: 0.2,
             level_states: level_dims.iter().map(|&d| vec![0.0; d]).collect(),
             level_dims,
             level_errors: vec![0.0; 4],
@@ -152,6 +176,19 @@ impl Default for WorldModelBridge {
         }
     }
 }
+
+    /// Number of action slots represented by this world-model bridge.
+    ///
+    /// Exposing the exact vocabulary size prevents generic planning adapters from
+    /// accepting an action index they cannot actually predict.
+    pub fn action_count(&self) -> usize {
+        self.action_deltas.len()
+    }
+
+    /// Dimension of the grounded level-0 state used by action-conditioned prediction.
+    pub fn state_dimension(&self) -> usize {
+        self.level_dims.first().copied().unwrap_or(0)
+    }
 
 impl WorldModelBridge {
     /// Update with sensory input (level 0)
@@ -222,12 +259,101 @@ impl WorldModelBridge {
             .unwrap_or(&[])
     }
 
+    /// Predict the next level-0 state from a current state and action.
+    ///
+    /// This is intentionally a baseline model, not a claim of general causal
+    /// understanding. It becomes useful when paired with observed transitions:
+    /// repeated prediction -> action -> observation cycles can reduce its error.
+    pub fn predict_action(&self, action: usize, current: &[f32]) -> Option<Vec<f32>> {
+        if action >= self.action_deltas.len() || current.len() < self.level_dims[0] {
+            return None;
+        }
+
+        let mut predicted = current[..self.level_dims[0]].to_vec();
+        for (value, delta) in predicted.iter_mut().zip(&self.action_deltas[action]) {
+            *value += *delta;
+        }
+        Some(predicted)
+    }
+
+    /// Update one action-conditioned transition using the observed level-0 delta.
+    pub fn observe_action_transition(
+        &mut self,
+        action: usize,
+        before: &[f32],
+        after: &[f32],
+    ) -> Option<f32> {
+        if action >= self.action_deltas.len()
+            || before.len() < self.level_dims[0]
+            || after.len() < self.level_dims[0]
+        {
+            return None;
+        }
+
+        let predicted = self.predict_action(action, before)?;
+        let error = predicted
+            .iter()
+            .zip(after.iter().take(self.level_dims[0]))
+            .map(|(p, a)| (p - a).abs())
+            .sum::<f32>()
+            / self.level_dims[0] as f32;
+
+        let samples_before = self.action_samples[action];
+        let error_ema_alpha = 0.2_f32;
+        self.action_errors[action] = if samples_before == 0 {
+            error
+        } else {
+            (1.0 - error_ema_alpha) * self.action_errors[action] + error_ema_alpha * error
+        };
+
+        let delta = &mut self.action_deltas[action];
+        let alpha = self.action_learning_rate;
+        for i in 0..self.level_dims[0] {
+            let observed_delta = after[i] - before[i];
+            delta[i] += alpha * (observed_delta - delta[i]);
+        }
+        self.action_samples[action] = self.action_samples[action].saturating_add(1);
+        Some(error)
+    }
+
+    /// Number of transitions learned for one action.
+    pub fn action_samples(&self, action: usize) -> Option<u64> {
+        self.action_samples.get(action).copied()
+    }
+
+    /// Confidence in an action-conditioned prediction.
+    ///
+    /// Confidence is jointly evidence- and accuracy-weighted. More samples increase
+    /// confidence, while persistent prediction error suppresses it. Repetition alone
+    /// therefore cannot make a bad model appear trustworthy.
+    pub fn action_confidence(&self, action: usize) -> Option<f32> {
+        self.action_samples
+            .get(action)
+            .zip(self.action_errors.get(action))
+            .map(|(&samples, &error)| {
+                let n = samples as f32;
+                let evidence = n / (n + 8.0);
+                let accuracy = (1.0 - error.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+                (evidence * accuracy).clamp(0.0, 1.0)
+            })
+    }
+
+    /// EMA of the latest prediction error for an action.
+    pub fn action_error(&self, action: usize) -> Option<f32> {
+        self.action_errors.get(action).copied()
+    }
+
     /// Reset the world model
     pub fn reset(&mut self) {
         for state in &mut self.level_states {
             state.fill(0.0);
         }
         self.level_errors.fill(0.0);
+        for deltas in &mut self.action_deltas {
+            deltas.fill(0.0);
+        }
+        self.action_samples.fill(0);
+        self.action_errors.fill(0.0);
         self.total_predictions = 0;
         self.avg_error = 0.0;
     }
@@ -273,4 +399,67 @@ impl WorldModelBridge {
             }
         }
     }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_conditioned_model_learns_constant_delta() {
+        let mut model = WorldModelBridge::with_actions(2);
+        let before = vec![0.0f32; 64];
+        let after: Vec<f32> = (0..64).map(|i| 0.1 + i as f32 * 0.001).collect();
+
+        let first_error = model.observe_action_transition(1, &before, &after).unwrap();
+        assert!(first_error > 0.0);
+        assert_eq!(model.action_samples(1), Some(1));
+
+        let mut error = first_error;
+        for _ in 0..30 {
+            error = model.observe_action_transition(1, &before, &after).unwrap();
+        }
+
+        assert!(error < first_error);
+        let prediction = model.predict_action(1, &before).unwrap();
+        let final_error = prediction
+            .iter()
+            .zip(after.iter())
+            .map(|(p, a)| (p - a).abs())
+            .sum::<f32>()
+            / 64.0;
+        assert!(final_error < first_error);
+    }
+
+    #[test]
+    fn action_confidence_penalizes_prediction_error() {
+        let mut model = WorldModelBridge::with_actions(1);
+        let before = vec![0.0f32; 64];
+        let bad_after = vec![1.0f32; 64];
+
+        model.observe_action_transition(0, &before, &bad_after).unwrap();
+        assert_eq!(model.action_error(0), Some(1.0));
+        assert_eq!(model.action_confidence(0), Some(0.0));
+    }
+
+    #[test]
+    fn action_confidence_grows_with_accurate_evidence() {
+        let mut model = WorldModelBridge::with_actions(1);
+        let before = vec![0.0f32; 64];
+        let after = vec![0.1f32; 64];
+
+        for _ in 0..32 {
+            model.observe_action_transition(0, &before, &after).unwrap();
+        }
+
+        let confidence = model.action_confidence(0).unwrap();
+        assert!(confidence > 0.5);
+        assert!(confidence <= 1.0);
+    }
+
+    #[test]
+    fn action_conditioned_model_rejects_unknown_action() {
+        let model = WorldModelBridge::with_actions(2);
+        let state = vec![0.0f32; 64];
+        assert!(model.predict_action(2, &state).is_none());
+    }
 }
+
