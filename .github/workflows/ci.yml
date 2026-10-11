@@ -58,6 +58,26 @@ jobs:
           reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
           mkdir -p "$reports"
 
+      - name: Match committed verification status to current source
+        shell: bash
+        run: |
+          set -euo pipefail
+          reports="${RUNNER_TEMP}/orbital-ring-contract-evidence"
+          python3 - docs/engineering/evidence/orbital_ring_validator_verification_status.json "$reports/validator_git_blob_sha.txt" "$reports/validator_sha256.txt" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          status = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          current = status["current_validator"]
+          blob = Path(sys.argv[2]).read_text(encoding="utf-8").strip()
+          sha256 = Path(sys.argv[3]).read_text(encoding="utf-8").split()[0]
+          assert current["git_blob_sha"] == blob, (current["git_blob_sha"], blob)
+          assert current["sha256"] == sha256, (current["sha256"], sha256)
+          assert current["expected_self_test_check_count"] == 82, current
+          print("verification status matches current validator blob, SHA-256, and 82-check contract")
+          PY
+
       - name: Compile fail-closed validator
         run: python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py
 
