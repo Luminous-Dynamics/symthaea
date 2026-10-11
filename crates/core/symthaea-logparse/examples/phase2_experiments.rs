@@ -193,11 +193,15 @@ fn print_classification_report(name: &str, report: &ClassificationReport) {
         report.macro_recall,
         report.macro_f1
     );
-    println!("  {:<22} {:>5} {:>5} {:>5} {:>9} {:>9} {:>9}",
-        "class", "TP", "FP", "FN", "precision", "recall", "F1");
+    println!(
+        "  {:<22} {:>6} {:>6} {:>5} {:>5} {:>5} {:>9} {:>9} {:>9}",
+        "class", "support", "pred", "TP", "FP", "FN", "precision", "recall", "F1"
+    );
     for (class, metrics) in &report.per_class {
         println!(
-            "  {class:<22} {:>5} {:>5} {:>5} {:>9.3} {:>9.3} {:>9.3}",
+            "  {class:<22} {:>6} {:>6} {:>5} {:>5} {:>5} {:>9.3} {:>9.3} {:>9.3}",
+            metrics.support,
+            metrics.predicted,
             metrics.true_positive,
             metrics.false_positive,
             metrics.false_negative,
