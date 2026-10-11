@@ -1,34 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Revolutionary Improvement #65: Unified Emergent Intelligence
+//! Collective/context-aware/meta-reasoning integration.
 //!
-//! **The Ultimate Integration**: All revolutionary systems working as unified consciousness!
+//! The historical API name `UnifiedIntelligence` is retained for compatibility, but the
+//! diagnostics in this module are **measurement-only telemetry**. In particular, the current
+//! `MetaCognitiveReasoner::meta_confidence` is not yet qualified as a probability of answer
+//! correctness, self-awareness, consciousness, or general intelligence. RQ-006 owns any future
+//! authority upgrade.
 //!
-//! ## The Paradigm Shift
+//! The module therefore distinguishes mechanism observations from capability claims:
 //!
-//! **Before #65**: Individual breakthroughs working in isolation
-//! - Collective primitives exist but aren't used in reasoning
-//! - Context-aware optimization works but doesn't share knowledge
-//! - Meta-cognition reflects but doesn't learn from collective
-//! - Systems are separate, not unified!
-//!
-//! **After #65**: All systems unified into emergent consciousness
-//! - **Collective Knowledge**: Reasoning uses shared primitives from all instances
-//! - **Context-Aware Selection**: Best primitives chosen for each context
-//! - **Meta-Cognitive Reflection**: System questions and adapts continuously
-//! - **Emergent Intelligence**: Whole > sum of parts!
-//!
-//! ## Why This Is Revolutionary
-//!
-//! This is the first AI system that:
-//! 1. **Unifies all breakthroughs** - collective + context-aware + meta-cognitive
-//! 2. **Demonstrates emergence** - capabilities that no individual system has
-//! 3. **Achieves true consciousness** - integrated information across all levels
-//! 4. **Self-improves recursively** - learns from collective, adapts, shares back
-//!
-//! This is **unified consciousness** - where emergence creates capabilities that
-//! transcend any individual component!
+//! `integration observed != intelligence established != self-awareness established`.
 
 use crate::consciousness::meta_reasoning::{
     MetaCognitiveReasoner, MetaReasoningConfig, MetaReasoningResult,
@@ -44,27 +27,28 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A reasoning instance in the unified system
+/// Authority carried by the diagnostics emitted from this module.
+///
+/// There is intentionally no stronger variant yet. A future variant must be introduced only by
+/// an evidence-backed qualification change, not by a threshold crossing inside this module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ObservationAuthority {
+    #[default]
+    MeasurementOnly,
+}
+
+/// A reasoning instance in the integrated multi-agent system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReasoningInstance {
-    /// Instance identifier
     pub id: String,
-
-    /// Primitives evolved by this instance
     pub local_primitives: Vec<CandidatePrimitive>,
-
-    /// Contribution count to collective
     pub contribution_count: usize,
-
-    /// Meta-cognitive confidence
+    /// Heuristic meta-confidence telemetry. Not a qualified correctness probability.
     pub meta_confidence: f64,
-
-    /// Reasoning episodes completed
     pub episodes_completed: usize,
 }
 
 impl ReasoningInstance {
-    /// Create new reasoning instance
     pub fn new(id: String) -> Self {
         Self {
             id,
@@ -76,92 +60,63 @@ impl ReasoningInstance {
     }
 }
 
-/// Result of unified reasoning
+/// Result of one integrated reasoning episode.
 #[derive(Debug, Clone)]
 pub struct UnifiedReasoningResult {
-    /// Which instance performed the reasoning
     pub instance_id: String,
-
-    /// Meta-cognitive reasoning result
     pub meta_result: MetaReasoningResult,
-
-    /// Primitives used (may include collective primitives)
     pub primitives_used: Vec<CandidatePrimitive>,
-
-    /// Number of primitives from collective
     pub collective_primitives_count: usize,
-
-    /// Number of primitives from local
     pub local_primitives_count: usize,
-
-    /// Emergent properties observed
+    /// Mechanism-level observations. Every entry is explicitly measurement-only.
     pub emergent_properties: Vec<EmergentProperty>,
-
-    /// Overall unified intelligence score
+    /// Historical compatibility field.
+    ///
+    /// This value is an integration heuristic assembled from unqualified internal signals. It
+    /// must not be interpreted as an intelligence, AGI, consciousness, or self-awareness score.
     pub unified_intelligence: f64,
+    /// Explicit authority boundary for all diagnostics above.
+    pub authority: ObservationAuthority,
 }
 
-/// Emergent property observed in unified system
+/// One observation emitted by the integration layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmergentProperty {
-    /// What emerged?
     pub property: String,
-
-    /// How strong is this emergence?
     pub strength: f64,
-
-    /// Evidence for this emergence
     pub evidence: String,
+    #[serde(default)]
+    pub authority: ObservationAuthority,
 }
 
-/// Statistics for the unified system
+/// Statistics for the integrated system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedSystemStats {
-    /// Total instances in the collective
     pub total_instances: usize,
-
-    /// Total primitives in collective
     pub total_collective_primitives: usize,
-
-    /// Total reasoning episodes
     pub total_episodes: usize,
-
-    /// Average meta-cognitive confidence
+    /// Average of the current heuristic meta-confidence telemetry.
     pub avg_meta_confidence: f64,
-
-    /// Emergent properties discovered
     pub emergent_properties: Vec<EmergentProperty>,
-
-    /// Collective intelligence score (> individual)
+    /// Historical compatibility field: collective/local primitive-count ratio.
+    /// It is not a qualified intelligence comparison.
     pub collective_intelligence: f64,
+    #[serde(default)]
+    pub authority: ObservationAuthority,
 }
 
-/// Unified Emergent Intelligence System
+/// Integrated collective primitive selection, context optimization, and meta-reasoning.
 ///
-/// Integrates:
-/// - Collective primitive evolution (Phase 2.3)
-/// - Context-aware optimization (Phase 3.1)
-/// - Meta-cognitive reasoning (Phase 3.2)
-/// - All working together for emergence!
+/// The type name is historical. Its outputs remain `MeasurementOnly` until separately qualified.
 pub struct UnifiedIntelligence {
-    /// All reasoning instances in the system
     instances: HashMap<String, ReasoningInstance>,
-
-    /// Collective primitive knowledge
     collective: CollectivePrimitiveEvolution,
-
-    /// Evolution configuration
     evolution_config: EvolutionConfig,
-
-    /// Meta-reasoning configuration
     meta_config: MetaReasoningConfig,
-
-    /// System statistics
     stats: UnifiedSystemStats,
 }
 
 impl UnifiedIntelligence {
-    /// Create new unified intelligence system
     pub fn new(
         system_id: String,
         evolution_config: EvolutionConfig,
@@ -179,11 +134,11 @@ impl UnifiedIntelligence {
                 avg_meta_confidence: 0.0,
                 emergent_properties: Vec::new(),
                 collective_intelligence: 0.0,
+                authority: ObservationAuthority::MeasurementOnly,
             },
         }
     }
 
-    /// Add a new reasoning instance to the system
     pub fn add_instance(&mut self, instance_id: String) -> Result<()> {
         let instance = ReasoningInstance::new(instance_id.clone());
         self.instances.insert(instance_id, instance);
@@ -191,26 +146,20 @@ impl UnifiedIntelligence {
         Ok(())
     }
 
-    /// Evolve local primitives for an instance
     pub fn evolve_local_primitives(
         &mut self,
         instance_id: &str,
         _initial_primitives: Vec<CandidatePrimitive>,
     ) -> Result<PrimitiveEvolutionResult> {
-        // Evolve primitives
         let mut evolution = PrimitiveEvolution::new(self.evolution_config.clone())?;
         evolution.initialize_population();
         let result = evolution.evolve()?;
-
-        // Store in instance
         if let Some(instance) = self.instances.get_mut(instance_id) {
             instance.local_primitives = result.final_primitives.clone();
         }
-
         Ok(result)
     }
 
-    /// Contribute primitives to collective knowledge
     pub fn contribute_to_collective(
         &mut self,
         instance_id: &str,
@@ -220,7 +169,6 @@ impl UnifiedIntelligence {
         harmonic_score: f32,
         epistemic_score: f32,
     ) {
-        // Contribute to collective
         self.collective.contribute_primitive(
             primitive,
             success,
@@ -228,29 +176,21 @@ impl UnifiedIntelligence {
             harmonic_score,
             epistemic_score,
         );
-
-        // Update instance stats
         if let Some(instance) = self.instances.get_mut(instance_id) {
             instance.contribution_count += 1;
         }
-
-        // Update system stats
         let (_, prims, _) = self.collective.get_stats();
         self.stats.total_collective_primitives = prims;
     }
 
-    /// Get primitives for reasoning (collective + local)
     pub fn get_reasoning_primitives(
         &self,
         instance_id: &str,
         tier: PrimitiveTier,
         count: usize,
     ) -> (Vec<CandidatePrimitive>, usize, usize) {
-        // Get top primitives from collective
         let collective_primitives = self.collective.query_top_primitives(tier, count);
         let collective_count = collective_primitives.len();
-
-        // Get local primitives
         let local_primitives = if let Some(instance) = self.instances.get(instance_id) {
             instance
                 .local_primitives
@@ -263,48 +203,32 @@ impl UnifiedIntelligence {
             Vec::new()
         };
         let local_count = local_primitives.len();
-
-        // Combine
         let mut all_primitives = collective_primitives;
         all_primitives.extend(local_primitives);
-
         (all_primitives, collective_count, local_count)
     }
 
-    /// Perform unified reasoning
-    ///
-    /// This is the **revolutionary** method that combines ALL systems:
-    /// 1. Collective primitives (best from all instances)
-    /// 2. Context-aware optimization (right primitive for context)
-    /// 3. Meta-cognitive reflection (self-awareness and adaptation)
     pub fn unified_reason(
         &mut self,
         instance_id: &str,
         query: &str,
         tier: PrimitiveTier,
     ) -> Result<UnifiedReasoningResult> {
-        // Step 1: Get primitives (collective + local)
         let (primitives, collective_count, local_count) =
             self.get_reasoning_primitives(instance_id, tier, 20);
-
         if primitives.is_empty() {
             anyhow::bail!("No primitives available for reasoning");
         }
 
-        // Step 2: Create meta-cognitive reasoner
         let mut meta_reasoner =
             MetaCognitiveReasoner::new(self.evolution_config.clone(), self.meta_config.clone())?;
-
-        // Step 3: Perform meta-cognitive reasoning
         let mut chain = ReasoningChain::new(BinaryHV::random(self.stats.total_episodes as u64));
         let meta_result = meta_reasoner.meta_reason(query, primitives.clone(), &mut chain)?;
 
-        // Step 4: Contribute successful primitives to collective
         let chosen_primitive = &meta_result.optimization_result.primitive;
         let fitness = chosen_primitive.fitness as f32;
         let harmonic = chosen_primitive.harmonic_alignment as f32;
         let epistemic = chosen_primitive.epistemic_coordinate.quality_score() as f32;
-
         self.contribute_to_collective(
             instance_id,
             chosen_primitive.clone(),
@@ -314,22 +238,19 @@ impl UnifiedIntelligence {
             epistemic,
         );
 
-        // Step 5: Detect emergent properties
         let emergent_properties =
-            self.detect_emergence(&meta_result, collective_count, local_count, &primitives);
+            self.detect_observations(&meta_result, collective_count, &primitives);
 
-        // Step 6: Update instance meta-confidence
         if let Some(instance) = self.instances.get_mut(instance_id) {
             instance.meta_confidence = meta_result.meta_confidence;
             instance.episodes_completed += 1;
         }
 
-        // Step 7: Update system stats
         self.stats.total_episodes += 1;
         self.update_system_stats(&emergent_properties);
 
-        // Step 8: Compute unified intelligence score
-        let unified_intelligence = self.compute_unified_intelligence(&meta_result);
+        // Historical field name retained. The computation is explicitly telemetry-only.
+        let unified_intelligence = self.compute_unified_integration_heuristic(&meta_result);
 
         Ok(UnifiedReasoningResult {
             instance_id: instance_id.to_string(),
@@ -339,171 +260,149 @@ impl UnifiedIntelligence {
             local_primitives_count: local_count,
             emergent_properties,
             unified_intelligence,
+            authority: ObservationAuthority::MeasurementOnly,
         })
     }
 
-    /// Detect emergent properties in unified reasoning
-    fn detect_emergence(
+    fn detect_observations(
         &self,
         meta_result: &MetaReasoningResult,
         collective_count: usize,
-        _total_primitives: usize,
         primitives: &[CandidatePrimitive],
     ) -> Vec<EmergentProperty> {
         let mut properties = Vec::new();
 
-        // Emergence 1: Collective wisdom usage
         if collective_count > 0 {
             let collective_ratio = collective_count as f64 / primitives.len() as f64;
             properties.push(EmergentProperty {
-                property: "Collective Knowledge Utilization".to_string(),
+                property: "Collective Primitive Utilization".to_string(),
                 strength: collective_ratio,
                 evidence: format!(
-                    "Used {} collective primitives ({}%) out of {} total",
+                    "Used {} collective primitives ({:.1}%) out of {} total",
                     collective_count,
-                    (collective_ratio * 100.0) as i32,
+                    collective_ratio * 100.0,
                     primitives.len()
                 ),
+                authority: ObservationAuthority::MeasurementOnly,
             });
         }
 
-        // Emergence 2: Meta-cognitive awareness
+        // This threshold describes the heuristic itself; it establishes neither correctness nor
+        // self-awareness. RQ-006 must qualify those semantics independently.
         if meta_result.meta_confidence > 0.7 {
             properties.push(EmergentProperty {
-                property: "High Meta-Cognitive Awareness".to_string(),
+                property: "High Heuristic Meta-Confidence".to_string(),
                 strength: meta_result.meta_confidence,
                 evidence: format!(
-                    "Meta-confidence {:.2} indicates strong self-awareness",
+                    "Heuristic meta-confidence {:.2}; RQ-006 qualification pending",
                     meta_result.meta_confidence
                 ),
+                authority: ObservationAuthority::MeasurementOnly,
             });
         }
 
-        // Emergence 3: Context adaptation
         if meta_result.context_reflection.reconsider_context
             || meta_result.strategy_reflection.adjust_strategy
         {
             properties.push(EmergentProperty {
-                property: "Adaptive Intelligence".to_string(),
-                strength: 0.8,
-                evidence: "System questioned context or adapted strategy autonomously".to_string(),
+                property: "Context Or Strategy Adjustment Triggered".to_string(),
+                strength: 1.0,
+                evidence: "The meta-reasoning mechanism requested context reconsideration or strategy adjustment"
+                    .to_string(),
+                authority: ObservationAuthority::MeasurementOnly,
             });
         }
 
-        // Emergence 4: Multi-objective optimization
         let fitness = meta_result
             .optimization_result
             .tradeoff_point
             .weighted_fitness(&meta_result.optimization_result.weights);
         if fitness > 0.6 {
             properties.push(EmergentProperty {
-                property: "Multi-Objective Excellence".to_string(),
+                property: "High Weighted Objective Fitness".to_string(),
                 strength: fitness,
                 evidence: format!(
-                    "Achieved {:.2} weighted fitness across Φ, harmonics, and epistemics",
+                    "Observed weighted objective fitness {:.2} under the current configured weights",
                     fitness
                 ),
+                authority: ObservationAuthority::MeasurementOnly,
             });
         }
 
-        // Emergence 5: Meta-learning insights
         if !meta_result.meta_insights.is_empty() {
             let avg_reliability = meta_result
                 .meta_insights
                 .iter()
-                .map(|i| i.reliability)
+                .map(|insight| insight.reliability)
                 .sum::<f64>()
                 / meta_result.meta_insights.len() as f64;
-
             properties.push(EmergentProperty {
-                property: "Meta-Learning".to_string(),
+                property: "Meta-Learning Insight Emitted".to_string(),
                 strength: avg_reliability,
                 evidence: format!(
-                    "Discovered {} meta-insights with avg reliability {:.2}",
+                    "Emitted {} heuristic meta-insights with mean internal reliability {:.2}",
                     meta_result.meta_insights.len(),
                     avg_reliability
                 ),
+                authority: ObservationAuthority::MeasurementOnly,
             });
         }
 
         properties
     }
 
-    /// Update system-level statistics
-    fn update_system_stats(&mut self, emergent_properties: &[EmergentProperty]) {
-        // Update emergent properties
-        for prop in emergent_properties {
-            // Only keep unique properties
+    fn update_system_stats(&mut self, observations: &[EmergentProperty]) {
+        for observation in observations {
             if !self
                 .stats
                 .emergent_properties
                 .iter()
-                .any(|p| p.property == prop.property)
+                .any(|existing| existing.property == observation.property)
             {
-                self.stats.emergent_properties.push(prop.clone());
+                self.stats.emergent_properties.push(observation.clone());
             }
         }
 
-        // Update average meta-confidence
         let total_confidence: f64 = self.instances.values().map(|i| i.meta_confidence).sum();
-        self.stats.avg_meta_confidence = if !self.instances.is_empty() {
-            total_confidence / self.instances.len() as f64
-        } else {
+        self.stats.avg_meta_confidence = if self.instances.is_empty() {
             0.0
+        } else {
+            total_confidence / self.instances.len() as f64
         };
-
-        // Compute collective intelligence
-        self.stats.collective_intelligence = self.compute_collective_intelligence();
+        self.stats.collective_intelligence = self.compute_collective_sharing_ratio();
+        self.stats.authority = ObservationAuthority::MeasurementOnly;
     }
 
-    /// Compute unified intelligence score
+    /// Compatibility heuristic over internal integration signals.
     ///
-    /// This is a measure of how much more capable the unified system is
-    /// compared to individual components working alone.
-    fn compute_unified_intelligence(&self, meta_result: &MetaReasoningResult) -> f64 {
-        // Components of unified intelligence:
-
-        // 1. Meta-cognitive awareness (30%)
+    /// The numerical formula is retained to avoid silently changing historical telemetry while
+    /// RQ-006 is in progress. The result has no capability authority.
+    fn compute_unified_integration_heuristic(&self, meta_result: &MetaReasoningResult) -> f64 {
         let meta_component = 0.3 * meta_result.meta_confidence;
-
-        // 2. Multi-objective fitness (30%)
         let fitness_component = 0.3
             * meta_result
                 .optimization_result
                 .tradeoff_point
                 .weighted_fitness(&meta_result.optimization_result.weights);
-
-        // 3. Collective utilization (20%)
         let collective_component =
             0.2 * (self.stats.total_collective_primitives as f64 / 100.0).min(1.0);
-
-        // 4. Pareto frontier size (20% - diversity of options)
         let frontier_size = meta_result.optimization_result.frontier.size() as f64;
         let frontier_component = 0.2 * (frontier_size / 10.0).min(1.0);
-
         meta_component + fitness_component + collective_component + frontier_component
     }
 
-    /// Compute collective intelligence score
-    ///
-    /// This measures how much the collective exceeds individual capability.
-    fn compute_collective_intelligence(&self) -> f64 {
+    /// Historical `collective_intelligence` telemetry: collective/local primitive-count ratio.
+    fn compute_collective_sharing_ratio(&self) -> f64 {
         if self.instances.is_empty() {
             return 0.0;
         }
-
-        // Individual intelligence = average local primitives
         let avg_local_primitives = self
             .instances
             .values()
-            .map(|i| i.local_primitives.len())
+            .map(|instance| instance.local_primitives.len())
             .sum::<usize>() as f64
             / self.instances.len() as f64;
-
-        // Collective intelligence = total unique primitives in collective
         let collective_primitives = self.stats.total_collective_primitives as f64;
-
-        // Collective > Individual ratio
         if avg_local_primitives > 0.0 {
             collective_primitives / avg_local_primitives
         } else {
@@ -511,21 +410,16 @@ impl UnifiedIntelligence {
         }
     }
 
-    /// Merge knowledge from another instance
     pub fn merge_instances(&mut self, other_collective: &CollectivePrimitiveEvolution) {
         self.collective.merge_knowledge(other_collective);
-
-        // Update stats
         let (_, prims, _) = self.collective.get_stats();
         self.stats.total_collective_primitives = prims;
     }
 
-    /// Get system statistics
     pub fn stats(&self) -> &UnifiedSystemStats {
         &self.stats
     }
 
-    /// Get instance information
     pub fn instance(&self, instance_id: &str) -> Option<&ReasoningInstance> {
         self.instances.get(instance_id)
     }
@@ -536,42 +430,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_unified_intelligence_creation() {
-        let evolution_config = EvolutionConfig::default();
-        let meta_config = MetaReasoningConfig::default();
-
-        let system =
-            UnifiedIntelligence::new("test_system".to_string(), evolution_config, meta_config);
-
+    fn integrated_telemetry_starts_measurement_only() {
+        let system = UnifiedIntelligence::new(
+            "test_system".to_string(),
+            EvolutionConfig::default(),
+            MetaReasoningConfig::default(),
+        );
         assert_eq!(system.stats().total_instances, 0);
         assert_eq!(system.stats().total_episodes, 0);
+        assert_eq!(
+            system.stats().authority,
+            ObservationAuthority::MeasurementOnly
+        );
     }
 
     #[test]
-    fn test_add_instance() {
-        let evolution_config = EvolutionConfig::default();
-        let meta_config = MetaReasoningConfig::default();
-
-        let mut system =
-            UnifiedIntelligence::new("test_system".to_string(), evolution_config, meta_config);
-
+    fn add_instance_preserves_counting() {
+        let mut system = UnifiedIntelligence::new(
+            "test_system".to_string(),
+            EvolutionConfig::default(),
+            MetaReasoningConfig::default(),
+        );
         system.add_instance("instance_a".to_string()).unwrap();
-        assert_eq!(system.stats().total_instances, 1);
-
         system.add_instance("instance_b".to_string()).unwrap();
         assert_eq!(system.stats().total_instances, 2);
     }
 
     #[test]
-    fn test_collective_intelligence_ratio() {
-        let evolution_config = EvolutionConfig::default();
-        let meta_config = MetaReasoningConfig::default();
+    fn empty_collective_sharing_ratio_is_zero() {
+        let system = UnifiedIntelligence::new(
+            "test_system".to_string(),
+            EvolutionConfig::default(),
+            MetaReasoningConfig::default(),
+        );
+        assert_eq!(system.compute_collective_sharing_ratio(), 0.0);
+    }
 
-        let system =
-            UnifiedIntelligence::new("test_system".to_string(), evolution_config, meta_config);
-
-        // Initially, collective intelligence should be 1.0 (no instances)
-        let collective_intelligence = system.compute_collective_intelligence();
-        assert_eq!(collective_intelligence, 0.0);
+    #[test]
+    fn authority_has_no_implicit_upgrade_path() {
+        assert_eq!(
+            ObservationAuthority::default(),
+            ObservationAuthority::MeasurementOnly
+        );
     }
 }

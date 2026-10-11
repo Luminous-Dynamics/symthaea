@@ -488,11 +488,17 @@ impl CognitiveLoopService {
         self.primitive_tier.epistemic_gate.as_ref()
     }
 
-    /// Borrow the meta-cognitive reasoner (if enabled).
+    /// Borrow the historical meta-cognitive reasoner (if enabled).
+    ///
+    /// The primitive tier may shadow this call through canonical V2, but the accessor preserves
+    /// the established read-only legacy type while the shadow path remains measurement-only.
     pub fn meta_cognitive_reasoner(
         &self,
     ) -> Option<&crate::consciousness::meta_reasoning::MetaCognitiveReasoner> {
-        self.primitive_tier.meta_cognitive_reasoner.as_ref()
+        self.primitive_tier
+            .meta_cognitive_reasoner
+            .as_ref()
+            .map(|reasoner| reasoner.legacy())
     }
 
     /// Borrow the code primitive router (if enabled).

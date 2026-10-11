@@ -27,7 +27,6 @@ use crate::consciousness::gis_integration::EpistemicDecisionGate;
 use crate::consciousness::harmonics::{HarmonicField, HarmonicResolver};
 // HarmoniesIntegrator removed — now solely owned by EthicsEngine
 use crate::consciousness::hierarchical_ltc::HierarchicalLTC;
-use crate::consciousness::meta_reasoning::MetaCognitiveReasoner;
 use crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution;
 use crate::consciousness::phi_validation::PhiValidationFramework;
 use crate::consciousness::primitive_composition_rules::CompositionRuleEngine;
@@ -39,6 +38,7 @@ use crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding;
 use crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer;
 // UnifiedValueEvaluator removed — now solely owned by EthicsEngine
 use crate::consciousness::value_feedback_loop::ValueFeedbackLoop;
+use crate::intelligence::ShadowQualifiedMetaReasoner;
 
 use super::CognitiveLoopConfig;
 
@@ -121,8 +121,8 @@ pub(crate) struct PrimitiveTierManager {
     /// Epistemic decision gate: evaluates through Graceful Ignorance System.
     pub epistemic_gate: Option<EpistemicDecisionGate>,
 
-    /// Meta-cognitive reasoner: self-reflective reasoning about reasoning.
-    pub meta_cognitive_reasoner: Option<MetaCognitiveReasoner>,
+    /// Historical meta-cognitive reasoner with canonical V2 shadow qualification.
+    pub meta_cognitive_reasoner: Option<ShadowQualifiedMetaReasoner>,
 
     /// Code primitive router: consciousness-aware code reasoning.
     pub code_primitive_router: Option<CodePrimitiveRouter>,
@@ -285,13 +285,13 @@ impl PrimitiveTierManager {
             (None, None)
         };
 
-        // Meta-cognitive reasoner
+        // Historical meta-cognitive behavior plus canonical V2 shadow measurement.
         let meta_cognitive_reasoner = if has_primitive {
-            MetaCognitiveReasoner::new(
+            ShadowQualifiedMetaReasoner::new(
                 crate::consciousness::primitive_evolution::EvolutionConfig::default(),
                 crate::consciousness::meta_reasoning::MetaReasoningConfig::default(),
             )
-            .map_err(|e| tracing::warn!(err = %e, "MetaCognitiveReasoner init failed"))
+            .map_err(|e| tracing::warn!(err = %e, "ShadowQualifiedMetaReasoner init failed"))
             .ok()
         } else {
             None
@@ -403,6 +403,14 @@ mod tests {
         assert!(tier.temporal_analyzer.is_some());
         assert!(tier.compositionality_engine.is_some());
         assert!(tier.harmonic_field.is_some());
+        assert!(tier.meta_cognitive_reasoner.is_some());
+        assert_eq!(
+            tier.meta_cognitive_reasoner
+                .as_ref()
+                .unwrap()
+                .canonical_next_sequence(),
+            0
+        );
     }
 
     #[test]
