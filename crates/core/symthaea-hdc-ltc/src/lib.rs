@@ -55,4 +55,4 @@ pub mod neuron;
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
-pub use neuron::HdcLtcUnifiedNeuron;
+pub use neuron::{HdcLtcUnifiedNeuron, NeuronStepError};
