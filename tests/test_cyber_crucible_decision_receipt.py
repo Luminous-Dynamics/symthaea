@@ -120,11 +120,21 @@ class DecisionReceiptTests(unittest.TestCase):
         with self.assertRaises(DecisionVerificationError):
             self.verify(receipt)
 
-    def test_payload_mutation_invalidates_signature(self):
+    def test_signature_mutation_is_rejected(self):
         receipt = self.make_receipt()
-        receipt["payload"]["decision"] = "reject"
+        original = receipt["signature"]
+        receipt["signature"] = ("A" if original[0] != "A" else "B") + original[1:]
         with self.assertRaises(DecisionVerificationError):
             self.verify(receipt)
+
+    def test_payload_mutation_invalidates_signature(self):
+        receipt = self.make_receipt()
+        context = deepcopy(self.context)
+        context["campaign_id"] = "different-campaign"
+        receipt["payload"]["campaign_id"] = "different-campaign"
+        receipt["payload"]["context_digest"] = canonical_json_digest(context)
+        with self.assertRaises(DecisionVerificationError):
+            self.verify(receipt, context=context)
 
     def test_wrong_attempt_context_is_rejected(self):
         receipt = self.make_receipt()
