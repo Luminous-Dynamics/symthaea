@@ -54,6 +54,7 @@
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
+pub mod moral_patient;
 pub mod substrate_transfer;
 pub mod wm;
 
