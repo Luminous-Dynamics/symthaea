@@ -35,7 +35,7 @@ Each of the Eight Harmonies has specific behavioral tests that validate correct 
 
 #### Compassion
 - **Test**: 28 `moral_algebra` tests including Care Ethics prototype matching
-- **Behavioral check**: Moral classification accuracy 91.1% on adversarial inputs; empathic_unification module active
+- **Behavioral check**: Selected adversarial tests exercise specific cases; no qualified aggregate moral accuracy result. Historical 91.1% claim unqualified pending task-matched evaluation and provenance audit.
 - **Threshold**: `MORAL_CONCERN_THRESHOLD` (Haidt 2001)
 
 #### Autonomy
