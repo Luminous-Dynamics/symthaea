@@ -167,6 +167,23 @@ def validate_record(
             if evidence != "simulation_generated" and role == "simulation_only":
                 errors.append(f"{mlabel}: simulation_only metric attached to a non-simulation target")
 
+    # Resource totals must reconcile with the per-target ledger, not just look plausible in isolation.
+    resource = record.get("resource_accounting", {})
+    if isinstance(resource, dict):
+        reported_conformers = resource.get("candidate_conformers_generated")
+        row_conformers = [
+            row.get("candidate_conformers")
+            for row in rows
+            if isinstance(row, dict) and isinstance(row.get("candidate_conformers"), int)
+            and not isinstance(row.get("candidate_conformers"), bool) and row.get("candidate_conformers") >= 0
+        ]
+        if len(row_conformers) == len(rows) and isinstance(reported_conformers, int) and not isinstance(reported_conformers, bool):
+            if sum(row_conformers) != reported_conformers:
+                errors.append(
+                    "resource_accounting.candidate_conformers_generated must equal the sum of target candidate_conformers "
+                    f"(reported={reported_conformers}, target_sum={sum(row_conformers)})"
+                )
+
     # Any artifact claimed in the record must resolve locally under the chosen root and match its hash.
     root = artifact_root.resolve()
     artifacts_value = record.get("output_artifacts", [])
