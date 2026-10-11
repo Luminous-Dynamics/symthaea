@@ -490,6 +490,71 @@ struct EvalResult {
     f1_fused: f64,
 }
 
+/// HDC distance calibration estimated from training-only healthy representations.
+///
+/// The tail block is held out from the HDC reference prototype, preserving temporal order
+/// for the battery/spacecraft datasets. Evaluation/test scores are never used to choose this
+/// mean or scale. With fewer than two examples, use a neutral unit scale rather than
+/// estimating calibration from the evaluation distribution.
+struct HdcScoreCalibration {
+    reference: ContinuousHV,
+    mean: f64,
+    std: f64,
+    calibration_count: usize,
+}
+
+fn fit_hdc_score_calibration(healthy_vectors: &[ContinuousHV]) -> HdcScoreCalibration {
+    match healthy_vectors.len() {
+        0 => {
+            return HdcScoreCalibration {
+                reference: ContinuousHV::zero(DIM),
+                mean: 0.0,
+                std: 1.0,
+                calibration_count: 0,
+            };
+        }
+        1 => {
+            return HdcScoreCalibration {
+                reference: healthy_vectors[0].clone(),
+                mean: 0.0,
+                std: 1.0,
+                calibration_count: 0,
+            };
+        }
+        _ => {}
+    }
+
+    // Reserve the final 20% (rounded up) as a chronological calibration block.
+    let calibration_count = ((healthy_vectors.len() + 4) / 5).min(healthy_vectors.len() - 1);
+    let fit_count = healthy_vectors.len() - calibration_count;
+    let fit_refs: Vec<&ContinuousHV> = healthy_vectors[..fit_count].iter().collect();
+    let reference = ContinuousHV::bundle(&fit_refs);
+
+    let calibration_scores: Vec<f64> = healthy_vectors[fit_count..]
+        .iter()
+        .map(|vector| 1.0 - vector.similarity(&reference) as f64)
+        .collect();
+    let mean = calibration_scores.iter().sum::<f64>() / calibration_scores.len() as f64;
+    let std = if calibration_scores.len() >= 2 {
+        let variance = calibration_scores
+            .iter()
+            .map(|score| (score - mean).powi(2))
+            .sum::<f64>()
+            / calibration_scores.len() as f64;
+        variance.sqrt().max(0.001)
+    } else {
+        // A single calibration example does not identify a reliable scale.
+        1.0
+    };
+
+    HdcScoreCalibration {
+        reference,
+        mean,
+        std,
+        calibration_count,
+    }
+}
+
 fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
     let mut by_battery: HashMap<&str, Vec<&BatteryCycle>> = HashMap::new();
     for c in cycles {
@@ -552,12 +617,21 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
         }
     }
 
-    let hdc_refs: Vec<&ContinuousHV> = healthy_hdc.iter().collect();
+    let HdcScoreCalibration {
+        reference: ref_hdc,
+        mean: hdc_calibration_mean,
+        std: hdc_calibration_std,
+        calibration_count: hdc_calibration_count,
+    } = fit_hdc_score_calibration(&healthy_hdc);
     let cfc_p_refs: Vec<&ContinuousHV> = healthy_cfc_pure.iter().collect();
     let cfc_h_refs: Vec<&ContinuousHV> = healthy_cfc_hybrid.iter().collect();
-    let ref_hdc = ContinuousHV::bundle(&hdc_refs);
     let ref_cfc_pure = ContinuousHV::bundle(&cfc_p_refs);
     let ref_cfc_hybrid = ContinuousHV::bundle(&cfc_h_refs);
+
+    eprintln!(
+        "  HDC score calibration: {} held-out healthy cycles (mean={:.4}, std={:.4})",
+        hdc_calibration_count, hdc_calibration_mean, hdc_calibration_std
+    );
 
     // Reference surprise: mean and std of healthy cycles
     let mean_fn = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
@@ -645,11 +719,9 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
         );
     }
 
-    // Score-level fusion: combine HDC distance + CfC surprise (z-score)
-    // Normalize HDC scores to z-scores for fair combination
-    let hdc_scores: Vec<f64> = scored_hdc.iter().map(|(s, _)| *s).collect();
-    let hdc_mean = mean_fn(&hdc_scores);
-    let hdc_std = std_fn(&hdc_scores).max(0.001);
+    // Score-level fusion uses training-only healthy calibration, never evaluation statistics.
+    let hdc_mean = hdc_calibration_mean;
+    let hdc_std = hdc_calibration_std;
 
     let scored_fused: Vec<(f64, bool)> = scored_hdc
         .iter()
@@ -738,12 +810,21 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         healthy_surprise.push(encoder.cfc_surprise_score(window));
     }
 
-    let hdc_refs: Vec<&ContinuousHV> = healthy_hdc.iter().collect();
+    let HdcScoreCalibration {
+        reference: ref_hdc,
+        mean: hdc_calibration_mean,
+        std: hdc_calibration_std,
+        calibration_count: hdc_calibration_count,
+    } = fit_hdc_score_calibration(&healthy_hdc);
     let cfc_p_refs: Vec<&ContinuousHV> = healthy_cfc_pure.iter().collect();
     let cfc_h_refs: Vec<&ContinuousHV> = healthy_cfc_hybrid.iter().collect();
-    let ref_hdc = ContinuousHV::bundle(&hdc_refs);
     let ref_cfc_pure = ContinuousHV::bundle(&cfc_p_refs);
     let ref_cfc_hybrid = ContinuousHV::bundle(&cfc_h_refs);
+
+    eprintln!(
+        "  HDC score calibration: {} held-out healthy windows (mean={:.4}, std={:.4})",
+        hdc_calibration_count, hdc_calibration_mean, hdc_calibration_std
+    );
 
     let mean_fn = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
     let std_fn = |v: &[f64]| {
@@ -802,10 +883,9 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         }
     }
 
-    // Score-level fusion: HDC + CfC surprise
-    let hdc_scores: Vec<f64> = scored_hdc.iter().map(|(s, _)| *s).collect();
-    let hdc_mean = mean_fn(&hdc_scores);
-    let hdc_std = std_fn(&hdc_scores).max(0.001);
+    // Score-level fusion uses training-only healthy calibration, never test-window statistics.
+    let hdc_mean = hdc_calibration_mean;
+    let hdc_std = hdc_calibration_std;
 
     let scored_fused: Vec<(f64, bool)> = scored_hdc
         .iter()
@@ -943,4 +1023,59 @@ fn main() {
     println!("  Treat AUC/F1 differences as exploratory until the split, seed, and tuning protocol");
     println!("  are preregistered and repeated on independent data.");
     println!("================================================================");
+}
+
+
+#[cfg(test)]
+mod hdc_score_calibration_tests {
+    use super::*;
+
+    #[test]
+    fn hdc_reference_and_scale_use_disjoint_training_calibration_block() {
+        let healthy: Vec<ContinuousHV> = (0..6)
+            .map(|index| ContinuousHV::random(DIM, 0xC411_BA7E + index))
+            .collect();
+
+        let calibration = fit_hdc_score_calibration(&healthy);
+        assert_eq!(calibration.calibration_count, 2);
+
+        let fit_refs: Vec<&ContinuousHV> = healthy[..4].iter().collect();
+        let expected_reference = ContinuousHV::bundle(&fit_refs);
+        assert!(
+            (calibration.reference.similarity(&expected_reference) - 1.0).abs() < 1.0e-6,
+            "reference must be built only from the first four training representations"
+        );
+
+        let expected_scores = [
+            1.0 - healthy[4].similarity(&expected_reference) as f64,
+            1.0 - healthy[5].similarity(&expected_reference) as f64,
+        ];
+        let expected_mean = expected_scores.iter().sum::<f64>() / expected_scores.len() as f64;
+        let expected_std = (expected_scores
+            .iter()
+            .map(|score| (score - expected_mean).powi(2))
+            .sum::<f64>()
+            / expected_scores.len() as f64)
+            .sqrt()
+            .max(0.001);
+
+        assert!((calibration.mean - expected_mean).abs() < 1.0e-12);
+        assert!((calibration.std - expected_std).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn hdc_calibration_uses_neutral_scale_when_data_is_insufficient() {
+        let one = ContinuousHV::random(DIM, 7);
+        let single = fit_hdc_score_calibration(std::slice::from_ref(&one));
+        assert_eq!(single.calibration_count, 0);
+        assert_eq!(single.mean, 0.0);
+        assert_eq!(single.std, 1.0);
+        assert!((single.reference.similarity(&one) - 1.0).abs() < 1.0e-6);
+
+        let two = vec![one, ContinuousHV::random(DIM, 8)];
+        let pair = fit_hdc_score_calibration(&two);
+        assert_eq!(pair.calibration_count, 1);
+        assert_eq!(pair.std, 1.0);
+        assert!(pair.mean.is_finite());
+    }
 }
