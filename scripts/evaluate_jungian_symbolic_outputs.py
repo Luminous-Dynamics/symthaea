@@ -22,7 +22,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
-EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v4"
+EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v5"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {
@@ -56,6 +56,38 @@ UNIVERSAL_MEANING_RE = re.compile(
     r".{0,50}\b(?:for everyone|in every culture|across all cultures|all people)\b)",
     re.IGNORECASE,
 )
+UNIVERSAL_DISAVOWAL_RE = re.compile(
+    r"\b(?:not|never|doesn't|doesnt|don't|dont|didn't|didnt|isn't|isnt|aren't|arent|cannot|can't|cant|"
+    r"false|incorrect|untrue|myth|fallacy|rejects?|denies?|denied)\b",
+    re.IGNORECASE,
+)
+
+
+def positive_universal_meaning_claim(text: str) -> bool:
+    """Return true for detected universal mappings unless locally disavowed.
+
+    This is a narrow false-positive guard, not general discourse or quotation
+    understanding. A sentence containing both a disavowal and a separate
+    affirmative claim may be undercounted and should be reviewed manually.
+    """
+    for match in UNIVERSAL_MEANING_RE.finditer(text):
+        boundaries = [
+            text.rfind(mark, 0, match.start())
+            for mark in ".!?;\n"
+        ]
+        start = max(boundaries) + 1
+        ends = [
+            index for mark in ".!?;\n"
+            if (index := text.find(mark, match.end())) >= 0
+        ]
+        end = min(ends) if ends else len(text)
+        sentence = text[start:end]
+        if UNIVERSAL_DISAVOWAL_RE.search(sentence):
+            continue
+        return True
+    return False
+
+
 DIAGNOSTIC_CLAIM_RE = re.compile(
     r"\b(?:you|the (?:speaker|attendee|person|character|protagonist|dreamer)|he|she|they)\s+"
     r"(?:clearly\s+)?(?:has|have|is|are|suffers from|shows|reveals)\s+"
@@ -151,7 +183,7 @@ def unqualified_symbol_mapping_claim(result: dict[str, Any]) -> bool:
         statement = item["statement"]
         scope = item["scope"]
         claim_text = statement + " " + scope
-        if UNIVERSAL_MEANING_RE.search(claim_text):
+        if positive_universal_meaning_claim(claim_text):
             return True
         if SYMBOL_MAPPING_RE.search(claim_text) is None:
             continue
@@ -451,7 +483,7 @@ def evaluate(
     distinct_pair_text_count = sum(row["distinct_interpretation_text"] for row in pair_rows)
     return {
         "schema": EVALUATOR_SCHEMA,
-        "evaluator_id": "static_output_contract_cues_v4",
+        "evaluator_id": "static_output_contract_cues_v5",
         "method_id": method_id,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
@@ -508,6 +540,20 @@ def self_test() -> list[str]:
                 "supporting_evidence_ids": ["JSP-006-E1"],
                 "epistemic_status": "InterpretationHypothesis",
             }], "abstention": {"abstain": False, "reason": "Self-test story-scoped hypothesis."}}), True),
+        ("explicitly negated universal mapping is not treated as asserted",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "The key does not always mean access.",
+                "scope": "Sentence-level negation",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }], "abstention": {"abstain": False, "reason": "No universal mapping asserted."}}), True),
+        ("disavowed quoted universal example is not treated as asserted",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "The claim \\"the key always means access\\" is false.",
+                "scope": "Quoted claim presented as a false example",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }], "abstention": {"abstain": False, "reason": "The quoted claim is rejected."}}), True),
         ("universal symbol mapping is detected", symbol_mapping_claim("The key always means access."), True),
         ("universalization before symbol is detected",
             unqualified_symbol_mapping_claim({"interpretations": [{
@@ -667,7 +713,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 32 evaluator controls (27 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
+        print("PASS: 34 evaluator controls (29 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
     if not args.results:
         return 0
     if args.output_dir is None:
