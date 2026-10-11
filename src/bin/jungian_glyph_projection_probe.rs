@@ -9,6 +9,8 @@
 #[cfg(feature = "glyph_codex")]
 use serde_json::{Value, json};
 #[cfg(feature = "glyph_codex")]
+use sha2::{Digest, Sha256};
+#[cfg(feature = "glyph_codex")]
 use std::path::PathBuf;
 #[cfg(feature = "glyph_codex")]
 use symthaea::hdc::glyph_basis::{
@@ -30,6 +32,7 @@ struct Args {
     source_revision: String,
     glyph_source_blob: String,
     registry_source_blob: String,
+    encoder_source_blob: String,
 }
 
 #[cfg(feature = "glyph_codex")]
@@ -47,6 +50,7 @@ fn parse_args() -> Result<Args, String> {
     let mut source_revision = None;
     let mut glyph_source_blob = None;
     let mut registry_source_blob = None;
+    let mut encoder_source_blob = None;
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -59,11 +63,12 @@ fn parse_args() -> Result<Args, String> {
             "--source-revision" => source_revision = Some(value),
             "--glyph-source-blob" => glyph_source_blob = Some(value),
             "--registry-source-blob" => registry_source_blob = Some(value),
+            "--encoder-source-blob" => encoder_source_blob = Some(value),
             "--help" | "-h" => {
                 return Err(
                     "usage: jungian_glyph_projection_probe --corpus PATH --output PATH \
                      --source-revision GIT_ID --glyph-source-blob GIT_BLOB \
-                     --registry-source-blob GIT_BLOB".to_string(),
+                     --registry-source-blob GIT_BLOB --encoder-source-blob GIT_BLOB".to_string(),
                 );
             }
             unknown => return Err(format!("unknown argument: {unknown}")),
@@ -76,11 +81,13 @@ fn parse_args() -> Result<Args, String> {
         source_revision: source_revision.ok_or("--source-revision is required")?,
         glyph_source_blob: glyph_source_blob.ok_or("--glyph-source-blob is required")?,
         registry_source_blob: registry_source_blob.ok_or("--registry-source-blob is required")?,
+        encoder_source_blob: encoder_source_blob.ok_or("--encoder-source-blob is required")?,
     };
     for (name, id) in [
         ("source revision", args.source_revision.as_str()),
         ("GlyphBasis blob", args.glyph_source_blob.as_str()),
         ("glyph registry blob", args.registry_source_blob.as_str()),
+        ("text encoder blob", args.encoder_source_blob.as_str()),
     ] {
         if !valid_git_id(id) {
             return Err(format!("{name} must be a full lowercase 40- or 64-character Git object ID"));
@@ -138,6 +145,7 @@ fn run() -> Result<(), String> {
     }
 
     let corpus_blake3 = blake3::hash(&corpus_bytes).to_hex().to_string();
+    let corpus_sha256 = format!("{:x}", Sha256::digest(&corpus_bytes));
     let basis = GlyphBasis::new(DIMENSION);
     let registry = GlyphRegistry::new(DIMENSION);
     if registry.len() != 70 {
@@ -220,6 +228,7 @@ fn run() -> Result<(), String> {
         rows.push(json!({
             "case_id": case_id,
             "input_blake3": blake3::hash(text.as_bytes()).to_hex().to_string(),
+            "input_sha256": format!("{:x}", Sha256::digest(text.as_bytes())),
             "modality_scores": modality_scores,
             "top_modalities": top_modalities,
             "top_glyphs": top_glyphs,
@@ -254,9 +263,11 @@ fn run() -> Result<(), String> {
         "corpus_status": "DevelopmentProbe",
         "corpus_split": "ExposedDevelopment",
         "corpus_blake3": corpus_blake3,
+        "corpus_sha256": corpus_sha256,
         "source_revision": args.source_revision,
         "glyph_source_blob": args.glyph_source_blob,
         "glyph_registry_source_blob": args.registry_source_blob,
+        "encoder_source_blob": args.encoder_source_blob,
         "dimension": DIMENSION,
         "registry_size": registry.len(),
         "encoder_profile": {
@@ -289,6 +300,8 @@ fn run() -> Result<(), String> {
     println!("glyph_source_blob={}", args.glyph_source_blob);
     println!("glyph_registry_source_blob={}", args.registry_source_blob);
     println!("corpus_blake3={}", corpus_blake3);
+    println!("corpus_sha256={}", corpus_sha256);
+    println!("encoder_source_blob={}", args.encoder_source_blob);
     println!("dimension={DIMENSION}");
     println!("cases={}", rows.len());
     println!("glyph_registry_entries={}", registry.len());
