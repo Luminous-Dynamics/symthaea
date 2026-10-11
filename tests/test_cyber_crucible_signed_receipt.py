@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import sys
 import tempfile
@@ -279,6 +280,27 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         self.verify(receipt, replay_ledger=ledger)
         with self.assertRaisesRegex(verifier.VerificationError, "replay rejected"):
             self.verify(receipt, replay_ledger=ledger)
+
+    def test_concurrent_replay_consumption_accepts_exactly_one_call(self):
+        receipt = signed_receipt()
+        ledger_path = Path(self.temp.name) / "concurrent-replay.sqlite3"
+
+        def consume_once():
+            try:
+                verifier.verify_receipt(
+                    receipt, policy(), context(receipt), now=NOW,
+                    replay_ledger=verifier.ReplayLedger(ledger_path),
+                )
+                return "accepted"
+            except verifier.VerificationError as exc:
+                return str(exc)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _: consume_once(), range(8)))
+        self.assertEqual(results.count("accepted"), 1, results)
+        self.assertEqual(
+            sum(result.startswith("replay rejected:") for result in results), 7, results
+        )
 
     def test_independent_receipts_for_one_attempt_can_each_be_consumed(self):
         trust = policy(["security_verdict"])
