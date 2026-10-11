@@ -519,6 +519,63 @@ impl ExactRational {
         Ok(Self { value })
     }
 
+    /// Whether this normalized rational is an integer.
+    pub fn is_integer(&self) -> bool {
+        self.value.denom() == &BigInt::from(1u8)
+    }
+
+    /// Exact mathematical floor, including for negative non-integers.
+    /// The input and result must fit the caller-selected resource budget.
+    pub fn checked_floor(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        let numerator = self.value.numer();
+        let denominator = self.value.denom(); // BigRational always normalizes this positive.
+        let quotient = numerator / denominator; // BigInt division truncates toward zero.
+        let remainder = numerator % denominator;
+        let floor = if numerator.is_negative() && !remainder.is_zero() {
+            quotient - BigInt::from(1u8)
+        } else {
+            quotient
+        };
+        let value = BigRational::from_integer(floor);
+        budget.validate_value(&value)?;
+        Ok(Self { value })
+    }
+
+    /// Exact mathematical ceiling, including for negative non-integers.
+    /// The input and result must fit the caller-selected resource budget.
+    pub fn checked_ceil(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        budget.validate_value(&self.value)?;
+        let numerator = self.value.numer();
+        let denominator = self.value.denom();
+        let quotient = numerator / denominator;
+        let remainder = numerator % denominator;
+        let ceil = if numerator.is_positive() && !remainder.is_zero() {
+            quotient + BigInt::from(1u8)
+        } else {
+            quotient
+        };
+        let value = BigRational::from_integer(ceil);
+        budget.validate_value(&value)?;
+        Ok(Self { value })
+    }
+
+    /// Exact fractional part in [0, 1), including for negative inputs.
+    /// For example, the fractional part of -1/3 is 2/3, not -1/3.
+    pub fn checked_fractional_part(
+        &self,
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        let floor = self.checked_floor(budget)?;
+        self.checked_subtract(&floor, budget)
+    }
+
     /// Add exactly, failing closed if operands or normalized result exceed budget.
     pub fn checked_add(
         &self,
@@ -1030,6 +1087,67 @@ mod tests {
             value.checked_abs(narrow).unwrap_err(),
             ExactRationalError::ResourceLimitExceeded
         );
+    }
+
+    #[test]
+    fn exact_floor_ceil_and_fractional_part_cover_signed_values() {
+        let limit = budget(128);
+        let cases = [
+            ("-7", "3", "-3", "-2", "2/3"),
+            ("-1", "3", "-1", "0", "2/3"),
+            ("-2", "1", "-2", "-2", "0/1"),
+            ("0", "1", "0", "0", "0/1"),
+            ("1", "3", "0", "1", "1/3"),
+            ("7", "3", "2", "3", "1/3"),
+        ];
+        for (numerator, denominator, expected_floor, expected_ceil, expected_fraction) in cases {
+            let value = ExactRational::parse(numerator, denominator, limit).unwrap();
+            let floor = value.checked_floor(limit).unwrap();
+            let ceil = value.checked_ceil(limit).unwrap();
+            let fractional = value.checked_fractional_part(limit).unwrap();
+            assert_eq!(floor.to_string(), format!("{expected_floor}/1"), "floor({value})");
+            assert_eq!(ceil.to_string(), format!("{expected_ceil}/1"), "ceil({value})");
+            assert_eq!(fractional.to_string(), expected_fraction, "fractional_part({value})");
+            assert!(fractional.checked_compare(&ExactRational::from_integer("0", limit).unwrap(), limit).unwrap() != std::cmp::Ordering::Less);
+            assert!(fractional.checked_compare(&ExactRational::from_integer("1", limit).unwrap(), limit).unwrap() == std::cmp::Ordering::Less);
+        }
+    }
+
+    #[test]
+    fn exact_integer_classification_and_floor_ceil_budget_are_explicit() {
+        let wide = budget(32);
+        let narrow = budget(8);
+        let integer = ExactRational::parse("-12", "3", wide).unwrap();
+        let fractional = ExactRational::parse("7", "3", wide).unwrap();
+        assert!(integer.is_integer());
+        assert!(!fractional.is_integer());
+        assert!(ExactRational::from_integer("0", wide).unwrap().is_integer());
+
+        let oversized = ExactRational::from_integer("65535", wide).unwrap();
+        assert_eq!(oversized.checked_floor(narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
+        assert_eq!(oversized.checked_ceil(narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
+        assert_eq!(oversized.checked_fractional_part(narrow).unwrap_err(), ExactRationalError::ResourceLimitExceeded);
+    }
+
+    #[test]
+    fn floor_and_ceil_obey_exact_ordering_on_a_signed_rational_grid() {
+        let limit = budget(128);
+        let zero = ExactRational::from_integer("0", limit).unwrap();
+        let one = ExactRational::from_integer("1", limit).unwrap();
+        for numerator in -15..=15 {
+            for denominator in 1..=7 {
+                let value = ExactRational::parse(&numerator.to_string(), &denominator.to_string(), limit).unwrap();
+                let floor = value.checked_floor(limit).unwrap();
+                let ceil = value.checked_ceil(limit).unwrap();
+                assert_ne!(floor.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Greater);
+                assert_ne!(ceil.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Less);
+                let floor_plus_one = floor.checked_add(&one, limit).unwrap();
+                assert_eq!(floor_plus_one.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Greater);
+                let ceil_minus_one = ceil.checked_subtract(&one, limit).unwrap();
+                assert_eq!(ceil_minus_one.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Less);
+                let _ = &zero;
+            }
+        }
     }
 
     #[test]
