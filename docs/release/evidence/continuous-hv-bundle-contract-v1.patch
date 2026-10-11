@@ -1,0 +1,299 @@
+diff --git a/crates/core/symthaea-core/src/hdc/unified_hv.rs b/crates/core/symthaea-core/src/hdc/unified_hv.rs
+--- a/crates/core/symthaea-core/src/hdc/unified_hv.rs
++++ b/crates/core/symthaea-core/src/hdc/unified_hv.rs
+@@ -329,14 +329,18 @@ impl ContinuousHV {
+         }
+ 
+         let dim = hvs[0].values.len();
++        for hv in hvs.iter().skip(1) {
++            assert_eq!(
++                hv.values.len(),
++                dim,
++                "Dimension mismatch in bundle(): expected {dim}, found {}",
++                hv.values.len()
++            );
++        }
+ 
+         #[cfg(feature = "simd")]
+         {
+-            // SIMD path requires uniform dimensions; fall through to scalar if mismatched
+-            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+-            if uniform {
+-                let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
+-                let weights = vec![1.0f32; hvs.len()];
+-                let values = crate::hdc::simd_continuous::bundle_simd(&slices, &weights);
+-                return Self { values };
+-            }
++            let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
++            let weights = vec![1.0f32; hvs.len()];
++            let values = crate::hdc::simd_continuous::bundle_simd(&slices, &weights);
++            return Self { values };
+         }
+ 
+         let inv_n = 1.0 / hvs.len() as f32;
+@@ -384,28 +388,48 @@ impl ContinuousHV {
+     /// # Performance
+     /// Uses SIMD acceleration when the `simd` feature is enabled (4x+ speedup).
+     pub fn weighted_bundle(hvs: &[&Self], weights: &[f32]) -> Self {
+-        if hvs.is_empty() || weights.is_empty() {
++        assert_eq!(
++            hvs.len(),
++            weights.len(),
++            "Number of HVs must match number of weights"
++        );
++        if hvs.is_empty() {
+             return Self::zero(HDC_DIMENSION);
+         }
+ 
+         let dim = hvs[0].values.len();
++        for hv in hvs.iter().skip(1) {
++            assert_eq!(
++                hv.values.len(),
++                dim,
++                "Dimension mismatch in weighted_bundle(): expected {dim}, found {}",
++                hv.values.len()
++            );
++        }
++        assert!(
++            weights.iter().all(|weight| weight.is_finite()),
++            "weighted_bundle() weights must be finite"
++        );
++
++        let weight_sum: f32 = weights.iter().sum();
++        assert!(
++            weight_sum.is_finite(),
++            "weighted_bundle() weight sum must be finite"
++        );
++        assert!(
++            weight_sum.abs() > 1e-10,
++            "weighted_bundle() weight sum magnitude must exceed 1e-10"
++        );
+ 
+         #[cfg(feature = "simd")]
+         {
+-            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+-            if uniform {
+-                let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
+-                let values = crate::hdc::simd_continuous::bundle_simd(&slices, weights);
+-                return Self { values };
+-            }
++            let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
++            let values = crate::hdc::simd_continuous::bundle_simd(&slices, weights);
++            return Self { values };
+         }
+ 
+-        // Scalar fallback (also used when dimensions are non-uniform)
+-        let weight_sum: f32 = weights.iter().sum();
+-
+         let values: Vec<f32> = (0..dim)
+             .map(|i| {
+                 let weighted_sum: f32 = hvs
+                     .iter()
+                     .zip(weights.iter())
+-                    .filter(|(hv, _)| i < hv.values.len())
+                     .map(|(hv, w)| hv.values[i] * w)
+                     .sum();
+                 weighted_sum / weight_sum
+@@ -774,14 +798,18 @@ impl ContinuousHV {
+         }
+ 
+         let dim = hvs[0].values.len();
++        for hv in hvs.iter().skip(1) {
++            assert_eq!(
++                hv.values.len(),
++                dim,
++                "Dimension mismatch in bundle_owned(): expected {dim}, found {}",
++                hv.values.len()
++            );
++        }
+ 
+         #[cfg(feature = "simd")]
+         {
+-            // SIMD path requires uniform dimensions; fall through to scalar if mismatched
+-            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+-            if uniform {
+-                let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
+-                let weights = vec![1.0f32; hvs.len()];
+-                let values = crate::hdc::simd_continuous::bundle_simd(&slices, &weights);
+-                return Self { values };
+-            }
++            let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
++            let weights = vec![1.0f32; hvs.len()];
++            let values = crate::hdc::simd_continuous::bundle_simd(&slices, &weights);
++            return Self { values };
+         }
+ 
+         let inv_n = 1.0 / hvs.len() as f32;
+diff --git a/crates/core/symthaea-core/src/hdc/simd_continuous.rs b/crates/core/symthaea-core/src/hdc/simd_continuous.rs
+--- a/crates/core/symthaea-core/src/hdc/simd_continuous.rs
++++ b/crates/core/symthaea-core/src/hdc/simd_continuous.rs
+@@ -461,10 +461,6 @@ fn bind_scalar(a: &[f32], b: &[f32], result: &mut [f32]) {
+ #[cfg(feature = "simd")]
+ #[inline]
+ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
+-    if hvs.is_empty() || weights.is_empty() {
+-        return Vec::new();
+-    }
+-
+     assert_eq!(
+         hvs.len(),
+         weights.len(),
+@@ -472,5 +468,9 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
+         "Number of HVs must match number of weights"
+     );
+ 
++    if hvs.is_empty() {
++        return Vec::new();
++    }
++
+     let dim = hvs[0].dim();
+     for hv in hvs.iter() {
+         assert_eq!(hv.len(), dim, "All HVs must have same dimension");
+@@ -479,7 +479,15 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
+ 
+     let weight_sum: f32 = weights.iter().sum();
+-    let inv_weight_sum = if weight_sum.abs() > 1e-10 {
+-        1.0 / weight_sum
+-    } else {
+-        0.0
+-    };
++    assert!(
++        weights.iter().all(|weight| weight.is_finite()),
++        "bundle_simd weights must be finite"
++    );
++    assert!(
++        weight_sum.is_finite(),
++        "bundle_simd weight sum must be finite"
++    );
++    assert!(
++        weight_sum.abs() > 1e-10,
++        "bundle_simd weight sum magnitude must exceed 1e-10"
++    );
++    let inv_weight_sum = 1.0 / weight_sum;
+ 
+     let mut result = vec![0.0f32; dim];
+diff --git a/crates/core/symthaea-core/tests/continuous_hv_bundle_contract.rs b/crates/core/symthaea-core/tests/continuous_hv_bundle_contract.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/core/symthaea-core/tests/continuous_hv_bundle_contract.rs
+@@ -0,0 +1,120 @@
++use std::panic::{catch_unwind, AssertUnwindSafe};
++
++use symthaea_core::hdc::ContinuousHV;
++
++fn hv(values: &[f32]) -> ContinuousHV {
++    ContinuousHV::from_vec(values.to_vec())
++}
++
++fn panics(f: impl FnOnce()) -> bool {
++    catch_unwind(AssertUnwindSafe(f)).is_err()
++}
++
++#[test]
++fn borrowed_bundle_rejects_mixed_dimensions() {
++    let a = hv(&[1.0, 2.0, 3.0]);
++    let b = hv(&[4.0, 5.0]);
++    assert!(panics(|| {
++        let _ = ContinuousHV::bundle(&[&a, &b]);
++    }));
++}
++
++#[test]
++fn owned_bundle_rejects_mixed_dimensions() {
++    let a = hv(&[1.0, 2.0, 3.0]);
++    let b = hv(&[4.0, 5.0]);
++    assert!(panics(|| {
++        let _ = ContinuousHV::bundle_owned(&[a, b]);
++    }));
++}
++
++#[test]
++fn weighted_bundle_rejects_count_mismatch_in_both_directions() {
++    let a = hv(&[1.0, 2.0]);
++    let b = hv(&[3.0, 4.0]);
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0]);
++    }));
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[&a], &[1.0, 2.0]);
++    }));
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[], &[1.0]);
++    }));
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[&a], &[]);
++    }));
++}
++
++#[test]
++fn weighted_bundle_rejects_mixed_dimensions() {
++    let a = hv(&[1.0, 2.0, 3.0]);
++    let b = hv(&[4.0, 5.0]);
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0, 1.0]);
++    }));
++}
++
++#[test]
++fn weighted_bundle_rejects_non_finite_weights() {
++    let a = hv(&[1.0, 2.0]);
++    for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
++        assert!(panics(|| {
++            let _ = ContinuousHV::weighted_bundle(&[&a], &[bad]);
++        }));
++    }
++}
++
++#[test]
++fn weighted_bundle_rejects_zero_and_near_zero_signed_sum() {
++    let a = hv(&[1.0, 2.0]);
++    let b = hv(&[3.0, 4.0]);
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0, -1.0]);
++    }));
++    assert!(panics(|| {
++        let _ = ContinuousHV::weighted_bundle(&[&a], &[1.0e-11]);
++    }));
++}
++
++#[test]
++fn weighted_bundle_retains_finite_negative_weight_support() {
++    let a = hv(&[1.0, 2.0]);
++    let b = hv(&[3.0, 4.0]);
++    let result = ContinuousHV::weighted_bundle(&[&a, &b], &[2.0, -1.0]);
++    assert_eq!(result.values, vec![-1.0, 0.0]);
++}
++
++#[test]
++fn valid_bundle_and_weighted_bundle_keep_expected_math() {
++    let a = hv(&[1.0, 3.0]);
++    let b = hv(&[3.0, 5.0]);
++    assert_eq!(ContinuousHV::bundle(&[&a, &b]).values, vec![2.0, 4.0]);
++    assert_eq!(
++        ContinuousHV::weighted_bundle(&[&a, &b], &[1.0, 3.0]).values,
++        vec![2.5, 4.5]
++    );
++}
++
++#[test]
++fn empty_weighted_bundle_contract_remains_zero_default_dimension() {
++    let result = ContinuousHV::weighted_bundle(&[], &[]);
++    assert_eq!(result.dim(), ContinuousHV::DEFAULT_DIM);
++    assert!(result.values.iter().all(|value| *value == 0.0));
++}
++
++#[cfg(feature = "simd")]
++#[test]
++fn direct_simd_bundle_rejects_undefined_normalization() {
++    use symthaea_core::hdc::simd_continuous::bundle_simd;
++
++    let a = [1.0f32, 2.0];
++    let b = [3.0f32, 4.0];
++    let refs: [&[f32]; 2] = [&a, &b];
++    assert!(panics(|| {
++        let _ = bundle_simd(&refs, &[1.0, -1.0]);
++    }));
++    assert!(panics(|| {
++        let _ = bundle_simd(&refs, &[1.0]);
++    }));
++}
