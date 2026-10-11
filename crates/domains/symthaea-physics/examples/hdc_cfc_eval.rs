@@ -747,6 +747,28 @@ fn evaluate_battery(cycles: &[BatteryCycle]) -> EvalResult {
 
 // ── Spacecraft Data Loading & Evaluation ─────────────────────────────────────
 
+fn parse_labeled_row(record: &csv::StringRecord, max_cols: usize) -> Option<(Vec<f32>, bool)> {
+    if record.len() < max_cols + 1 {
+        return None;
+    }
+
+    let mut features = Vec::with_capacity(max_cols);
+    for index in 0..max_cols {
+        let value = record.get(index)?.parse::<f32>().ok()?;
+        if !value.is_finite() {
+            return None;
+        }
+        features.push(value);
+    }
+
+    let label = match record.get(max_cols)?.parse::<u8>().ok()? {
+        0 => false,
+        1 => true,
+        _ => return None,
+    };
+    Some((features, label))
+}
+
 fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool)> {
     eprintln!("Loading {:?}...", path);
     let mut rdr = csv::ReaderBuilder::new()
@@ -755,22 +777,20 @@ fn load_csv_rows(path: &std::path::Path, max_cols: usize) -> Vec<(Vec<f32>, bool
         .expect("Failed to open CSV");
 
     let mut rows: Vec<(Vec<f32>, bool)> = Vec::new();
+    let mut skipped_rows = 0usize;
     for result in rdr.records() {
-        let record = match result {
-            Ok(r) => r,
-            Err(_) => continue,
-        };
-        if record.len() < max_cols + 1 {
-            continue;
+        match result {
+            Ok(record) => match parse_labeled_row(&record, max_cols) {
+                Some(row) => rows.push(row),
+                None => skipped_rows += 1,
+            },
+            Err(_) => skipped_rows += 1,
         }
-
-        let feats: Vec<f32> = (0..max_cols)
-            .map(|i| record[i].parse::<f32>().unwrap_or(0.0))
-            .collect();
-        let label: bool = record[max_cols].parse::<u8>().unwrap_or(0) == 1;
-        rows.push((feats, label));
     }
-    eprintln!("  Loaded {} rows", rows.len());
+    eprintln!(
+        "  Loaded {} valid rows; skipped {} malformed, non-finite, short, or invalid-label rows",
+        rows.len(), skipped_rows
+    );
     rows
 }
 
@@ -1040,6 +1060,36 @@ fn main() {
 #[cfg(test)]
 mod hdc_score_calibration_tests {
     use super::*;
+
+    #[test]
+    fn spacecraft_row_parser_rejects_malformed_nonfinite_and_invalid_labels() {
+        let mut valid = csv::StringRecord::new();
+        valid.push_field("1.25");
+        valid.push_field("-2.5");
+        valid.push_field("1");
+        assert_eq!(
+            parse_labeled_row(&valid, 2),
+            Some((vec![1.25, -2.5], true))
+        );
+
+        let mut nonfinite = csv::StringRecord::new();
+        nonfinite.push_field("NaN");
+        nonfinite.push_field("0.5");
+        nonfinite.push_field("0");
+        assert!(parse_labeled_row(&nonfinite, 2).is_none());
+
+        let mut malformed = csv::StringRecord::new();
+        malformed.push_field("not-a-number");
+        malformed.push_field("0.5");
+        malformed.push_field("0");
+        assert!(parse_labeled_row(&malformed, 2).is_none());
+
+        let mut invalid_label = csv::StringRecord::new();
+        invalid_label.push_field("1.0");
+        invalid_label.push_field("0.5");
+        invalid_label.push_field("2");
+        assert!(parse_labeled_row(&invalid_label, 2).is_none());
+    }
 
     #[test]
     fn hdc_reference_and_scale_use_disjoint_training_calibration_block() {
