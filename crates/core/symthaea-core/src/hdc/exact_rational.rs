@@ -225,7 +225,10 @@ impl ExactRational {
 
             // Reject implausible lengths before UTF-8 validation or integer parsing.
             let max_chars = budget.max_decimal_digits().saturating_add(1);
-            if encoded_length == 0 || encoded_length > max_chars {
+            if encoded_length == 0 {
+                return Err(ExactRationalError::InvalidCanonicalEncoding);
+            }
+            if encoded_length > max_chars {
                 return Err(ExactRationalError::ResourceLimitExceeded);
             }
             let length = usize::try_from(encoded_length)
@@ -258,7 +261,7 @@ impl ExactRational {
             ExactRationalError::ResourceLimitExceeded => error,
             _ => ExactRationalError::InvalidCanonicalEncoding,
         })?;
-        if value.canonical_encoding_bytes() != input {
+        if value.canonical_encoding_bytes().as_slice() != input {
             return Err(ExactRationalError::InvalidCanonicalEncoding);
         }
         Ok(value)
@@ -631,6 +634,25 @@ mod tests {
         };
         assert_eq!(
             ExactRational::from_canonical_encoding_bytes(&leading_zero, limit).unwrap_err(),
+            ExactRationalError::InvalidCanonicalEncoding
+        );
+    }
+
+    #[test]
+    fn canonical_decoder_rejects_absurd_or_truncated_component_lengths() {
+        let limit = budget(32);
+        let mut absurd = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0".to_vec();
+        absurd.extend_from_slice(&u64::MAX.to_be_bytes());
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(&absurd, limit).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
+
+        let mut truncated = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0".to_vec();
+        truncated.extend_from_slice(&3u64.to_be_bytes());
+        truncated.extend_from_slice(b"12");
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(&truncated, limit).unwrap_err(),
             ExactRationalError::InvalidCanonicalEncoding
         );
     }
