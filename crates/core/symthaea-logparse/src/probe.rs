@@ -397,15 +397,10 @@ mod tests {
         let (tx, ty, vx, vy) =
             grouped_stratified_split(&hvs, &labels, &groups, 0.5, 7).expect("valid grouped split");
 
-        let mut train_groups = std::collections::BTreeSet::new();
-        let mut test_groups = std::collections::BTreeSet::new();
-        for (hv, group) in tx.iter().zip(groups.iter().filter(|g| train_groups.insert((*g).clone()))) {
-            let _ = (hv, group);
-        }
         // Reconstruct group membership from unique sample values; every pair in a
         // group has adjacent IDs and must remain on the same side.
-        let train_values: std::collections::BTreeSet<i32> = tx.iter().map(|x| x[0]).collect();
-        let test_values: std::collections::BTreeSet<i32> = vx.iter().map(|x| x[0]).collect();
+        let train_values: std::collections::BTreeSet<i8> = tx.iter().map(|x| x[0]).collect();
+        let test_values: std::collections::BTreeSet<i8> = vx.iter().map(|x| x[0]).collect();
         for (left, right) in [(1, 2), (3, 4), (5, 6), (7, 8)] {
             assert!(
                 (train_values.contains(&left) && train_values.contains(&right))
@@ -416,7 +411,6 @@ mod tests {
         assert!(train_values.is_disjoint(&test_values));
         assert!(["a", "b"].iter().all(|l| ty.iter().any(|y| y == l)));
         assert!(["a", "b"].iter().all(|l| vy.iter().any(|y| y == l)));
-        let _ = (train_groups, test_groups);
     }
 
     #[test]
