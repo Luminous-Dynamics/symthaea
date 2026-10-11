@@ -788,12 +788,24 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
     let mut encoder = HdcEncoder::new(n_features, 0x5C_0001);
     encoder.fit(&train_refs);
 
-    // Group training data into windows
+    // Group training data into windows, retaining their labels so labelled anomalies do
+    // not contaminate the healthy reference or the HDC score calibration.
     eprintln!("  Grouping into windows of {}...", SPACECRAFT_WINDOW);
-    let train_windows: Vec<Vec<&[f32]>> = train_rows
+    let total_train_windows = train_rows.chunks(SPACECRAFT_WINDOW).len();
+    let normal_train_window_count = train_rows
         .chunks(SPACECRAFT_WINDOW)
-        .map(|chunk| chunk.iter().map(|(f, _)| f.as_slice()).collect())
+        .filter(|chunk| !chunk.iter().any(|(_, is_anomaly)| *is_anomaly))
+        .count();
+    let ref_windows: Vec<Vec<&[f32]>> = train_rows
+        .chunks(SPACECRAFT_WINDOW)
+        .filter(|chunk| !chunk.iter().any(|(_, is_anomaly)| *is_anomaly))
+        .take(200)
+        .map(|chunk| chunk.iter().map(|(features, _)| features.as_slice()).collect())
         .collect();
+    eprintln!(
+        "  Using {} normal-labelled training windows for reference/calibration ({} normal windows, {} total)",
+        ref_windows.len(), normal_train_window_count, total_train_windows
+    );
 
     // Build healthy reference (subset for speed)
     let mut healthy_hdc: Vec<ContinuousHV> = Vec::new();
@@ -801,8 +813,7 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
     let mut healthy_cfc_hybrid: Vec<ContinuousHV> = Vec::new();
     let mut healthy_surprise: Vec<f64> = Vec::new();
 
-    let ref_windows = &train_windows[..train_windows.len().min(200)];
-    for window in ref_windows {
+    for window in &ref_windows {
         healthy_hdc.push(encoder.encode_cycle_hdc_only(window));
         let (cp, ch) = encoder.encode_cycle_cfc(window);
         healthy_cfc_pure.push(cp);
