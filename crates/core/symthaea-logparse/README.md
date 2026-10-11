@@ -38,7 +38,7 @@ product work.
 | `src/syslog_source.rs` | RFC5424/RFC3164 syslog parsing (via `syslog-loose`) |
 | `src/encoder.rs` | HDC encoder (6 role-filler bindings → 16,384D bipolar HV) |
 | `DOMAIN_INVARIANT_ABLATION.md` | Cross-corpus metadata ablation protocol; exploratory, not production |
-| `src/scenario.rs` | One HDC bundle per source capture/scenario, with fail-closed label/group checks |
+| `src/scenario.rs` | Typed orderless and relative-record-position scenario vectors; fail-closed label/group checks |
 | `SCENARIO_LEVEL_EVALUATION.md` | Scenario-level evaluation protocol and limitations |
 | `src/cluster.rs` | Cluster purity metric + nearest-centroid baseline |
 | `examples/cluster_evtx.rs` | Phase 1 benchmark runner |
