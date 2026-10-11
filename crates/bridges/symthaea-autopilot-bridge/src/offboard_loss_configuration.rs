@@ -154,9 +154,10 @@ impl Px4MavlinkParameterValueV1 {
         {
             return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
         }
-        let mut expected_id_bytes = [0_u8; 16];
-        expected_id_bytes[..self.param_id.len()].copy_from_slice(self.param_id.as_bytes());
-        if self.param_id_bytes != expected_id_bytes {
+        let id_len = self.param_id.len();
+        if self.param_id_bytes[..id_len] != *self.param_id.as_bytes()
+            || self.param_id_bytes.get(id_len) != Some(&0)
+        {
             return Err(Px4OffboardLossConfigurationError::InvalidWireParameterId);
         }
         Ok(())
@@ -1106,6 +1107,20 @@ mod tests {
                 capture_skew_ns: 201,
                 max_capture_skew_ns: 200,
             }
+        );
+    }
+
+    #[test]
+    fn wire_parameter_id_checks_terminator_but_preserves_tail_bytes() {
+        let value = Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(1.0_f32.to_bits());
+        let mut wire = wire_for(value);
+        wire.param_id_bytes[15] = 0x7f;
+        assert_eq!(wire.validate_for(value), Ok(()));
+
+        wire.param_id_bytes[wire.param_id.len()] = b'X';
+        assert_eq!(
+            wire.validate_for(value),
+            Err(Px4OffboardLossConfigurationError::InvalidWireParameterId)
         );
     }
 
