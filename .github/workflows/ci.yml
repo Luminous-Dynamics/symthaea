@@ -99,7 +99,7 @@ jobs:
           import sys
 
           report = json.load(open(sys.argv[1], encoding="utf-8"))
-          expected = 82
+          expected = 84
           assert report.get("checks_passed") == expected, report
           assert report.get("checks_failed") == 0, report
           checks = report.get("checks")
