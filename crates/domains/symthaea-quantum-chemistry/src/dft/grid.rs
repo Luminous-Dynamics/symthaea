@@ -5,7 +5,7 @@
 //!
 //! Uses atom-centered grids with:
 //! - Radial: Gauss-Chebyshev (Becke 1988) mapping [0,∞) → [-1,1]
-//! - Angular: Lebedev quadrature (6, 14, 26, or 50 point grids)
+//! - Angular: normalized Lebedev quadrature (6, 26, 50, or 302 points)
 //! - Partitioning: Becke's fuzzy cell scheme (1988)
 //!
 //! References:
@@ -649,6 +649,13 @@ mod tests {
             (weight_sum - 1.0).abs() < 1e-12,
             "normalized Lebedev-302 weights sum to {weight_sum}"
         );
+        for (index, point) in pts.iter().enumerate() {
+            assert!(
+                point.3.is_finite() && point.3 > 0.0,
+                "Lebedev-302 point {index} has invalid weight {}",
+                point.3
+            );
+        }
 
         // Exhaust every even monomial through total degree 28 (680 analytic
         // moments). The published rule is degree-29 exact; all odd moments
