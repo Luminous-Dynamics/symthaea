@@ -93,4 +93,4 @@ jobs:
           fi
 
       - name: Run checked DFT, grid, and fail-closed regression tests
-        run: cargo test --locked -p symthaea-quantum-chemistry --lib dft::
+        run: cargo test --locked -p symthaea-quantum-chemistry --lib 'dft::'
