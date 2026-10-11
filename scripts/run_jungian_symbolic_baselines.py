@@ -538,7 +538,7 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_re
         "schema", "corpus_id", "corpus_version", "corpus_status", "corpus_split",
         "corpus_blake3", "source_revision", "glyph_source_blob", "glyph_registry_source_blob",
         "dimension", "registry_size", "encoder_profile", "basis_profile", "registry_profile",
-        "retrieval", "claim_ceiling", "cases",
+        "retrieval", "claim_ceiling", "pairwise_input_similarity_profile", "pairwise_input_similarity", "cases",
     }
     require(isinstance(projection, dict) and set(projection) == top_keys, "Glyph projection top-level schema mismatch")
     require(projection["schema"] == "symthaea-jungian-glyph-projection-v1", "Glyph projection schema mismatch")
@@ -550,6 +550,10 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_re
         require(isinstance(projection[field], str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", projection[field]) is not None, f"Glyph projection {field} malformed")
     require(projection["dimension"] == 16384, "Glyph projection must use 16,384 dimensions for this profile")
     require(projection["registry_size"] == 70, "Glyph projection registry size mismatch")
+    require(
+        projection["pairwise_input_similarity_profile"] == "Cosine between whole-text TextHdcEncoder outputs; reflects this committed lexical/morphological/positional encoding only, not semantic truth.",
+        "Glyph projection pairwise similarity profile mismatch",
+    )
     require(projection["encoder_profile"] == {
         "type": "TextHdcEncoder",
         "ngram_size": 3,
@@ -587,8 +591,71 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_re
         require(all(isinstance(gid, str) and gid for gid in glyph_ids) and len(set(glyph_ids)) == 5, f"{case_id}: duplicate/missing glyph ID")
         by_id[case_id] = row
     require(set(by_id) == expected_ids, "Glyph projection case set incomplete")
+
+    pair_rows = projection["pairwise_input_similarity"]
+    expected_case_order = [case["id"] for case in corpus["cases"]]
+    expected_pairs = [
+        (expected_case_order[left], expected_case_order[right])
+        for left in range(len(expected_case_order))
+        for right in range(left + 1, len(expected_case_order))
+    ]
+    require(isinstance(pair_rows, list) and len(pair_rows) == len(expected_pairs), "Glyph projection pairwise matrix must contain every unordered case pair")
+    seen_pairs: list[tuple[str, str]] = []
+    for row, expected_pair in zip(pair_rows, expected_pairs, strict=True):
+        require(isinstance(row, dict) and set(row) == {"left_case_id", "right_case_id", "cosine_similarity"}, "Glyph projection pairwise row schema mismatch")
+        pair = (row["left_case_id"], row["right_case_id"])
+        require(pair == expected_pair, "Glyph projection pairwise rows are not in canonical corpus order")
+        similarity = row["cosine_similarity"]
+        require(isinstance(similarity, (int, float)) and not isinstance(similarity, bool) and math.isfinite(similarity) and -1 <= similarity <= 1, f"invalid pairwise input similarity: {pair}")
+        seen_pairs.append(pair)
+    require(len(seen_pairs) == len(set(seen_pairs)), "duplicate pairwise similarity row")
     return by_id
 
+
+
+
+def context_pair_diagnostics(
+    corpus: dict[str, Any],
+    projection_by_id: dict[str, dict[str, Any]],
+    projection: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Report exploratory context-pair geometry; deliberately has no pass threshold."""
+    input_similarity = {
+        (row["left_case_id"], row["right_case_id"]): row["cosine_similarity"]
+        for row in projection["pairwise_input_similarity"]
+    }
+    pairs = [
+        ("JSP-001", "JSP-002", "key object in two different access contexts"),
+        ("JSP-003", "JSP-014", "the word shadow in tree-shade versus theatre-lighting contexts"),
+    ]
+    rows = []
+    for left_id, right_id, rationale in pairs:
+        left = projection_by_id[left_id]
+        right = projection_by_id[right_id]
+        left_vector = [item["cosine_similarity"] for item in left["modality_scores"]]
+        right_vector = [item["cosine_similarity"] for item in right["modality_scores"]]
+        dot = sum(a * b for a, b in zip(left_vector, right_vector, strict=True))
+        norm_left = math.sqrt(sum(a * a for a in left_vector))
+        norm_right = math.sqrt(sum(b * b for b in right_vector))
+        projected_cosine = dot / (norm_left * norm_right) if norm_left and norm_right else None
+        projected_distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(left_vector, right_vector, strict=True)))
+        left_glyphs = [item["glyph_id"] for item in left["top_glyphs"]]
+        right_glyphs = [item["glyph_id"] for item in right["top_glyphs"]]
+        union = set(left_glyphs) | set(right_glyphs)
+        intersection = set(left_glyphs) & set(right_glyphs)
+        rows.append({
+            "left_case_id": left_id,
+            "right_case_id": right_id,
+            "pair_rationale": rationale,
+            "whole_text_hdc_cosine": input_similarity[(left_id, right_id)],
+            "modality_projection_cosine": projected_cosine,
+            "modality_projection_l2_distance": projected_distance,
+            "top1_glyph_equal": left_glyphs[0] == right_glyphs[0],
+            "top5_glyph_overlap": sorted(intersection),
+            "top5_glyph_jaccard": len(intersection) / len(union) if union else 1.0,
+            "claim_ceiling": "Exploratory representation geometry only; no expected direction, pass threshold, semantic correctness, or psychological interpretation claim.",
+        })
+    return rows
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -653,6 +720,10 @@ def main() -> int:
             "claim_ceiling": "Rule output and rubric agreement only; HDC output is representation-level retrieval only. No psychological truth, archetype validity, clinical efficacy, or consciousness claim.",
             "metric_warning": "Required/forbidden behavior labels are hand-authored development rubrics. Scores are not blinded human evaluation, scientific accuracy, model generalization, or holdout performance.",
             "glyph_projection_artifact": glyph_projection_meta,
+            "context_pair_diagnostics": (
+                context_pair_diagnostics(corpus, glyph_projection_by_id, projection)
+                if glyph_projection_by_id is not None else None
+            ),
             "methods": [],
             "cases": [],
         }
