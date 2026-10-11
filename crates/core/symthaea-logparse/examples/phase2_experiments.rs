@@ -25,7 +25,8 @@ use symthaea_logparse::encoder::{
     DOMAIN_INVARIANT_ENCODER_VERSION, Hdv, encode, encode_domain_invariant,
 };
 use symthaea_logparse::probe::{
-    classification_report, ClassificationReport, LogisticProbe, TrainConfig,
+    classification_report, selective_accuracy_curve, ClassificationReport, LogisticProbe,
+    TrainConfig,
 };
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
@@ -130,10 +131,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // a confusion matrix. OTRF is not a benign baseline, so this is not an
     // operational benign false-positive rate.
     println!("\n=== Raw-encoder OOD classification report ===");
-    let raw_ood_predictions = scale_up_probe.predict_batch(&otrf_hvs);
+    let raw_ood_details: Vec<(usize, f32)> = otrf_hvs
+        .iter()
+        .map(|hv| scale_up_probe.predict_with_margin(hv))
+        .collect();
+    let raw_ood_predictions: Vec<usize> =
+        raw_ood_details.iter().map(|(class, _)| *class).collect();
+    let raw_ood_margins: Vec<f32> = raw_ood_details.iter().map(|(_, margin)| *margin).collect();
     let raw_ood_report =
         classification_report(&otrf_labels, &raw_ood_predictions, &scale_up_probe.class_names)?;
     print_classification_report("raw encoder OOD", &raw_ood_report);
+    print_selective_curve(
+        "raw encoder OOD",
+        &otrf_labels,
+        &raw_ood_predictions,
+        &raw_ood_margins,
+        &scale_up_probe.class_names,
+    )?;
 
     // ----------------------------------------------------------------
     // Summary
@@ -159,7 +173,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
         let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
         let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
-        let di_ood_predictions = di_probe.predict_batch(&otrf_di_hvs);
+        let di_ood_details: Vec<(usize, f32)> = otrf_di_hvs
+            .iter()
+            .map(|hv| di_probe.predict_with_margin(hv))
+            .collect();
+        let di_ood_predictions: Vec<usize> =
+            di_ood_details.iter().map(|(class, _)| *class).collect();
+        let di_ood_margins: Vec<f32> = di_ood_details.iter().map(|(_, margin)| *margin).collect();
         let di_ood_report =
             classification_report(&otrf_labels, &di_ood_predictions, &di_probe.class_names)?;
 
@@ -172,6 +192,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  baseline raw OOD macro F1:              {:.3}", raw_ood_report.macro_f1);
         println!("  ablation OOD macro F1:                  {:.3}", di_ood_report.macro_f1);
         print_classification_report("domain-invariant OOD", &di_ood_report);
+        print_selective_curve(
+            "domain-invariant OOD",
+            &otrf_labels,
+            &di_ood_predictions,
+            &di_ood_margins,
+            &di_probe.class_names,
+        )?;
         println!(
             "{}",
             concat!(
@@ -181,6 +208,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    Ok(())
+}
+
+fn print_selective_curve(
+    name: &str,
+    labels: &[String],
+    predictions: &[usize],
+    margins: &[f32],
+    class_names: &[String],
+) -> Result<(), String> {
+    let points = selective_accuracy_curve(
+        labels,
+        predictions,
+        margins,
+        class_names,
+        &[0.50, 0.75, 0.90, 1.00],
+    )?;
+    println!("  {name} uncalibrated margin-ranked selective evaluation:");
+    println!(
+        "  {:>9} {:>9} {:>10} {:>11} {:>17}",
+        "target", "coverage", "accepted", "accuracy", "macro recall"
+    );
+    for point in points {
+        println!(
+            "  {:>8.0}% {:>8.0}% {:>10} {:>11.3} {:>17.3}",
+            point.target_coverage * 100.0,
+            point.actual_coverage * 100.0,
+            point.accepted_samples,
+            point.accepted_accuracy,
+            point.accepted_macro_recall
+        );
+    }
+    println!(
+        "  Margin ranking is not calibrated confidence; this curve does not select a deployment threshold."
+    );
     Ok(())
 }
 
