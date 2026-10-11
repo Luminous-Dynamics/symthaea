@@ -51,13 +51,13 @@ Use these equations only for the stated circular-orbit model. A stationary suppo
 
 Using mu = 3.986004418e14 m^3/s^2 and an equatorial reference radius of 6,378.137 km gives this independently evaluated *two-body circular-orbit* sanity table:
 
-| Altitude h (km) | Radius r (km) | Circumference (km) | Circular speed (km/s) | Period (min) | Orbital kinetic energy per kg (MJ/kg) |
+| Altitude h (km) | Radius r (km) | Circumference (km) | Circular speed (km/s) | Period (min) | Kinetic energy per kg (MJ/kg) | Specific mechanical energy per kg (MJ/kg) |
 |---:|---:|---:|---:|---:|---:|
-| 200 | 6,578.137 | 41,331.65 | 7.78426 | 88.494 | 30.297 |
-| 300 | 6,678.137 | 41,959.97 | 7.72576 | 90.520 | 29.844 |
-| 400 | 6,778.137 | 42,588.29 | 7.66856 | 92.560 | 29.403 |
-| 500 | 6,878.137 | 43,216.61 | 7.61261 | 94.616 | 28.976 |
-| 600 | 6,978.137 | 43,844.93 | 7.55787 | 96.687 | 28.561 |
+| 200 | 6,578.137 | 41,331.65 | 7.78426 | 88.494 | 30.297 | -30.297 |
+| 300 | 6,678.137 | 41,959.97 | 7.72576 | 90.520 | 29.844 | -29.844 |
+| 400 | 6,778.137 | 42,588.29 | 7.66856 | 92.560 | 29.403 | -29.403 |
+| 500 | 6,878.137 | 43,216.61 | 7.61261 | 94.616 | 28.976 | -28.976 |
+| 600 | 6,978.137 | 43,844.93 | 7.55787 | 96.687 | 28.561 | -28.561 |
 
 These numbers are reference fixtures for formula/unit tests only. They omit atmosphere, oblateness, lunar/solar perturbations, inclination, attitude, and all ring-support physics; they are **not** a claim that any listed altitude is suitable for a long-lived infrastructure ring. The table's kinetic-energy column is the ideal orbital specific kinetic energy, not the rotor's energy and not the energy required to build, deploy, or support a ring.
 
@@ -290,4 +290,4 @@ A dedicated draft-safe Python workflow now lives at `.github/workflows/orbital-r
 
 Structural/schema errors now also force the expected gate state to `Blocked`, rather than allowing a malformed complete-looking manifest to report `ReadyForIndependentReview`. The expanded contract has 84 expected tests; the current source remains unexecuted pending the draft-safe workflow.
 
-The 300 km and 600 km heights are explicitly listed by Birch as representative ORS heights on printed p. 476. The new 600 km two-body fixture is a reference comparator, not a claim that the real ring path is circular or that either altitude is a feasible design. The v2 checker uses NGA WGS 84 constants and its output is verified by the isolated workflow against 56 unique checks; until that job passes on the exact source blob, the count remains expected, not evidence of execution.
+The 300 km and 600 km heights are explicitly listed by Birch as representative ORS heights on printed p. 476. The new 600 km two-body fixture is a reference comparator, not a claim that the real ring path is circular or that either altitude is a feasible design. The v3 checker reports kinetic and total specific orbital mechanical energy and independently checks \(\epsilon=e_k-\mu/r=-\mu/(2r)\). It uses NGA WGS 84 constants and the isolated workflow is configured to require 66 unique checks; until that job passes on the exact source blob, the count remains expected, not evidence of execution.
