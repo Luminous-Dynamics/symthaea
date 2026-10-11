@@ -116,9 +116,12 @@ pub fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
     grad
 }
 
+/// Relative floor on squared gradient magnitude used by the informative-fraction metric.
+/// A value of 0.01 means 10% of peak gradient amplitude.
+pub const GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR: f64 = 0.01;
+
 /// Fraction of `trajectory` samples where the squared gradient magnitude of
 /// `expr` reaches a fraction of the trajectory's peak squared gradient magnitude.
-/// The current 0.01 floor therefore means 10% of peak gradient amplitude.
 ///
 /// [`lie_derivative_variance`] normalizes by the *mean* squared gradient,
 /// which a degenerate high-power monomial of a single variable can game: if
@@ -133,10 +136,6 @@ pub fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
 /// so callers can gate on it, without changing `lie_derivative_variance`
 /// itself (which stays the exact scoring function used during GP
 /// evolution — this is a separate, additive acceptance check).
-/// Relative floor on squared gradient magnitude used by the informative-fraction metric.
-/// A value of 0.01 means 10% of peak gradient amplitude.
-pub const GRADIENT_INFORMATIVENESS_RELATIVE_SQUARED_FLOOR: f64 = 0.01;
-
 pub fn gradient_informativeness_fraction(
     expr: &Expr,
     trajectory: &[Vec<f64>],
