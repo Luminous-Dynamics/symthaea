@@ -18,10 +18,11 @@ The 600 km idealized comparison uses the same declared point-mass reference cons
 | Circular speed | 7.725760 km/s | 7.557865 km/s |
 | Period | 90.519619 min | 96.687196 min |
 | Specific kinetic energy | 29.843686 MJ/kg | 28.560663 MJ/kg |
+| Specific mechanical energy | −29.843686 MJ/kg | −28.560663 MJ/kg |
 
-These values come from the idealized relations \(r=R_E+h\), \(C=2\pi r\), \(v=\sqrt{\mu/r}\), \(T=2\pi\sqrt{r^3/\mu}\), and \(e_k=v^2/2\). They are reference calculations, **not values transcribed from Birch’s tables**. The model omits Earth oblateness, rotation, drag, third bodies, and all ring/support/rider dynamics.
+The mechanical-energy column includes both kinetic and gravitational potential terms; it is not a system-wide stored-energy estimate for an orbital ring. These values come from the idealized relations \(r=R_E+h\), \(C=2\pi r\), \(v=\sqrt{\mu/r}\), \(T=2\pi\sqrt{r^3/\mu}\), and \(e_k=v^2/2\). They are reference calculations, **not values transcribed from Birch’s tables**. The model omits Earth oblateness, rotation, drag, third bodies, and all ring/support/rider dynamics.
 
-The reference checker now includes a 600 km fixture with source metadata and a source-bound regression. It is schema v2 with **56 expected checks**, compared with 47 on the prior checked source. The new source has not yet been runtime-verified; the isolated workflow is configured to run it twice, require byte-identical output, and archive the raw result and source fingerprints. Do not cite the expected count as a pass.
+The reference checker now includes a 600 km fixture with source metadata and a source-bound regression. Schema v3 also reports and cross-checks specific orbital mechanical energy \(\epsilon = e_k-\mu/r=-\mu/(2r)\) for circular two-body motion. It has **66 expected checks**, compared with 47 on the prior checked source. The new source has not yet been runtime-verified; the isolated workflow is configured to run it twice, require byte-identical output, and archive the raw result and source fingerprints. Do not cite the expected count as a pass.
 
 ## Relationship to Table 8
 
