@@ -20,6 +20,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
+const CAPABILITY_RECEIPT_VERIFIER_IDENTITY: &str = "symthaea-capability-receipt-verifier";
+const CAPABILITY_RECEIPT_VERIFIER_REVISION: &str = "capability-receipt-v1";
+
 /// Exact software/evaluation subject to which all forecasts and outcomes are bound.
 ///
 /// Digest fields are supplied by the build/evaluation authority, not derived by this type.
@@ -136,6 +139,7 @@ pub struct CapabilityForecast {
 }
 
 /// Untrusted outcome receipt payload. Digest shape and evaluator labels are data, not proof.
+/// receipt_sha256 is the SHA-256 of the exact evidence payload bytes supplied for verification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CapabilityOutcomeReceipt {
     pub forecast_id: String,
@@ -149,6 +153,15 @@ pub struct CapabilityOutcomeReceipt {
     pub actual_compute_units: Option<f64>,
 }
 
+/// Signed receipt envelope. The signing key is deliberately not embedded: verification uses the
+/// evaluator public key frozen in QualificationPolicy.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SignedCapabilityOutcomeReceipt {
+    pub receipt: CapabilityOutcomeReceipt,
+    /// Hex-encoded Ed25519 signature over the versioned canonical receipt payload.
+    pub signature_hex: String,
+}
+
 /// Opaque qualification-admission token. It intentionally has private fields and no serde
 /// implementation, so callers cannot create one by supplying a digest or deserializing a claim.
 /// Only this module and its descendants (the future independent verifier and unit tests) can
@@ -157,6 +170,7 @@ pub struct CapabilityOutcomeReceipt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedCapabilityOutcomeReceipt {
     receipt: CapabilityOutcomeReceipt,
+    evaluator_public_key_hex: String,
     verifier_identity: String,
     verifier_revision: String,
     verification_root_sha256: String,
@@ -165,17 +179,20 @@ pub struct VerifiedCapabilityOutcomeReceipt {
 impl VerifiedCapabilityOutcomeReceipt {
     fn from_verified_pipeline(
         receipt: CapabilityOutcomeReceipt,
+        evaluator_public_key_hex: impl Into<String>,
         verifier_identity: impl Into<String>,
         verifier_revision: impl Into<String>,
         verification_root_sha256: impl Into<String>,
     ) -> Result<Self, CapabilityLedgerError> {
         let verified = Self {
             receipt,
+            evaluator_public_key_hex: evaluator_public_key_hex.into(),
             verifier_identity: verifier_identity.into(),
             verifier_revision: verifier_revision.into(),
             verification_root_sha256: verification_root_sha256.into(),
         };
-        if !non_empty(&verified.verifier_identity)
+        if !is_hex_digest(&verified.evaluator_public_key_hex, &[64])
+            || !non_empty(&verified.verifier_identity)
             || !non_empty(&verified.verifier_revision)
             || !is_hex_digest(&verified.verification_root_sha256, &[64])
         {
@@ -212,6 +229,8 @@ pub struct QualificationPolicy {
     pub maximum_expected_calibration_error: f64,
     pub trusted_evaluator_identity: String,
     pub trusted_evaluator_revisions: Vec<String>,
+    /// Hex-encoded Ed25519 public key pinned by the trusted evaluation layer.
+    pub trusted_evaluator_public_key_hex: String,
     /// Exact independent receipt-verifier identity/revision accepted for qualification.
     pub trusted_verifier_identity: String,
     pub trusted_verifier_revisions: Vec<String>,
@@ -228,6 +247,7 @@ impl QualificationPolicy {
             || !non_empty(&self.trusted_evaluator_identity)
             || self.trusted_evaluator_revisions.is_empty()
             || self.trusted_evaluator_revisions.iter().any(|r| !non_empty(r))
+            || !is_hex_digest(&self.trusted_evaluator_public_key_hex, &[64])
             || !non_empty(&self.trusted_verifier_identity)
             || self.trusted_verifier_revisions.is_empty()
             || self.trusted_verifier_revisions.iter().any(|r| !non_empty(r))
@@ -244,6 +264,9 @@ impl QualificationPolicy {
                 .trusted_evaluator_revisions
                 .iter()
                 .any(|revision| revision == &receipt.evaluator_revision)
+            && verified.evaluator_public_key_hex.eq_ignore_ascii_case(
+                &self.trusted_evaluator_public_key_hex,
+            )
             && verified.verifier_identity == self.trusted_verifier_identity
             && self
                 .trusted_verifier_revisions
@@ -269,6 +292,8 @@ pub enum CapabilityLedgerError {
     SequenceNotMonotonic,
     SplitMismatch,
     InvalidOutcomeReceipt,
+    InvalidReceiptSignature,
+    EvidenceRootMismatch,
     InvalidVerificationProvenance,
     ReceiptReplay,
     InvalidQualificationPolicy,
@@ -517,6 +542,26 @@ impl CapabilityLedger {
         Ok(())
     }
 
+    /// Verify and admit a runner-signed receipt under this ledger's frozen qualification policy.
+    ///
+    /// Available only with the existing `identity` feature. The verifier checks the policy-pinned
+    /// Ed25519 key, the versioned receipt signature, and SHA-256 of the exact evidence bytes before
+    /// handing an opaque token to the ledger state machine. This authenticates the signed claim and
+    /// bytes, but does not independently prove that the evaluator's runner produced truthful data.
+    #[cfg(feature = "identity")]
+    pub fn verify_and_resolve_signed_receipt(
+        &mut self,
+        signed: SignedCapabilityOutcomeReceipt,
+        evidence_payload: &[u8],
+    ) -> Result<(), CapabilityLedgerError> {
+        let verified = receipt_verifier::verify_and_issue(
+            &signed,
+            evidence_payload,
+            &self.qualification_policy,
+        )?;
+        self.resolve_verified_forecast(verified)
+    }
+
     /// Return descriptive metrics for all resolved evidence attached to a claim.
     ///
     /// Qualification decisions use a stricter, policy-filtered subset via qualification_metrics.
@@ -593,6 +638,83 @@ impl CapabilityLedger {
             .ok_or(CapabilityLedgerError::UnknownClaim)?
             .lifecycle = CapabilityLifecycle::Qualified;
         Ok(metrics)
+    }
+}
+
+#[cfg(feature = "identity")]
+mod receipt_verifier {
+    use super::*;
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use sha2::{Digest, Sha256};
+
+    /// Domain-separated canonical bytes for the versioned signed receipt contract. The payload
+    /// is a field-ordered struct without maps; incompatible schema changes must bump this version.
+    pub(super) fn canonical_payload(
+        receipt: &CapabilityOutcomeReceipt,
+    ) -> Result<Vec<u8>, CapabilityLedgerError> {
+        let encoded = serde_json::to_vec(receipt)
+            .map_err(|_| CapabilityLedgerError::InvalidOutcomeReceipt)?;
+        let mut payload = Vec::with_capacity(40 + encoded.len());
+        payload.extend_from_slice(b"MAGI_CAPABILITY_OUTCOME_RECEIPT_V1\0");
+        payload.extend_from_slice(&(encoded.len() as u64).to_be_bytes());
+        payload.extend_from_slice(&encoded);
+        Ok(payload)
+    }
+
+    pub(super) fn verify_and_issue(
+        signed: &SignedCapabilityOutcomeReceipt,
+        evidence_payload: &[u8],
+        policy: &QualificationPolicy,
+    ) -> Result<VerifiedCapabilityOutcomeReceipt, CapabilityLedgerError> {
+        policy.validate()?;
+        if signed.receipt.evaluator_identity != policy.trusted_evaluator_identity
+            || !policy.trusted_evaluator_revisions
+                .iter()
+                .any(|revision| revision == &signed.receipt.evaluator_revision)
+        {
+            return Err(CapabilityLedgerError::InvalidOutcomeReceipt);
+        }
+
+        let public_key_bytes = hex::decode(&policy.trusted_evaluator_public_key_hex)
+            .map_err(|_| CapabilityLedgerError::InvalidQualificationPolicy)?;
+        let public_key_array: [u8; 32] = public_key_bytes
+            .try_into()
+            .map_err(|_| CapabilityLedgerError::InvalidQualificationPolicy)?;
+        let public_key = VerifyingKey::from_bytes(&public_key_array)
+            .map_err(|_| CapabilityLedgerError::InvalidQualificationPolicy)?;
+        let signature_bytes = hex::decode(&signed.signature_hex)
+            .map_err(|_| CapabilityLedgerError::InvalidReceiptSignature)?;
+        let signature = Signature::from_slice(&signature_bytes)
+            .map_err(|_| CapabilityLedgerError::InvalidReceiptSignature)?;
+
+        let evidence_root = Sha256::digest(evidence_payload);
+        if signed.receipt.receipt_sha256 != hex::encode(evidence_root) {
+            return Err(CapabilityLedgerError::EvidenceRootMismatch);
+        }
+
+        let payload = canonical_payload(&signed.receipt)?;
+        public_key
+            .verify(&payload, &signature)
+            .map_err(|_| CapabilityLedgerError::InvalidReceiptSignature)?;
+
+        // Bind the verifier receipt to the exact canonical bytes, signature, evidence root, and
+        // policy-pinned evaluator key. Reusing either root for another outcome is rejected.
+        let mut root = Sha256::new();
+        root.update(b"MAGI_CAPABILITY_VERIFICATION_ROOT_V1\0");
+        root.update((payload.len() as u64).to_be_bytes());
+        root.update(&payload);
+        root.update(signature.to_bytes());
+        root.update(evidence_root);
+        root.update(public_key.as_bytes());
+        let verification_root = hex::encode(root.finalize());
+
+        VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
+            signed.receipt.clone(),
+            hex::encode(public_key.as_bytes()),
+            CAPABILITY_RECEIPT_VERIFIER_IDENTITY,
+            CAPABILITY_RECEIPT_VERIFIER_REVISION,
+            verification_root,
+        )
     }
 }
 
@@ -765,8 +887,9 @@ mod tests {
             maximum_expected_calibration_error: 0.15,
             trusted_evaluator_identity: "independent-qualification-runner".to_string(),
             trusted_evaluator_revisions: vec!["v1".to_string()],
-            trusted_verifier_identity: "symthaea-evidence-verifier".to_string(),
-            trusted_verifier_revisions: vec!["v1".to_string()],
+            trusted_evaluator_public_key_hex: "a".repeat(64),
+            trusted_verifier_identity: CAPABILITY_RECEIPT_VERIFIER_IDENTITY.to_string(),
+            trusted_verifier_revisions: vec![CAPABILITY_RECEIPT_VERIFIER_REVISION.to_string()],
         }
     }
 
@@ -792,6 +915,7 @@ mod tests {
         let verification_root = format!("{:064x}", receipt.sequence);
         VerifiedCapabilityOutcomeReceipt::from_verified_pipeline(
             receipt,
+            "a".repeat(64),
             verifier_identity,
             verifier_revision,
             verification_root,
