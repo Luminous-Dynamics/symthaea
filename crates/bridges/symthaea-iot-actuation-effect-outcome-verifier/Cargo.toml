@@ -16,6 +16,7 @@ blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 symthaea-authority = { path = "../../core/symthaea-authority" }
 symthaea-iot-actuation-effect-reconciliation-challenge = { path = "../symthaea-iot-actuation-effect-reconciliation-challenge" }
+symthaea-iot-effect-outcome-policy-bound-protocol = { path = "../symthaea-iot-effect-outcome-policy-bound-protocol" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
