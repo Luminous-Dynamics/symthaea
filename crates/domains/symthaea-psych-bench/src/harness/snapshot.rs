@@ -309,8 +309,9 @@ impl RegressionReport {
                     if let Some(current_val) = current_metrics.get(metric_name) {
                         // Percentage changes are undefined/unreliable for near-zero baselines.
                         // The strict comparison API rejects these before reaching
-                        // this exploratory comparator; keep this legacy path from
-                        // dividing by zero and leave its result visibly non-comparable.
+                        // this exploratory comparator. This legacy path avoids
+                        // division by zero; format_summary() explicitly marks such
+                        // reports as not qualified.
                         if baseline_val.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON {
                             results.push(RegressionResult {
                                 benchmark: bench_name.clone(),
@@ -504,6 +505,14 @@ impl RegressionReport {
             // This message also protects the legacy exploratory API from
             // presenting zero observed comparisons as an all-pass result.
             out.push_str("No comparable metrics; this report is not a qualified comparison.\n");
+        } else if self
+            .results
+            .iter()
+            .any(|result| result.baseline_mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON)
+        {
+            out.push_str(
+                "At least one baseline metric is near zero; percentage comparison is not qualified.\n",
+            );
         } else if !self.has_regressions() {
             out.push_str("All metrics within baseline CI. No regressions detected.\n");
         }
@@ -940,6 +949,16 @@ mod strict_population_tests {
         .unwrap();
         assert_eq!(report.summary.total_metrics, 2);
         assert_eq!(report.results.len(), 2);
+    }
+
+    #[test]
+    fn exploratory_summary_marks_near_zero_baseline_unqualified() {
+        let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.0)])]);
+        let current = snapshot("current", &[("NBack", &[("accuracy", 0.8)])]);
+        let report = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        let summary = report.format_summary();
+        assert!(summary.contains("near zero"));
+        assert!(!summary.contains("All metrics within baseline CI"));
     }
 
     #[test]
