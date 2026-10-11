@@ -135,13 +135,19 @@ impl std::fmt::Display for IterativeEvolutionError {
                 max_substeps,
             } => write!(
                 f,
-                "iterative step requires at least {requested_at_least} substeps, budget is {max_substeps}"
+                concat!(
+                    "iterative step requires at least {requested_at_least} substeps, ",
+                    "budget is {max_substeps}"
+                )
                     
             ),
             Self::NonFiniteOutput { index } => {
                 write!(
                     f,
-                    "iterative evolution produced a non-finite state at index {index}; state rolled back"
+                    concat!(
+                        "iterative evolution produced a non-finite state at index {index}; ",
+                        "state rolled back"
+                    )
                 )
             }
         }
