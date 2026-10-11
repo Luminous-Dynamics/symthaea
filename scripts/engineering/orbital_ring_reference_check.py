@@ -52,8 +52,15 @@ def calculate(h_km):
 def normal_force_per_length(line_density_kg_m, inertial_speed_m_s, path_radius_m):
     """Net normal force per unit arc length for a steady circular stream."""
     values = (line_density_kg_m, inertial_speed_m_s, path_radius_m)
-    if not all(math.isfinite(x) for x in values):
-        raise ValueError("inputs must be finite")
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("inputs must be finite numeric values, not booleans")
+        try:
+            finite_value = math.isfinite(value)
+        except (OverflowError, TypeError, ValueError) as exc:
+            raise ValueError("inputs must be representable as finite floating-point values") from exc
+        if not finite_value:
+            raise ValueError("inputs must be finite")
     if line_density_kg_m < 0 or inertial_speed_m_s < 0 or path_radius_m <= 0:
         raise ValueError("density/speed must be non-negative and radius positive")
     if line_density_kg_m == 0.0 or inertial_speed_m_s == 0.0:
@@ -144,6 +151,8 @@ def main():
         ("negative_density_rejected", (-1.0, 3.0, 10.0)),
         ("nonfinite_speed_rejected", (1.0, math.inf, 10.0)),
         ("nonpositive_radius_rejected", (1.0, 3.0, 0.0)),
+        ("nonnumeric_density_rejected", (None, 3.0, 10.0)),
+        ("boolean_density_rejected", (True, 3.0, 10.0)),
     ):
         try:
             normal_force_per_length(*args)
