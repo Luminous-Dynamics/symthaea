@@ -22,7 +22,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
-EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v2"
+EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v3"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {
@@ -446,7 +446,7 @@ def evaluate(
     distinct_pair_text_count = sum(row["distinct_interpretation_text"] for row in pair_rows)
     return {
         "schema": EVALUATOR_SCHEMA,
-        "evaluator_id": "static_output_contract_cues_v2",
+        "evaluator_id": "static_output_contract_cues_v3",
         "method_id": method_id,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
@@ -651,7 +651,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 23 evaluator controls (18 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
+        print("PASS: 27 evaluator controls (22 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
     if not args.results:
         return 0
     if args.output_dir is None:
