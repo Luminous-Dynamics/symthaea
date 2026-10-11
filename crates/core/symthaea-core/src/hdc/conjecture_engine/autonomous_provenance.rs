@@ -767,7 +767,13 @@ fn holdout_record_is_consistent(
                 && holdout.trajectories_checked == holdout.requested_trajectories
                 && holdout.max_lie_derivative_variance > holdout.threshold
         }
-        Some(AutonomousHoldoutFailure::InvalidInput) | None => false,
+        Some(AutonomousHoldoutFailure::InvalidInput) => {
+            holdout.requested_trajectories > 0
+                && holdout.trajectories_checked == 0
+                && holdout.max_lie_derivative_variance == f64::MAX
+                && holdout.median_lie_derivative_variance == f64::MAX
+        }
+        None => false,
     }
 }
 
@@ -821,6 +827,10 @@ mod tests {
         } else {
             Vec::new()
         }
+    }
+
+    fn wrong_dimension_at_start(_state: &[f64], _time: f64) -> Vec<f64> {
+        Vec::new()
     }
 
     fn system_definition_canonical() -> &'static str {
@@ -1118,6 +1128,48 @@ mod tests {
         assert!(!verify_autonomous_discovery_receipt_v1(&altered));
     }
 
+
+    #[test]
+    fn immediate_invalid_rhs_result_is_archived_as_a_failed_receipt() {
+        let config = RegressorConfig { seed: 23, ..RegressorConfig::default() };
+        let formula = Expr::Var("x".into());
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let initial = [1.0, 0.0, 0.0, 1.0];
+        let names = ["x", "y", "vx", "vy"];
+        let holdout = validate_invariant_holdout(
+            wrong_dimension_at_start,
+            &formula,
+            &initial,
+            &names,
+            &config,
+            4.0,
+            0.01,
+            3,
+            709,
+            1e-2,
+        );
+        assert!(!holdout.passed);
+        assert_eq!(holdout.failure, Some(AutonomousHoldoutFailure::InvalidInput));
+        assert_eq!(holdout.trajectories_checked, 0);
+
+        let receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "invalid-rhs-shape-v1",
+            "system-definition-v1\ninvalid-rhs-shape-v1\nrhs(state, t) -> []",
+            &config,
+            &[],
+            &candidate,
+            &names,
+            &initial,
+            4.0,
+            0.01,
+            &holdout,
+        )
+        .expect("the invalid-input result must remain archivable");
+        assert!(!receipt.holdout_passed);
+        assert_eq!(receipt.holdout_failure, Some(AutonomousHoldoutFailure::InvalidInput));
+        assert!(verify_autonomous_discovery_receipt_v1(&receipt));
+    }
 
     #[test]
     fn wrong_rhs_dimension_on_intermediate_step_fails_closed_without_panicking() {
