@@ -70,7 +70,7 @@ pub use types::{
 pub use capability_ledger::{
     CapabilityClaim, CapabilityForecast, CapabilityLedger, CapabilityLedgerError,
     CapabilityLifecycle, CapabilityMetrics, CapabilityOutcomeReceipt, CapabilitySplit,
-    QualificationPolicy, SubjectIdentity,
+    QualificationPolicy, SubjectIdentity, VerifiedCapabilityOutcomeReceipt,
 };
 
 pub use core::{
