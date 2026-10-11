@@ -40,7 +40,33 @@ jobs:
           import sys
           from pathlib import Path
 
-          status = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          def reject_duplicate_keys(pairs):
+              result = {}
+              for key, value in pairs:
+                  if key in result:
+                      raise ValueError(f"duplicate JSON object key: {key}")
+                  result[key] = value
+              return result
+
+          def reject_nonstandard_constant(value):
+              raise ValueError(f"non-standard JSON numeric constant: {value}")
+
+          def strict_json(text):
+              return json.loads(
+                  text,
+                  object_pairs_hook=reject_duplicate_keys,
+                  parse_constant=reject_nonstandard_constant,
+              )
+
+          # Self-check the exact parser used for the committed trust record.
+          for sample in ('{"schema":"first","schema":"second"}',
+                         '{"expected_self_test_check_count":NaN}'):
+              try:
+                  strict_json(sample)
+              except ValueError:
+                  continue
+              raise AssertionError("strict verification-status parser accepted invalid JSON")
+          status = strict_json(Path(sys.argv[1]).read_text(encoding="utf-8"))
           current = status["current_validator"]
           blob = Path(sys.argv[2]).read_text(encoding="utf-8").strip()
           sha256 = Path(sys.argv[3]).read_text(encoding="utf-8").split()[0]
