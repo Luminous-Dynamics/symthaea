@@ -22,6 +22,8 @@ pub mod offboard_observation;
 pub mod offboard_loss_flag;
 /// Firmware-profile-bound Offboard-loss parameter configuration evidence.
 pub mod offboard_loss_configuration;
+/// PX4 external-mode SetpointConfig request/reply evidence.
+pub mod external_mode_setpoint_config;
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.
