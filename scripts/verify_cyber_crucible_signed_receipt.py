@@ -252,7 +252,6 @@ class ReplayLedger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.is_symlink():
             raise VerificationError("replay ledger path must not be a symlink")
-        created = False
         if not self.path.exists():
             try:
                 fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
@@ -261,7 +260,6 @@ class ReplayLedger:
                 pass
             else:
                 os.close(fd)
-                created = True
         try:
             if self.path.is_symlink() or not self.path.is_file():
                 raise VerificationError("replay ledger path must be a regular file, not a symlink")
@@ -286,18 +284,9 @@ class ReplayLedger:
                 )
                 db.execute("COMMIT")
         except sqlite3.IntegrityError as exc:
-            try:
-                with sqlite3.connect(self.path, timeout=10) as db:
-                    db.rollback()
-            except sqlite3.Error:
-                pass
+            # The connection context manager rolls back the failed insert before
+            # control reaches this handler.
             raise VerificationError("replay rejected: receipt_id or receipt_nonce was already consumed") from exc
-        except Exception:
-            if created:
-                # Keep a created DB if SQLite initialized it; do not delete a path that
-                # may now have been opened by another verifier process.
-                pass
-            raise
 
 
 def verify_receipt(
