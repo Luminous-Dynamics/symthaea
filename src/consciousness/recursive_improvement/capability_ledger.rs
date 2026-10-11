@@ -8,10 +8,12 @@
 //! evaluator identities/revisions on held-out or transfer cases can qualify a claim. Training
 //! success remains useful telemetry but cannot grant qualification.
 //!
-//! Under the optional `identity` feature, the signed-receipt ingress verifies an Ed25519
-//! signature using the evaluator key frozen in the ledger policy and checks the SHA-256 of the
-//! exact evidence bytes. It does not retrieve runner artifacts or independently prove that a real
-//! run occurred; evaluator-key custody and the evaluator's truthfulness remain in the trust model.
+//! Under the optional `identity` feature, signed-receipt ingress verifies an Ed25519 signature
+//! using the evaluator key frozen in the ledger policy, checks the SHA-256 of exact evidence bytes,
+//! and requires canonical `CapabilityEvidencePayloadV1` fields to match the signed receipt. The
+//! verifier contract is `capability-evidence-envelope-v2`. It does not retrieve runner artifacts
+//! or independently prove that a real run occurred; evaluator-key custody and evaluator truthfulness
+//! remain in the trust model.
 //! Raw receipt data cannot be admitted to qualification directly, and a digest string is not proof.
 //!
 //! This first version measures prospective success-probability calibration. Expected compute cost
@@ -688,9 +690,10 @@ impl CapabilityLedger {
     /// Verify and admit a runner-signed receipt under this ledger's frozen qualification policy.
     ///
     /// Available only with the existing `identity` feature. The verifier checks the policy-pinned
-    /// Ed25519 key, the versioned receipt signature, and SHA-256 of the exact evidence bytes before
-    /// handing an opaque token to the ledger state machine. This authenticates the signed claim and
-    /// bytes, but does not independently prove that the evaluator's runner produced truthful data.
+    /// Ed25519 key and versioned receipt signature, hashes the exact evidence bytes, and requires a
+    /// canonical, size-bounded CapabilityEvidencePayloadV1 whose outcome fields match the receipt.
+    /// This authenticates the signed claim and envelope consistency, but does not independently
+    /// prove artifact lineage or that the evaluator's runner produced truthful data.
     #[cfg(feature = "identity")]
     pub fn verify_and_resolve_signed_receipt(
         &mut self,
