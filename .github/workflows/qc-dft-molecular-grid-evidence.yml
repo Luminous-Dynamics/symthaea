@@ -8,6 +8,7 @@ on:
       - "crates/domains/symthaea-quantum-chemistry/src/scf/generalized_eigen.rs"
       - "crates/domains/symthaea-quantum-chemistry/examples/qc_dft_molecular_grid_evidence.rs"
       - "scripts/qc/compare_dft_molecular_grid_pyscf.py"
+      - "scripts/qc/test_compare_dft_molecular_grid_pyscf.py"
       - "crates/core/symthaea-observation-attestation/Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/qc-dft-molecular-grid-evidence.yml"
@@ -69,7 +70,8 @@ jobs:
         run: |
           python -m py_compile \
             scripts/qc/check_vwn5_pyscf_reference.py \
-            scripts/qc/compare_dft_molecular_grid_pyscf.py
+            scripts/qc/compare_dft_molecular_grid_pyscf.py \
+            scripts/qc/test_compare_dft_molecular_grid_pyscf.py
 
       - name: Install pinned PySCF reference dependencies
         run: |
@@ -78,6 +80,9 @@ jobs:
             "scipy==1.15.3" \
             "h5py==3.14.0" \
             "pyscf==2.14.0"
+
+      - name: Test the PySCF radial rule against analytic Gaussian integrals
+        run: python -m unittest discover -s scripts/qc -p test_compare_dft_molecular_grid_pyscf.py
 
       - name: Check formatting of DFT and benchmark sources
         run: |
