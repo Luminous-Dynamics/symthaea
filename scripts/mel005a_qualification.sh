@@ -42,6 +42,7 @@ run_step() {
   local current_head
   local command_status
   local tee_status
+  local -a pipeline_status
   current_head="$(git rev-parse HEAD)"
   if [[ "$current_head" != "$actual_head" ]]; then
     printf 'HEAD changed during qualification: initial=%s current=%s\n' "$actual_head" "$current_head" >&2
@@ -67,8 +68,9 @@ run_step() {
   printf '\n' >> "$out_dir/$name.command.txt"
 
   "$@" 2>&1 | tee "$out_dir/$name.output.log"
-  command_status=$PIPESTATUS
-  tee_status=0
+  pipeline_status=("${PIPESTATUS[@]}")
+  command_status="${pipeline_status[0]}"
+  tee_status="${pipeline_status[1]:-1}"
   # The primary command is recorded independently; artifact capture failure is
   # also fatal because a pass without complete output is not valid evidence.
   if [[ "$command_status" -eq 0 && "$tee_status" -ne 0 ]]; then
