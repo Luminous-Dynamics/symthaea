@@ -66,22 +66,31 @@ impl NumberTheoryEngine {
 
         let mut factors = Vec::new();
         let mut remaining = n;
-        let mut divisor = 2;
 
-        while divisor * divisor <= remaining {
-            let mut count = 0;
-            while remaining.is_multiple_of(divisor) {
-                count += 1;
-                remaining /= divisor;
-            }
-            if count > 0 {
-                factors.push((divisor, count));
-            }
-            divisor += if divisor == 2 { 1 } else { 2 };
-        }
+        // Fast path: primality is deterministic over the full u64 domain, so
+        // large primes do not fall into an infeasible trial-division loop.
+        if self.miller_rabin(n) {
+            factors.push((n, 1));
+        } else {
+            let mut divisor = 2;
 
-        if remaining > 1 {
-            factors.push((remaining, 1));
+            // Compare by division rather than divisor * divisor: the product
+            // can overflow u64 near the square-root boundary.
+            while divisor <= remaining / divisor {
+                let mut count = 0;
+                while remaining.is_multiple_of(divisor) {
+                    count += 1;
+                    remaining /= divisor;
+                }
+                if count > 0 {
+                    factors.push((divisor, count));
+                }
+                divisor += if divisor == 2 { 1 } else { 2 };
+            }
+
+            if remaining > 1 {
+                factors.push((remaining, 1));
+            }
         }
 
         // Encode as bundle of MULTIPLICATION.bind(prime_enc).bind(exp_enc)
@@ -234,27 +243,13 @@ impl NumberTheoryEngine {
             .collect()
     }
 
-    /// Trial division primality test
+    /// Deterministic primality test for the entire u64 domain.
+    ///
+    /// Uses Miller–Rabin with witness sets selected by proven numeric bounds,
+    /// avoiding floating-point square-root rounding and unbounded O(sqrt(n))
+    /// trial division for large inputs.
     pub fn is_prime(&self, n: u64) -> bool {
-        if n < 2 {
-            return false;
-        }
-        if n == 2 {
-            return true;
-        }
-        if n.is_multiple_of(2) {
-            return false;
-        }
-
-        let limit = (n as f64).sqrt() as u64;
-        let mut divisor = 3;
-        while divisor <= limit {
-            if n.is_multiple_of(divisor) {
-                return false;
-            }
-            divisor += 2;
-        }
-        true
+        self.miller_rabin(n)
     }
 
     /// Fermat primality test: for each witness a, check a^(n-1) mod n == 1
@@ -838,6 +833,25 @@ mod tests {
         assert!(!engine.is_prime(15));
         assert!(!engine.is_prime(1));
         assert!(engine.is_prime(2));
+    }
+
+    #[test]
+    fn test_is_prime_is_deterministic_near_u64_limits() {
+        let engine = NumberTheoryEngine::new();
+        // Largest known prime below 2^64.
+        assert!(engine.is_prime(18_446_744_073_709_551_557));
+        assert!(!engine.is_prime(u64::MAX));
+        assert!(!engine.is_prime(3_215_031_751)); // strong pseudoprime to small bases
+        assert!(!engine.is_prime(561)); // Carmichael number
+    }
+
+    #[test]
+    fn test_factorize_large_u64_prime_uses_fast_primality_path() {
+        let engine = NumberTheoryEngine::new();
+        let prime = 18_446_744_073_709_551_557;
+        let factorization = engine.factorize(prime);
+        assert_eq!(factorization.value, prime);
+        assert_eq!(factorization.factors, vec![(prime, 1)]);
     }
 
     #[test]
