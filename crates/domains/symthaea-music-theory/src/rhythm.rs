@@ -281,7 +281,10 @@ mod tests {
     fn deserialization_normalizes_legacy_rationals_and_rejects_zero_denominator() {
         let canonical = Duration::new(3, 2);
         let encoded = serde_json::to_string(&canonical).unwrap();
-        assert_eq!(serde_json::from_str::<Duration>(&encoded).unwrap(), canonical);
+        assert_eq!(
+            serde_json::from_str::<Duration>(&encoded).unwrap(),
+            canonical
+        );
 
         // Previously accepted wire values keep their mathematical meaning,
         // but are brought back into the canonical in-memory representation.
@@ -308,7 +311,11 @@ mod tests {
     fn checked_comparison_preserves_order_below_float_resolution() {
         let smaller = Duration::new(1, i64::MAX);
         let larger = Duration::new(1, i64::MAX - 2);
-        assert_eq!(smaller.beats(), larger.beats(), "f64 loses this distinction");
+        assert_eq!(
+            smaller.beats(),
+            larger.beats(),
+            "f64 loses this distinction"
+        );
         assert_eq!(
             smaller.checked_cmp(larger),
             Some(std::cmp::Ordering::Less),
@@ -322,9 +329,11 @@ mod tests {
             Duration::new(5, 1).checked_sub(Duration::new(2, 1)),
             Some(Duration::new(3, 1))
         );
-        assert!(Duration::new(1, i64::MAX)
-            .checked_sub(Duration::new(1, i64::MAX - 2))
-            .is_none());
+        assert!(
+            Duration::new(1, i64::MAX)
+                .checked_sub(Duration::new(1, i64::MAX - 2))
+                .is_none()
+        );
     }
 
     #[test]
@@ -348,10 +357,7 @@ mod tests {
 
     #[test]
     fn constructor_handles_signed_extremes_when_representable() {
-        assert_eq!(
-            Duration::new(2, i64::MIN),
-            Duration::new(-1, 1_i64 << 62)
-        );
+        assert_eq!(Duration::new(2, i64::MIN), Duration::new(-1, 1_i64 << 62));
         assert_eq!(Duration::new(i64::MIN, 1).num(), i64::MIN);
     }
 
