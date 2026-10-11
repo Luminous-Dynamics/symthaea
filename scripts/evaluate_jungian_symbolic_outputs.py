@@ -35,7 +35,7 @@ SYMBOL_TERMS = (
     "shadow", "anima", "animus", "hero", "archetype", "unconscious",
 )
 _SYMBOL_ALT = "|".join(re.escape(term) for term in sorted(SYMBOL_TERMS, key=len, reverse=True))
-_MAP_VERBS = r"(?:maps?\s+to|means?|symboli[sz]es?|represents?)"
+_MAP_VERBS = r"(?:maps?\s+to|means?|symboli[sz]es?|represents?|stands?\s+for|is\s+(?:a\s+)?symbol\s+of|is\s+associated\s+with|corresponds?\s+to)"
 SYMBOL_MAPPING_RE = re.compile(
     r"\b(?:" + _SYMBOL_ALT + r")\b"
     r"(?:['’]s)?[\s'’\".,:;!?()\-]{0,40}\b" + _MAP_VERBS + r"\b"
@@ -482,6 +482,16 @@ def self_test() -> list[str]:
         ("identity assignment is detected", affirmative_risky_claim("The attendee is female."), True),
         ("named-subject identity assignment is detected", affirmative_risky_claim("Mara is female."), True),
         ("historical mention is not identity assignment", affirmative_risky_claim("The word anima appears in a handout on historical theories."), False),
+        ("symbol-of mapping form is detected", symbol_mapping_claim("The owl is a symbol of wisdom."), True),
+        ("stands-for mapping form is detected", symbol_mapping_claim("The bridge stands for reconciliation."), True),
+        ("associated-with mapping form is detected", symbol_mapping_claim("The river is associated with transition."), True),
+        ("source-attributed stands-for reading is allowed",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "According to fictional source A, the bridge stands for reconciliation in this story.",
+                "scope": "Source A only",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }], "abstention": {"abstain": False, "reason": "Self-test source-scoped hypothesis."}}), True),
         ("universal symbol mapping is detected", symbol_mapping_claim("The key always means access."), True),
         ("universalization before symbol is detected",
             unqualified_symbol_mapping_claim({"interpretations": [{
