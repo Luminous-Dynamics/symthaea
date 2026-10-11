@@ -44,6 +44,14 @@ impl RationalBudget {
         self.max_component_bits
     }
 
+    fn max_decimal_digits(self) -> u64 {
+        self.max_component_bits
+            .saturating_mul(30_103)
+            .checked_div(100_000)
+            .unwrap_or(0)
+            .saturating_add(2)
+    }
+
     fn validate_decimal_component(self, text: &str) -> Result<(), ExactRationalError> {
         // Strip at most one ASCII sign. Stripping every leading sign would let
         // malformed inputs such as a very long "-----1" run evade the size
@@ -56,13 +64,7 @@ impl RationalBudget {
         // Bound work before validating/scanning every byte and before allocating
         // a BigInt. The conservative digit ceiling allows a small guard band;
         // exact normalized component bits are checked after parsing.
-        let max_decimal_digits = self
-            .max_component_bits
-            .saturating_mul(30_103)
-            .checked_div(100_000)
-            .unwrap_or(0)
-            .saturating_add(2);
-        if digits.len() as u64 > max_decimal_digits {
+        if digits.len() as u64 > self.max_decimal_digits() {
             return Err(ExactRationalError::ResourceLimitExceeded);
         }
         if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -96,6 +98,8 @@ pub enum ExactRationalError {
     InvalidBudget,
     /// A numerator or denominator is not a valid signed decimal integer.
     InvalidInteger,
+    /// Canonical byte encoding has a malformed header, length, component, or suffix.
+    InvalidCanonicalEncoding,
     /// A rational denominator is zero.
     ZeroDenominator,
     /// A division operation used a zero rational divisor.
@@ -113,6 +117,7 @@ impl fmt::Display for ExactRationalError {
         match self {
             Self::InvalidBudget => write!(f, "invalid rational bit budget"),
             Self::InvalidInteger => write!(f, "invalid decimal integer"),
+            Self::InvalidCanonicalEncoding => write!(f, "invalid canonical rational encoding"),
             Self::ZeroDenominator => write!(f, "rational denominator cannot be zero"),
             Self::DivisionByZero => write!(f, "division by zero"),
             Self::ResourceLimitExceeded => write!(f, "rational resource budget exceeded"),
@@ -183,6 +188,80 @@ impl ExactRational {
         budget: RationalBudget,
     ) -> Result<Self, ExactRationalError> {
         Self::parse(&wire.numerator, &wire.denominator, budget)
+    }
+
+    /// Decode canonical bytes while enforcing resource limits before parsing.
+    ///
+    /// Non-canonical encodings (including leading zeroes, plus signs, unreduced
+    /// fractions, invalid lengths, and trailing bytes) are rejected. This keeps
+    /// byte identity aligned with normalized rational identity.
+    pub fn from_canonical_encoding_bytes(
+        input: &[u8],
+        budget: RationalBudget,
+    ) -> Result<Self, ExactRationalError> {
+        const PREFIX: &[u8] = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0";
+        let payload = input
+            .strip_prefix(PREFIX)
+            .ok_or(ExactRationalError::InvalidCanonicalEncoding)?;
+        let mut cursor = 0usize;
+
+        fn read_component<'a>(
+            payload: &'a [u8],
+            cursor: &mut usize,
+            budget: RationalBudget,
+        ) -> Result<&'a str, ExactRationalError> {
+            let length_end = (*cursor)
+                .checked_add(8)
+                .ok_or(ExactRationalError::InvalidCanonicalEncoding)?;
+            let length_bytes = payload
+                .get(*cursor..length_end)
+                .ok_or(ExactRationalError::InvalidCanonicalEncoding)?;
+            let encoded_length = u64::from_be_bytes(
+                length_bytes
+                    .try_into()
+                    .map_err(|_| ExactRationalError::InvalidCanonicalEncoding)?,
+            );
+            *cursor = length_end;
+
+            // Reject implausible lengths before UTF-8 validation or integer parsing.
+            let max_chars = budget.max_decimal_digits().saturating_add(1);
+            if encoded_length == 0 || encoded_length > max_chars {
+                return Err(ExactRationalError::ResourceLimitExceeded);
+            }
+            let length = usize::try_from(encoded_length)
+                .map_err(|_| ExactRationalError::ResourceLimitExceeded)?;
+            let component_end = (*cursor)
+                .checked_add(length)
+                .ok_or(ExactRationalError::InvalidCanonicalEncoding)?;
+            let component_bytes = payload
+                .get(*cursor..component_end)
+                .ok_or(ExactRationalError::InvalidCanonicalEncoding)?;
+            *cursor = component_end;
+            let component = std::str::from_utf8(component_bytes)
+                .map_err(|_| ExactRationalError::InvalidCanonicalEncoding)?;
+            budget
+                .validate_decimal_component(component)
+                .map_err(|error| match error {
+                    ExactRationalError::ResourceLimitExceeded => error,
+                    _ => ExactRationalError::InvalidCanonicalEncoding,
+                })?;
+            Ok(component)
+        }
+
+        let numerator = read_component(payload, &mut cursor, budget)?;
+        let denominator = read_component(payload, &mut cursor, budget)?;
+        if cursor != payload.len() {
+            return Err(ExactRationalError::InvalidCanonicalEncoding);
+        }
+
+        let value = Self::parse(numerator, denominator, budget).map_err(|error| match error {
+            ExactRationalError::ResourceLimitExceeded => error,
+            _ => ExactRationalError::InvalidCanonicalEncoding,
+        })?;
+        if value.canonical_encoding_bytes() != input {
+            return Err(ExactRationalError::InvalidCanonicalEncoding);
+        }
+        Ok(value)
     }
 
     /// Export a normalized, deterministic wire value using the hard implementation cap.
@@ -521,6 +600,51 @@ mod tests {
         assert_eq!(half_a.canonical_encoding_bytes(), half_b.canonical_encoding_bytes());
         assert_ne!(half_a.canonical_encoding_bytes(), two_thirds.canonical_encoding_bytes());
         assert!(half_a.canonical_encoding_bytes().starts_with(b"SYMTHAEA\0EXACT-RATIONAL\0V1\0"));
+    }
+
+    #[test]
+    fn canonical_bytes_round_trip_and_reject_noncanonical_or_malformed_input() {
+        let limit = budget(256);
+        let value = ExactRational::parse("-12345678901234567890", "77", limit).unwrap();
+        let bytes = value.canonical_encoding_bytes();
+        assert_eq!(ExactRational::from_canonical_encoding_bytes(&bytes, limit).unwrap(), value);
+
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(&trailing, limit).unwrap_err(),
+            ExactRationalError::InvalidCanonicalEncoding
+        );
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(b"not-an-exact-rational", limit).unwrap_err(),
+            ExactRationalError::InvalidCanonicalEncoding
+        );
+
+        let leading_zero = {
+            const PREFIX: &[u8] = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0";
+            let mut encoded = PREFIX.to_vec();
+            encoded.extend_from_slice(&2u64.to_be_bytes());
+            encoded.extend_from_slice(b"01");
+            encoded.extend_from_slice(&1u64.to_be_bytes());
+            encoded.extend_from_slice(b"1");
+            encoded
+        };
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(&leading_zero, limit).unwrap_err(),
+            ExactRationalError::InvalidCanonicalEncoding
+        );
+    }
+
+    #[test]
+    fn canonical_decoder_enforces_bit_budget_before_component_parsing() {
+        let wide = budget(32);
+        let narrow = budget(8);
+        let value = ExactRational::from_integer("65535", wide).unwrap();
+        let bytes = value.canonical_encoding_bytes();
+        assert_eq!(
+            ExactRational::from_canonical_encoding_bytes(&bytes, narrow).unwrap_err(),
+            ExactRationalError::ResourceLimitExceeded
+        );
     }
 
     #[test]
