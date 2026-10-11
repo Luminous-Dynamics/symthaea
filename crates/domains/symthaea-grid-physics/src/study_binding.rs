@@ -305,9 +305,9 @@ mod tests {
             schema_version: ENERGY_STUDY_BINDING_SCHEMA_VERSION,
             manifest_sha256:
                 "896b4579a632dac32bafd3b2347f19f5da5a74f7173c14cf818b00a8e5c484da".into(),
-            // This is a format test vector, not a claim of equivalence with
-            // Symthaea's distinct native scenario-input digest.
-            case_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+            // This frozen value comes from the Sol Atlas Rust and Mycelix TypeScript
+            // golden-vector fixtures; it is separate from Symthaea's native digest.
+            case_sha256: "1612238432409a5282145479c7c585c53b4ae9a45832de5213722ee75d438f63".into(),
             artifact_set_sha256:
                 "74a2bb57ea351ab2f0d68502443d27a971db33293fa4c11e12a45d0afa3b30e2".into(),
         }
