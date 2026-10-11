@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-time-integrity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Domain-neutral clock identity, continuity, and bounded timestamp uncertainty contracts for Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
