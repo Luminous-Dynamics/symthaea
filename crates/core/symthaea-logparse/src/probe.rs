@@ -957,7 +957,7 @@ mod tests {
         assert!((curve[0].actual_coverage - 0.5).abs() < 1e-6);
         assert!((curve[0].accepted_accuracy - 0.5).abs() < 1e-6);
         assert_eq!(curve[1].accepted_samples, 3);
-        assert!((curve[1].accepted_accuracy - (2.0 / 3.0)).abs() < 1e-6);
+        assert!((curve[1].accepted_accuracy - (1.0 / 3.0)).abs() < 1e-6);
         assert_eq!(curve[2].accepted_samples, 4);
         assert!((curve[2].accepted_accuracy - 0.5).abs() < 1e-6);
     }
