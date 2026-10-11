@@ -120,6 +120,8 @@ pub struct Px4OffboardLossParameterObservationV1 {
     pub firmware_profile_id: String,
     /// PX4 boot/session identity supplied by the adapter.
     pub source_boot_session_id: String,
+    /// Local correlation label for the adapter's parameter-capture attempt.
+    pub capture_window_id: String,
     /// Adapter-allocated unique response sequence.
     pub capture_sequence: u64,
     /// Exact raw parameter value.
@@ -138,6 +140,7 @@ impl Px4OffboardLossParameterObservationV1 {
         target_instance_id: impl Into<String>,
         firmware_profile_id: impl Into<String>,
         source_boot_session_id: impl Into<String>,
+        capture_window_id: impl Into<String>,
         capture_sequence: u64,
         value: Px4OffboardLossParameterValueV1,
         received_at: TimestampV1,
@@ -148,6 +151,7 @@ impl Px4OffboardLossParameterObservationV1 {
             target_instance_id: target_instance_id.into(),
             firmware_profile_id: firmware_profile_id.into(),
             source_boot_session_id: source_boot_session_id.into(),
+            capture_window_id: capture_window_id.into(),
             capture_sequence,
             value,
             received_at,
@@ -188,6 +192,7 @@ impl Px4OffboardLossParameterObservationV1 {
         validate_identifier(&self.target_instance_id, "target_instance_id")?;
         validate_identifier(&self.firmware_profile_id, "firmware_profile_id")?;
         validate_identifier(&self.source_boot_session_id, "source_boot_session_id")?;
+        validate_identifier(&self.capture_window_id, "capture_window_id")?;
         self.value.validate()?;
         self.received_at
             .validate()
@@ -203,6 +208,7 @@ impl Px4OffboardLossParameterObservationV1 {
         feed_str(&mut hasher, &self.target_instance_id);
         feed_str(&mut hasher, &self.firmware_profile_id);
         feed_str(&mut hasher, &self.source_boot_session_id);
+        feed_str(&mut hasher, &self.capture_window_id);
         hasher.update(&self.capture_sequence.to_le_bytes());
         self.value.feed_digest(&mut hasher);
         feed_str(&mut hasher, self.received_at.clock_domain.as_str());
@@ -376,6 +382,11 @@ pub struct Px4OffboardLossConfigurationAssessmentV1 {
     pub schema_version: u16,
     /// Exact provenance and capture-window profile.
     pub profile: Px4OffboardLossConfigurationProfileV1,
+    /// Adapter-local ID shared by responses intended to form one read set.
+    ///
+    /// This prevents accidental mixing of known attempts, but does not prove a
+    /// broadcast parameter value was caused by a particular request.
+    pub capture_window_id: String,
     /// Receiver-clock time when assessed.
     pub assessed_at: TimestampV1,
     /// Canonically ordered parameter responses.
@@ -388,6 +399,7 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
     /// Construct, order, bind, and validate a parameter capture window.
     pub fn new(
         profile: Px4OffboardLossConfigurationProfileV1,
+        capture_window_id: impl Into<String>,
         assessed_at: TimestampV1,
         mut observations: Vec<Px4OffboardLossParameterObservationV1>,
     ) -> Result<Self, Px4OffboardLossConfigurationError> {
@@ -395,6 +407,7 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
         let mut assessment = Self {
             schema_version: PX4_OFFBOARD_LOSS_CONFIGURATION_SCHEMA_V1,
             profile,
+            capture_window_id: capture_window_id.into(),
             assessed_at,
             observations,
             assessment_digest_hex: String::new(),
@@ -480,6 +493,7 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
     fn validate_without_digest(&self) -> Result<(), Px4OffboardLossConfigurationError> {
         validate_schema(self.schema_version)?;
         self.profile.validate()?;
+        validate_identifier(&self.capture_window_id, "capture_window_id")?;
         self.assessed_at
             .validate()
             .map_err(Px4OffboardLossConfigurationError::Timestamp)?;
@@ -490,6 +504,9 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
         let mut sequences = HashSet::with_capacity(self.observations.len());
         for item in &self.observations {
             item.validate()?;
+            if item.capture_window_id != self.capture_window_id {
+                return Err(Px4OffboardLossConfigurationError::CaptureWindowMismatch);
+            }
             if item.producer_profile_id != self.profile.producer_profile_id {
                 return Err(Px4OffboardLossConfigurationError::ProducerMismatch);
             }
@@ -526,6 +543,7 @@ impl Px4OffboardLossConfigurationAssessmentV1 {
         hasher.update(ASSESSMENT_DOMAIN);
         hasher.update(&self.schema_version.to_le_bytes());
         feed_str(&mut hasher, &self.profile.profile_digest_hex);
+        feed_str(&mut hasher, &self.capture_window_id);
         feed_str(&mut hasher, self.assessed_at.clock_domain.as_str());
         hasher.update(&self.assessed_at.nanoseconds.to_le_bytes());
         hasher.update(&(self.observations.len() as u64).to_le_bytes());
@@ -599,6 +617,9 @@ pub enum Px4OffboardLossConfigurationError {
     /// Timeout is NaN, infinite, or negative.
     #[error("COM_OF_LOSS_T must be a finite non-negative Float32")]
     InvalidTimeoutValue,
+    /// An observation carried another adapter-local capture-window ID.
+    #[error("parameter response capture-window mismatch")]
+    CaptureWindowMismatch,
     /// Source producer did not match profile.
     #[error("parameter producer mismatch")]
     ProducerMismatch,
@@ -651,11 +672,26 @@ mod tests {
         value: Px4OffboardLossParameterValueV1,
         received_ns: u64,
     ) -> Px4OffboardLossParameterObservationV1 {
+        observation_in_window(
+            "parameter-capture.fixture.attempt-1",
+            sequence,
+            value,
+            received_ns,
+        )
+    }
+
+    fn observation_in_window(
+        capture_window_id: &str,
+        sequence: u64,
+        value: Px4OffboardLossParameterValueV1,
+        received_ns: u64,
+    ) -> Px4OffboardLossParameterObservationV1 {
         Px4OffboardLossParameterObservationV1::new(
             "px4.param.decoder.fixture.v1",
             "vehicle.slot-a",
             "px4.firmware-profile.fixture.v1",
             "px4.boot.fixture.session-a",
+            capture_window_id,
             sequence,
             value,
             ts(received_ns),
@@ -699,6 +735,7 @@ mod tests {
     ) -> Px4OffboardLossConfigurationAssessmentV1 {
         Px4OffboardLossConfigurationAssessmentV1::new(
             profile(200_000_000),
+            "parameter-capture.fixture.attempt-1",
             ts(assessed_ns),
             observations,
         )
@@ -774,6 +811,7 @@ mod tests {
     fn overly_wide_capture_window_is_not_complete() {
         let value = Px4OffboardLossConfigurationAssessmentV1::new(
             profile(200),
+            "parameter-capture.fixture.attempt-1",
             ts(1_300),
             vec![timeout(11, 1_000), action(12, 6, 1_201)],
         ).unwrap();
@@ -794,6 +832,7 @@ mod tests {
                 "vehicle.slot-a",
                 "px4.firmware-profile.fixture.v1",
                 "px4.boot.fixture.session-a",
+                "parameter-capture.fixture.attempt-1",
                 1,
                 Px4OffboardLossParameterValueV1::TimeoutSecondsF32Bits(f32::NAN.to_bits()),
                 ts(1_000),
@@ -813,6 +852,7 @@ mod tests {
             "vehicle.slot-a",
             "px4.firmware-profile.fixture.v1",
             "px4.boot.fixture.session-b",
+            "parameter-capture.fixture.attempt-1",
             12,
             Px4OffboardLossParameterValueV1::RcActionI32(6),
             ts(1_100_000_000),
@@ -820,10 +860,31 @@ mod tests {
         assert_eq!(
             Px4OffboardLossConfigurationAssessmentV1::new(
                 profile(200_000_000),
+                "parameter-capture.fixture.attempt-1",
                 ts(1_200_000_000),
                 vec![timeout(11, 1_000_000_000), wrong_session],
             ).unwrap_err(),
             Px4OffboardLossConfigurationError::BootSessionMismatch
+        );
+    }
+
+    #[test]
+    fn observations_from_different_capture_attempts_cannot_be_mixed() {
+        let other_attempt = observation_in_window(
+            "parameter-capture.fixture.attempt-2",
+            12,
+            Px4OffboardLossParameterValueV1::RcActionI32(6),
+            1_100_000_000,
+        );
+        assert_eq!(
+            Px4OffboardLossConfigurationAssessmentV1::new(
+                profile(200_000_000),
+                "parameter-capture.fixture.attempt-1",
+                ts(1_200_000_000),
+                vec![timeout(11, 1_000_000_000), other_attempt],
+            )
+            .unwrap_err(),
+            Px4OffboardLossConfigurationError::CaptureWindowMismatch
         );
     }
 
