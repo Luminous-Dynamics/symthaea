@@ -92,8 +92,31 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
     grid_name = str(record["grid_quality"])
     if grid_name not in GRID_SETTINGS:
         raise ValueError(f"unknown grid quality {grid_name!r}")
+    if record.get("basis") != "STO-3G":
+        raise ValueError(f"{molecule_name}: expected native basis STO-3G, got {record.get('basis')!r}")
+    if record.get("functional") != "Slater exchange + VWN5 correlation (LDA)":
+        raise ValueError(
+            f"{molecule_name}: unexpected native functional metadata {record.get('functional')!r}"
+        )
     radial_count, angular_count = GRID_SETTINGS[grid_name]
+    expected_points_per_atom = radial_count * angular_count
+    if int(record.get("expected_grid_points_per_atom", -1)) != expected_points_per_atom:
+        raise ValueError(
+            f"{molecule_name}/{grid_name}: reported per-atom grid size "
+            f"{record.get('expected_grid_points_per_atom')!r} != expected {expected_points_per_atom}"
+        )
     geometry = record["geometry"]
+    if geometry.get("coordinates_unit") != "bohr":
+        raise ValueError(
+            f"{molecule_name}: expected Bohr coordinates, got {geometry.get('coordinates_unit')!r}"
+        )
+    geometry_electrons = int(geometry["electron_count"])
+    metadata_electrons = record.get("expected_electron_count")
+    if metadata_electrons is not None and int(metadata_electrons) != geometry_electrons:
+        raise ValueError(
+            f"{molecule_name}: native record electron count {metadata_electrons} "
+            f"disagrees with geometry count {geometry_electrons}"
+        )
     atoms = []
     for atom in geometry["atoms"]:
         atomic_number = int(atom["atomic_number"])
@@ -104,7 +127,14 @@ def build_pyscf_reference(record: dict[str, Any]) -> dict[str, Any]:
 
     charge = int(geometry["charge"])
     multiplicity = int(geometry["multiplicity"])
-    expected_electrons = int(geometry["electron_count"])
+    expected_electrons = geometry_electrons
+    if multiplicity != 1:
+        raise ValueError(
+            f"{molecule_name}: this comparison lane supports closed-shell singlets only, "
+            f"got multiplicity {multiplicity}"
+        )
+    if not atoms:
+        raise ValueError(f"{molecule_name}: geometry contains no atoms")
     molecule = gto.Mole()
     molecule.atom = atoms
     molecule.unit = "Bohr"
