@@ -183,9 +183,7 @@ impl RegressionSnapshot {
 
         for (bench, bench_metrics) in &self.metrics {
             if bench_metrics.is_empty() {
-                errors.push(format!(
-                    "{bench}: benchmark contains no metrics"
-                ));
+                errors.push(format!("{bench}: benchmark contains no metrics"));
             }
             for (metric_name, val) in bench_metrics {
                 if val.n == 0 {
@@ -359,7 +357,9 @@ impl RegressionReport {
                         // this exploratory comparator. This legacy path avoids
                         // division by zero; format_summary() explicitly marks such
                         // reports as not qualified.
-                        if baseline_val.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON {
+                        let baseline_mean_is_near_zero =
+                            baseline_val.mean.abs() < MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON;
+                        if baseline_mean_is_near_zero {
                             results.push(RegressionResult {
                                 benchmark: bench_name.clone(),
                                 metric: metric_name.clone(),
@@ -653,14 +653,21 @@ mod strict_population_tests {
     #[test]
     fn snapshot_validation_rejects_nonfinite_or_reversed_confidence_bounds() {
         let mut nonfinite = snapshot("nonfinite-ci", &[("NBack", &[("accuracy", 0.8)])]);
-        nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap().ci_lower = f64::INFINITY;
-        assert!(nonfinite.validate().unwrap_err().iter().any(|error| error.contains("ci_lower is not finite")));
+        let metric = nonfinite.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
+        metric.ci_lower = f64::INFINITY;
+        let errors = nonfinite.validate().unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("ci_lower is not finite")));
 
         let mut reversed = snapshot("reversed-ci", &[("NBack", &[("accuracy", 0.8)])]);
         let metric = reversed.metrics.get_mut("NBack").unwrap().get_mut("accuracy").unwrap();
         metric.ci_lower = 0.9;
         metric.ci_upper = 0.7;
-        assert!(reversed.validate().unwrap_err().iter().any(|error| error.contains("ci_lower exceeds ci_upper")));
+        let errors = reversed.validate().unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("ci_lower exceeds ci_upper")));
     }
 
     #[test]
@@ -703,7 +710,13 @@ mod strict_population_tests {
     #[test]
     fn strict_comparison_rejects_unexpected_benchmark() {
         let baseline = snapshot("baseline", &[("NBack", &[("accuracy", 0.8)])]);
-        let current = snapshot("current", &[("NBack", &[("accuracy", 0.81)]), ("Stroop", &[("accuracy", 0.7)])]);
+        let current = snapshot(
+            "current",
+            &[
+                ("NBack", &[("accuracy", 0.81)]),
+                ("Stroop", &[("accuracy", 0.7)]),
+            ],
+        );
         assert_eq!(
             RegressionReport::compare_strict_metric_population(&baseline, &current, 0.05, 0.10)
                 .unwrap_err(),
