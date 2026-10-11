@@ -356,10 +356,9 @@ fn validate_invariant_holdout_inner(
     }
 }
 
-/// Validate a candidate on holdout trajectories and bind its exact numerical
-/// evaluation context. The digest prevents a receipt builder from accidentally
-/// reusing the metrics with a different formula, variable list, initial state,
-/// integration horizon, step size, seed, trajectory count, or threshold.
+/// Validate a candidate on holdout trajectories and bind its full evaluation
+/// context: candidate formula, variables, initial state, integration settings,
+/// seed pair, trajectory budget, threshold, and versioned system identity.
 pub fn validate_invariant_holdout(
     system: &AutonomousHoldoutSystemV1,
     candidate: &Expr,
@@ -1347,13 +1346,35 @@ mod tests {
     fn holdout_context_rejects_receipt_for_another_system() {
         let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
         let formula = harmonic_energy();
-        let holdout = validate_invariant_holdout(&harmonic_system(), &formula, &[1.0, 0.0, 0.0, 1.0],
-            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 3, 701, 1e-2);
-        let result = build_autonomous_discovery_receipt_v1("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "unrelated-system-v1", "system-definition-v1\nunrelated-system-v1\nxdot=0",
-            &config, &[], &candidate(formula, AutonomousDiscoveryMode::Cold),
-            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0], 4.0, 0.01, &holdout);
-        assert!(matches!(result, Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord)));
+        let holdout = validate_invariant_holdout(
+            &harmonic_system(),
+            &formula,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"],
+            &config,
+            4.0,
+            0.01,
+            3,
+            701,
+            1e-2,
+        );
+        let result = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "unrelated-system-v1",
+            "system-definition-v1\nunrelated-system-v1\nxdot=0",
+            &config,
+            &[],
+            &candidate(formula, AutonomousDiscoveryMode::Cold),
+            &["x", "y", "vx", "vy"],
+            &[1.0, 0.0, 0.0, 1.0],
+            4.0,
+            0.01,
+            &holdout,
+        );
+        assert!(matches!(
+            result,
+            Err(AutonomousDiscoveryReceiptError::InvalidHoldoutRecord)
+        ));
     }
 
     #[test]
@@ -1442,7 +1463,10 @@ mod tests {
             4.0, 0.01, &holdout,
         ).expect("well-formed receipt should be constructed");
         let mut altered = receipt.clone();
-        altered.system_definition_blake3 = blake3::hash(b"a different rhs").to_hex().to_string();
+        altered.system_definition_canonical =
+            "system-definition-v1\nharmonic-oscillator-v1\nxdot=0\nydot=0\nvxdot=0\nvydot=0"
+                .to_string();
+        altered.receipt_blake3 = compute_receipt_digest(&altered);
         assert!(!verify_autonomous_discovery_receipt_v1(&altered));
     }
 
