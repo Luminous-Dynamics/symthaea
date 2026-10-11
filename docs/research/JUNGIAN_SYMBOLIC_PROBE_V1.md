@@ -64,12 +64,16 @@ The companion runner is `scripts/run_jungian_symbolic_baselines.py`. It runs two
 
 The harness never reads `required_behaviors`, `forbidden_behaviors`, or `oracle_note` while generating method outputs. It reads those authored labels only afterward to calculate required-code coverage and forbidden-flag overlap. The metric therefore measures conformance to this small authored development rubric, not psychological accuracy, human preference, or generalization.
 
-The harness emits two normalized result bundles and a comparison report. Each bundle records the exact source revision, configuration digest, byte digest, and repeat-run determinism. The workflow independently validates both result bundles and uploads a 14-day artifact packet.
+The harness emits two normalized result bundles and a comparison report. Each bundle records the exact source revision and configuration digest; the comparison report records output SHA-256 values and byte-identical replay status. The workflow independently validates both result bundles and uploads a 14-day artifact packet.
 
-**Glyph/HDC status:** `not_run`. This runner does not call `GlyphBasis`, `TextHdcEncoder`, the interaction matrix, or a Symthaea inference path. Integrating that model requires a separate adapter and must not be inferred from the context-rule score.
+### Actual Glyph/HDC projection
+
+The companion Rust binary `src/bin/jungian_glyph_projection_probe.rs` calls the committed `GlyphBasis::new`, `TextHdcEncoder::with_sentiment`, and `GlyphRegistry::new` APIs under `--features glyph_codex`. It encodes each case at 16,384 dimensions and records all 11 modality cosine scores plus the nearest five entries from the actual 70-glyph registry. The receipt binds the exact `glyph_basis.rs` and `glyph_registry_data.rs` blob IDs, source revision, encoder profile, corpus identity, input digests, and output digest.
+
+This is a **representation/projection probe**, not a psychological interpretation system. `TextHdcEncoder` deterministically builds a vector from character trigrams, hashed word vectors with positions, and an optional sentiment channel. The modality and glyph vectors are themselves seeded from repository-defined text. Therefore nearest-neighbour rankings are evidence about that encoding geometry and vocabulary overlap—not a trained Jungian learner, independent corroboration of an archetype, or proof of meaning. The workflow includes this projection receipt in the same capture packet, but marks it `projection_only_not_rubric_scored`; it produces no behavior labels or person-level inferences.
 
 ## Next implementation step
 
-Build a small validator that checks schema, unique case/evidence IDs, exact span membership, known behavior codes, complete per-case result coverage, and deterministic normalization. Then add the simplest keyword baseline and existing Glyph/HDC baseline behind the same interface. Only after the exposed suite is stable should a separate, permissioned holdout set be authored and frozen by a distinct custodian.
+The structural validator and both non-HDC baselines now exist, and the actual Glyph/HDC projection has a distinct capture binary. The next step is to inspect deterministic captures and compare context-paired cases (JSP-001/JSP-002, JSP-003/JSP-014) to quantify where the projection is driven by vocabulary overlap or fails to separate context. Only later should a context-aware interpretation adapter be designed, and only after the exposed suite is stable should a separate, permissioned holdout set be authored and frozen by a distinct custodian.
 
 The future evaluator should check contract mechanics; it must not pretend to adjudicate the universal truth of an interpretation.
