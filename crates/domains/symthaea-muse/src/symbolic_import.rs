@@ -1414,9 +1414,7 @@ mod tests {
     fn midi_lyrics_are_rejected_until_score_preserves_sung_text() {
         let track = [
             0, 0xFF, 0x05, 4, b'H', b'e', b'l', b'o', // lyric meta-event
-            0, 0x90, 60, 100,
-            1, 0x80, 60, 0,
-            0, 0xFF, 0x2F, 0,
+            0, 0x90, 60, 100, 1, 0x80, 60, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("lyric events are not represented by Score"), "{error}");
@@ -1479,9 +1477,7 @@ mod tests {
         let track = [
             0, 0x90, 60, 100, // channel 1 note-on
             0, 0x91, 67, 100, // channel 2 note-on
-            1, 0x80, 60, 0,
-            0, 0x81, 67, 0,
-            0, 0xFF, 0x2F, 0,
+            1, 0x80, 60, 0, 0, 0x81, 67, 0, 0, 0xFF, 0x2F, 0,
         ];
         let error = parse_midi(&midi_file(&track)).unwrap_err();
         assert!(error.contains("contains multiple note channels"), "{error}");
