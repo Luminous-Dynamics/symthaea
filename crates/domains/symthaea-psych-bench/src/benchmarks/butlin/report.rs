@@ -634,6 +634,8 @@ pub enum EvidenceMergeError {
     UnknownIndicatorId(String),
     /// Two or more `AblationResult`s target the same indicator ID.
     DuplicateIndicatorId(String),
+    /// A declared seed identity appears more than once in the bundle.
+    DuplicateSeedIdentity(u64),
     /// The bundle's schema version doesn't match what this code understands.
     SchemaVersionMismatch { expected: u32, found: u32 },
     /// An `AblationResult`'s cached `indicator_dropped`/`benchmark_degraded`/
@@ -663,6 +665,9 @@ impl std::fmt::Display for EvidenceMergeError {
             }
             EvidenceMergeError::DuplicateIndicatorId(id) => {
                 write!(f, "duplicate ablation result for indicator id {id:?}")
+            }
+            EvidenceMergeError::DuplicateSeedIdentity(seed) => {
+                write!(f, "duplicate seed identity {seed}; seed entries are not independent runs")
             }
             EvidenceMergeError::SchemaVersionMismatch { expected, found } => write!(
                 f,
@@ -880,6 +885,13 @@ pub fn annotate_with_ablation_results(
         });
     }
 
+    let mut seen_seeds: HashSet<u64> = HashSet::new();
+    for &seed in &bundle.seeds {
+        if !seen_seeds.insert(seed) {
+            return Err(EvidenceMergeError::DuplicateSeedIdentity(seed));
+        }
+    }
+
     let known_ids: HashSet<&str> = report.indicators.iter().map(|i| i.id.as_str()).collect();
     let mut seen_ids: HashSet<&str> = HashSet::new();
     for result in &bundle.ablations {
@@ -943,6 +955,36 @@ pub fn annotate_with_ablation_results(
         let quality = ablation_probe_quality(result);
         indicator.probe_quality = Some(quality);
 
+        if !quality.qualifies_for_ablation_interpretation() {
+            push_annotation_once(
+                &mut indicator.annotations,
+                EvidenceAnnotation::KnownConfound(format!(
+                    concat!(
+                        "ablation probe quality insufficient to interpret ({:?}); ",
+                        "baseline={:.4}, ablated={:.4} — not treated as a scientific result"
+                    ),
+                    quality.degeneracy,
+                    result.baseline_indicator_score,
+                    result.ablated_indicator_score
+                )),
+            );
+        }
+
+        let seed_lineage_missing = bundle.seeds.is_empty();
+        if seed_lineage_missing {
+            push_annotation_once(
+                &mut indicator.annotations,
+                EvidenceAnnotation::KnownConfound(
+                    concat!(
+                        "Butlin evidence bundle contains no seed identities; ",
+                        "observed scores are retained for diagnostics and cannot ",
+                        "authorize a support tier"
+                    )
+                    .to_string(),
+                ),
+            );
+        }
+
         // Fallback provenance is genuinely unknown at this layer (see
         // `ablation_probe_quality`'s doc comment) -- disclose that plainly
         // rather than let `Unknown`'s pass-through of the quality gate read
@@ -982,17 +1024,9 @@ pub fn annotate_with_ablation_results(
         // precondition for trusting it. See
         // `qualifies_for_ablation_interpretation()`'s doc comment for why
         // this differs from `qualifies_as_observed()`.
-        indicator.outcome = if !quality.qualifies_for_ablation_interpretation() {
-            push_annotation_once(
-                &mut indicator.annotations,
-                EvidenceAnnotation::KnownConfound(format!(
-                    "ablation probe quality insufficient to interpret ({:?}); \
-                     baseline={:.4}, ablated={:.4} — not treated as a scientific result",
-                    quality.degeneracy,
-                    result.baseline_indicator_score,
-                    result.ablated_indicator_score
-                )),
-            );
+        indicator.outcome = if seed_lineage_missing
+            || !quality.qualifies_for_ablation_interpretation()
+        {
             EvidenceOutcome::Inconclusive
         } else if classification.contradicted {
             EvidenceOutcome::Contradicted
@@ -1972,7 +2006,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_seed_identity_is_not_fabricated_as_one() {
+    fn empty_seed_identity_is_diagnostic_only_and_cannot_support_a_tier() {
         let report = ButlinIndicatorReport::from_indicators(vec![stub_indicator(
             "AE-2",
             EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
@@ -1990,9 +2024,35 @@ mod tests {
         let ae2 = &merged.indicators[0];
         assert_eq!(ae2.causal_effect.unwrap().seed_count, 0);
         assert_eq!(ae2.functional_effect.unwrap().seed_count, 0);
+        assert_eq!(ae2.outcome, EvidenceOutcome::Inconclusive);
+        assert_eq!(merged.causally_supported_count, 0);
+        assert_eq!(merged.functionally_supported_count, 0);
+        assert!(ae2.annotations.iter().any(|annotation| matches!(
+            annotation,
+            EvidenceAnnotation::KnownConfound(message)
+                if message.contains("no seed identities")
+                    && message.contains("cannot")
+        )));
+    }
+
+    #[test]
+    fn duplicate_seed_identity_is_rejected_before_evidence_merge() {
+        let report = ButlinIndicatorReport::from_indicators(vec![stub_indicator(
+            "AE-2",
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        )]);
+        let bundle = ButlinEvidenceBundle {
+            schema_version: REPORT_SCHEMA_VERSION,
+            commit_sha: "fixture".into(),
+            config_hash: "fixture".into(),
+            seeds: vec![7, 7],
+            generated_at: "fixture".into(),
+            ablations: vec![stub_ablation_result("AE-2", true, true, false)],
+        };
+
         assert_eq!(
-            ae2.outcome,
-            EvidenceOutcome::Supported(SupportTier::CausallySupported)
+            annotate_with_ablation_results(report, &bundle).unwrap_err(),
+            EvidenceMergeError::DuplicateSeedIdentity(7)
         );
     }
 
