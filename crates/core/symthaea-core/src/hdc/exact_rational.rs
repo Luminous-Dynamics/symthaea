@@ -1132,7 +1132,6 @@ mod tests {
     #[test]
     fn floor_and_ceil_obey_exact_ordering_on_a_signed_rational_grid() {
         let limit = budget(128);
-        let zero = ExactRational::from_integer("0", limit).unwrap();
         let one = ExactRational::from_integer("1", limit).unwrap();
         for numerator in -15..=15 {
             for denominator in 1..=7 {
@@ -1145,7 +1144,6 @@ mod tests {
                 assert_eq!(floor_plus_one.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Greater);
                 let ceil_minus_one = ceil.checked_subtract(&one, limit).unwrap();
                 assert_eq!(ceil_minus_one.checked_compare(&value, limit).unwrap(), std::cmp::Ordering::Less);
-                let _ = &zero;
             }
         }
     }
