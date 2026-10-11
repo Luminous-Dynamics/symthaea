@@ -90,6 +90,9 @@ pub mod phi_engine;
 /// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
 pub mod physics;
+/// Smooth metric 2D/3D HDC coordinates for opt-in spatial reasoning.
+#[path = "hdc/spatial_encoder.rs"]
+pub mod spatial_encoder;
 /// Unified code synthesis trait for cross-backend code generation.
 #[cfg(feature = "synthesis-trait")]
 #[allow(missing_docs)]
