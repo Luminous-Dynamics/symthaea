@@ -60,4 +60,6 @@ jobs:
               print(f"Draft 2020-12 schema meta-validation PASS: {name}")
           PY
       - name: Run deterministic decision-receipt regressions
-        run: python -m unittest discover -s tests -p "test_cyber_crucible_decision_receipt.py" -v
+        run: |
+          python -m unittest discover -s tests -p "test_cyber_crucible_decision_receipt.py" -v
+          python -m unittest discover -s tests -p "test_cyber_crucible_report_decision.py" -v
