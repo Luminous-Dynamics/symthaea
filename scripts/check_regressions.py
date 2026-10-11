@@ -137,7 +137,7 @@ def _read_change_estimate(estimate_file: Path) -> dict:
     if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value)
            for value in numbers):
         raise ValueError(f"Non-numeric or non-finite Criterion change estimate in {estimate_file}")
-    if not (0.0 < confidence_level < 1.0) or lower > point or point > upper:
+    if not (0.0 < confidence_level < 1.0) or lower > upper:
         raise ValueError(f"Invalid Criterion change interval in {estimate_file}")
     if lower <= -1.0:
         raise ValueError(f"Invalid relative timing change lower bound in {estimate_file}")
