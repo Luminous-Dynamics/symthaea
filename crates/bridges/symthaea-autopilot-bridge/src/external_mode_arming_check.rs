@@ -25,10 +25,12 @@ use super::external_mode_setpoint_config::{
 
 /// Schema version for external-mode arming-check coherence evidence.
 pub const PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1: u16 = 1;
+/// Schema version for the ArmingCheckReply evidence record with a source-payload fingerprint.
+pub const PX4_EXTERNAL_MODE_ARMING_CHECK_REPLY_SCHEMA_V2: u16 = 2;
 const REGISTRATION_DOMAIN: &[u8] =
     b"symthaea.autopilot.px4.external-mode-registration-binding.v1\0";
 const REQUEST_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-request.v1\0";
-const REPLY_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply.v1\0";
+const REPLY_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-reply.v2\0";
 const REPLY_PAYLOAD_DOMAIN: &[u8] =
     b"symthaea.autopilot.px4.arming-check-reply-payload.v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea.autopilot.px4.arming-check-coherence-profile.v1\0";
@@ -490,7 +492,7 @@ impl Px4ExternalModeArmingCheckReplyV1 {
         received_at: TimestampV1,
     ) -> Result<Self, Px4ExternalModeArmingCheckError> {
         let mut item = Self {
-            schema_version: PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1,
+            schema_version: PX4_EXTERNAL_MODE_ARMING_CHECK_REPLY_SCHEMA_V2,
             message_version: 1,
             producer_profile_id: producer_profile_id.into(),
             target_instance_id: target_instance_id.into(),
@@ -547,7 +549,7 @@ impl Px4ExternalModeArmingCheckReplyV1 {
     pub fn reply_evidence_id(&self) -> Result<String, Px4ExternalModeArmingCheckError> {
         self.validate()?;
         Ok(format!(
-            "symthaea.autopilot.px4.arming-check-reply.v1:{}",
+            "symthaea.autopilot.px4.arming-check-reply.v2:{}",
             self.reply_digest_hex
         ))
     }
@@ -564,7 +566,7 @@ impl Px4ExternalModeArmingCheckReplyV1 {
     }
 
     fn validate_without_digest(&self) -> Result<(), Px4ExternalModeArmingCheckError> {
-        validate_schema(self.schema_version)?;
+        validate_reply_schema(self.schema_version)?;
         if self.message_version != 1 {
             return Err(Px4ExternalModeArmingCheckError::UnsupportedMessageVersion {
                 found: self.message_version,
@@ -1409,6 +1411,15 @@ pub enum Px4ExternalModeArmingCheckError {
 
 fn validate_schema(schema_version: u16) -> Result<(), Px4ExternalModeArmingCheckError> {
     if schema_version != PX4_EXTERNAL_MODE_ARMING_CHECK_SCHEMA_V1 {
+        return Err(Px4ExternalModeArmingCheckError::UnsupportedSchemaVersion {
+            found: schema_version,
+        });
+    }
+    Ok(())
+}
+
+fn validate_reply_schema(schema_version: u16) -> Result<(), Px4ExternalModeArmingCheckError> {
+    if schema_version != PX4_EXTERNAL_MODE_ARMING_CHECK_REPLY_SCHEMA_V2 {
         return Err(Px4ExternalModeArmingCheckError::UnsupportedSchemaVersion {
             found: schema_version,
         });
