@@ -222,8 +222,9 @@ impl HdcLtcUnifiedNeuron {
 
     /// Validated CfC step for inputs crossing a trust or data-quality boundary.
     ///
-    /// The preflight rejects invalid time increments, dimensions, and non-finite input/state
-    /// before mutating the neuron. A zero time increment is a no-op. The preflight performs
+    /// The preflight rejects invalid time increments/configuration, dimension mismatches,
+    /// corrupt parameter vectors, and non-finite input/state before mutating the neuron.
+    /// A zero time increment is a no-op. The preflight performs
     /// an additional O(D) scan; callers that have already validated inputs can use the
     /// allocation-free `evolve_closed_form_fused` hot path directly.
     pub fn try_evolve_closed_form_fused(
@@ -308,9 +309,12 @@ impl HdcLtcUnifiedNeuron {
     /// Implements the Hasani LTC closed-form update in a single O(D) pass
     /// with zero intermediate heap allocations.
     ///
-    /// Handles any dt value correctly:
-    /// - Very small dt → σ_i ≈ 0 (state barely moves)
-    /// - Very large dt → σ_i ≈ 1 (state snaps to equilibrium)
+    /// This allocation-free hot path assumes finite inputs/configuration and matching
+    /// dimensions. It floors dt at 1e-9 seconds; use `try_evolve_closed_form_fused`
+    /// at data-quality boundaries for validation and a true zero-dt no-op.
+    ///
+    /// - Very small positive dt → σ_i approaches zero without avoidable cancellation
+    /// - Very large dt → σ_i approaches one (state approaches the modeled equilibrium)
     pub fn evolve_closed_form_fused(&mut self, dt: f32, input: &ContinuousHV) {
         let dim = self.config.dim;
         let tau_base = self.config.tau_base;
