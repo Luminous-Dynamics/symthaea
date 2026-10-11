@@ -21,7 +21,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-use symthaea_logparse::encoder::{Hdv, encode, encode_domain_invariant};
+use symthaea_logparse::encoder::{
+    DOMAIN_INVARIANT_ENCODER_VERSION, Hdv, encode, encode_domain_invariant,
+};
 use symthaea_logparse::probe::{
     classification_report, ClassificationReport, LogisticProbe, TrainConfig,
 };
@@ -147,6 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\n=== Optional ablation: domain-invariant encoder ===");
         println!("  This is a paired experiment using the same source split seed.");
         println!("  It is not a new headline result until run on the staged corpora.");
+        println!("  ablation encoder version: {DOMAIN_INVARIANT_ENCODER_VERSION}");
 
         let sbou_di_hvs: Vec<Hdv> = sbou_events.iter().map(encode_domain_invariant).collect();
         let otrf_di_hvs: Vec<Hdv> = otrf_events.iter().map(encode_domain_invariant).collect();
