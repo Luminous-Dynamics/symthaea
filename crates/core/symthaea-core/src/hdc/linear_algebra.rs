@@ -166,7 +166,7 @@ impl HdcVector {
     }
 }
 
-/// Complete a row-major square matrix whose first `initial_columns` columns are already orthonormal.
+/// Complete a row-major square matrix whose first columns are orthonormal.
 fn complete_orthonormal_columns(
     data: &mut [f64],
     dimension: usize,
@@ -188,8 +188,7 @@ fn complete_orthonormal_columns(
 
         let mut column = vec![0.0; dimension];
         column[candidate_index] = 1.0;
-        // Modified Gram-Schmidt with a second pass to control loss of
-        // orthogonality when the supplied columns are nearly aligned with e_i.
+        // Modified Gram-Schmidt with a second pass to reduce loss of orthogonality.
         for _ in 0..2 {
             for prior in 0..filled {
                 let projection: f64 = (0..dimension)
@@ -793,16 +792,71 @@ impl HdcMatrix {
                     &format!("QR converged after {} iterations", iter + 1),
                     "qr_eigen",
                     0.2,
-        /// Singular Value Decomposition: A = U Σ V^T.
+                );
+                break;
+            }
+        }
+
+        let mut eigenvalues: Vec<f64> = (0..n).map(|i| a.get(i, i)).collect();
+        eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+
+        result.verified = true;
+        (eigenvalues, result)
+    }
+
+    /// Full eigendecomposition for symmetric matrices.
+    /// Returns (eigenvalues, eigenvectors_as_columns).
+    pub fn eigen_symmetric(&self) -> (Vec<f64>, HdcMatrix, LinAlgResult) {
+        assert!(self.is_square());
+        let n = self.rows;
+        let mut result = LinAlgResult::new(format!("{}x{} symmetric eigendecomposition", n, n));
+
+        let mut a = self.clone();
+        let mut v = HdcMatrix::identity(n);
+
+        for iter in 0..MAX_QR_ITERATIONS {
+            let (q, r, _) = a.qr_decompose();
+            let (new_a, _) = r.mul(&q);
+            let (new_v, _) = v.mul(&q);
+            a = new_a;
+            v = new_v;
+
+            let mut off_diag = 0.0;
+            for i in 0..n {
+                for j in 0..n {
+                    if i != j {
+                        off_diag += a.get(i, j).abs();
+                    }
+                }
+            }
+
+            if off_diag < DEFAULT_TOLERANCE * (n * n) as f64 {
+                result.add_step(
+                    &format!("Eigen converged after {} iterations", iter + 1),
+                    "qr_eigen",
+                    0.3,
+                );
+                break;
+            }
+        }
+
+        let eigenvalues: Vec<f64> = (0..n).map(|i| a.get(i, i)).collect();
+        result.verified = true;
+        (eigenvalues, v, result)
+    }
+
+    // ─── SVD ─────────────────────────────────────────────────────────────
+
+    /// Singular Value Decomposition: A = U Σ V^T.
     ///
-    /// Returns (singular_values, U, V) where singular values are in descending
-    /// order, U is m×m orthogonal, and V is n×n orthogonal. This preserves the
-    /// historical full-basis shape contract while computing the singular values
-    /// directly from A rather than from AᵀA.
+    /// Returns singular values in descending order, a full m×m orthogonal U,
+    /// and a full n×n orthogonal V. This preserves the historical full-basis
+    /// shape contract while computing singular values directly from A rather
+    /// than from AᵀA.
     ///
-    /// The compatibility wrapper fails closed on malformed input or solver
-    /// exhaustion: singular values are NaN, the result is unverified, and the
-    /// failure is recorded in its trace. Call try_svd() to receive the error.
+    /// On malformed input or solver exhaustion, this compatibility wrapper
+    /// fails closed: singular values are NaN and result.verified is false.
+    /// Call try_svd() when the caller needs an explicit error.
     pub fn svd(&self) -> (Vec<f64>, HdcMatrix, HdcMatrix, LinAlgResult) {
         match self.try_svd() {
             Ok(result) => result,
@@ -821,11 +875,11 @@ impl HdcMatrix {
         }
     }
 
-    /// Checked direct SVD with explicit convergence, residual and orthogonality checks.
+    /// Checked direct SVD with explicit convergence, residual, and orthogonality checks.
     ///
-    /// Uses nalgebra's fallible direct SVD, avoiding the condition-number squaring
-    /// caused by an AᵀA eigendecomposition. The normalized input keeps the iterative
-    /// solver away from avoidable overflow for very large but finite matrix scales.
+    /// The input is scaled before solving to avoid unnecessary overflow. The
+    /// normalized reconstruction residual and both full-basis orthogonality
+    /// residuals are independently checked before a result is called verified.
     pub fn try_svd(
         &self,
     ) -> Result<(Vec<f64>, HdcMatrix, HdcMatrix, LinAlgResult), String> {
@@ -839,8 +893,8 @@ impl HdcMatrix {
             return Err("SVD input contains a non-finite value".to_string());
         }
 
-        let scale = self.data.iter().fold(0.0_f64, |max_value, value| {
-            max_value.max(value.abs())
+        let scale = self.data.iter().fold(0.0_f64, |maximum, value| {
+            maximum.max(value.abs())
         });
         let mut result = LinAlgResult::new(format!("{}x{} direct SVD", m, n));
 
@@ -886,8 +940,7 @@ impl HdcMatrix {
             return Err("direct SVD returned invalid or unordered singular values".to_string());
         }
 
-        // Expand nalgebra's thin factors to the full square U/V matrices required
-        // by the existing public API. The thin columns remain paired with σ.
+        // Expand nalgebra's thin factors to the existing full square U/V contract.
         let mut u_data = vec![0.0; m * m];
         for i in 0..m {
             for j in 0..k {
@@ -991,63 +1044,6 @@ impl HdcMatrix {
             HdcMatrix::new(v_data, n, n),
             result,
         ))
-    }
-
-basis vector e_k as candidate; if linearly
-        // independent from existing columns, orthogonalize and add.
-        let mut filled = rank;
-        for candidate_idx in 0..m {
-            if filled >= m {
-                break;
-            }
-
-            let mut col = vec![0.0; m];
-            col[candidate_idx] = 1.0;
-
-            // Orthogonalize against all existing columns (0..filled)
-            for k in 0..filled {
-                let mut dot = 0.0;
-                for i in 0..m {
-                    dot += col[i] * u_data[i * m + k];
-                }
-                for i in 0..m {
-                    col[i] -= dot * u_data[i * m + k];
-                }
-            }
-
-            // Double orthogonalization for numerical stability (CGS re-orthogonalization)
-            for k in 0..filled {
-                let mut dot = 0.0;
-                for i in 0..m {
-                    dot += col[i] * u_data[i * m + k];
-                }
-                for i in 0..m {
-                    col[i] -= dot * u_data[i * m + k];
-                }
-            }
-
-            let norm: f64 = col.iter().map(|v| v * v).sum::<f64>().sqrt();
-            if norm > SVD_TOLERANCE {
-                for i in 0..m {
-                    u_data[i * m + filled] = col[i] / norm;
-                }
-                filled += 1;
-            }
-        }
-
-        let u = HdcMatrix::new(u_data, m, m);
-        result.add_step(
-            &format!(
-                "SVD computed: {} singular values, rank = {}",
-                singular_values.len(),
-                rank
-            ),
-            "svd",
-            0.3,
-        );
-        result.verified = true;
-
-        (singular_values, u, v, result)
     }
 
     /// Null space (kernel) of the matrix.
