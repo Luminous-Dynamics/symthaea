@@ -1,106 +1,106 @@
 # Vocal backend contract and benchmark plan
 
-Status: research/engineering plan; not a claim that a backend has passed or that new audio has been rendered.
+Status: research/engineering plan. This document does not claim a backend has passed, new audio has been rendered, or an external candidate has been tested locally.
 
 ## Goal
 
-Identify the best usable singing backend for Symthaea's target use cases, separate generator defects from control-layer defects, and prevent technical metrics from being mistaken for perceptual quality.
+Improve Symthaea vocals by resolving the checked-in renderer contract first, preserving existing evidence, and comparing viable backends without mistaking technical metrics for perceptual quality.
 
-## Exact-head observations
+## Exact-head source audit
 
-- `src/voice/kokoro_singing.rs` adapts speech audio into sung notes. Keep it as a baseline, not the presumed production winner.
-- `src/voice/diffsinger.rs` and `scripts/diffsinger_worker.py` implement a JSONL worker path.
-- At the inspected main revision, `scripts/diffsinger_worker.py` declares `SAMPLE_RATE = 44100`; `examples/diffsinger_worker_smoke.rs` asserts that the returned `VocalStem` is 24,000 Hz. The Rust bridge passes through the worker's `sample_rate` field and validates the stem, but does not resample it. This is a real source-level contract discrepancy. Do not change either value by assumption: inspect the voicebank/vocoder's actual emitted rate and make the authoritative contract explicit.
-- The current production guide references a substantial `communication/singing/` and `communication/worker/` provisioning path. These assets do exist on current main; an earlier tree listing was stale/incomplete. The remaining question is whether a clean checkout plus the documented external provisioning steps can reproduce a render.
-- The Python worker's module documentation calls its voice a placeholder and requires auditing the voicebank terms. Do not treat this as the final Symthaea identity.
-- Prior evidence reports quality problems in speech-to-singing experiments. Keep those results visible as baselines.
+The Git tree for `main` at base revision `b9af191f380d635f0459b24284c1d1fd6a5516aa` was inspected directly.
 
-## Contract: audio output
+- `src/voice/diffsinger.rs` implements a version-1 JSONL bridge. It forwards returned samples and the worker's declared sample rate to `VocalStem` and calls `stem.validate()`; it does not resample.
+- `scripts/diffsinger_worker.py` declares `SAMPLE_RATE = 44100`, uses that rate to derive frame timing, and returns it with the synthesized waveform.
+- `examples/diffsinger_worker_smoke.rs` instead asserts `stem.sample_rate == 24_000`. This is a source-level contract mismatch. Do not just change WAV metadata or choose a rate to make the smoke example pass. Establish the model/vocoder's true output rate from its pinned config or a real render, then align the worker, bridge contract, and test. In the meantime this path is not validated.
+- `docs/MUSE_SINGING_PRODUCTION.md` describes a pinned OpenVPI/DiffSinger v2.5.1 path and commands under `communication/singing/` and `communication/worker/`. Those paths are absent from the complete `main` tree at the revision above. A clean checkout of this repository therefore cannot follow that guide as written. Treat this as documentation/source drift, not as proof that the referenced external assets never existed elsewhere.
+- The in-tree worker itself calls its voice a placeholder and points to voicebank-specific terms. It is not evidence of a cleared or distinct Symthaea voice identity.
+- `examples/muse_vocal_release_gate.rs` exists and already defines 20 phrase challenges crossed with three vocal ranges/styles (60 cases), concealed clip IDs, objective diagnostics, and a human-rating template. Build on this rather than creating a competing miniature benchmark.
+- The prior DiffSinger + RVC evidence bundle shows a completed historical experiment, but explicitly says that speaker identity, commercial clearance, broader generalization, and perceptual preference were not established. Retain those limitations with the evidence.
 
-Every backend invocation must return or record:
+## Immediate priorities
 
-- Exact backend name/version and model/checkpoint digest.
-- Exact voicebank/reference identity and licensing/provenance record.
-- Input score and lyrics digest; normalized input representation.
-- Actual decoded sample rate, channel count, sample format, sample count, duration, peak/RMS.
-- Whether output was generated, resampled, trimmed, padded, or otherwise post-processed.
-- Exit status, stderr/log path, wall-clock time, and resource profile when available.
-- Output WAV digest and immutable run identifier.
+### P0 — reconcile the published renderer path
 
-Fail closed if the observed sample rate differs from the backend's declared rate, if audio is empty/non-finite, if the channel layout is unexpected, or if a model/voicebank identity is missing. Never fix a sample-rate mismatch by merely changing WAV metadata. Resampling must be an explicit, recorded transform with its own test.
+1. Decide which DiffSinger integration is canonical: the checked-in legacy ONNX JSONL worker, or the production path described in the guide.
+2. Either restore the guide's referenced scripts and lockfiles with a reproducible, reviewed commit, or rewrite the guide to document only files that exist at the pinned repository HEAD.
+3. Record external weights/runtime separately from source assets. A clean checkout must fail with a precise missing-prerequisite message rather than implying the backend is ready.
+4. Add a path-existence / documentation consistency check so commands in the guide do not silently rot.
 
-## Minimum reproducible phrase pack
+### P0 — make sample-rate truth testable
 
-Start small, deterministic, and rights-cleared. Use equivalent symbolic inputs wherever backend contracts permit:
+The worker's declared rate, the vocoder's configured native output rate, any actual decoded WAV rate, and any resampling stage are distinct facts. Record all four when applicable. Add a test that compares metadata to the authoritative pinned model configuration or worker handshake; do not hardcode an expected rate without tracing its provenance. A resampling operation must be explicit, measured, and recorded.
 
-1. Mid-range legato phrase with ordinary English phonemes.
-2. Sustained open vowel with a controlled dynamic arc.
-3. Consonant-dense phrase (fricatives, plosives, and clusters).
-4. One syllable across multiple notes (melisma).
-5. Large melodic leap and register transition.
-6. Phrase ending with controlled release.
-7. Low/intimate delivery.
-8. High/intense delivery.
+### P1 — protect benchmark validity
 
-Do not compare models on a phrase their language, score representation, or conditioning setup cannot meaningfully support. Record exclusions and reasons instead of silently dropping difficult cases.
+Reuse the existing 60-case gate as the primary corpus. Freeze its source revision, lyrics, score generation, voice/model IDs, category assignment, and output-processing rules before comparing candidates. Expand it only when a specific uncovered failure mode is identified; retain the 20 phrase challenges as traceable case IDs.
 
-## Evaluation dimensions (never collapse into one score)
+The current `singing_quality.rs` score-guided pitch estimate uses expected score pitch as a search prior (`estimate_f0_near`). That is useful for an operational score-following diagnostic, but it is not independent proof of pitch correctness: a tracker can be biased toward the expected answer. Report it separately from a tracker with a wider, score-independent search range, and explicitly report voiced-frame coverage, octave errors, gross pitch error, unvoiced/voiced errors, and undefined estimates. Do not rename a metric's meaning merely to match a field label.
+
+Use the existing concealed IDs and human-rating workflow. Keep technical checks separate from ratings for naturalness, intelligibility, melodic fidelity, emotional fit, artifacts, and identity. Compare loudness-matched dry captures; human anchors cannot count toward the synthetic-candidate pass threshold. Never promote on a single aggregate score.
+
+## Output and provenance contract
+
+Every backend invocation should produce a machine-readable run manifest containing:
+
+- Exact source HEAD, backend name/version, invocation/configuration, and checkpoint digest.
+- Voicebank/reference identity, authorization and license status, and provenance of any voice prompt.
+- Normalized lyrics/score input and hashes; declared language and supported-control mode.
+- Declared native rate, observed decoded rate, channel count, format, sample count, duration, peak/RMS, and whether samples were generated, resampled, trimmed, padded, or normalized.
+- Exit status, stdout/stderr/log reference, elapsed time, execution device/provider, and resource profile when available.
+- Output digest, immutable run ID, metric versions/configuration, per-case results, and explicit limitations.
+
+Fail closed on empty or non-finite audio, invalid sample rate, unexpected channel layout, model/voice identity absence, malformed protocol, or digest mismatch. Unknown evidence fields must be marked unknown. Do not silently convert missing metrics to zeros or pass results.
+
+## Evaluation dimensions
 
 ### Integrity and reproducibility
-- Valid WAV, finite samples, no unexpected silence, clipping, or discontinuities.
-- Actual versus declared sample rate and channel count.
-- Configuration, checkpoint, voice, input, and output hashes.
-- Repeated-run variability, if the backend is stochastic.
+- Valid audio container and decoded samples; no unexpected silence, clipping, DC offset, or discontinuities.
+- Declared versus observed rate/channel consistency and complete configuration/checkpoint/input/output hashes.
+- Repeated-run variability for stochastic backends, with seed and determinism limits recorded.
 
 ### Musical and linguistic fidelity
-- Independent F0 tracker with voiced-frame coverage, octave errors, gross pitch error, and missing-frame accounting.
-- Note-level pitch and timing errors, with score-aware tolerance documented before evaluation.
-- Singing-robust ASR as a diagnostic, not ground truth; manually verified transcripts for a small fixed reference pack.
-- Melisma and syllable-to-note assignment checks.
+- Independent F0 tracking and score-aligned measurements with voiced coverage, octave mistakes, missing-frame handling, and predeclared tolerances.
+- Note onset/duration error, melisma handling, syllable-to-note alignment, and phrase-release behavior.
+- Singing-robust ASR as a diagnostic—not ground truth—with manually checked transcripts for a fixed subset.
+- For expressive alternatives, distinguish acceptable vibrato/portamento from wrong notes instead of requiring samplewise waveform equality.
 
-### Perceptual quality
-- Singing-specific MOS estimator (e.g. SingMOS-Pro or a compatible maintained evaluation suite) as a screening metric only.
-- Direct listening to loudness-matched, dry captures at defined milestones.
-- Separate judgments for naturalness, timbre/artifacts, intelligibility, melodic fidelity, expression, and identity consistency.
-- No promotion based solely on automated metrics. Speech-only MOS metrics remain diagnostic, not singing release gates.
+### Perceptual quality and generalization
+- Singing-specific MOS models are screening signals, not a release authority. Speech-trained MOS scores remain diagnostic only.
+- Use concealed, loudness-matched dry audio and stable rating instructions. Averages cannot hide a catastrophic phrase or register failure.
+- Hold out complete phrases/songs or recording sessions where relevant; report case-level results, language, genre, register, hardware, and prompt compatibility.
+- Human evaluation remains necessary at promotion milestones. A successful build/render or a high pitch score alone is not a quality pass.
 
-### Generalization
-- Hold out phrases, not just random frames from the same song.
-- Report each case and aggregate summaries; averages must not conceal a catastrophic phrase or register failure.
-- Keep language, genre, hardware, and voice-prompt applicability explicit.
+## Candidate comparison
 
-## Backend comparison
+- **Current in-tree candidates:** Kokoro speech-to-singing baseline, DiffSinger worker (after rate resolution), and the functional singing/vocal-tract experiment. These already have different tasks and must be characterized rather than assumed equivalent.
+- **SoulX-Singer:** a high-priority external comparison candidate because its official repository describes both melody-conditioned and score/MIDI-conditioned singing synthesis. Before integration, pin a specific source/model revision, verify the published model and dataset terms for the intended use, test English inputs and controls, and record its hardware/memory needs. A public paper or project claim is a reason to test, not evidence it outperforms Symthaea locally.
+- **SoulX-Singer-Eval:** a useful evaluation reference because its suite separates singing aesthetics (SingMOS-Pro/Sheet-SSQA), spectral quality, ASR WER/CER, speaker similarity, and melodic precision (FFE/GPE/VDE). Reuse the taxonomy first; adopt the heavyweight dependency only after checking licenses, model costs, and whether its inputs fit this corpus.
+- **MusicJudge (Interspeech 2026):** a promising later evaluation experiment because it attempts joint lyric correctness and pitch/rhythm assessment at musically meaningful lyric blocks. Do not make it a gate dependency until the implementation, model availability, licensing, and failure behavior have been independently inspected.
+- **VocalRender:** retain as a separate score-native research candidate only for cases where language, prompt-conditioning, checkpoint license/provenance, and hardware match. English quality must be measured rather than inferred from Mandarin-focused results.
+- **Whole-song music generators:** a separate task track. Do not score them as equivalent to score-conditioned vocal synthesis unless controllability, lyric requirements, and inputs are matched.
 
-- Current Kokoro speech-to-singing path as baseline.
-- Exact current DiffSinger worker/voicebank after output-rate contract reconciliation.
-- VocalRender as a research candidate only where prompt, language, license, and hardware constraints are appropriate; its released checkpoints primarily target Mandarin, so English quality is unproven.
-- Functional vocal tract as an interpretable experimental backend, not assumed production-quality.
-- Whole-song music generators in a separate track; do not score them as direct substitutes for score-conditioned singing unless task and controls are equivalent.
-
-For every candidate, capture exact revisions and model hashes. Do not infer current model quality from a paper's aggregate results.
+Research links:
+- SoulX-Singer official implementation: https://github.com/Soul-AILab/SoulX-Singer
+- SoulX-Singer evaluation suite: https://github.com/Soul-AILab/SoulX-Singer-Eval
+- MusicJudge paper: https://arxiv.org/abs/2606.26451
+- VocalRender implementation: https://github.com/pymaster17/VocalRender
 
 ## Execution sequence
 
-1. Inspect exact-head code, docs, scripts, and tests; identify the actual vocoder output-rate contract.
-2. Add a focused contract test that validates the authoritative output-rate declaration and rejects mismatches.
-3. Verify the documented provisioning chain against current paths and pinned revisions; distinguish repository assets from external model weights and runtime prerequisites.
-4. Run the smallest local smoke test when dependencies/checkpoints are available. If not, record the exact missing prerequisite and complete static validation.
-5. Render the fixed phrase pack for each viable backend; store immutable WAVs and manifests.
-6. Evaluate technical fidelity and perceptual proxies separately; inspect captures directly before selecting a winner.
-7. Make a targeted follow-up change based on the dominant evidenced failure mode.
+1. Resolve source/documentation drift and the legacy worker sample-rate contract.
+2. Add focused tests for the authoritative rate, malformed/empty worker output, and documentation paths; test fail-closed behavior without downloading model weights.
+3. When the actual pinned assets and runtime are available, run the smallest real renderer smoke test and save the exact prerequisite inventory, logs, observed rate, and output digest.
+4. Run the existing frozen 60-case corpus against viable in-tree backends; preserve each WAV, manifest, objective metrics, and concealed listening pack.
+5. Compare independent musical metrics and human ratings; only then select a dominant failure mode and make a targeted runtime change.
+6. Add an external backend adapter only after the capability mapping, licensing, language coverage, model pinning, and host resource budget are recorded.
 
 ## Promotion rule
 
-A candidate is not "better" because it builds, has more features, passes pitch checks, or scores well on a speech-trained estimator. Promotion requires:
-- no contract or integrity failures;
-- documented lyric and musical fidelity;
-- improved perceptual results on relevant cases;
-- no unacceptable regressions in identity, language, or register;
-- reproducible artifacts and model provenance;
-- a rights review appropriate to intended use.
+A candidate is not “better” because it builds, has more features, follows pitch under a score-guided tracker, or scores well on a speech-trained estimator. Promotion requires no contract/integrity failures; documented lyric and musical fidelity; improved blinded perceptual outcomes on relevant cases; no unacceptable identity/language/register regressions; reproducible artifacts and model provenance; and a rights review appropriate to intended deployment.
 
 ## Evidence record template
 
-For each run, retain a JSON manifest with `run_id`, `git_sha`, `backend`, `backend_version`, `checkpoint_sha256`, `voicebank_id`, `input_sha256`, `declared_sample_rate_hz`, `observed_sample_rate_hz`, `channels`, `samples`, `duration_s`, `output_sha256`, `integrity_status`, `f0_metrics`, `lyric_metrics`, `singmos_metrics`, `listening_notes`, `license_status`, and `limitations`.
+For each run retain at least `run_id`, `git_sha`, `backend`, `backend_version`, `checkpoint_sha256`, `voicebank_id`, `input_sha256`, `declared_sample_rate_hz`, `observed_sample_rate_hz`, `resampling_provenance`, `channels`, `samples`, `duration_s`, `output_sha256`, `integrity_status`, `independent_f0_metrics`, `score_guided_f0_metrics`, `lyric_metrics`, `singmos_metrics`, `listening_notes`, `license_status`, and `limitations`.
 
-Unknown fields must be explicitly marked unknown; never fabricate a result or mark queued work as passed.
+Unknown fields are explicitly marked unknown; queued work is not passed work.
