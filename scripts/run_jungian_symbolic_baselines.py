@@ -546,7 +546,7 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_by
     top_keys = {
         "schema", "corpus_id", "corpus_version", "corpus_status", "corpus_split",
         "corpus_blake3", "corpus_sha256", "source_revision", "glyph_source_blob", "glyph_registry_source_blob", "encoder_source_blob",
-        "dimension", "registry_size", "encoder_profile", "basis_profile", "registry_profile",
+        "dimension", "registry_size", "encoder_profile", "model_scope", "basis_profile", "registry_profile",
         "retrieval", "claim_ceiling", "pairwise_input_similarity_profile", "pairwise_input_similarity", "cases",
     }
     require(isinstance(projection, dict) and set(projection) == top_keys, "Glyph projection top-level schema mismatch")
@@ -560,6 +560,9 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_by
         require(isinstance(projection[field], str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", projection[field]) is not None, f"Glyph projection {field} malformed")
     require(projection["dimension"] == 16384, "Glyph projection must use 16,384 dimensions for this profile")
     require(projection["registry_size"] == 70, "Glyph projection registry size mismatch")
+    require(projection["model_scope"] == "Existing general-purpose Glyph Codex substrate; not a dedicated Jungian model or validated archetype detector.", "Glyph projection model scope changed")
+    require(projection["basis_profile"] == "GlyphBasis::new over the 11 committed MODALITY_KEYWORDS; vectors use TextHdcEncoder with 0.5 trigram and 0.2 sentiment weights.", "Glyph projection basis profile changed")
+    require(projection["registry_profile"] == "GlyphRegistry::new encodes only name + core_function + echo_phrase; relational_archetype, somatic_practice, sonic_signature, and field_modality are not part of the embedding input text.", "Glyph projection registry encoding profile changed")
     require(
         projection["pairwise_input_similarity_profile"] == "Cosine between whole-text TextHdcEncoder outputs; reflects this committed lexical/morphological/positional encoding only, not semantic truth.",
         "Glyph projection pairwise similarity profile mismatch",
@@ -577,7 +580,7 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_by
     require(isinstance(rows, list) and len(rows) == len(expected_ids), "Glyph projection case count mismatch")
     by_id: dict[str, dict[str, Any]] = {}
     for row in rows:
-        require(isinstance(row, dict) and set(row) == {"case_id", "input_blake3", "input_sha256", "modality_scores", "top_modalities", "top_glyphs"}, "Glyph projection case schema mismatch")
+        require(isinstance(row, dict) and set(row) == {"case_id", "input_blake3", "input_sha256", "modality_scores", "top_modalities", "glyph_scores", "top_glyphs"}, "Glyph projection case schema mismatch")
         case_id = row["case_id"]
         require(case_id in expected_ids and case_id not in by_id, f"unknown/duplicate Glyph projection case: {case_id}")
         require(re.fullmatch(r"[0-9a-f]{64}", row["input_blake3"] or "") is not None, f"malformed input BLAKE3 digest for {case_id}")
@@ -601,6 +604,24 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_by
             require(item["index"] == expected["index"] and item["modality"] == expected["modality"], f"{case_id}: top modality ranking does not derive from full modality scores")
             require(item["cosine_similarity"] == expected["cosine_similarity"], f"{case_id}: top modality score mismatches full score row")
 
+        full_glyph_scores = row["glyph_scores"]
+        require(isinstance(full_glyph_scores, list) and len(full_glyph_scores) == 70, f"{case_id}: glyph_scores must include all 70 registry entries")
+        glyph_ids_all: set[str] = set()
+        for rank, item in enumerate(full_glyph_scores, start=1):
+            require(isinstance(item, dict) and set(item) == {"rank", "glyph_id", "name", "class", "field_modality", "cosine_similarity"}, f"{case_id}: full glyph-score schema mismatch")
+            require(item["rank"] == rank, f"{case_id}: full glyph ranks are not contiguous")
+            gid = item["glyph_id"]
+            require(isinstance(gid, str) and gid and gid not in glyph_ids_all, f"{case_id}: empty/duplicate glyph id in full ranking")
+            glyph_ids_all.add(gid)
+            for name_field in ("name", "class", "field_modality"):
+                require(isinstance(item[name_field], str) and item[name_field], f"{case_id}: missing full glyph {name_field}")
+            metric = item["cosine_similarity"]
+            require(isinstance(metric, (int, float)) and not isinstance(metric, bool) and math.isfinite(metric) and -1 <= metric <= 1, f"{case_id}: invalid full glyph score")
+            if rank > 1:
+                previous = full_glyph_scores[rank - 2]
+                previous_metric = previous["cosine_similarity"]
+                require(previous_metric > metric or (previous_metric == metric and previous["glyph_id"] <= gid), f"{case_id}: full glyph ranking not sorted by score/stable ID")
+
         top_glyphs = row["top_glyphs"]
         require(isinstance(top_glyphs, list) and len(top_glyphs) == 5, f"{case_id}: top_glyphs must contain top five")
         for rank, item in enumerate(top_glyphs, start=1):
@@ -614,6 +635,9 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_by
                 require(previous_metric > metric or (previous_metric == metric and previous["glyph_id"] <= item["glyph_id"]), f"{case_id}: top glyphs not sorted by descending similarity/stable ID")
         glyph_ids = [glyph.get("glyph_id") for glyph in row["top_glyphs"]]
         require(all(isinstance(gid, str) and gid for gid in glyph_ids) and len(set(glyph_ids)) == 5, f"{case_id}: duplicate/missing glyph ID")
+        for top_item, full_item in zip(top_glyphs, full_glyph_scores[:5], strict=True):
+            for field in ("rank", "glyph_id", "name", "class", "field_modality", "cosine_similarity"):
+                require(top_item[field] == full_item[field], f"{case_id}: top-five glyph ranking conflicts with complete 70-entry ranking")
         by_id[case_id] = row
     require(set(by_id) == expected_ids, "Glyph projection case set incomplete")
 
@@ -723,7 +747,32 @@ def self_test_glyph_projection_validator(
             "input_sha256": hashlib.sha256(case["input_text"].encode("utf-8")).hexdigest(),
             "modality_scores": full_scores,
             "top_modalities": top_modalities,
-            "top_glyphs": top_glyphs,
+            "glyph_scores": [
+                {
+                    "rank": index + 1,
+                    "glyph_id": f"G{index:02d}",
+                    "name": f"Glyph {index:02d}",
+                    "class": "SyntheticTestOnly",
+                    "field_modality": f"Modality{index:02d}",
+                    "cosine_similarity": 1.0 - index / 100.0,
+                }
+                for index in range(70)
+            ],
+            "top_glyphs": [
+                {
+                    **{
+                        "rank": index + 1,
+                        "glyph_id": f"G{index:02d}",
+                        "name": f"Glyph {index:02d}",
+                        "class": "SyntheticTestOnly",
+                        "field_modality": f"Modality{index:02d}",
+                        "cosine_similarity": 1.0 - index / 100.0,
+                    },
+                    "core_function": "validator self-test fixture",
+                    "echo_phrase": "not a psychological interpretation",
+                }
+                for index in range(5)
+            ],
         })
     pair_rows = [
         {"left_case_id": corpus["cases"][left]["id"], "right_case_id": corpus["cases"][right]["id"], "cosine_similarity": 0.0}
@@ -744,6 +793,9 @@ def self_test_glyph_projection_validator(
         "encoder_source_blob": "3" * 40,
         "dimension": 16384,
         "registry_size": 70,
+        "model_scope": "Existing general-purpose Glyph Codex substrate; not a dedicated Jungian model or validated archetype detector.",
+        "basis_profile": "GlyphBasis::new over the 11 committed MODALITY_KEYWORDS; vectors use TextHdcEncoder with 0.5 trigram and 0.2 sentiment weights.",
+        "registry_profile": "GlyphRegistry::new encodes only name + core_function + echo_phrase; relational_archetype, somatic_practice, sonic_signature, and field_modality are not part of the embedding input text.",
         "encoder_profile": {
             "type": "TextHdcEncoder",
             "ngram_size": 3,
