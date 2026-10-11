@@ -170,9 +170,14 @@ pub fn parse_jsonl_tree(root: &Path) -> Result<Vec<LogEvent>> {
 }
 
 fn visit(dir: &Path, out: &mut Vec<LogEvent>) -> Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    // read_dir order is filesystem-dependent. Sorting is necessary for
+    // deterministic corpus construction and seeded training runs.
+    let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?
+        .map(|entry| entry.map(|e| e.path()))
+        .collect::<std::io::Result<_>>()?;
+    paths.sort();
+
+    for path in paths {
         if path.is_dir() {
             visit(&path, out)?;
         } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
