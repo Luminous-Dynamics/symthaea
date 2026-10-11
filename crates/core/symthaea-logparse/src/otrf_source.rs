@@ -118,8 +118,9 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         };
         if sval.len() > 256 {
             // Mordor/Splunk include huge blobs; truncate for the encoder so
-            // hash collisions don't obscure short-field structure.
-            fields.insert(k.clone(), sval[..256].to_string());
+            // hash collisions don't obscure short-field structure. The helper
+            // stops at a UTF-8 boundary instead of panicking on non-ASCII data.
+            fields.insert(k.clone(), truncate_utf8(&sval, 256).to_string());
         } else {
             fields.insert(k.clone(), sval);
         }
@@ -137,6 +138,16 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         host,
         label: None,
     })
+}
+
+/// Return the longest prefix of `value` that fits within `max_bytes`
+/// without splitting a UTF-8 code point.
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
+    let mut end = value.len().min(max_bytes);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
 }
 
 fn parse_level(s: &str) -> Option<Severity> {
@@ -159,6 +170,35 @@ fn parse_level(s: &str) -> Option<Severity> {
         "info" | "informational" => Some(Severity::Info),
         "debug" | "verbose" => Some(Severity::Debug),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn field_truncation_preserves_utf8_boundaries() {
+        // A 3-byte character makes byte offset 256 land inside a code point.
+        let long = "漢".repeat(100);
+        let value = serde_json::json!({
+            "SourceName": "Microsoft-Windows-Security-Auditing",
+            "Channel": "Security",
+            "EventID": 4624,
+            "LongField": long,
+        });
+        let event = json_to_log_event(&value).expect("object should parse");
+        let truncated = &event.fields["LongField"];
+        assert!(truncated.len() <= 256);
+        assert_eq!(truncated.len(), 255);
+        assert!(truncated.chars().all(|c| c == '漢'));
+    }
+
+    #[test]
+    fn utf8_truncation_handles_short_and_zero_limits() {
+        assert_eq!(truncate_utf8("security", 256), "security");
+        assert_eq!(truncate_utf8("漢字", 0), "");
+        assert_eq!(truncate_utf8("漢字", 4), "漢");
     }
 }
 
