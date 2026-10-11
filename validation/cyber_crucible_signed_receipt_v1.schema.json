@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/validation/cyber_crucible_signed_receipt_v1.schema.json",
+  "title": "Symthaea Cyber Crucible detached signed receipt v1",
+  "description": "A non-authorizing receipt envelope. Signature authenticity is determined by a separate verifier and operator-controlled trust policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payload", "signature"],
+  "properties": {
+    "payload": { "$ref": "#/$defs/payload" },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$",
+      "description": "Unpadded base64url encoding of a 64-byte Ed25519 signature."
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "utcSecond": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "algorithm", "receipt_id", "key_id", "evaluator_id",
+        "role", "campaign_id", "run_nonce", "issued_at", "expires_at",
+        "scenario_id", "scenario_revision", "scenario_digest", "evidence_digest",
+        "status", "proposal_id", "proposal_digest"
+      ],
+      "properties": {
+        "schema_version": { "const": "cyber-crucible-signed-receipt.v1" },
+        "algorithm": { "const": "Ed25519" },
+        "receipt_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "key_id": { "type": "string", "minLength": 1 },
+        "evaluator_id": { "type": "string", "minLength": 1 },
+        "role": {
+          "enum": [
+            "functional_verdict", "security_verdict", "authorization_decision",
+            "outcome_verification", "recovery_verification"
+          ]
+        },
+        "campaign_id": { "type": "string", "minLength": 1 },
+        "run_nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "issued_at": { "$ref": "#/$defs/utcSecond" },
+        "expires_at": { "$ref": "#/$defs/utcSecond" },
+        "scenario_id": { "type": "string", "minLength": 1 },
+        "scenario_revision": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "scenario_digest": { "$ref": "#/$defs/sha256" },
+        "evidence_digest": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["pass", "fail", "inconclusive", "not_run"] },
+        "proposal_id": { "type": ["string", "null"] },
+        "proposal_digest": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "role": { "const": "authorization_decision" } } },
+          "then": {
+            "properties": {
+              "proposal_id": { "type": "string", "minLength": 1 },
+              "proposal_digest": { "$ref": "#/$defs/sha256" }
+            }
+          },
+          "else": {
+            "properties": {
+              "proposal_id": { "type": "null" },
+              "proposal_digest": { "type": "null" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
