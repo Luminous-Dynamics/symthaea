@@ -289,7 +289,14 @@ impl std::error::Error for SnapshotComparisonError {}
 const MIN_BASELINE_MAGNITUDE_FOR_PERCENTAGE_COMPARISON: f64 = 1e-10;
 
 impl RegressionReport {
-    /// Compare current results against a baseline snapshot.
+    /// Compare current results against a baseline snapshot using the intersection
+    /// of benchmark/metric keys.
+    ///
+    /// This is an exploratory compatibility API: missing baseline/current keys
+    /// are skipped, and the percentage policy assumes higher-is-better metrics.
+    /// Do not use this method to qualify an evidence baseline or integrity lane.
+    /// Such callers must use `compare_strict_metric_population()` and separately
+    /// verify execution identity and metric direction.
     ///
     /// `warning_pct` and `critical_pct` are degradation thresholds expressed as
     /// fractions (e.g., 0.05 for 5%, 0.10 for 10%). A regression is flagged only
