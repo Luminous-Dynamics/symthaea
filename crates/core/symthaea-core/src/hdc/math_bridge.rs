@@ -746,6 +746,73 @@ impl UnifiedMathEngine {
         })
     }
 
+    /// Checked natural logarithm with explicit real/complex domain policy.
+    ///
+    /// Positive real inputs use the numeric tower, preserving ln(1) = 0 exactly
+    /// when the input is exact. Negative real values promote to the principal
+    /// complex logarithm. Zero, malformed rationals, and non-finite values fail
+    /// with typed errors instead of producing infinities, NaNs, or panics.
+    pub fn checked_ln(
+        &self,
+        value: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(value)?;
+        if value.is_zero_exact() {
+            return Err(NumericArithmeticError::NonPositiveLogarithmInput);
+        }
+
+        if value.is_complex() || Self::math_value_is_negative(value) {
+            let logged = value.to_complex().ln();
+            if !logged.re.is_finite() || !logged.im.is_finite() {
+                return Err(NumericArithmeticError::NonFiniteResult);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result_unary(logged, value, "ln"),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let number = value.to_tower_number();
+        let logged = self.tower.checked_ln(&number)?;
+        Ok(CheckedMathResult {
+            result: self.from_tower_result_unary(&logged.result, value, "ln"),
+            precision: logged.precision,
+        })
+    }
+
+    /// Checked exponential with typed overflow and total-underflow handling.
+    ///
+    /// Real exact zero maps to exact one; other real and all complex inputs are
+    /// approximate. Nonzero subnormal outputs are preserved instead of being
+    /// confused with total underflow.
+    pub fn checked_exp(
+        &self,
+        value: &MathValue,
+    ) -> Result<CheckedMathResult, NumericArithmeticError> {
+        Self::validate_checked_math_value(value)?;
+
+        if value.is_complex() {
+            let exponentiated = value.to_complex().exp();
+            if !exponentiated.re.is_finite() || !exponentiated.im.is_finite() {
+                return Err(NumericArithmeticError::ExponentialOverflow);
+            }
+            if exponentiated.re == 0.0 && exponentiated.im == 0.0 && !value.is_zero_exact() {
+                return Err(NumericArithmeticError::ExponentialUnderflow);
+            }
+            return Ok(CheckedMathResult {
+                result: self.from_complex_result_unary(exponentiated, value, "exp"),
+                precision: ArithmeticPrecision::Approximate,
+            });
+        }
+
+        let number = value.to_tower_number();
+        let exponentiated = self.tower.checked_exp(&number)?;
+        Ok(CheckedMathResult {
+            result: self.from_tower_result_unary(&exponentiated.result, value, "exp"),
+            precision: exponentiated.precision,
+        })
+    }
+
     /// Checked general exponentiation, preserving exactness metadata.
     ///
     /// Defined domain failures and total underflow are typed errors. Complex-domain
@@ -1278,6 +1345,72 @@ mod tests {
     // ====================================================================
     // sqrt(-1) → Complex
     // ====================================================================
+
+    #[test]
+    fn test_checked_ln_preserves_exact_one_and_promotes_negative_to_complex() {
+        let e = engine();
+        let exact = e.checked_ln(&MathValue::Natural(1)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(0)));
+
+        let negative = e.checked_ln(&MathValue::Integer(-1)).unwrap();
+        assert_eq!(negative.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(negative.result.value, MathValue::Complex { re, im } if re.abs() < 1e-12 && (im - std::f64::consts::PI).abs() < 1e-12));
+    }
+
+    #[test]
+    fn test_checked_ln_rejects_zero_and_invalid_inputs_without_panicking() {
+        let e = engine();
+        assert_eq!(
+            e.checked_ln(&MathValue::Natural(0)).unwrap_err(),
+            NumericArithmeticError::NonPositiveLogarithmInput
+        );
+        assert_eq!(
+            e.checked_ln(&MathValue::Complex { re: 0.0, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonPositiveLogarithmInput
+        );
+        assert_eq!(
+            e.checked_ln(&MathValue::Rational { numerator: 2, denominator: 4 }).unwrap_err(),
+            NumericArithmeticError::NonCanonicalRationalOperand
+        );
+        assert_eq!(
+            e.checked_ln(&MathValue::Complex { re: f64::NAN, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
+
+    #[test]
+    fn test_checked_exp_preserves_exact_zero_and_finite_subnormal() {
+        let e = engine();
+        let exact = e.checked_exp(&MathValue::Natural(0)).unwrap();
+        assert_eq!(exact.precision, ArithmeticPrecision::Exact);
+        assert!(matches!(exact.result.value, MathValue::Natural(1)));
+
+        let subnormal = e.checked_exp(&MathValue::Real(-744.0)).unwrap();
+        assert_eq!(subnormal.precision, ArithmeticPrecision::Approximate);
+        assert!(matches!(subnormal.result.value, MathValue::Real(value) if value > 0.0 && value.is_finite()));
+    }
+
+    #[test]
+    fn test_checked_exp_rejects_overflow_underflow_and_nonfinite_values() {
+        let e = engine();
+        assert_eq!(
+            e.checked_exp(&MathValue::Natural(1000)).unwrap_err(),
+            NumericArithmeticError::ExponentialOverflow
+        );
+        assert_eq!(
+            e.checked_exp(&MathValue::Real(-1000.0)).unwrap_err(),
+            NumericArithmeticError::ExponentialUnderflow
+        );
+        assert_eq!(
+            e.checked_exp(&MathValue::Real(f64::NAN)).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+        assert_eq!(
+            e.checked_exp(&MathValue::Complex { re: f64::INFINITY, im: 0.0 }).unwrap_err(),
+            NumericArithmeticError::NonFiniteOperand
+        );
+    }
 
     #[test]
     fn test_checked_power_keeps_rational_integer_exponents_exact() {
