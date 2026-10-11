@@ -222,8 +222,8 @@ Expected Free Energy naturally decomposes into epistemic (uncertainty reduction)
 ### 9.1 Consciousness Benchmarks
 - Psych-Bench: 862 tests, 98 benchmarks across 20 cognitive domains
 - 14/14 Butlin indicators present (mean 0.85)
-- ETHICS trained: 94.5% (Hendrycks, 4 domains, 2K samples)
-- Grand mean z-score: +0.961
+- ETHICS: no qualified full-suite accuracy result. The prior 94.5% headline was retracted; the later 56.2% aggregate is unqualified pending task/label/split reconciliation. See `docs/ETHICS_TASK_SEMANTICS_AUDIT_2026-10-11.md`.
+- Grand mean z-score: +0.961 (historical internal aggregate; not independent validation of ethics and must be recalculated if it includes an unqualified ETHICS metric)
 
 ### 9.2 Federated Learning Quality
 - 45% Byzantine fault tolerance (PoGQ algorithm)
