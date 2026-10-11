@@ -241,7 +241,11 @@ fn print_selective_curve(
         );
     }
     println!(
-        "  Margin ranking is not calibrated confidence; this curve does not select a deployment threshold."
+        "  {}",
+        concat!(
+            "Margin ranking is not calibrated confidence; ",
+            "this curve does not select a deployment threshold."
+        )
     );
     Ok(())
 }
