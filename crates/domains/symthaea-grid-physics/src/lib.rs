@@ -16,6 +16,7 @@
 //! - [`islanding`] — passive islanding detection (ROCOF, threshold), incl. the
 //!   real non-detection-zone limitation
 //! - [`generation`] — PVWatts-style solar + IEC 61400-12-style wind generation
+//! - [`fixture_mapping`] — checked kWh/interval to mean-kW mapping
 //! - [`scheduling`] — storage-scheduling scenario harness, scored on cost /
 //!   unserved energy / battery cycles, with a naive baseline and a first
 //!   reserve-aware advisor policy
@@ -26,6 +27,7 @@ pub mod battery;
 pub mod droop;
 pub mod feeder;
 pub mod generation;
+pub mod fixture_mapping;
 pub mod islanding;
 pub mod qualification;
 pub mod scheduling;
