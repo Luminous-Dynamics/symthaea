@@ -66,7 +66,7 @@ SYTHAEA_HDC_LTC_BENCH_4M=1 cargo run --release -p symthaea-hdc-ltc --example sca
 
 ## GPU backend profile
 
-For an 8 GiB RTX 2070 Laptop GPU target, see [the hardware-specific GPU profile](docs/RTX_2070_LAPTOP_GPU_PROFILE.md). It defines a 1.5 GiB default working-set soft cap, a conditional 2 GiB ceiling, adapter-limit enforcement, and CPU/GPU qualification requirements. These are design limits, not evidence of a completed GPU backend.
+For the 8 GiB RTX 2070 Laptop GPU target, see [the workstation GPU profile](docs/RTX_2070_LAPTOP_GPU_PROFILE.md). It defines a 1.5 GiB default working-set soft cap, a conditional 2 GiB ceiling, adapter-limit enforcement, and CPU/GPU qualification requirements. For the Google Pixel 8 Pro, see [the mobile GPU profile](docs/PIXEL_8_PRO_MOBILE_GPU_PROFILE.md), which sets a 256 MiB default cap, a conditional 512 MiB ceiling, and sustained-thermal/mobile qualification requirements. These profiles are design constraints, not evidence of a completed GPU backend.
 
 ## References
 
