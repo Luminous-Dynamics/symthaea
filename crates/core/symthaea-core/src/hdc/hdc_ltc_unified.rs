@@ -28,7 +28,8 @@
 //!
 //! ## Closed-Form Solution
 //!
-//! Like CfC networks, we derive a closed-form solution enabling O(1) temporal jumps:
+//! Like CfC networks, we derive a solver-free closed-form update with O(D) work
+//! per jump, independent of the elapsed time horizon Δt at fixed dimension:
 //! ```text
 //! x(t+Δt) = x_∞ + (x(t) - x_∞) * exp(-Δt/τ)
 //! ```
@@ -37,7 +38,7 @@
 //!
 //! ## Key Benefits
 //!
-//! 1. **O(1) Temporal Jumps**: No ODE integration needed for large time steps
+//! 1. **Time-horizon-independent work**: One O(D) coordinate pass; no repeated ODE substeps
 //! 2. **HDC Algebraic Operations**: Binding/bundling instead of matrix multiply
 //! 3. **State-Dependent Dynamics**: Time constant adapts to state complexity
 //! 4. **Memory as Computation**: HV state IS the memory (holographic)
@@ -50,10 +51,10 @@
 //! let config = UnifiedConfig::default();
 //! let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
 //!
-//! // O(1) jump to arbitrary time
+//! // O(D) update regardless of elapsed time horizon, at fixed vector dimension
 //! let input = ContinuousHV::random_default(123);
-//! neuron.evolve_closed_form(1.0, &input); // Jump 1 second
-//! neuron.evolve_closed_form(100.0, &input); // Jump 100 seconds (same cost!)
+//! neuron.evolve_closed_form(1.0, &input);   // Jump 1 second
+//! neuron.evolve_closed_form(100.0, &input); // Jump 100 seconds
 //! ```
 
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
