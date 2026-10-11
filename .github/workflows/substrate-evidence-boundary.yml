@@ -1,0 +1,175 @@
+name: Substrate Evidence Boundary
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-core/src/hdc/substrate_validation.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/substrate/validation.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/cortical_similarity.rs'
+      - '.github/workflows/substrate-evidence-boundary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Qualify no-auto-promotion invariant
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format contract
+        run: cargo fmt --check -p symthaea-core
+
+      - name: Core evidence-boundary tests
+        run: cargo test -p symthaea-core --lib --features neural_validation substrate_validation
+
+      - name: Neural-validation consumer compile/tests
+        run: cargo test -p symthaea-psych-bench --lib --features neural_validation
+
+      - name: Authority topology ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          path = Path('crates/core/symthaea-core/src/hdc/substrate_validation.rs')
+          source = path.read_text(encoding='utf-8')
+
+          assert 'pub fn substrate_mut' not in source, 'public mutable SubstrateKnowledge escape hatch reintroduced'
+          assert 'Generic deserialization is deliberately unavailable' in source
+          assert 'pub substrates:' not in source
+          assert 'pub methodology_notes:' not in source
+
+          match = re.search(
+              r'#\[derive\(([^)]*)\)\]\s*pub struct SubstrateValidationFramework\b',
+              source,
+              flags=re.MULTILINE,
+          )
+          assert match, 'SubstrateValidationFramework derive not found'
+          derives = {item.strip() for item in match.group(1).split(',')}
+          assert 'Serialize' in derives, derives
+          assert 'Deserialize' not in derives, derives
+
+          def impl_bodies(type_name: str) -> list[str]:
+              bodies = []
+              pattern = re.compile(rf'\bimpl\s+{re.escape(type_name)}\s*\{{')
+              for impl_match in pattern.finditer(source):
+                  open_brace = source.find('{', impl_match.start())
+                  assert open_brace >= 0
+                  depth = 1
+                  index = open_brace + 1
+                  while index < len(source) and depth:
+                      if source[index] == '{':
+                          depth += 1
+                      elif source[index] == '}':
+                          depth -= 1
+                      index += 1
+                  assert depth == 0, f'unclosed impl block for {type_name}'
+                  bodies.append(source[open_brace + 1:index - 1])
+              return bodies
+
+          framework_impls = impl_bodies('SubstrateValidationFramework')
+          assert framework_impls, 'SubstrateValidationFramework impl not found'
+          public_mutators = {
+              name
+              for body in framework_impls
+              for name in re.findall(
+                  r'pub\s+fn\s+(\w+)\s*\(\s*&mut\s+self',
+                  body,
+                  flags=re.MULTILINE,
+              )
+          }
+          assert public_mutators == {
+              'record_prediction_result',
+              'check_evidence_upgrade',
+              'record_cortical_similarity',
+          }, public_mutators
+
+          for rust in Path('crates/core/symthaea-core/src').rglob('*.rs'):
+              text = rust.read_text(encoding='utf-8')
+              assert not re.search(
+                  r'impl(?:\s*<[^>]*>)?\s+[^\n{]*Deserialize[^\n{]*for\s+SubstrateValidationFramework\b',
+                  text,
+              ), f'manual Deserialize authority path in {rust}'
+
+          print('authority topology closed: framework mutators are exact-allowlisted and generic import is unavailable')
+          PY
+
+      - name: Authority-surface lint contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy -p symthaea-core --lib --features neural_validation --message-format=json > "$RUNNER_TEMP/core-clippy.json"
+          cargo clippy -p symthaea-psych-bench --lib --features neural_validation --message-format=json > "$RUNNER_TEMP/consumer-clippy.json"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          # Clippy still compiles the complete affected crates, including neural
+          # consumers. Only diagnostics whose primary span lies on files modified
+          # by this PR may decide this narrow authority theorem.
+          targets = {
+              "crates/core/symthaea-core/src/hdc/substrate_validation.rs",
+              "crates/domains/symthaea-psych-bench/src/benchmarks/substrate/validation.rs",
+          }
+          bad = []
+          for name in ("core-clippy.json", "consumer-clippy.json"):
+              path = Path(os.environ["RUNNER_TEMP"]) / name
+              for raw in path.read_text().splitlines():
+                  try:
+                      event = json.loads(raw)
+                  except json.JSONDecodeError:
+                      continue
+                  if event.get("reason") != "compiler-message":
+                      continue
+                  message = event.get("message", {})
+                  if message.get("level") not in {"warning", "error"}:
+                      continue
+                  primary_files = {
+                      span.get("file_name")
+                      for span in message.get("spans", [])
+                      if span.get("is_primary")
+                  }
+                  if primary_files & targets:
+                      rendered = (message.get("rendered") or message.get("message") or "diagnostic").strip()
+                      bad.append(rendered)
+
+          if bad:
+              print("PR-modified authority-sensitive files emitted clippy/rustc diagnostics:")
+              for diagnostic in bad:
+                  print(diagnostic)
+              raise SystemExit(1)
+
+          print("PR-modified authority-sensitive files are diagnostic-clean; unrelated diagnostics do not decide this theorem.")
+          PY
