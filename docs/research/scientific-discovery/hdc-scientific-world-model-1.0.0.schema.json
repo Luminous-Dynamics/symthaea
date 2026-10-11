@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/docs/research/scientific-discovery/hdc-scientific-world-model-1.0.0.schema.json",
+  "title": "Symthaea HDC Scientific World Model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "authority",
+    "representation_scope",
+    "non_equivalences"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.research.scientific_discovery.hdc_world_model"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "authority": {
+      "const": "computational_representation_only"
+    },
+    "representation_scope": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "scientific_entity",
+          "typed_relation",
+          "scientific_state",
+          "scientific_motif",
+          "structural_similarity",
+          "deterministic_codebook"
+        ]
+      }
+    },
+    "non_equivalences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 6
+    }
+  }
+}
