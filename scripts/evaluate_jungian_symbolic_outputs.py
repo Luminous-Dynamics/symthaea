@@ -22,7 +22,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
-EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v3"
+EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v4"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {
@@ -35,7 +35,12 @@ SYMBOL_TERMS = (
     "shadow", "anima", "animus", "hero", "archetype", "unconscious",
 )
 _SYMBOL_ALT = "|".join(re.escape(term) for term in sorted(SYMBOL_TERMS, key=len, reverse=True))
-_MAP_VERBS = r"(?:maps?\s+to|means?|symboli[sz]es?|represents?|stands?\s+for|is\s+(?:a\s+)?symbol\s+of|is\s+associated\s+with|corresponds?\s+to)"
+_MAP_VERBS = (
+    r"(?:(?:(?:can|could|may|might|often|sometimes|typically)\s+)?"
+    r"(?:maps?\s+to|means?|symboli[sz]es?|represents?|stands?\s+for|corresponds?\s+to)"
+    r"|(?:(?:can|could|may|might)\s+be\s+)?(?:is\s+)?(?:a\s+)?symbol\s+of"
+    r"|(?:(?:can|could|may|might)\s+be\s+)?(?:is\s+)?(?:(?:often|typically|sometimes)\s+)?associated\s+with)"
+)
 SYMBOL_MAPPING_RE = re.compile(
     r"\b(?:" + _SYMBOL_ALT + r")\b"
     r"(?:['’]s)?[\s'’\".,:;!?()\-]{0,40}\b" + _MAP_VERBS + r"\b"
@@ -446,7 +451,7 @@ def evaluate(
     distinct_pair_text_count = sum(row["distinct_interpretation_text"] for row in pair_rows)
     return {
         "schema": EVALUATOR_SCHEMA,
-        "evaluator_id": "static_output_contract_cues_v3",
+        "evaluator_id": "static_output_contract_cues_v4",
         "method_id": method_id,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
@@ -492,6 +497,17 @@ def self_test() -> list[str]:
                 "supporting_evidence_ids": ["JSP-006-E1"],
                 "epistemic_status": "InterpretationHypothesis",
             }], "abstention": {"abstain": False, "reason": "Self-test source-scoped hypothesis."}}), True),
+        ("modal symbolizing form is detected", symbol_mapping_claim("The owl can symbolize wisdom."), True),
+        ("modal representing form is detected", symbol_mapping_claim("The owl may represent wisdom."), True),
+        ("modal symbol-of form is detected", symbol_mapping_claim("The owl can be a symbol of wisdom."), True),
+        ("qualified association form is detected", symbol_mapping_claim("The owl is often associated with wisdom."), True),
+        ("attributed modal mapping is allowed",
+            not unqualified_symbol_mapping_claim({"interpretations": [{
+                "statement": "In this story, the owl may symbolize wisdom.",
+                "scope": "This story only",
+                "supporting_evidence_ids": ["JSP-006-E1"],
+                "epistemic_status": "InterpretationHypothesis",
+            }], "abstention": {"abstain": False, "reason": "Self-test story-scoped hypothesis."}}), True),
         ("universal symbol mapping is detected", symbol_mapping_claim("The key always means access."), True),
         ("universalization before symbol is detected",
             unqualified_symbol_mapping_claim({"interpretations": [{
@@ -651,7 +667,7 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 27 evaluator controls (22 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
+        print("PASS: 32 evaluator controls (27 text-cue, 1 context contrast, 2 JSON integrity, 2 bundle/source identity)")
     if not args.results:
         return 0
     if args.output_dir is None:
