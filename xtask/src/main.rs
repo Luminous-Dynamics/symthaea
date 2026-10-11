@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod cargo_graph;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -35,6 +36,12 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Emit a canonical, content-addressed snapshot of the locked Cargo resolve graph.
+    CargoGraph {
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -147,6 +154,13 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::CargoGraph { output } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            cargo_graph::run(&root, output)?;
         }
     }
     Ok(())
