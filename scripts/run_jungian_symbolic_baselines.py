@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -530,11 +531,71 @@ def self_test(cases: list[dict[str, Any]], methods: list[tuple[str, Any, dict[st
                 break
     return failures
 
+
+def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_revision: str) -> dict[str, dict[str, Any]]:
+    """Validate the representation-only receipt from the actual Rust Glyph/HDC API."""
+    top_keys = {
+        "schema", "corpus_id", "corpus_version", "corpus_status", "corpus_split",
+        "corpus_blake3", "source_revision", "glyph_source_blob", "glyph_registry_source_blob",
+        "dimension", "registry_size", "encoder_profile", "basis_profile", "registry_profile",
+        "retrieval", "claim_ceiling", "cases",
+    }
+    require(isinstance(projection, dict) and set(projection) == top_keys, "Glyph projection top-level schema mismatch")
+    require(projection["schema"] == "symthaea-jungian-glyph-projection-v1", "Glyph projection schema mismatch")
+    require(projection["corpus_id"] == corpus["corpus_id"] and projection["corpus_version"] == corpus["version"], "Glyph projection corpus identity mismatch")
+    require(projection["corpus_status"] == "DevelopmentProbe" and projection["corpus_split"] == "ExposedDevelopment", "Glyph projection split/status mismatch")
+    require(projection["source_revision"] == source_revision, "Glyph projection source revision mismatch")
+    require(re.fullmatch(r"[0-9a-f]{64}", projection["corpus_blake3"] or "") is not None, "Glyph projection corpus BLAKE3 identity is malformed")
+    for field in ("glyph_source_blob", "glyph_registry_source_blob"):
+        require(isinstance(projection[field], str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", projection[field]) is not None, f"Glyph projection {field} malformed")
+    require(projection["dimension"] == 16384, "Glyph projection must use 16,384 dimensions for this profile")
+    require(projection["registry_size"] == 70, "Glyph projection registry size mismatch")
+    require(projection["encoder_profile"] == {
+        "type": "TextHdcEncoder",
+        "ngram_size": 3,
+        "trigram_weight": 0.5,
+        "sentiment_weight": 0.2,
+        "seed_profile": "the exact committed TextHdcEncoder implementation",
+    }, "Glyph projection encoder profile mismatch")
+    expected_ids = {case["id"] for case in corpus["cases"]}
+    rows = projection["cases"]
+    require(isinstance(rows, list) and len(rows) == len(expected_ids), "Glyph projection case count mismatch")
+    by_id: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        require(isinstance(row, dict) and set(row) == {"case_id", "input_blake3", "modality_scores", "top_modalities", "top_glyphs"}, "Glyph projection case schema mismatch")
+        case_id = row["case_id"]
+        require(case_id in expected_ids and case_id not in by_id, f"unknown/duplicate Glyph projection case: {case_id}")
+        require(re.fullmatch(r"[0-9a-f]{64}", row["input_blake3"] or "") is not None, f"malformed input digest for {case_id}")
+        scores = row["modality_scores"]
+        require(isinstance(scores, list) and len(scores) == 11, f"{case_id}: expected 11 modality scores")
+        names: set[str] = set()
+        for i, score in enumerate(scores):
+            require(isinstance(score, dict) and set(score) == {"index", "modality", "cosine_similarity"}, f"{case_id}: modality score shape mismatch")
+            require(score["index"] == i and isinstance(score["modality"], str), f"{case_id}: noncanonical modality order")
+            require(score["modality"] not in names, f"{case_id}: duplicate modality name")
+            names.add(score["modality"])
+            value = score["cosine_similarity"]
+            require(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and -1 <= value <= 1, f"{case_id}: invalid modality similarity")
+        for field in ("top_modalities", "top_glyphs"):
+            values = row[field]
+            require(isinstance(values, list) and len(values) == 5, f"{case_id}: {field} must contain top five")
+            for rank, item in enumerate(values, start=1):
+                require(isinstance(item, dict) and item.get("rank") == rank, f"{case_id}: invalid {field} rank")
+                metric = item.get("cosine_similarity")
+                require(isinstance(metric, (int, float)) and not isinstance(metric, bool) and math.isfinite(metric) and -1 <= metric <= 1, f"{case_id}: invalid {field} similarity")
+        glyph_ids = [glyph.get("glyph_id") for glyph in row["top_glyphs"]]
+        require(all(isinstance(gid, str) and gid for gid in glyph_ids) and len(set(glyph_ids)) == 5, f"{case_id}: duplicate/missing glyph ID")
+        by_id[case_id] = row
+    require(set(by_id) == expected_ids, "Glyph projection case set incomplete")
+    return by_id
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     parser.add_argument("--output-dir", type=Path, required=True, help="directory for immutable-by-digest output captures")
     parser.add_argument("--source-revision", required=True, help="exact 40- or 64-character lowercase Git revision under test")
+    parser.add_argument("--glyph-projection", type=Path, help="optional exact-source output from jungian_glyph_projection_probe")
     args = parser.parse_args()
 
     try:
@@ -549,6 +610,25 @@ def main() -> int:
         runner_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         args.output_dir.mkdir(parents=True, exist_ok=True)
 
+        glyph_projection_by_id = None
+        glyph_projection_sha256 = None
+        glyph_projection_meta = None
+        if args.glyph_projection:
+            projection_bytes = args.glyph_projection.read_bytes()
+            projection = load_json(args.glyph_projection)
+            glyph_projection_by_id = validate_glyph_projection(projection, corpus, args.source_revision)
+            glyph_projection_sha256 = hashlib.sha256(projection_bytes).hexdigest()
+            glyph_projection_meta = {
+                "file": args.glyph_projection.name,
+                "sha256": glyph_projection_sha256,
+                "source_revision": projection["source_revision"],
+                "glyph_source_blob": projection["glyph_source_blob"],
+                "glyph_registry_source_blob": projection["glyph_registry_source_blob"],
+                "corpus_blake3": projection["corpus_blake3"],
+                "dimension": projection["dimension"],
+                "registry_size": projection["registry_size"],
+            }
+
         methods = [
             ("keyword_dictionary_foil_v0", lexical_foil, {
                 "class": "Intentionally context-blind failure-prone foil",
@@ -557,7 +637,7 @@ def main() -> int:
             }),
             ("context_guardrails_rules_v0", context_rule_baseline, {
                 "class": "Hand-authored deterministic context rules",
-                "purpose": "Probe explicit context, attribution, and abstention paths before adding an HDC adapter.",
+                "purpose": "Probe explicit context, attribution, and abstention paths independently of the HDC projection.",
                 "production_use": False,
             }),
         ]
@@ -570,8 +650,9 @@ def main() -> int:
             "corpus_sha256": corpus_digest,
             "runner_sha256": runner_digest,
             "source_revision": args.source_revision,
-            "claim_ceiling": "Rule output and rubric agreement only; no psychological truth, archetype validity, clinical efficacy, or consciousness claim.",
+            "claim_ceiling": "Rule output and rubric agreement only; HDC output is representation-level retrieval only. No psychological truth, archetype validity, clinical efficacy, or consciousness claim.",
             "metric_warning": "Required/forbidden behavior labels are hand-authored development rubrics. Scores are not blinded human evaluation, scientific accuracy, model generalization, or holdout performance.",
+            "glyph_projection_artifact": glyph_projection_meta,
             "methods": [],
             "cases": [],
         }
@@ -613,14 +694,23 @@ def main() -> int:
                 "summary": {k: v for k, v in summary.items() if k != "per_case"},
             })
 
-        # The actual Glyph/HDC projection has not been called by this runner.
-        capture["methods"].append({
-            "method_id": "glyph_hdc",
-            "class": "Symthaea Glyph/HDC model",
-            "state": "not_run",
-            "reason": "No adapter from glyph_basis/HDC projection to this normalized interpretation contract is implemented in this PR. The deterministic context-rule baseline must not be presented as HDC.",
-            "summary": None,
-        })
+        if glyph_projection_by_id is not None:
+            capture["methods"].append({
+                "method_id": "glyph_hdc_projection_v0",
+                "class": "Actual Symthaea GlyphBasis / TextHdcEncoder / GlyphRegistry",
+                "state": "projection_only_not_rubric_scored",
+                "reason": "Produces modality scores and nearest existing glyph vectors only. It does not emit contextual interpretation hypotheses or behavior codes, so it is not scored against the interpretation rubric.",
+                "summary": None,
+                "artifact_sha256": glyph_projection_sha256,
+            })
+        else:
+            capture["methods"].append({
+                "method_id": "glyph_hdc_projection_v0",
+                "class": "Actual Symthaea GlyphBasis / TextHdcEncoder / GlyphRegistry",
+                "state": "not_run",
+                "reason": "No Rust projection receipt supplied; no HDC result is fabricated from a Python stand-in.",
+                "summary": None,
+            })
 
         for case in cases:
             capture["cases"].append({
@@ -639,6 +729,15 @@ def main() -> int:
                     }
                     for method_id, _, _ in methods
                 ],
+                "glyph_projection": (
+                    {
+                        "state": "projection_only_not_rubric_scored",
+                        "input_blake3": glyph_projection_by_id[case["id"]]["input_blake3"],
+                        "top_modalities": glyph_projection_by_id[case["id"]]["top_modalities"],
+                        "top_glyphs": glyph_projection_by_id[case["id"]]["top_glyphs"],
+                    }
+                    if glyph_projection_by_id is not None else {"state": "not_run"}
+                ),
             })
 
         report_path = args.output_dir / "baseline_comparison.json"
@@ -651,6 +750,9 @@ def main() -> int:
         print(f"comparison_report={report_path}")
         print(f"comparison_report_sha256={report_digest}")
         for item in capture["methods"]:
+            if item["state"] == "projection_only_not_rubric_scored":
+                print(f"{item['method_id']}: PROJECTION_ONLY; artifact_sha256={item['artifact_sha256']}; not interpreted or rubric-scored")
+                continue
             if item["state"] != "executed":
                 print(f"{item['method_id']}: NOT_RUN ({item['reason']})")
                 continue
