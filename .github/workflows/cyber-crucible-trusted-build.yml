@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Require release tag and exact source commit
+      - name: Require semantic-version release tag and exact source commit
         env:
           EXPECTED_SOURCE_REF: ${{ inputs.source_ref }}
           EXPECTED_SOURCE_COMMIT: ${{ inputs.source_commit }}
@@ -78,11 +78,8 @@ jobs:
           import json
           from pathlib import Path
           from jsonschema import Draft202012Validator
+
           paths = sorted(Path("validation").glob("cyber_crucible_*schema.json"))
-          paths.extend([
-              Path("validation/cyber_crucible_decision_trust_policy_v1.schema.json"),
-              Path("validation/cyber_crucible_verifier_provenance_policy_v1.schema.json"),
-          ])
           for path in sorted(set(paths)):
               schema = json.loads(path.read_text(encoding="utf-8"))
               Draft202012Validator.check_schema(schema)
@@ -101,7 +98,7 @@ jobs:
           python -m unittest discover -s tests -p "test_cyber_crucible_verifier_provenance.py" -v
           python -m unittest discover -s tests -p "test_cyber_crucible_verifier_bundle.py" -v
 
-      - name: Reject any test-induced source tree mutation
+      - name: Reject test-induced source tree mutation
         run: |
           git diff --exit-code
           git diff --cached --exit-code
@@ -111,128 +108,40 @@ jobs:
             exit 2
           fi
 
-      - name: Build reproducible verifier archive twice
-        env:
-          EXPECTED_SOURCE_COMMIT: ${{ inputs.source_commit }}
+      - name: Install SHA-pinned actionlint for release workflow syntax
+        shell: bash
         run: |
-          python scripts/package_cyber_crucible_verifier.py build \
-            --root . \
-            --output "$RUNNER_TEMP/cyber-crucible-verifier-v1-a.tar.gz" \
-            --source-commit "$EXPECTED_SOURCE_COMMIT"
-          python scripts/package_cyber_crucible_verifier.py build \
-            --root . \
-            --output "$RUNNER_TEMP/cyber-crucible-verifier-v1-b.tar.gz" \
-            --source-commit "$EXPECTED_SOURCE_COMMIT"
-          cmp --silent "$RUNNER_TEMP/cyber-crucible-verifier-v1-a.tar.gz" "$RUNNER_TEMP/cyber-crucible-verifier-v1-b.tar.gz"
-          python scripts/package_cyber_crucible_verifier.py verify \
-            --bundle "$RUNNER_TEMP/cyber-crucible-verifier-v1-a.tar.gz" \
-            --expected-source-commit "$EXPECTED_SOURCE_COMMIT"
-          sha256sum "$RUNNER_TEMP/cyber-crucible-verifier-v1-a.tar.gz"
-          mv "$RUNNER_TEMP/cyber-crucible-verifier-v1-a.tar.gz" "$RUNNER_TEMP/cyber-crucible-verifier-v1.tar.gz"
+          set -euo pipefail
+          version="1.7.12"
+          archive="actionlint_1.7.12_linux_amd64.tar.gz"
+          expected="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          curl -fsSLo "/tmp/$archive" "https://github.com/rhysd/actionlint/releases/download/v$version/$archive"
+          echo "$expected  /tmp/$archive" | sha256sum -c -
+          mkdir -p /tmp/actionlint
+          tar -xzf "/tmp/$archive" -C /tmp/actionlint actionlint
+          /tmp/actionlint/actionlint -version
 
-      - name: Upload the exact tested verifier bundle
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: cyber-crucible-verifier-v1
-          path: ${{ runner.temp }}/cyber-crucible-verifier-v1.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-
-  attest-exact-tested-bundle:
-    if: github.repository == 'Luminous-Dynamics/symthaea'
-    name: Attest exact archive in an isolated, non-executing job
-    needs: build-and-test
-    runs-on: ubuntu-24.04
-    environment:
-      name: cyber-crucible-verifier-release
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-      artifact-metadata: write
-    steps:
-      - name: Download only the tested verifier archive
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: cyber-crucible-verifier-v1
-          path: ${{ runner.temp }}/downloaded
-
-      - name: Check single expected artifact and copy to fixed subject path
+      - name: Lint trusted release workflow contracts
+        shell: bash
         run: |
-          test -f "$RUNNER_TEMP/downloaded/cyber-crucible-verifier-v1.tar.gz"
-          test ! -L "$RUNNER_TEMP/downloaded/cyber-crucible-verifier-v1.tar.gz"
-          test "$(find "$RUNNER_TEMP/downloaded" -type f | wc -l)" -eq 1
-          test "$(find "$RUNNER_TEMP/downloaded" -type l | wc -l)" -eq 0
-          mkdir -p dist
-          install -m 0644 "$RUNNER_TEMP/downloaded/cyber-crucible-verifier-v1.tar.gz" dist/cyber-crucible-verifier-v1.tar.gz
-          sha256sum dist/cyber-crucible-verifier-v1.tar.gz
+          set -euo pipefail
+          /tmp/actionlint/actionlint -color -shellcheck "" -pyflakes "" \
+            .github/workflows/cyber-crucible-decision-receipt.yml \
+            .github/workflows/cyber-crucible-trusted-build.yml \
+            .github/workflows/cyber-crucible-verifier-release.yml
 
-      - name: Generate GitHub artifact attestation for the exact tested bundle
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: dist/cyber-crucible-verifier-v1.tar.gz
-; then
-            echo "REJECTED: source_ref must be a semantic-version verifier release tag" >&2
-            exit 2
-          fi
-          if ! printf '%s' "$EXPECTED_SOURCE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "REJECTED: source_commit must be a 40-character lowercase Git SHA" >&2
-            exit 2
-          fi
-          ACTUAL_SOURCE_COMMIT="$(git rev-parse HEAD)"
-          test "$ACTUAL_SOURCE_COMMIT" = "$EXPECTED_SOURCE_COMMIT" || {
-            echo "REJECTED: checked-out commit differs from independently supplied source_commit" >&2
-            exit 2
-          }
-          printf 'source_ref=%s\nsource_commit=%s\n' "$EXPECTED_SOURCE_REF" "$ACTUAL_SOURCE_COMMIT"
-
-      - name: Set up pinned Python security release
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12.15"
-
-      - name: Install only pinned contract dependencies
-        run: python -m pip install --disable-pip-version-check -r validation/cyber_crucible_verifier_requirements_v1.txt
-
-      - name: Meta-validate all verifier JSON schemas
+      - name: Parse-check verifier and regression Python sources
         run: |
           python - <<'PY'
-          import json
+          import ast
           from pathlib import Path
-          from jsonschema import Draft202012Validator
-          paths = sorted(Path("validation").glob("cyber_crucible_*schema.json"))
-          paths.extend([
-              Path("validation/cyber_crucible_decision_trust_policy_v1.schema.json"),
-              Path("validation/cyber_crucible_verifier_provenance_policy_v1.schema.json"),
-          ])
-          for path in sorted(set(paths)):
-              schema = json.loads(path.read_text(encoding="utf-8"))
-              Draft202012Validator.check_schema(schema)
-              print(f"Draft 2020-12 schema meta-validation PASS: {path}")
+
+          paths = sorted(Path("scripts").glob("*cyber_crucible*.py"))
+          paths += sorted(Path("tests").glob("test_cyber_crucible_*.py"))
+          for path in paths:
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+              print(f"Python syntax PASS: {path}")
           PY
-
-      - name: Run signed receipt and diagnostic-loop regressions
-        run: |
-          python -m unittest discover -s tests -p "test_cyber_crucible_signed_receipt.py" -v
-          python -m unittest discover -s tests -p "test_cyber_crucible_diagnostic_loop.py" -v
-
-      - name: Run decision, report, provenance, and bundle regressions
-        run: |
-          python -m unittest discover -s tests -p "test_cyber_crucible_decision_receipt.py" -v
-          python -m unittest discover -s tests -p "test_cyber_crucible_report_decision.py" -v
-          python -m unittest discover -s tests -p "test_cyber_crucible_verifier_provenance.py" -v
-          python -m unittest discover -s tests -p "test_cyber_crucible_verifier_bundle.py" -v
-
-      - name: Reject any test-induced source tree mutation
-        run: |
-          git diff --exit-code
-          git diff --cached --exit-code
-          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
-            echo "REJECTED: tests or tooling changed the release source checkout" >&2
-            git status --short
-            exit 2
-          fi
 
       - name: Build reproducible verifier archive twice
         env:
@@ -261,13 +170,28 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  release-approval:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    name: Wait for protected release approval
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    environment:
+      name: cyber-crucible-verifier-release
+    permissions:
+      contents: read
+    steps:
+      - name: Record the approved release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'approved_ref=%s\napproved_commit=%s\n' "$GITHUB_REF" "$GITHUB_SHA"
+
   attest-exact-tested-bundle:
     if: github.repository == 'Luminous-Dynamics/symthaea'
     name: Attest exact archive in an isolated, non-executing job
-    needs: build-and-test
+    needs: [build-and-test, release-approval]
     runs-on: ubuntu-24.04
-    environment:
-      name: cyber-crucible-verifier-release
     timeout-minutes: 5
     permissions:
       contents: read
@@ -282,7 +206,9 @@ jobs:
           path: ${{ runner.temp }}/downloaded
 
       - name: Check single expected artifact and copy to fixed subject path
+        shell: bash
         run: |
+          set -euo pipefail
           test -f "$RUNNER_TEMP/downloaded/cyber-crucible-verifier-v1.tar.gz"
           test ! -L "$RUNNER_TEMP/downloaded/cyber-crucible-verifier-v1.tar.gz"
           test "$(find "$RUNNER_TEMP/downloaded" -type f | wc -l)" -eq 1
