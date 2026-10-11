@@ -53,7 +53,7 @@ jobs:
           assert reference["git_blob_sha"] == reference_blob, (reference["git_blob_sha"], reference_blob)
           assert reference["sha256"] == reference_sha256, (reference["sha256"], reference_sha256)
           assert reference["expected_check_count"] == 66, reference
-          print("verification status matches validator (84 checks) and reference checker (56 checks)")
+          print(f"verification status matches validator ({current['expected_self_test_check_count']} checks) and reference checker ({reference['expected_check_count']} checks)")
           PY
 
       - name: Compile fail-closed validator
