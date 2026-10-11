@@ -12,6 +12,8 @@ import argparse
 import hashlib
 import json
 import math
+import os
+import platform
 import re
 import sys
 from pathlib import Path
@@ -937,6 +939,19 @@ def main() -> int:
             "corpus_git_blob_sha1": corpus_git_blob_sha1,
             "runner_sha256": runner_digest,
             "source_revision": args.source_revision,
+            "runtime_profile": {
+                "python_implementation": platform.python_implementation(),
+                "python_version": platform.python_version(),
+                "python_version_full": sys.version.replace("\\n", " "),
+                "platform": platform.platform(),
+                "architecture": platform.machine(),
+                "rustc_version": os.environ.get("SYMTHAEA_RUSTC_VERSION", "not-provided"),
+                "cargo_version": os.environ.get("SYMTHAEA_CARGO_VERSION", "not-provided"),
+                "rust_toolchain_manifest_sha256": (
+                    hashlib.sha256((ROOT / "rust-toolchain.toml").read_bytes()).hexdigest()
+                    if (ROOT / "rust-toolchain.toml").is_file() else None
+                ),
+            },
             "claim_ceiling": "Rule output and rubric agreement only; HDC output is representation-level retrieval only. No psychological truth, archetype validity, clinical efficacy, or consciousness claim.",
             "metric_warning": "Required/forbidden behavior labels are hand-authored development rubrics. Scores are not blinded human evaluation, scientific accuracy, model generalization, or holdout performance.",
             "glyph_projection_artifact": glyph_projection_meta,
