@@ -232,8 +232,9 @@ pub struct CapabilityMetrics {
     pub mean_absolute_compute_error: Option<f64>,
 }
 
-/// Externally supplied qualification policy. Evaluator identity and accepted revisions must be
-/// pinned by the trusted evaluation/verification layer, not selected by the capability claimant.
+/// Qualification policy frozen into a ledger at construction. The trusted outer evaluation
+/// layer must authorize this policy for the exact subject/profile; do not let the claimant select
+/// evaluator keys, allowlists, or score thresholds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QualificationPolicy {
     pub minimum_resolved: usize,
@@ -590,8 +591,8 @@ impl CapabilityLedger {
         Ok(calculate_metrics(&records, records.len()))
     }
 
-    /// Metrics computed only from resolved held-out/transfer receipts issued by the evaluator
-    /// revision explicitly accepted by the supplied policy.
+    /// Metrics computed only from resolved held-out/transfer receipts accepted by the
+    /// immutable qualification policy supplied at ledger construction.
     pub fn qualification_metrics(
         &self,
         claim_id: &str,
@@ -639,10 +640,12 @@ impl CapabilityLedger {
         }
         if metrics
             .brier_score
-            .map_or(true, |score| score > policy.maximum_brier_score)
+            .map_or(true, |score| score > self.qualification_policy.maximum_brier_score)
             || metrics
                 .expected_calibration_error
-                .map_or(true, |ece| ece > policy.maximum_expected_calibration_error)
+                .map_or(true, |ece| {
+                    ece > self.qualification_policy.maximum_expected_calibration_error
+                })
         {
             return Err(CapabilityLedgerError::QualificationRejected);
         }
