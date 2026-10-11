@@ -1474,6 +1474,7 @@ mod tests {
     };
 
     #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct Px4ArmingCheckReplayCorpusV1 {
         schema_version: u16,
         provenance: Px4ArmingCheckReplayProvenanceV1,
@@ -1481,6 +1482,7 @@ mod tests {
     }
 
     #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct Px4ArmingCheckReplayProvenanceV1 {
         fixture_kind: String,
         raw_wire_capture: bool,
@@ -1489,6 +1491,7 @@ mod tests {
     }
 
     #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct Px4MessageContractReferenceV1 {
         message: String,
         source_url: String,
@@ -1496,6 +1499,7 @@ mod tests {
     }
 
     #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
     struct Px4ArmingCheckReplayCaseV1 {
         case_id: String,
         kind: String,
@@ -1511,6 +1515,10 @@ mod tests {
         assessment_at_ns: u64,
         config_assessed_at_ns: u64,
         duplicate_second_received_at_ns: Option<u64>,
+        #[serde(default)]
+        previous_request_id: Option<u8>,
+        #[serde(default)]
+        previous_request_source_timestamp_us: Option<u64>,
     }
 
     fn clock() -> ClockDomainId {
@@ -2414,6 +2422,34 @@ mod tests {
                 "duplicate replay case ID: {}",
                 case.case_id
             );
+            match (
+                case.previous_request_id,
+                case.previous_request_source_timestamp_us,
+            ) {
+                (Some(previous_id), Some(previous_timestamp)) => {
+                    assert_eq!(
+                        previous_id.wrapping_add(1),
+                        case.request_id,
+                        "request ID did not wrap as declared for {}",
+                        case.case_id
+                    );
+                    assert!(
+                        previous_timestamp < case.request_source_timestamp_us,
+                        "previous source timestamp must precede current request for {}",
+                        case.case_id
+                    );
+                    assert!(
+                        case.reply_source_timestamp_us <= previous_timestamp,
+                        "stale reply must be no newer than previous request for {}",
+                        case.case_id
+                    );
+                }
+                (None, None) => {}
+                _ => panic!(
+                    "partial previous-request identity in case {}",
+                    case.case_id
+                ),
+            }
 
             match case.kind.as_str() {
                 "duplicate_observation" => {
@@ -2421,6 +2457,16 @@ mod tests {
                     let second_receive = case
                         .duplicate_second_received_at_ns
                         .expect("duplicate case must define its second receive time");
+                    assert!(
+                        second_receive > case.reply_received_at_ns,
+                        "duplicate receive time must follow the first observation for {}",
+                        case.case_id
+                    );
+                    assert!(
+                        case.previous_request_id.is_none()
+                            && case.previous_request_source_timestamp_us.is_none(),
+                        "duplicate case must not carry previous-request metadata"
+                    );
                     let events = [
                         Px4ExternalModeArmingCheckEventV1::default();
                         PX4_ARMING_CHECK_REPLY_EVENT_CAPACITY_V1
@@ -2473,6 +2519,11 @@ mod tests {
                     );
                 }
                 "assessment" => {
+                    assert!(
+                        case.duplicate_second_received_at_ns.is_none(),
+                        "assessment case must not carry duplicate-capture time: {}",
+                        case.case_id
+                    );
                     let request = arming_request_in_window(
                         case.request_id,
                         case.request_source_timestamp_us,
