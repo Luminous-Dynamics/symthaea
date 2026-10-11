@@ -774,13 +774,13 @@ impl MagiLoopRuntime {
             },
         }
 
-        let snapshot: Vec<(WorldPrediction, Option<Instant>, Option<AutoResolveType>)> = {
+        let snapshot: Vec<(String, Option<Instant>, Option<AutoResolveType>)> = {
             let pending = self.pending.lock();
             pending
                 .iter()
                 .map(|pred| {
                     (
-                        pred.prediction.clone(),
+                        pred.prediction.id.clone(),
                         pred.deadline,
                         pred.auto_resolve.clone(),
                     )
@@ -789,22 +789,32 @@ impl MagiLoopRuntime {
         };
 
         let mut actions = Vec::new();
-        for (prediction, deadline, auto) in snapshot {
-            let prediction_id = prediction.id.clone();
-            // Explicit prediction deadlines keep their documented contract: once the stated
-            // observation window expires, Timeout is resolved as a task-level failure. This is
-            // distinct from a resolver process timing out while trying to observe the task.
-            if deadline.is_some_and(|deadline| Instant::now() > deadline) {
-                actions.push(ResolutionAction::Observed {
-                    prediction_id,
-                    success: false,
-                });
-                continue;
-            }
-
+        for (prediction_id, deadline, auto) in snapshot {
             let Some(auto) = auto else {
                 continue;
             };
+
+            // Re-read the canonical forecast from the model. The runtime queue holds a separate
+            // caller-provided clone, which must never be allowed to replace the contract that was
+            // actually registered with the model before execution.
+            let prediction = {
+                let model = self.model.lock();
+                model
+                    .model()
+                    .pending_predictions()
+                    .iter()
+                    .find(|prediction| prediction.id == prediction_id)
+                    .cloned()
+            };
+            let Some(prediction) = prediction else {
+                actions.push(ResolutionAction::Unresolved {
+                    prediction_id,
+                    disposition: "missing forecast",
+                    reason: "runtime queue item has no canonical pending forecast in the model".to_string(),
+                });
+                continue;
+            };
+
             if let Some(reason) = auto_resolve_contract_error(&prediction, &auto) {
                 actions.push(ResolutionAction::Unresolved {
                     prediction_id,
@@ -813,6 +823,19 @@ impl MagiLoopRuntime {
                 });
                 continue;
             }
+
+            // Explicit prediction deadlines keep their documented contract: once the declared
+            // observation window expires, a task-level timeout is handled separately from a
+            // resolver-process timeout. Authority binding is checked first so a queue item with a
+            // forged/mismatched observer cannot bypass the frozen resolver contract at timeout.
+            if deadline.is_some_and(|deadline| Instant::now() > deadline) {
+                actions.push(ResolutionAction::Observed {
+                    prediction_id,
+                    success: false,
+                });
+                continue;
+            }
+
             match self.check_auto_resolve(&prediction, &auto).await {
                 AutoResolveAttempt::Observed(success) => {
                     actions.push(ResolutionAction::Observed {
