@@ -11,6 +11,8 @@ description = "Standalone electrical-grid physics: battery SoC/degradation, radi
 # an optional simulator backend by symthaea-infrastructure.
 [dependencies]
 serde = { workspace = true }
+sha2 = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 proptest = "1"

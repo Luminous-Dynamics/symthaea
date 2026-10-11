@@ -1,0 +1,52 @@
+name: Energy Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-grid-physics/**"
+      - ".github/workflows/energy-qualification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-grid-physics/**"
+      - ".github/workflows/energy-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: energy-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  energy-qualification:
+    name: Standalone grid-physics qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting for standalone grid-physics crate
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-grid-physics/src/lib.rs
+
+      - name: Run grid-physics unit and property tests
+        run: cargo test --locked -p symthaea-grid-physics
+
+      - name: Run strict Clippy for grid-physics targets
+        run: cargo clippy --locked -p symthaea-grid-physics --all-targets -- -D warnings
