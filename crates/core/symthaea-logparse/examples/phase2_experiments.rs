@@ -115,7 +115,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 2: grouped 5-fold CV on sbousseaden ===");
-    let fold_accs = run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, cfg)?;
+    let fold_accs =
+        run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, 0xDEADBEEF, cfg)?;
     let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
     let var = fold_accs.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / fold_accs.len() as f32;
     let std = var.sqrt();
@@ -314,18 +315,28 @@ fn run_scenario_classifier(
     print_distribution("source scenarios by label", &source_labels);
     print_distribution("OTRF scenarios by label", &held_out_labels);
 
-    let fold_accuracies =
-        run_grouped_kfold(&source_hvs, &source_labels, &source_groups, 5, cfg)?;
-    let mean = fold_accuracies.iter().sum::<f32>() / fold_accuracies.len() as f32;
-    let variance = fold_accuracies
+    // Same three split seeds are reused for every scenario encoder so results
+    // are paired across representation variants.
+    let scenario_repeat_seeds = [0xDEADBEEF, 0x51CE_0002, 0x51CE_0003];
+    let repeat_means = run_repeated_grouped_kfold(
+        &source_hvs,
+        &source_labels,
+        &source_groups,
+        5,
+        &scenario_repeat_seeds,
+        cfg,
+    )?;
+    let mean = repeat_means.iter().sum::<f32>() / repeat_means.len() as f32;
+    let variance = repeat_means
         .iter()
         .map(|accuracy| (accuracy - mean).powi(2))
         .sum::<f32>()
-        / fold_accuracies.len() as f32;
+        / repeat_means.len() as f32;
     println!(
-        "  grouped scenario 5-fold CV accuracy: {mean:.3} ± {:.3}",
+        "  repeated grouped scenario 5-fold accuracy: {mean:.3} ± {:.3} (repeat means)",
         variance.sqrt()
     );
+    println!("  per-repeat means: {repeat_means:?}");
 
     let (train_hvs, train_labels, test_hvs, test_labels) =
         symthaea_logparse::probe::grouped_stratified_split(
@@ -530,18 +541,47 @@ fn load_otrf_corpus(
 }
 
 /// Stratified k-fold cross-validation with source groups kept intact.
+fn run_repeated_grouped_kfold(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+    k: usize,
+    seeds: &[u64],
+    cfg: TrainConfig,
+) -> Result<Vec<f32>, String> {
+    if seeds.is_empty() {
+        return Err("repeated grouped CV needs at least one split seed".to_string());
+    }
+    let mut repeat_means = Vec::with_capacity(seeds.len());
+    for (index, &seed) in seeds.iter().enumerate() {
+        println!(
+            "\\n  grouped CV repeat {} of {} (split seed={seed:#x})",
+            index + 1,
+            seeds.len()
+        );
+        let fold_accuracies = run_grouped_kfold(hvs, labels, groups, k, seed, cfg)?;
+        if fold_accuracies.is_empty() {
+            return Err("grouped CV returned no fold metrics".to_string());
+        }
+        let mean = fold_accuracies.iter().sum::<f32>() / fold_accuracies.len() as f32;
+        println!("  repeat {} mean accuracy: {mean:.3}", index + 1);
+        repeat_means.push(mean);
+    }
+    Ok(repeat_means)
+}
+
 fn run_grouped_kfold(
     hvs: &[Hdv],
     labels: &[String],
     groups: &[String],
     k: usize,
+    seed: u64,
     cfg: TrainConfig,
 ) -> Result<Vec<f32>, String> {
     if hvs.len() != labels.len() {
         return Err("grouped CV feature/label length mismatch".to_string());
     }
-    let fold_of =
-        symthaea_logparse::probe::grouped_fold_assignment(labels, groups, k, 0xDEADBEEF)?;
+    let fold_of = symthaea_logparse::probe::grouped_fold_assignment(labels, groups, k, seed)?;
 
     let mut accs = Vec::with_capacity(k);
     for fold in 0..k {
