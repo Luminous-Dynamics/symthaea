@@ -62,7 +62,7 @@ def signed_receipt(
         "campaign_id": "campaign-2026-10-A",
         "subject_id": "symthaea-candidate-A",
         "attempt_id": "attempt-2026-10-11-0001",
-        "run_nonce": nonce,
+        "receipt_nonce": nonce,
         "issued_at": issued_at,
         "expires_at": expires_at,
         "scenario_id": scenario_id,
@@ -102,7 +102,7 @@ def context(receipt: dict) -> dict:
         "campaign_id": p["campaign_id"],
         "subject_id": p["subject_id"],
         "attempt_id": p["attempt_id"],
-        "run_nonce": p["run_nonce"],
+        "receipt_nonce": p["receipt_nonce"],
         "scenario_id": p["scenario_id"],
         "scenario_revision": p["scenario_revision"],
         "scenario_digest": p["scenario_digest"],
@@ -401,7 +401,7 @@ class SignedReceiptVerifierTests(unittest.TestCase):
     def test_noncanonical_context_nonce_is_rejected(self):
         receipt = signed_receipt()
         expected = context(receipt)
-        expected["run_nonce"] += "="
+        expected["receipt_nonce"] += "="
         with self.assertRaisesRegex(verifier.VerificationError, "unpadded base64url"):
             self.verify(receipt, expected=expected)
 
