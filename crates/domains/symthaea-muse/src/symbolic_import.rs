@@ -1151,9 +1151,35 @@ fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<Option<u8>, String> {
     Ok(Some(midi as u8))
 }
 
+const MAX_MOTIF_OCCURRENCE_EVIDENCE: usize = 128;
+
 fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotifSummary> {
-    let mut notes: Vec<_> = score.notes.iter().filter(|note| note.part == part).collect();
-    notes.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    // Keep original Score indices and explicit within-part ordering together.
+    // The index is relative to this exact score snapshot, not a persistent ID.
+    let mut notes: Vec<_> = score
+        .notes
+        .iter()
+        .enumerate()
+        .filter(|(_, note)| note.part == part)
+        .map(|(score_note_index, note)| (score_note_index, note))
+        .collect();
+    for (_, note) in &notes {
+        if note.onset.den() <= 0
+            || note.duration.den() <= 0
+            || note.onset.num() < 0
+            || note.duration.num() <= 0
+            || note.pitch.midi() > 127
+            || note.onset.checked_add(note.duration).is_none()
+        {
+            return None;
+        }
+    }
+    notes.sort_by(|(left_index, left), (right_index, right)| {
+        left.onset
+            .checked_cmp(right.onset)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| left_index.cmp(right_index))
+    });
     if notes.len() < 2 {
         return None;
     }
@@ -1161,8 +1187,8 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
     // A PartId preserves source-line identity, but one part may contain chords
     // or overlapping voices. Do not invent a monophonic contour in that case.
     for pair in notes.windows(2) {
-        let previous_end = pair[0].onset.checked_add(pair[0].duration)?;
-        let ordering = previous_end.checked_cmp(pair[1].onset)?;
+        let previous_end = pair[0].1.onset.checked_add(pair[0].1.duration)?;
+        let ordering = previous_end.checked_cmp(pair[1].1.onset)?;
         if ordering == std::cmp::Ordering::Greater {
             return None;
         }
@@ -1172,24 +1198,60 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
     let midi_pitches: Vec<u8> = notes
         .iter()
         .take(motif_len)
-        .map(|note| note.pitch.midi())
+        .map(|(_, note)| note.pitch.midi())
         .collect();
-    let motif_intervals: Vec<i16> = midi_pitches
+    let pitch_interval_pattern: Vec<i16> = midi_pitches
         .windows(2)
         .map(|pair| i16::from(pair[1]) - i16::from(pair[0]))
         .collect();
-    if motif_intervals.is_empty() {
+    if pitch_interval_pattern.is_empty() {
         return None;
     }
-    let occurrence_count = notes
-        .windows(motif_len)
-        .filter(|window| {
-            window
-                .windows(2)
-                .map(|pair| i16::from(pair[1].pitch.midi()) - i16::from(pair[0].pitch.midi()))
-                .eq(motif_intervals.iter().copied())
-        })
-        .count();
+
+    let representative_notes: Vec<_> = notes.iter().take(motif_len).collect();
+    let mut onset_deltas = Vec::with_capacity(motif_len.saturating_sub(1));
+    for pair in representative_notes.windows(2) {
+        let delta = pair[1].1.onset.checked_sub(pair[0].1.onset)?;
+        if delta.num() < 0 || delta.den() <= 0 {
+            return None;
+        }
+        onset_deltas.push(ImportedBeatRational {
+            numerator: delta.num(),
+            denominator: delta.den(),
+        });
+    }
+
+    let mut occurrence_count = 0_usize;
+    let mut matched_occurrences = Vec::new();
+    for (window_start, window) in notes.windows(motif_len).enumerate() {
+        let intervals_match = window
+            .windows(2)
+            .map(|pair| {
+                i16::from(pair[1].1.pitch.midi()) - i16::from(pair[0].1.pitch.midi())
+            })
+            .eq(pitch_interval_pattern.iter().copied());
+        if !intervals_match {
+            continue;
+        }
+        occurrence_count += 1;
+        if matched_occurrences.len() >= MAX_MOTIF_OCCURRENCE_EVIDENCE {
+            continue;
+        }
+
+        let mut references = Vec::with_capacity(window.len());
+        for (offset, (score_note_index, note)) in window.iter().enumerate() {
+            references.push(ImportedNoteReference {
+                score_note_index: *score_note_index,
+                part_note_index: window_start + offset,
+                midi_pitch: note.pitch.midi(),
+                onset_numerator: note.onset.num(),
+                onset_denominator: note.onset.den(),
+                duration_numerator: note.duration.num(),
+                duration_denominator: note.duration.den(),
+            });
+        }
+        matched_occurrences.push(ImportedMotifOccurrence { notes: references });
+    }
 
     Some(ImportedMotifSummary {
         source_part_id: Some(part.0),
@@ -1197,6 +1259,10 @@ fn part_local_motif_summary(score: &Score, part: PartId) -> Option<ImportedMotif
         midi_pitches,
         identity_note: "Monophonic part-local pitch-interval pattern; musical function remains unspecified; contributor confirmation required".into(),
         confidence: if occurrence_count > 1 { 0.72 } else { 0.42 },
+        pitch_interval_pattern,
+        onset_deltas,
+        matched_occurrences,
+        occurrence_evidence_complete: Some(occurrence_count <= MAX_MOTIF_OCCURRENCE_EVIDENCE),
     })
 }
 
@@ -1336,6 +1402,40 @@ mod tests {
         assert_eq!(score.notes.len(), 1);
         assert_eq!(score.notes[0].part, PartId(0));
         assert_eq!(score.notes[0].role, VoiceRole::Unspecified);
+    }
+
+    #[test]
+    fn motif_evidence_records_transposed_interval_matches_and_exact_timing() {
+        let pitches = [60_u8, 62, 64, 65, 67, 69, 62, 64, 66, 67, 69, 71];
+        let mut track = Vec::new();
+        for pitch in pitches {
+            track.extend_from_slice(&[0, 0x90, pitch, 100, 100, 0x80, pitch, 0]);
+        }
+        track.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+        let score = parse_midi(&midi_file(&track)).unwrap();
+        let analysis = analyze(&score);
+        assert_eq!(analysis.motifs.len(), 1);
+        let motif = &analysis.motifs[0];
+
+        assert_eq!(motif.pitch_interval_pattern, vec![2, 2, 1, 2, 2]);
+        assert_eq!(motif.occurrence_count, 2);
+        assert_eq!(motif.occurrence_evidence_complete, Some(true));
+        assert_eq!(motif.matched_occurrences.len(), 2);
+        assert_eq!(motif.onset_deltas.len(), 5);
+        assert!(motif.onset_deltas.iter().all(|delta| {
+            delta.numerator == 5 && delta.denominator == 24
+        }));
+
+        let first = &motif.matched_occurrences[0].notes;
+        let transposed = &motif.matched_occurrences[1].notes;
+        assert_eq!(first.iter().map(|note| note.score_note_index).collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5]);
+        assert_eq!(transposed.iter().map(|note| note.score_note_index).collect::<Vec<_>>(), vec![6, 7, 8, 9, 10, 11]);
+        assert_eq!(first[0].midi_pitch, 60);
+        assert_eq!(transposed[0].midi_pitch, 62);
+        assert_eq!(first[0].onset_numerator, 0);
+        assert_eq!(first[0].onset_denominator, 1);
+        assert_eq!(first[0].duration_numerator, 5);
+        assert_eq!(first[0].duration_denominator, 24);
     }
 
     #[test]
@@ -2008,8 +2108,19 @@ mod tests {
         assert!(analysis.inferred_territory.is_none());
         assert_eq!(analysis.voice_count, 1);
         assert_eq!(analysis.motifs.len(), 1);
-        assert_eq!(analysis.motifs[0].source_part_id, Some(0));
-        assert!(analysis.motifs[0].identity_note.contains("part-local"));
+        let motif = &analysis.motifs[0];
+        assert_eq!(motif.source_part_id, Some(0));
+        assert!(motif.identity_note.contains("part-local"));
+        assert_eq!(motif.pitch_interval_pattern, vec![4]);
+        assert_eq!(motif.occurrence_count, 1);
+        assert_eq!(motif.occurrence_evidence_complete, Some(true));
+        assert_eq!(motif.matched_occurrences.len(), 1);
+        assert_eq!(motif.matched_occurrences[0].notes.len(), 2);
+        assert_eq!(motif.matched_occurrences[0].notes[0].score_note_index, 0);
+        assert_eq!(motif.matched_occurrences[0].notes[1].score_note_index, 1);
+        assert_eq!(motif.onset_deltas.len(), 1);
+        assert_eq!(motif.onset_deltas[0].numerator, 1);
+        assert_eq!(motif.onset_deltas[0].denominator, 1);
     }
 
     #[test]

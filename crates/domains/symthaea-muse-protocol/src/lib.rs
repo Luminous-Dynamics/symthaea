@@ -172,6 +172,35 @@ fn default_authorization_basis() -> AuthorizationBasis {
     AuthorizationBasis::LegacyUnspecified
 }
 
+/// One exact-rational note snapshot backing a symbolic motif claim.
+///
+/// `score_note_index` refers to the exact Score supplied to the analysis call;
+/// pitch and rational timing are copied so the evidence is inspectable without
+/// trusting a derived label. Indices are not durable IDs across score edits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedNoteReference {
+    pub score_note_index: usize,
+    pub part_note_index: usize,
+    pub midi_pitch: u8,
+    pub onset_numerator: i64,
+    pub onset_denominator: i64,
+    pub duration_numerator: i64,
+    pub duration_denominator: i64,
+}
+
+/// One pitch-interval-contour match, with the source note snapshots that form it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedMotifOccurrence {
+    pub notes: Vec<ImportedNoteReference>,
+}
+
+/// Exact beat ratio used in a motif's representative onset-spacing pattern.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedBeatRational {
+    pub numerator: i64,
+    pub denominator: i64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
     pub occurrence_count: usize,
@@ -182,6 +211,19 @@ pub struct ImportedMotifSummary {
     /// Missing on legacy records; it is never inferred from register or role.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_part_id: Option<u16>,
+    /// Directed semitone steps of the representative motif.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pitch_interval_pattern: Vec<i16>,
+    /// Exact onset spacings for the representative occurrence, in beats.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub onset_deltas: Vec<ImportedBeatRational>,
+    /// Bounded sample of occurrences matching pitch intervals; rhythm is
+    /// evidence alongside each occurrence, not currently part of the match gate.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_occurrences: Vec<ImportedMotifOccurrence>,
+    /// None means an older record did not state whether its evidence was complete.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurrence_evidence_complete: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -2717,12 +2759,17 @@ mod tests {
     }
 
     #[test]
-    fn imported_motif_summary_defaults_missing_source_part_id_for_legacy_records() {
-        let legacy = r#"{"occurrence_count":2,"midi_pitches":[60,62,64],"identity_note":"legacy record","confidence":0.42}"#;
+    fn imported_motif_summary_defaults_new_evidence_for_legacy_records() {
+        let legacy = r#"{ "occurrence_count": 2, "midi_pitches": [60, 62, 64], "identity_note": "legacy record", "confidence": 0.42 }"#;
         let decoded: ImportedMotifSummary = serde_json::from_str(legacy).unwrap();
         assert_eq!(decoded.source_part_id, None);
+        assert!(decoded.pitch_interval_pattern.is_empty());
+        assert!(decoded.onset_deltas.is_empty());
+        assert!(decoded.matched_occurrences.is_empty());
+        assert_eq!(decoded.occurrence_evidence_complete, None);
 
         let round_trip = serde_json::to_string(&decoded).unwrap();
         assert!(!round_trip.contains("source_part_id"));
+        assert!(!round_trip.contains("matched_occurrences"));
     }
 }
