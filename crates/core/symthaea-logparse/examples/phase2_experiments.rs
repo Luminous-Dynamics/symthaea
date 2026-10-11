@@ -114,10 +114,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Err(error) => {
                 println!(
-                    "  grouped source holdout unavailable under the strict capture-group contract: {error}"
+                    "  grouped source holdout unavailable: {error}"
                 );
                 println!(
-                    "  fitting all source events for independent-corpus OOD only; no in-corpus holdout score claimed"
+                    "  using all source events for OOD only; no in-corpus holdout score claimed"
                 );
                 (
                     LogisticProbe::train(&sbou_hvs, &sbou_labels, cfg),
@@ -183,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(held_out_acc) = test_acc {
         println!("  sbousseaden grouped holdout: {held_out_acc:.3}");
     } else {
-        println!("  sbousseaden grouped holdout: unavailable (insufficient independent source groups)");
+        println!("  sbousseaden grouped holdout: unavailable (insufficient groups)");
     }
     println!("  sbousseaden 5-fold CV:       {mean:.3} ± {std:.3}");
     println!("  OOD (train sbou, test otrf): {ood_test_acc:.3}");
@@ -209,7 +209,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Err(error) => {
                     println!(
-                        "  domain-invariant source holdout unavailable under strict group contract: {error}"
+                        "  domain-invariant holdout unavailable: {error}"
                     );
                     println!("  using all source events for independent-corpus OOD only");
                     (
@@ -410,7 +410,7 @@ fn run_scenario_classifier(
                 "  source-capture holdout unavailable under the strict group contract: {error}"
             );
             println!(
-                "  fitting all source scenarios for independent-corpus OOD only; no holdout score claimed"
+                "  using all source scenarios for OOD only; no holdout score claimed"
             );
             LogisticProbe::train(&source_hvs, &source_labels, cfg)
         }
