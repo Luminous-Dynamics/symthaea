@@ -194,7 +194,7 @@ pub struct ImportedNoteReference {
 }
 
 /// One exact pitch-interval-contour match, with source note snapshots.
-////// Overlapping matches may both be represented in the evidence list.
+/// Overlapping matches may both be represented in the evidence list.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImportedMotifOccurrence {
     pub notes: Vec<ImportedNoteReference>,
@@ -2780,6 +2780,7 @@ mod tests {
         }"#;
         let decoded: ImportedMotifSummary = serde_json::from_str(legacy).unwrap();
         assert_eq!(decoded.source_part_id, None);
+        assert_eq!(decoded.independent_occurrence_count, None);
         assert!(decoded.pitch_interval_pattern.is_empty());
         assert!(decoded.onset_deltas.is_empty());
         assert!(decoded.matched_occurrences.is_empty());
