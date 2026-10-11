@@ -1,0 +1,59 @@
+name: Cyber Crucible Verifier Decision Receipt Contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/verify_cyber_crucible_decision_receipt.py"
+      - "tests/test_cyber_crucible_decision_receipt.py"
+      - "validation/cyber_crucible_verifier_decision_v1.schema.json"
+      - "validation/cyber_crucible_decision_trust_policy_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_VERIFIER_DECISION_V1.md"
+      - ".github/workflows/cyber-crucible-decision-receipt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/verify_cyber_crucible_decision_receipt.py"
+      - "tests/test_cyber_crucible_decision_receipt.py"
+      - "validation/cyber_crucible_verifier_decision_v1.schema.json"
+      - "validation/cyber_crucible_decision_trust_policy_v1.schema.json"
+      - "validation/CYBER_CRUCIBLE_VERIFIER_DECISION_V1.md"
+      - ".github/workflows/cyber-crucible-decision-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  decision-receipt-contract:
+    name: Decision signature, context, policy, expiry, and replay regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.15"
+      - name: Install pinned verification dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "cryptography==50.0.2" \
+            "rfc8785==0.1.4" \
+            "jsonschema==4.26.0"
+      - name: Meta-validate decision schemas
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          for name in (
+              "cyber_crucible_verifier_decision_v1.schema.json",
+              "cyber_crucible_decision_trust_policy_v1.schema.json",
+          ):
+              schema = json.loads((Path("validation") / name).read_text(encoding="utf-8"))
+              Draft202012Validator.check_schema(schema)
+              print(f"Draft 2020-12 schema meta-validation PASS: {name}")
+          PY
+      - name: Run deterministic decision-receipt regressions
+        run: python -m unittest discover -s tests -p "test_cyber_crucible_decision_receipt.py" -v
