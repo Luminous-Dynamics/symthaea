@@ -71,10 +71,21 @@ fn diagnostics_json(result: &symthaea_quantum_chemistry::dft::xc::DftResult) -> 
 
 fn main() {
     let molecules = vec![
-        ("He", Molecule::new(vec![Atom::new(2, 0.0, 0.0, 0.0)]),
-         "single_atom_closed_shell"),
-        ("H2", Molecule::h2(), "symmetric_singlet_r_1_4_bohr"),
-        ("H2O", Molecule::water(), "water_0_9572_angstrom_104_52_deg"),
+        (
+            "He",
+            Molecule::new(vec![Atom::new(2, 0.0, 0.0, 0.0)]),
+            "single_atom_closed_shell",
+        ),
+        (
+            "H2",
+            Molecule::h2(),
+            "symmetric_singlet_r_1_4_bohr",
+        ),
+        (
+            "H2O",
+            Molecule::water(),
+            "water_0_9572_angstrom_104_52_deg",
+        ),
     ];
 
     let mut records = Vec::new();
@@ -163,7 +174,9 @@ fn main() {
         }
     }
 
-    let pass = all_solver_receipts_present && all_scf_converged && all_electron_integrals_finite
+    let pass = all_solver_receipts_present
+        && all_scf_converged
+        && all_electron_integrals_finite
         && records.len() == molecules.len() * GRID_QUALITIES.len();
     let report = json!({
         "schema": "symthaea.qc-dft-molecular-grid-evidence.v1",
