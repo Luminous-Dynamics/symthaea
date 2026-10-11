@@ -158,9 +158,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sbou_di_hvs: Vec<Hdv> = sbou_events.iter().map(encode_domain_invariant).collect();
         let otrf_di_hvs: Vec<Hdv> = otrf_events.iter().map(encode_domain_invariant).collect();
         let (tr_hv, tr_y, te_hv, te_y) =
-            symthaea_logparse::probe::stratified_split(
-                &sbou_di_hvs, &sbou_labels, 0.8, 0xFACADE,
-            );
+            symthaea_logparse::probe::stratified_split(&sbou_di_hvs, &sbou_labels, 0.8, 0xFACADE);
         let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
         let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
         let di_ood = di_probe.accuracy(&otrf_di_hvs, &otrf_labels);
