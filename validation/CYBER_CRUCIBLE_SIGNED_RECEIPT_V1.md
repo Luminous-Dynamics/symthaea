@@ -1,6 +1,6 @@
 # Cyber Crucible authenticated receipt contract v1
 
-This is a narrow upstream trust-boundary component for the diagnostic-loop contract. It verifies detached Ed25519 signatures over a domain-separated RFC 8785 canonical JSON payload, resolves evaluator identity and roles through an operator-controlled trust policy, binds each receipt to a trusted expected campaign/run/scenario context, checks validity windows and key revocation, and atomically consumes receipt IDs and receipt nonces in a persistent replay ledger.
+This is a narrow upstream trust-boundary component for the diagnostic-loop contract. It verifies detached Ed25519 signatures over a domain-separated RFC 8785 canonical JSON payload, resolves evaluator identity and roles through an operator-controlled trust policy, binds each receipt to a trusted expected campaign/subject/attempt/scenario context, checks validity windows and key revocation, and atomically consumes receipt IDs and receipt nonces in a persistent replay ledger.
 
 It is **not** a production authorization service, incident-response runner, or proof that the evidence is truthful. A verified evaluator signature proves that the corresponding private key signed this specific payload; whether the key belongs to an approved evaluator depends on the trust policy and how that policy was provisioned.
 
@@ -54,7 +54,7 @@ Every key has an explicit evaluator identity, a finite validity interval, and a 
 
 The verifier uses SQLite uniqueness constraints inside a \`BEGIN IMMEDIATE\` transaction to consume both receipt IDs and receipt nonces atomically on one host. The ledger file is created with restrictive permissions and chmodded to owner-only. The path and parent directory must remain protected from untrusted writers. For distributed verifiers, replace this local ledger with a shared, durable store offering equivalent linearizable uniqueness semantics; a local SQLite file is not distributed replay protection.
 
-The caller must issue unpredictable, one-time 32-byte nonces and provide independently trusted values for campaign, scenario identity, evidence digest, and role. Passing \`--expected-context\` values from the untrusted receipt itself defeats context binding. The replay database prevents repeated receipt-ID/receipt-nonce consumption only within that database's protection and lifecycle. Every independently issued receipt—including functional, security, authorization, outcome, or recovery receipts—must get its own fresh challenge nonce; subject_id and attempt_id provide the stable linkage across receipts for the same attempt.
+The caller must issue an unpredictable, unique 32-byte challenge nonce for every receipt and provide independently trusted values for campaign, subject, attempt, scenario identity, evidence digest, and role. Passing \`--expected-context\` values from the untrusted receipt itself defeats context binding. The replay database prevents repeated receipt-ID/receipt-nonce consumption only within that database's protection and lifecycle. Every independently issued receipt—including functional, security, authorization, outcome, or recovery receipts—must get its own fresh challenge nonce; subject_id and attempt_id provide the stable linkage across receipts for the same attempt.
 
 CLI example (paths are operator-controlled where noted):
 
