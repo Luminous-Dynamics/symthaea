@@ -639,6 +639,24 @@ mod tests {
     }
 
     #[test]
+    fn canonical_encoding_round_trips_small_rational_grid() {
+        let limit = budget(128);
+        for numerator in -12..=12 {
+            for denominator in 1..=9 {
+                let value = ExactRational::parse(
+                    &numerator.to_string(),
+                    &denominator.to_string(),
+                    limit,
+                ).unwrap();
+                let bytes = value.canonical_encoding_bytes();
+                let decoded = ExactRational::from_canonical_encoding_bytes(&bytes, limit).unwrap();
+                assert_eq!(&decoded, &value);
+                assert_eq!(decoded.canonical_encoding_bytes(), bytes);
+            }
+        }
+    }
+
+    #[test]
     fn canonical_decoder_rejects_absurd_or_truncated_component_lengths() {
         let limit = budget(32);
         let mut absurd = b"SYMTHAEA\0EXACT-RATIONAL\0V1\0".to_vec();
@@ -741,6 +759,37 @@ mod tests {
             value.checked_to_f64_approx(narrow_budget).unwrap_err(),
             ExactRationalError::ResourceLimitExceeded
         );
+    }
+
+    #[test]
+    fn small_rational_grid_obeys_arithmetic_round_trip_identities() {
+        let limit = budget(128);
+        let mut values = Vec::new();
+        for numerator in -3..=3 {
+            for denominator in 1..=4 {
+                values.push(
+                    ExactRational::parse(
+                        &numerator.to_string(),
+                        &denominator.to_string(),
+                        limit,
+                    ).unwrap(),
+                );
+            }
+        }
+
+        for lhs in &values {
+            for rhs in &values {
+                let sum = lhs.checked_add(rhs, limit).unwrap();
+                let recovered_lhs = sum.checked_subtract(rhs, limit).unwrap();
+                assert_eq!(&recovered_lhs, lhs, "addition/subtraction identity");
+
+                if !rhs.value.numer().is_zero() {
+                    let product = lhs.checked_multiply(rhs, limit).unwrap();
+                    let recovered_lhs = product.checked_divide(rhs, limit).unwrap();
+                    assert_eq!(&recovered_lhs, lhs, "multiplication/division identity");
+                }
+            }
+        }
     }
 
     #[test]
