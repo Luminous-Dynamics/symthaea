@@ -592,4 +592,53 @@ mod tests {
             "3D Gaussian integral = {numerical_integral}, expected {exact_integral}"
         );
     }
+
+    #[test]
+    fn test_diatomic_grid_integrates_gaussians_across_becke_partition() {
+        // The integral of a sum of two unit-exponent Gaussians is independent
+        // of their centers: ∫[exp(-|r-Ra|²) + exp(-|r-Rb|²)] d³r = 2π^(3/2).
+        // Unlike the single-center test, this exercises atom-centered grids and
+        // Becke partitioning together, so a broken partition cannot hide behind
+        // a correct radial measure. Tolerances reflect the documented presets;
+        // they do not assert strict monotonic convergence for every geometry.
+        let exact_integral = 2.0 * PI.powf(1.5);
+        let cases = [
+            (GridQuality::Coarse, 7e-2),
+            (GridQuality::Medium, 1.1e-2),
+            (GridQuality::Fine, 2e-4),
+        ];
+
+        for (quality, relative_tolerance) in cases {
+            for separation in [1.0_f64, 1.4, 2.0] {
+                let atoms = [
+                    Atom::new(1, 0.0, 0.0, -separation / 2.0),
+                    Atom::new(1, 0.0, 0.0, separation / 2.0),
+                ];
+                let grid = DftGrid::build(&atoms, quality);
+                let numerical_integral: f64 = grid
+                    .points
+                    .iter()
+                    .map(|point| {
+                        atoms
+                            .iter()
+                            .map(|atom| {
+                                let dx = point.x - atom.position[0];
+                                let dy = point.y - atom.position[1];
+                                let dz = point.z - atom.position[2];
+                                (-(dx * dx + dy * dy + dz * dz)).exp()
+                            })
+                            .sum::<f64>()
+                            * point.weight
+                    })
+                    .sum();
+                let relative_error =
+                    (numerical_integral - exact_integral).abs() / exact_integral;
+
+                assert!(
+                    relative_error <= relative_tolerance,
+                    "{quality:?}, separation={separation}: integral={numerical_integral}, expected={exact_integral}, relative error={relative_error}, tolerance={relative_tolerance}"
+                );
+            }
+        }
+    }
 }
