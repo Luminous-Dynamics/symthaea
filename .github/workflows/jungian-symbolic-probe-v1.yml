@@ -152,7 +152,7 @@ jobs:
               "",
               "## Independent output-side audit (static cues; not semantic accuracy)",
               "",
-              "| Baseline | Text/evidence checks | Cases satisfying all local checks | Pairs with distinct text (not correctness) |",
+              "| Baseline | Text/evidence checks | Cases satisfying every static cue | Pairs with distinct text (not correctness) |",
               "|---|---:|---:|---:|",
           ])
           for item in data["methods"]:
@@ -162,7 +162,7 @@ jobs:
               audit = json.load(open(audit_path, encoding="utf-8"))
               lines.append(
                   f"| {item['method_id']} | {audit['checks_passed']}/{audit['checks_total']} | "
-                  f"{audit['case_contracts_passed']}/{audit['case_count']} | "
+                  f"{audit['case_sets_all_static_cues_satisfied']}/{audit['case_count']} | "
                   f"{audit['distinct_pair_text_count']}/{audit['context_pair_count']} |"
               )
           lines.extend([

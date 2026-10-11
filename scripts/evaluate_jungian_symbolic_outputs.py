@@ -410,7 +410,7 @@ def evaluate(
             "case_id": case["id"],
             "checks_passed": passed,
             "checks_total": len(rows),
-            "case_contract_passed": passed == len(rows),
+            "all_static_cues_satisfied": passed == len(rows),
             "failed_checks": [row["check"] for row in rows if not row["passed"]],
             "checks": rows,
         })
@@ -447,7 +447,7 @@ def evaluate(
         "case_count": len(per_case),
         "checks_passed": checks_passed,
         "checks_total": checks_total,
-        "case_contracts_passed": sum(row["case_contract_passed"] for row in per_case),
+        "case_sets_all_static_cues_satisfied": sum(row["all_static_cues_satisfied"] for row in per_case),
         "distinct_pair_text_count": distinct_pair_text_count,
         "context_pair_count": len(pair_rows),
         "per_case": per_case,
@@ -565,7 +565,7 @@ def main() -> int:
             print(
                 f"{report['method_id']}: output_contract_checks="
                 f"{report['checks_passed']}/{report['checks_total']} "
-                f"case_contracts={report['case_contracts_passed']}/{report['case_count']} "
+                f"case_static_cues_satisfied={report['case_sets_all_static_cues_satisfied']}/{report['case_count']} "
                 f"context_pairs_distinct_text={report['distinct_pair_text_count']}/{report['context_pair_count']} "
                 f"report_sha256={hashlib.sha256(output_bytes).hexdigest()} path={output_path}"
             )
