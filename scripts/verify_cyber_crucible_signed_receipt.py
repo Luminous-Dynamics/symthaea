@@ -315,6 +315,8 @@ def verify_receipt(
     if now.tzinfo is None:
         raise VerificationError("verification time must be timezone-aware")
     now = now.astimezone(timezone.utc)
+    if replay_ledger is None:
+        raise VerificationError("persistent replay ledger is required for receipt acceptance")
     if not isinstance(receipt, dict) or set(receipt) != {"payload", "signature"}:
         raise VerificationError("receipt envelope must contain exactly payload and signature")
     payload = _validate_payload(receipt["payload"])
@@ -365,9 +367,8 @@ def verify_receipt(
     except (ValueError, TypeError) as exc:
         raise VerificationError(f"invalid Ed25519 verification input: {exc}") from exc
 
-    # This is a stateful mutation and happens only after every other check succeeds.
-    if replay_ledger is not None:
-        replay_ledger.consume(payload, now)
+    # This stateful mutation is mandatory and happens only after every other check succeeds.
+    replay_ledger.consume(payload, now)
 
     return {
         "schema_version": "cyber-crucible-receipt-verification-result.v1",
@@ -391,7 +392,7 @@ def verify_receipt(
         "evidence_digest": payload["evidence_digest"],
         "proposal_id": payload["proposal_id"],
         "proposal_digest": payload["proposal_digest"],
-        "replay_checked": replay_ledger is not None,
+        "replay_checked": True,
         "non_authorizing": True,
     }
 
