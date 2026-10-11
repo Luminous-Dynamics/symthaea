@@ -178,7 +178,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  baseline raw OOD macro recall:          {raw_macro_ood:.3}");
         println!("  ablation OOD macro recall:              {di_macro_ood:.3}");
         print_per_class_recall("domain-invariant OOD", &di_probe, &otrf_di_hvs, &otrf_labels);
-        println!("  Compare both accuracy and macro recall; neither alone proves detection quality.");
+        println!(
+            "  Compare both accuracy and macro recall; neither alone proves detection quality."
+        );
     }
 
     Ok(())
