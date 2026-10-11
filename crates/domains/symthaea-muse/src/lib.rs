@@ -125,6 +125,8 @@ pub mod midi;
 pub mod midi_loader;
 #[cfg(feature = "theory")]
 pub mod musical_policy;
+#[cfg(feature = "theory")]
+pub mod symbolic_import;
 pub mod neural_melody;
 pub mod notation;
 #[cfg(feature = "theory")]
@@ -201,6 +203,8 @@ pub mod study_release;
 #[cfg(feature = "theory")]
 pub mod study_runner;
 pub mod synth;
+#[cfg(feature = "theory")]
+pub mod teaching_corpus;
 #[cfg(feature = "theory")]
 pub mod temporal_confirmatory;
 #[cfg(feature = "theory")]
