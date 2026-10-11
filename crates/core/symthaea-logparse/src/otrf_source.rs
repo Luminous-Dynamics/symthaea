@@ -118,8 +118,9 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         };
         if sval.len() > 256 {
             // Mordor/Splunk include huge blobs; truncate for the encoder so
-            // hash collisions don't obscure short-field structure.
-            fields.insert(k.clone(), sval[..256].to_string());
+            // hash collisions don't obscure short-field structure. The cap is
+            // in bytes, so move backward to a valid UTF-8 boundary first.
+            fields.insert(k.clone(), truncate_utf8(&sval, 256).to_string());
         } else {
             fields.insert(k.clone(), sval);
         }
@@ -137,6 +138,15 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         host,
         label: None,
     })
+}
+
+/// Truncate to at most `max_bytes` without slicing through a UTF-8 code point.
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
+    let mut end = value.len().min(max_bytes);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
 }
 
 fn parse_level(s: &str) -> Option<Severity> {
@@ -188,4 +198,39 @@ fn visit(dir: &Path, out: &mut Vec<LogEvent>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unicode_field_truncation_never_slices_through_a_code_point() {
+        // Euro signs use three bytes, so byte offset 256 is not a UTF-8 boundary.
+        let value = "€".repeat(86);
+        assert_eq!(value.len(), 258);
+        let truncated = truncate_utf8(&value, 256);
+        assert_eq!(truncated.len(), 255);
+        assert_eq!(truncated, "€".repeat(85));
+        assert!(truncated.is_char_boundary(truncated.len()));
+    }
+
+    #[test]
+    fn json_event_with_long_unicode_field_does_not_panic() {
+        let payload = "€".repeat(86);
+        let value = serde_json::json!({
+            "SourceName": "Microsoft-Windows-Security-Auditing",
+            "EventID": 4624,
+            "Level": "4",
+            "unicode_payload": payload,
+        });
+        let event = json_to_log_event(&value).expect("valid synthetic event");
+        let truncated = event
+            .fields
+            .get("unicode_payload")
+            .expect("custom field should be retained");
+        assert_eq!(truncated.len(), 255);
+        assert_eq!(truncated, &"€".repeat(85));
+    }
 }

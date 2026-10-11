@@ -23,6 +23,7 @@ pub mod evtx_source;
 pub mod fixtures;
 pub mod otrf_source;
 pub mod probe;
+pub mod scenario;
 pub mod syslog_source;
 
 pub use event::{LogEvent, Severity, Source};

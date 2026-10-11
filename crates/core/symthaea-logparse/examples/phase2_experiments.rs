@@ -18,6 +18,7 @@
 //! Usage:
 //!   cargo run -p symthaea-logparse --example phase2_experiments --release -- \
 //!     /tmp/evtx-staged /tmp/otrf-staged [--domain-invariant-ablation]
+//!     [--scenario-level-evaluation]
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -27,13 +28,22 @@ use symthaea_logparse::encoder::{
 use symthaea_logparse::probe::{
     classification_report, ClassificationReport, LogisticProbe, TrainConfig,
 };
+use symthaea_logparse::scenario::{
+    aggregate_ordered_scenarios, aggregate_scenarios, validate_matching_scenario_modes,
+    ORDERED_SCENARIO_ENCODER_VERSION, ScenarioEmbedding, ScenarioEncodingMode,
+};
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let evtx_dir = std::env::args().nth(1).ok_or("need evtx corpus dir")?;
     let otrf_dir = std::env::args().nth(2).ok_or("need otrf corpus dir")?;
-    let run_domain_invariant_ablation =
-        std::env::args().nth(3).as_deref() == Some("--domain-invariant-ablation");
+    let experiment_flags: Vec<String> = std::env::args().skip(3).collect();
+    let run_domain_invariant_ablation = experiment_flags
+        .iter()
+        .any(|flag| flag == "--domain-invariant-ablation");
+    let run_scenario_level_evaluation = experiment_flags
+        .iter()
+        .any(|flag| flag == "--scenario-level-evaluation");
 
     let shared_labels: Vec<&str> = vec![
         "credential_access",
@@ -63,7 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load OTRF (walk the staged dirs, parse every .json file)
     // ----------------------------------------------------------------
     println!("\n[load] OTRF corpus from {otrf_dir}");
-    let otrf_events = load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
+    let (otrf_events, otrf_groups) =
+        load_otrf_corpus(&PathBuf::from(&otrf_dir), &shared_labels, 50)?;
     let otrf_labels: Vec<String> = otrf_events
         .iter()
         .map(|e| e.label.clone().unwrap())
@@ -83,38 +94,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Experiment 1: Scale-up single 80/20 split on full sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 1: scale-up (sbousseaden full corpus, grouped 80/20 split) ===");
-    let (tr_hv, tr_y, te_hv, te_y) =
-        symthaea_logparse::probe::grouped_stratified_split(
+    let (scale_up_probe, test_acc) =
+        match symthaea_logparse::probe::grouped_stratified_split(
             &sbou_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
-        )?;
-    println!(
-        "  train={}, test={}, classes={}",
-        tr_hv.len(),
-        te_hv.len(),
-        shared_labels.len()
-    );
-    let probe1 = LogisticProbe::train(&tr_hv, &tr_y, cfg);
-    let train_acc = probe1.accuracy(&tr_hv, &tr_y);
-    let test_acc = probe1.accuracy(&te_hv, &te_y);
-    println!("  train accuracy: {train_acc:.3}");
-    println!("  test accuracy:  {test_acc:.3}");
-    let scale_up_probe = probe1;
+        ) {
+            Ok((tr_hv, tr_y, te_hv, te_y)) => {
+                println!(
+                    "  train={}, test={}, classes={}",
+                    tr_hv.len(),
+                    te_hv.len(),
+                    shared_labels.len()
+                );
+                let probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
+                let train_acc = probe.accuracy(&tr_hv, &tr_y);
+                let held_out_acc = probe.accuracy(&te_hv, &te_y);
+                println!("  train accuracy: {train_acc:.3}");
+                println!("  grouped holdout accuracy: {held_out_acc:.3}");
+                (probe, Some(held_out_acc))
+            }
+            Err(error) => {
+                println!(
+                    "  grouped source holdout unavailable: {error}"
+                );
+                println!(
+                    "  using all source events for OOD only; no in-corpus holdout score claimed"
+                );
+                (
+                    LogisticProbe::train(&sbou_hvs, &sbou_labels, cfg),
+                    None,
+                )
+            }
+        };
 
     // ----------------------------------------------------------------
     // Experiment 2: 5-fold stratified cross-validation on sbousseaden
     // ----------------------------------------------------------------
     println!("\n=== Experiment 2: grouped 5-fold CV on sbousseaden ===");
-    let fold_accs = run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, cfg)?;
-    let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
-    let var = fold_accs.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / fold_accs.len() as f32;
-    let std = var.sqrt();
-    println!("  per-fold test accuracy: {:?}", fold_accs);
-    println!("  mean ± std: {mean:.3} ± {std:.3}");
-    println!(
-        "  min/max:    {:.3} / {:.3}",
-        fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
-        fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
-    );
+    let grouped_cv_summary =
+        match run_grouped_kfold(&sbou_hvs, &sbou_labels, &sbou_groups, 5, 0xDEADBEEF, cfg) {
+            Ok(fold_accs) if !fold_accs.is_empty() => {
+                let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
+                let var = fold_accs
+                    .iter()
+                    .map(|a| (a - mean).powi(2))
+                    .sum::<f32>()
+                    / fold_accs.len() as f32;
+                let std = var.sqrt();
+                println!("  per-fold test accuracy: {:?}", fold_accs);
+                println!("  mean ± std: {mean:.3} ± {std:.3}");
+                println!(
+                    "  min/max:    {:.3} / {:.3}",
+                    fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
+                    fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+                );
+                Some((mean, std))
+            }
+            Ok(_) => {
+                println!("  grouped CV unavailable: no fold metrics produced");
+                None
+            }
+            Err(error) => {
+                println!(
+                    "  grouped CV unavailable under strict capture-group contract: {error}"
+                );
+                None
+            }
+        };
 
     // ----------------------------------------------------------------
     // Experiment 3: Cross-corpus OOD — train on sbousseaden, test on OTRF
@@ -124,7 +169,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  test  corpus: OTRF        ({} events)", otrf_hvs.len());
     let ood_test_acc = scale_up_probe.accuracy(&otrf_hvs, &otrf_labels);
     println!("  OOD test accuracy: {ood_test_acc:.3}");
-    println!("  (reference: same-distribution test was {test_acc:.3})");
+    if let Some(held_out_acc) = test_acc {
+        println!("  (reference: grouped same-distribution holdout was {held_out_acc:.3})");
+    } else {
+        println!("  (no same-distribution holdout estimate; group support was insufficient)");
+    }
 
     // Cross-corpus evaluation includes class-level precision/recall/F1 and
     // a confusion matrix. OTRF is not a benign baseline, so this is not an
@@ -139,8 +188,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Summary
     // ----------------------------------------------------------------
     println!("\n=== Phase 2 summary ===");
-    println!("  sbousseaden single split:    {test_acc:.3}");
-    println!("  sbousseaden 5-fold CV:       {mean:.3} ± {std:.3}");
+    if let Some(held_out_acc) = test_acc {
+        println!("  sbousseaden grouped holdout: {held_out_acc:.3}");
+    } else {
+        println!("  sbousseaden grouped holdout: unavailable (insufficient groups)");
+    }
+    if let Some((mean, std)) = grouped_cv_summary {
+        println!("  sbousseaden grouped 5-fold CV: {mean:.3} ± {std:.3}");
+    } else {
+        println!("  sbousseaden grouped 5-fold CV: unavailable");
+    }
     println!("  OOD (train sbou, test otrf): {ood_test_acc:.3}");
     println!("  chance (7 classes):          {:.3}", 1.0 / 7.0);
     println!("  Phase 1 cutoff:              0.500");
@@ -153,18 +210,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let sbou_di_hvs: Vec<Hdv> = sbou_events.iter().map(encode_domain_invariant).collect();
         let otrf_di_hvs: Vec<Hdv> = otrf_events.iter().map(encode_domain_invariant).collect();
-        let (tr_hv, tr_y, te_hv, te_y) =
-            symthaea_logparse::probe::grouped_stratified_split(
+        let (di_probe, di_in_distribution) =
+            match symthaea_logparse::probe::grouped_stratified_split(
                 &sbou_di_hvs, &sbou_labels, &sbou_groups, 0.8, 0xFACADE,
-            )?;
-        let di_probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
-        let di_in_distribution = di_probe.accuracy(&te_hv, &te_y);
+            ) {
+                Ok((tr_hv, tr_y, te_hv, te_y)) => {
+                    let probe = LogisticProbe::train(&tr_hv, &tr_y, cfg);
+                    let held_out_acc = probe.accuracy(&te_hv, &te_y);
+                    (probe, Some(held_out_acc))
+                }
+                Err(error) => {
+                    println!(
+                        "  domain-invariant holdout unavailable: {error}"
+                    );
+                    println!("  using all source events for independent-corpus OOD only");
+                    (
+                        LogisticProbe::train(&sbou_di_hvs, &sbou_labels, cfg),
+                        None,
+                    )
+                }
+            };
         let di_ood_predictions = di_probe.predict_batch(&otrf_di_hvs);
         let di_ood_report =
             classification_report(&otrf_labels, &di_ood_predictions, &di_probe.class_names)?;
 
-        println!("  baseline raw in-distribution accuracy: {test_acc:.3}");
-        println!("  ablation in-distribution accuracy:      {di_in_distribution:.3}");
+        if let Some(held_out_acc) = test_acc {
+            println!("  baseline raw grouped holdout accuracy: {held_out_acc:.3}");
+        } else {
+            println!("  baseline raw grouped holdout accuracy: unavailable");
+        }
+        if let Some(held_out_acc) = di_in_distribution {
+            println!("  ablation grouped holdout accuracy:      {held_out_acc:.3}");
+        } else {
+            println!("  ablation grouped holdout accuracy:      unavailable");
+        }
         println!("  baseline raw OOD accuracy:              {ood_test_acc:.3}");
         println!("  ablation OOD accuracy:                  {:.3}", di_ood_report.accuracy);
         println!("  baseline raw OOD macro recall:          {:.3}", raw_ood_report.macro_recall);
@@ -181,6 +260,181 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    if run_scenario_level_evaluation {
+        println!("\n=== Capture/scenario-level evaluation ===");
+        println!("  One vector per labeled source file or scenario directory.");
+        println!("  Compare an orderless bundle with relative record-position encoding.");
+        println!(
+            "  Ordered scenario encoder version: {ORDERED_SCENARIO_ENCODER_VERSION}"
+        );
+        println!("  Relative record order is not proof of timestamp order or causality.");
+
+        let sbou_raw_scenarios = aggregate_scenarios(&sbou_hvs, &sbou_labels, &sbou_groups)?;
+        let otrf_raw_scenarios = aggregate_scenarios(&otrf_hvs, &otrf_labels, &otrf_groups)?;
+        run_scenario_classifier(
+            "raw encoder / orderless bundle",
+            &sbou_raw_scenarios,
+            &otrf_raw_scenarios,
+            cfg,
+        )?;
+
+        let sbou_raw_ordered =
+            aggregate_ordered_scenarios(&sbou_hvs, &sbou_labels, &sbou_groups)?;
+        let otrf_raw_ordered =
+            aggregate_ordered_scenarios(&otrf_hvs, &otrf_labels, &otrf_groups)?;
+        run_scenario_classifier(
+            "raw encoder / relative record position",
+            &sbou_raw_ordered,
+            &otrf_raw_ordered,
+            cfg,
+        )?;
+
+        if run_domain_invariant_ablation {
+            let sbou_di_hvs: Vec<Hdv> =
+                sbou_events.iter().map(encode_domain_invariant).collect();
+            let otrf_di_hvs: Vec<Hdv> =
+                otrf_events.iter().map(encode_domain_invariant).collect();
+            let sbou_di_scenarios =
+                aggregate_scenarios(&sbou_di_hvs, &sbou_labels, &sbou_groups)?;
+            let otrf_di_scenarios =
+                aggregate_scenarios(&otrf_di_hvs, &otrf_labels, &otrf_groups)?;
+            run_scenario_classifier(
+                "domain-invariant encoder / orderless bundle",
+                &sbou_di_scenarios,
+                &otrf_di_scenarios,
+                cfg,
+            )?;
+
+            let sbou_di_ordered =
+                aggregate_ordered_scenarios(&sbou_di_hvs, &sbou_labels, &sbou_groups)?;
+            let otrf_di_ordered =
+                aggregate_ordered_scenarios(&otrf_di_hvs, &otrf_labels, &otrf_groups)?;
+            run_scenario_classifier(
+                "domain-invariant encoder / relative record position",
+                &sbou_di_ordered,
+                &otrf_di_ordered,
+                cfg,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn run_scenario_classifier(
+    name: &str,
+    source_scenarios: &[ScenarioEmbedding],
+    held_out_scenarios: &[ScenarioEmbedding],
+    cfg: TrainConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let expected_mode =
+        validate_matching_scenario_modes(source_scenarios, held_out_scenarios)?;
+    let mode_name = match expected_mode {
+        ScenarioEncodingMode::OrderlessBundle => "orderless-bundle",
+        ScenarioEncodingMode::RelativeRecordPosition => "relative-record-position",
+    };
+    println!("  scenario encoding mode: {mode_name}");
+
+    let source_hvs: Vec<Hdv> = source_scenarios
+        .iter()
+        .map(|scenario| scenario.vector.clone())
+        .collect();
+    let source_labels: Vec<String> = source_scenarios
+        .iter()
+        .map(|scenario| scenario.label.clone())
+        .collect();
+    let source_groups: Vec<String> = source_scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_id.clone())
+        .collect();
+    let held_out_hvs: Vec<Hdv> = held_out_scenarios
+        .iter()
+        .map(|scenario| scenario.vector.clone())
+        .collect();
+    let held_out_labels: Vec<String> = held_out_scenarios
+        .iter()
+        .map(|scenario| scenario.label.clone())
+        .collect();
+
+    println!("\n--- Scenario-level model: {name} ---");
+    println!(
+        "  source captures/scenarios: {}, held-out corpus scenarios: {}",
+        source_scenarios.len(),
+        held_out_scenarios.len()
+    );
+    println!(
+        "  source event count represented by bundles: {}",
+        source_scenarios
+            .iter()
+            .map(|scenario| scenario.event_count)
+            .sum::<usize>()
+    );
+    print_distribution("source scenarios by label", &source_labels);
+    print_distribution("OTRF scenarios by label", &held_out_labels);
+
+    // Same three split seeds are reused for every scenario encoder so results
+    // are paired across representation variants.
+    let scenario_repeat_seeds = [0xDEADBEEF, 0x51CE_0002, 0x51CE_0003];
+    match run_repeated_grouped_kfold(
+        &source_hvs,
+        &source_labels,
+        &source_groups,
+        5,
+        &scenario_repeat_seeds,
+        cfg,
+    ) {
+        Ok(repeat_means) if !repeat_means.is_empty() => {
+            let mean = repeat_means.iter().sum::<f32>() / repeat_means.len() as f32;
+            let variance = repeat_means
+                .iter()
+                .map(|accuracy| (accuracy - mean).powi(2))
+                .sum::<f32>()
+                / repeat_means.len() as f32;
+            println!(
+                "  repeated grouped scenario 5-fold accuracy: {mean:.3} ± {:.3} (repeat means)",
+                variance.sqrt()
+            );
+            println!("  per-repeat means: {repeat_means:?}");
+        }
+        Ok(_) => println!("  grouped scenario CV unavailable: no repeat metrics produced"),
+        Err(error) => println!(
+            "  grouped scenario CV unavailable under the strict capture-group contract: {error}"
+        ),
+    }
+
+    let probe = match symthaea_logparse::probe::grouped_stratified_split(
+        &source_hvs,
+        &source_labels,
+        &source_groups,
+        0.8,
+        0x51CE_0001,
+    ) {
+        Ok((train_hvs, train_labels, test_hvs, test_labels)) => {
+            let probe = LogisticProbe::train(&train_hvs, &train_labels, cfg);
+            let held_out_predictions = probe.predict_batch(&test_hvs);
+            let held_out_report =
+                classification_report(&test_labels, &held_out_predictions, &probe.class_names)?;
+            print_classification_report("source-capture holdout", &held_out_report);
+            probe
+        }
+        Err(error) => {
+            println!(
+                "  source-capture holdout unavailable under the strict group contract: {error}"
+            );
+            println!(
+                "  using all source scenarios for OOD only; no holdout score claimed"
+            );
+            LogisticProbe::train(&source_hvs, &source_labels, cfg)
+        }
+    };
+
+    let ood_predictions = probe.predict_batch(&held_out_hvs);
+    let ood_report = classification_report(
+        &held_out_labels,
+        &ood_predictions,
+        &probe.class_names,
+    )?;
+    print_classification_report("separate-corpus scenario-level OOD", &ood_report);
     Ok(())
 }
 
@@ -313,7 +567,7 @@ fn load_otrf_corpus(
     corpus_dir: &PathBuf,
     keep_labels: &[&str],
     max_per_dir: usize,
-) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
+) -> Result<(Vec<LogEvent>, Vec<String>), Box<dyn std::error::Error>> {
     let labels_path = corpus_dir.join("labels.csv");
     let labels_csv = std::fs::read_to_string(&labels_path)?;
     let mut dir_labels: HashMap<String, String> = HashMap::new();
@@ -329,6 +583,7 @@ fn load_otrf_corpus(
     paths.sort();
 
     let mut out: Vec<LogEvent> = Vec::new();
+    let mut groups: Vec<String> = Vec::new();
     for path in paths {
         if !path.is_dir() {
             continue;
@@ -351,27 +606,58 @@ fn load_otrf_corpus(
                 .take(max_per_dir)
                 .collect()
         };
+        let group_id = format!("otrf:{dname}");
         for mut ev in capped {
             ev.label = Some(label.clone());
             out.push(ev);
+            groups.push(group_id.clone());
         }
     }
-    Ok(out)
+    Ok((out, groups))
 }
 
 /// Stratified k-fold cross-validation with source groups kept intact.
+fn run_repeated_grouped_kfold(
+    hvs: &[Hdv],
+    labels: &[String],
+    groups: &[String],
+    k: usize,
+    seeds: &[u64],
+    cfg: TrainConfig,
+) -> Result<Vec<f32>, String> {
+    if seeds.is_empty() {
+        return Err("repeated grouped CV needs at least one split seed".to_string());
+    }
+    let mut repeat_means = Vec::with_capacity(seeds.len());
+    for (index, &seed) in seeds.iter().enumerate() {
+        println!(
+            "\n  grouped CV repeat {} of {} (split seed={seed:#x})",
+            index + 1,
+            seeds.len()
+        );
+        let fold_accuracies = run_grouped_kfold(hvs, labels, groups, k, seed, cfg)?;
+        if fold_accuracies.is_empty() {
+            return Err("grouped CV returned no fold metrics".to_string());
+        }
+        let mean = fold_accuracies.iter().sum::<f32>() / fold_accuracies.len() as f32;
+        println!("  repeat {} mean accuracy: {mean:.3}", index + 1);
+        repeat_means.push(mean);
+    }
+    Ok(repeat_means)
+}
+
 fn run_grouped_kfold(
     hvs: &[Hdv],
     labels: &[String],
     groups: &[String],
     k: usize,
+    seed: u64,
     cfg: TrainConfig,
 ) -> Result<Vec<f32>, String> {
     if hvs.len() != labels.len() {
         return Err("grouped CV feature/label length mismatch".to_string());
     }
-    let fold_of =
-        symthaea_logparse::probe::grouped_fold_assignment(labels, groups, k, 0xDEADBEEF)?;
+    let fold_of = symthaea_logparse::probe::grouped_fold_assignment(labels, groups, k, seed)?;
 
     let mut accs = Vec::with_capacity(k);
     for fold in 0..k {

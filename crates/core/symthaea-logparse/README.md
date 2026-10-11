@@ -38,6 +38,8 @@ product work.
 | `src/syslog_source.rs` | RFC5424/RFC3164 syslog parsing (via `syslog-loose`) |
 | `src/encoder.rs` | HDC encoder (6 role-filler bindings → 16,384D bipolar HV) |
 | `DOMAIN_INVARIANT_ABLATION.md` | Cross-corpus metadata ablation protocol; exploratory, not production |
+| `src/scenario.rs` | Typed orderless and relative-record-position scenario vectors; fail-closed label/group checks |
+| `SCENARIO_LEVEL_EVALUATION.md` | Scenario-level evaluation protocol and limitations |
 | `src/cluster.rs` | Cluster purity metric + nearest-centroid baseline |
 | `examples/cluster_evtx.rs` | Phase 1 benchmark runner |
 
@@ -60,6 +62,10 @@ benign_baseline.evtx,benign
 ## Cross-corpus ablation
 
 The experimental `encode_domain_invariant` variant can be compared against the baseline on staged EVTX and OTRF corpora using the optional `--domain-invariant-ablation` flag in `examples/phase2_experiments.rs`. See [`DOMAIN_INVARIANT_ABLATION.md`](DOMAIN_INVARIANT_ABLATION.md). It is an ablation only; do not assume it improves out-of-distribution performance without reproducing the measurements.
+
+## Scenario-level evaluation
+
+Grouped event splits reduce capture leakage, but event-level metrics can still over-weight captures with many events. The optional `--scenario-level-evaluation` run compares an orderless HDC bundle with a relative-record-position encoding, using one vector per EVTX file or OTRF scenario directory. The second variant preserves coarse parser-record order—not verified chronology, time gaps, or causality—and neither is an attack-chain model. See [`SCENARIO_LEVEL_EVALUATION.md`](SCENARIO_LEVEL_EVALUATION.md).
 
 ## Kill criterion
 
