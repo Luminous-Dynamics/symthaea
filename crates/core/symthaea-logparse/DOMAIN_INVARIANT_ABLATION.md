@@ -31,10 +31,11 @@ The ordinary baseline experiments now use source-file-grouped train/test and 5-f
 
 - in-distribution test accuracy;
 - OOD accuracy;
-- OOD macro recall, averaged equally across the represented classes;
-- the corresponding raw-encoder OOD accuracy and macro recall.
+- macro precision, macro recall, and macro F1;
+- per-class TP/FP/FN, precision, recall, F1, and the full confusion matrix;
+- the corresponding raw-encoder metrics for direct comparison.
 
-Accuracy alone can be dominated by common classes; read it alongside macro recall and the per-class breakdown. The script prints measurements from the currently staged corpora; do not copy historical values into a new result as if it had been reproduced.
+Accuracy alone can be dominated by common classes; read it alongside macro metrics and the confusion matrix. Class-level false positives here mean confusion among the labeled attack classes—not false alarms on benign enterprise activity. The staged OTRF corpus does not provide the benign control needed to measure operational false-positive rates. The script prints measurements from the currently staged corpora; do not copy historical values into a new result as if it had been reproduced.
 
 ## Decision discipline
 
