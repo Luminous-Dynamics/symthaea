@@ -78,7 +78,7 @@ jobs:
           reference_sha256 = Path(sys.argv[5]).read_text(encoding="utf-8").split()[0]
           assert reference["git_blob_sha"] == reference_blob, (reference["git_blob_sha"], reference_blob)
           assert reference["sha256"] == reference_sha256, (reference["sha256"], reference_sha256)
-          assert reference["expected_check_count"] == 66, reference
+          assert reference["expected_check_count"] == 68, reference
           print(f"verification status matches validator ({current['expected_self_test_check_count']} checks) and reference checker ({reference['expected_check_count']} checks)")
           PY
 
@@ -126,7 +126,7 @@ jobs:
           import sys
 
           report = json.load(open(sys.argv[1], encoding="utf-8"))
-          expected = 66
+          expected = 68
           assert report["schema"] == "luminous-dynamics.orbital-ring-reference-check/v3", report
           assert report["check_count"] == expected, report
           assert report["evidence_state"] == "passed_at_specified_fidelity", report
