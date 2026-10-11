@@ -27,6 +27,7 @@ MANIFEST_NAME = "BUNDLE-MANIFEST.json"
 SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_MEMBER_BYTES = 20 * 1024 * 1024
+MAX_BUNDLE_BYTES_COMPRESSED = 128 * 1024 * 1024
 MAX_BUNDLE_BYTES_UNCOMPRESSED = 128 * 1024 * 1024
 
 PACKAGE_FILES = tuple(sorted((
@@ -246,17 +247,39 @@ def build_bundle(root: str | Path, output_path: str | Path, source_commit: str) 
     }
 
 
+def _read_bundle_snapshot(bundle: Path) -> tuple[bytes, str]:
+    """Read one regular-file snapshot through O_NOFOLLOW, then hash those exact bytes."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(bundle, flags)
+    except OSError as exc:
+        raise BundleError("bundle must be a readable regular non-symlink file") from exc
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise BundleError("bundle must be a regular file")
+        if info.st_size < 0 or info.st_size > MAX_BUNDLE_BYTES_COMPRESSED:
+            raise BundleError("compressed bundle exceeds configured size limit")
+        with os.fdopen(fd, "rb", closefd=True) as handle:
+            fd = -1
+            raw = handle.read(MAX_BUNDLE_BYTES_COMPRESSED + 1)
+        if len(raw) > MAX_BUNDLE_BYTES_COMPRESSED:
+            raise BundleError("compressed bundle exceeds configured size limit")
+        if len(raw) != info.st_size:
+            raise BundleError("bundle changed size while taking a verification snapshot")
+        return raw, hashlib.sha256(raw).hexdigest()
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
 def verify_bundle(bundle_path: str | Path, *, expected_source_commit: str | None = None) -> dict[str, Any]:
     """Verify tar structure, fixed file inventory, manifest digests, and reproducible metadata."""
     bundle = Path(bundle_path)
-    if bundle.is_symlink() or not bundle.is_file():
-        raise BundleError("bundle must be a regular non-symlink file")
-    if bundle.stat().st_size > MAX_BUNDLE_BYTES_UNCOMPRESSED:
-        raise BundleError("compressed bundle exceeds configured size limit")
-    bundle_digest_before = _sha256_file(bundle)
+    bundle_bytes, bundle_digest = _read_bundle_snapshot(bundle)
 
     try:
-        with tarfile.open(bundle, mode="r:gz") as tar:
+        with tarfile.open(fileobj=io.BytesIO(bundle_bytes), mode="r:gz") as tar:
             expected_names = sorted(
                 [f"{BUNDLE_ROOT}/{MANIFEST_NAME}"] +
                 [f"{BUNDLE_ROOT}/{name}" for name in PACKAGE_FILES]
@@ -337,12 +360,9 @@ def verify_bundle(bundle_path: str | Path, *, expected_source_commit: str | None
         if digest != record["sha256"] or len(raw) != size_bytes:
             raise BundleError(f"manifest digest or size mismatch for {name}")
         expected_file_records.append(record)
-    bundle_digest_after = _sha256_file(bundle)
-    if bundle_digest_after != bundle_digest_before:
-        raise BundleError("bundle changed while it was being verified")
     return {
         "schema_version": BUNDLE_VERSION,
-        "bundle_sha256": bundle_digest_after,
+        "bundle_sha256": bundle_digest,
         "source_commit": source_commit,
         "file_count": len(expected_file_records),
         "bundle_verified": True,
