@@ -834,6 +834,12 @@ def self_test_glyph_projection_validator(
     mutation = json.loads(json.dumps(fixture))
     mutation["encoder_source_blob"] = "not-a-git-blob"
     mutations.append(("encoder source identity corruption rejected", mutation, "encoder_source_blob malformed"))
+    mutation = json.loads(json.dumps(fixture))
+    mutation["cases"][0]["glyph_scores"][0], mutation["cases"][0]["glyph_scores"][1] = mutation["cases"][0]["glyph_scores"][1], mutation["cases"][0]["glyph_scores"][0]
+    mutations.append(("full glyph ranking corruption rejected", mutation, "full glyph ranks are not contiguous"))
+    mutation = json.loads(json.dumps(fixture))
+    mutation["cases"][0]["top_glyphs"][0]["name"] = "Contradictory top-five name"
+    mutations.append(("top-five/full-rank divergence rejected", mutation, "top-five glyph ranking conflicts with complete 70-entry ranking"))
 
     for name, mutated, expected_error in mutations:
         try:
@@ -868,7 +874,7 @@ def main() -> int:
         projection_test_failures = self_test_glyph_projection_validator(corpus, corpus_bytes, args.source_revision)
         if projection_test_failures:
             raise BaselineError("Glyph projection validator self-test failures: " + "; ".join(projection_test_failures))
-        print("PASS Glyph projection validator self-test: valid receipt plus five hostile mutations")
+        print("PASS Glyph projection validator self-test: valid receipt plus seven hostile mutations")
         args.output_dir.mkdir(parents=True, exist_ok=True)
 
         glyph_projection_by_id = None
