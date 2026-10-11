@@ -2237,6 +2237,32 @@ mod tests {
     }
 
     #[test]
+    fn test_rank_and_condition_number_are_scale_invariant() {
+        let a = HdcMatrix::from_rows(&[&[3.0e-100, 0.0], &[0.0, 1.0e-100]]);
+
+        assert_eq!(a.try_rank().expect("direct SVD should qualify rank"), 2);
+        assert_eq!(a.rank(), 2);
+        let condition = a
+            .try_condition_number()
+            .expect("direct SVD should qualify condition number");
+        assert!((condition - 3.0).abs() < 1e-8);
+        assert!((a.condition_number() - 3.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn test_checked_rank_and_condition_number_report_numerical_rank_deficiency() {
+        let a = HdcMatrix::from_rows(&[&[1.0, 2.0], &[2.0, 4.0]]);
+
+        assert_eq!(a.try_rank().expect("rank-deficient SVD should qualify"), 1);
+        assert!(
+            a.try_condition_number()
+                .expect("rank-deficient SVD should qualify")
+                .is_infinite()
+        );
+        assert!(a.null_space().is_some());
+    }
+
+    #[test]
     fn test_svd_checked_api_rejects_non_finite_input_and_wrapper_fails_closed() {
         let mut a = HdcMatrix::identity(2);
         a.data[0] = f64::NAN;
