@@ -167,6 +167,22 @@ class SignedReceiptVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(verifier.VerificationError, "not currently within its validity interval"):
             self.verify(trust=trust)
 
+    def test_schema_accepts_valid_receipt_envelope(self):
+        from jsonschema import Draft202012Validator
+        schema_path = Path(__file__).resolve().parents[1] / "validation" / "cyber_crucible_signed_receipt_v1.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        errors = list(Draft202012Validator(schema).iter_errors(signed_receipt()))
+        self.assertEqual(errors, [])
+
+    def test_schema_rejects_unknown_signed_payload_field(self):
+        from jsonschema import Draft202012Validator
+        schema_path = Path(__file__).resolve().parents[1] / "validation" / "cyber_crucible_signed_receipt_v1.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        receipt = signed_receipt()
+        receipt["payload"]["unbound_security_claim"] = True
+        errors = list(Draft202012Validator(schema).iter_errors(receipt))
+        self.assertTrue(any("Additional properties are not allowed" in error.message for error in errors), errors)
+
     def test_valid_receipt_is_signature_verified_but_non_authorizing(self):
         result = self.verify(replay_ledger=verifier.ReplayLedger(self.replay_db))
         self.assertTrue(result["signature_verified"])
