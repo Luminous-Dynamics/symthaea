@@ -532,11 +532,11 @@ def self_test(cases: list[dict[str, Any]], methods: list[tuple[str, Any, dict[st
     return failures
 
 
-def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_revision: str) -> dict[str, dict[str, Any]]:
+def validate_glyph_projection(projection: Any, corpus: dict[str, Any], corpus_bytes: bytes, source_revision: str) -> dict[str, dict[str, Any]]:
     """Validate the representation-only receipt from the actual Rust Glyph/HDC API."""
     top_keys = {
         "schema", "corpus_id", "corpus_version", "corpus_status", "corpus_split",
-        "corpus_blake3", "source_revision", "glyph_source_blob", "glyph_registry_source_blob",
+        "corpus_blake3", "corpus_sha256", "source_revision", "glyph_source_blob", "glyph_registry_source_blob", "encoder_source_blob",
         "dimension", "registry_size", "encoder_profile", "basis_profile", "registry_profile",
         "retrieval", "claim_ceiling", "pairwise_input_similarity_profile", "pairwise_input_similarity", "cases",
     }
@@ -546,7 +546,8 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_re
     require(projection["corpus_status"] == "DevelopmentProbe" and projection["corpus_split"] == "ExposedDevelopment", "Glyph projection split/status mismatch")
     require(projection["source_revision"] == source_revision, "Glyph projection source revision mismatch")
     require(re.fullmatch(r"[0-9a-f]{64}", projection["corpus_blake3"] or "") is not None, "Glyph projection corpus BLAKE3 identity is malformed")
-    for field in ("glyph_source_blob", "glyph_registry_source_blob"):
+    require(projection["corpus_sha256"] == hashlib.sha256(corpus_bytes).hexdigest(), "Glyph projection corpus SHA-256 does not match exact corpus bytes")
+    for field in ("glyph_source_blob", "glyph_registry_source_blob", "encoder_source_blob"):
         require(isinstance(projection[field], str) and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", projection[field]) is not None, f"Glyph projection {field} malformed")
     require(projection["dimension"] == 16384, "Glyph projection must use 16,384 dimensions for this profile")
     require(projection["registry_size"] == 70, "Glyph projection registry size mismatch")
@@ -562,14 +563,16 @@ def validate_glyph_projection(projection: Any, corpus: dict[str, Any], source_re
         "seed_profile": "the exact committed TextHdcEncoder implementation",
     }, "Glyph projection encoder profile mismatch")
     expected_ids = {case["id"] for case in corpus["cases"]}
+    input_sha256 = {case["id"]: hashlib.sha256(case["input_text"].encode("utf-8")).hexdigest() for case in corpus["cases"]}
     rows = projection["cases"]
     require(isinstance(rows, list) and len(rows) == len(expected_ids), "Glyph projection case count mismatch")
     by_id: dict[str, dict[str, Any]] = {}
     for row in rows:
-        require(isinstance(row, dict) and set(row) == {"case_id", "input_blake3", "modality_scores", "top_modalities", "top_glyphs"}, "Glyph projection case schema mismatch")
+        require(isinstance(row, dict) and set(row) == {"case_id", "input_blake3", "input_sha256", "modality_scores", "top_modalities", "top_glyphs"}, "Glyph projection case schema mismatch")
         case_id = row["case_id"]
         require(case_id in expected_ids and case_id not in by_id, f"unknown/duplicate Glyph projection case: {case_id}")
-        require(re.fullmatch(r"[0-9a-f]{64}", row["input_blake3"] or "") is not None, f"malformed input digest for {case_id}")
+        require(re.fullmatch(r"[0-9a-f]{64}", row["input_blake3"] or "") is not None, f"malformed input BLAKE3 digest for {case_id}")
+        require(row["input_sha256"] == input_sha256[case_id], f"input SHA-256 does not bind exact corpus text for {case_id}")
         scores = row["modality_scores"]
         require(isinstance(scores, list) and len(scores) == 11, f"{case_id}: expected 11 modality scores")
         names: set[str] = set()
@@ -683,7 +686,7 @@ def main() -> int:
         if args.glyph_projection:
             projection_bytes = args.glyph_projection.read_bytes()
             projection = load_json(args.glyph_projection)
-            glyph_projection_by_id = validate_glyph_projection(projection, corpus, args.source_revision)
+            glyph_projection_by_id = validate_glyph_projection(projection, corpus, corpus_bytes, args.source_revision)
             glyph_projection_sha256 = hashlib.sha256(projection_bytes).hexdigest()
             glyph_projection_meta = {
                 "file": args.glyph_projection.name,
@@ -691,7 +694,9 @@ def main() -> int:
                 "source_revision": projection["source_revision"],
                 "glyph_source_blob": projection["glyph_source_blob"],
                 "glyph_registry_source_blob": projection["glyph_registry_source_blob"],
+                "encoder_source_blob": projection["encoder_source_blob"],
                 "corpus_blake3": projection["corpus_blake3"],
+                "corpus_sha256": projection["corpus_sha256"],
                 "dimension": projection["dimension"],
                 "registry_size": projection["registry_size"],
             }
