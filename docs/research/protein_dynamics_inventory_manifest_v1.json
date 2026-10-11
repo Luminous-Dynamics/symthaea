@@ -34,7 +34,10 @@
         "reproduce one labelled reference case in a fresh environment",
         "separate pre-reweighting, same-observable post-reweighting, and genuinely held-out-observable results",
         "check target overlap with model training and exposure",
-        "verify publisher-provided checksum for the data archive, or explicitly record its absence; preserve the downloaded archive and compute a local SHA-256 before extraction"
+        "verify publisher-provided checksum for the data archive, or explicitly record its absence; preserve the downloaded archive and compute a local SHA-256 before extraction",
+        "implement fail-closed run-record validator and adversarial tests (implementation committed)",
+        "run validator tests against the repository's production schema and preserve local test output",
+        "create and hash the target-specific run bundle before reference execution"
       ],
       "revision": "f161b5220a52ebd1a715c91a68beef125101608e",
       "revision_url": "https://github.com/PeptoneLtd/peptonebench/commit/f161b5220a52ebd1a715c91a68beef125101608e",
@@ -275,8 +278,13 @@
   "execution_record_contract": {
     "schema_version": "1.0.0",
     "path": "docs/research/PROTEIN_DYNAMICS_RUN_RECORD_SCHEMA_v1.json",
-    "purpose": "Fail-closed provenance, target-outcome, metric-role, and resource-accounting contract.",
-    "runtime_validator_implemented": false,
+    "validator_path": "scripts/research/validate_protein_dynamics_run.py",
+    "tests_path": "scripts/research/test_validate_protein_dynamics_run.py",
+    "usage_doc": "docs/research/PROTEIN_DYNAMICS_RUN_RECORD_VALIDATOR.md",
+    "purpose": "Fail-closed provenance, target-outcome, metric-role, conformer/resource accounting, and local output-hash validation.",
+    "runtime_validator_implemented": true,
+    "adversarial_test_cases": 16,
+    "production_schema_selected_by_tests_when_repository_checkout_available": true,
     "execution_record_created": false
   }
 }
