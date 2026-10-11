@@ -212,6 +212,7 @@ fn rational_components_are_canonical(numerator: i64, denominator: i64) -> bool {
 }
 
 /// Convert a numeric tower `Number` into a `MathValue`.
+fn number_to_math_value(n: &Number) -> MathValue {
     match n {
         Number::Natural(v) => MathValue::Natural(*v),
         Number::Integer(v) => MathValue::Integer(*v),
