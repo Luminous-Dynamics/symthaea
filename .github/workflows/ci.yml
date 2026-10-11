@@ -42,6 +42,67 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  orbital-ring-manifest-contract:
+    name: Orbital-Ring Manifest Contract (Python)
+    runs-on: ubuntu-24.04
+    # Run this targeted, dependency-free evidence gate on draft PRs too. The broad
+    # Rust/governance matrix intentionally waits until a draft is marked ready.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile fail-closed validator
+        run: python3 -m py_compile scripts/engineering/validate_orbital_ring_failure_manifest.py
+
+      - name: Run validator self-tests twice; require deterministic complete pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$tmp/self-test-a.json"
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py --self-test > "$tmp/self-test-b.json"
+          cmp "$tmp/self-test-a.json" "$tmp/self-test-b.json"
+          python3 - "$tmp/self-test-a.json" <<'PY'
+          import json
+          import sys
+
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          expected = 80
+          assert report.get("checks_passed") == expected, report
+          assert report.get("checks_failed") == 0, report
+          checks = report.get("checks")
+          assert isinstance(checks, list) and len(checks) == expected, report
+          ids = [item.get("id") for item in checks]
+          assert all(isinstance(item, str) and item for item in ids), report
+          assert len(set(ids)) == len(ids), "self-test IDs must be unique"
+          assert all(item.get("status") == "passed" for item in checks), report
+          print(f"manifest validator: {expected}/{expected} deterministic contract tests passed")
+          PY
+
+      - name: Validate frozen scenario template and match committed report
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          trap 'rm -f "$tmp"' EXIT
+          python3 scripts/engineering/validate_orbital_ring_failure_manifest.py docs/engineering/scenarios/F_SKYHOOK_LOAD_STEP.json > "$tmp"
+          cmp "$tmp" docs/engineering/evidence/f_skyhook_load_step_manifest_validation.json
+          python3 - "$tmp" <<'PY'
+          import json
+          import sys
+
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert report["validation_state"] == "passed_contract_checks", report
+          assert report["scenario_schema"] == "luminous-dynamics.orbital-ring-failure-scenario/v2", report
+          assert report["scenario_version"] == 2, report
+          assert report["expected_gate_state"] == "Blocked", report
+          assert report["blocking_field_count"] == 23, report
+          assert report["analysis_state"] == "NotRun", report
+          assert report["physics_claim"].startswith("none;"), report
+          print("scenario manifest structurally valid and correctly remains Blocked/NotRun")
+          PY
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
