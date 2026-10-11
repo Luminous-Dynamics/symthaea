@@ -526,12 +526,16 @@ pub fn verify_autonomous_discovery_receipt_v1(receipt: &AutonomousDiscoveryRecei
         failure: receipt.holdout_failure,
     };
     receipt.schema_version == 1
-        && !receipt.source_revision.is_empty()
         && matches!(receipt.source_revision.len(), 40 | 64)
+        && receipt.source_revision == receipt.source_revision.to_ascii_lowercase()
         && receipt.source_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
         && !receipt.system_id.trim().is_empty()
+        && receipt.system_id == receipt.system_id.trim()
         && receipt.system_definition_blake3.len() == 64
+        && receipt.system_definition_blake3 == receipt.system_definition_blake3.to_ascii_lowercase()
         && receipt.system_definition_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && receipt.search_config_blake3.len() == 64
+        && receipt.search_config_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
         && !receipt.variable_names.is_empty()
         && receipt.variable_names.iter().all(|name| !name.trim().is_empty())
         && receipt.variable_names.iter().collect::<std::collections::HashSet<_>>().len()
@@ -954,6 +958,26 @@ mod tests {
             4.0, 0.01, &holdout,
         );
         assert_eq!(result.unwrap_err(), AutonomousDiscoveryReceiptError::EmptySystemDefinition);
+    }
+
+    #[test]
+    fn verifier_rejects_malformed_search_digest_even_after_redigest() {
+        let config = RegressorConfig { seed: 13, ..RegressorConfig::default() };
+        let formula = harmonic_energy();
+        let candidate = candidate(formula.clone(), AutonomousDiscoveryMode::Cold);
+        let holdout = validate_invariant_holdout(
+            harmonic_rhs, &formula, &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "vx", "vy"], &config, 4.0, 0.01, 2, 701, 1e-2,
+        );
+        let mut receipt = build_autonomous_discovery_receipt_v1(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "harmonic-oscillator-v1", system_definition_canonical(), &config, &[], &candidate,
+            &["x", "y", "vx", "vy"], &[1.0, 0.0, 0.0, 1.0],
+            4.0, 0.01, &holdout,
+        ).expect("well-formed receipt should be constructed");
+        receipt.search_config_blake3 = "not-a-digest".to_string();
+        receipt.receipt_blake3 = compute_receipt_digest(&receipt);
+        assert!(!verify_autonomous_discovery_receipt_v1(&receipt));
     }
 
 }
