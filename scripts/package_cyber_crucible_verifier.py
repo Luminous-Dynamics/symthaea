@@ -257,17 +257,21 @@ def verify_bundle(bundle_path: str | Path, *, expected_source_commit: str | None
 
     try:
         with tarfile.open(bundle, mode="r:gz") as tar:
-            members = tar.getmembers()
             expected_names = sorted(
                 [f"{BUNDLE_ROOT}/{MANIFEST_NAME}"] +
                 [f"{BUNDLE_ROOT}/{name}" for name in PACKAGE_FILES]
             )
-            names = [member.name for member in members]
-            if names != expected_names:
-                raise BundleError("bundle inventory is missing, duplicated, extra, or out of deterministic order")
             payloads: dict[str, bytes] = {}
             total_size = 0
-            for member in members:
+            observed_count = 0
+            # Iterate incrementally. getmembers() would materialize every attacker-
+            # controlled tar header before the member-count and expansion limits run.
+            for member in tar:
+                if observed_count >= len(expected_names):
+                    raise BundleError("bundle contains more members than the fixed inventory")
+                if member.name != expected_names[observed_count]:
+                    raise BundleError("bundle inventory is missing, duplicated, extra, or out of deterministic order")
+                observed_count += 1
                 _safe_relpath(member.name)
                 if not member.isfile() or member.issym() or member.islnk():
                     raise BundleError(f"non-regular tar member rejected: {member.name}")
@@ -289,6 +293,8 @@ def verify_bundle(bundle_path: str | Path, *, expected_source_commit: str | None
                 if len(data) != member.size or len(data) > MAX_MEMBER_BYTES:
                     raise BundleError(f"member size mismatch or limit exceeded: {member.name}")
                 payloads[member.name] = data
+            if observed_count != len(expected_names):
+                raise BundleError("bundle inventory is missing required members")
     except (tarfile.TarError, OSError, EOFError) as exc:
         raise BundleError(f"cannot read deterministic verifier bundle: {exc}") from exc
 
