@@ -370,6 +370,19 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
             root.tag_name().name()
         ));
     }
+    // A linear note list cannot preserve repeat traversal, alternate endings,
+    // or the elapsed span of a multiple-measure rest. Reject these structures
+    // before parsing note positions rather than silently compressing the score.
+    if let Some(structure) = document.descendants().find(|node| {
+        ["repeat", "ending", "multiple-rest"]
+            .iter()
+            .any(|tag| node.has_tag_name(*tag))
+    }) {
+        let name = structure.tag_name().name();
+        return Err(format!(
+            "MusicXML <{name}> repeat/measure structure cannot be represented by the linear Score importer; refusing to flatten source timing"
+        ));
+    }
     // The importer has no separate written-pitch/sounding-pitch layer. A
     // transposing-instrument directive must not be silently ignored.
     if document
@@ -1541,6 +1554,42 @@ mod tests {
             error.contains("ties are not supported by the single-note-event importer"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn musicxml_repeat_markers_are_rejected_instead_of_flattened() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "</measure>",
+                r#"<barline location="right"><repeat direction="backward"/></barline></measure>"#,
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("<repeat>"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_alternate_endings_are_rejected_instead_of_flattened() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "</measure>",
+                r#"<barline location="left"><ending number="1" type="start">1.</ending></barline></measure>"#,
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("<ending>"), "{error}");
+    }
+
+    #[test]
+    fn musicxml_multiple_measure_rests_are_rejected_to_preserve_timing() {
+        let xml = String::from_utf8(minimal_musicxml().to_vec())
+            .unwrap()
+            .replace(
+                "</attributes>",
+                "<measure-style><multiple-rest>2</multiple-rest></measure-style></attributes>",
+            );
+        let error = parse_musicxml(xml.as_bytes()).unwrap_err();
+        assert!(error.contains("<multiple-rest>"), "{error}");
     }
 
     #[test]
