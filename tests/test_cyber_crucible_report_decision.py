@@ -1,15 +1,34 @@
 """Tests for exact report-to-decision binding."""
 from __future__ import annotations
 
+import base64
 from copy import deepcopy
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
-from scripts.verify_cyber_crucible_decision_receipt import canonical_json_digest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from scripts.verify_cyber_crucible_decision_receipt import (
+    POLICY_VERSION,
+    SCHEMA_VERSION,
+    ReplayLedger,
+    canonical_json_digest,
+    canonical_signed_bytes,
+)
 from scripts.verify_cyber_crucible_report_decision import (
     ReportDecisionBindingError,
     validate_input_receipt_binding,
     validate_report_binding,
+    verify_report_decision,
 )
+
+
+def b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
 class ReportBindingTests(unittest.TestCase):
@@ -106,6 +125,96 @@ class ReportBindingTests(unittest.TestCase):
         context["report_digest"] = canonical_json_digest(changed)
         with self.assertRaises(ReportDecisionBindingError):
             validate_report_binding(changed, context)
+
+    def test_end_to_end_public_report_decision_binding(self):
+        report_path = Path(__file__).resolve().parents[1] / "validation" / "cyber_crucible_diagnostic_loop_public_v1.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        run = report["run"]
+        scenario = run["scenario"]
+        campaign_id = "public-calibration-campaign-v1"
+        attempt_id = run["run_id"]
+
+        input_receipt = {
+            "payload": {
+                "schema_version": "cyber-crucible-signed-receipt.v1",
+                "receipt_id": "b" * 32,
+                "role": "security_verdict",
+                "campaign_id": campaign_id,
+                "subject_id": run["subject_id"],
+                "attempt_id": attempt_id,
+                "scenario_id": scenario["scenario_id"],
+                "scenario_revision": scenario["revision"],
+                "scenario_digest": scenario["scenario_digest"],
+            },
+            "signature": b64url(bytes([17]) * 64),
+        }
+
+        private_key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+        public_key = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        policy = {
+            "schema_version": POLICY_VERSION,
+            "policy_id": "public-e2e-decision-policy-v1",
+            "keys": [{
+                "key_id": "e2e-verifier-key",
+                "verifier_id": "e2e-independent-verifier",
+                "public_key": b64url(public_key),
+                "not_before": "2029-01-01T00:00:00Z",
+                "not_after": "2031-01-01T00:00:00Z",
+                "revoked_at": None,
+            }],
+        }
+        context = {
+            "campaign_id": campaign_id,
+            "subject_id": run["subject_id"],
+            "attempt_id": attempt_id,
+            "scenario_id": scenario["scenario_id"],
+            "scenario_revision": scenario["revision"],
+            "scenario_digest": scenario["scenario_digest"],
+            "input_receipt_digest": canonical_json_digest(input_receipt),
+            "report_digest": canonical_json_digest(report),
+            "evaluator_policy_digest": "3" * 64,
+            "verifier_build_digest": "4" * 64,
+            "decision_nonce": b64url(bytes(range(32, 64))),
+        }
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "algorithm": "Ed25519",
+            "decision_id": "c" * 32,
+            "decision_nonce": context["decision_nonce"],
+            "signer_key_id": "e2e-verifier-key",
+            "verifier_id": "e2e-independent-verifier",
+            "decision": "accept",
+            "reason_code": "authenticated_under_policy",
+            **context,
+            "context_digest": canonical_json_digest(context),
+            "decision_trust_policy_digest": canonical_json_digest(policy),
+            "issued_at": "2030-01-01T00:00:00Z",
+            "expires_at": "2030-01-01T00:05:00Z",
+            "non_authorizing": True,
+        }
+        decision_receipt = {
+            "payload": payload,
+            "signature": b64url(private_key.sign(canonical_signed_bytes(payload))),
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = verify_report_decision(
+                report,
+                input_receipt,
+                decision_receipt,
+                policy,
+                context,
+                replay_ledger=ReplayLedger(Path(temp_dir) / "e2e-replay.sqlite3"),
+                now=datetime(2030, 1, 1, 0, 0, 30, tzinfo=timezone.utc),
+            )
+        self.assertTrue(result["report_contract_valid"])
+        self.assertTrue(result["decision_receipt_verified"])
+        self.assertEqual(result["decision"], "accept")
+        self.assertEqual(result["report_digest"], context["report_digest"])
+        self.assertTrue(result["non_authorizing"])
 
 
 if __name__ == "__main__":
