@@ -528,8 +528,24 @@ impl EffectEstimate {
         Ok(())
     }
 
-    /// Attach finite, non-negative dispersion.
-    pub fn with_std_dev(
+    /// Compatibility wrapper for attaching dispersion.
+    ///
+    /// Invalid dispersion is rejected rather than stored. Call
+    /// `try_with_std_dev()` when the value can be invalid or comes from
+    /// untrusted input, so validation can be handled without a panic.
+    #[deprecated(note = "use try_with_std_dev for fallible validation")]
+    pub fn with_std_dev(mut self, std_dev: f64) -> Self {
+        assert!(
+            std_dev.is_finite() && std_dev >= 0.0,
+            "standard deviation must be finite and non-negative"
+        );
+        self.standard_deviation = Some(std_dev);
+        self
+    }
+
+    /// Attach dispersion only when both the existing estimate and the new
+    /// standard deviation pass validation.
+    pub fn try_with_std_dev(
         mut self,
         std_dev: f64,
     ) -> Result<Self, EffectEstimateValidationError> {
@@ -583,7 +599,7 @@ impl<'de> Deserialize<'de> for EffectEstimate {
         }
 
         if let Some(sd) = persisted.standard_deviation {
-            estimate = estimate.with_std_dev(sd).map_err(D::Error::custom)?;
+            estimate = estimate.try_with_std_dev(sd).map_err(D::Error::custom)?;
         }
         Ok(estimate)
     }
@@ -2143,14 +2159,14 @@ mod effect_estimate_persistence_tests {
         assert_eq!(
             EffectEstimate::try_new(0.8, 0.4, 4)
                 .unwrap()
-                .with_std_dev(f64::NAN)
+                .try_with_std_dev(f64::NAN)
                 .unwrap_err(),
             EffectEstimateValidationError::InvalidStandardDeviation
         );
         assert_eq!(
             EffectEstimate::try_new(0.8, 0.4, 4)
                 .unwrap()
-                .with_std_dev(-0.1)
+                .try_with_std_dev(-0.1)
                 .unwrap_err(),
             EffectEstimateValidationError::InvalidStandardDeviation
         );
