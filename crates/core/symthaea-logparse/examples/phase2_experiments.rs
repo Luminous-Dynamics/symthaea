@@ -22,13 +22,13 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
-use symthaea_logparse::scenario::{aggregate_scenarios, ScenarioEmbedding};
 use symthaea_logparse::encoder::{
     DOMAIN_INVARIANT_ENCODER_VERSION, Hdv, encode, encode_domain_invariant,
 };
 use symthaea_logparse::probe::{
     classification_report, ClassificationReport, LogisticProbe, TrainConfig,
 };
+use symthaea_logparse::scenario::{aggregate_scenarios, ScenarioEmbedding};
 use symthaea_logparse::{LogEvent, evtx_source, otrf_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
