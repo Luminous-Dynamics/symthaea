@@ -71,7 +71,7 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | Field | Value |
 |-------|-------|
 | **Description** | HDC moral algebra produces incorrect moral verdicts on novel or adversarial inputs outside training distribution |
-| **Likelihood** | 3 (Moderate — 91.1% classification accuracy leaves ~9% error rate; adversarial inputs not systematically tested) |
+| **Likelihood** | 3 (Moderate — no qualified task-matched accuracy baseline; adversarial input coverage is incomplete) |
 | **Impact** | 5 (Critical — incorrect moral verdicts could permit harmful actions or block beneficial ones) |
 | **Risk Score** | **15 (High)** |
 | **Existing Controls** | Three-stage ethics pipeline (MoralParser + MoralAlgebra -> ValueEvaluator -> HarmoniesIntegrator); deontological verdict with consent violation detection; moral topology anomaly detection (drift alerts, completeness failures); veto system (Allow/Warn/Veto) |
