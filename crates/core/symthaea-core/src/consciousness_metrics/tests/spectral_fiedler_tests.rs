@@ -124,11 +124,7 @@ fn spectral_partition_separates_dense_clusters_across_weak_bridge() {
 #[test]
 fn spectral_partition_abstains_for_disconnected_graph() {
     let calc = TruePhiCalculator::new();
-    let matrix = mi_graph(
-        4,
-        &[(0, 1, 1.0), (2, 3, 1.0)],
-        &[0.0; 4],
-    );
+    let matrix = mi_graph(4, &[(0, 1, 1.0), (2, 3, 1.0)], &[0.0; 4]);
 
     assert!(
         calc.spectral_partition(&matrix, 4).is_none(),
