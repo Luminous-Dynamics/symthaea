@@ -1,0 +1,130 @@
+{
+  "schema_version": "ll009a.south-pole-evidence.v1",
+  "pack_id": "ll009a-pgda-south-pole-v1",
+  "study_frame": "MOON_ME_DE440_ME421",
+  "no_data_policy": "fail_closed",
+  "datasets": [
+    {
+      "id": "pgda-site01-5m",
+      "provider": "NASA Goddard PGDA / LOLA",
+      "product": "High-Resolution LOLA Topography for Lunar South Pole Sites — Site01 Connecting ridge",
+      "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+      "frame": "MOON_ME_DE421",
+      "projection": "south polar stereographic; X/Y meters; pixel-registered 5 m GeoTIFF products",
+      "horizontal_units": "m",
+      "vertical_units": "m",
+      "resolution_m": 5.0,
+      "evidence_class": "measured",
+      "files": [
+        {
+          "filename": "Site01_final_adj_5mpp_surf.tif",
+          "role": "surface_elevation",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site01_final_adj_5mpp_slp.tif",
+          "role": "surface_slope_deg",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site01_final_adj_5mpp_toterr.tif",
+          "role": "elevation_rms_uncertainty_m",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site01_final_adj_5mpp_slperr.tif",
+          "role": "slope_rms_uncertainty_deg",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site01_ROIs.tgz",
+          "role": "region_geometry",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": false
+        }
+      ],
+      "uncertainty_products": [
+        "Site01_final_adj_5mpp_toterr.tif",
+        "Site01_final_adj_5mpp_slperr.tif"
+      ],
+      "frame_bridge": {
+        "policy": "explicit_transform_required",
+        "source_frame": "MOON_ME_DE421",
+        "destination_frame": "MOON_ME_DE440_ME421",
+        "evidence_ref": "NAIF DE440 lunar frames kernel / LL-004F orientation lineage; do not treat DE421 and DE440 ME frames as identical"
+      }
+    },
+    {
+      "id": "pgda-site04-5m",
+      "provider": "NASA Goddard PGDA / LOLA",
+      "product": "High-Resolution LOLA Topography for Lunar South Pole Sites — Site04 Shackleton rim",
+      "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+      "frame": "MOON_ME_DE421",
+      "projection": "south polar stereographic; X/Y meters; pixel-registered 5 m GeoTIFF products",
+      "horizontal_units": "m",
+      "vertical_units": "m",
+      "resolution_m": 5.0,
+      "evidence_class": "measured",
+      "files": [
+        {
+          "filename": "Site04_final_adj_5mpp_surf.tif",
+          "role": "surface_elevation",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site04_final_adj_5mpp_slp.tif",
+          "role": "surface_slope_deg",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site04_final_adj_5mpp_toterr.tif",
+          "role": "elevation_rms_uncertainty_m",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site04_final_adj_5mpp_slperr.tif",
+          "role": "slope_rms_uncertainty_deg",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": true
+        },
+        {
+          "filename": "Site04_ROIs.tgz",
+          "role": "region_geometry",
+          "source_reference": "https://pgda.gsfc.nasa.gov/products/78",
+          "required_local": false
+        }
+      ],
+      "uncertainty_products": [
+        "Site04_final_adj_5mpp_toterr.tif",
+        "Site04_final_adj_5mpp_slperr.tif"
+      ],
+      "frame_bridge": {
+        "policy": "explicit_transform_required",
+        "source_frame": "MOON_ME_DE421",
+        "destination_frame": "MOON_ME_DE440_ME421",
+        "evidence_ref": "NAIF DE440 lunar frames kernel / LL-004F orientation lineage; do not treat DE421 and DE440 ME frames as identical"
+      }
+    }
+  ],
+  "candidate_nodes": [
+    {
+      "id": "study-region-site01",
+      "label": "Connecting ridge study region",
+      "status": "study_hypothesis",
+      "source_dataset_id": "pgda-site01-5m"
+    },
+    {
+      "id": "study-region-site04",
+      "label": "Shackleton rim study region",
+      "status": "study_hypothesis",
+      "source_dataset_id": "pgda-site04-5m"
+    }
+  ]
+}
