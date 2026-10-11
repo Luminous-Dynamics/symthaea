@@ -169,9 +169,9 @@ pub fn encode(event: &LogEvent) -> Hdv {
 
 /// Coarse Windows event family used by the domain-invariant ablation.
 ///
-/// This is intentionally an ablation, not a replacement for \`encode\`: the numeric EventID
+/// This is intentionally an ablation, not a replacement for `encode`: the numeric EventID
 /// is discarded after mapping known IDs into a small semantic family. Unknown IDs
-/// share an \`unknown\` bucket. Numeric IDs can collide across providers, so this
+/// share an `unknown` bucket. Numeric IDs can collide across providers, so this
 /// heuristic must be evaluated cross-corpus before use in production.
 fn event_family(event_id: u32) -> &'static str {
     match event_id {
@@ -252,13 +252,13 @@ fn canonical_field_key(key: &str) -> String {
 
 /// Experimental domain-invariant encoder for cross-corpus ablation.
 ///
-/// Compared with [\`encode\`], this version:
+/// Compared with [`encode`], this version:
 /// - drops raw provider and component strings;
 /// - maps known numeric Windows EventIDs into coarse event families;
 /// - canonicalizes common structured-field name aliases;
 /// - retains source, severity, and field values as separate channels.
 ///
-/// It is deliberately additive: existing \`encode\` behavior and historical
+/// It is deliberately additive: existing `encode` behavior and historical
 /// benchmark results remain reproducible. This is not yet an OCSF mapper and
 /// does not normalize high-cardinality field values; cross-corpus gains must be
 /// measured rather than presumed.
