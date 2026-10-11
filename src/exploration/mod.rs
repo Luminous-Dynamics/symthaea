@@ -3,8 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Exploration Strategies for Symthaea
 //!
-//! Re-exports from the `symthaea-exploration` sub-crate.
-//! See that crate for full documentation.
+//! Re-exports from the `symthaea-exploration` sub-crate plus experimental
+//! measurement-only evaluation contracts that are not yet part of action selection.
+
+/// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
+pub mod generativity;
 
 pub use symthaea_exploration::*;
 
