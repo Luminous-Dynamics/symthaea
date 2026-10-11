@@ -123,7 +123,7 @@ def _context(context: Any) -> dict[str, Any]:
         raise VerificationError("expected scenario_revision must be a safe positive integer")
     _digest(context["scenario_digest"], "expected scenario_digest")
     _digest(context["evidence_digest"], "expected evidence_digest")
-    if context["role"] not in ROLES:
+    if not isinstance(context["role"], str) or context["role"] not in ROLES:
         raise VerificationError("expected role is unsupported")
     _b64url_decode(context["run_nonce"], "expected run_nonce", 32)
     if context["role"] == "authorization_decision":
@@ -187,9 +187,9 @@ def _validate_payload(payload: Any) -> dict[str, Any]:
         raise VerificationError("receipt_id must be 32 lowercase hexadecimal characters")
     for field in ("key_id", "evaluator_id", "campaign_id", "scenario_id"):
         _text(payload[field], f"payload.{field}")
-    if payload["role"] not in ROLES:
+    if not isinstance(payload["role"], str) or payload["role"] not in ROLES:
         raise VerificationError("payload.role is unsupported")
-    if payload["status"] not in STATUSES:
+    if not isinstance(payload["status"], str) or payload["status"] not in STATUSES:
         raise VerificationError("payload.status is unsupported")
     if not isinstance(payload["scenario_revision"], int) or isinstance(payload["scenario_revision"], bool) or not 1 <= payload["scenario_revision"] <= (2**53 - 1):
         raise VerificationError("scenario_revision must be a safe positive integer")
@@ -314,9 +314,9 @@ def verify_receipt(
     expires_at = _utc(payload["expires_at"], "payload.expires_at")
     policy_start = _utc(key["not_before"], "trust key not_before")
     policy_end = _utc(key["not_after"], "trust key not_after")
-    if issued_at < policy_start or issued_at > policy_end:
+    if issued_at < policy_start or issued_at >= policy_end:
         raise VerificationError("receipt was issued outside trusted key validity")
-    if now < policy_start or now > policy_end:
+    if now < policy_start or now >= policy_end:
         raise VerificationError("trusted key is not currently within its validity interval")
     if now < issued_at:
         raise VerificationError("receipt issue time is in the future")
