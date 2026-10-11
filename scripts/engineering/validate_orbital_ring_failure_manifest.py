@@ -15,6 +15,12 @@ FIELDS = (
     "rider_damping_n_s_per_m", "rider_max_coupling_force_n", "actuation_measurement_delay_s",
     "force_model_reference", "energy_boundary", "momentum_boundary", "acceptance_limits", "independent_reference_case",
 )
+TOP_LEVEL_KEYS = {
+    "schema", "scenario_id", "scenario_version", "architecture_mode", "initial_path_constraint",
+    "title", "purpose", "source_basis", "declared_state", "analysis_state", "evidence_state",
+    "result_artifacts", "required_fields", "required_inputs", "required_outputs_when_unblocked",
+    "blocking_reason", "not_claimed", "input_provenance",
+}
 UNKNOWN = {"", "unknown", "tbd", "todo", "unspecified", "not specified", "?"}
 PROVENANCE_CLASSES = {"primary_source", "derived", "engineering_assumption", "measurement", "independent_model", "test_fixture"}
 PROVENANCE_STATES = {"not_reviewed", "independently_reviewed", "rejected"}
@@ -204,6 +210,8 @@ def assess(m):
                 errors.append("initial_ring_velocity_m_s: radial component exceeds max_initial_radial_velocity_m_s")
 
     structural = []
+    unknown_top_level = sorted(set(m) - TOP_LEVEL_KEYS)
+    if unknown_top_level: structural.append(f"manifest contains unknown top-level keys: {unknown_top_level}")
     if not isinstance(raw_inputs, dict): structural.append("required_inputs must be an object")
     if not isinstance(raw_provenance, dict): structural.append("input_provenance must be an object")
     unknown_inputs = sorted(set(inputs) - set(FIELDS))
@@ -235,7 +243,7 @@ def assess(m):
         expected = "Blocked"
     return {
         "schema": "luminous-dynamics.orbital-ring-manifest-validation/v1",
-        "validation_state": "passed_contract_checks" if not structural else "failed_contract_checks",
+        "validation_state": "passed_contract_checks" if not structural and not errors else "failed_contract_checks",
         "scenario_id": m.get("scenario_id"), "scenario_schema": m.get("schema"),
         "scenario_version": m.get("scenario_version"), "expected_gate_state": expected,
         "declared_gate_state": m.get("declared_state"), "analysis_state": m.get("analysis_state"),
@@ -294,6 +302,11 @@ def self_test():
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
     c["required_inputs"]["ring_radius_m"]="7000000"; c["declared_state"]="Blocked"; r=assess(c)
     check("wrong_numeric_type_blocks", r["expected_gate_state"]=="Blocked" and bool(r["type_errors"]) and r["blocking_field_count"]==1)
+    check("wrong_numeric_type_fails_contract_validation", r["validation_state"]=="failed_contract_checks")
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["input_provenance"]["ring_radius_m"]["classification"]="test_fixture"; c["declared_state"]="Blocked"; r=assess(c)
+    check("invalid_populated_provenance_fails_contract_validation", r["validation_state"]=="failed_contract_checks" and bool(r["type_errors"]))
+    c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance(); c["telemetry"]="unexpected"; c["declared_state"]="ReadyForIndependentReview"; r=assess(c)
+    check("unknown_top_level_key_fails_structural_gate", r["validation_state"]=="failed_contract_checks" and any("unknown top-level keys" in e for e in r["structural_errors"]) and r["expected_gate_state"]=="Blocked")
     c=json.loads(json.dumps(m)); c["required_inputs"]=complete_fixture(); c["input_provenance"]=fixture_provenance()
     c["required_inputs"]["rider_force_law"]="TBD"; c["declared_state"]="Blocked"; r=assess(c)
     check("tbd_force_law_blocks", r["expected_gate_state"]=="Blocked")
