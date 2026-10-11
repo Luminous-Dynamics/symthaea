@@ -105,6 +105,13 @@ jobs:
         if: github.event_name == 'pull_request'
         run: cargo bench --bench quick -- --noplot --save-baseline main
 
+      # The base run also writes estimates under each benchmark's "new/" path.
+      # Remove those current-result files while preserving the named "main"
+      # baseline, or deleted/renamed PR benchmarks could inherit stale base data.
+      - name: Clear base-revision current estimates
+        if: github.event_name == 'pull_request'
+        run: find target/criterion -type d -name new -prune -exec rm -rf {} +
+
       - name: Checkout tested revision
         if: github.event_name == 'pull_request'
         uses: actions/checkout@v4
