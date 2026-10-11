@@ -217,32 +217,94 @@ def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=strict_object)
 
 
+def valid_results_stub(corpus: dict[str, Any]) -> dict[str, Any]:
+    """Build a neutral schema-only fixture; it makes no interpretive claims."""
+    return {
+        "schema": RESULT_SCHEMA,
+        "corpus_id": corpus["corpus_id"],
+        "corpus_version": corpus["version"],
+        "source_revision": "0" * 40,
+        "implementation_id": "validator-self-test-only",
+        "config_sha256": "0" * 64,
+        "results": [
+            {
+                "case_id": case["id"],
+                "observations": [
+                    {"evidence_id": span["id"], "exact_span": span["text"], "source_scope": "InputText"}
+                    for span in case["evidence_spans"]
+                ],
+                "interpretations": [],
+                "open_questions": [],
+                "abstention": {"abstain": False, "reason": "Validator self-test fixture; no interpretation asserted."},
+            }
+            for case in corpus["cases"]
+        ],
+    }
+
+
 def self_test(data: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     if validate_corpus(data):
         failures.append("canonical corpus unexpectedly fails")
-    mutations: list[tuple[str, Any, str]] = []
+
+    corpus_mutations: list[tuple[str, Any, str]] = []
     mutation = copy.deepcopy(data)
     mutation["cases"][0]["evidence_spans"][0]["text"] = "not an exact source span"
-    mutations.append(("reject altered evidence", mutation, "exact substring"))
+    corpus_mutations.append(("reject altered evidence", mutation, "exact substring"))
     mutation = copy.deepcopy(data)
     mutation["cases"][1]["id"] = mutation["cases"][0]["id"]
-    mutations.append(("reject duplicate case id", mutation, "duplicate case id"))
+    corpus_mutations.append(("reject duplicate case id", mutation, "duplicate case id"))
     mutation = copy.deepcopy(data)
     mutation["cases"][2]["required_behaviors"].append("made_up_behavior")
-    mutations.append(("reject unknown behavior", mutation, "unknown required behavior"))
+    corpus_mutations.append(("reject unknown behavior", mutation, "unknown required behavior"))
     mutation = copy.deepcopy(data)
     mutation["cases"][3]["evidence_spans"][0]["id"] = mutation["cases"][0]["evidence_spans"][0]["id"]
-    mutations.append(("reject duplicate evidence id", mutation, "duplicate global evidence id"))
+    corpus_mutations.append(("reject duplicate evidence id", mutation, "duplicate global evidence id"))
     mutation = copy.deepcopy(data)
     mutation["cases"].pop()
-    mutations.append(("reject incomplete corpus", mutation, "expected 14"))
-    for name, mutated, expected in mutations:
+    corpus_mutations.append(("reject incomplete corpus", mutation, "expected 14"))
+    for name, mutated, expected in corpus_mutations:
         errors = validate_corpus(mutated)
         if not errors or expected not in errors[0]:
             failures.append(f"{name}: expected error containing {expected!r}; got {errors!r}")
-    return failures
 
+    try:
+        json.loads('{"duplicate": 1, "duplicate": 2}', object_pairs_hook=strict_object)
+        failures.append("duplicate JSON object keys were accepted")
+    except ValidationError:
+        pass
+
+    good_results = valid_results_stub(data)
+    if validate_results(good_results, data):
+        failures.append("neutral normalized-results positive control was rejected")
+    results_mutations: list[tuple[str, Any, str]] = []
+    mutation = copy.deepcopy(good_results)
+    mutation["results"].pop()
+    results_mutations.append(("reject missing result case", mutation, "missing cases"))
+    mutation = copy.deepcopy(good_results)
+    mutation["results"][0]["observations"][0]["exact_span"] = "tampered evidence"
+    results_mutations.append(("reject altered result evidence", mutation, "does not match frozen source text"))
+    mutation = copy.deepcopy(good_results)
+    mutation["results"][0]["interpretations"].append({
+        "hypothesis_id": "H-UNBOUND",
+        "statement": "Synthetic test-only unsupported claim.",
+        "scope": "synthetic-validator-test",
+        "supporting_evidence_ids": ["NOT-IN-CORPUS"],
+        "contradicting_evidence_ids": [],
+        "epistemic_status": "InterpretationHypothesis",
+    })
+    results_mutations.append(("reject unbound hypothesis evidence", mutation, "reference to evidence outside the frozen case"))
+    mutation = copy.deepcopy(good_results)
+    mutation["source_revision"] = "not-a-git-object-id"
+    results_mutations.append(("reject weak source identity", mutation, "full lowercase Git object ID"))
+    mutation = copy.deepcopy(good_results)
+    mutation["results"].append(copy.deepcopy(mutation["results"][0]))
+    results_mutations.append(("reject duplicate result case", mutation, "duplicate case_id"))
+    for name, mutated, expected in results_mutations:
+        errors = validate_results(mutated, data)
+        if not errors or expected not in errors[0]:
+            failures.append(f"{name}: expected error containing {expected!r}; got {errors!r}")
+    return failures
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -285,7 +347,7 @@ def main() -> int:
             for failure in failures:
                 print(f"FAIL self-test: {failure}", file=sys.stderr)
             return 1
-        print("PASS self-test: 5 validator mutation checks")
+        print("PASS self-test: 11 hostile mutations plus normalized-results positive control")
     return 0
 
 
