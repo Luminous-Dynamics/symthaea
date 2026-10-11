@@ -457,6 +457,79 @@ def run_method(cases: list[dict[str, Any]], method) -> tuple[list[dict[str, Any]
     return results, signals
 
 
+
+def self_test(cases: list[dict[str, Any]], methods: list[tuple[str, Any, dict[str, Any]]]) -> list[str]:
+    """Metamorphic and adversarial checks over the frozen exposed examples."""
+    failures: list[str] = []
+
+    def find_case(needle: str) -> dict[str, Any]:
+        matches = [case for case in cases if needle.casefold() in case["input_text"].casefold()]
+        if len(matches) != 1:
+            raise BaselineError(f"self-test fixture selector {needle!r} matched {len(matches)} cases")
+        return matches[0]
+
+    lexical_by_id = {case["id"]: lexical_foil(case) for case in cases}
+    contextual_by_id = {case["id"]: context_rule_baseline(case) for case in cases}
+
+    # The context-blind foil must give the same fixed shadow mapping to literal
+    # shade and theater-lighting uses; context should not influence this foil.
+    shadow_cases = [find_case("tree's shadow"), find_case("lighting effect")]
+    for case in shadow_cases:
+        matches = [
+            item["statement"] for item in lexical_by_id[case["id"]][0]["interpretations"]
+            if "'shadow' maps to" in item["statement"]
+        ]
+        if matches != ["Context-blind dictionary candidate: 'shadow' maps to 'unacknowledged aspect of the psyche'."]:
+            failures.append(f"lexical foil did not emit fixed shadow mapping for {case['id']}")
+
+    # The context-aware rules must distinguish literal uses and retain source conflict.
+    literal = find_case("tree's shadow")
+    if not {"treat_literal_usage_literally", "reject_keyword_only_support"} <= set(contextual_by_id[literal["id"]][1]):
+        failures.append("context rules missed literal-shadow negative control")
+    injected = find_case("prop-box names")
+    if "reject_keyword_only_support" not in contextual_by_id[injected["id"]][1]:
+        failures.append("context rules missed keyword-injection control")
+    dream = find_case("dreamed about an owl")
+    if not contextual_by_id[dream["id"]][0]["abstention"]["abstain"] or "ask_clarifying_question_or_abstain" not in contextual_by_id[dream["id"]][1]:
+        failures.append("context rules failed to abstain on underspecified dream")
+    disagreement = find_case("Source A")
+    if not {"preserve_source_disagreement", "return_competing_readings"} <= set(contextual_by_id[disagreement["id"]][1]):
+        failures.append("context rules collapsed conflicting source notes")
+    self_report = find_case("I am not afraid")
+    if "preserve_self_report" not in contextual_by_id[self_report["id"]][1]:
+        failures.append("context rules did not preserve explicit self-report")
+    narrative = find_case("avoids the cellar in three scenes")
+    if "describe_narrative_change_only" not in contextual_by_id[narrative["id"]][1]:
+        failures.append("context rules missed narrative-change-only control")
+
+    # Required/forbidden annotations and oracle prose must not affect predictions.
+    for case in cases:
+        mutated = {
+            **case,
+            "required_behaviors": ["MUTATION_REQUIRED_LABEL_LEAK"],
+            "forbidden_behaviors": ["MUTATION_FORBIDDEN_LABEL_LEAK"],
+            "oracle_note": "MUTATION_ORACLE_LEAK",
+        }
+        for method_id, method, _ in methods:
+            before_result, before_signals = method(case)
+            after_result, after_signals = method(mutated)
+            if canonical_json(before_result) != canonical_json(after_result) or before_signals != after_signals:
+                failures.append(f"{method_id} changed output when labels/oracle prose changed for {case['id']}")
+                break
+
+    # Replays and normalized bundle checks are exercised in the runner; ensure
+    # no behavior labels or rubric annotations were embedded in normalized rows.
+    banned_fields = {"required_behaviors", "forbidden_behaviors", "oracle_note", "rubric_case_pass"}
+    for method_id, _, _ in methods:
+        for case_id, (result, _) in {
+            cid: lexical_by_id[cid] if method_id == "keyword_dictionary_foil_v0" else contextual_by_id[cid]
+            for cid in lexical_by_id
+        }.items():
+            if any(banned_fields & set(row) for row in [result] + result["observations"] + result["interpretations"]):
+                failures.append(f"{method_id} leaked rubric fields into output for {case_id}")
+                break
+    return failures
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
@@ -505,6 +578,11 @@ def main() -> int:
         outputs_by_method: dict[str, list[dict[str, Any]]] = {}
         signals_by_method: dict[str, dict[str, list[str]]] = {}
         config_hashes: dict[str, str] = {}
+
+        test_failures = self_test(cases, methods)
+        if test_failures:
+            raise BaselineError("baseline self-test failures: " + "; ".join(test_failures))
+        print("PASS baseline self-test: literal/context controls, abstention, disagreement, self-report, narrative arc, and label-leakage invariance")
 
         for method_id, method, metadata in methods:
             outputs, signals = run_method(cases, method)
