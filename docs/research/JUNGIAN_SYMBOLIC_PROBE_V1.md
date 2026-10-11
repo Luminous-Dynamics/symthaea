@@ -64,7 +64,7 @@ The companion runner is `scripts/run_jungian_symbolic_baselines.py`. It runs two
 
 The harness never reads `required_behaviors`, `forbidden_behaviors`, or `oracle_note` while generating method outputs. It reads those authored labels only afterward to calculate required-code coverage and forbidden-flag overlap. The metric therefore measures conformance to this small authored development rubric, not psychological accuracy, human preference, or generalization.
 
-The harness emits two normalized result bundles and a comparison report. Each bundle records the exact source revision and configuration digest; the comparison report records output SHA-256 values and byte-identical replay status. The workflow independently validates both result bundles and uploads a 14-day artifact packet.
+The harness emits two normalized result bundles and a comparison report. Each bundle carries the SHA-256 of the exact corpus bytes plus the exact source revision and configuration digest; the comparison report records output SHA-256 values, the corpus Git blob SHA-1, and byte-identical replay status. Both runner and validator fail closed unless the current corpus bytes match the reviewed Git blob pin `7503a660f0062571fe1d7094a00b80631680500a`. A corpus edit therefore requires an explicit reviewed pin/version update before a new baseline can run. The workflow independently validates both result bundles and uploads a 14-day artifact packet.
 
 ### Actual Glyph/HDC projection
 
