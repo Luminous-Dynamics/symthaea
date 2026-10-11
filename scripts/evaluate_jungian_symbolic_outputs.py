@@ -22,7 +22,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 OUTPUT_SCHEMA = "symthaea-jungian-normalized-results-v1"
-EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v1"
+EVALUATOR_SCHEMA = "symthaea-jungian-output-contract-audit-v2"
 RESULT_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {
@@ -96,8 +96,16 @@ def git_blob_sha1(data: bytes) -> str:
     return hashlib.sha1(header + data, usedforsecurity=False).hexdigest()
 
 
+def reject_constant(token: str) -> None:
+    raise AuditError(f"non-standard JSON numeric token: {token}")
+
+
 def load_json_bytes(data: bytes) -> Any:
-    return json.loads(data.decode("utf-8"), object_pairs_hook=strict_object)
+    return json.loads(
+        data.decode("utf-8"),
+        object_pairs_hook=strict_object,
+        parse_constant=reject_constant,
+    )
 
 
 def canonical_json(value: Any) -> bytes:
@@ -167,6 +175,7 @@ def validate_bundle(
     corpus_bytes: bytes,
     corpus: dict[str, Any],
     corpus_sha256: str,
+    expected_source_revision: str,
 ) -> tuple[dict[str, dict[str, Any]], str, str]:
     bundle = load_json_bytes(bundle_bytes)
     require(isinstance(bundle, dict), "normalized result bundle must be an object")
@@ -183,6 +192,10 @@ def validate_bundle(
         isinstance(bundle["source_revision"], str)
         and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", bundle["source_revision"]) is not None,
         "source revision is not a full lowercase Git object ID",
+    )
+    require(
+        bundle["source_revision"] == expected_source_revision,
+        "normalized bundle source revision does not match expected exact source revision",
     )
     method_id = bundle["implementation_id"]
     require(
@@ -371,10 +384,16 @@ def case_contract_checks(case_id: str, result: dict[str, Any]) -> list[dict[str,
     return checks
 
 
-def evaluate(bundle_path: Path, corpus_bytes: bytes, corpus: dict[str, Any], corpus_sha256: str) -> dict[str, Any]:
+def evaluate(
+    bundle_path: Path,
+    corpus_bytes: bytes,
+    corpus: dict[str, Any],
+    corpus_sha256: str,
+    expected_source_revision: str,
+) -> dict[str, Any]:
     bundle_bytes = bundle_path.read_bytes()
     results, method_id, source_revision = validate_bundle(
-        bundle_bytes, corpus_bytes, corpus, corpus_sha256
+        bundle_bytes, corpus_bytes, corpus, corpus_sha256, expected_source_revision
     )
     per_case = []
     for case in corpus["cases"]:
@@ -405,10 +424,10 @@ def evaluate(bundle_path: Path, corpus_bytes: bytes, corpus: dict[str, Any], cor
         })
     checks_passed = sum(row["checks_passed"] for row in per_case)
     checks_total = sum(row["checks_total"] for row in per_case)
-    pair_passed = sum(row["distinct_interpretation_text"] for row in pair_rows)
+    distinct_pair_text_count = sum(row["distinct_interpretation_text"] for row in pair_rows)
     return {
         "schema": EVALUATOR_SCHEMA,
-        "evaluator_id": "static_output_contract_cues_v1",
+        "evaluator_id": "static_output_contract_cues_v2",
         "method_id": method_id,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
@@ -422,8 +441,8 @@ def evaluate(bundle_path: Path, corpus_bytes: bytes, corpus: dict[str, Any], cor
         "checks_passed": checks_passed,
         "checks_total": checks_total,
         "case_contracts_passed": sum(row["case_contract_passed"] for row in per_case),
-        "pair_checks_passed": pair_passed,
-        "pair_checks_total": len(pair_rows),
+        "distinct_pair_text_count": distinct_pair_text_count,
+        "context_pair_count": len(pair_rows),
         "per_case": per_case,
         "context_pairs": pair_rows,
         "limitations": [
@@ -477,6 +496,18 @@ def self_test() -> list[str]:
         "interpretations": [{"statement": "The key failed mechanically"}]
     }):
         failures.append("context pair statement contrast failed")
+    for name, payload in (
+        ("duplicate JSON keys are rejected", b'{"case_id":"A","case_id":"B"}'),
+        ("non-standard JSON NaN is rejected", b'{"score":NaN}'),
+    ):
+        try:
+            load_json_bytes(payload)
+        except AuditError:
+            pass
+        except Exception as exc:
+            failures.append(f"{name}: wrong exception type {type(exc).__name__}: {exc}")
+        else:
+            failures.append(f"{name}: invalid JSON was accepted")
     return failures
 
 
@@ -485,6 +516,8 @@ def main() -> int:
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     parser.add_argument("--results", type=Path, action="append", default=[],
                         help="normalized result bundle to audit; may be repeated")
+    parser.add_argument("--source-revision",
+                        help="expected exact 40- or 64-character lowercase Git object ID for the capture")
     parser.add_argument("--output-dir", type=Path,
                         help="directory for per-bundle output evaluation JSON files")
     parser.add_argument("--self-test", action="store_true", help="run evaluator detector self-tests")
@@ -497,11 +530,15 @@ def main() -> int:
             for failure in failures:
                 print(f"- {failure}", file=sys.stderr)
             return 1
-        print("PASS: 12 output-cue detector controls and context-contrast control")
+        print("PASS: 15 evaluator controls (12 text-cue, 1 context contrast, 2 JSON integrity)")
     if not args.results:
         return 0
     if args.output_dir is None:
         parser.error("--output-dir is required when --results is supplied")
+    if not args.source_revision:
+        parser.error("--source-revision is required when --results is supplied")
+    if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.source_revision) is None:
+        parser.error("--source-revision must be a full lowercase Git object ID")
     try:
         corpus_bytes = args.corpus.read_bytes()
         corpus = load_json_bytes(corpus_bytes)
@@ -513,7 +550,7 @@ def main() -> int:
         corpus_sha256 = hashlib.sha256(corpus_bytes).hexdigest()
         args.output_dir.mkdir(parents=True, exist_ok=True)
         for results_path in args.results:
-            report = evaluate(results_path, corpus_bytes, corpus, corpus_sha256)
+            report = evaluate(results_path, corpus_bytes, corpus, corpus_sha256, args.source_revision)
             output_path = args.output_dir / f"{report['method_id']}.output_evaluation.json"
             output_bytes = canonical_json(report)
             output_path.write_bytes(output_bytes)
@@ -521,7 +558,7 @@ def main() -> int:
                 f"{report['method_id']}: output_contract_checks="
                 f"{report['checks_passed']}/{report['checks_total']} "
                 f"case_contracts={report['case_contracts_passed']}/{report['case_count']} "
-                f"context_pairs={report['pair_checks_passed']}/{report['pair_checks_total']} "
+                f"context_pairs_distinct_text={report['distinct_pair_text_count']}/{report['context_pair_count']} "
                 f"report_sha256={hashlib.sha256(output_bytes).hexdigest()} path={output_path}"
             )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, AuditError, KeyError, TypeError) as exc:
