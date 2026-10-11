@@ -2188,6 +2188,31 @@ mod effect_estimate_persistence_tests {
     }
 
     #[test]
+    fn relative_change_overflow_is_rejected_even_when_raw_means_are_finite() {
+        assert_eq!(
+            EffectEstimate::try_new(1e-10, 1e308, 1).unwrap_err(),
+            EffectEstimateValidationError::NonFiniteRelativeChange
+        );
+    }
+
+    #[test]
+    fn validate_rejects_nonfinite_or_negative_mutated_dispersion() {
+        let mut nonfinite = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        nonfinite.standard_deviation = Some(f64::INFINITY);
+        assert_eq!(
+            nonfinite.validate().unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+
+        let mut negative = EffectEstimate::try_new(0.8, 0.4, 4).unwrap();
+        negative.standard_deviation = Some(-0.01);
+        assert_eq!(
+            negative.validate().unwrap_err(),
+            EffectEstimateValidationError::InvalidStandardDeviation
+        );
+    }
+
+    #[test]
     fn zero_seed_count_is_preserved_without_inference() {
         let estimate = EffectEstimate::try_new(0.8, 0.4, 0).unwrap();
         let restored: EffectEstimate =
