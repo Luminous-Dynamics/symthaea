@@ -370,60 +370,11 @@ fn run_grouped_kfold(
     k: usize,
     cfg: TrainConfig,
 ) -> Result<Vec<f32>, String> {
-    if hvs.len() != labels.len() || labels.len() != groups.len() {
-        return Err("grouped CV input length mismatch".to_string());
+    if hvs.len() != labels.len() {
+        return Err("grouped CV feature/label length mismatch".to_string());
     }
-    if k < 2 {
-        return Err("grouped CV needs at least two folds".to_string());
-    }
-
-    let mut by_label: BTreeMap<String, BTreeMap<String, Vec<usize>>> = BTreeMap::new();
-    let mut group_labels: BTreeMap<&str, &str> = BTreeMap::new();
-    for (i, (label, group)) in labels.iter().zip(groups.iter()).enumerate() {
-        if let Some(existing) = group_labels.get(group.as_str()) {
-            if *existing != label.as_str() {
-                return Err(format!("group {group:?} contains multiple labels"));
-            }
-        } else {
-            group_labels.insert(group.as_str(), label.as_str());
-        }
-        by_label
-            .entry(label.clone())
-            .or_default()
-            .entry(group.clone())
-            .or_default()
-            .push(i);
-    }
-
-    fn xorshift(state: &mut u64) -> u64 {
-        let mut x = *state;
-        x ^= x << 13;
-        x ^= x >> 7;
-        x ^= x << 17;
-        *state = x;
-        x.wrapping_mul(0x2545F4914F6CDD1D)
-    }
-
-    let mut state = 0xDEADBEEFu64;
-    let mut fold_of = vec![usize::MAX; hvs.len()];
-    for (label, group_map) in by_label.iter_mut() {
-        if group_map.len() < k {
-            return Err(format!(
-                "label {label:?} has {} groups; need at least {k} for grouped {k}-fold CV",
-                group_map.len()
-            ));
-        }
-        let mut ids: Vec<String> = group_map.keys().cloned().collect();
-        for i in (1..ids.len()).rev() {
-            let j = (xorshift(&mut state) as usize) % (i + 1);
-            ids.swap(i, j);
-        }
-        for (position, id) in ids.iter().enumerate() {
-            for &index in &group_map[id] {
-                fold_of[index] = position % k;
-            }
-        }
-    }
+    let fold_of =
+        symthaea_logparse::probe::grouped_fold_assignment(labels, groups, k, 0xDEADBEEF)?;
 
     let mut accs = Vec::with_capacity(k);
     for fold in 0..k {
