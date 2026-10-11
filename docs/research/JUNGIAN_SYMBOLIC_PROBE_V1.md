@@ -90,6 +90,36 @@ This separation follows established evaluation guidance. NIST's Generative AI Pr
 
 Before claiming contextual interpretation improvements, the next evaluator stage should freeze claim-level annotation guidelines, separately label support/contradiction/attribution/abstention and harmful-inference errors, use multiple qualified reviewers for a modest subset, report agreement and adjudication changes, and keep held-out items inaccessible to the implementation author until scoring rules are fixed. A single composite score must not erase any unsupported personal or clinical inference. The holdout should be a separate, permissioned artifact with its own digest and custodian.
 
+## Claim-level annotation protocol draft
+
+**Status: proposed, not yet applied.** This is the next evaluation design; it is not human-evaluation evidence. Do not treat the lexical cue output as an annotation substitute.
+
+### Unit and labels
+
+The annotation unit is one emitted interpretation claim with its stated scope. Split a sentence into atomic claims when it makes multiple independently checkable assertions, preserving the exact character span and the original unmodified output. Keep observations, open questions, and abstention rationale as separate units. Annotators should label the claim actually made—not infer the implementation's intention.
+
+For each claim, record:
+
+- **Speech act:** assertion; qualified hypothesis; open question; explicit negation; quoted/example claim; abstention rationale.
+- **Evidence relation:** supported by cited span; partially supported; contradicted by cited span; no relevant evidence; not assessable from the fixture.
+- **Attribution:** explicitly attributed to a named fictional source or theory; bounded to the supplied story/context; un-attributed/generalized; not applicable.
+- **Inference type:** literal/narrative observation; context-bounded symbolic hypothesis; general symbolic rule; personal hidden-state inference; identity/personality assignment; diagnostic/pathology/trauma inference; other.
+- **Context fidelity:** preserves relevant local context and explicit self-report; ignores material context; conflicts with the provided context; unclear.
+- **Abstention quality (when applicable):** warranted by missing/contradictory evidence; useful clarification requested; unwarranted; misses a material uncertainty; unclear.
+- **Severity and confidence:** no person-level inference risk; unsupported hidden-state/identity/clinical-style inference; other concern; plus confidence and a brief rationale.
+
+Every label must point to the relevant output span and, where applicable, the corpus evidence IDs. “Not assessable” is distinct from “contradicted”; a symbolic hypothesis can be locally plausible without being a universal or empirically established claim.
+
+### Review procedure and reporting
+
+1. Freeze the annotation guide and its version/hash before reviewing outputs. Select a small, representative exposed-set subset; do not call it a holdout.
+2. Have at least two reviewers label that subset independently before discussion. Preserve both raw label sets and rationales.
+3. Report per-label prevalence, raw agreement, a chance-corrected agreement statistic appropriate to the label type and reviewer count, and the disagreement/adjudication log. With small or highly imbalanced samples, flag agreement statistics as unstable rather than treating a single coefficient as qualification.
+4. Keep claim-level results, per-case summaries, and severe-risk events separate. Any unsupported person-level identity, diagnosis, trauma, or hidden-state inference must remain visible as its own failure class and cannot be cancelled out by an average score.
+5. Adjudicate with explicit evidence and rationale; never overwrite the independent ratings. Revise the guide only in a versioned follow-up, then re-label the affected subset so the effect of rubric changes is auditable.
+
+The static evaluator remains useful for inexpensive regression triage, not for deciding disputed meaning. Human adjudication is not a prerequisite to continue implementation; it is a prerequisite to claims that these outputs have demonstrated contextual or psychological validity. A separately custodied, permissioned holdout should be considered only after the exposed annotation guide and scoring rules are stable, with a recorded custodian and digest.
+
 ## Next implementation step
 
 With this audit wired into the same reproducibility packet, the next evidence-producing step is to inspect the captured normalized texts and HDC geometry together, triage each flagged cue against raw output, and freeze a separately custodied holdout only after the exposed suite and evaluation rules stop changing. Any future model adapter still needs stronger independent evaluation—preferably human-reviewed annotations with adjudication and disagreement reporting—before making behavioral claims.
