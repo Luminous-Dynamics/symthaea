@@ -20,6 +20,7 @@ DEFAULT_CORPUS = ROOT / "docs/research/data/jungian_symbolic_probe_v1.json"
 CORPUS_SCHEMA = "symthaea-jungian-symbolic-probe-v1"
 RESULT_SCHEMA = "symthaea-jungian-normalized-results-v1"
 EXPECTED_CASE_COUNT = 14
+EXPECTED_CORPUS_GIT_BLOB_SHA1 = "7503a660f0062571fe1d7094a00b80631680500a"
 HEX_256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_HEX = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 CORPUS_KEYS = {
@@ -33,7 +34,7 @@ OUTPUT_CONTRACT_KEYS = {
 
 CASE_KEYS = {"id", "task", "input_text", "evidence_spans", "required_behaviors", "forbidden_behaviors", "oracle_note"}
 SPAN_KEYS = {"id", "text"}
-RESULT_TOP_KEYS = {"schema", "corpus_id", "corpus_version", "source_revision", "implementation_id", "config_sha256", "results"}
+RESULT_TOP_KEYS = {"schema", "corpus_id", "corpus_version", "corpus_sha256", "source_revision", "implementation_id", "config_sha256", "results"}
 RESULT_CASE_KEYS = {"case_id", "observations", "interpretations", "open_questions", "abstention"}
 OBSERVATION_KEYS = {"evidence_id", "exact_span", "source_scope"}
 INTERPRETATION_KEYS = {"hypothesis_id", "statement", "scope", "supporting_evidence_ids", "contradicting_evidence_ids", "epistemic_status"}
@@ -145,13 +146,14 @@ def validate_corpus(data: Any) -> list[str]:
     return errors
 
 
-def validate_results(data: Any, corpus: dict[str, Any]) -> list[str]:
+def validate_results(data: Any, corpus: dict[str, Any], corpus_bytes: bytes) -> list[str]:
     errors: list[str] = []
     try:
         top = exact_keys(data, RESULT_TOP_KEYS, "results")
         require(top.get("schema") == RESULT_SCHEMA, "results: unexpected schema")
         require(top.get("corpus_id") == corpus["corpus_id"], "results: corpus_id mismatch")
         require(top.get("corpus_version") == corpus["version"], "results: corpus_version mismatch")
+        require(top.get("corpus_sha256") == hashlib.sha256(corpus_bytes).hexdigest(), "results: corpus SHA-256 mismatch")
         require(isinstance(top.get("source_revision"), str) and COMMIT_HEX.fullmatch(top["source_revision"]) is not None, "results: source_revision must be a full lowercase Git object ID")
         require(nonempty_string(top.get("implementation_id"), "implementation_id"), "results: missing implementation_id")
         require(isinstance(top.get("config_sha256"), str) and HEX_256.fullmatch(top["config_sha256"]) is not None, "results: config_sha256 must be 64 lowercase hex characters")
@@ -213,16 +215,26 @@ def validate_results(data: Any, corpus: dict[str, Any]) -> list[str]:
     return errors
 
 
+def git_blob_sha1(data: bytes) -> str:
+    header = b"blob " + str(len(data)).encode("ascii") + b"\\0"
+    return hashlib.sha1(header + data).hexdigest()
+
+
+def load_json_bytes(data: bytes) -> Any:
+    return json.loads(data.decode("utf-8"), object_pairs_hook=strict_object)
+
+
 def load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=strict_object)
+    return load_json_bytes(path.read_bytes())
 
 
-def valid_results_stub(corpus: dict[str, Any]) -> dict[str, Any]:
+def valid_results_stub(corpus: dict[str, Any], corpus_bytes: bytes) -> dict[str, Any]:
     """Build a neutral schema-only fixture; it makes no interpretive claims."""
     return {
         "schema": RESULT_SCHEMA,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["version"],
+        "corpus_sha256": hashlib.sha256(corpus_bytes).hexdigest(),
         "source_revision": "0" * 40,
         "implementation_id": "validator-self-test-only",
         "config_sha256": "0" * 64,
@@ -274,7 +286,7 @@ def self_test(data: dict[str, Any]) -> list[str]:
     except ValidationError:
         pass
 
-    good_results = valid_results_stub(data)
+    good_results = valid_results_stub(data, corpus_bytes)
     if validate_results(good_results, data):
         failures.append("neutral normalized-results positive control was rejected")
     results_mutations: list[tuple[str, Any, str]] = []
@@ -301,7 +313,7 @@ def self_test(data: dict[str, Any]) -> list[str]:
     mutation["results"].append(copy.deepcopy(mutation["results"][0]))
     results_mutations.append(("reject duplicate result case", mutation, "duplicate case_id"))
     for name, mutated, expected in results_mutations:
-        errors = validate_results(mutated, data)
+        errors = validate_results(mutated, data, corpus_bytes)
         if not errors or expected not in errors[0]:
             failures.append(f"{name}: expected error containing {expected!r}; got {errors!r}")
     return failures
@@ -314,10 +326,21 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        data = load_json(args.corpus)
-    except (OSError, json.JSONDecodeError, ValidationError) as exc:
+        corpus_bytes = args.corpus.read_bytes()
+        data = load_json_bytes(corpus_bytes)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationError) as exc:
         print(f"FAIL: cannot load strict JSON: {exc}", file=sys.stderr)
         return 2
+
+    actual_git_blob = git_blob_sha1(corpus_bytes)
+    if actual_git_blob != EXPECTED_CORPUS_GIT_BLOB_SHA1:
+        print(
+            "FAIL corpus identity: Git blob SHA-1 mismatch "
+            f"(got={actual_git_blob}, expected={EXPECTED_CORPUS_GIT_BLOB_SHA1}); "
+            "bump the corpus version and review the changed cases before updating this pin.",
+            file=sys.stderr,
+        )
+        return 1
 
     corpus_errors = validate_corpus(data)
     if corpus_errors:
@@ -325,16 +348,17 @@ def main() -> int:
             print(f"FAIL corpus: {error}", file=sys.stderr)
         return 1
 
-    digest = hashlib.sha256(args.corpus.read_bytes()).hexdigest()
-    print(f"PASS corpus structure: {len(data['cases'])} cases")
+    digest = hashlib.sha256(corpus_bytes).hexdigest()
+    print(f"PASS corpus structure and pinned Git blob: {len(data['cases'])} cases")
     print(f"corpus_sha256={digest}")
+    print(f"corpus_git_blob_sha1={actual_git_blob}")
     if args.results:
         try:
             results_data = load_json(args.results)
         except (OSError, json.JSONDecodeError, ValidationError) as exc:
             print(f"FAIL: cannot load strict results JSON: {exc}", file=sys.stderr)
             return 2
-        result_errors = validate_results(results_data, data)
+        result_errors = validate_results(results_data, data, corpus_bytes)
         if result_errors:
             for error in result_errors:
                 print(f"FAIL results: {error}", file=sys.stderr)
