@@ -283,6 +283,7 @@ pub struct SelectivePoint {
     pub target_coverage: f32,
     pub actual_coverage: f32,
     pub accepted_samples: usize,
+    pub margin_threshold: f32,
     pub accepted_accuracy: f32,
     pub accepted_macro_recall: f32,
 }
@@ -290,9 +291,10 @@ pub struct SelectivePoint {
 /// Evaluate accuracy when the evaluator accepts only the top-margin fraction.
 ///
 /// The margin ranks examples but is not a calibrated probability. For a
-/// target coverage, this helper deterministically accepts ceil(coverage * n)
-/// examples, sorting by descending margin and then original index. This is a
-/// diagnostic risk/coverage curve, not a deployment threshold policy.
+/// target coverage, this helper derives the margin at the requested rank and
+/// accepts all examples tied at or above that margin. Actual coverage can exceed
+/// the target when margins tie; tied observations are never split by row order.
+/// This is a diagnostic risk/coverage curve, not a deployment threshold policy.
 pub fn selective_accuracy_curve(
     labels: &[String],
     predictions: &[usize],
@@ -351,12 +353,17 @@ pub fn selective_accuracy_curve(
 
     let mut points = Vec::with_capacity(target_coverages.len());
     for &target_coverage in target_coverages {
-        let accepted_samples = ((target_coverage * labels.len() as f32).ceil() as usize)
+        let target_samples = ((target_coverage * labels.len() as f32).ceil() as usize)
             .clamp(1, labels.len());
+        let margin_threshold = margins[ranked[target_samples - 1]];
+        let accepted_indices: Vec<usize> = (0..labels.len())
+            .filter(|&index| margins[index] >= margin_threshold)
+            .collect();
+        let accepted_samples = accepted_indices.len();
         let mut correct = 0usize;
         let mut support_by_class: BTreeMap<&str, usize> = BTreeMap::new();
         let mut correct_by_class: BTreeMap<&str, usize> = BTreeMap::new();
-        for &index in ranked.iter().take(accepted_samples) {
+        for index in accepted_indices {
             let actual = labels[index].as_str();
             *support_by_class.entry(actual).or_insert(0) += 1;
             if class_names[predictions[index]] == labels[index] {
@@ -383,6 +390,7 @@ pub fn selective_accuracy_curve(
             target_coverage,
             actual_coverage: accepted_samples as f32 / labels.len() as f32,
             accepted_samples,
+            margin_threshold,
             accepted_accuracy: correct as f32 / accepted_samples as f32,
             accepted_macro_recall,
         });
@@ -965,6 +973,20 @@ mod tests {
         assert!((curve[1].accepted_accuracy - (1.0 / 3.0)).abs() < 1e-6);
         assert_eq!(curve[2].accepted_samples, 4);
         assert!((curve[2].accepted_accuracy - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn selective_curve_keeps_equal_margin_boundary_ties_together() {
+        let labels = vec!["a".into(), "b".into(), "a".into(), "b".into()];
+        let predictions = vec![0, 1, 0, 0];
+        let margins = vec![0.8, 0.8, 0.2, 0.1];
+        let classes = vec!["a".into(), "b".into()];
+        let curve =
+            selective_accuracy_curve(&labels, &predictions, &margins, &classes, &[0.25]).unwrap();
+        assert_eq!(curve[0].accepted_samples, 2);
+        assert!((curve[0].actual_coverage - 0.5).abs() < 1e-6);
+        assert!((curve[0].margin_threshold - 0.8).abs() < 1e-6);
+        assert_eq!(curve[0].accepted_accuracy, 1.0);
     }
 
     #[test]
