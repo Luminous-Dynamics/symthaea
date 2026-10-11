@@ -172,7 +172,7 @@ def derive(c):
    ordered_outputs.append(scores(ordered_input))
   if any(output != baseline for output in ordered_outputs):
    fail("order-dependent candidate outputs")
-  o.update(enumeration_invariance="VerifiedByRecomputation",per_action_outputs="IdenticalAcrossOrders")
+  o.update(enumeration_invariance="Required",per_action_outputs="IdenticalAcrossOrders")
  elif k=="SetIdentity":
   ids=[a["id"] for a in r["actions"]]
   if len(ids)!=len(set(ids)):fail("duplicate set identity")
