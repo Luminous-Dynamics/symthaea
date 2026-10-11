@@ -5,6 +5,7 @@ source truth, the physical model, or suitability for aircraft illumination.
 """
 from __future__ import annotations
 
+import calendar
 import hashlib
 import json
 import math
@@ -250,10 +251,12 @@ def solar_daylight_hours_noaa(latitude_deg: float, day: str) -> float:
         raise ValueError("latitude_deg must be in [-90, 90]")
     observed_day = _iso_date("day", day)
     day_of_year = observed_day.timetuple().tm_yday
+    days_in_year = 366 if calendar.isleap(observed_day.year) else 365
 
-    # NOAA fractional-year declination approximation at solar noon; the algorithm
-    # identifier is carried by the transformation source digest, not inferred.
-    gamma = 2.0 * math.pi * (day_of_year - 1) / 365.0
+    # NOAA fractional-year declination approximation at solar noon. The phase
+    # denominator follows the Gregorian calendar year length, including leap years.
+    # The algorithm identifier is carried by the transformation source digest.
+    gamma = 2.0 * math.pi * (day_of_year - 1) / days_in_year
     declination = (
         0.006918
         - 0.399912 * math.cos(gamma)
