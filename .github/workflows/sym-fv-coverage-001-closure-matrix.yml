@@ -1,0 +1,100 @@
+name: SYM-FV-COVERAGE-001 Closure Matrix
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/verification-closure-matrix-v1.json"
+      - "scripts/validate_verification_closure_matrix.py"
+      - ".github/workflows/sym-fv-coverage-001-closure-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-coverage-001-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  closure-matrix:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXACT_PARENT: eae17187e199e3a53d108b437c0215b5ff812261
+      REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact lineage and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD"
+          test "$(git merge-base "$EXACT_PARENT" HEAD)" = "$EXACT_PARENT"
+          mapfile -t changed < <(git diff --name-only "$EXACT_PARENT"...HEAD | sort)
+          expected=(
+            ".github/workflows/sym-fv-coverage-001-closure-matrix.yml"
+            "docs/formal/verification-closure-matrix-v1.json"
+            "scripts/validate_verification_closure_matrix.py"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${expected_sorted[@]}") <(printf '%s\n' "${changed[@]}")
+
+      - name: Validate closure matrix and hostile controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/validate_verification_closure_matrix.py
+          python3 scripts/validate_verification_closure_matrix.py
+
+      - name: Postflight and exact-head receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def git(*args): return subprocess.check_output(["git", *args], text=True).strip()
+          def sha(path): return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          matrix = json.loads(pathlib.Path("docs/formal/verification-closure-matrix-v1.json").read_text())
+          receipt = {
+              "schema": "symthaea.formal.verification-closure-matrix.qualification.v1",
+              "tracking_issue": 6027,
+              "authority": "EvidenceOnly",
+              "result": "Pass",
+              "qualification_kind": "VerificationClosureMatrixQualified",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent": os.environ["EXACT_PARENT"],
+              "obligation_count": len(matrix["obligations"]),
+              "artifacts": {
+                  "matrix_sha256": sha("docs/formal/verification-closure-matrix-v1.json"),
+                  "validator_sha256": sha("scripts/validate_verification_closure_matrix.py")
+              },
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-proof-of-tracked-systems",
+                  "not-certification",
+                  "not-runtime-authorization",
+                  "not-universal-confidence-score"
+              ]
+          }
+          out = pathlib.Path("/tmp/sym-fv-coverage-001-receipt.json")
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(out.read_text())
+          PY
+
+      - name: Retain coverage evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-coverage-001-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/sym-fv-coverage-001-receipt.json
+          if-no-files-found: error
+          retention-days: 30
