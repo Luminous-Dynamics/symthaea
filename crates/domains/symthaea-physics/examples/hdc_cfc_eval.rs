@@ -823,8 +823,10 @@ fn evaluate_spacecraft(train_path: &std::path::Path, test_path: &std::path::Path
         .map(|chunk| chunk.iter().map(|(features, _)| features.as_slice()).collect())
         .collect();
     eprintln!(
-        "  Using {} normal-labelled training windows for reference/calibration ({} normal windows, {} total)",
-        ref_windows.len(), normal_train_window_count, total_train_windows
+        "  Using {} reference windows ({} normal-labelled of {} total training windows)",
+        ref_windows.len(),
+        normal_train_window_count,
+        total_train_windows
     );
 
     // Build healthy reference (subset for speed)
@@ -1047,11 +1049,11 @@ fn main() {
     // ── Interpretation limits ───────────────────────────────────────────────
     println!("================================================================");
     println!("INTERPRETATION LIMITS:");
-    println!("  CfC here is an untrained, seeded temporal feature transform, not a learned detector.");
+    println!("  CfC is a seeded, untrained temporal transform, not a learned detector.");
     println!("  Normalization is fit on training partitions only.");
-    println!("  Best-F1 thresholds are optimized on evaluation labels; these are oracle diagnostics,");
+    println!("  Best-F1 thresholds use evaluation labels and are oracle diagnostics,");
     println!("  not deployable metrics. Select thresholds on a separate validation split.");
-    println!("  Treat AUC/F1 differences as exploratory until the split, seed, and tuning protocol");
+    println!("  Treat AUC/F1 differences as exploratory pending a fixed split, seed, and tuning protocol");
     println!("  are preregistered and repeated on independent data.");
     println!("================================================================");
 }
