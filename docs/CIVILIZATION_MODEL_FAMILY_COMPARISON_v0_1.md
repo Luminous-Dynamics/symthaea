@@ -61,6 +61,15 @@ Do not make the simulator, evidence repository, user interface and policy author
 
 Align producer/consumer schemas with the public Sol-Atlas Humanity Atlas work rather than creating a second incompatible envelope.
 
+### Existing simulator audit — 2026-10-11
+
+The repository already contains a multi-world civilization simulator; the first implementation task must not accidentally create a competing simulator. A source audit of `mycelix-multiworld-sim/src/bin/governance_comparison.rs` found that its five-row comparison iterated all declared `GovernanceModel` variants, but `Sortition`, `Meritocratic` and `ElderCouncil` all mapped to the same `trust_weighted_governance = false` setting as the equal-weight arm. The executable also classified a single-seed delta using fixed percentage thresholds. Labels therefore implied three additional interventions that were not actually executed, and a single seed was being used to print hypothesis-support language.
+
+The fix is proposed in [Luminous-Dynamics PR #3765](https://github.com/Luminous-Dynamics/luminous-dynamics/pull/3765): separate the full declared model catalog from `comparison_ready()`, report unwired variants as `NOT RUN`, call the output a single-seed smoke comparison, and remove the threshold-based support verdict. It is still a draft: source was fetched back and checked, but Rust tests and the simulation have not been run in this environment.
+
+This finding changes the implementation order. Reuse the current simulator and correct its experiment harness first; wire additional policy families end-to-end only in a subsequent change. Do not cite the existing five-row output as a five-way governance comparison.
+
+
 ## 4. First pilot: essential-energy access
 
 ### Research question
