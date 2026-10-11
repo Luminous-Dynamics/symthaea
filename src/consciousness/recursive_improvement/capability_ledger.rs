@@ -173,6 +173,100 @@ pub struct CapabilityOutcomeReceipt {
     pub actual_compute_units: Option<f64>,
 }
 
+/// Version identifier for the canonical outcome-evidence envelope.
+pub const CAPABILITY_EVIDENCE_SCHEMA_VERSION: &str = "magi-capability-evidence-v1";
+
+/// Structured outcome evidence covered by the receipt SHA-256.
+///
+/// The immutable artifact/run identifiers and digest are claims to be resolved by a trusted
+/// artifact adapter. This type checks that the envelope is canonical and agrees with the signed
+/// receipt; it does not fetch the artifact or prove that the referenced run occurred.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityEvidencePayloadV1 {
+    pub schema_version: String,
+    pub forecast_id: String,
+    pub forecast_commitment_blake3: String,
+    pub subject: SubjectIdentity,
+    /// Outcome event sequence, which must match the signed receipt (not the forecast sequence).
+    pub receipt_sequence: u64,
+    pub observed_success: bool,
+    pub split: CapabilitySplit,
+    pub evaluator_identity: String,
+    pub evaluator_revision: String,
+    pub actual_compute_units: Option<f64>,
+    /// Stable identity of the runner implementation that produced the artifact.
+    pub runner_identity: String,
+    /// Immutable execution/run identity assigned by the runner or CI provider.
+    pub runner_run_identity: String,
+    /// Immutable artifact identity in the runner's artifact store.
+    pub runner_artifact_identity: String,
+    /// Expected SHA-256 of the artifact bytes fetched by a trusted adapter.
+    pub runner_artifact_sha256: String,
+}
+
+impl CapabilityEvidencePayloadV1 {
+    /// Serialize this evidence envelope using the versioned field-ordered JSON profile.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, CapabilityLedgerError> {
+        self.validate_shape()?;
+        serde_json::to_vec(self).map_err(|_| CapabilityLedgerError::InvalidEvidencePayload)
+    }
+
+    fn decode_canonical(bytes: &[u8]) -> Result<Self, CapabilityLedgerError> {
+        if bytes.len() > MAX_CAPABILITY_EVIDENCE_PAYLOAD_BYTES {
+            return Err(CapabilityLedgerError::EvidencePayloadTooLarge);
+        }
+        let evidence: Self = serde_json::from_slice(bytes)
+            .map_err(|_| CapabilityLedgerError::InvalidEvidencePayload)?;
+        evidence.validate_shape()?;
+        if evidence.canonical_bytes()?.as_slice() != bytes {
+            return Err(CapabilityLedgerError::NonCanonicalEvidencePayload);
+        }
+        Ok(evidence)
+    }
+
+    fn validate_shape(&self) -> Result<(), CapabilityLedgerError> {
+        self.subject.validate()?;
+        if self.schema_version != CAPABILITY_EVIDENCE_SCHEMA_VERSION
+            || !non_empty(&self.forecast_id)
+            || !is_hex_digest(&self.forecast_commitment_blake3, &[64])
+            || !non_empty(&self.evaluator_identity)
+            || !non_empty(&self.evaluator_revision)
+            || self
+                .actual_compute_units
+                .is_some_and(|value| !value.is_finite() || value < 0.0)
+            || !non_empty(&self.runner_identity)
+            || !non_empty(&self.runner_run_identity)
+            || !non_empty(&self.runner_artifact_identity)
+            || !is_hex_digest(&self.runner_artifact_sha256, &[64])
+        {
+            return Err(CapabilityLedgerError::InvalidEvidencePayload);
+        }
+        Ok(())
+    }
+
+    fn validate_against_receipt(
+        &self,
+        receipt: &CapabilityOutcomeReceipt,
+    ) -> Result<(), CapabilityLedgerError> {
+        if self.forecast_id != receipt.forecast_id
+            || self.forecast_commitment_blake3 != receipt.forecast_commitment_blake3
+            || self.subject != receipt.subject
+            || self.receipt_sequence != receipt.sequence
+            || self.observed_success != receipt.observed_success
+            || self.split != receipt.split
+            || self.evaluator_identity != receipt.evaluator_identity
+            || self.evaluator_revision != receipt.evaluator_revision
+            || self.actual_compute_units != receipt.actual_compute_units
+        {
+            return Err(CapabilityLedgerError::EvidenceReceiptMismatch);
+        }
+        Ok(())
+    }
+}
+
+const MAX_CAPABILITY_EVIDENCE_PAYLOAD_BYTES: usize = 1024 * 1024;
+
 /// Signed receipt envelope. The signing key is deliberately not embedded: verification uses the
 /// evaluator public key frozen in QualificationPolicy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -328,6 +422,10 @@ pub enum CapabilityLedgerError {
     ForecastCommitmentMismatch,
     InvalidReceiptSignature,
     EvidenceRootMismatch,
+    EvidencePayloadTooLarge,
+    InvalidEvidencePayload,
+    NonCanonicalEvidencePayload,
+    EvidenceReceiptMismatch,
     InvalidVerificationProvenance,
     ReceiptReplay,
     InvalidQualificationPolicy,
@@ -734,6 +832,9 @@ mod receipt_verifier {
         let signature = Signature::from_slice(&signature_bytes)
             .map_err(|_| CapabilityLedgerError::InvalidReceiptSignature)?;
 
+        if evidence_payload.len() > MAX_CAPABILITY_EVIDENCE_PAYLOAD_BYTES {
+            return Err(CapabilityLedgerError::EvidencePayloadTooLarge);
+        }
         let evidence_root = Sha256::digest(evidence_payload);
         if signed.receipt.receipt_sha256 != hex::encode(&evidence_root) {
             return Err(CapabilityLedgerError::EvidenceRootMismatch);
@@ -743,6 +844,11 @@ mod receipt_verifier {
         public_key
             .verify(&payload, &signature)
             .map_err(|_| CapabilityLedgerError::InvalidReceiptSignature)?;
+
+        // A valid signature only authenticates the evaluator statement. Require the evidence
+        // bytes themselves to follow the exact schema and agree with the signed outcome fields.
+        let evidence = CapabilityEvidencePayloadV1::decode_canonical(evidence_payload)?;
+        evidence.validate_against_receipt(&signed.receipt)?;
 
         // Bind the verifier receipt to the exact canonical bytes, signature, evidence root, and
         // policy-pinned evaluator key. Reusing either root for another outcome is rejected.
@@ -1270,16 +1376,32 @@ mod tests {
             predicted_failure_mode: None,
         }).unwrap();
 
-        let evidence = b"exact evaluator evidence bytes";
         let forecast_commitment_blake3 = ledger
             .forecasts
             .get("signed-forecast")
             .unwrap()
             .forecast_commitment_blake3
             .clone();
+        let evidence = CapabilityEvidencePayloadV1 {
+            schema_version: CAPABILITY_EVIDENCE_SCHEMA_VERSION.to_string(),
+            forecast_id: "signed-forecast".to_string(),
+            forecast_commitment_blake3: forecast_commitment_blake3.clone(),
+            subject: subject(),
+            receipt_sequence: 2,
+            observed_success: true,
+            split: CapabilitySplit::HeldOut,
+            evaluator_identity: "independent-qualification-runner".to_string(),
+            evaluator_revision: "v1".to_string(),
+            actual_compute_units: Some(2.0),
+            runner_identity: "github-actions-runner".to_string(),
+            runner_run_identity: "repo/actions/runs/12345/attempts/1".to_string(),
+            runner_artifact_identity: "repo/actions/artifacts/67890".to_string(),
+            runner_artifact_sha256: "a".repeat(64),
+        }
+        .canonical_bytes()
+        .unwrap();
         let receipt = CapabilityOutcomeReceipt {
             forecast_id: "signed-forecast".to_string(),
-            forecast_commitment_blake3: "0".repeat(64),
             forecast_commitment_blake3,
             subject: subject(),
             sequence: 2,
@@ -1287,7 +1409,7 @@ mod tests {
             split: CapabilitySplit::HeldOut,
             evaluator_identity: "independent-qualification-runner".to_string(),
             evaluator_revision: "v1".to_string(),
-            receipt_sha256: hex::encode(Sha256::digest(evidence)),
+            receipt_sha256: hex::encode(Sha256::digest(&evidence)),
             actual_compute_units: Some(2.0),
         };
         let canonical = receipt.canonical_signing_payload().unwrap();
@@ -1305,8 +1427,33 @@ mod tests {
         let mut tampered_claim = signed.clone();
         tampered_claim.receipt.observed_success = false;
         assert_eq!(
-            ledger.verify_and_resolve_signed_receipt(tampered_claim, evidence),
+            ledger.verify_and_resolve_signed_receipt(tampered_claim, evidence.as_slice()),
             Err(CapabilityLedgerError::InvalidReceiptSignature)
+        );
+        assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
+
+        // A correctly signed receipt whose canonical evidence describes a different outcome
+        // must be rejected even when its byte digest and receipt signature both verify.
+        let mut contradictory_evidence: CapabilityEvidencePayloadV1 =
+            serde_json::from_slice(&evidence).unwrap();
+        contradictory_evidence.observed_success = false;
+        let contradictory_bytes = contradictory_evidence.canonical_bytes().unwrap();
+        let mut contradictory_receipt = signed.receipt.clone();
+        contradictory_receipt.receipt_sha256 =
+            hex::encode(Sha256::digest(&contradictory_bytes));
+        let contradictory_signature = key.sign(
+            &contradictory_receipt.canonical_signing_payload().unwrap(),
+        );
+        let contradictory_signed = SignedCapabilityOutcomeReceipt {
+            receipt: contradictory_receipt,
+            signature_hex: hex::encode(contradictory_signature.to_bytes()),
+        };
+        assert_eq!(
+            ledger.verify_and_resolve_signed_receipt(
+                contradictory_signed,
+                &contradictory_bytes,
+            ),
+            Err(CapabilityLedgerError::EvidenceReceiptMismatch)
         );
         assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 0);
 
@@ -1326,7 +1473,7 @@ mod tests {
             predicted_failure_mode: None,
         }).unwrap();
         assert_eq!(
-            transplanted_ledger.verify_and_resolve_signed_receipt(signed.clone(), evidence),
+            transplanted_ledger.verify_and_resolve_signed_receipt(signed.clone(), evidence.as_slice()),
             Err(CapabilityLedgerError::ForecastCommitmentMismatch)
         );
         assert_eq!(
@@ -1334,7 +1481,7 @@ mod tests {
             0
         );
 
-        ledger.verify_and_resolve_signed_receipt(signed, evidence).unwrap();
+        ledger.verify_and_resolve_signed_receipt(signed, evidence.as_slice()).unwrap();
         assert_eq!(ledger.metrics("rust-debugging").unwrap().resolved_count, 1);
     }
 
