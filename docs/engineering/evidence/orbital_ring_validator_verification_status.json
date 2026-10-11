@@ -3,7 +3,11 @@
     "expected_check_count": 68,
     "git_blob_sha": "422a77f90dbf21a6b8dba6175193116c2a89cb15",
     "path": "scripts/engineering/orbital_ring_reference_check.py",
-    "sha256": "934ae71d6b1db63dba1ee276c9144593efd0945b20e3f6d929340a0c93215332"
+    "sha256": "934ae71d6b1db63dba1ee276c9144593efd0945b20e3f6d929340a0c93215332",
+    "unexecuted_check_ids": [
+      "circular_stream.zero_density_large_finite_speed_is_zero",
+      "circular_stream.nonfinite_result_rejected"
+    ]
   },
   "current_validator": {
     "expected_self_test_check_count": 88,
@@ -31,8 +35,6 @@
   "physics_claim": "none; these checks cover manifest contract handling only, not orbital-ring equilibrium, stability, or survivability",
   "schema": "luminous-dynamics.orbital-ring-validator-verification-status/v1",
   "unexecuted_regressions": [
-    "circular_stream.zero_density_large_finite_speed_is_zero",
-    "circular_stream.nonfinite_result_rejected",
     "wrong_numeric_type_fails_contract_validation",
     "invalid_populated_provenance_fails_contract_validation",
     "unknown_top_level_key_fails_structural_gate",
