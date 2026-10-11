@@ -1909,15 +1909,8 @@ mod tests {
     fn musicxml_multiple_voices_in_one_part_are_rejected_instead_of_merged() {
         let xml = String::from_utf8(minimal_musicxml().to_vec())
             .unwrap()
-            .replace(
-                "<note><pitch>",
-                "<note><voice>1</voice><pitch>",
-            )
-            .replacen(
-                "<voice>1</voice><pitch>",
-                "<voice>2</voice><pitch>",
-                1,
-            );
+            .replace("<note><pitch>", "<note><voice>1</voice><pitch>")
+            .replacen("<voice>1</voice><pitch>", "<voice>2</voice><pitch>", 1);
         let error = parse_musicxml(xml.as_bytes()).unwrap_err();
         assert!(error.contains("contains multiple voices"), "{error}");
     }
@@ -1930,11 +1923,7 @@ mod tests {
                 "</pitch><duration>1</duration>",
                 "</pitch><duration>1</duration><staff>1</staff>",
             )
-            .replacen(
-                "<staff>1</staff>",
-                "<staff>2</staff>",
-                1,
-            );
+            .replacen("<staff>1</staff>", "<staff>2</staff>", 1);
         let error = parse_musicxml(xml.as_bytes()).unwrap_err();
         assert!(error.contains("contains multiple staves"), "{error}");
     }
