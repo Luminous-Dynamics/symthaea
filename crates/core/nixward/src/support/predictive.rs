@@ -234,6 +234,8 @@ impl PredictiveMonitor {
     /// Clones the neuron, evolves it forward by `hours_ahead` hours, then
     /// decodes the resulting state vector back to telemetry values.
     pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
+        // Validate before reading/encoding telemetry so rejected horizons have no side effects.
+        let dt_seconds = checked_horizon_seconds(hours_ahead)?;
         if self.history.is_empty() {
             return None;
         }
@@ -242,16 +244,6 @@ impl PredictiveMonitor {
         let last_entry = self.history.last()?;
         let last_telemetry = last_entry.2.clone();
         let last_input = self.encode_telemetry(&last_telemetry);
-
-        if !hours_ahead.is_finite() || hours_ahead < 0.0 {
-            return None;
-        }
-
-        let dt_seconds_f64 = hours_ahead * 3600.0;
-        if !dt_seconds_f64.is_finite() || dt_seconds_f64 > f32::MAX as f64 {
-            return None;
-        }
-        let dt_seconds = dt_seconds_f64 as f32;
 
         let mut future_neuron = self.neuron.clone();
         future_neuron
@@ -272,6 +264,12 @@ impl PredictiveMonitor {
     /// is available (>=10 samples), the LTC neuron is consulted for directional
     /// agreement — if LTC and trend agree, confidence is boosted.
     pub fn predict(&mut self, hours_ahead: f64) -> Vec<Prediction> {
+        // Keep the trend path and the iterative LTC path on the same horizon contract.
+        // Invalid or unrepresentable horizons must not produce NaN/Inf predictions.
+        if checked_horizon_seconds(hours_ahead).is_none() {
+            return Vec::new();
+        }
+
         let current = match self.history.last() {
             Some((_, _, t)) => t.clone(),
             None => return vec![],
@@ -684,6 +682,21 @@ struct TelemetryTrend {
     swap_used_pct: f64,
 }
 
+/// Convert an hour horizon to the solver's f32 seconds representation.
+///
+/// The same contract gates both trend and LTC predictions so invalid/overflowing
+/// horizons cannot silently produce non-finite prediction values.
+fn checked_horizon_seconds(hours_ahead: f64) -> Option<f32> {
+    if !hours_ahead.is_finite() || hours_ahead < 0.0 {
+        return None;
+    }
+    let seconds = hours_ahead * 3600.0;
+    if !seconds.is_finite() || seconds > f32::MAX as f64 {
+        return None;
+    }
+    Some(seconds as f32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -710,6 +723,23 @@ mod tests {
         let mut monitor = PredictiveMonitor::with_defaults();
         monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
         assert_eq!(monitor.sample_count(), 1);
+    }
+
+    #[test]
+    fn invalid_horizons_are_rejected_by_trend_and_ltc_paths() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+
+        for hours in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, f64::MAX] {
+            assert!(
+                monitor.predict(hours).is_empty(),
+                "trend path accepted invalid horizon {hours}"
+            );
+            assert!(
+                monitor.predict_ltc(hours).is_none(),
+                "LTC path accepted invalid horizon {hours}"
+            );
+        }
     }
 
     #[test]
