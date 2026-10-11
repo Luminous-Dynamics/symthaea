@@ -12,7 +12,7 @@
 //! | ι₁ | Known Unknown | We know we don't know this specific thing |
 //! | ι₂ | Unknown Unknown | We don't know what we don't know |
 //! | ι₃ | Impossible | Fundamentally unknowable |
-//! | ι∞ | None | No ignorance (complete knowledge) |
+//! | ι∞ | None | No ignorance detected under the active frame |
 //!
 //! ## GIS v4.0 Extension: Harmonic Ignorance
 //!
@@ -40,7 +40,7 @@ use std::time::SystemTime;
 /// Based on epistemological analysis of what kinds of "not knowing" exist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IgnoranceType {
-    /// No ignorance - we have complete knowledge (κ)
+    /// No ignorance detected under the active evidence/model/schema/ontology frame (κ).
     None,
 
     /// Known - Information exists somewhere, we know what it is but don't have it (κ temporally limited)
@@ -63,7 +63,7 @@ impl IgnoranceType {
     /// Can this type of ignorance be resolved in principle?
     pub fn is_resolvable(&self) -> bool {
         match self {
-            Self::None => true,         // Already resolved
+            Self::None => true,         // No ignorance detected under the active frame
             Self::Known => true,        // Just need to fetch it
             Self::KnownUnknown => true, // Can research it
             Self::Unknown => false,     // Can't target what we don't know
@@ -84,10 +84,12 @@ impl IgnoranceType {
 
     /// Get confidence ceiling for this ignorance type
     ///
-    /// Even if we answer, this is the max confidence we can claim.
+    /// Even if we answer, this is the max confidence we can claim. For `None`, the
+    /// ceiling applies only to the ignorance category; it does not establish completeness.
     pub fn confidence_ceiling(&self) -> f32 {
         match self {
-            Self::None => 1.0,
+            // This is a ceiling for the ignorance category, not a proof of completeness.
+        Self::None => 1.0,
             Self::Known => 0.95,
             Self::KnownUnknown => 0.85,
             Self::Unknown => 0.50,
@@ -109,7 +111,7 @@ impl IgnoranceType {
     /// Human-readable description
     pub fn description(&self) -> &'static str {
         match self {
-            Self::None => "Complete knowledge - no ignorance",
+            Self::None => "No ignorance detected under the active frame",
             Self::Known => "Information exists but is not currently accessible",
             Self::KnownUnknown => "We know what we don't know",
             Self::Unknown => "We don't know what we don't know",
@@ -208,11 +210,64 @@ pub struct IgnoranceRecord {
     /// Resolution (if resolved)
     pub resolution: Option<IgnoranceResolution>,
 
+    /// Append-only frame/correction lineage. Historical entries are never rewritten.
+    pub frame_revisions: Vec<EpistemicFrameRevision>,
+
     /// When created
     pub created_at: SystemTime,
 
     /// When last updated
     pub updated_at: SystemTime,
+}
+
+impl IgnoranceRecord {
+    /// Append a frame revision without mutating the historical detection.
+    pub fn append_frame_revision(&mut self, revision: EpistemicFrameRevision) {
+        self.frame_revisions.push(revision);
+        self.updated_at = SystemTime::now();
+    }
+
+    /// Append a frame revision only when it continues the current lineage.
+    pub fn try_append_frame_revision(
+        &mut self,
+        revision: EpistemicFrameRevision,
+    ) -> Result<(), FrameLineageError> {
+        let expected = self
+            .latest_frame_revision()
+            .map(|entry| entry.revised_frame.as_str().to_owned())
+            .unwrap_or_else(|| self.detection.frame.identity());
+
+        if !revision.follows_frame(&expected) {
+            return Err(FrameLineageError::Discontinuous);
+        }
+        if !revision.changes_frame() {
+            return Err(FrameLineageError::NoOp);
+        }
+
+        self.append_frame_revision(revision);
+        Ok(())
+    }
+
+    /// Return the most recent frame revision, if any.
+    pub fn latest_frame_revision(&self) -> Option<&EpistemicFrameRevision> {
+        self.frame_revisions.last()
+    }
+
+    /// Verify that the append-only lineage forms one continuous frame chain.
+    ///
+    /// The first revision must begin at the detection frame, and every later revision
+    /// must begin at the prior revision's revised frame. This makes silent provenance
+    /// jumps detectable without rewriting historical entries.
+    pub fn frame_lineage_is_contiguous(&self) -> bool {
+        let mut expected = self.detection.frame.identity();
+        for revision in &self.frame_revisions {
+            if !revision.follows_frame(&expected) || !revision.changes_frame() {
+                return false;
+            }
+            expected = revision.revised_frame.clone();
+        }
+        true
+    }
 }
 
 /// Status of an ignorance record
@@ -262,6 +317,528 @@ pub enum ResolutionMethod {
     UserProvided,
     /// Question was reframed
     Reframed,
+}
+
+// =============================================================================
+// Epistemic frame provenance
+// =============================================================================
+
+/// The representational frame under which a GIS conclusion was produced.
+///
+/// A frame qualifies confidence: it records the evidence/model/schema boundary
+/// rather than pretending that a high proposition confidence proves completeness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicFrame {
+    /// Stable semantic identifier for the frame definition.
+    pub id: String,
+    /// Monotonic schema/frame revision.
+    pub version: u32,
+    /// Boundary of evidence considered by the frame.
+    pub evidence_boundary: String,
+    /// Ontology/schema identifier used to interpret observations.
+    pub ontology_id: String,
+    /// Causal/model identifier used for inference.
+    pub causal_model_id: String,
+    /// Variables deliberately excluded from the frame.
+    pub excluded_variables: Vec<String>,
+    /// Known blind spots acknowledged by the frame.
+    pub known_blind_spots: Vec<String>,
+}
+
+impl EpistemicFrame {
+    /// Stable identity used for provenance and future correction events.
+    pub fn identity(&self) -> String {
+        format!("{}@{}", self.id, self.version)
+    }
+
+    /// Compare this frame with another frame without collapsing either into a scalar score.
+    ///
+    /// A divergent ontology or causal model is itself epistemically relevant: conclusions
+    /// produced under the two frames must not be treated as interchangeable merely because
+    /// their proposition-level confidence happens to be similar.
+    pub fn divergence_from(&self, other: &Self) -> EpistemicFrameDivergence {
+        EpistemicFrameDivergence {
+            identity_changed: self.id != other.id,
+            version_changed: self.version != other.version,
+            evidence_boundary_changed: self.evidence_boundary != other.evidence_boundary,
+            ontology_changed: self.ontology_id != other.ontology_id,
+            causal_model_changed: self.causal_model_id != other.causal_model_id,
+            excluded_variables_changed: self.excluded_variables != other.excluded_variables,
+            blind_spots_changed: self.known_blind_spots != other.known_blind_spots,
+        }
+    }
+}
+
+/// Structured difference between two epistemic frames.
+///
+/// This intentionally avoids a single "frame uncertainty" number. Different kinds of
+/// frame divergence have different meanings and should remain inspectable for provenance,
+/// correction, and later model comparison.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicFrameDivergence {
+    /// Stable frame identity changed; provenance must therefore remain distinct.
+    pub identity_changed: bool,
+    /// Frame schema revision changed; provenance must therefore remain distinct.
+    pub version_changed: bool,
+    pub evidence_boundary_changed: bool,
+    pub ontology_changed: bool,
+    pub causal_model_changed: bool,
+    pub excluded_variables_changed: bool,
+    pub blind_spots_changed: bool,
+}
+
+impl EpistemicFrameDivergence {
+    /// Whether any epistemically material frame component differs.
+    pub fn is_divergent(&self) -> bool {
+        self.identity_changed
+            || self.version_changed
+            || self.evidence_boundary_changed
+            || self.ontology_changed
+            || self.causal_model_changed
+            || self.excluded_variables_changed
+            || self.blind_spots_changed
+    }
+}
+
+
+/// Append-only record describing a revision of an epistemic frame.
+///
+/// A revision never mutates or erases conclusions produced under the prior frame.
+/// It records why the frame changed and which previously derived conclusions require
+/// re-evaluation or scope qualification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicFrameRevision {
+    /// Prior frame identity (id@version).
+    pub prior_frame: String,
+    /// Revised frame identity (id@version).
+    pub revised_frame: String,
+    /// Evidence or observation that triggered the revision.
+    pub trigger: String,
+    /// Newly represented entity, variable, or relationship, if any.
+    pub newly_represented: Option<String>,
+    /// Human/model-readable scope change.
+    pub scope_change: String,
+    /// Claim or conclusion identifiers affected by the revision.
+    pub affected_conclusions: Vec<String>,
+    /// Typed impact mask derived from the prior/revised frame pair.
+    pub impact: EpistemicFrameImpact,
+}
+
+impl EpistemicFrameRevision {
+    /// Construct an append-only frame revision event.
+    pub fn new(
+        prior_frame: &EpistemicFrame,
+        revised_frame: &EpistemicFrame,
+        trigger: impl Into<String>,
+        newly_represented: Option<String>,
+        scope_change: impl Into<String>,
+        affected_conclusions: Vec<String>,
+    ) -> Self {
+        Self {
+            prior_frame: prior_frame.identity(),
+            revised_frame: revised_frame.identity(),
+            trigger: trigger.into(),
+            newly_represented,
+            scope_change: scope_change.into(),
+            affected_conclusions,
+            impact: EpistemicFrameImpact::from_divergence(
+                &prior_frame.divergence_from(revised_frame),
+            ),
+        }
+    }
+
+    /// Whether this revision continues directly from the supplied frame identity.
+    pub fn follows_frame(&self, frame_identity: &str) -> bool {
+        self.prior_frame == frame_identity
+    }
+
+    /// Whether this revision is structurally meaningful rather than a no-op.
+    /// Whether this revision is structurally meaningful rather than a no-op.
+    ///
+    /// Frame content is versioned by `EpistemicFrame::identity()`. A semantic
+    /// change without an identity change is not representable as a distinct
+    /// append-only frame state and must not masquerade as one.
+    pub fn changes_frame(&self) -> bool {
+        self.prior_frame != self.revised_frame
+    }
+}
+
+/// Lifecycle state of a conclusion whose provenance may be affected by frame revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConclusionStatus {
+    /// Conclusion remains usable under its originating frame.
+    Active,
+    /// Conclusion remains historical but requires qualification under a changed frame.
+    Qualified,
+    /// Conclusion must be evaluated again before being used as current knowledge.
+    Reopened,
+    /// Conclusion has been explicitly replaced by a later conclusion.
+    Superseded,
+}
+
+/// Why a downstream conclusion depends on an upstream conclusion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConclusionDependencyKind {
+    EvidenceSupport,
+    CausalDependency,
+    DefinitionDependency,
+    OntologyDependency,
+    InferenceDependency,
+    AssumptionDependency,
+}
+
+/// Which dependency kinds are potentially affected by a frame revision.
+///
+/// This is deliberately a capability mask rather than a scalar severity score.
+/// A revision asks which relationships require re-evaluation; it does not assert
+/// that every downstream conclusion is false.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EpistemicFrameImpact {
+    pub evidence_boundary: bool,
+    pub ontology: bool,
+    pub causal_model: bool,
+    pub exclusions: bool,
+    pub blind_spots: bool,
+}
+
+impl EpistemicFrameImpact {
+    pub const fn broad() -> Self {
+        Self {
+            evidence_boundary: true,
+            ontology: true,
+            causal_model: true,
+            exclusions: true,
+            blind_spots: true,
+        }
+    }
+
+    /// Derive dependency impact from a structured frame divergence.
+    pub fn from_divergence(divergence: &EpistemicFrameDivergence) -> Self {
+        let material = divergence.evidence_boundary_changed
+            || divergence.ontology_changed
+            || divergence.causal_model_changed
+            || divergence.excluded_variables_changed
+            || divergence.blind_spots_changed;
+
+        if !material {
+            // A version-only change is still a provenance boundary. Without a
+            // semantic diff, prefer re-evaluation over silently trusting old edges.
+            return Self::broad();
+        }
+
+        Self {
+            evidence_boundary: divergence.evidence_boundary_changed,
+            ontology: divergence.ontology_changed,
+            causal_model: divergence.causal_model_changed,
+            exclusions: divergence.excluded_variables_changed,
+            blind_spots: divergence.blind_spots_changed,
+        }
+    }
+
+    pub fn affects(&self, kind: ConclusionDependencyKind) -> bool {
+        match kind {
+            ConclusionDependencyKind::EvidenceSupport => self.evidence_boundary,
+            ConclusionDependencyKind::CausalDependency => self.causal_model,
+            ConclusionDependencyKind::DefinitionDependency => self.ontology,
+            ConclusionDependencyKind::OntologyDependency => self.ontology,
+            ConclusionDependencyKind::InferenceDependency => {
+                self.evidence_boundary || self.ontology || self.causal_model
+            }
+            ConclusionDependencyKind::AssumptionDependency => {
+                self.evidence_boundary
+                    || self.ontology
+                    || self.causal_model
+                    || self.exclusions
+                    || self.blind_spots
+            }
+        }
+    }
+}
+
+/// Typed dependency between epistemic conclusions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConclusionDependency {
+    pub upstream: String,
+    pub downstream: String,
+    pub kind: ConclusionDependencyKind,
+}
+
+impl ConclusionDependency {
+    pub fn new(
+        upstream: impl Into<String>,
+        downstream: impl Into<String>,
+        kind: ConclusionDependencyKind,
+    ) -> Self {
+        Self { upstream: upstream.into(), downstream: downstream.into(), kind }
+    }
+}
+
+/// A frame-qualified epistemic conclusion.
+///
+/// This is intentionally narrower than a general knowledge-graph node: it records the
+/// provenance needed to reopen reasoning when its frame or an upstream conclusion changes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicConclusion {
+    /// Stable conclusion identifier.
+    pub id: String,
+    /// Human/model-readable proposition represented by this conclusion.
+    pub proposition: String,
+    /// Frame under which the conclusion was produced.
+    pub originating_frame: String,
+    /// Evidence identifiers directly supporting the conclusion.
+    pub evidence: Vec<String>,
+    /// Upstream conclusion identifiers required by this conclusion.
+    pub dependencies: Vec<String>,
+    /// Current lifecycle state.
+    pub status: ConclusionStatus,
+}
+
+impl EpistemicConclusion {
+    pub fn new(
+        id: impl Into<String>,
+        proposition: impl Into<String>,
+        originating_frame: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            proposition: proposition.into(),
+            originating_frame: originating_frame.into(),
+            evidence: Vec::new(),
+            dependencies: Vec::new(),
+            status: ConclusionStatus::Active,
+        }
+    }
+
+    /// Mark a historical conclusion as requiring re-evaluation under a changed frame.
+    pub fn reopen(&mut self) {
+        // Superseded conclusions remain historical replacements; reopening them would
+        // blur the distinction between correction of a live belief and resurrection of
+        // an explicitly replaced one.
+        if self.status != ConclusionStatus::Superseded {
+            self.status = ConclusionStatus::Reopened;
+        }
+    }
+
+    /// Preserve the conclusion while explicitly qualifying it against its originating frame.
+    pub fn qualify(&mut self) {
+        if self.status != ConclusionStatus::Reopened {
+            self.status = ConclusionStatus::Qualified;
+        }
+    }
+}
+
+/// Minimal dependency graph for deterministic downstream impact analysis.
+///
+/// The graph deliberately does not infer semantic validity. It only answers the narrower
+/// provenance question: which conclusions transitively depend on conclusions whose frame
+/// provenance has changed?
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConclusionDependencyGraph {
+    pub conclusions: Vec<EpistemicConclusion>,
+    /// Typed dependency edges; legacy conclusion-local dependency IDs remain supported.
+    pub dependency_edges: Vec<ConclusionDependency>,
+}
+
+impl ConclusionDependencyGraph {
+    pub fn add(&mut self, conclusion: EpistemicConclusion) {
+        self.conclusions.push(conclusion);
+    }
+
+    pub fn add_dependency(&mut self, dependency: ConclusionDependency) {
+        self.dependency_edges.push(dependency);
+    }
+
+    /// Return conclusion IDs transitively downstream of the supplied roots.
+    pub fn downstream_of(&self, roots: &[String]) -> Vec<String> {
+        let mut affected = Vec::new();
+        let mut frontier = roots.to_vec();
+
+        while let Some(root) = frontier.pop() {
+            for dependency in &self.dependency_edges {
+                if dependency.upstream == root
+                    && !affected.iter().any(|id| id == &dependency.downstream)
+                    && !roots.iter().any(|id| id == &dependency.downstream)
+                {
+                    affected.push(dependency.downstream.clone());
+                    frontier.push(dependency.downstream.clone());
+                }
+            }
+
+            for conclusion in &self.conclusions {
+                if conclusion.dependencies.iter().any(|dep| dep == &root)
+                    && !affected.iter().any(|id| id == &conclusion.id)
+                    && !roots.iter().any(|id| id == &conclusion.id)
+                {
+                    affected.push(conclusion.id.clone());
+                    frontier.push(conclusion.id.clone());
+                }
+            }
+        }
+
+        affected
+    }
+
+    pub fn dependency_reasons(
+        &self,
+        upstream: &str,
+        downstream: &str,
+    ) -> Vec<ConclusionDependencyKind> {
+        self.dependency_edges
+            .iter()
+            .filter(|edge| edge.upstream == upstream && edge.downstream == downstream)
+            .map(|edge| edge.kind)
+            .collect()
+    }
+
+    /// Reopen roots and all transitively dependent conclusions.
+    pub fn reopen_from(&mut self, roots: &[String]) -> Vec<String> {
+        // Only return conclusions that actually exist in the graph. A provenance event
+        // may reference a stale/deleted ID; silently reporting it as reopened would turn
+        // missing provenance into false evidence of correction.
+        let known: std::collections::HashSet<&str> =
+            self.conclusions.iter().map(|c| c.id.as_str()).collect();
+
+        let downstream = self.downstream_of(roots);
+        let mut candidates = roots.to_vec();
+        candidates.extend(downstream);
+
+        let mut reopened = Vec::new();
+        for id in candidates {
+            if known.contains(id.as_str()) && !reopened.iter().any(|seen| seen == &id) {
+                reopened.push(id);
+            }
+        }
+
+        for conclusion in &mut self.conclusions {
+            if reopened.iter().any(|id| id == &conclusion.id) {
+                conclusion.reopen();
+            }
+        }
+
+        reopened
+    }
+
+    /// Apply a frame revision using dependency semantics rather than graph proximity.
+    /// Typed edges propagate only when their dependency kind is affected. Legacy untyped
+    /// dependency IDs remain conservative because their semantic basis is unavailable.
+    pub fn reopen_from_frame_revision(
+        &mut self,
+        revision: &EpistemicFrameRevision,
+    ) -> Vec<String> {
+        let mut affected = Vec::new();
+        let mut frontier = Vec::new();
+        let known: std::collections::HashSet<&str> =
+            self.conclusions.iter().map(|c| c.id.as_str()).collect();
+
+        for root in &revision.affected_conclusions {
+            if known.contains(root.as_str()) && !affected.contains(root) {
+                affected.push(root.clone());
+                frontier.push(root.clone());
+            }
+        }
+
+        while let Some(upstream) = frontier.pop() {
+            for edge in &self.dependency_edges {
+                if edge.upstream == upstream
+                    && revision.impact.affects(edge.kind)
+                    && known.contains(edge.downstream.as_str())
+                    && !affected.contains(&edge.downstream)
+                {
+                    affected.push(edge.downstream.clone());
+                    frontier.push(edge.downstream.clone());
+                }
+            }
+
+            for conclusion in &self.conclusions {
+                let depends = conclusion.dependencies.iter().any(|id| id == &upstream);
+                let has_typed_edge = self.dependency_edges.iter().any(|edge| {
+                    edge.upstream == upstream && edge.downstream == conclusion.id
+                });
+                if depends && !has_typed_edge && !affected.contains(&conclusion.id) {
+                    affected.push(conclusion.id.clone());
+                    frontier.push(conclusion.id.clone());
+                }
+            }
+        }
+
+        for conclusion in &mut self.conclusions {
+            if affected.contains(&conclusion.id) {
+                conclusion.reopen();
+            }
+        }
+        affected
+    }
+}
+
+/// Failure returned when a frame revision would corrupt append-only lineage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameLineageError {
+    /// The revision starts from a different frame than the record's current frame.
+    Discontinuous,
+    /// The revision does not actually change the frame.
+    NoOp,
+}
+
+impl std::fmt::Display for FrameLineageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Discontinuous => write!(f, "frame revision is discontinuous"),
+            Self::NoOp => write!(f, "frame revision is a no-op"),
+        }
+    }
+}
+
+impl std::error::Error for FrameLineageError {}
+
+#[cfg(test)]
+mod frame_identity_divergence_tests {
+    use super::*;
+
+    #[test]
+    fn same_frame_identity_cannot_claim_a_revision() {
+        let frame = EpistemicFrame::default();
+        let mut revised = frame.clone();
+        revised.ontology_id = "different-ontology".to_string();
+
+        let revision = EpistemicFrameRevision::new(
+            &frame,
+            &revised,
+            "ontology changed without version bump",
+            None,
+            "invalid identity reuse",
+            vec!["c1".to_string()],
+        );
+
+        assert!(!revision.changes_frame());
+        assert_eq!(revision.prior_frame, revision.revised_frame);
+    }
+
+    #[test]
+    fn distinct_frame_id_is_provenance_divergence() {
+        let left = EpistemicFrame::default();
+        let right = EpistemicFrame {
+            id: "different-frame".to_string(),
+            ..left.clone()
+        };
+
+        let divergence = left.divergence_from(&right);
+        assert!(divergence.identity_changed);
+        assert!(divergence.is_divergent());
+    }
+}
+
+impl Default for EpistemicFrame {
+    fn default() -> Self {
+        Self {
+            id: "gis-default".to_string(),
+            version: 1,
+            evidence_boundary: "local-query-context".to_string(),
+            ontology_id: "general-v1".to_string(),
+            causal_model_id: "unspecified".to_string(),
+            excluded_variables: Vec::new(),
+            known_blind_spots: vec!["unrepresented variables and categories".to_string()],
+        }
+    }
 }
 
 // =============================================================================
@@ -466,6 +1043,42 @@ fn harmony_resolution_effort(harmony: Harmony, impact: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mycelix::gis::Uncertainty3D;
+
+    #[test]
+    fn test_frame_lineage_contiguity() {
+        let mut record = IgnoranceRecord {
+            id: "lineage".to_string(),
+            detection: super::IgnoranceDetection {
+                query: "q".to_string(),
+                ignorance_type: IgnoranceType::KnownUnknown,
+                uncertainty: Uncertainty3D::new(0.2, 0.2, 0.2),
+                domain: Domain::General,
+                eig: 0.5,
+                detected_at: SystemTime::now(),
+                frame: EpistemicFrame::default(),
+            },
+            status: IgnoranceStatus::Active,
+            resolution: None,
+            frame_revisions: Vec::new(),
+            created_at: SystemTime::now(),
+            updated_at: SystemTime::now(),
+        };
+        assert!(record.frame_lineage_is_contiguous());
+
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+        record.append_frame_revision(EpistemicFrameRevision::new(
+            &prior, &revised, "revision-1", None, "version bump", vec![],
+        ));
+        assert!(record.frame_lineage_is_contiguous());
+
+        let next = EpistemicFrame { version: 3, ..revised.clone() };
+        record.append_frame_revision(EpistemicFrameRevision::new(
+            &revised, &next, "revision-2", None, "version bump", vec![],
+        ));
+        assert!(record.frame_lineage_is_contiguous());
+    }
 
     #[test]
     fn test_ignorance_resolvability() {
@@ -490,6 +1103,209 @@ mod tests {
             IgnoranceType::Unknown.confidence_ceiling()
                 > IgnoranceType::Impossible.confidence_ceiling()
         );
+    }
+
+    #[test]
+    fn test_conclusion_dependency_reopening_is_transitive() {
+        let mut graph = ConclusionDependencyGraph::default();
+
+        let root = EpistemicConclusion::new("c1", "A", "gis-default@1");
+        let mut dependent = EpistemicConclusion::new("c2", "B", "gis-default@1");
+        dependent.dependencies.push("c1".to_string());
+        let mut downstream = EpistemicConclusion::new("c3", "C", "gis-default@1");
+        downstream.dependencies.push("c2".to_string());
+
+        graph.add(root);
+        graph.add(dependent);
+        graph.add(downstream);
+        graph.add_dependency(ConclusionDependency::new(
+            "c1",
+            "c2",
+            ConclusionDependencyKind::OntologyDependency,
+        ));
+
+        let reopened = graph.reopen_from(&["c1".to_string()]);
+        assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string(), "c3".to_string()]);
+        assert!(graph.conclusions.iter().all(|c| c.status == ConclusionStatus::Reopened));
+        assert_eq!(
+            graph.dependency_reasons("c1", "c2"),
+            vec![ConclusionDependencyKind::OntologyDependency]
+        );
+    }
+
+    #[test]
+    fn test_frame_revision_propagates_to_typed_conclusions() {
+        let prior = EpistemicFrame::default();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+        let revision = EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "new variable represented",
+            Some("institutional-role".to_string()),
+            "expanded ontology",
+            vec!["c1".to_string()],
+        );
+
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "root", prior.identity()));
+        let mut c2 = EpistemicConclusion::new("c2", "dependent", prior.identity());
+        c2.dependencies.push("c1".to_string());
+        graph.add(c2);
+
+        let reopened = graph.reopen_from_frame_revision(&revision);
+        assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string()]);
+        assert!(graph.conclusions.iter().all(|c| c.status == ConclusionStatus::Reopened));
+    }
+
+    #[test]
+    fn test_checked_frame_revision_append_rejects_invalid_history() {
+        let mut record = IgnoranceRecord {
+            id: "checked-lineage".to_string(),
+            detection: super::IgnoranceDetection {
+                query: "q".to_string(),
+                ignorance_type: IgnoranceType::KnownUnknown,
+                uncertainty: Uncertainty3D::new(0.2, 0.2, 0.2),
+                domain: Domain::General,
+                eig: 0.5,
+                detected_at: SystemTime::now(),
+                frame: EpistemicFrame::default(),
+            },
+            status: IgnoranceStatus::Active,
+            resolution: None,
+            frame_revisions: Vec::new(),
+            created_at: SystemTime::now(),
+            updated_at: SystemTime::now(),
+        };
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+
+        let valid = EpistemicFrameRevision::new(
+            &prior, &revised, "valid", None, "version bump", vec![],
+        );
+        assert!(record.try_append_frame_revision(valid).is_ok());
+
+        let no_op = EpistemicFrameRevision::new(
+            &revised, &revised, "noop", None, "unchanged", vec![],
+        );
+        assert_eq!(
+            record.try_append_frame_revision(no_op),
+            Err(FrameLineageError::NoOp)
+        );
+
+        let discontinuous = EpistemicFrameRevision::new(
+            &prior,
+            &EpistemicFrame { version: 3, ..prior.clone() },
+            "stale writer",
+            None,
+            "skipped current frame",
+            vec![],
+        );
+        assert_eq!(
+            record.try_append_frame_revision(discontinuous),
+            Err(FrameLineageError::Discontinuous)
+        );
+        assert_eq!(record.frame_revisions.len(), 1);
+        assert!(record.frame_lineage_is_contiguous());
+    }
+
+    #[test]
+    fn test_frame_revision_continuity_and_non_noop() {
+        let prior = EpistemicFrame::default();
+        let revised = EpistemicFrame {
+            version: 2,
+            ontology_id: "collective-agents-v2".to_string(),
+            ..prior.clone()
+        };
+        let revision = EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "new relationship observed",
+            Some("institutional-role".to_string()),
+            "expanded ontology",
+            vec!["conclusion-1".to_string()],
+        );
+
+        assert!(revision.follows_frame(&prior.identity()));
+        assert!(revision.changes_frame());
+        assert!(!revision.follows_frame("other@1"));
+    }
+
+    #[test]
+    fn test_frame_impact_is_dependency_sensitive() {
+        let prior = EpistemicFrame::default();
+        let revised = EpistemicFrame {
+            version: 2,
+            ontology_id: "collective-agents-v2".to_string(),
+            ..prior.clone()
+        };
+        let revision = EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "ontology expanded",
+            Some("institutional-role".to_string()),
+            "ontology change",
+            vec!["c1".to_string()],
+        );
+
+        assert!(revision.impact.ontology);
+        assert!(!revision.impact.causal_model);
+        assert!(revision.impact.affects(ConclusionDependencyKind::OntologyDependency));
+        assert!(!revision.impact.affects(ConclusionDependencyKind::CausalDependency));
+
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "root", prior.identity()));
+        graph.add(EpistemicConclusion::new("c2", "causal dependent", prior.identity()));
+        graph.add(EpistemicConclusion::new("c3", "ontology dependent", prior.identity()));
+        graph.add_dependency(ConclusionDependency::new(
+            "c1", "c2", ConclusionDependencyKind::CausalDependency,
+        ));
+        graph.add_dependency(ConclusionDependency::new(
+            "c1", "c3", ConclusionDependencyKind::OntologyDependency,
+        ));
+
+        let reopened = graph.reopen_from_frame_revision(&revision);
+        assert_eq!(reopened, vec!["c1".to_string(), "c3".to_string()]);
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Reopened);
+        assert_eq!(graph.conclusions[1].status, ConclusionStatus::Active);
+        assert_eq!(graph.conclusions[2].status, ConclusionStatus::Reopened);
+    }
+
+    #[test]
+    fn test_reopen_preserves_already_superseded_state() {
+        let mut graph = ConclusionDependencyGraph::default();
+        let mut c = EpistemicConclusion::new("c1", "A", "gis-default@1");
+        c.status = ConclusionStatus::Superseded;
+        graph.add(c);
+
+        let reopened = graph.reopen_from(&["c1".to_string()]);
+        assert_eq!(reopened, vec!["c1".to_string()]);
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Superseded);
+    }
+
+    #[test]
+    fn test_reopen_does_not_report_missing_roots() {
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "A", "gis-default@1"));
+
+        let reopened = graph.reopen_from(&["missing".to_string()]);
+        assert!(reopened.is_empty());
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Active);
+    }
+
+    #[test]
+    fn test_typed_dependency_cycle_terminates_deterministically() {
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "A", "gis-default@1"));
+        graph.add(EpistemicConclusion::new("c2", "B", "gis-default@1"));
+        graph.add_dependency(ConclusionDependency::new(
+            "c1", "c2", ConclusionDependencyKind::InferenceDependency,
+        ));
+        graph.add_dependency(ConclusionDependency::new(
+            "c2", "c1", ConclusionDependencyKind::AssumptionDependency,
+        ));
+
+        let reopened = graph.reopen_from(&["c1".to_string()]);
+        assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string()]);
     }
 
     #[test]

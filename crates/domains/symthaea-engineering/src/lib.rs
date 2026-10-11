@@ -30,6 +30,7 @@ pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
 pub use symthaea_memory as memory;
 pub use symthaea_sim_bridge as sim_bridge;
+pub mod provenance_graph;
 
 /// Debug-friendly wrapper for the fabrication autonomy loop.
 pub struct DebugFabricationLoop(pub AutonomyLoop);

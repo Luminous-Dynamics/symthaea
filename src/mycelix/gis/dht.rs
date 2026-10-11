@@ -50,6 +50,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
+use super::EpistemicFrame;
 use super::GISError;
 use super::zk_proofs::{ZKEIGRangeProof, ZKTopicCommitment};
 
@@ -1190,7 +1191,7 @@ mod tests {
 
     #[test]
     fn test_curiosity_engine() {
-        use super::super::IgnoranceDetection;
+        use super::super::{EpistemicFrame, IgnoranceDetection};
 
         let config = CuriosityConfig::default();
         let mut engine = CuriosityEngine::new(config);
@@ -1202,6 +1203,7 @@ mod tests {
             domain: super::super::Domain::General,
             eig: 0.7,
             detected_at: SystemTime::now(),
+            frame: EpistemicFrame::default(),
         };
 
         let request = engine.queue_resolution(&detection).unwrap();
@@ -1311,6 +1313,7 @@ mod tests {
             domain: Domain::General,
             eig: 0.5,
             detected_at: SystemTime::now(),
+            frame: EpistemicFrame::default(),
         };
 
         let mut hi = HarmonicIgnorance::new(IgnoranceType::KnownUnknown);

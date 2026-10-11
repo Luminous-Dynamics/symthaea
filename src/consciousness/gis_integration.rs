@@ -77,8 +77,10 @@ impl ConsciousUncertaintyState {
     /// Create from Φ measurement and GIS detection
     pub fn from_phi_and_detection(phi: f32, detection: &IgnoranceDetection) -> Self {
         let epistemic_confidence = 1.0 - detection.uncertainty.total().min(1.0);
-        let is_grounded =
-            detection.ignorance_type == IgnoranceType::None || epistemic_confidence > 0.7;
+        // Grounding must come from measured epistemic confidence, not from the
+        // absence of a detected ignorance category. IgnoranceType::None means
+        // "no ignorance detected under the active frame", not completeness.
+        let is_grounded = epistemic_confidence > 0.7;
 
         Self {
             phi,
@@ -577,6 +579,7 @@ mod tests {
             domain: Domain::Physics,
             eig: 0.7,
             detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
         };
 
         let state = ConsciousUncertaintyState::from_phi_and_detection(0.8, &detection);
@@ -659,6 +662,7 @@ mod tests {
             domain: Domain::Physics,
             eig: 0.8,
             detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
         };
 
         let context = EpistemicBidContext::from_detection(&detection, 0.5);
@@ -677,6 +681,7 @@ mod tests {
             domain: Domain::General,
             eig: 0.0,
             detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
         };
         let state_none = ConsciousUncertaintyState::from_phi_and_detection(0.9, &detection_none);
         assert!(
@@ -685,7 +690,7 @@ mod tests {
         );
         assert!(
             state_none.is_grounded,
-            "zero uncertainty + IgnoranceType::None should be grounded"
+            "zero uncertainty should be grounded even without relying on IgnoranceType::None"
         );
 
         // High uncertainty => effective << phi
@@ -696,6 +701,7 @@ mod tests {
             domain: Domain::General,
             eig: 0.9,
             detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
         };
         let state_high = ConsciousUncertaintyState::from_phi_and_detection(0.9, &detection_high);
         assert!(
@@ -717,6 +723,7 @@ mod tests {
             domain: Domain::General,
             eig: 0.2,
             detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
         };
         let state = ConsciousUncertaintyState::from_phi_and_detection(0.7, &detection);
         let conf = state.epistemic_confidence;
@@ -780,6 +787,7 @@ mod tests {
                 domain: Domain::General,
                 eig: 0.1,
                 detected_at: SystemTime::now(),
+            frame: crate::mycelix::gis::EpistemicFrame::default(),
             };
             let context = EpistemicBidContext::from_detection(&detection, 0.5);
             assert!(
