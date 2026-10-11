@@ -34,7 +34,8 @@ fn main() {
     let mut dimensions = DIMENSIONS.to_vec();
     // Four-million-dimension trials allocate ~128 MiB for neuron vectors alone
     // and perform much more timed work; make this large-host tier explicit opt-in.
-    let include_4m = std::env::var_os("SYTHAEA_HDC_LTC_BENCH_4M").is_some_and(|v| v == "1");
+    let include_4m = std::env::var_os("SYTHAEA_HDC_LTC_BENCH_4M")
+        .is_some_and(|value| value.to_string_lossy() == "1");
     if include_4m {
         dimensions.push(4_194_304);
         eprintln!("Including optional 4M dimension tier (SYTHAEA_HDC_LTC_BENCH_4M=1).");
@@ -92,8 +93,8 @@ fn main() {
 
                 println!(
                     concat!(
-                        "{dimension},{hypervector_bytes},{neuron_vector_bytes},{dt},{mode},{iterations},{warmup_iterations},{elapsed_ns},"
-                        "{ns_per_component_update:.6},{component_updates_per_second:.3},",
+                        "{dimension},{hypervector_bytes},{neuron_vector_bytes},{dt},{mode},{iterations},{warmup_iterations},{elapsed_ns},",
+                        "{ns_per_component_update:.6},{component_updates_per_second:.3},"
                         "{final_state_norm:.8}"
                     )
                 );
