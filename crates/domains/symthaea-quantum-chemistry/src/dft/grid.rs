@@ -558,6 +558,28 @@ mod tests {
             .sum()
     }
 
+    fn odd_double_factorial(n: i32) -> f64 {
+        let mut product = 1.0;
+        let mut factor = 1;
+        while factor <= n {
+            product *= factor as f64;
+            factor += 2;
+        }
+        product
+    }
+
+    /// Exact moment under the normalized uniform-sphere measure, for even
+    /// exponents: E[x^(2a)y^(2b)z^(2c)] = ((2a-1)!!(2b-1)!!(2c-1)!!)
+    /// / (2(a+b+c)+1)!!.
+    fn exact_normalized_sphere_moment(powers: [i32; 3]) -> f64 {
+        assert!(powers.iter().all(|power| *power >= 0 && power % 2 == 0));
+        let [a, b, c] = [powers[0] / 2, powers[1] / 2, powers[2] / 2];
+        odd_double_factorial(2 * a - 1)
+            * odd_double_factorial(2 * b - 1)
+            * odd_double_factorial(2 * c - 1)
+            / odd_double_factorial(2 * (a + b + c) + 1)
+    }
+
     fn assert_spherical_moment(
         pts: &[(f64, f64, f64, f64)],
         powers: [i32; 3],
@@ -622,6 +644,65 @@ mod tests {
             ([4, 4, 2], 1.0 / 1155.0),
         ] {
             assert_spherical_moment(&lebedev50, powers, exact, "Lebedev-50 (degree 11)");
+        }
+    }
+
+    #[test]
+    fn test_lebedev_302_degree_29_even_moments() {
+        let pts = lebedev_302();
+        assert_eq!(pts.len(), 302, "Lebedev-302 must contain exactly 302 nodes");
+
+        let weight_sum: f64 = pts.iter().map(|point| point.3).sum();
+        assert!(
+            (weight_sum - 1.0).abs() < 1e-12,
+            "normalized Lebedev-302 weights sum to {weight_sum}"
+        );
+
+        // Exhaust every even monomial through total degree 28 (680 analytic
+        // moments). The published rule is degree-29 exact; all odd moments
+        // vanish by its sign symmetry, so these are the non-trivial moments.
+        for a in 0_i32..=14 {
+            for b in 0_i32..=(14 - a) {
+                for c in 0_i32..=(14 - a - b) {
+                    let powers = [2 * a, 2 * b, 2 * c];
+                    let exact = exact_normalized_sphere_moment(powers);
+                    assert_spherical_moment(&pts, powers, exact, "Lebedev-302 (degree 29)");
+                }
+            }
+        }
+
+        for powers in [[29, 0, 0], [17, 4, 2], [9, 7, 1], [1, 14, 14]] {
+            assert_spherical_moment(
+                &pts,
+                powers,
+                0.0,
+                "Lebedev-302 odd-parity moment",
+            );
+        }
+    }
+
+    #[test]
+    fn test_lebedev_302_points_are_unique_and_on_the_unit_sphere() {
+        let pts = lebedev_302();
+        for (index, &(x, y, z, _)) in pts.iter().enumerate() {
+            let norm_squared = x * x + y * y + z * z;
+            assert!(
+                (norm_squared - 1.0).abs() < 1e-12,
+                "Lebedev-302 point {index} has squared norm {norm_squared}"
+            );
+        }
+
+        for i in 0..pts.len() {
+            for j in (i + 1)..pts.len() {
+                let dx = pts[i].0 - pts[j].0;
+                let dy = pts[i].1 - pts[j].1;
+                let dz = pts[i].2 - pts[j].2;
+                let distance_squared = dx * dx + dy * dy + dz * dz;
+                assert!(
+                    distance_squared > 1e-12,
+                    "Lebedev-302 duplicate points at indices {i} and {j}"
+                );
+            }
         }
     }
 
